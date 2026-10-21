@@ -11,7 +11,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+import hashlib
+
 from app.ml.answers import PLAYBOOKS
+from app.ml.howto import choices_for, find_howto, render
 from app.ml.intent import IntentModel, Prediction
 from app.ml.normalize import detect_language, normalize
 from app.ml.slots import INTENT_LABELS, RELATED, SPECS, Slot, extract_all, main_issue
@@ -159,6 +162,21 @@ def _next_step(goal: Goal, hi: bool) -> Turn:
     goal.pending = None
     refresh(goal, hi)
     reply, next_line = _answer(goal, hi)
+    digest = hashlib.sha1(reply.encode()).hexdigest()[:12]
+    data = _slots(goal)
+    if data.get("_last_answer") == digest:
+        # Never send the same answer twice: offer to explain one step instead.
+        choices = choices_for(goal.intent)
+        text = ("Ye steps maine upar bata diye hai. Kis step ko detail mein samjhaun?" if hi
+                else "I've shared these steps above. Which one should I explain in detail?")
+        if not choices:
+            text = ("Ye steps upar hai. Kuch naya batana ho (jaise kaam, shehar, ya kya try kiya) to likho ya 🎤 bolo."
+                    if hi else "The steps are above. Tell me anything new (your work, city, what you tried) to refine them.")
+        goal.next_action_type = "execute"
+        goal.next_action = next_line
+        return Turn(text, "", goal, options=choices)
+    data["_last_answer"] = digest
+    goal.slots = dumps(data)
     goal.next_action_type = "investigate" if goal.intent == "website_problem" and _slots(goal).get("website_url") else "execute"
     goal.next_action = next_line
     return Turn(reply, "", goal)
@@ -246,6 +264,19 @@ class Brain:
             lang = focus.detected_language  # "php me" stays in the conversation's language
         hi = lang in ("Hinglish", "Hindi")
         pred = self.model.predict(text)
+
+        # 0. "How do I do that step?" -> explain that step, never repeat the list.
+        howto = find_howto(text)
+        if howto is not None:
+            reply = render(howto, hi)
+            options: list[str] = []
+            if focus is not None:
+                options = choices_for(focus.intent, exclude=howto.key)
+                if options:
+                    reply += "\n\n" + ("Aur kisi step mein madad chahiye?" if hi else "Want help with another step?")
+                focus.updates = (focus.updates or 0) + 1
+            return Turn(reply, "howto", focus, options=options, intent=pred.intent,
+                        confidence=round(pred.confidence, 3))
 
         def done(turn: Turn) -> Turn:
             turn.intent, turn.confidence = pred.intent, round(pred.confidence, 3)

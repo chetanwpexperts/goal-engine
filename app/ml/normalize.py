@@ -18,6 +18,8 @@ SPELLINGS = {
     "achchha": "accha", "achchhaa": "accha", "nahin": "nahi", "nahim": "nahi", "bijanes": "business",
     "biznes": "business", "bizanes": "business", "vebasait": "website", "vebsait": "website", "kastamar": "customer",
     "grahak": "customer", "naukari": "job", "dukan": "dukaan", "gadi": "gadi", "gaadi": "gadi",
+    "gugal": "google", "gugl": "google", "chek": "check", "listig": "listing", "rivyu": "review",
+    "riviu": "review", "rivyuj": "reviews", "vhatsap": "whatsapp", "vhatsaip": "whatsapp", "ophar": "offer",
     "bhot": "bahut", "bohot": "bahut", "bahot": "bahut", "bht": "bahut",
     "dukan": "dukaan", "dukkan": "dukaan", "shop": "shop",
     "grahak": "customer", "customers": "customer", "costumer": "customer", "custmer": "customer",

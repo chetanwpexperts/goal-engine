@@ -53,6 +53,7 @@
     supporting_task: "Supporting task added",
     chit_chat: "",
     unknown: "",
+    howto: "How to",
     list: "",
   };
   const ACTION_LABEL = {

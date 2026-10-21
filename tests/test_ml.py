@@ -196,3 +196,25 @@ def test_short_message_without_business_or_city_asks_for_description_first(clien
     second = say(client, "furniture shop hai mohali mein, 1 saal se, online koi order nahi aata")
     assert "Business: furniture shop" in second["goal"]["known_facts"]
     assert "furniture shop Mohali" in second["reply"]
+
+
+def test_how_to_follow_up_explains_the_step_instead_of_repeating(client, ml_mode):
+    say(client, "Meri website hai but customer nahi aa rhe.")
+    answer = say(client, "kapde ki dukaan hai Panchkula mein, log aate hi nahi")
+    assert answer["reply"].startswith("Ye kijiye")
+    how = say(client, "मैं गूगल पर कैसे देखूं")
+    assert how["relation"] == "howto"
+    assert "Incognito" in how["reply"]
+    assert how["reply"] != answer["reply"]
+    assert how["options"] and all("Google pe kaise check" not in o for o in how["options"])
+    listing = say(client, how["options"][0])          # tap another step
+    assert listing["relation"] == "howto" and listing["reply"] != how["reply"]
+    assert len(listing["goals"]) == 1                   # no new goals from follow-ups
+
+
+def test_same_answer_is_never_sent_twice(client, ml_mode):
+    say(client, "Meri website hai but customer nahi aa rhe.")
+    first = say(client, "kapde ki dukaan hai Panchkula mein, log aate hi nahi")
+    again = say(client, "customer nahi aate")
+    assert again["reply"] != first["reply"]
+    assert again["options"]                               # offers steps to explain instead

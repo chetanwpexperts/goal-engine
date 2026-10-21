@@ -33,7 +33,7 @@ class Settings(BaseModel):
     # AI providers, tried in this order. Empty key = provider skipped.
     ai_provider_order: str = os.getenv("AI_PROVIDER_ORDER", "gemini,groq")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
     gemini_thinking: str = os.getenv("GEMINI_THINKING", "low")   # low = fast; empty = model default
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")
     groq_model: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")

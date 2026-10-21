@@ -91,9 +91,8 @@ def test_never_more_than_two_questions(client, ml_mode):
 def test_question_has_tap_options_and_skip_assumes_default(client, ml_mode):
     first = say(client, "website khulti hi nahi")
     assert first["goal"]["intent"] == "website_problem"
-    assert first["goal"]["next_action"]["type"] == "ask"
-    second = say(client, "pata nahi")
-    assert second["goal"]["next_action"]["type"] != "ask"
+    assert first["reply"].startswith("Main ye karunga") and "Website ka address" in first["reply"]
+    second = say(client, "pata nahi")                    # doesn't know the address: steps instead, no loop
     assert "Ye kijiye" in second["reply"]
 
 
@@ -195,13 +194,14 @@ def test_short_message_without_business_or_city_asks_for_description_first(clien
     assert first["ask_words"] == 100
     second = say(client, "furniture shop hai mohali mein, 1 saal se, online koi order nahi aata")
     assert "Business: furniture shop" in second["goal"]["known_facts"]
-    assert "furniture shop Mohali" in second["reply"]
+    assert second["reply"].startswith("Main ye karunga")   # it has a website: the agent checks it
+    steps = say(client, second["options"][0])
+    assert "furniture shop Mohali" in steps["reply"]
 
 
 def test_how_to_follow_up_explains_the_step_instead_of_repeating(client, ml_mode):
     say(client, "Meri website hai but customer nahi aa rhe.")
     answer = say(client, "kapde ki dukaan hai Panchkula mein, log aate hi nahi")
-    assert answer["reply"].startswith("Ye kijiye")
     how = say(client, "मैं गूगल पर कैसे देखूं")
     assert how["relation"] == "howto"
     assert "Incognito" in how["reply"]
@@ -247,7 +247,7 @@ def test_brand_new_developer_issue_is_understood(client, ml_mode):
             "जिसमें मुझे डेटाबेस की क्वेरी में ऑप्टिमाइज करवाना है क्या आप मेरी इसमें मदद करेंगे")
     res = say(client, text)
     assert res["goal"]["intent"] == "slow_db_query"
-    assert "EXPLAIN" in res["reply"]
+    assert res["agents"][0]["recipe"] == "sql_review" and "query" in res["reply"].lower()
     assert any("php" in f for f in res["goal"]["known_facts"])
 
 

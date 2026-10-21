@@ -11,6 +11,7 @@ os.environ["GROQ_API_KEY"] = ""
 os.environ["VISITOR_DAILY_CAP"] = "5"
 os.environ["AI_DAILY_CAP"] = "8"
 os.environ["ENGINE_MODE"] = "ai"   # AI-path tests; ML tests switch it on per test
+os.environ["AGENT_SCHEDULER"] = "off"
 
 from fastapi.testclient import TestClient  # noqa: E402
 

@@ -104,3 +104,32 @@ class UsageCounter(Base):
     day: Mapped[str] = mapped_column(String(10))
     scope: Mapped[str] = mapped_column(String(80))  # "all" or "visitor:<id>"
     count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Agent(Base):
+    """An agent assembled for a goal from a recipe: what it does, its inputs, its schedule."""
+
+    __tablename__ = "agents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    visitor_id: Mapped[str] = mapped_column(String(64), index=True)
+    goal_id: Mapped[int] = mapped_column(ForeignKey("goals.id"), index=True)
+    recipe: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(20), default="proposed")  # proposed / needs_input / running / active / done / failed / paused
+    inputs: Mapped[str | None] = mapped_column(Text, nullable=True)       # JSON
+    interval_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class AgentRun(Base):
+    __tablename__ = "agent_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), index=True)
+    status: Mapped[str] = mapped_column(String(20), default="running")    # running / done / failed
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result: Mapped[str | None] = mapped_column(Text, nullable=True)       # JSON
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

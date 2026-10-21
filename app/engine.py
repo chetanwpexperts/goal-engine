@@ -11,7 +11,11 @@ from app.ai.router import AIRouter
 from app.ai.schema import Interpretation
 from app.config import Settings
 from app.limits import release_ai_call, reserve_ai_call
-from app.models import Goal, Message, dumps
+from app.agents.core import (YES_RE, AgentError, agent_dict, assign, goal_agents, inputs_from_text,
+                             recipe_for, run_agent)
+from app.ml.brain import SKIP_RE, steps_text
+from app.ml.normalize import normalize
+from app.models import Agent, Goal, Message, dumps
 
 
 MAX_CONTEXT_GOALS = 6
@@ -72,27 +76,112 @@ def focus_goal(db: Session, visitor_id: str, goal_id: int | None) -> Goal | None
     return goals[0] if goals else None
 
 
+STEPS_LABELS = {"Khud karne ke steps dikhao": True, "Show me the steps instead": False}
+WATCH_LABELS = {"Haan, roz check karo": True, "Yes, check it daily": False}
+
+
+def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: str, relation: str,
+             options: list[str] | None = None, ask_words: int = 0, intent: str = "", confidence: float = 0.0,
+             hi: bool = True) -> dict[str, Any]:
+    gid = goal.id if goal else None
+    db.add(Message(visitor_id=visitor_id, goal_id=gid, role="user", text=text, relation=relation,
+                   intent=intent or None, confidence=confidence or None))
+    db.add(Message(visitor_id=visitor_id, goal_id=gid, role="assistant", text=reply, relation=relation, provider="ml"))
+    db.commit()
+    return {
+        "reply": reply,
+        "relation": relation,
+        "goal": goal.as_dict() if goal else None,
+        "goals": [g.summary() for g in all_goals(db, visitor_id)],
+        "provider": "ml",
+        "options": options or [],
+        "ask_words": ask_words,
+        "agents": [agent_dict(a, db, hi) for a in goal_agents(db, goal.id)] if goal else [],
+    }
+
+
+def _after_run(agent, run, hi: bool) -> tuple[str, list[str]]:
+    reply = run.summary or ""
+    options: list[str] = []
+    if agent.recipe == "website_check" and run.status == "done":
+        reply += "\n\n" + ("Poori report goal card mein hai. Roz check karta rahoon, taaki kuch toote to turant pata chale?"
+                            if hi else "The full report is in the goal card. Shall I keep checking it daily, so you know the moment something breaks?")
+        options = [next(k for k, v in WATCH_LABELS.items() if v == hi)]
+    elif agent.recipe == "sql_review" and run.status == "done":
+        reply += "\n\n" + ("Fixes (rewritten query aur index commands) goal card mein hai, copy kar lo." if hi
+                            else "The fixes (rewritten query and index commands) are in the goal card, ready to copy.")
+    return reply, options
+
+
 def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | None) -> dict[str, Any]:
-    turn = brain.handle(visitor_id, text, focus_goal(db, visitor_id, goal_id))
+    focus = focus_goal(db, visitor_id, goal_id)
+    hi_focus = (focus.detected_language in ("Hinglish", "Hindi")) if focus is not None else True
+
+    # Tap: "show me the steps instead"
+    if text.strip() in STEPS_LABELS and focus is not None and focus.intent:
+        hi = STEPS_LABELS[text.strip()]
+        return _respond(db, visitor_id, text, focus, steps_text(focus, hi), "howto", hi=hi)
+
+    # Tap: "yes, check it daily" -> a scheduled watch agent with the same website
+    if text.strip() in WATCH_LABELS and focus is not None:
+        hi = WATCH_LABELS[text.strip()]
+        source = next((a for a in goal_agents(db, focus.id) if a.recipe == "website_check"), None)
+        if source is not None:
+            watch = Agent(visitor_id=visitor_id, goal_id=focus.id, recipe="website_watch", inputs=source.inputs, status="proposed")
+            db.add(watch)
+            db.flush()
+            try:
+                run = run_agent(db, watch, hi)
+                reply = (("Theek hai, ab main roz is website ko check karunga. Kuch toota to is goal mein alert aayega.\n\n" if hi
+                          else "Done. I'll check this website every day and alert you in this goal if something breaks.\n\n")
+                         + (run.summary or ""))
+            except AgentError as exc:
+                reply = str(exc)
+            return _respond(db, visitor_id, text, focus, reply, "agent_run", hi=hi)
+
+    # The message carries what a waiting agent needs (a URL, a pasted query): use it, don't re-classify.
+    if focus is not None:
+        recipe = recipe_for(focus)
+        waiting = next((a for a in goal_agents(db, focus.id) if recipe and a.recipe == recipe.key
+                        and a.status in ("proposed", "done", "failed")), None)
+        if (waiting is not None and waiting.status == "proposed" and SKIP_RE.search(normalize(text))
+                and not inputs_from_text(recipe, text, {})):
+            reply = (("Koi baat nahi. Jab mil jaaye tab bhej dena, main check kar dunga. Tab tak ye kar sakte ho:\n"
+                      if hi_focus else "No problem. Send it when you have it and I'll run the check. Meanwhile:\n")
+                     + steps_text(focus, hi_focus))
+            return _respond(db, visitor_id, text, focus, reply, "howto", hi=hi_focus)
+        if waiting is not None and recipe is not None and (inputs_from_text(recipe, text, {}) or (
+                waiting.status == "proposed" and YES_RE.search(text))):
+            agent, _override, run_now = assign(db, focus, text, hi_focus, asking=False)
+            if run_now:
+                try:
+                    run = run_agent(db, agent, hi_focus)
+                    reply, options = _after_run(agent, run, hi_focus)
+                except AgentError as exc:
+                    reply, options = str(exc), []
+                return _respond(db, visitor_id, text, focus, reply, "agent_run", options=options, hi=hi_focus)
+
+    turn = brain.handle(visitor_id, text, focus)
     goal = turn.goal
     if goal is not None and goal.id is None:
         db.add(goal)
     db.flush()
-    gid = goal.id if goal else None
-    db.add(Message(visitor_id=visitor_id, goal_id=gid, role="user", text=text, relation=turn.relation,
-                   intent=turn.intent, confidence=turn.confidence))
-    db.add(Message(visitor_id=visitor_id, goal_id=gid, role="assistant", text=turn.reply,
-                   relation=turn.relation, provider="ml"))
-    db.commit()
-    return {
-        "reply": turn.reply,
-        "relation": turn.relation,
-        "goal": goal.as_dict() if goal else None,
-        "goals": [g.summary() for g in all_goals(db, visitor_id)],
-        "provider": "ml",
-        "options": turn.options,
-        "ask_words": turn.ask_words,
-    }
+    reply, options, relation = turn.reply, turn.options, turn.relation
+    if goal is not None and relation not in ("howto", "safety", "chit_chat"):
+        agent, override, run_now = assign(db, goal, text, turn.hi, asking=bool(goal.pending))
+        if run_now:
+            try:
+                run = run_agent(db, agent, turn.hi)
+                reply, options = _after_run(agent, run, turn.hi)
+                relation = "agent_run"
+            except AgentError as exc:
+                reply = str(exc)
+        elif override:
+            # The system does the work: show the plan instead of a to-do list for the user.
+            reply = override
+            options = [next(k for k, v in STEPS_LABELS.items() if v == turn.hi)]
+    return _respond(db, visitor_id, text, goal, reply, relation, options=options, ask_words=turn.ask_words,
+                    intent=turn.intent, confidence=turn.confidence, hi=turn.hi)
 
 
 def handle_message(db: Session, visitor_id: str, text: str, router: AIRouter, settings: Settings,

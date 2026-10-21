@@ -29,6 +29,22 @@ text request → structured goal → goal kept up to date across messages.
 - **Act**: once nothing critical is missing, it gives a concrete, personalised first answer (`app/ml/answers.py`).
 - **Learn**: every message is stored with its predicted type and confidence, ready for the learning loop.
 
+## Agents: the system does the work
+
+The user describes the problem; the system assigns an agent, shows the plan in plain words
+("Main ye karunga"), and runs it on one tap or a "haan". The user never configures anything.
+
+- **Building blocks**: connect -> check -> act -> when -> verify (`app/agents/core.py`).
+- **Assignment**: the goal's problem type picks the recipe; inputs (a URL, a pasted query) come
+  from the conversation; the agent asks only for what it's missing.
+- **Trust levels**: Level 0 needs no access (public URL, pasted query). Level 1 (database automation)
+  will use a read-only connector on the user's own server, so passwords never leave it.
+- **Agents now**: Website Checker (security, speed, phone layout, errors, Google basics, contact
+  buttons; with evidence), Website Watch (daily, scheduled), SQL Query Checker (real bugs,
+  index-blocking patterns, rewritten query, exact index commands). Database Automation is planned.
+- **Safety**: user URLs are checked against private/internal addresses on every redirect (SSRF);
+  agent runs are rate-limited per visitor; scheduled runs are claimed once even with several workers.
+
 `ENGINE_MODE=ai` uses Gemini/Groq instead (the path described below).
 
 ## How it works (AI mode)

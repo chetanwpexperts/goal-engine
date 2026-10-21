@@ -55,6 +55,7 @@
     unknown: "",
     howto: "How to",
     corrected: "Corrected",
+    agent_run: "Agent",
     safety: "",
     list: "",
   };
@@ -186,6 +187,135 @@
     });
   }
 
+  // ---------------------------------------------------------------- agents
+  const T = {
+    hi: { plan: "Main ye karunga:", none: "🔒 Koi password ya access nahi chahiye", connector: "🔌 Aapke server pe read-only connector chahiye",
+          start: "Start", again: "Phir se chalao", pause: "Roko", running: "Chal raha hai…", soon: "Ye agent abhi ban raha hai",
+          status: { proposed: "Taiyar", running: "Chal raha", done: "Ho gaya", failed: "Fail", active: "Roz chal raha", paused: "Ruka hua", planned: "Jald aa raha" },
+          rewritten: "Rewritten query", indexes: "Index commands", copy: "Copy", copied: "Copied" },
+    en: { plan: "Here's what I'll do:", none: "🔒 No password or access needed", connector: "🔌 Needs a read-only connector on your server",
+          start: "Start", again: "Run again", pause: "Pause", running: "Running…", soon: "This agent is being built",
+          status: { proposed: "Ready", running: "Running", done: "Done", failed: "Failed", active: "Runs daily", paused: "Paused", planned: "Coming soon" },
+          rewritten: "Rewritten query", indexes: "Index commands", copy: "Copy", copied: "Copied" },
+  };
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined && text !== null) e.textContent = text;
+    return e;
+  }
+
+  function codeBox(title, code, t) {
+    const box = el("div", "codebox");
+    box.append(el("h4", null, title));
+    const pre = el("pre", null, code);
+    const copy = el("button", null, t.copy);
+    copy.type = "button";
+    copy.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(code); copy.textContent = t.copied; } catch (_) { /* no clipboard */ }
+    });
+    box.append(copy, pre);
+    return box;
+  }
+
+  function renderResult(run, t, isHi) {
+    const wrap = el("div", "result");
+    wrap.append(el("p", "summary", run.summary || ""));
+    const r = run.result || {};
+    if (typeof r.score === "number") wrap.append(el("p", "score", `Score ${r.score}/100 · ${r.url || ""}`));
+    if (r.findings && r.findings.length) {
+      const ul = el("ul", "findings");
+      for (const f of r.findings) {
+        const li = el("li", `s${f.severity}`);
+        li.append(el("div", "f-title", isHi ? f.title_hi : f.title_en));
+        const fix = isHi ? f.fix_hi : f.fix_en;
+        if (fix) li.append(el("div", "f-fix", fix));
+        if (f.evidence) li.append(el("div", "f-ev", f.evidence));
+        ul.append(li);
+      }
+      wrap.append(ul);
+    }
+    if (r.rewritten) wrap.append(codeBox(t.rewritten, r.rewritten, t));
+    if (r.indexes && r.indexes.length) wrap.append(codeBox(t.indexes, r.indexes.join("\n"), t));
+    if (r.note) wrap.append(el("p", "score", r.note));
+    return wrap;
+  }
+
+  function renderAgents(agents) {
+    const box = $("#agents");
+    box.replaceChildren();
+    for (const a of agents || []) {
+      const isHi = a.lang === "hi";
+      const t = isHi ? T.hi : T.en;
+      const card = el("article", "agent");
+      const head = el("div", "agent-head");
+      head.append(el("h3", null, a.name), el("span", `agent-status ${a.status}`, t.status[a.status] || a.status));
+      card.append(head);
+      const plan = el("details", "plan");
+      plan.open = !(a.runs && a.runs.length);   // after a run, results matter more than the plan
+      plan.append(el("summary", "plan-title", t.plan));
+      const ol = el("ol");
+      for (const b of a.blocks) {
+        const li = el("li");
+        li.append(el("span", "kind", b.kind), document.createTextNode(b.text));
+        ol.append(li);
+      }
+      plan.append(ol, el("span", `access ${a.access}`, a.access === "none" ? t.none : t.connector));
+      card.append(plan);
+      if (a.runs && a.runs.length) card.append(renderResult(a.runs[0], t, isHi));
+      if (!a.available) {
+        card.append(el("p", "score", t.soon));
+      } else {
+        const fields = {};
+        if (a.status !== "active" && !(a.runs && a.runs.length)) {
+          for (const inp of a.inputs) {
+            const label = el("label", null, inp.label);
+            const field = inp.multiline ? el("textarea") : el("input");
+            if (!inp.multiline) field.type = "text";
+            field.value = inp.value || "";
+            if (inp.kind === "url") field.placeholder = "example.com";
+            fields[inp.key] = field;
+            card.append(label, field);
+          }
+        }
+        const actions = el("div", "agent-actions");
+        if (a.status === "active") {
+          const pause = el("button", "primary", t.pause);
+          pause.type = "button";
+          pause.addEventListener("click", async () => {
+            const data = await api(`/api/agents/${a.id}/pause`, { method: "POST" });
+            renderAgents(data.agents);
+          });
+          actions.append(pause);
+        } else {
+          const start = el("button", "primary", a.runs.length ? t.again : t.start);
+          start.type = "button";
+          start.addEventListener("click", async () => {
+            const inputs = {};
+            for (const [k, f] of Object.entries(fields)) inputs[k] = f.value;
+            start.disabled = true;
+            start.textContent = t.running;
+            try {
+              const data = await api(`/api/agents/${a.id}/start`, { method: "POST", body: JSON.stringify({ inputs }) });
+              addMessage("assistant", data.reply, "Agent");
+              if (data.goal) renderCard(data.goal);
+              renderAgents(data.agents);
+              showOptions(data.options || []);
+            } catch (err) {
+              addMessage("error", err.message);
+              start.disabled = false;
+              start.textContent = a.runs.length ? t.again : t.start;
+            }
+          });
+          actions.append(start);
+        }
+        card.append(actions);
+      }
+      box.append(card);
+    }
+  }
+
   function setRemaining(n) {
     if (typeof n === "number") $("#remaining").textContent = `${n} messages left today.`;
   }
@@ -194,6 +324,7 @@
     try {
       const data = await api(`/api/goals/${id}`);
       renderCard(data.goal);
+      renderAgents(data.agents || []);
       const state = await api("/api/state");
       renderGoals(state.goals);
     } catch (err) {
@@ -218,6 +349,7 @@
       thinking.remove();
       addMessage("assistant", data.reply, RELATION_LABEL[data.relation] || "");
       if (data.goal) renderCard(data.goal, data.relation);
+      if (data.goal && data.agents) renderAgents(data.agents);
       showOptions(data.options || []);
       setAskWords(data.ask_words || 0);
       renderGoals(data.goals || []);
@@ -319,6 +451,7 @@
         else addMessage("assistant", m.text, RELATION_LABEL[m.relation] || "");
       }
       if (state.current) renderCard(state.current);
+      renderAgents(state.agents || []);
       renderGoals(state.goals);
       setRemaining(state.remaining_today);
     } catch (_) { /* first load offline: page still usable */ }

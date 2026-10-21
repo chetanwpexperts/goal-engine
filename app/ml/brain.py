@@ -60,6 +60,7 @@ class Turn:
     ask_words: int = 0                  # >0: UI shows a word counter with this target
     intent: str = ""
     confidence: float = 0.0
+    hi: bool = True
 
 
 # ---------------------------------------------------------------- goal state helpers
@@ -333,7 +334,7 @@ class Brain:
                         confidence=round(pred.confidence, 3))
 
         def done(turn: Turn) -> Turn:
-            turn.intent, turn.confidence = pred.intent, round(pred.confidence, 3)
+            turn.intent, turn.confidence, turn.hi = pred.intent, round(pred.confidence, 3), hi
             if turn.goal is not None:
                 turn.goal.updates = (turn.goal.updates or 0) + 1
                 if words >= 4 or not turn.goal.detected_language:
@@ -435,3 +436,8 @@ class Brain:
             turn.ask_words = BRIEF_TARGET_WORDS
         turn.relation = "new_goal"
         return turn
+
+
+def steps_text(goal: Goal, hi: bool) -> str:
+    """The do-it-yourself steps, for people who prefer to do it themselves."""
+    return _answer(goal, hi)[0]

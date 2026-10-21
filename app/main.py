@@ -1,4 +1,6 @@
 import logging
+import os
+import threading
 from contextlib import asynccontextmanager
 import re
 import secrets
@@ -14,6 +16,9 @@ from sqlalchemy.orm import Session
 
 from app.ai.router import AIRouter, AIUnavailable
 from app.ml.brain import Brain
+from app.agents.core import AgentError, agent_dict, claim_due, goal_agents, run_agent
+from app.engine import _after_run
+from app.models import Agent, dumps, loads, utcnow
 from app.config import get_settings
 from app.db import get_db, init_db
 from app.engine import InvalidMessage, all_goals, handle_message
@@ -34,11 +39,37 @@ async def lifespan(application: FastAPI):
     if not hasattr(application.state, "brain"):
         application.state.brain = Brain()
     application.state.brain.model.load()  # train or load the ML model before the first visitor
+    stop = threading.Event()
+    if os.getenv("AGENT_SCHEDULER", "on") != "off":
+        threading.Thread(target=_scheduler, args=(stop,), daemon=True, name="agent-scheduler").start()
     yield
+    stop.set()
 
 
 app = FastAPI(title="Goal Engine", docs_url=None, redoc_url=None, lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+
+def _scheduler(stop: threading.Event) -> None:
+    """Runs daily agents when they're due. Safe with several workers (each run is claimed once)."""
+    log = logging.getLogger("agent-scheduler")
+    from app.db import get_db as _get_db
+
+    while not stop.wait(60):
+        try:
+            db = next(_get_db())
+            try:
+                for agent in claim_due(db, utcnow()):
+                    goal = db.get(Goal, agent.goal_id)
+                    hi = bool(goal and goal.detected_language in ("Hinglish", "Hindi"))
+                    try:
+                        run_agent(db, agent, hi, scheduled=True)
+                    except AgentError as exc:
+                        log.warning("Scheduled agent %s: %s", agent.id, exc)
+            finally:
+                db.close()
+        except Exception:  # noqa: BLE001 - the scheduler must keep going
+            log.exception("Scheduler tick failed")
 
 
 @app.middleware("http")
@@ -100,6 +131,7 @@ def state(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)) -> 
     return {
         "goals": [g.summary() for g in goals],
         "current": goals[0].as_dict() if goals else None,
+        "agents": [agent_dict(a, db, _goal_hi(goals[0])) for a in goal_agents(db, goals[0].id)] if goals else [],
         "messages": _messages(db, visitor, limit=40),
         "remaining_today": max(0, settings.visitor_daily_cap - used["visitor"]),
     }
@@ -123,6 +155,54 @@ def post_message(body: MessageIn, db: Session = Depends(get_db), visitor: str = 
     return result
 
 
+class StartIn(BaseModel):
+    inputs: dict[str, str] = {}
+
+
+def own_agent(db: Session, agent_id: int, visitor: str) -> Agent:
+    agent = db.get(Agent, agent_id)
+    if not agent or agent.visitor_id != visitor:
+        raise HTTPException(404, "Agent not found")
+    return agent
+
+
+def _goal_hi(goal: Goal | None) -> bool:
+    return bool(goal is None or goal.detected_language in ("Hinglish", "Hindi"))
+
+
+@app.post("/api/agents/{agent_id}/start")
+def start_agent(agent_id: int, body: StartIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    agent = own_agent(db, agent_id, visitor)
+    goal = db.get(Goal, agent.goal_id)
+    hi = _goal_hi(goal)
+    inputs = loads(agent.inputs, {}) or {}
+    for key, value in body.inputs.items():
+        if key in ("url", "query", "explain") and isinstance(value, str) and value.strip():
+            inputs[key] = value.strip()[:20000]
+    agent.inputs = dumps(inputs)
+    db.commit()
+    try:
+        run = run_agent(db, agent, hi)
+    except AgentError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    reply, options = _after_run(agent, run, hi)
+    db.add(Message(visitor_id=visitor, goal_id=agent.goal_id, role="assistant", text=reply, relation="agent_run", provider="agent"))
+    db.commit()
+    return {"reply": reply, "options": options, "relation": "agent_run",
+            "goal": goal.as_dict() if goal else None,
+            "goals": [g.summary() for g in all_goals(db, visitor)],
+            "agents": [agent_dict(a, db, hi) for a in goal_agents(db, agent.goal_id)]}
+
+
+@app.post("/api/agents/{agent_id}/pause")
+def pause_agent(agent_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    agent = own_agent(db, agent_id, visitor)
+    agent.status, agent.next_run_at = "paused", None
+    db.commit()
+    goal = db.get(Goal, agent.goal_id)
+    return {"agents": [agent_dict(a, db, _goal_hi(goal)) for a in goal_agents(db, agent.goal_id)]}
+
+
 @app.post("/api/new-chat")
 def new_chat() -> JSONResponse:
     """Start fresh: the browser gets a new anonymous id. Old messages stay stored for learning."""
@@ -134,7 +214,8 @@ def new_chat() -> JSONResponse:
 @app.get("/api/goals/{goal_id}")
 def get_goal(goal_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)) -> dict:
     goal = own_goal(db, goal_id, visitor)
-    return {"goal": goal.as_dict(), "messages": _messages(db, visitor, goal_id=goal.id)}
+    return {"goal": goal.as_dict(), "messages": _messages(db, visitor, goal_id=goal.id),
+            "agents": [agent_dict(a, db, _goal_hi(goal)) for a in goal_agents(db, goal.id)]}
 
 
 @app.post("/api/goals/{goal_id}/status")

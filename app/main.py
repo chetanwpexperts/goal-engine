@@ -120,6 +120,14 @@ def post_message(body: MessageIn, db: Session = Depends(get_db), visitor: str = 
     return result
 
 
+@app.post("/api/new-chat")
+def new_chat() -> JSONResponse:
+    """Start fresh: the browser gets a new anonymous id. Old messages stay stored for learning."""
+    response = JSONResponse({"ok": True})
+    response.delete_cookie(COOKIE)
+    return response
+
+
 @app.get("/api/goals/{goal_id}")
 def get_goal(goal_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)) -> dict:
     goal = own_goal(db, goal_id, visitor)

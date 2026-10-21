@@ -288,6 +288,11 @@
     });
   }
 
+  $("#new-chat").addEventListener("click", async () => {
+    try { await api("/api/new-chat", { method: "POST" }); } catch (_) { /* reload anyway */ }
+    window.location.reload();
+  });
+
   $$(".example").forEach((b) => b.addEventListener("click", () => sendMessage(b.textContent)));
 
   $$("[data-status]").forEach((b) => b.addEventListener("click", async () => {

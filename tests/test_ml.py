@@ -179,3 +179,11 @@ def test_goal_from_ai_mode_without_type_does_not_crash(client, ml_mode):
     db.commit()
     res = say(client, "website khulti hi nahi")
     assert res["goal"]["intent"] == "website_problem"
+
+
+def test_new_chat_starts_fresh(client, ml_mode):
+    say(client, "website khulti hi nahi")
+    assert client.get("/api/state").json()["goals"]
+    client.post("/api/new-chat")
+    client.cookies.clear()  # what the browser does with the deleted cookie
+    assert client.get("/api/state").json()["goals"] == []

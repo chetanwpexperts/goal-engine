@@ -5,3 +5,4 @@ python-dotenv==1.2.4
 requests==2.34.2
 SQLAlchemy==2.1.5
 uvicorn[standard]==0.54.0
+scikit-learn==1.9.1

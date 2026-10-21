@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai.router import AIRouter, AIUnavailable
+from app.ml.brain import Brain
 from app.config import get_settings
 from app.db import get_db, init_db
 from app.engine import InvalidMessage, all_goals, handle_message
@@ -30,6 +31,9 @@ async def lifespan(application: FastAPI):
     init_db()
     if not hasattr(application.state, "router"):
         application.state.router = AIRouter.from_settings(get_settings())
+    if not hasattr(application.state, "brain"):
+        application.state.brain = Brain()
+    application.state.brain.model.load()  # train or load the ML model before the first visitor
     yield
 
 
@@ -67,6 +71,7 @@ def own_goal(db: Session, goal_id: int, visitor: str) -> Goal:
 
 class MessageIn(BaseModel):
     text: str
+    goal_id: int | None = None   # the goal the person is looking at
 
 
 class StatusIn(BaseModel):
@@ -81,7 +86,7 @@ def index() -> FileResponse:
 @app.get("/api/health")
 def health() -> dict:
     router: AIRouter = app.state.router
-    return {"ok": True, "ai_providers": [p.name for p in router.providers]}
+    return {"ok": True, "engine": get_settings().engine_mode, "ai_providers": [p.name for p in router.providers]}
 
 
 @app.get("/api/state")
@@ -100,7 +105,8 @@ def state(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)) -> 
 @app.post("/api/message")
 def post_message(body: MessageIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     try:
-        result = handle_message(db, visitor, body.text, app.state.router, get_settings())
+        result = handle_message(db, visitor, body.text, app.state.router, get_settings(),
+                                brain=app.state.brain, goal_id=body.goal_id)
     except InvalidMessage as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     except LimitReached as exc:

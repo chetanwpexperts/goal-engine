@@ -10,12 +10,49 @@
   const card = $("#card");
   const cardEmpty = $("#card-empty");
   let currentGoalId = null;
+  let wordTarget = 0;
+  const optionsEl = $("#options");
+  const wordcount = $("#wordcount");
+
+  function countWords(text) {
+    return (text.trim().match(/\S+/g) || []).length;
+  }
+
+  function updateWordcount() {
+    if (!wordTarget) { wordcount.hidden = true; return; }
+    const n = countWords(input.value);
+    wordcount.hidden = false;
+    wordcount.textContent = n >= wordTarget ? `${n} words ✓` : `${n} / ${wordTarget} words`;
+    wordcount.classList.toggle("ok", n >= wordTarget);
+  }
+
+  function setAskWords(n) {
+    wordTarget = n || 0;
+    input.rows = wordTarget ? 5 : 2;
+    input.placeholder = wordTarget
+      ? "Kya kaam hai, kahan hai, kya problem hai, kab se… (likho ya 🎤 bolo)"
+      : "What's the problem? Type it or tap 🎤";
+    updateWordcount();
+  }
+
+  function showOptions(options) {
+    optionsEl.replaceChildren();
+    optionsEl.hidden = !(options && options.length);
+    for (const label of options || []) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      b.addEventListener("click", () => sendMessage(label));
+      optionsEl.appendChild(b);
+    }
+  }
 
   const RELATION_LABEL = {
     new_goal: "New goal",
     update_goal: "Goal updated",
     supporting_task: "Supporting task added",
     chit_chat: "",
+    unknown: "",
     list: "",
   };
   const ACTION_LABEL = {
@@ -166,13 +203,20 @@
     if (!text) return;
     addMessage("user", text);
     input.value = "";
+    showOptions([]);
+    setAskWords(0);
+    stopListening();
     send.disabled = true;
     const thinking = addMessage("assistant thinking", "Understanding…");
     try {
-      const data = await api("/api/message", { method: "POST", body: JSON.stringify({ text }) });
+      const data = await api("/api/message", {
+        method: "POST", body: JSON.stringify({ text, goal_id: currentGoalId }),
+      });
       thinking.remove();
       addMessage("assistant", data.reply, RELATION_LABEL[data.relation] || "");
       if (data.goal) renderCard(data.goal, data.relation);
+      showOptions(data.options || []);
+      setAskWords(data.ask_words || 0);
       renderGoals(data.goals || []);
       setRemaining(data.remaining_today);
     } catch (err) {
@@ -188,12 +232,62 @@
     e.preventDefault();
     sendMessage(input.value);
   });
+  input.addEventListener("input", updateWordcount);
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage(input.value);
     }
   });
+  // Voice input: the browser's own speech recognition (free, no server cost).
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const mic = $("#mic");
+  const micLang = $("#mic-lang");
+  let recognition = null;
+  let listening = false;
+  let voiceLang = "hi-IN";
+  try { voiceLang = localStorage.getItem("ge_voice_lang") || "hi-IN"; } catch (_) { /* storage blocked */ }
+
+  function stopListening() {
+    if (recognition && listening) recognition.stop();
+  }
+
+  function paintMicLang() {
+    micLang.textContent = voiceLang === "hi-IN" ? "हिं" : "EN";
+    micLang.title = voiceLang === "hi-IN" ? "Voice: Hindi (tap for English)" : "Voice: English (tap for Hindi)";
+  }
+
+  if (Recognition) {
+    mic.hidden = false;
+    micLang.hidden = false;
+    paintMicLang();
+    micLang.addEventListener("click", () => {
+      voiceLang = voiceLang === "hi-IN" ? "en-IN" : "hi-IN";
+      try { localStorage.setItem("ge_voice_lang", voiceLang); } catch (_) { /* ignore */ }
+      paintMicLang();
+    });
+    mic.addEventListener("click", () => {
+      if (listening) { stopListening(); return; }
+      recognition = new Recognition();
+      recognition.lang = voiceLang;
+      recognition.interimResults = true;
+      recognition.continuous = true;
+      const base = input.value ? input.value.trim() + " " : "";
+      recognition.onresult = (event) => {
+        let spoken = "";
+        for (const result of event.results) spoken += result[0].transcript;
+        input.value = base + spoken;
+        updateWordcount();
+      };
+      recognition.onstart = () => { listening = true; mic.classList.add("listening"); };
+      recognition.onend = () => { listening = false; mic.classList.remove("listening"); input.focus(); };
+      recognition.onerror = (e) => {
+        if (e.error === "not-allowed") addMessage("error", "Microphone permission is blocked. Allow it in the browser to speak.");
+      };
+      recognition.start();
+    });
+  }
+
   $$(".example").forEach((b) => b.addEventListener("click", () => sendMessage(b.textContent)));
 
   $$("[data-status]").forEach((b) => b.addEventListener("click", async () => {

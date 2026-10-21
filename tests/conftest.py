@@ -10,6 +10,7 @@ os.environ["GEMINI_API_KEY"] = ""
 os.environ["GROQ_API_KEY"] = ""
 os.environ["VISITOR_DAILY_CAP"] = "5"
 os.environ["AI_DAILY_CAP"] = "8"
+os.environ["ENGINE_MODE"] = "ai"   # AI-path tests; ML tests switch it on per test
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -74,3 +75,14 @@ def use_provider():
         app.state.router = AIRouter(list(providers))
         return providers[0] if len(providers) == 1 else providers
     return _set
+
+
+@pytest.fixture()
+def ml_mode():
+    from app.config import get_settings
+
+    settings = get_settings()
+    old_mode, old_cap, old_all = settings.engine_mode, settings.visitor_daily_cap, settings.ai_daily_cap
+    settings.engine_mode, settings.visitor_daily_cap, settings.ai_daily_cap = "ml", 100, 1000
+    yield
+    settings.engine_mode, settings.visitor_daily_cap, settings.ai_daily_cap = old_mode, old_cap, old_all

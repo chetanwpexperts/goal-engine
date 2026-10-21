@@ -62,7 +62,41 @@ def _apply(goal: Goal, data: Interpretation) -> None:
     goal.next_action = data.next_action.description
 
 
-def handle_message(db: Session, visitor_id: str, text: str, router: AIRouter, settings: Settings) -> dict[str, Any]:
+def focus_goal(db: Session, visitor_id: str, goal_id: int | None) -> Goal | None:
+    """The goal the person is looking at, else their most recent active goal."""
+    if goal_id:
+        goal = db.get(Goal, goal_id)
+        if goal and goal.visitor_id == visitor_id and goal.status == "active":
+            return goal
+    goals = active_goals(db, visitor_id, 1)
+    return goals[0] if goals else None
+
+
+def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | None) -> dict[str, Any]:
+    turn = brain.handle(visitor_id, text, focus_goal(db, visitor_id, goal_id))
+    goal = turn.goal
+    if goal is not None and goal.id is None:
+        db.add(goal)
+    db.flush()
+    gid = goal.id if goal else None
+    db.add(Message(visitor_id=visitor_id, goal_id=gid, role="user", text=text, relation=turn.relation,
+                   intent=turn.intent, confidence=turn.confidence))
+    db.add(Message(visitor_id=visitor_id, goal_id=gid, role="assistant", text=turn.reply,
+                   relation=turn.relation, provider="ml"))
+    db.commit()
+    return {
+        "reply": turn.reply,
+        "relation": turn.relation,
+        "goal": goal.as_dict() if goal else None,
+        "goals": [g.summary() for g in all_goals(db, visitor_id)],
+        "provider": "ml",
+        "options": turn.options,
+        "ask_words": turn.ask_words,
+    }
+
+
+def handle_message(db: Session, visitor_id: str, text: str, router: AIRouter, settings: Settings,
+                   brain=None, goal_id: int | None = None) -> dict[str, Any]:
     text = (text or "").strip()
     if not text:
         raise InvalidMessage("Please write something first.")
@@ -79,6 +113,9 @@ def handle_message(db: Session, visitor_id: str, text: str, router: AIRouter, se
                 "goals": [g.summary() for g in all_goals(db, visitor_id)], "provider": "app"}
 
     reserve_ai_call(db, visitor_id, settings)
+    if settings.engine_mode == "ml" and brain is not None:
+        return _handle_ml(db, visitor_id, text, brain, goal_id)
+
     context = active_goals(db, visitor_id, MAX_CONTEXT_GOALS)
     prompt = build_user_prompt(text, [g.as_dict() for g in context], recent_messages(db, visitor_id))
     try:

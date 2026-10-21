@@ -47,6 +47,11 @@ class Goal(Base):
     next_action_type: Mapped[str] = mapped_column(String(20), default="ask")
     next_action: Mapped[str] = mapped_column(Text, default="")
     updates: Mapped[int] = mapped_column(Integer, default=0)
+    # ML engine state
+    intent: Mapped[str | None] = mapped_column(String(40), nullable=True, default="")
+    slots: Mapped[str | None] = mapped_column(Text, nullable=True)            # JSON dict
+    pending: Mapped[str | None] = mapped_column(String(40), nullable=True)    # question waiting for an answer
+    questions_asked: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -66,6 +71,7 @@ class Goal(Base):
             "confidence": round(self.confidence or 0, 2),
             "next_action": {"type": self.next_action_type, "description": self.next_action},
             "updates": self.updates,
+            "intent": self.intent or "",
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -85,6 +91,8 @@ class Message(Base):
     text: Mapped[str] = mapped_column(Text)
     relation: Mapped[str] = mapped_column(String(24), default="")  # how it touched the goal state
     provider: Mapped[str] = mapped_column(String(20), default="")
+    intent: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

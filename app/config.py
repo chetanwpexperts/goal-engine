@@ -30,6 +30,9 @@ class Settings(BaseModel):
     db_user: str = os.getenv("DB_USER", "goal_engine")
     db_password: str = os.getenv("DB_PASSWORD", "")
 
+    # "ml" = own machine-learning engine (no external AI). "ai" = Gemini/Groq.
+    engine_mode: str = os.getenv("ENGINE_MODE", "ml").strip().lower()
+
     # AI providers, tried in this order. Empty key = provider skipped.
     ai_provider_order: str = os.getenv("AI_PROVIDER_ORDER", "gemini,groq")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")

@@ -36,8 +36,16 @@
           </div>
         </div>
       </div>
+      <div id="options" class="options" hidden></div>
       <form id="composer" class="composer">
-        <textarea id="input" rows="2" maxlength="1500" placeholder="What's the problem?" aria-label="Your message"></textarea>
+        <div class="field">
+          <textarea id="input" rows="2" maxlength="1500" placeholder="What's the problem? Type it or tap 🎤" aria-label="Your message"></textarea>
+          <div class="field-bar">
+            <span id="wordcount" class="wordcount" hidden></span>
+            <button id="mic-lang" type="button" class="mic-lang" title="Voice language" hidden>हिं</button>
+          </div>
+        </div>
+        <button id="mic" type="button" class="mic" aria-label="Speak instead of typing" title="Speak instead of typing" hidden>🎤</button>
         <button id="send" type="submit">Send</button>
       </form>
       <p class="fineprint">Demo. Please don't share passwords or private details. <span id="remaining"></span></p>

@@ -35,6 +35,7 @@ def init_db() -> None:
     for attempt in range(3):
         try:
             Base.metadata.create_all(get_engine())
+            _add_missing_columns()
             return
         except Exception:  # noqa: BLE001
             if attempt == 2:
@@ -50,3 +51,22 @@ def get_db() -> Iterator[Session]:
         yield db
     finally:
         db.close()
+
+
+def _add_missing_columns() -> None:
+    """Additive migrations: new model columns are added to existing tables (as NULL-able)."""
+    from sqlalchemy import inspect, text
+
+    engine = get_engine()
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            existing = {c["name"] for c in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in existing:
+                    continue
+                col_type = column.type.compile(dialect=engine.dialect)
+                try:
+                    conn.execute(text(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {col_type} NULL"))
+                except Exception:  # noqa: BLE001 - another worker added it first
+                    pass

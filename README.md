@@ -7,7 +7,23 @@ The goal lives outside the chat, so it doesn't drift as the conversation goes on
 This is Phase 1–2 of the Universal AI Problem-Solving Platform:
 text request → structured goal → goal kept up to date across messages.
 
-## How it works
+## Engines
+
+`ENGINE_MODE=ml` (default) runs the project's own machine-learning engine, with no external AI:
+
+- **Clean**: Hinglish spelling normaliser; Hindi script (e.g. from voice typing) is transliterated to Hinglish letters.
+- **Classify**: scikit-learn TF-IDF (character + word n-grams) + logistic regression over 12 problem types.
+  Seed examples live in `app/ml/seed_data.py`; the model retrains automatically when they change.
+- **Extract**: rule-based slot extraction (business type, city, website, since when, budget, skills, ...).
+- **Converse without loops**: a short, vague first message gets ONE request for a ~100-word description
+  (typed or spoken, with a live word counter). After that, at most one question per reply and two per goal,
+  always with tap answers. "Pata nahi" is accepted: a default is assumed and shown as "Assumed ...".
+- **Act**: once nothing critical is missing, it gives a concrete, personalised first answer (`app/ml/answers.py`).
+- **Learn**: every message is stored with its predicted type and confidence, ready for the learning loop.
+
+`ENGINE_MODE=ai` uses Gemini/Groq instead (the path described below).
+
+## How it works (AI mode)
 
 1. **Receive**: the message, plus the visitor's active goals and the last few messages.
 2. **Cheap path first**: requests like "show my goals" are answered from the database, with no AI call.

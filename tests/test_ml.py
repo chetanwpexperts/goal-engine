@@ -218,3 +218,14 @@ def test_same_answer_is_never_sent_twice(client, ml_mode):
     again = say(client, "customer nahi aate")
     assert again["reply"] != first["reply"]
     assert again["options"]                               # offers steps to explain instead
+
+
+def test_confused_gets_one_simple_step_not_the_list(client, ml_mode):
+    say(client, "Meri website hai but customer nahi aa rhe.")
+    answer = say(client, "kapde ki dukaan hai Panchkula mein, log aate hi nahi")
+    for text in ("मुझे समझ नहीं आया", "आपने मुझे फिर से वही आंसर दे दिया", "I didn't understand"):
+        res = say(client, text)
+        assert res["relation"] == "howto", text
+        assert res["reply"] != answer["reply"]
+        assert res["options"]
+        assert len(res["goals"]) == 1

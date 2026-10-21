@@ -14,7 +14,7 @@ from typing import Any
 import hashlib
 
 from app.ml.answers import PLAYBOOKS
-from app.ml.howto import choices_for, find_howto, render
+from app.ml.howto import BY_KEY, STEP_CHOICES, choices_for, find_howto, render
 from app.ml.intent import IntentModel, Prediction
 from app.ml.normalize import detect_language, normalize
 from app.ml.slots import INTENT_LABELS, RELATED, SPECS, Slot, extract_all, main_issue
@@ -33,7 +33,12 @@ CONTEXT_INTENTS = {"no_customers", "need_website", "marketing_social", "hiring_s
 REFINES_VAGUE = {"no_customers", "website_problem", "need_website", "customer_followup", "find_work",
                  "marketing_social", "payments_collection", "hiring_staff"}
 
-SKIP_RE = re.compile(r"(pata nahi|nahi pata|maloom nahi|don ?t know|dont know|not sure|\bskip\b|aap decide|you decide|"
+# "I didn't understand" / "you gave the same answer again": go one simple step at a time.
+CONFUSED_RE = re.compile(r"(samajh nahi|samjh nahi|samaj nahi|samjha nahi|nahi samajh|nahi samjha|samajh mein nahi|"
+                         r"didn.?t understand|did not understand|don.?t understand|not clear|confus|"
+                         r"phir se (vahi|wahi)|(vahi|wahi|same) (answer|aansar|jawab|baat)|same thing again|repeat)")
+
+SKIP_RE = re.compile(r"(pata nahi|nahi pata|maloom nahi|don.?t know|dont know|not sure|\bskip\b|aap decide|you decide|"
                      r"kuch bhi|koi bhi|anything|nahi bata sakta)")
 
 
@@ -264,6 +269,23 @@ class Brain:
             lang = focus.detected_language  # "php me" stays in the conversation's language
         hi = lang in ("Hinglish", "Hindi")
         pred = self.model.predict(text)
+
+        # 0a. Confused or "same answer again": one simple step, with the others as buttons.
+        if CONFUSED_RE.search(normalize(text)):
+            steps = STEP_CHOICES.get(focus.intent, []) if focus is not None else []
+            if steps:
+                first = BY_KEY[steps[0]]
+                lead = ("Koi baat nahi, ek-ek step karte hai. Sabse pehle ye:" if hi
+                        else "No problem, let's go one step at a time. First this:")
+                reply = lead + "\n" + render(first, hi).split("\n", 1)[1]
+                reply += "\n\n" + ("Ye ho jaaye to agla step chuno:" if hi else "When that's done, pick the next step:")
+                focus.updates = (focus.updates or 0) + 1
+                return Turn(reply, "howto", focus, options=choices_for(focus.intent, exclude=first.key),
+                            intent=pred.intent, confidence=round(pred.confidence, 3))
+            reply = ("Koi baat nahi. Apni problem apne shabdon mein dobara batao, likh ke ya 🎤 bol ke."
+                     if hi else "No problem. Tell me the problem again in your own words, typed or by tapping 🎤.")
+            return Turn(reply, "unknown", focus, ask_words=BRIEF_TARGET_WORDS, intent=pred.intent,
+                        confidence=round(pred.confidence, 3))
 
         # 0. "How do I do that step?" -> explain that step, never repeat the list.
         howto = find_howto(text)

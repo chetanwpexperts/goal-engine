@@ -234,6 +234,8 @@ class Brain:
         return turn
 
     def handle(self, visitor_id: str, text: str, focus: Goal | None) -> Turn:
+        if focus is not None and focus.intent not in SPECS:
+            focus = None  # goals made by the old AI mode: start fresh instead of guessing their type
         words = len(text.split())
         lang = detect_language(text)
         if words < 4 and focus is not None and focus.detected_language:

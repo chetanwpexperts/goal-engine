@@ -167,3 +167,15 @@ def test_answer_to_a_different_question_is_not_forced_into_the_asked_slot(client
     fourth = say(client, "php me")
     assert fourth["reply"].startswith("Ye kijiye")       # stays Hinglish
     assert "Skills: php" in fourth["goal"]["known_facts"]
+
+
+def test_goal_from_ai_mode_without_type_does_not_crash(client, ml_mode):
+    from app.models import Goal
+
+    say(client, "hello")  # creates the visitor cookie
+    db = next(get_db())
+    visitor = db.scalar(select(Message.visitor_id))
+    db.add(Goal(visitor_id=visitor, title="Old AI goal", original_request="x"))
+    db.commit()
+    res = say(client, "website khulti hi nahi")
+    assert res["goal"]["intent"] == "website_problem"

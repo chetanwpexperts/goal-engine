@@ -1,3 +1,4 @@
+import time
 from collections.abc import Iterator
 
 from sqlalchemy import create_engine
@@ -29,7 +30,16 @@ def get_engine():
 def init_db() -> None:
     from app import models  # noqa: F401 - registers tables
 
-    Base.metadata.create_all(get_engine())
+    # Several workers start at once; if two create the same table, the loser retries
+    # and finds the tables already there.
+    for attempt in range(3):
+        try:
+            Base.metadata.create_all(get_engine())
+            return
+        except Exception:  # noqa: BLE001
+            if attempt == 2:
+                raise
+            time.sleep(1 + attempt)
 
 
 def get_db() -> Iterator[Session]:

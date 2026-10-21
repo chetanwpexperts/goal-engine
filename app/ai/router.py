@@ -37,7 +37,8 @@ class AIRouter:
     @classmethod
     def from_settings(cls, settings: Settings) -> "AIRouter":
         available = {
-            "gemini": lambda: GeminiProvider(settings.gemini_api_key, settings.gemini_model, settings.ai_timeout_seconds)
+            "gemini": lambda: GeminiProvider(settings.gemini_api_key, settings.gemini_model, settings.ai_timeout_seconds,
+                                   thinking=settings.gemini_thinking)
             if settings.gemini_api_key else None,
             "groq": lambda: GroqProvider(settings.groq_api_key, settings.groq_model, settings.ai_timeout_seconds)
             if settings.groq_api_key else None,

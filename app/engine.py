@@ -10,7 +10,7 @@ from app.ai.prompts import build_user_prompt
 from app.ai.router import AIRouter
 from app.ai.schema import Interpretation
 from app.config import Settings
-from app.limits import reserve_ai_call
+from app.limits import release_ai_call, reserve_ai_call
 from app.models import Goal, Message, dumps
 
 
@@ -81,7 +81,11 @@ def handle_message(db: Session, visitor_id: str, text: str, router: AIRouter, se
     reserve_ai_call(db, visitor_id, settings)
     context = active_goals(db, visitor_id, MAX_CONTEXT_GOALS)
     prompt = build_user_prompt(text, [g.as_dict() for g in context], recent_messages(db, visitor_id))
-    data, provider = router.interpret(prompt)
+    try:
+        data, provider = router.interpret(prompt)
+    except Exception:
+        release_ai_call(db, visitor_id)
+        raise
 
     relation = data.relation
     goal: Goal | None = None

@@ -28,6 +28,13 @@ def test_gemini_request_and_parse():
     assert "gemini-3.8-flash:generateContent" in url
     assert kw["headers"]["x-goog-api-key"] == "KEY"  # key in header, never in the URL
     assert kw["json"]["generationConfig"]["responseMimeType"] == "application/json"
+    assert kw["json"]["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "low"}
+
+
+def test_gemini_skips_thought_parts():
+    s = Session(Resp(200, {"candidates": [{"content": {"parts": [
+        {"text": "thinking...", "thought": True}, {"text": '{"a":1}'}]}}]}))
+    assert GeminiProvider("KEY", "m", session=s).complete_json("s", "u") == '{"a":1}'
 
 
 def test_groq_request_and_parse():

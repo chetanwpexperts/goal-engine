@@ -45,6 +45,16 @@ def reserve_ai_call(db: Session, visitor_id: str, settings: Settings) -> None:
     db.commit()
 
 
+def release_ai_call(db: Session, visitor_id: str) -> None:
+    """Give the message back when the AI failed, so errors don't eat the daily limit."""
+    day = _today()
+    for scope in ("all", f"visitor:{visitor_id}"):
+        row = db.scalar(select(UsageCounter).where(UsageCounter.day == day, UsageCounter.scope == scope))
+        if row and row.count > 0:
+            row.count -= 1
+    db.commit()
+
+
 def usage_today(db: Session, visitor_id: str) -> dict[str, int]:
     day = _today()
     rows = {r.scope: r.count for r in db.scalars(select(UsageCounter).where(UsageCounter.day == day))}

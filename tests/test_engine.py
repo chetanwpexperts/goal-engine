@@ -99,6 +99,7 @@ def test_all_providers_down_gives_friendly_error(client, use_provider):
     res = client.post("/api/message", json={"text": "help"})
     assert res.status_code == 503
     assert "try again" in res.json()["error"]
+    assert client.get("/api/state").json()["remaining_today"] == 5  # failed call not counted
 
 
 def test_no_keys_configured_is_503_not_crash(client, use_provider):

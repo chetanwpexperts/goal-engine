@@ -187,3 +187,12 @@ def test_new_chat_starts_fresh(client, ml_mode):
     client.post("/api/new-chat")
     client.cookies.clear()  # what the browser does with the deleted cookie
     assert client.get("/api/state").json()["goals"] == []
+
+
+def test_short_message_without_business_or_city_asks_for_description_first(client, ml_mode):
+    first = say(client, "Meri website hai but customer nahi aa rhe.")
+    assert first["goal"]["intent"] == "no_customers"
+    assert first["ask_words"] == 100
+    second = say(client, "furniture shop hai mohali mein, 1 saal se, online koi order nahi aata")
+    assert "Business: furniture shop" in second["goal"]["known_facts"]
+    assert "furniture shop Mohali" in second["reply"]

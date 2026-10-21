@@ -27,7 +27,7 @@ def business_slow(s: dict, hi: bool) -> tuple[list[str], str]:
 
 
 def no_customers(s: dict, hi: bool) -> tuple[list[str], str]:
-    biz, place = _g(s, "business_type", "business"), _g(s, "city", "aapke area" if hi else "your area")
+    biz, place = _g(s, "business_type", "apna kaam" if hi else "your service"), _g(s, "city", "apna shehar" if hi else "your city")
     site = s.get("has_website")
     if hi:
         pts = [f"Google pe \"{biz} {place}\" search karo. Agar aap top 3 mein nahi dikhte, to log aapko dhoondh hi nahi pa rahe.",

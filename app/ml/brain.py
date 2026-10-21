@@ -24,6 +24,8 @@ BRIEF_TARGET_WORDS = 100
 NEW_GOAL_CONFIDENCE = 0.40
 SWITCH_CONFIDENCE = 0.75
 REFINE_CONFIDENCE = 0.30
+# Answers for these depend on what the business is and where; ask for the short description first.
+CONTEXT_INTENTS = {"no_customers", "need_website", "marketing_social", "hiring_staff"}
 # Problem types a vague "business is not doing well" goal can turn into (a car problem never can).
 REFINES_VAGUE = {"no_customers", "website_problem", "need_website", "customer_followup", "find_work",
                  "marketing_social", "payments_collection", "hiring_staff"}
@@ -174,7 +176,9 @@ class Brain:
         _merge(goal, extract_all(pred.intent, text))
         words = len(text.split())
         vague = SPECS[pred.intent].get("vague", False)
-        if words < SHORT_MESSAGE_WORDS and (vague or len(_missing_critical(goal)) >= 2):
+        context_known = sum(1 for k in ("business_type", "city") if _slots(goal).get(k))
+        needs_context = pred.intent in CONTEXT_INTENTS and context_known == 0
+        if words < SHORT_MESSAGE_WORDS and (vague or needs_context or len(_missing_critical(goal)) >= 2):
             goal.pending = "brief"
             goal.questions_asked = 1
             refresh(goal, hi)

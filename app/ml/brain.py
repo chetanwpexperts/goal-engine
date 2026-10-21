@@ -17,6 +17,7 @@ from app.ml.answers import PLAYBOOKS
 from app.ml.howto import BY_KEY, STEP_CHOICES, choices_for, find_howto, render
 from app.ml.intent import IntentModel, Prediction
 from app.ml.normalize import detect_language, normalize
+from app.ml.registry import BUSINESS_DOMAIN, short_title
 from app.ml.slots import INTENT_LABELS, RELATED, SPECS, Slot, extract_all, main_issue
 from app.models import Goal, dumps, loads
 
@@ -24,14 +25,22 @@ from app.models import Goal, dumps, loads
 MAX_QUESTIONS_PER_GOAL = 2
 SHORT_MESSAGE_WORDS = 15
 BRIEF_TARGET_WORDS = 100
-NEW_GOAL_CONFIDENCE = 0.40
+NEW_GOAL_CONFIDENCE = 0.22   # measured on unseen messages: almost always right above this
 SWITCH_CONFIDENCE = 0.75
 REFINE_CONFIDENCE = 0.30
+SURE_CONFIDENCE = 0.50       # below this, a new goal also shows "wrong guess? pick one" alternatives
 # Answers for these depend on what the business is and where; ask for the short description first.
 CONTEXT_INTENTS = {"no_customers", "need_website", "marketing_social", "hiring_staff"}
 # Problem types a vague "business is not doing well" goal can turn into (a car problem never can).
 REFINES_VAGUE = {"no_customers", "website_problem", "need_website", "customer_followup", "find_work",
-                 "marketing_social", "payments_collection", "hiring_staff"}
+                 "marketing_social", "payments_collection", "hiring_staff"} | BUSINESS_DOMAIN
+
+# Safety first: these never go through problem-solving.
+CRISIS_RE = re.compile(r"(suicide|kill myself|end my life|want to die|no reason to live|self harm|hurt myself|"
+                       r"marna chahta|marna chahti|mar jaana chahta|mar jana chahta|jeena nahi chahta|jeena nahi chahti|"
+                       r"zindagi khatam|khudkushi|aatmahatya|atmahatya|khud ko nuksan|khud ko khatam)")
+EMERGENCY_RE = re.compile(r"(accident ho gaya|heart attack|aag lag gayi|house on fire|saans nahi aa rahi|can t breathe|"
+                          r"cannot breathe|behosh ho gaya|behosh ho gayi|unconscious|bahut khoon)")
 
 # "I didn't understand" / "you gave the same answer again": go one simple step at a time.
 CONFUSED_RE = re.compile(r"(samajh nahi|samjh nahi|samaj nahi|samjha nahi|nahi samajh|nahi samjha|samajh mein nahi|"
@@ -211,6 +220,14 @@ class Brain:
             return Turn(_brief_request(hi, understood), "new_goal", goal, ask_words=BRIEF_TARGET_WORDS)
         turn = _next_step(goal, hi)
         turn.relation = "new_goal"
+        if pred.confidence < SURE_CONFIDENCE and not turn.options:
+            alts = [i for i, _ in pred.ranking[1:4] if i in INTENT_LABELS][:2]  # right answer is in the top 3 ~92% of the time
+            if alts:
+                data = _slots(goal)
+                data["_alts"] = alts
+                goal.slots = dumps(data)
+                turn.options = [INTENT_LABELS[i] for i in alts]
+                turn.reply += "\n\n" + ("Galat samjha? Inme se chuno:" if hi else "Did I get it wrong? Pick one:")
         return turn
 
     def _refine_vague(self, goal: Goal, text: str) -> None:
@@ -269,6 +286,21 @@ class Brain:
             lang = focus.detected_language  # "php me" stays in the conversation's language
         hi = lang in ("Hinglish", "Hindi")
         pred = self.model.predict(text)
+
+        norm_text = normalize(text)
+        if CRISIS_RE.search(norm_text):
+            reply = ("Mujhe bahut afsos hai ki aap itna mushkil waqt dekh rahe ho. Aapko ye akele nahi jhelna hai. "
+                     "Abhi kisi se baat karo: Tele-MANAS 14416 (free, 24x7) pe call karo, ya turant khatra ho to 112. "
+                     "Ho sake to kisi bharose wale insaan ko abhi batao ki aap theek nahi ho."
+                     if hi else
+                     "I'm really sorry you're going through this. You don't have to carry it alone. "
+                     "Please talk to someone now: call Tele-MANAS 14416 (free, 24x7, India), or 112 if you're in immediate danger. "
+                     "If you can, tell someone you trust right now that you're not okay.")
+            return Turn(reply, "safety", None, intent="safety", confidence=1.0)
+        if EMERGENCY_RE.search(norm_text):
+            reply = ("Ye emergency hai: abhi 112 call karo (ambulance 108). Madad aane tak insaan ke saath raho."
+                     if hi else "This is an emergency: call 112 now (ambulance 108). Stay with the person until help arrives.")
+            return Turn(reply, "safety", None, intent="safety", confidence=1.0)
 
         # 0a. Confused or "same answer again": one simple step, with the others as buttons.
         if CONFUSED_RE.search(normalize(text)):
@@ -329,8 +361,23 @@ class Brain:
 
         # 3. More about the current goal, a supporting task, or a separate problem.
         if focus is not None:
+            alts = _slots(focus).get("_alts", [])
+            if pred.intent in alts and pred.confidence >= NEW_GOAL_CONFIDENCE:
+                # The person corrected our guess: fix this goal instead of starting another.
+                _set_intent(focus, pred.intent, 0.9)
+                data = _slots(focus)
+                data.pop("_alts", None)
+                data.pop("_last_answer", None)
+                data["_corrected_from_text"] = focus.original_request[:300]
+                focus.slots = dumps(data)
+                focus.title = SPECS[pred.intent]["title"]
+                _merge(focus, extract_all(focus.intent, focus.original_request))
+                turn = _next_step(focus, hi)
+                turn.relation = "corrected"
+                return done(turn)
             same = pred.intent == focus.intent
-            refines = (_spec(focus).get("vague") and pred.intent in REFINES_VAGUE
+            refines = ((_spec(focus).get("vague") and pred.intent in REFINES_VAGUE
+                        or focus.intent == "general" and pred.intent in SPECS)
                        and pred.confidence >= NEW_GOAL_CONFIDENCE)
             if same or refines:
                 if refines and not same:
@@ -355,7 +402,11 @@ class Brain:
                 return done(Turn(reply, "supporting_task", focus))
             if pred.intent in SPECS and pred.confidence >= NEW_GOAL_CONFIDENCE:
                 return done(self._new_goal(focus.visitor_id, text, pred, hi, lang))
-            _merge(focus, extract_all(focus.intent, text))
+            found = extract_all(focus.intent, text)
+            if words >= 8 and not found and focus.intent != "general":
+                # A substantial message the engine can't place: its own goal, not glued onto this one.
+                return done(self._general_goal(focus.visitor_id, text, pred, hi, lang, words))
+            _merge(focus, found)
             turn = _next_step(focus, hi)
             turn.relation = "update_goal"
             return done(turn)
@@ -364,10 +415,23 @@ class Brain:
         if pred.intent in SPECS and pred.confidence >= NEW_GOAL_CONFIDENCE:
             return done(self._new_goal(visitor_id, text, pred, hi, lang))
 
-        # 5. Not understood: one request for detail, plus tap choices. Never a chain of questions.
-        choices = [INTENT_LABELS[i] for i, _ in pred.ranking if i in INTENT_LABELS][:3]
-        reply = ("Main abhi poori tarah samjha nahi. Apni problem thodi detail mein likho (around "
-                 f"{BRIEF_TARGET_WORDS} words) ya 🎤 dabake bolo. Ya inme se chuno:"
-                 if hi else "I didn't fully get that. Describe it in a bit more detail (around "
-                 f"{BRIEF_TARGET_WORDS} words) or tap 🎤 and say it. Or pick one:")
-        return done(Turn(reply, "unknown", options=choices, ask_words=BRIEF_TARGET_WORDS))
+        # 5. Not learned yet: still a goal, facts and a first plan. Never a loop of questions.
+        return done(self._general_goal(visitor_id, text, pred, hi, lang, words))
+
+    def _general_goal(self, visitor_id: str, text: str, pred: Prediction, hi: bool, lang: str, words: int) -> Turn:
+        goal = Goal(visitor_id=visitor_id, title="", original_request=text, detected_language=lang,
+                    slots=dumps({}), questions_asked=MAX_QUESTIONS_PER_GOAL, updates=0)
+        _set_intent(goal, "general", pred.confidence)
+        goal.title = short_title(text)
+        _merge(goal, extract_all("general", text))
+        turn = _next_step(goal, hi)
+        lead = ("Is tarah ki problem main abhi seekh raha hoon, par shuruaat aise karo:" if hi
+                else "I'm still learning this kind of problem, but here's how to start:")
+        turn.reply = lead + "\n" + turn.reply.split("\n", 1)[1]
+        turn.options = [INTENT_LABELS[i] for i, c in pred.ranking if i in INTENT_LABELS and c >= 0.12][:3]
+        if turn.options:
+            turn.reply += "\n\n" + ("Kya aapka matlab inme se kuch hai?" if hi else "Did you mean one of these?")
+        if words < 5:
+            turn.ask_words = BRIEF_TARGET_WORDS
+        turn.relation = "new_goal"
+        return turn

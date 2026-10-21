@@ -86,7 +86,10 @@ def index() -> FileResponse:
 @app.get("/api/health")
 def health() -> dict:
     router: AIRouter = app.state.router
-    return {"ok": True, "engine": get_settings().engine_mode, "ai_providers": [p.name for p in router.providers]}
+    from app.ml.slots import SPECS
+
+    return {"ok": True, "engine": get_settings().engine_mode, "problem_types": len(SPECS) - 1,
+            "ai_providers": [p.name for p in router.providers]}
 
 
 @app.get("/api/state")

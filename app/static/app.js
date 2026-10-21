@@ -54,6 +54,8 @@
     chit_chat: "",
     unknown: "",
     howto: "How to",
+    corrected: "Corrected",
+    safety: "",
     list: "",
   };
   const ACTION_LABEL = {

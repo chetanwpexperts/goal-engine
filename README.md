@@ -12,8 +12,16 @@ text request → structured goal → goal kept up to date across messages.
 `ENGINE_MODE=ml` (default) runs the project's own machine-learning engine, with no external AI:
 
 - **Clean**: Hinglish spelling normaliser; Hindi script (e.g. from voice typing) is transliterated to Hinglish letters.
-- **Classify**: scikit-learn TF-IDF (character + word n-grams) + logistic regression over 12 problem types.
-  Seed examples live in `app/ml/seed_data.py`; the model retrains automatically when they change.
+- **Classify**: scikit-learn TF-IDF (character + word n-grams) + logistic regression over 70 real problem types
+  (business, developer/tech, career, education, money, home, vehicle, government papers, consumer, legal,
+  health, farming, personal, travel). Examples and answer steps live in `app/ml/knowledge/` and
+  `app/ml/seed_data.py`; the model retrains automatically when they change.
+  Measured on messages it never saw (`tests/data/holdout*.py`): ~79-87% exactly right, ~92-97% in the top 3.
+- **When unsure**: below 50% confidence it also shows "Did I get it wrong?" with the next two guesses;
+  one tap corrects the same goal (and that correction is stored for learning).
+- **Not learned yet**: still creates a goal, pulls out facts and gives a general first plan. No question loops.
+- **Safety**: crisis messages get support and helplines (Tele-MANAS 14416, 112), emergencies get 112/108;
+  health, legal and money answers carry a "check with a professional" note.
 - **Extract**: rule-based slot extraction (business type, city, website, since when, budget, skills, ...).
 - **Converse without loops**: a short, vague first message gets ONE request for a ~100-word description
   (typed or spoken, with a live word counter). After that, at most one question per reply and two per goal,

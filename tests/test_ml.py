@@ -229,3 +229,56 @@ def test_confused_gets_one_simple_step_not_the_list(client, ml_mode):
         assert res["reply"] != answer["reply"]
         assert res["options"]
         assert len(res["goals"]) == 1
+
+
+def test_accuracy_on_unseen_messages_does_not_regress():
+    from tests.data.holdout import HOLDOUT
+    from tests.data.holdout2 import HOLDOUT2
+
+    model = IntentModel()
+    for data, min_top1, min_top3 in ((HOLDOUT, 0.80, 0.92), (HOLDOUT2, 0.75, 0.88)):
+        top1 = sum(model.predict(t).intent == y for t, y in data) / len(data)
+        top3 = sum(y in [i for i, _ in model.predict(t).ranking[:3]] for t, y in data) / len(data)
+        assert top1 >= min_top1 and top3 >= min_top3, (top1, top3)
+
+
+def test_brand_new_developer_issue_is_understood(client, ml_mode):
+    text = ("मैं एक सॉफ्टवेयर डेवलपर हूं पीएचपी लैंग्वेज में काम करता हूं मेरा एक प्रोजेक्ट है "
+            "जिसमें मुझे डेटाबेस की क्वेरी में ऑप्टिमाइज करवाना है क्या आप मेरी इसमें मदद करेंगे")
+    res = say(client, text)
+    assert res["goal"]["intent"] == "slow_db_query"
+    assert "EXPLAIN" in res["reply"]
+    assert any("php" in f for f in res["goal"]["known_facts"])
+
+
+def test_unlearned_problem_gets_a_goal_and_plan_not_a_loop(client, ml_mode):
+    first = say(client, "mere pados ka kutta raat bhar bhaukta hai aur so nahi paata koi upaay")
+    assert first["goal"] is not None
+    assert "Ye kijiye" not in first["reply"] or "seekh" in first["reply"]
+    second = say(client, "haan roz ka hai ye")
+    assert second["reply"] != first["reply"]
+
+
+def test_crisis_message_gets_support_not_problem_solving(client, ml_mode):
+    res = say(client, "mujhe ab jeena nahi chahta, sab khatam karna hai")
+    assert res["relation"] == "safety" and "14416" in res["reply"] and res["goal"] is None
+
+
+def test_professional_topics_carry_a_caution(client, ml_mode):
+    res = say(client, "teen credit card aur do personal loan hai, emi nahi bhar pa raha, recovery wale call karte hai")
+    assert res["goal"]["intent"] == "debt_emi"
+    assert "professional" in res["reply"]
+
+
+def test_wrong_guess_can_be_corrected_with_one_tap(client, ml_mode):
+    first = say(client, "parents ko kashmir ghumana hai")
+    if first["goal"]["intent"] == "travel_plan":
+        return  # guessed right this time; nothing to correct
+    assert first["options"], first
+    trip = next((o for o in first["options"] if o == "Plan a trip"), None)
+    assert trip, first["options"]
+    fixed = say(client, trip)
+    assert fixed["relation"] == "corrected"
+    assert fixed["goal"]["id"] == first["goal"]["id"]
+    assert fixed["goal"]["intent"] == "travel_plan"
+    assert len(fixed["goals"]) == 1

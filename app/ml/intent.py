@@ -35,18 +35,37 @@ class Prediction:
 
 
 def training_examples() -> tuple[list[str], list[str]]:
+    from app.ml.knowledge import all_types
+
     texts, labels = [], []
     for intent, examples in SEED.items():
         for text in examples:
             texts.append(text)
             labels.append(intent)
+    from app.ml.knowledge.extra_examples import EXTRA
+
+    for problem in all_types():
+        for text in (*problem.examples, problem.title, *EXTRA.get(problem.key, [])):  # title = tap-button text
+            texts.append(text)
+            labels.append(problem.key)
+    for intent in SEED:
+        for text in EXTRA.get(intent, []):
+            texts.append(text)
+            labels.append(intent)
+    from app.ml.slots import INTENT_LABELS
+
+    for intent, label in INTENT_LABELS.items():  # tap-button texts of the core types
+        if intent in SEED:
+            texts.append(label)
+            labels.append(intent)
+    known = set(labels)
     if LEARNED_PATH.exists():
         for line in LEARNED_PATH.read_text(encoding="utf-8").splitlines():
             try:
                 row = json.loads(line)
             except ValueError:
                 continue
-            if row.get("intent") in SEED and row.get("text"):
+            if row.get("intent") in known and row.get("text"):
                 texts.append(row["text"])
                 labels.append(row["intent"])
     return texts, labels

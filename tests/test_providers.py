@@ -22,10 +22,10 @@ class Session:
 
 def test_gemini_request_and_parse():
     s = Session(Resp(200, {"candidates": [{"content": {"parts": [{"text": '{"a":1}'}]}}]}))
-    out = GeminiProvider("KEY", "gemini-2.5-flash", session=s).complete_json("sys", "user")
+    out = GeminiProvider("KEY", "gemini-3.8-flash", session=s).complete_json("sys", "user")
     url, kw = s.calls[0]
     assert out == '{"a":1}'
-    assert "gemini-2.5-flash:generateContent" in url
+    assert "gemini-3.8-flash:generateContent" in url
     assert kw["headers"]["x-goog-api-key"] == "KEY"  # key in header, never in the URL
     assert kw["json"]["generationConfig"]["responseMimeType"] == "application/json"
 

@@ -15,7 +15,7 @@ define('GOAL_CONNECTOR_ID', '__CONNECTOR_ID__');
 define('GOAL_KEY', '__KEY__');
 define('GOAL_VERSION', '1.0');
 define('GOAL_MAX_ROWS', 100000);
-define('GOAL_MAX_BYTES', 10 * 1024 * 1024);
+define('GOAL_MAX_BYTES', 20 * 1024 * 1024);
 
 @ini_set('display_errors', '0');
 @set_time_limit(120);
@@ -29,18 +29,30 @@ $GOAL_ENCRYPT = false;
 // and nobody in between can read your data.
 function goal_aes_key() { return hash('sha256', 'goal-engine-transport:' . GOAL_KEY, true); }
 
+function goal_seal($text) {
+    $iv = random_bytes(12);
+    $tag = '';
+    $ct = openssl_encrypt($text, 'aes-256-gcm', goal_aes_key(), OPENSSL_RAW_DATA, $iv, $tag);
+    return base64_encode($iv . $ct . $tag);
+}
+
+function goal_json($data) {
+    return json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+}
+
 function goal_out($data, $code = 200) {
     global $GOAL_ENCRYPT;
     http_response_code($code);
-    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
-    if ($GOAL_ENCRYPT) {
-        $iv = random_bytes(12);
-        $tag = '';
-        $ct = openssl_encrypt($json, 'aes-256-gcm', goal_aes_key(), OPENSSL_RAW_DATA, $iv, $tag);
-        $json = json_encode(['ok' => true, 'sealed' => base64_encode($iv . $ct . $tag)]);
-    }
+    $json = goal_json($data);
+    if ($GOAL_ENCRYPT) $json = json_encode(['ok' => true, 'sealed' => goal_seal($json)]);
     echo $json;
     exit;
+}
+
+// Streaming answers (exports): one encrypted line per piece, so neither side holds the whole file in memory.
+function goal_emit($data) {
+    echo json_encode(['sealed' => goal_seal(goal_json($data))]) . "\n";
+    @flush();
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -278,31 +290,45 @@ function goal_health($pdo, $type) {
     return $out;
 }
 
-function goal_export($pdo, $type, $sql) {
-    goal_begin($pdo, $type);
-    $fh = fopen('php://temp', 'w+');
-    fwrite($fh, "\xEF\xBB\xBF");
+function goal_export_stream($pdo, $type, $sql) {
+    header('Content-Type: application/x-ndjson');
+    while (ob_get_level()) @ob_end_clean();
     $count = 0;
     $limited = false;
+    $total = 0;
+    $buf = "\xEF\xBB\xBF";
+    $line = fopen('php://temp', 'w+');
+    $put = function ($row) use ($line, &$buf) {
+        ftruncate($line, 0); rewind($line);
+        fputcsv($line, $row);
+        rewind($line);
+        $buf .= stream_get_contents($line);
+    };
+    goal_begin($pdo, $type);
     try {
         $st = $pdo->query($sql);
         $cols = [];
         for ($i = 0; $i < $st->columnCount(); $i++) { $m = $st->getColumnMeta($i); $cols[] = $m['name']; }
-        fputcsv($fh, $cols);
         $hidden = goal_hidden($cols);
+        $put($cols);
         while (($r = $st->fetch()) !== false) {
-            fputcsv($fh, goal_mask(array_map('goal_clean', $r), $hidden));
+            $put(goal_mask(array_map('goal_clean', $r), $hidden));
             $count++;
-            if ($count >= GOAL_MAX_ROWS || ftell($fh) > GOAL_MAX_BYTES) { $limited = true; break; }
+            if (strlen($buf) >= 262144) {               // send every ~256 KB, compressed
+                $total += strlen($buf);
+                goal_emit(['part' => base64_encode(gzencode($buf, 6))]);
+                $buf = '';
+            }
+            if ($count >= GOAL_MAX_ROWS || $total > GOAL_MAX_BYTES) { $limited = true; break; }
         }
         $st->closeCursor();
-    } finally {
-        try { $pdo->exec('ROLLBACK'); } catch (Exception $e) {}
+        if ($buf !== '') goal_emit(['part' => base64_encode(gzencode($buf, 6))]);
+        goal_emit(['ok' => true, 'result' => ['row_count' => $count, 'limited' => $limited]]);
+    } catch (Exception $e) {
+        goal_emit(['ok' => false, 'error' => substr($e->getMessage(), 0, 300)]);
     }
-    rewind($fh);
-    $csv = stream_get_contents($fh);
-    fclose($fh);
-    return [['row_count' => $count, 'limited' => $limited], $csv];
+    try { $pdo->exec('ROLLBACK'); } catch (Exception $e) {}
+    exit;
 }
 
 // ---------------------------------------------------------------- run the job
@@ -329,8 +355,7 @@ try {
             list($cols, $rows) = goal_rows($pdo, $type, goal_safe_sql(isset($payload['sql']) ? $payload['sql'] : ''), $limit);
             goal_out(['ok' => true, 'result' => ['columns' => $cols, 'rows' => $rows, 'row_count' => count($rows), 'limited' => count($rows) >= $limit]]);
         case 'export':
-            list($res, $csv) = goal_export($pdo, $type, goal_safe_sql(isset($payload['sql']) ? $payload['sql'] : ''));
-            goal_out(['ok' => true, 'result' => $res, 'csv' => $csv]);
+            goal_export_stream($pdo, $type, goal_safe_sql(isset($payload['sql']) ? $payload['sql'] : ''));
         case 'explain':
             $sql = preg_replace('/^\s*explain\s+/i', '', goal_safe_sql(isset($payload['sql']) ? $payload['sql'] : ''));
             list($cols, $rows) = goal_rows($pdo, $type, 'EXPLAIN ' . goal_safe_sql($sql));

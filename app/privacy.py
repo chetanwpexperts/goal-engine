@@ -6,6 +6,7 @@
 3. Customer details inside agent run results (names, emails, message text) are wiped after 24 hours;
    the "already emailed" log keeps only a one-way fingerprint of each address, and is deleted after 30 days.
 4. "Delete all my data" removes everything for that visitor, at once.
+   Live views (running queries) are deleted 2 minutes after they're shown; the activity log keeps no data values and is kept 30 days.
 5. Visitors inactive for 90 days (and with no agent switched on) are deleted automatically.
 6. Saved database passwords not used for 30 days are deleted.
 """
@@ -26,6 +27,8 @@ from app.models import (Agent, AgentRun, Connector, ConnectorJob, Goal, Message,
                         dumps, loads, utcnow)
 
 DB_RESULT_TTL = timedelta(minutes=15)
+LIVE_TTL = timedelta(minutes=2)
+ACTIVITY_TTL = timedelta(days=30)
 EXPORT_TTL = timedelta(hours=1)
 RUN_DETAIL_TTL = timedelta(hours=24)
 SENT_LOG_TTL = timedelta(days=30)
@@ -138,6 +141,17 @@ def maintain(db: Session, now=None) -> dict:
             job.file_path = None
             done["exports"] += 1
         done["db_results"] += 1
+
+    # 1b. live view snapshots (running queries etc.) are only for the moment they're shown
+    for job in db.scalars(select(ConnectorJob).where(ConnectorJob.kind == "live", ConnectorJob.finished_at.is_not(None),
+                                                     ConnectorJob.finished_at < now - LIVE_TTL)):
+        db.delete(job)
+        done["db_results"] += 1
+    # 1c. the activity log itself (no data values in it) is kept 30 days
+    old_jobs = list(db.scalars(select(ConnectorJob).where(ConnectorJob.created_at < now - ACTIVITY_TTL)))
+    for job in old_jobs:
+        _remove(job.file_path)
+        db.delete(job)
 
     # 2. customer details inside agent runs
     for run in db.scalars(select(AgentRun).where(AgentRun.finished_at.is_not(None), AgentRun.finished_at < now - RUN_DETAIL_TTL,

@@ -151,10 +151,28 @@ class Driver:
                 "limited": len(rows) >= limit, "hidden_columns": [cols[i] for i in hidden]}
 
     def export(self, sql):
+        """Whole CSV as text (small exports and tests)."""
+        buf = io.StringIO()
+        info = self._export_into(sql, buf, lambda: buf.tell())
+        return {"csv": "\ufeff" + buf.getvalue(), **info}
+
+    def export_file(self, sql, path):
+        """Stream the CSV straight into a gzip file, a few thousand rows at a time: memory stays small."""
+        import gzip
+
+        raw = open(path, "wb")
+        try:
+            with gzip.open(raw, "wt", encoding="utf-8", newline="") as fh:
+                fh.write("\ufeff")
+                info = self._export_into(sql, fh, lambda: raw.tell() * 4)   # ~4x compression: stop near the size limit
+        finally:
+            raw.close()
+        return info
+
+    def _export_into(self, sql, out, size):
         sql = safe_sql(sql)
         cur = self.cursor()
-        buf = io.StringIO()
-        writer = csv.writer(buf)
+        writer = csv.writer(out)
         count = 0
         try:
             cur.execute(sql)
@@ -168,12 +186,12 @@ class Driver:
                 for r in batch:
                     writer.writerow(mask_row([clean(v) for v in r], hidden))
                     count += 1
-                if count >= MAX_EXPORT_ROWS or buf.tell() > MAX_EXPORT_BYTES:
+                if count >= MAX_EXPORT_ROWS or size() > MAX_EXPORT_BYTES:
                     break
         finally:
             cur.close()
             self.done()
-        return {"csv": "\ufeff" + buf.getvalue(), "row_count": count, "limited": count >= MAX_EXPORT_ROWS or buf.tell() > MAX_EXPORT_BYTES}
+        return {"row_count": count, "limited": count >= MAX_EXPORT_ROWS or size() > MAX_EXPORT_BYTES}
 
     def explain(self, sql):
         sql = safe_sql(sql)
@@ -363,8 +381,20 @@ def call(cfg, path, body=None, timeout=60):
         return json.loads(resp.read() or b"{}")
 
 
-def handle(db, job):
+def upload(cfg, job_id, path):
+    size = os.path.getsize(path)
+    with open(path, "rb") as fh:
+        req = urllib.request.Request(cfg["server"].rstrip("/") + f"/api/connector/upload/{job_id}", data=fh, method="POST",
+                                     headers={"Authorization": f"Bearer {cfg['token']}", "Content-Type": "application/gzip",
+                                              "Content-Length": str(size), "User-Agent": f"goal-connector/{VERSION}"})
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            resp.read()
+
+
+def handle(db, job, export_path=None):
     kind, payload = job["kind"], job.get("payload") or {}
+    if kind == "export" and export_path:
+        return db.export_file(payload.get("sql", ""), export_path)
     if kind == "schema":
         return db.schema()
     if kind == "query":
@@ -399,15 +429,20 @@ def run(cfg):
         except Exception:  # noqa: BLE001 - network blip; try again
             jobs, backoff = [], min(backoff * 2, 60)
         for job in jobs:
+            tmp = os.path.join(os.path.dirname(CONFIG), f"export_{job['id']}.csv.gz")
             try:
-                data = handle(db, job)
-                csv_text = data.pop("csv", None)
-                result = {"ok": True, "result": data}
-                if csv_text is not None:
-                    result["csv"] = csv_text
+                if job["kind"] == "export":
+                    data = handle(db, job, export_path=tmp)
+                    upload(cfg, job["id"], tmp)          # streamed from disk, compressed
+                    result = {"ok": True, "result": data, "uploaded": True}
+                else:
+                    result = {"ok": True, "result": handle(db, job)}
             except Exception as exc:  # noqa: BLE001 - report the error back, keep running
                 db.done()
                 result = {"ok": False, "error": str(exc)[:500]}
+            finally:
+                if os.path.exists(tmp):
+                    os.remove(tmp)
             try:
                 call(cfg, f"/api/connector/result/{job['id']}", result)
             except Exception as exc:  # noqa: BLE001

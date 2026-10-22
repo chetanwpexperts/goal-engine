@@ -40,6 +40,8 @@
 
   <ul class="rules">
     <li><span class="when">Not kept</span><div><b>Data from your database.</b> <span>Previews and query results are wiped 15 minutes after you see them. Excel files are deleted after 1 hour. Only table names and row counts stay, so the card keeps working.</span></div></li>
+    <li><span class="when">2 minutes</span><div><b>Live view of your database</b> <span>(queries running right now, slowest queries) is shown and then deleted.</span></div></li>
+    <li><span class="when">30 days</span><div><b>Activity log.</b> <span>What Goal Engine did and when, with values hidden (e.g. <code>WHERE email = ?</code>). No data from your tables.</span></div></li>
     <li><span class="when">Never changed</span><div><b>Your database itself.</b> <span>Every query is checked twice and runs in a read-only transaction. Commands that change data are refused.</span></div></li>
     <li><span class="when">Encrypted</span><div><b>Database passwords and customer lists you paste.</b> <span>Stored encrypted, used only while a job runs. A saved database password is deleted when you disconnect, or after 30 days without use.</span></div></li>
     <li><span class="when">On your server</span><div><b>With the one-command connector,</b> <span>your database password never leaves your own server at all.</span></div></li>

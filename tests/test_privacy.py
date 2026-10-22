@@ -137,3 +137,25 @@ def test_inactive_visitors_and_unused_passwords_expire(client, ml_mode):
 def test_privacy_page(client):
     res = client.get("/privacy")
     assert res.status_code == 200 and "Delete all my data" in res.text
+
+
+def test_activity_log_has_no_values_and_live_data_expires(client, ml_mode, shop_db):  # noqa: F811
+    agent = say(client, "mere mysql database ki tables dikhao")["agents"][0]
+    token = client.post("/api/connectors", json={"agent_id": agent["id"]}).json()["token"]
+    db = gc.Database({"type": "sqlite", "database": shop_db}).connect()
+    client.post("/api/connector/hello", headers={"Authorization": f"Bearer {token}"}, json={"db_type": "sqlite"})
+    pump(client, token, db)
+    cid = client.get("/api/connectors").json()["connectors"][0]["id"]
+    client.post(f"/api/connectors/{cid}/jobs", json={"kind": "query", "sql": "SELECT * FROM customers WHERE name = 'Customer 7' AND id > 3"})
+    client.post(f"/api/connectors/{cid}/jobs", json={"kind": "export", "table": "orders"})
+    pump(client, token, db)
+    items = client.get(f"/api/connectors/{cid}/activity").json()["items"]
+    text = str(items)
+    assert "Customer 7" not in text and "name = ?" in text and "id > ?" in text and "Excel · orders" in text
+    assert all(i["status"] == "done" and i["ms"] is not None for i in items)
+    s = session()
+    s.add(ConnectorJob(connector_id=cid, kind="live", status="done", result=dumps({"running": [["SELECT secret"]]}),
+                       finished_at=utcnow()))
+    s.commit()
+    privacy.maintain(s, utcnow() + timedelta(minutes=3))
+    assert s.scalar(select(func.count()).select_from(ConnectorJob).where(ConnectorJob.kind == "live")) == 0

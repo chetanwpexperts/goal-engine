@@ -45,11 +45,18 @@ def pump(client, token, db):
     """One connector cycle against the real API, as the script on the user's server would do."""
     auth = {"Authorization": f"Bearer {token}"}
     jobs = client.post("/api/connector/poll", headers=auth).json()["jobs"]
+    import tempfile
     for job in jobs:
         try:
-            data = gc.handle(db, job)
-            csv_text = data.pop("csv", None)
-            body = {"ok": True, "result": data, **({"csv": csv_text} if csv_text is not None else {})}
+            if job["kind"] == "export":            # like the real connector: gzip file, streamed upload
+                tmp = tempfile.NamedTemporaryFile(suffix=".csv.gz", delete=False).name
+                data = gc.handle(db, job, export_path=tmp)
+                with open(tmp, "rb") as fh:
+                    up = client.post(f"/api/connector/upload/{job['id']}", headers=auth, content=fh.read())
+                assert up.status_code == 200, up.text
+                body = {"ok": True, "result": data, "uploaded": True}
+            else:
+                body = {"ok": True, "result": gc.handle(db, job)}
         except Exception as exc:  # noqa: BLE001
             body = {"ok": False, "error": str(exc)}
         assert client.post(f"/api/connector/result/{job['id']}", headers=auth, json=body).status_code == 200

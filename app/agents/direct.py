@@ -218,24 +218,27 @@ def run_job(job_id: int) -> None:
         job.status, job.claimed_at = "claimed", utcnow()
         db.commit()
         with _slots:
+            path = dbagent.save_upload_path(job) if job.kind == "export" else None   # exports go straight to disk
             try:
                 if connector.kind == "php":
                     from app.agents import phpconn
 
-                    data = phpconn.run(connector, job.kind, loads(job.payload, {}))
+                    data = phpconn.run(connector, job.kind, loads(job.payload, {}), export_path=path)
                 else:
                     conn = _open(decrypt(connector.secret or ""))
                     try:
-                        data = gc.handle(conn, {"kind": job.kind, "payload": loads(job.payload, {})})
+                        data = gc.handle(conn, {"kind": job.kind, "payload": loads(job.payload, {})}, export_path=path)
                     finally:
                         _close(conn)
-                csv_text = data.pop("csv", None)
-                body = {"ok": True, "result": data, **({"csv": csv_text} if csv_text is not None else {})}
+                body = {"ok": True, "result": data}
             except Exception as exc:  # noqa: BLE001 - every failure is reported on the job
                 body = {"ok": False, "error": str(exc)[:300]}
                 if getattr(exc, "missing", False):
                     connector.status = "missing"      # the card will say the file needs uploading again
-        job = dbagent.complete(db, connector, job.id, body)
+        if not body.get("ok") and path is not None:
+            path.unlink(missing_ok=True)
+            path = None
+        job = dbagent.complete(db, connector, job.id, body, file_path=path)
         for hook in _done_hooks:
             try:
                 hook(db, job)

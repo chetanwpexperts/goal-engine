@@ -391,6 +391,32 @@ async def connector_poll(request: Request, db: Session = Depends(get_db)):
     return {"jobs": [{"id": j.id, "kind": j.kind, "payload": loads(j.payload, {})} for j in jobs]}
 
 
+@app.post("/api/connector/upload/{job_id}")
+async def connector_upload(job_id: int, request: Request, db: Session = Depends(get_db)):
+    """The connector streams an export here (gzip). Written to disk piece by piece, never held in memory."""
+    from app.models import ConnectorJob
+
+    connector = await run_in_threadpool(_connector_from, request, db)
+    job = await run_in_threadpool(db.get, ConnectorJob, job_id)
+    if job is None or job.connector_id != connector.id or job.kind != "export" or job.status != "claimed":
+        return JSONResponse({"error": "Unknown job"}, status_code=400)
+    path = dbagent.save_upload_path(job)
+    size = 0
+    try:
+        with open(path, "wb") as fh:
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > dbagent.MAX_UPLOAD_BYTES:
+                    raise ValueError("too big")
+                fh.write(chunk)
+    except ValueError:
+        path.unlink(missing_ok=True)
+        return JSONResponse({"error": "The export is too big. Add a WHERE condition or fewer columns"}, status_code=413)
+    job.file_path = str(path)
+    await run_in_threadpool(db.commit)
+    return {"ok": True}
+
+
 @app.post("/api/connector/result/{job_id}")
 async def connector_result(job_id: int, request: Request, db: Session = Depends(get_db)):
     connector = _connector_from(request, db)
@@ -419,6 +445,10 @@ def _after_db_job(db: Session, job) -> None:
     try:
         with open(job.file_path, "rb") as fh:
             data = fh.read()
+        if job.file_path.endswith(".gz"):
+            import gzip
+
+            data = gzip.decompress(data)
         rows = (loads(job.result, {}) or {}).get("row_count", "")
         mailer().send(owner.email, f"{title} · {utcnow():%d %b}", f"{title}\n\nRows: {rows}\nThe CSV file is attached (opens in Excel).",
                       from_name="Goal Engine", attachments=[(f"{title[:40]}.csv", data, "text/csv")])
@@ -583,12 +613,12 @@ def link_connector(agent_id: int, connector_id: int, db: Session = Depends(get_d
 def create_db_job(connector_id: int, body: DbJobIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     try:
         connector = dbagent.own_connector(db, connector_id, visitor)
-        sql = body.sql
+        sql, summary = body.sql, None
         if body.table and body.kind == "query":
-            sql = dbagent.table_preview_sql(body.table)
+            sql, summary = dbagent.table_preview_sql(body.table), f"Preview · {body.table}"
         elif body.table and body.kind == "export":
-            sql = dbagent.table_export_sql(body.table)
-        job = dbagent.queue(db, connector, body.kind, {"sql": sql} if sql else {})
+            sql, summary = dbagent.table_export_sql(body.table), f"Excel · {body.table}"
+        job = dbagent.queue(db, connector, body.kind, {"sql": sql} if sql else {}, summary=summary)
     except dbagent.DatabaseError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     return dbagent.job_dict(job)
@@ -614,7 +644,20 @@ def download_db_job(job_id: int, db: Session = Depends(get_db), visitor: str = D
     job = _own_job(db, job_id, visitor)
     if not job.file_path or not os.path.exists(job.file_path):
         raise HTTPException(404, "No file for this job")
+    if job.file_path.endswith(".gz"):
+        # sent compressed; the browser unpacks it, so the user simply gets a .csv
+        return FileResponse(job.file_path, media_type="text/csv", filename=f"export_{job.id}.csv",
+                            headers={"Content-Encoding": "gzip", "Cache-Control": "no-store"})
     return FileResponse(job.file_path, media_type="text/csv", filename=f"export_{job.id}.csv")
+
+
+@app.get("/api/connectors/{connector_id}/activity")
+def connector_activity(connector_id: int, after: int = 0, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    try:
+        connector = dbagent.own_connector(db, connector_id, visitor)
+    except dbagent.DatabaseError:
+        raise HTTPException(404, "Not found")
+    return {"items": dbagent.activity(db, connector, after), "online": dbagent.is_online(connector), "status": connector.status}
 
 
 @app.post("/api/agents/{agent_id}/db-report")

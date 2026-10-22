@@ -196,7 +196,8 @@ class ConnectorJob(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     connector_id: Mapped[int] = mapped_column(ForeignKey("connectors.id"), index=True)
     agent_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    kind: Mapped[str] = mapped_column(String(20))        # schema / query / export / explain / health
+    kind: Mapped[str] = mapped_column(String(20))        # schema / query / export / explain / health / live / change / undo
+    summary: Mapped[str | None] = mapped_column(String(300), nullable=True)   # for the activity log, never contains data values
     payload: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="queued", index=True)   # queued / claimed / done / failed / expired
     result: Mapped[str | None] = mapped_column(Text(4_000_000), nullable=True)   # MEDIUMTEXT on MySQL

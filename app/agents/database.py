@@ -10,6 +10,7 @@ Safety model:
 
 import hashlib
 import json
+import os
 import re
 import secrets
 from datetime import timedelta
@@ -22,7 +23,9 @@ from app.models import Agent, Connector, ConnectorJob, Goal, dumps, loads, utcno
 
 
 EXPORT_DIR = Path(__file__).resolve().parents[2] / "data" / "exports"
-JOB_KINDS = ("schema", "query", "export", "explain", "health")
+JOB_KINDS = ("schema", "query", "export", "explain", "health", "live")
+MAX_OPEN_JOBS = 4            # per user at once: keeps our server and theirs light
+MAX_UPLOAD_BYTES = 30 * 1024 * 1024
 JOB_TTL = timedelta(minutes=10)
 ONLINE_WINDOW = timedelta(seconds=45)
 PREVIEW_ROWS = 50
@@ -145,7 +148,20 @@ def hello(db: Session, connector: Connector, info: dict) -> None:
 
 
 # ---------------------------------------------------------------- jobs
-def queue(db: Session, connector: Connector, kind: str, payload: dict | None = None, agent_id: int | None = None) -> ConnectorJob:
+def normalize_sql(sql: str) -> str:
+    """For the activity log: the shape of the query without any values (WHERE email = ?)."""
+    sql = re.sub(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"", "?", sql or "")
+    sql = re.sub(r"\b\d+(\.\d+)?\b", "?", sql)
+    return re.sub(r"\s+", " ", sql).strip()[:200]
+
+
+def default_summary(kind: str, payload: dict) -> str:
+    return {"schema": "Read the table list", "health": "Health check", "live": "Live view"}.get(kind) or \
+        f"{ {'query': 'Query', 'export': 'Excel', 'explain': 'EXPLAIN'}.get(kind, kind) } · {normalize_sql(payload.get('sql', ''))}"
+
+
+def queue(db: Session, connector: Connector, kind: str, payload: dict | None = None, agent_id: int | None = None,
+          summary: str | None = None) -> ConnectorJob:
     if connector.status == "disconnected":
         raise DatabaseError("This connector is disconnected")
     if kind not in JOB_KINDS:
@@ -154,7 +170,16 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
     if kind in ("query", "export", "explain"):
         payload["sql"] = read_only_sql(payload.get("sql", ""))
     payload["limit"] = min(int(payload.get("limit") or (PREVIEW_ROWS if kind == "query" else 100000)), 100000)
-    job = ConnectorJob(connector_id=connector.id, agent_id=agent_id, kind=kind, payload=dumps(payload), status="queued")
+    open_jobs = list(db.scalars(select(ConnectorJob).where(ConnectorJob.connector_id == connector.id,
+                                                           ConnectorJob.status.in_(("queued", "claimed")))))
+    if kind == "live":
+        same = next((j for j in open_jobs if j.kind == "live"), None)
+        if same is not None:
+            return same                    # one live view at a time, however often the screen asks
+    if len([j for j in open_jobs if j.created_at > utcnow() - JOB_TTL]) >= MAX_OPEN_JOBS and kind != "schema":
+        raise DatabaseError("A few jobs are still running on this database. Try again in a moment")
+    job = ConnectorJob(connector_id=connector.id, agent_id=agent_id, kind=kind, payload=dumps(payload), status="queued",
+                       summary=(summary or default_summary(kind, payload))[:300])
     db.add(job)
     db.commit()
     if connector.kind in ("direct", "php"):
@@ -163,6 +188,11 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
         direct.start(job.id)
         db.refresh(job)
     return job
+
+
+def save_upload_path(job: ConnectorJob) -> Path:
+    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    return EXPORT_DIR / f"job_{job.id}_{secrets.token_hex(6)}.csv.gz"
 
 
 def claim(db: Session, connector: Connector, limit: int = 3) -> list[ConnectorJob]:
@@ -182,7 +212,7 @@ def claim(db: Session, connector: Connector, limit: int = 3) -> list[ConnectorJo
     return jobs
 
 
-def complete(db: Session, connector: Connector, job_id: int, data: dict) -> ConnectorJob:
+def complete(db: Session, connector: Connector, job_id: int, data: dict, file_path=None) -> ConnectorJob:
     job = db.get(ConnectorJob, job_id)
     if job is None or job.connector_id != connector.id or job.status not in ("claimed", "queued"):
         raise DatabaseError("Unknown job")
@@ -195,20 +225,42 @@ def complete(db: Session, connector: Connector, job_id: int, data: dict) -> Conn
         return job
     result = data.get("result") or {}
     csv_text = data.get("csv")
-    if job.kind == "export" and isinstance(csv_text, str):
+    if file_path:
+        job.file_path = str(file_path)
+    if job.kind == "export" and isinstance(csv_text, str):       # older connectors send the CSV inline
         if len(csv_text.encode()) > MAX_RESULT_BYTES:
             job.status, job.error = "failed", "The export is bigger than 25 MB. Add a WHERE condition or fewer columns"
             db.commit()
             return job
-        EXPORT_DIR.mkdir(parents=True, exist_ok=True)
-        path = EXPORT_DIR / f"job_{job.id}_{secrets.token_hex(6)}.csv"
-        path.write_text(csv_text, encoding="utf-8")
+        import gzip
+
+        path = save_upload_path(job)
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as fh:
+            fh.write(csv_text)
         job.file_path = str(path)
+    if job.kind == "export" and not (job.file_path and os.path.exists(job.file_path)):
+        job.status, job.error = "failed", "The export file didn't arrive. Try again"
+        db.commit()
+        return job
     raw = json.dumps(result, ensure_ascii=False, default=str)
     job.result = raw if len(raw) < 2_000_000 else json.dumps({"truncated": True})
     job.status = "done"
     db.commit()
     return job
+
+
+def activity(db: Session, connector: Connector, after: int = 0, limit: int = 40) -> list[dict]:
+    q = select(ConnectorJob).where(ConnectorJob.connector_id == connector.id, ConnectorJob.kind != "live", ConnectorJob.id > after)
+    out = []
+    for j in db.scalars(q.order_by(ConnectorJob.id.desc()).limit(limit)):
+        r = loads(j.result, {}) or {}
+        rows = r.get("row_count")
+        if rows is None and j.kind == "schema":
+            rows = len(r.get("tables", []))
+        ms = int((j.finished_at - (j.claimed_at or j.created_at)).total_seconds() * 1000) if j.finished_at else None
+        out.append({"id": j.id, "kind": j.kind, "summary": j.summary or j.kind, "status": j.status, "error": j.error,
+                    "rows": rows, "ms": ms, "at": j.created_at.isoformat(), "undo": r.get("undo") if j.kind == "change" else None})
+    return out
 
 
 def job_dict(job: ConnectorJob) -> dict:

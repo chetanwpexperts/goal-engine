@@ -91,7 +91,7 @@ def _check_url(url: str) -> str:
     return url
 
 
-def call(url: str, key: str, kind: str, payload: dict | None = None, timeout: int = 100) -> dict:
+def call(url: str, key: str, kind: str, payload: dict | None = None, timeout: int = 100, stream_to=None) -> dict:
     body = json.dumps({"sealed": seal(key, {"kind": kind, "payload": payload or {}})})   # firewalls see no SQL
     for _ in range(3):                     # follow up to 2 redirects (http->https, www), each one re-checked
         url = _check_url(url)
@@ -111,6 +111,8 @@ def call(url: str, key: str, kind: str, payload: dict | None = None, timeout: in
         break
     else:
         raise PhpError("That link keeps redirecting")
+    if "ndjson" in r.headers.get("Content-Type", "") and r.status_code == 200:
+        return _read_stream(r, key, stream_to)
     data = b""
     for chunk in r.iter_content(65536):
         data += chunk
@@ -136,6 +138,37 @@ def call(url: str, key: str, kind: str, payload: dict | None = None, timeout: in
     return out
 
 
+def _read_stream(r, key: str, path) -> dict:
+    """An export arrives as encrypted gzip pieces, one per line; each piece goes straight to disk."""
+    import base64
+
+    size, final = 0, None
+    fh = open(path, "wb") if path else None
+    try:
+        for line in r.iter_lines(chunk_size=65536):
+            if not line:
+                continue
+            try:
+                item = unseal(key, json.loads(line)["sealed"])
+            except Exception as exc:  # noqa: BLE001
+                raise PhpError("The answer couldn't be verified. Download the file again and replace the old one", missing=True) from exc
+            if "part" in item:
+                piece = base64.b64decode(item["part"])
+                size += len(piece)
+                if size > MAX_RESPONSE:
+                    raise PhpError("The export is too big. Add a WHERE condition or fewer columns")
+                if fh:
+                    fh.write(piece)       # gzip pieces joined together are one valid .gz file
+            else:
+                final = item
+    finally:
+        if fh:
+            fh.close()
+    if final is None:
+        raise PhpError("The website stopped answering half way. Try again")
+    return final
+
+
 def link(db: Session, connector: Connector, url: str) -> Connector:
     from app.agents import database as dbagent
 
@@ -158,17 +191,14 @@ def link(db: Session, connector: Connector, url: str) -> Connector:
     return connector
 
 
-def run(connector: Connector, kind: str, payload: dict) -> dict:
+def run(connector: Connector, kind: str, payload: dict, export_path=None) -> dict:
     secret = direct.decrypt(connector.secret or "")
     if not secret.get("url"):
         raise PhpError("Paste the link of the uploaded file first")
-    out = call(secret["url"], secret["key"], kind, payload)
+    out = call(secret["url"], secret["key"], kind, payload, stream_to=export_path)
     if not out.get("ok"):
         raise PhpError(out.get("error") or "The file couldn't run that")
-    result = out.get("result") or {}
-    if out.get("csv") is not None:
-        result["csv"] = out["csv"]
-    return result
+    return out.get("result") or {}
 
 
 def check_all(db: Session) -> int:

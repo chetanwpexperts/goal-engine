@@ -253,20 +253,42 @@ def maintain(db: Session, now=None) -> int:
     return n
 
 
+_resume_lock = None
+
+
+def _resume_owner() -> bool:
+    """Only one server process resumes work: the first to take this lock keeps it for its whole life."""
+    global _resume_lock
+    if _resume_lock is not None:
+        return True
+    import fcntl
+
+    DATA.mkdir(parents=True, exist_ok=True)
+    fh = open(DATA / ".resume.lock", "w")
+    try:
+        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        fh.close()
+        return False
+    _resume_lock = fh
+    return True
+
+
 def resume_interrupted(boot) -> int:
-    """After a restart (an update, a crash), carry on with work that was running. Each file is claimed by one
-    worker only: the update succeeds for whoever changes it first."""
+    """After a restart (an update, a crash), carry on with work that was running, in one process only."""
     from sqlalchemy import update
 
     from app.db import _SessionLocal, get_engine
 
+    if not _resume_owner():
+        return 0
     get_engine()
     n = 0
     with _SessionLocal() as db:
         ids = list(db.scalars(select(OfficeFile.id).where(OfficeFile.status.in_(("queued", "working")), OfficeFile.updated_at < boot)))
         for fid in ids:
             claimed = db.execute(update(OfficeFile).where(OfficeFile.id == fid, OfficeFile.status.in_(("queued", "working")),
-                                                          OfficeFile.updated_at < boot).values(status="queued", updated_at=utcnow())).rowcount
+                                                          OfficeFile.updated_at < boot).values(status="queued", updated_at=boot)).rowcount
             db.commit()
             if claimed:
                 f = db.get(OfficeFile, fid)

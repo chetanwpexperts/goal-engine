@@ -128,6 +128,22 @@ def test_work_cut_off_by_a_restart_carries_on(client, ml_mode):
         row.updated_at = utcnow() - timedelta(minutes=1)
         db.commit()
     assert office_agent.resume_interrupted(utcnow()) == 1
-    assert office_agent.resume_interrupted(utcnow()) == 0     # the other worker doesn't run it again
     f = _wait(client, f["id"])
     assert f["status"] == "ready" and f["result"]["changes"]["trim_spaces"] >= 8
+
+
+def test_only_one_process_resumes(tmp_path):
+    import subprocess
+    import sys
+
+    code = ("from app.agents import office_agent as o; import pathlib; o.DATA = pathlib.Path(r'%s');"
+            "print(o._resume_owner())") % tmp_path
+    from app.agents import office_agent as o
+    import fcntl
+
+    tmp_path.mkdir(exist_ok=True)
+    held = open(tmp_path / ".resume.lock", "w")
+    fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)          # another worker already owns it
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=str(__import__("pathlib").Path(o.__file__).parents[2]))
+    assert out.stdout.strip() == "False", out.stderr
+    held.close()

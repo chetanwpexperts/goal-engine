@@ -25,6 +25,19 @@ Work top to bottom, one item per run. Tick `[x]` when done (and note it in LOG.m
 - [ ] Table purpose guessing: users/auth, orders, payments, products, logs, sessions, settings, jobs/queues, migrations, cache
 - [ ] Index rules: duplicate/redundant indexes, unused indexes (perf schema / pg_stat_user_indexes), missing index on join/filter columns
 
+## Real-world problems (Stack Overflow as the guide, official docs as the truth)
+- [ ] Top 50 MySQL/MariaDB questions on Stack Overflow + DBA Stack Exchange (by votes): check each is covered by errors/questions/slow_rules; add what's missing (with `seen_at` links)
+- [ ] Same for PostgreSQL
+- [ ] Laravel / WordPress / WooCommerce database problems people hit most (N+1, wp_options autoload bloat, postmeta joins, missing indexes on meta tables)
+
+## Recognise popular software from its tables (GitHub as facts)  (structure.json, kind "app_signature")
+- [ ] WordPress core + WooCommerce (+ HPOS order tables) + common plugins (Yoast, Elementor): table sets, what each table holds, key links
+- [ ] Laravel defaults (users, password_reset_tokens, jobs, failed_jobs, sessions, cache, migrations, personal_access_tokens), Spatie permission tables
+- [ ] Magento 2, OpenCart, PrestaShop, Django auth/admin, CodeIgniter sessions
+
+## Ideas from well-known database tools (write our own rules; MIT/Apache only if copying)
+- [ ] MySQLTuner checks -> health rules; pt-query-digest / pgBadger report sections -> daily report ideas; SQL linter anti-patterns -> slow_rules
+
 ## Later: more database engines
 - [ ] SQL Server: error numbers, catalog queries (sys.tables, sys.columns, sys.indexes), DMVs for live view, templates in T-SQL
 - [ ] Oracle: ORA- errors, data dictionary (ALL_TABLES, ALL_TAB_COLUMNS), templates

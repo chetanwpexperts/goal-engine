@@ -50,6 +50,11 @@ def validate() -> list[str]:
             seen.add(e["id"])
             if not str(e["source"]).startswith("https://"):
                 problems.append(f"{where}: source must be an https link to official docs")
+            for link in e.get("seen_at", []):
+                if not str(link).startswith("https://"):
+                    problems.append(f"{where}: seen_at links must be https")
+            if "license" in e and str(e["license"]).upper().startswith(("GPL", "AGPL", "LGPL")):
+                problems.append(f"{where}: nothing may be copied from GPL-family projects")
             for eng in e.get("engines", []):
                 if eng not in ENGINES:
                     problems.append(f"{where}: unknown engine {eng}")

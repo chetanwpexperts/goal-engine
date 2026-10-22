@@ -3,9 +3,16 @@
 Goal Engine solves database problems **without AI**. Its "brain" is the knowledge in `app/dbknow/*.json`.
 A scheduled session adds to it every night. These rules are for that session (and any human doing the same work).
 
+## Sources
+- **Truth comes from official documentation** (dev.mysql.com, mariadb.com/kb, postgresql.org/docs, learn.microsoft.com, docs.oracle.com, sqlite.org). Every entry's `source` is an official page.
+- **Stack Overflow / DBA Stack Exchange: to find WHAT real people get stuck on**, never to copy. Read questions to pick the most common real problems, then write our own entry from the official docs.
+  Put the question links in the optional `seen_at` list. Never copy answer text or code (CC BY-SA would then apply to Goal Engine). Don't scrape in bulk; read pages normally.
+- **GitHub: facts and ideas, not code.**
+  - Table structures of popular software (WordPress core, WooCommerce, Laravel defaults, Magento, Django auth, OpenCart, PrestaShop) are facts: record them in `structure.json` as recognisers ("this table set = WooCommerce").
+  - Well-known database tools (MySQLTuner, pt-query-digest, pgBadger, SQL linters) show which problems are worth detecting: write our own rules. Copy text/code only from MIT/Apache/BSD projects with the license noted in the entry, and **never from GPL/AGPL projects**.
+
 ## Never
 - Never look at, connect to, or collect anything from any user's database or Goal Engine's production data.
-  Knowledge comes only from **official public documentation** (dev.mysql.com, mariadb.com/kb, postgresql.org/docs, learn.microsoft.com, docs.oracle.com, sqlite.org).
 - Never push to `main`, never deploy, never touch the server. Work only on the `db-knowledge` branch.
 - Never add AI/LLM calls or paid APIs.
 - Never weaken a safety rule (read-only checks, approval + Undo, privacy wipes). If a task seems to need that, stop and write it in LOG.md for Chetan.

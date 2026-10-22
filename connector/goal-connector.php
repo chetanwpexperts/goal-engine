@@ -194,8 +194,9 @@ function goal_rows($pdo, $type, $sql, $limit = 0) {
         $cols = [];
         for ($i = 0; $i < $st->columnCount(); $i++) { $m = $st->getColumnMeta($i); $cols[] = $m['name']; }
         $rows = [];
+        $hidden = goal_hidden($cols);
         while (($r = $st->fetch()) !== false) {
-            $rows[] = array_map('goal_clean', $r);
+            $rows[] = goal_mask(array_map('goal_clean', $r), $hidden);
             if ($limit && count($rows) >= $limit) break;
         }
         $st->closeCursor();
@@ -203,6 +204,21 @@ function goal_rows($pdo, $type, $sql, $limit = 0) {
         try { $pdo->exec('ROLLBACK'); } catch (Exception $e) {}
     }
     return [$cols, $rows];
+}
+
+// Columns that hold secrets are never sent, even in a preview (WordPress user_pass, API tokens, ...)
+function goal_hidden($cols) {
+    $h = [];
+    foreach ($cols as $i => $c) {
+        $n = strtolower(preg_replace('/([a-z0-9])([A-Z])/', '$1_$2', (string)$c));   // apiToken -> api_token
+        if (preg_match('/(^|_)(pass|password|passwd|pwd|secret|secrets|token|tokens|salt|hash|otp|cvv|pin)($|_)|api_?key|private_?key|card_?number|session/', $n)) $h[$i] = true;
+    }
+    return $h;
+}
+
+function goal_mask($row, $hidden) {
+    foreach ($hidden as $i => $_) if (isset($row[$i]) && $row[$i] !== null) $row[$i] = "\u{2022}\u{2022}\u{2022}\u{2022}";
+    return $row;
 }
 
 function goal_clean($v) {
@@ -273,8 +289,9 @@ function goal_export($pdo, $type, $sql) {
         $cols = [];
         for ($i = 0; $i < $st->columnCount(); $i++) { $m = $st->getColumnMeta($i); $cols[] = $m['name']; }
         fputcsv($fh, $cols);
+        $hidden = goal_hidden($cols);
         while (($r = $st->fetch()) !== false) {
-            fputcsv($fh, array_map('goal_clean', $r));
+            fputcsv($fh, goal_mask(array_map('goal_clean', $r), $hidden));
             $count++;
             if ($count >= GOAL_MAX_ROWS || ftell($fh) > GOAL_MAX_BYTES) { $limited = true; break; }
         }

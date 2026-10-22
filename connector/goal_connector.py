@@ -146,7 +146,9 @@ class Driver:
 
     def query(self, sql, limit):
         cols, rows = self.rows(safe_sql(sql), limit=limit)
-        return {"columns": cols, "rows": [[clean(v) for v in r] for r in rows], "row_count": len(rows), "limited": len(rows) >= limit}
+        hidden = secret_columns(cols)
+        return {"columns": cols, "rows": [mask_row([clean(v) for v in r], hidden) for r in rows], "row_count": len(rows),
+                "limited": len(rows) >= limit, "hidden_columns": [cols[i] for i in hidden]}
 
     def export(self, sql):
         sql = safe_sql(sql)
@@ -156,13 +158,15 @@ class Driver:
         count = 0
         try:
             cur.execute(sql)
-            writer.writerow([d[0] for d in cur.description or []])
+            cols = [d[0] for d in cur.description or []]
+            hidden = secret_columns(cols)
+            writer.writerow(cols)
             while True:
                 batch = cur.fetchmany(2000)
                 if not batch:
                     break
                 for r in batch:
-                    writer.writerow([clean(v) for v in r])
+                    writer.writerow(mask_row([clean(v) for v in r], hidden))
                     count += 1
                 if count >= MAX_EXPORT_ROWS or buf.tell() > MAX_EXPORT_BYTES:
                     break
@@ -321,6 +325,21 @@ def Database(cfg):  # noqa: N802 - kept as the public name
     if driver is None:
         raise ValueError(f"Unknown database type: {cfg.get('type')}")
     return driver(cfg)
+
+
+# Columns that hold secrets are never sent, even in a preview (WordPress user_pass, API tokens, ...)
+SECRET_COLUMN = re.compile(r"(^|_)(pass|password|passwd|pwd|secret|secrets|token|tokens|salt|hash|otp|cvv|pin)($|_)"
+                           r"|api_?key|private_?key|card_?number|session", re.I)
+MASK = "••••"
+
+
+def secret_columns(cols):
+    # apiToken -> api_token, so camelCase names are caught too
+    return [i for i, c in enumerate(cols) if SECRET_COLUMN.search(re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", str(c or "")).lower())]
+
+
+def mask_row(row, hidden):
+    return [MASK if i in hidden and v is not None else v for i, v in enumerate(row)]
 
 
 def clean(v):

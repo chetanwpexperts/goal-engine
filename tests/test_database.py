@@ -238,7 +238,7 @@ def test_direct_end_to_end_with_real_mysql(client, ml_mode, monkeypatch):
     assert res.status_code == 200, res.text
     card = res.json()["agents"][0]
     c = card["connector"]
-    assert c["kind"] == "direct" and c["online"] and c["can_write"] is True and [t["name"] for t in c["tables"]] == ["orders"]
+    assert c["kind"] == "direct" and c["online"] and c["can_write"] is True and "orders" in [t["name"] for t in c["tables"]]
 
     from app.db import get_db
     from app.models import Connector
@@ -320,3 +320,23 @@ def test_mysql_transaction_refuses_writes_even_without_the_check():
         cur.execute("DELETE FROM orders")
     db.done()
     assert db.query("SELECT count(*) FROM orders", 5)["rows"][0][0] >= 2
+
+
+def test_secret_columns_are_hidden():
+    cols = ["ID", "user_login", "user_pass", "user_email", "apiToken", "api_key", "passenger_name", "compass", "password_hash",
+            "remember_token", "session_id", "card_number", "hashtag_count"]
+    hidden = {cols[i] for i in gc.secret_columns(cols)}
+    assert hidden == {"user_pass", "apiToken", "api_key", "password_hash", "remember_token", "session_id", "card_number"}
+
+
+def test_preview_and_export_never_contain_passwords(tmp_path):
+    import sqlite3 as _sq
+    path = tmp_path / "wp.sqlite"
+    con = _sq.connect(path)
+    con.executescript("CREATE TABLE wp_users (ID INTEGER PRIMARY KEY, user_login TEXT, user_pass TEXT, user_email TEXT);"
+                      "INSERT INTO wp_users VALUES (1, 'admin', '$P$Bsecrethash', 'a@b.com');")
+    con.commit(); con.close()
+    db = gc.Database({"type": "sqlite", "database": str(path)}).connect()
+    q = db.query("SELECT * FROM wp_users", 10)
+    assert "$P$Bsecrethash" not in str(q) and q["hidden_columns"] == ["user_pass"] and q["rows"][0][1] == "admin"
+    assert "$P$Bsecrethash" not in db.export("SELECT * FROM wp_users")["csv"]

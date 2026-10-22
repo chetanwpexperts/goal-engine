@@ -59,7 +59,7 @@ def test_php_file_end_to_end(client, ml_mode, wp_site, env):
     ok = client.post(f"/api/connectors/{cid}/php-link", json={"url": f"http://127.0.0.1:8099/{name}"})
     assert ok.status_code == 200, ok.text
     c = ok.json()["connector"]
-    assert c["online"] and c["db_name"] == "shop_db" and [t["name"] for t in c["tables"]] == ["orders"]
+    assert c["online"] and c["db_name"] == "shop_db" and "orders" in [t["name"] for t in c["tables"]]
 
     q = client.post(f"/api/connectors/{cid}/jobs", json={"kind": "query", "table": "orders"}).json()
     assert client.get(f"/api/connector-jobs/{q['id']}").json()["result"]["row_count"] >= 2
@@ -138,3 +138,16 @@ def test_removed_file_is_noticed_and_fixed_by_uploading_again(client, ml_mode, w
 
 
 import re  # noqa: E402
+
+
+def test_php_file_hides_password_columns(wp_site, env):
+    key = "p" * 40
+    (wp_site / "m.php").write_text(phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "2").replace("__KEY__", key))
+    url = "http://127.0.0.1:8099/m.php"
+    import subprocess as sp
+    sp.run(["mysql", "-e", "USE shop_db; CREATE TABLE IF NOT EXISTS wp_users (ID INT PRIMARY KEY, user_login VARCHAR(50), "
+            "user_pass VARCHAR(255), user_email VARCHAR(100)); REPLACE INTO wp_users VALUES (1,'admin','$P$Bsecrethash','a@b.com');"])
+    q = phpconn.call(url, key, "query", {"sql": "SELECT * FROM wp_users", "limit": 5})
+    assert q["ok"] and "secrethash" not in str(q) and q["result"]["rows"][0][1] == "admin"
+    e = phpconn.call(url, key, "export", {"sql": "SELECT * FROM wp_users"})
+    assert "secrethash" not in e["csv"] and "admin" in e["csv"]

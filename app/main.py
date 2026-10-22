@@ -1,4 +1,5 @@
 import logging
+import asyncio
 import hmac
 import os
 import time
@@ -12,6 +13,7 @@ from typing import Literal
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -22,6 +24,7 @@ from app.agents import automation
 from app import privacy
 from app.agents import database as dbagent
 from app.agents import direct as dbagent_direct
+from app.agents import phpconn
 from app.agents.core import AgentError, agent_dict, claim_due, goal_agents, run_agent
 from app.agents.mailer import SmtpMailer
 from app.engine import _after_run
@@ -362,13 +365,24 @@ async def connector_hello(request: Request, db: Session = Depends(get_db)):
     dbagent.queue(db, connector, "schema")   # fresh table list every time it starts
     if connector.can_write:
         logging.getLogger(__name__).info("Connector %s reports a database user that can write", connector.id)
-    return {"ok": True, "poll_seconds": 4}
+    return {"ok": True, "poll_seconds": 4, "long_poll": 20}
 
 
 @app.post("/api/connector/poll")
-def connector_poll(request: Request, db: Session = Depends(get_db)):
-    connector = _connector_from(request, db)
-    jobs = dbagent.claim(db, connector)
+async def connector_poll(request: Request, db: Session = Depends(get_db)):
+    """Long poll: the connector's request waits here (up to ?wait= seconds, max 25) until a job arrives,
+    so a job starts the moment it's queued instead of on the next 4-second check."""
+    connector = await run_in_threadpool(_connector_from, request, db)
+    try:
+        wait = max(0.0, min(25.0, float(request.query_params.get("wait", "0"))))
+    except ValueError:
+        wait = 0.0
+    deadline = time.monotonic() + wait
+    while True:
+        jobs = await run_in_threadpool(dbagent.claim, db, connector)
+        if jobs or time.monotonic() >= deadline or await request.is_disconnected():
+            break
+        await asyncio.sleep(0.4)
     return {"jobs": [{"id": j.id, "kind": j.kind, "payload": loads(j.payload, {})} for j in jobs]}
 
 
@@ -477,6 +491,50 @@ def connect_direct(body: DirectIn, db: Session = Depends(get_db), visitor: str =
         agent.inputs = dumps(inputs)
         db.commit()
         return _agent_payload(db, agent, visitor)
+    return {"connector": dbagent.connector_dict(connector, db)}
+
+
+class PhpLinkIn(BaseModel):
+    url: str = ""
+
+
+@app.post("/api/agents/{agent_id}/php-connector")
+def create_php_connector(agent_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    agent = own_agent(db, agent_id, visitor)
+    try:
+        connector = phpconn.create(db, visitor)
+    except (dbagent.DatabaseError, dbagent_direct.DirectError) as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    inputs = loads(agent.inputs, {}) or {}
+    inputs["connector_id"] = connector.id
+    agent.inputs = dumps(inputs)
+    db.commit()
+    return _agent_payload(db, agent, visitor)
+
+
+@app.get("/api/connectors/{connector_id}/php-file")
+def download_php_file(connector_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    try:
+        connector = dbagent.own_connector(db, connector_id, visitor)
+    except dbagent.DatabaseError:
+        raise HTTPException(404, "Not found")
+    if connector.kind != "php" or not connector.secret:
+        raise HTTPException(404, "Not found")
+    return Response(phpconn.file_text(connector), media_type="application/x-httpd-php",
+                    headers={"Content-Disposition": f'attachment; filename="{phpconn.file_name(connector)}"',
+                             "Cache-Control": "no-store"})
+
+
+@app.post("/api/connectors/{connector_id}/php-link")
+def link_php_file(connector_id: int, body: PhpLinkIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    try:
+        connector = dbagent.own_connector(db, connector_id, visitor)
+        if connector.kind != "php":
+            raise dbagent.DatabaseError("Not a website connection")
+        dbagent_direct._rate_limit(visitor)
+        phpconn.link(db, connector, body.url)
+    except (dbagent.DatabaseError, dbagent_direct.DirectError) as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
     return {"connector": dbagent.connector_dict(connector, db)}
 
 

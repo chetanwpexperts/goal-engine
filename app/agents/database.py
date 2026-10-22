@@ -93,13 +93,13 @@ def authenticate(db: Session, token: str) -> Connector | None:
     if not token or not token.startswith("gec_"):
         return None
     connector = db.scalar(select(Connector).where(Connector.token_hash == _hash(token)))
-    if connector is None or connector.status == "disconnected" or connector.kind == "direct":
+    if connector is None or connector.status == "disconnected" or connector.kind in ("direct", "php"):
         return None
     return connector
 
 
 def is_online(connector: Connector) -> bool:
-    if connector.kind == "direct":
+    if connector.kind in ("direct", "php"):
         return connector.status == "online"
     return bool(connector.last_seen_at and utcnow() - connector.last_seen_at < ONLINE_WINDOW
                 and connector.status != "disconnected")
@@ -144,7 +144,7 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
     job = ConnectorJob(connector_id=connector.id, agent_id=agent_id, kind=kind, payload=dumps(payload), status="queued")
     db.add(job)
     db.commit()
-    if connector.kind == "direct":
+    if connector.kind in ("direct", "php"):
         from app.agents import direct
 
         direct.start(job.id)
@@ -333,8 +333,8 @@ def plan_reply(mode: str, hi: bool, has_connector: bool, later: list[str] | None
     if has_connector:
         return (f"Main ye karunga: {title}. Aapka database juda hua hai, table chuno." if hi
                 else f"Here's what I'll do: {title}. Your database is connected; pick a table.")
-    return (f"Main ye karunga: {title}. Bas database ki details bharo aur Jodo dabao."
-            if hi else f"Here's what I'll do: {title}. Just fill in the database details and tap Connect.")
+    return (f"Main ye karunga: {title}. Bas batao aapka database kahan hai, 1-2 step mein jud jayega."
+            if hi else f"Here's what I'll do: {title}. Just tell me where your database is; it connects in a step or two.")
 
 
 def clean_exports(max_age_hours: int = 24) -> None:

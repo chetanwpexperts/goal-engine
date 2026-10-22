@@ -504,27 +504,61 @@
     }, 3000);
   }
 
-  function setupBox(a, hi) {
-    const box = el("div", "slot");
-    if (a.connectors && a.connectors.length) {
-      box.append(el("label", null, T(hi, "Pehle se juda database use karo", "Use a database you already connected")));
-      const row = el("div", "acts flat");
-      for (const c of a.connectors) {
-        const b = el("button", "btn", `${c.name}${c.db_name && c.db_name !== c.name ? ` · ${c.db_name}` : ""}`);
-        b.type = "button";
-        b.addEventListener("click", async () => renderAgents((await api(`/api/agents/${a.id}/connect/${c.id}`, { method: "POST" })).agents));
-        row.append(b);
+  // ---- the three ways in, chosen by one question
+  function phpPanel(a, hi, c) {
+    const box = el("div", "slot inner");
+    const step = (n, text) => { const p = el("p", "step"); p.append(el("b", null, `${n}`), el("span", null, text)); return p; };
+    const dl = el("button", "btn solid", T(hi, "File download karo", "Download the file")); dl.type = "button";
+    const url = el("input"); url.type = "url"; url.placeholder = "https://aapki-site.com/goal-connector-….php";
+    const check = el("button", "btn go", T(hi, "Jodo", "Connect")); check.type = "submit";
+    const err = el("p", "note err"); err.hidden = true;
+    const form = el("form", "row"); form.append(url, check);
+    box.append(
+      step(1, T(hi, "Ye file download karo (har database ke liye alag, isme ek secret key hai):", "Download this file (one per database; it has its own secret key):")),
+      dl,
+      step(2, T(hi, "Hosting ke File Manager mein website ke main folder mein upload karo, jahan wp-config.php ya .env hai.",
+                    "Upload it with your hosting's File Manager into the website's main folder, where wp-config.php or .env is.")),
+      step(3, T(hi, "Upload ki hui file ka link yahan paste karo:", "Paste the link of the uploaded file here:")),
+      form, err,
+      el("p", "fine", T(hi, "Password aapki hosting pe hi rehta hai. File sirf Goal Engine ki signed requests maanti hai aur kuch badal nahi sakti. Disconnect karne ke liye file delete kar do.",
+                            "Your password stays on your hosting. The file only accepts signed requests from Goal Engine and can't change anything. Delete the file to disconnect.")));
+    let cid = c ? c.id : null;
+    dl.addEventListener("click", async () => {
+      dl.disabled = true;
+      try {
+        if (!cid) {
+          const data = await api(`/api/agents/${a.id}/php-connector`, { method: "POST" });
+          cid = (data.agents.find((x) => x.id === a.id) || {}).connector.id;
+        }
+        window.location.href = `/api/connectors/${cid}/php-file`;
+        dl.textContent = T(hi, "Download ho gaya. Dobara?", "Downloaded. Again?");
+        url.focus();
+      } catch (ex) { addMachine(ex.message, [], true); }
+      dl.disabled = false;
+    });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!cid) { err.textContent = T(hi, "Pehle file download karo (step 1).", "Download the file first (step 1)."); err.hidden = false; return; }
+      check.disabled = true; check.textContent = T(hi, "Check kar raha hoon…", "Checking…"); err.hidden = true;
+      try {
+        await api(`/api/connectors/${cid}/php-link`, { method: "POST", body: JSON.stringify({ url: url.value }) });
+        addMachine(T(hi, "Website ka database jud gaya. Tables padh raha hoon.", "Your website's database is connected. Reading the tables."),
+                   [T(hi, "Signed, read-only connection", "Signed, read-only connection")]);
+        await refreshGoal();
+      } catch (ex) {
+        err.textContent = ex.message; err.hidden = false;
+        check.disabled = false; check.textContent = T(hi, "Jodo", "Connect");
       }
-      box.append(row, el("label", null, T(hi, "Ya naya database jodo", "Or connect a new one")));
-    }
+    });
+    return box;
+  }
 
-    // Typed on Goal Engine: no terminal
-    const vps = el("details", "vps");
-    const form = el("form", "dbform");
+  function formPanel(a, hi, onUseCommand) {
+    const form = el("form", "dbform inner");
     const field = (label, input) => { const l = el("label", "f"); l.append(el("span", null, label), input); return l; };
     const type = el("select");
     for (const [v, t] of [["mysql", "MySQL / MariaDB"], ["postgres", "PostgreSQL"]]) { const o = el("option", null, t); o.value = v; type.append(o); }
-    const host = el("input"); host.placeholder = T(hi, "jaise db.mysite.com ya server ka IP", "e.g. db.mysite.com or the server IP"); host.autocomplete = "off"; host.required = true;
+    const host = el("input"); host.placeholder = T(hi, "jaise db.provider.com", "e.g. db.provider.com"); host.autocomplete = "off"; host.required = true;
     const port = el("input"); port.inputMode = "numeric"; port.placeholder = "3306"; port.maxLength = 5;
     type.addEventListener("change", () => { port.placeholder = type.value === "postgres" ? "5432" : "3306"; });
     const dbn = el("input"); dbn.autocomplete = "off"; dbn.required = true;
@@ -533,17 +567,14 @@
     const r1 = el("div", "row two"); r1.append(field(T(hi, "Database", "Database"), type), field("Port", port));
     const r2 = el("div", "row two"); r2.append(field(T(hi, "Database ka naam", "Database name"), dbn), field(T(hi, "User", "User"), user));
     form.append(r1, field("Host", host), r2, field(T(hi, "Password", "Password"), pass));
-    const hint = el("p", "fine", T(hi, "Sirf padhne wala (read-only) user sabse safe hai. cPanel mein: MySQL Databases → naya user, sirf SELECT. Password encrypt karke rakha jaata hai, hum data badal nahi sakte.",
-                                     "A read-only user is safest. In cPanel: MySQL Databases → new user with SELECT only. The password is stored encrypted, and nothing can change your data."));
-    const ipHint = el("p", "fine");
+    const ipHint = el("p", "fine", T(hi, "Sirf-SELECT wala user sabse safe hai. Password encrypt karke rakha jaata hai.", "A SELECT-only user is safest. The password is stored encrypted."));
     api("/api/connector-info").then((d) => {
-      if (d.server_ip) ipHint.textContent = T(hi, `Remote access mein ye IP allow karo: ${d.server_ip}`, `Allow this IP for remote access: ${d.server_ip}`);
+      if (d.server_ip) ipHint.textContent += T(hi, ` Provider ke "allowed IPs" mein ye daalo: ${d.server_ip}`, ` Add this to your provider's allowed IPs: ${d.server_ip}`);
     }).catch(() => {});
     const go = el("button", "btn solid", T(hi, "Jodo", "Connect")); go.type = "submit";
-    const err = el("p", "note err");
-    err.hidden = true;
+    const err = el("p", "note err"); err.hidden = true;
     const ga = el("div", "acts flat"); ga.append(go);
-    form.append(hint, ipHint, ga, err);
+    form.append(ipHint, ga, err);
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       go.disabled = true; go.textContent = T(hi, "Jod raha hoon…", "Connecting…"); err.hidden = true;
@@ -556,32 +587,71 @@
       } catch (ex) {
         err.textContent = ex.message; err.hidden = false;
         go.disabled = false; go.textContent = T(hi, "Jodo", "Connect");
-        if (ex.data && ex.data.use_command) { vps.open = true; vps.classList.add("hint"); vps.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" }); }
+        if (ex.data && ex.data.use_command && onUseCommand) onUseCommand();
       }
     });
-    box.append(form);
+    return form;
+  }
 
-    // On a VPS where the database only listens locally: one command on the server
-    vps.append(el("summary", null, T(hi, "Database sirf server ke andar chalta hai (VPS)? Ek command se jodo", "Database only reachable inside your server (VPS)? Connect with one command")));
-    const make = el("button", "btn", T(hi, "Command banao", "Get the command")); make.type = "button";
-    const inner = el("div", "slot inner"); inner.append(make);
-    vps.append(inner);
+  function vpsPanel(a, hi) {
+    const box = el("div", "slot inner");
+    const make = el("button", "btn solid", T(hi, "Command banao", "Get the command")); make.type = "button";
+    box.append(el("p", "fine", T(hi, "Server ke terminal mein ek command paste karni hai. Ye database khud dhoondh lega.",
+                                     "You'll paste one command in your server's terminal. It finds the database by itself.")), make);
     make.addEventListener("click", async () => {
       make.disabled = true;
       try {
         const data = await api("/api/connectors", { method: "POST", body: JSON.stringify({ agent_id: a.id }) });
-        const w = W(a.lang);
-        inner.replaceChildren(
-          el("label", null, T(hi, "Ye ek command server ke terminal mein paste karo. Ye sirf ek baar dikhega:",
-                                  "Paste this one command in your server's terminal. It's shown only once:")),
-          codeBox("", data.command, w),
-          el("p", "fine", T(hi, "Ye aapke project ki settings khud dhoondh lega, aap bas Enter dabao. Password aapke server pe hi rehta hai.",
-                                "It finds your project's database settings by itself; you just press Enter. The password stays on your server.")),
+        box.replaceChildren(
+          el("label", null, T(hi, "Ye ek command server ke terminal mein paste karo. Ye sirf ek baar dikhega:", "Paste this one command in your server's terminal. It's shown only once:")),
+          codeBox("", data.command, W(a.lang)),
+          el("p", "fine", T(hi, "List mein se database ka number chuno aur Enter dabao. Password aapke server pe hi rehta hai.",
+                                "Pick your database's number from the list and press Enter. The password stays on your server.")),
           el("p", "waiting", T(hi, "Connector ka intezaar…", "Waiting for the connector…")));
         watchConnector(data.connector.id, a.id);
       } catch (ex) { addMachine(ex.message, [], true); make.disabled = false; }
     });
-    box.append(vps);
+    return box;
+  }
+
+  function setupBox(a, hi) {
+    const box = el("div", "slot");
+    if (a.connectors && a.connectors.some((c) => c.online)) {
+      box.append(el("label", null, T(hi, "Pehle se juda database use karo", "Use a database you already connected")));
+      const row = el("div", "acts flat");
+      for (const c of a.connectors.filter((x) => x.online)) {
+        const b = el("button", "btn", `${c.name}${c.db_name && c.db_name !== c.name ? ` · ${c.db_name}` : ""}`);
+        b.type = "button";
+        b.addEventListener("click", async () => renderAgents((await api(`/api/agents/${a.id}/connect/${c.id}`, { method: "POST" })).agents));
+        row.append(b);
+      }
+      box.append(row);
+    }
+    box.append(el("p", "ask", T(hi, "Aapka database kahan hai?", "Where is your database?")));
+    const choices = el("div", "where");
+    const panel = el("div", "where-panel");
+    const options = [
+      ["hosting", T(hi, "Website hosting", "Website hosting"), T(hi, "cPanel, Hostinger, WordPress, PHP site · terminal nahi chahiye", "cPanel, Hostinger, WordPress, any PHP site · no terminal")],
+      ["cloud", T(hi, "Cloud database", "Cloud database"), T(hi, "AWS, DigitalOcean, Supabase, Neon · bas details bharo", "AWS, DigitalOcean, Supabase, Neon · just fill the details")],
+      ["vps", T(hi, "Apna server / VPS", "My own server / VPS"), T(hi, "Terminal access hai · ek command", "You have a terminal · one command")],
+      ["windows", T(hi, "Windows PC / XAMPP", "Windows PC / XAMPP"), T(hi, "Jald aa raha", "Coming soon")],
+    ];
+    const pick = (key) => {
+      for (const b of choices.children) b.setAttribute("aria-pressed", String(b.dataset.key === key));
+      panel.replaceChildren();
+      if (key === "hosting") panel.append(phpPanel(a, hi, null));
+      else if (key === "cloud") panel.append(formPanel(a, hi, () => pick("vps")));
+      else if (key === "vps") panel.append(vpsPanel(a, hi));
+      else panel.append(el("p", "fine", T(hi, "Windows connector ban raha hai. Agar aapki website kisi hosting pe hai to \"Website hosting\" chuno, wo abhi kaam karega.",
+                                             "The Windows connector is being built. If your website is on hosting, choose \"Website hosting\"; that works now.")));
+    };
+    for (const [key, title, sub] of options) {
+      const b = el("button", "choice"); b.type = "button"; b.dataset.key = key; b.setAttribute("aria-pressed", "false");
+      b.append(el("b", null, title), el("span", null, sub));
+      b.addEventListener("click", () => pick(key));
+      choices.append(b);
+    }
+    box.append(choices, panel);
     return box;
   }
 
@@ -599,6 +669,7 @@
     if (!a.available) card.append(el("p", "note", T(hi, "Ye level abhi ban raha hai. Tab tak data dekh, export aur report kar sakte ho.",
                                                       "This level is being built. Until then you can view, export and report.")));
     if (!c) { card.append(setupBox(a, hi)); return card; }
+    if (c.kind === "php" && !c.online) { card.append(phpPanel(a, hi, c)); return card; }
 
     const out = el("div", "db-out");
     const say = (text) => { out.replaceChildren(el("p", "waiting", text)); };

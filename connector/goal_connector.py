@@ -52,49 +52,50 @@ def safe_sql(sql, allow_write=False):
 
 
 # ---------------------------------------------------------------- database drivers
-class Database:
+# ---------------------------------------------------------------- database drivers
+# Each database type is one small class. To support a new database (SQL Server, Oracle, ...),
+# add a Driver subclass and register it in DRIVERS; the jobs, safety checks and Goal Engine
+# itself don't change.
+class Driver:
+    name = ""
+    default_port = 0
+    explain_prefix = "EXPLAIN "
+    version_sql = "SELECT 1"
+    has_primary_keys_in_schema = True
+
     def __init__(self, cfg):
         self.cfg = cfg
         self.kind = cfg["type"]
         self.conn = None
 
+    # --- per database
+    def open(self):
+        raise NotImplementedError
+
+    def start_read_only(self, cur):
+        """Put the session/transaction in read-only mode with a time limit."""
+
+    def alive(self):
+        return True
+
+    def write_rights(self):
+        return False
+
+    def tables(self):
+        """[(name, rows, bytes)] and [(table, column, type, key)]"""
+        raise NotImplementedError
+
+    def server_checks(self, out):
+        """Extra health checks this database can do."""
+
+    # --- shared by every database
     def connect(self):
-        c = self.cfg
-        if self.kind == "mysql":
-            try:
-                import pymysql
-            except ImportError:
-                sys.exit("Install the MySQL driver first:  pip3 install pymysql")
-            self.conn = pymysql.connect(host=c["host"], port=int(c.get("port") or 3306), user=c["user"], password=c["password"],
-                                        database=c["database"], charset="utf8mb4", connect_timeout=5, read_timeout=120,
-                                        autocommit=False)
-        elif self.kind == "postgres":
-            try:
-                import psycopg
-                self.conn = psycopg.connect(host=c["host"], port=int(c.get("port") or 5432), user=c["user"], password=c["password"],
-                                            dbname=c["database"], connect_timeout=10)
-            except ImportError:
-                try:
-                    import psycopg2 as psycopg
-                except ImportError:
-                    import subprocess
-                    if subprocess.run([sys.executable, "-m", "pip", "install", "-q", "psycopg[binary]"]).returncode != 0:
-                        sys.exit("Install the PostgreSQL driver first:  pip3 install 'psycopg[binary]'")
-                    import psycopg
-                self.conn = psycopg.connect(host=c["host"], port=int(c.get("port") or 5432), user=c["user"], password=c["password"],
-                                            dbname=c["database"], connect_timeout=10)
-        elif self.kind == "sqlite":
-            import sqlite3
-            self.conn = sqlite3.connect(f"file:{c['database']}?mode=ro", uri=True)
-        else:
-            raise ValueError("Unknown database type")
+        self.conn = self.open()
         return self
 
     def ensure(self):
         try:
-            if self.kind == "mysql":
-                self.conn.ping()
-            elif self.kind == "postgres" and self.conn.closed:
+            if not self.alive():
                 self.connect()
         except Exception:  # noqa: BLE001
             self.connect()
@@ -102,19 +103,8 @@ class Database:
     def cursor(self, read_only=True):
         self.ensure()
         cur = self.conn.cursor()
-        if read_only and self.kind == "mysql":
-            cur.execute("SET SESSION TRANSACTION READ ONLY")
-            for limit in ("SET SESSION MAX_EXECUTION_TIME=120000", "SET SESSION max_statement_time=120"):  # MySQL / MariaDB
-                try:
-                    cur.execute(limit)
-                    break
-                except Exception:  # noqa: BLE001
-                    continue
-            cur.execute("START TRANSACTION READ ONLY")
-        elif read_only and self.kind == "postgres":
-            self.conn.rollback()
-            cur.execute("SET TRANSACTION READ ONLY")
-            cur.execute("SET LOCAL statement_timeout = '120s'")
+        if read_only:
+            self.start_read_only(cur)
         return cur
 
     def done(self):
@@ -135,46 +125,17 @@ class Database:
             self.done()
 
     def version(self):
-        sql = {"mysql": "SELECT VERSION()", "postgres": "SHOW server_version", "sqlite": "SELECT sqlite_version()"}[self.kind]
-        return str(self.rows(sql)[1][0][0])
+        return str(self.rows(self.version_sql)[1][0][0])
 
     def can_write(self):
         """Does this database user have write rights? (We still never write.)"""
         try:
-            if self.kind == "mysql":
-                _, grants = self.rows("SHOW GRANTS")
-                text = " ".join(str(g[0]).upper() for g in grants)
-                return bool(re.search(r"ALL PRIVILEGES|INSERT|UPDATE|DELETE|DROP", text))
-            if self.kind == "postgres":
-                _, r = self.rows("SELECT count(*) FROM information_schema.table_privileges WHERE grantee = current_user "
-                                 "AND privilege_type IN ('INSERT','UPDATE','DELETE')")
-                _, su = self.rows("SELECT rolsuper FROM pg_roles WHERE rolname = current_user")
-                return bool(r[0][0]) or bool(su and su[0][0])
+            return bool(self.write_rights())
         except Exception:  # noqa: BLE001
             return False
-        return False
 
-    # ------------------------------------------------ jobs
     def schema(self):
-        if self.kind == "mysql":
-            _, rows = self.rows("SELECT table_name, table_rows, data_length + index_length FROM information_schema.tables "
-                                "WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' ORDER BY table_name")
-            _, cols = self.rows("SELECT table_name, column_name, column_type, column_key FROM information_schema.columns "
-                                "WHERE table_schema = DATABASE() ORDER BY table_name, ordinal_position")
-        elif self.kind == "postgres":
-            _, rows = self.rows("SELECT c.relname, c.reltuples::bigint, pg_total_relation_size(c.oid) FROM pg_class c "
-                                "JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'r' AND n.nspname = 'public' "
-                                "ORDER BY c.relname")
-            _, cols = self.rows("SELECT table_name, column_name, data_type, '' FROM information_schema.columns "
-                                "WHERE table_schema = 'public' ORDER BY table_name, ordinal_position")
-        else:
-            _, names = self.rows("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
-            rows, cols = [], []
-            for (name,) in names:
-                n = self.rows(f'SELECT COUNT(*) FROM "{name}"')[1][0][0]
-                rows.append([name, n, None])
-                for c in self.rows(f'PRAGMA table_info("{name}")')[1]:
-                    cols.append([name, c[1], c[2], "PRI" if c[5] else ""])
+        rows, cols = self.tables()
         tables = {}
         for name, count, size in rows:
             tables[name] = {"name": name, "rows": int(count or 0), "bytes": int(size or 0), "columns": []}
@@ -208,14 +169,12 @@ class Database:
         finally:
             cur.close()
             self.done()
-        return {"csv": "﻿" + buf.getvalue(), "row_count": count, "limited": count >= MAX_EXPORT_ROWS or buf.tell() > MAX_EXPORT_BYTES}
+        return {"csv": "\ufeff" + buf.getvalue(), "row_count": count, "limited": count >= MAX_EXPORT_ROWS or buf.tell() > MAX_EXPORT_BYTES}
 
     def explain(self, sql):
         sql = safe_sql(sql)
-        if re.match(r"^\s*explain\b", sql, re.I):
-            sql = re.sub(r"^\s*explain\s+", "", sql, flags=re.I)
-        prefix = {"mysql": "EXPLAIN ", "postgres": "EXPLAIN ", "sqlite": "EXPLAIN QUERY PLAN "}[self.kind]
-        cols, rows = self.rows(prefix + sql)
+        sql = re.sub(r"^\s*explain\s+", "", sql, flags=re.I)
+        cols, rows = self.rows(self.explain_prefix + sql)
         return {"columns": cols, "rows": [[clean(v) for v in r] for r in rows], "row_count": len(rows)}
 
     def health(self):
@@ -224,34 +183,144 @@ class Database:
         biggest = sorted(schema, key=lambda t: t["bytes"] or t["rows"], reverse=True)[:5]
         out["biggest"] = [{"name": t["name"], "rows": t["rows"], "bytes": t["bytes"]} for t in biggest]
         no_key = [t["name"] for t in schema if not any(c["key"] == "PRI" for c in t["columns"])]
-        if no_key and self.kind != "postgres":
+        if no_key and self.has_primary_keys_in_schema:
             out["checks"].append({"level": "warn", "text": f"{len(no_key)} table(s) have no primary key: {', '.join(no_key[:8])}"})
         try:
-            if self.kind == "mysql":
-                _, r = self.rows("SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected','Slow_queries','Uptime','Max_used_connections')")
-                status = {k: v for k, v in r}
-                _, mc = self.rows("SHOW VARIABLES LIKE 'max_connections'")
-                out["status"] = {**status, "max_connections": mc[0][1] if mc else ""}
-                if int(status.get("Slow_queries", 0) or 0) > 0:
-                    out["checks"].append({"level": "warn", "text": f"{status['Slow_queries']} slow queries since the server started"})
-                _, big_unindexed = self.rows(
-                    "SELECT t.table_name, t.table_rows FROM information_schema.tables t WHERE t.table_schema = DATABASE() "
-                    "AND t.table_rows > 10000 AND NOT EXISTS (SELECT 1 FROM information_schema.statistics s "
-                    "WHERE s.table_schema = t.table_schema AND s.table_name = t.table_name AND s.index_name <> 'PRIMARY')")
-                for name, n in big_unindexed[:8]:
-                    out["checks"].append({"level": "warn", "text": f"{name} has {n} rows but no index besides the primary key"})
-            elif self.kind == "postgres":
-                _, r = self.rows("SELECT count(*) FROM pg_stat_activity")
-                out["status"] = {"connections": r[0][0]}
-                _, seq = self.rows("SELECT relname, seq_scan, idx_scan, n_live_tup FROM pg_stat_user_tables "
-                                   "WHERE n_live_tup > 10000 AND seq_scan > coalesce(idx_scan, 0) * 10 ORDER BY seq_scan DESC LIMIT 8")
-                for name, s, i, n in seq:
-                    out["checks"].append({"level": "warn", "text": f"{name} ({n} rows) is mostly read without an index ({s} full scans)"})
+            self.server_checks(out)
         except Exception as exc:  # noqa: BLE001 - not every user can read server status
             out["checks"].append({"level": "info", "text": f"Server status not readable with this user ({type(exc).__name__})"})
         if not out["checks"]:
             out["checks"].append({"level": "ok", "text": "No problems found"})
         return out
+
+
+class MySQL(Driver):
+    name, default_port, version_sql = "MySQL / MariaDB", 3306, "SELECT VERSION()"
+
+    def open(self):
+        try:
+            import pymysql
+        except ImportError:
+            sys.exit("Install the MySQL driver first:  pip3 install pymysql")
+        c = self.cfg
+        return pymysql.connect(host=c["host"], port=int(c.get("port") or 3306), user=c["user"], password=c["password"],
+                               database=c["database"], charset="utf8mb4", connect_timeout=5, read_timeout=120, autocommit=False)
+
+    def alive(self):
+        self.conn.ping()
+        return True
+
+    def start_read_only(self, cur):
+        cur.execute("SET SESSION TRANSACTION READ ONLY")
+        for limit in ("SET SESSION MAX_EXECUTION_TIME=120000", "SET SESSION max_statement_time=120"):  # MySQL / MariaDB
+            try:
+                cur.execute(limit)
+                break
+            except Exception:  # noqa: BLE001
+                continue
+        cur.execute("START TRANSACTION READ ONLY")
+
+    def write_rights(self):
+        _, grants = self.rows("SHOW GRANTS")
+        return re.search(r"ALL PRIVILEGES|INSERT|UPDATE|DELETE|DROP", " ".join(str(g[0]).upper() for g in grants))
+
+    def tables(self):
+        _, rows = self.rows("SELECT table_name, table_rows, data_length + index_length FROM information_schema.tables "
+                            "WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' ORDER BY table_name")
+        _, cols = self.rows("SELECT table_name, column_name, column_type, column_key FROM information_schema.columns "
+                            "WHERE table_schema = DATABASE() ORDER BY table_name, ordinal_position")
+        return rows, cols
+
+    def server_checks(self, out):
+        _, r = self.rows("SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected','Slow_queries','Uptime','Max_used_connections')")
+        status = {k: v for k, v in r}
+        _, mc = self.rows("SHOW VARIABLES LIKE 'max_connections'")
+        out["status"] = {**status, "max_connections": mc[0][1] if mc else ""}
+        if int(status.get("Slow_queries", 0) or 0) > 0:
+            out["checks"].append({"level": "warn", "text": f"{status['Slow_queries']} slow queries since the server started"})
+        _, big_unindexed = self.rows(
+            "SELECT t.table_name, t.table_rows FROM information_schema.tables t WHERE t.table_schema = DATABASE() "
+            "AND t.table_rows > 10000 AND NOT EXISTS (SELECT 1 FROM information_schema.statistics s "
+            "WHERE s.table_schema = t.table_schema AND s.table_name = t.table_name AND s.index_name <> 'PRIMARY')")
+        for name, n in big_unindexed[:8]:
+            out["checks"].append({"level": "warn", "text": f"{name} has {n} rows but no index besides the primary key"})
+
+
+class Postgres(Driver):
+    name, default_port, version_sql = "PostgreSQL", 5432, "SHOW server_version"
+    has_primary_keys_in_schema = False
+
+    def open(self):
+        try:
+            import psycopg
+        except ImportError:
+            try:
+                import psycopg2 as psycopg
+            except ImportError:
+                import subprocess
+                if subprocess.run([sys.executable, "-m", "pip", "install", "-q", "psycopg[binary]"]).returncode != 0:
+                    sys.exit("Install the PostgreSQL driver first:  pip3 install 'psycopg[binary]'")
+                import psycopg
+        c = self.cfg
+        return psycopg.connect(host=c["host"], port=int(c.get("port") or 5432), user=c["user"], password=c["password"],
+                               dbname=c["database"], connect_timeout=10)
+
+    def alive(self):
+        return not self.conn.closed
+
+    def start_read_only(self, cur):
+        self.conn.rollback()
+        cur.execute("SET TRANSACTION READ ONLY")
+        cur.execute("SET LOCAL statement_timeout = '120s'")
+
+    def write_rights(self):
+        _, r = self.rows("SELECT count(*) FROM information_schema.table_privileges WHERE grantee = current_user "
+                         "AND privilege_type IN ('INSERT','UPDATE','DELETE')")
+        _, su = self.rows("SELECT rolsuper FROM pg_roles WHERE rolname = current_user")
+        return bool(r[0][0]) or bool(su and su[0][0])
+
+    def tables(self):
+        _, rows = self.rows("SELECT c.relname, c.reltuples::bigint, pg_total_relation_size(c.oid) FROM pg_class c "
+                            "JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'r' AND n.nspname = 'public' "
+                            "ORDER BY c.relname")
+        _, cols = self.rows("SELECT table_name, column_name, data_type, '' FROM information_schema.columns "
+                            "WHERE table_schema = 'public' ORDER BY table_name, ordinal_position")
+        return rows, cols
+
+    def server_checks(self, out):
+        _, r = self.rows("SELECT count(*) FROM pg_stat_activity")
+        out["status"] = {"connections": r[0][0]}
+        _, seq = self.rows("SELECT relname, seq_scan, idx_scan, n_live_tup FROM pg_stat_user_tables "
+                           "WHERE n_live_tup > 10000 AND seq_scan > coalesce(idx_scan, 0) * 10 ORDER BY seq_scan DESC LIMIT 8")
+        for name, s, i, n in seq:
+            out["checks"].append({"level": "warn", "text": f"{name} ({n} rows) is mostly read without an index ({s} full scans)"})
+
+
+class SQLite(Driver):
+    name, version_sql, explain_prefix = "SQLite", "SELECT sqlite_version()", "EXPLAIN QUERY PLAN "
+
+    def open(self):
+        import sqlite3
+        return sqlite3.connect(f"file:{self.cfg['database']}?mode=ro", uri=True)   # the file itself is opened read-only
+
+    def tables(self):
+        _, names = self.rows("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+        rows, cols = [], []
+        for (name,) in names:
+            rows.append([name, self.rows(f'SELECT COUNT(*) FROM "{name}"')[1][0][0], None])
+            for c in self.rows(f'PRAGMA table_info("{name}")')[1]:
+                cols.append([name, c[1], c[2], "PRI" if c[5] else ""])
+        return rows, cols
+
+
+DRIVERS = {"mysql": MySQL, "postgres": Postgres, "sqlite": SQLite}
+
+
+def Database(cfg):  # noqa: N802 - kept as the public name
+    driver = DRIVERS.get(cfg.get("type"))
+    if driver is None:
+        raise ValueError(f"Unknown database type: {cfg.get('type')}")
+    return driver(cfg)
 
 
 def clean(v):
@@ -267,11 +336,11 @@ def clean(v):
 
 
 # ---------------------------------------------------------------- talking to Goal Engine
-def call(cfg, path, body=None):
+def call(cfg, path, body=None, timeout=60):
     req = urllib.request.Request(cfg["server"].rstrip("/") + path, data=json.dumps(body or {}).encode(), method="POST",
                                  headers={"Authorization": f"Bearer {cfg['token']}", "Content-Type": "application/json",
                                           "User-Agent": f"goal-connector/{VERSION}"})
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read() or b"{}")
 
 
@@ -294,13 +363,16 @@ def run(cfg):
     db = Database(cfg).connect()
     info = {"version": VERSION, "db_type": cfg["type"], "db_version": db.version(), "db_name": cfg["database"],
             "host": socket.gethostname(), "can_write": db.can_write(), "allow_write": False}
-    wait = call(cfg, "/api/connector/hello", info).get("poll_seconds", 4)
+    hello = call(cfg, "/api/connector/hello", info)
+    wait = hello.get("poll_seconds", 4)
+    long_poll = int(hello.get("long_poll") or 0)   # the server holds the request until a job arrives
     print(f"Connected to Goal Engine. Database: {cfg['database']} ({cfg['type']} {info['db_version']}). Ctrl+C to stop.")
     backoff = wait
     while True:
         try:
-            jobs = call(cfg, "/api/connector/poll").get("jobs", [])
-            backoff = wait
+            path = f"/api/connector/poll?wait={long_poll}" if long_poll else "/api/connector/poll"
+            jobs = call(cfg, path, timeout=long_poll + 30).get("jobs", [])
+            backoff = 0.2 if long_poll else wait
         except urllib.error.HTTPError as exc:
             if exc.code == 401:
                 sys.exit("This connector was disconnected from Goal Engine. Create a new one to connect again.")

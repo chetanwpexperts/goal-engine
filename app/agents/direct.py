@@ -219,11 +219,16 @@ def run_job(job_id: int) -> None:
         db.commit()
         with _slots:
             try:
-                conn = _open(decrypt(connector.secret or ""))
-                try:
-                    data = gc.handle(conn, {"kind": job.kind, "payload": loads(job.payload, {})})
-                finally:
-                    _close(conn)
+                if connector.kind == "php":
+                    from app.agents import phpconn
+
+                    data = phpconn.run(connector, job.kind, loads(job.payload, {}))
+                else:
+                    conn = _open(decrypt(connector.secret or ""))
+                    try:
+                        data = gc.handle(conn, {"kind": job.kind, "payload": loads(job.payload, {})})
+                    finally:
+                        _close(conn)
                 csv_text = data.pop("csv", None)
                 body = {"ok": True, "result": data, **({"csv": csv_text} if csv_text is not None else {})}
             except Exception as exc:  # noqa: BLE001 - every failure is reported on the job

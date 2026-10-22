@@ -74,7 +74,7 @@ def test_sentence_builds_database_agent_not_sheet_automation(client, ml_mode):
     assert res["relation"] == "agent_plan"
     agent = res["agents"][0]
     assert agent["recipe"] == "database" and agent["mode"] == "export" and agent["available"]
-    assert "details" in res["reply"].lower()
+    assert "database kahan hai" in res["reply"].lower()
     # Pasted SQL still goes to the query checker, not the connector
     client.post("/api/new-chat")
     res2 = say(client, "ye query slow hai SELECT * FROM orders WHERE YEAR(created) = 2024")
@@ -269,3 +269,54 @@ def test_direct_refuses_our_own_server(client, monkeypatch):
     res = client.post("/api/connectors/direct", json={"host": "mysite.example", "database": "d", "user": "u"})
     assert res.status_code == 400 and "own server" in res.json()["error"]
     direct._attempts.clear()
+
+
+def test_long_poll_waits_then_returns(client, ml_mode):
+    import time as _t
+    token = client.post("/api/connectors", json={}).json()["token"]
+    auth = {"Authorization": f"Bearer {token}"}
+    client.post("/api/connector/hello", headers=auth, json={"db_type": "sqlite"})
+    start = _t.monotonic()
+    assert client.post("/api/connector/poll?wait=0", headers=auth).json()["jobs"]   # schema job waiting: instant
+    assert _t.monotonic() - start < 1
+    start = _t.monotonic()
+    assert client.post("/api/connector/poll?wait=1", headers=auth).json()["jobs"] == []
+    assert 0.9 < _t.monotonic() - start < 3
+
+
+def _local_pg():
+    try:
+        socket.create_connection(("127.0.0.1", 5432), timeout=1).close()
+        return True
+    except OSError:
+        return False
+
+
+@pytest.mark.skipif(not _local_pg(), reason="needs a local PostgreSQL with the shop_pg test database")
+def test_postgres_driver_for_real(monkeypatch):
+    db = gc.Database({"type": "postgres", "host": "127.0.0.1", "port": "5432", "database": "shop_pg",
+                      "user": "shopapp", "password": "app pass"}).connect()
+    assert db.version() and db.can_write() is True
+    assert [t["name"] for t in db.schema()["tables"]] == ["orders"]
+    q = db.query("SELECT id, amount, created FROM orders ORDER BY id", 50)
+    assert q["row_count"] == 2 and q["rows"][1][1] == "250.50"
+    assert db.export("SELECT * FROM orders")["row_count"] == 2
+    assert db.explain("SELECT * FROM orders WHERE id = 1")["rows"]
+    assert db.health()["checks"]
+    # even if the safety check were bypassed, the transaction itself refuses writes
+    cur = db.cursor()
+    with pytest.raises(Exception, match="read-only"):
+        cur.execute("DELETE FROM orders")
+    db.done()
+    assert db.query("SELECT count(*) FROM orders", 5)["rows"][0][0] == 2
+
+
+@pytest.mark.skipif(not _local_mysql(), reason="needs a local MySQL/MariaDB")
+def test_mysql_transaction_refuses_writes_even_without_the_check():
+    db = gc.Database({"type": "mysql", "host": "127.0.0.1", "port": "3306", "database": "shop_db",
+                      "user": "shopapp", "password": "app pass"}).connect()
+    cur = db.cursor()
+    with pytest.raises(Exception, match="(?i)read.only"):
+        cur.execute("DELETE FROM orders")
+    db.done()
+    assert db.query("SELECT count(*) FROM orders", 5)["rows"][0][0] >= 2

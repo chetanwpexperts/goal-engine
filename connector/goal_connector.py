@@ -90,7 +90,7 @@ class Database:
     def ensure(self):
         try:
             if self.kind == "mysql":
-                self.conn.ping(reconnect=True)
+                self.conn.ping()
             elif self.kind == "postgres" and self.conn.closed:
                 self.connect()
         except Exception:  # noqa: BLE001

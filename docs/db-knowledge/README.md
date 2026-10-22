@@ -40,7 +40,7 @@ and how to prove it's fixed.
    - Plain-language text in both English (`*_en`) and simple Hinglish (`*_hi`), short, for a small-business owner.
    - Query templates must be read-only (`SELECT`/`WITH`), use `{placeholders}`, and be written for each engine they support.
 5. **Prove it works before keeping it:**
-   - Every playbook and question gets `test_phrases`: at least 2 NEW ways a person would say it (English/Hinglish/Hindi), NOT copies of the symptoms/examples.
+   - Every playbook and question gets `test_phrases`: at least 3 NEW ways a person would say it, one each in English, Hinglish (Roman) and Hindi (Devanagari, e.g. "मेरा डेटाबेस धीमा है"), NOT copies of the symptoms/examples. Write them the way a normal non-technical user (or voice typing) would say it, not like a developer.
      `tests/test_dbbrain.py` checks the brain recognises them. If it doesn't, add richer `symptoms`/`examples` (more variety, real wording from Stack Overflow titles) until it does. Never weaken the test phrases to make it pass.
    - Add the error codes a problem shows (`codes`: ["1040", "53300"]) so "error 1040 aa raha hai" is recognised directly.
    - Every check and template is executed against the real test databases (tests/test_dbknow.py).

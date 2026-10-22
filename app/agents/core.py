@@ -159,6 +159,10 @@ def agent_dict(agent: Agent, db: Session, hi: bool) -> dict:
         from app.agents.database import database_dict
 
         return database_dict(db, agent, hi)
+    if agent.recipe == "office":
+        from app.agents.office_agent import office_dict
+
+        return office_dict(db, agent, hi)
     if agent.recipe == "db_report":
         inputs = loads(agent.inputs, {}) or {}
         from app.agents.spec import schedule_text

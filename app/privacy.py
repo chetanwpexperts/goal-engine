@@ -108,6 +108,13 @@ def delete_visitor(db: Session, visitor_id: str) -> dict:
     from app import learning
 
     counts["learning_votes"] = learning.delete_voter(db, visitor_id)
+    from app.agents import office_agent
+    from app.models import OfficeFile
+
+    for f in db.scalars(select(OfficeFile).where(OfficeFile.visitor_id == visitor_id)):
+        office_agent.remove_file(f)
+        db.delete(f)
+        counts["office_files"] = counts.get("office_files", 0) + 1
     db.execute(delete(UsageCounter).where(UsageCounter.scope == f"visitor:{visitor_id}"))
     db.commit()
     return counts
@@ -192,6 +199,9 @@ def maintain(db: Session, now=None) -> dict:
     from app import learning
 
     done.update(learning.maintain(db, now))
+    from app.agents import office_agent
+
+    done["office_files"] = office_agent.maintain(db, now)
 
     # 3. "already emailed" log
     done["sent_log"] = db.execute(delete(SentEmail).where(SentEmail.sent_at < now - SENT_LOG_TTL)).rowcount

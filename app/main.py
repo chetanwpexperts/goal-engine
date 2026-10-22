@@ -273,6 +273,98 @@ def admin_update(req_id: int, body: ExpertUpdate, request: Request, db: Session 
         raise HTTPException(404, "Not Found")
 
 
+# ---------------------------------------------------------------- Microsoft agent: files (app/agents/office_agent.py)
+class OfficeStartIn(BaseModel):
+    name: str
+    size: int
+    agent_id: int | None = None
+
+
+class OfficeFixIn(BaseModel):
+    ops: list[str]
+
+
+class OfficeCompareIn(BaseModel):
+    other: str
+    key: str = ""
+
+
+def _office_call(fn):
+    from app.agents.office_agent import OfficeAgentError
+
+    try:
+        return fn()
+    except OfficeAgentError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/office/files")
+def office_start(body: OfficeStartIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    from app.agents import office_agent as oa
+
+    if body.agent_id is not None:
+        agent = db.get(Agent, body.agent_id)
+        if not agent or agent.visitor_id != visitor or agent.recipe != "office":
+            raise HTTPException(404, "Not found")
+    return _office_call(lambda: oa.file_dict(oa.start_upload(db, visitor, body.agent_id, body.name, body.size)))
+
+
+@app.put("/api/office/files/{token}/chunk")
+async def office_chunk(token: str, offset: int, request: Request, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    from app.agents import office_agent as oa
+
+    data = await request.body()
+    return _office_call(lambda: oa.file_dict(oa.add_chunk(db, oa.own_file(db, token, visitor), offset, data)))
+
+
+@app.post("/api/office/files/{token}/done")
+def office_done(token: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    from app.agents import office_agent as oa
+
+    return _office_call(lambda: oa.file_dict(oa.finish_upload(db, oa.own_file(db, token, visitor))))
+
+
+@app.get("/api/office/files/{token}")
+def office_get(token: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    from app.agents import office_agent as oa
+
+    return _office_call(lambda: oa.file_dict(oa.own_file(db, token, visitor)))
+
+
+@app.post("/api/office/files/{token}/fix")
+def office_fix(token: str, body: OfficeFixIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    from app.agents import office_agent as oa
+
+    return _office_call(lambda: oa.file_dict(oa.start_fix(db, oa.own_file(db, token, visitor), body.ops)))
+
+
+@app.post("/api/office/files/{token}/compare")
+def office_compare(token: str, body: OfficeCompareIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    from app.agents import office_agent as oa
+
+    return _office_call(lambda: oa.file_dict(oa.start_compare(db, oa.own_file(db, token, visitor), oa.own_file(db, body.other, visitor), body.key)))
+
+
+@app.get("/api/office/files/{token}/download")
+def office_download(token: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    from app.agents import office_agent as oa
+
+    f = _office_call(lambda: oa.own_file(db, token, visitor))
+    if not f.result_path or not os.path.exists(f.result_path):
+        raise HTTPException(404, "Not ready")
+    return FileResponse(f.result_path, filename=f.result_name or "result.xlsx", headers={"Cache-Control": "no-store"})
+
+
+@app.delete("/api/office/files/{token}")
+def office_delete(token: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    from app.agents import office_agent as oa
+
+    f = _office_call(lambda: oa.own_file(db, token, visitor))
+    oa.remove_file(f)
+    db.commit()
+    return {"ok": True}
+
+
 # ---------------------------------------------------------------- brains learning from users (app/learning.py)
 class LearnVoteIn(BaseModel):
     brain: str

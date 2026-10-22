@@ -384,3 +384,17 @@ body[data-state="active"] .status { display: none; }
 .brain-choices .chip:hover { background: var(--ink); color: var(--paper); }
 .brain-choices .chip.ghost { border-style: dashed; color: var(--muted); }
 .fine.small { font-size: 12px; }
+.dropzone { border: 2px dashed var(--line); border-radius: 16px; padding: 18px; display: grid; gap: 10px; justify-items: start; }
+.dropzone.over { border-color: var(--ink); background: var(--panel); }
+.progress { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; }
+.progress span { display: block; height: 100%; background: var(--ink); transition: width .2s; }
+.findings { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 8px; }
+.findings li { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: baseline; }
+.findings li > span, .findings li > label { grid-column: 2; }
+.findings li > :first-child:not(input) { grid-column: 1 / -1; }
+.findings li small { grid-column: 2; color: var(--muted); font-size: 12px; }
+.findings.done li { display: list-item; list-style: disc; margin-left: 18px; }
+.office .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.formula code { display: block; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); overflow-x: auto; white-space: nowrap; }
+.office a.btn { text-decoration: none; display: inline-block; margin-top: 10px; }
+.office .fine.small { margin: 6px 0 0; }

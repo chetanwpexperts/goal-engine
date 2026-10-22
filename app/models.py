@@ -280,3 +280,27 @@ class LearnedPhrase(Base):
     label: Mapped[str] = mapped_column(String(80))
     status: Mapped[str] = mapped_column(String(12), default="auto", index=True)   # auto / approved / rejected
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class OfficeFile(Base):
+    """A file someone gave the Microsoft agent. The file, its report and any fixed copy are deleted after 1 hour."""
+
+    __tablename__ = "office_files"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token: Mapped[str] = mapped_column(String(40), unique=True)          # what the browser uses; ids aren't guessable
+    visitor_id: Mapped[str] = mapped_column(String(64), index=True)
+    agent_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    received: Mapped[int] = mapped_column(Integer, default=0)
+    path: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="uploading")   # uploading / queued / working / ready / error / removed
+    task: Mapped[str | None] = mapped_column(String(16), nullable=True)   # scan / fix / compare
+    report: Mapped[str | None] = mapped_column(Text(16_000_000), nullable=True)    # JSON: addresses and counts, no values
+    result_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    result_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    result: Mapped[str | None] = mapped_column(Text, nullable=True)       # JSON summary of the fix / compare
+    error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)

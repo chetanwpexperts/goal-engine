@@ -174,7 +174,7 @@
       if (["new_goal", "update_goal", "corrected", "agent_plan"].includes(data.relation)) t.push(`${hi ? "Goal" : "Goal"}: ${data.goal.title}`);
     }
     const agent = (data.agents || [])[0];
-    if (agent && data.relation === "agent_plan") t.push(hi ? `${agent.blocks.length} blocks se agent banaya` : `Built an agent from ${agent.blocks.length} blocks`);
+    if (agent && data.relation === "agent_plan" && agent.blocks.length) t.push(hi ? `${agent.blocks.length} blocks se agent banaya` : `Built an agent from ${agent.blocks.length} blocks`);
     if (data.relation === "agent_run") t.push(hi ? "Agent ne kaam kiya" : "Agent did the work");
     if (data.relation === "howto") t.push(hi ? "Step samjhaya" : "Explained the step");
     return t;
@@ -1065,6 +1065,209 @@
     return box;
   }
 
+  // ---------------------------------------------------------------- Microsoft agent: the person gives a file, the agent fixes it
+  const OFFICE_CHUNK = 4 * 1024 * 1024;
+
+  async function officeUpload(file, agentId, onProgress) {
+    let f = await api("/api/office/files", { method: "POST", body: JSON.stringify({ name: file.name, size: file.size, agent_id: agentId }) });
+    let offset = f.received || 0;
+    let tries = 0;
+    while (offset < file.size) {
+      const piece = file.slice(offset, offset + OFFICE_CHUNK);
+      try {
+        const res = await fetch(`/api/office/files/${f.id}/chunk?offset=${offset}`, { method: "PUT", body: piece, credentials: "same-origin",
+                                                                                     headers: { "Content-Type": "application/octet-stream" } });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.detail || "Upload failed");
+        offset = d.received; tries = 0;
+        onProgress(offset / file.size);
+      } catch (ex) {
+        if (++tries > 5) throw ex;                        // internet dropped: wait and continue from the same place
+        await new Promise((r) => setTimeout(r, 1500 * tries));
+      }
+    }
+    return api(`/api/office/files/${f.id}/done`, { method: "POST" });
+  }
+
+  async function officeWait(id, onTick) {
+    for (;;) {
+      const f = await api(`/api/office/files/${id}`);
+      if (f.status === "ready" || f.status === "error") return f;
+      onTick && onTick(f);
+      await new Promise((r) => setTimeout(r, f.size > 50e6 ? 3000 : 1000));
+    }
+  }
+
+  function officePanel(a, hi) {
+    const box = el("section", "office");
+    const out = el("div", "office-out");
+    const pick = (label, multiple) => {
+      const inp = el("input"); inp.type = "file"; inp.accept = ".xlsx,.xlsm,.csv"; inp.hidden = true; inp.multiple = !!multiple;
+      const btn = el("button", "btn go", label); btn.type = "button";
+      btn.addEventListener("click", () => inp.click());
+      return [btn, inp];
+    };
+    const status = (text) => out.replaceChildren(el("p", "waiting", text));
+    const bar = (frac, text) => {
+      const p = el("div", "progress"); const i = el("span"); i.style.width = `${Math.round(frac * 100)}%`; p.append(i);
+      out.replaceChildren(el("p", "waiting", `${text} ${Math.round(frac * 100)}%`), p);
+    };
+
+    const drop = el("div", "dropzone");
+    const [btn, inp] = pick(T(hi, "File chuno", "Choose a file"));
+    drop.append(el("p", null, T(hi, "Excel (.xlsx) ya CSV file yahan chhodo. 1.5 GB tak.", "Drop an Excel (.xlsx) or CSV file here. Up to 1.5 GB.")), btn, inp,
+                el("p", "fine small", T(hi, "Original file kabhi nahi badalti; aapko theek ki hui copy milti hai. Files 1 ghante mein apne aap delete.",
+                                         "Your original never changes; you get a fixed copy. Files are deleted automatically within an hour.")));
+    const go = async (file) => {
+      try {
+        bar(0, T(hi, "Upload ho raha hai", "Uploading"));
+        const f = await officeUpload(file, a.id, (x) => bar(x, T(hi, "Upload ho raha hai", "Uploading")));
+        status(T(hi, "File check kar raha hoon…", "Checking the file…"));
+        showFile(await officeWait(f.id));
+      } catch (ex) { out.replaceChildren(el("p", "note err", ex.message)); }
+    };
+    inp.addEventListener("change", () => inp.files[0] && go(inp.files[0]));
+    drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+    drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+    drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) go(e.dataTransfer.files[0]); });
+
+    const FIND = [
+      ["broken_refs", "fix_broken_refs", true, (n) => T(hi, `${n} formula toote hue hain (#REF!)`, `${n} broken formulas (#REF!)`)],
+      ["text_numbers", "text_to_number", true, (n) => T(hi, `${n} number text ki tarah save hain (total galat aata hai)`, `${n} numbers saved as text (totals come out wrong)`)],
+      ["spaces", "trim_spaces", true, (n) => T(hi, `${n} cells mein chhupe hue extra space`, `${n} cells with hidden extra spaces`)],
+      ["duplicate_rows", "remove_duplicates", false, (n) => T(hi, `${n} rows do baar hain (duplicate)`, `${n} repeated rows (duplicates)`)],
+      ["errors", null, false, (n) => T(hi, `${n} cells mein error dikh raha hai (#N/A, #DIV/0! …)`, `${n} cells show an error (#N/A, #DIV/0! …)`)],
+      ["odd_formulas", null, false, (n) => T(hi, `${n} rows ka formula baaki column se alag hai (galti ho sakti hai)`, `${n} rows have a formula different from the rest of the column (possible mistake)`)],
+    ];
+
+    const cellsOf = (rep, key) => {
+      const list = [];
+      for (const sh of rep.sheets) {
+        const cells = key === "broken_refs" ? sh.broken_refs : key === "odd_formulas" ? sh.odd_formulas : key === "text_numbers" ? sh.text_number_cells
+          : key === "spaces" ? sh.space_cells : key === "errors" ? Object.values(sh.errors).flatMap((e) => e.cells) : [];
+        for (const c of (cells || []).slice(0, 8)) list.push(rep.sheets.length > 1 ? `${sh.name}!${c}` : c);
+      }
+      return list.join(", ");
+    };
+
+    const showFile = (f) => {
+      if (f.status === "error") { out.replaceChildren(el("p", "note err", f.error)); return; }
+      if (f.result) { showResult(f); return; }
+      const rep = f.report, s = rep.summary;
+      const parts = [el("p", "cap", `${f.name} · ${s.sheets} ${T(hi, "sheet", s.sheets > 1 ? "sheets" : "sheet")} · ${(s.rows || 0).toLocaleString("en-IN")} ${T(hi, "rows", "rows")} · ${(s.formulas || 0).toLocaleString("en-IN")} ${T(hi, "formula", "formulas")}`)];
+      const ops = [];
+      const ul = el("ul", "findings");
+      for (const [key, op, on, text] of FIND) {
+        const n = s[key] || 0;
+        if (!n) continue;
+        const li = el("li");
+        if (op) {
+          const cb = el("input"); cb.type = "checkbox"; cb.checked = on; cb.id = `of-${f.id}-${op}`;
+          const lb = el("label", null, text(n.toLocaleString("en-IN"))); lb.htmlFor = cb.id;
+          li.append(cb, lb); ops.push([op, cb]);
+        } else li.append(el("span", null, text(n.toLocaleString("en-IN"))));
+        const where = cellsOf(rep, key);
+        if (where) li.append(el("small", null, `${T(hi, "Kahan", "Where")}: ${where}${n > 8 ? " …" : ""}`));
+        ul.append(li);
+      }
+      if (!ul.children.length) parts.push(el("p", "fine", T(hi, "Is file mein mujhe koi galti nahi mili.", "I found no problems in this file.")));
+      else parts.push(ul);
+      const acts = el("div", "acts");
+      if (ops.length) {
+        const fixBtn = el("button", "btn solid", T(hi, "Theek karo", "Fix it")); fixBtn.type = "button";
+        fixBtn.addEventListener("click", async () => {
+          const chosen = ops.filter(([, cb]) => cb.checked).map(([op]) => op);
+          if (!chosen.length) return;
+          try {
+            await api(`/api/office/files/${f.id}/fix`, { method: "POST", body: JSON.stringify({ ops: chosen }) });
+            status(T(hi, "Theek kar raha hoon…", "Fixing…"));
+            showResult(await officeWait(f.id));
+          } catch (ex) { out.replaceChildren(el("p", "note err", ex.message)); }
+        });
+        acts.append(fixBtn);
+      }
+      const [cmpBtn, cmpInp] = pick(T(hi, "Doosri file se compare karo", "Compare with another file"));
+      cmpBtn.className = "btn";
+      cmpInp.addEventListener("change", async () => {
+        const other = cmpInp.files[0]; if (!other) return;
+        try {
+          bar(0, T(hi, "Doosri file upload", "Uploading the second file"));
+          const g = await officeUpload(other, a.id, (x) => bar(x, T(hi, "Doosri file upload", "Uploading the second file")));
+          status(T(hi, "Doosri file check kar raha hoon…", "Checking the second file…"));
+          const g2 = await officeWait(g.id);
+          if (g2.status === "error") { out.replaceChildren(el("p", "note err", g2.error)); return; }
+          await api(`/api/office/files/${f.id}/compare`, { method: "POST", body: JSON.stringify({ other: g2.id }) });
+          status(T(hi, "Dono files mila raha hoon…", "Comparing both files…"));
+          showResult(await officeWait(f.id));
+        } catch (ex) { out.replaceChildren(el("p", "note err", ex.message)); }
+      });
+      acts.append(cmpBtn, cmpInp);
+      parts.push(acts);
+      out.replaceChildren(...parts);
+    };
+
+    const showResult = (f) => {
+      if (f.status === "error") { out.replaceChildren(el("p", "note err", f.error)); return; }
+      const r = f.result, parts = [];
+      if (r.task === "fix") {
+        const c = r.changes || {};
+        const lines = [
+          [c.fix_broken_refs, T(hi, "toote formula theek kiye", "broken formulas fixed")],
+          [c.text_to_number, T(hi, "text wale numbers asli number banaye", "text-numbers turned into numbers")],
+          [c.trim_spaces, T(hi, "cells se extra space hataye", "cells cleaned of extra spaces")],
+          [c.remove_duplicates, T(hi, "duplicate rows hatayi", "duplicate rows removed")],
+        ].filter(([n]) => n);
+        parts.push(el("p", "cap", T(hi, "Ho gaya", "Done")));
+        const ul = el("ul", "findings done");
+        for (const [n, t] of lines) ul.append(el("li", null, `${n.toLocaleString("en-IN")} ${t}`));
+        if (!lines.length) ul.append(el("li", null, T(hi, "Kuch badalne ki zaroorat nahi padi.", "Nothing needed changing.")));
+        parts.push(ul);
+        if (c.broken_refs_left) parts.push(el("p", "note", T(hi, `${c.broken_refs_left} toote formula main khud nahi bana saka (column mein koi saaf pattern nahi). Inhe "Changes" sheet mein dekho.`, `${c.broken_refs_left} broken formulas had no clear pattern to rebuild from; see the "Changes" sheet.`)));
+        if (c.duplicates_skipped_sheets) parts.push(el("p", "note", T(hi, "Jin sheets mein formula hain wahan duplicate rows nahi hatayi, taaki formula na toote.", "Duplicates weren't removed on sheets with formulas, so no formula breaks.")));
+        if (!r.formatting_kept) parts.push(el("p", "note", T(hi, "Badi file thi, isliye values aur formula rakhe hain, rang/format nahi.", "Big file: values and formulas are kept, colours and formatting aren't.")));
+        parts.push(el("p", "fine small", T(hi, "Har badlav fixed file ki \"Changes by Goal Engine\" sheet mein likha hai.", "Every change is listed in the fixed file's \"Changes by Goal Engine\" sheet.")));
+      } else {
+        parts.push(el("p", "cap", T(hi, `${f.name} vs ${r.other} · "${r.key}" column se milaya`, `${f.name} vs ${r.other} · matched on "${r.key}"`)));
+        const ul = el("ul", "findings done");
+        ul.append(el("li", null, `${(r.matched || 0).toLocaleString("en-IN")} ${T(hi, "rows dono mein", "rows in both")}`),
+                  el("li", null, `${(r.only_in_a || 0).toLocaleString("en-IN")} ${T(hi, "sirf pehli file mein", "only in the first file")}`),
+                  el("li", null, `${(r.only_in_b || 0).toLocaleString("en-IN")} ${T(hi, "sirf doosri file mein", "only in the second file")}`),
+                  el("li", null, `${(r.changed_rows || 0).toLocaleString("en-IN")} ${T(hi, "rows mein value badli", "rows with changed values")} (${(r.changed_cells || 0).toLocaleString("en-IN")} cells)`));
+        parts.push(ul, el("p", "fine small", T(hi, "Extra space, chhote-bade akshar aur text wale numbers ko farak nahi maana.", "Extra spaces, capital/small letters and numbers saved as text weren't counted as differences.")));
+      }
+      if (f.download) {
+        const dl = el("a", "btn solid", T(hi, "Download karo", "Download")); dl.href = `/api/office/files/${f.id}/download`;
+        parts.push(dl);
+      }
+      out.replaceChildren(...parts);
+    };
+
+    box.append(drop, out);
+    const last = (a.files || [])[0];
+    if (last && (last.status === "ready" || last.status === "error")) showFile(last);
+    else if (last && last.status !== "uploading") { status(T(hi, "Kaam chal raha hai…", "Working…")); officeWait(last.id).then(showFile).catch(() => {}); }
+    return box;
+  }
+
+  function renderOffice(a) {
+    const hi = a.lang !== "en";
+    const card = el("article", "agent office-agent");
+    const head = el("div", "agent-name");
+    head.append(el("h2", null, a.name), el("span", "state proposed", T(hi, "Taiyar", "Ready")));
+    card.append(head);
+    if (a.brain && a.brain.text) card.append(el("p", "brain-seen", (hi ? "Samjha: " : "Understood: ") + a.brain.text));
+    if (a.formula) {
+      const fx = el("div", "formula");
+      fx.append(el("p", "cap", a.formula.title), el("code", null, a.formula.excel), el("p", "fine", a.formula.explain));
+      const copy = el("button", "btn", T(hi, "Copy", "Copy")); copy.type = "button";
+      copy.addEventListener("click", () => { navigator.clipboard && navigator.clipboard.writeText(a.formula.excel); copy.textContent = T(hi, "Copy ho gaya", "Copied"); });
+      fx.append(copy);
+      card.append(fx);
+    }
+    card.append(keep(`office:${a.id}`, () => officePanel(a, hi)));
+    return card;
+  }
+
   function renderDatabase(a) {
     const w = W(a.lang);
     const hi = a.lang !== "en";
@@ -1256,7 +1459,7 @@
     const box = $("#agents");
     box.replaceChildren();
     for (const a of agents || []) {
-      box.append(a.automation ? renderAutomation(a) : a.database ? renderDatabase(a) : a.db_report ? renderDbReport(a) : renderCheckAgent(a));
+      box.append(a.automation ? renderAutomation(a) : a.database ? renderDatabase(a) : a.office ? renderOffice(a) : a.db_report ? renderDbReport(a) : renderCheckAgent(a));
     }
     if (agents && agents.length && currentGoalId) {
       const hi = agents[0].lang !== "en";

@@ -28,6 +28,7 @@ from app.models import (Agent, AgentRun, Connector, ConnectorJob, Goal, Message,
 
 DB_RESULT_TTL = timedelta(minutes=15)
 LIVE_TTL = timedelta(minutes=2)
+UNDO_TTL = timedelta(days=7)
 ACTIVITY_TTL = timedelta(days=30)
 EXPORT_TTL = timedelta(hours=1)
 RUN_DETAIL_TTL = timedelta(hours=24)
@@ -125,7 +126,7 @@ def maintain(db: Session, now=None) -> dict:
     done = {"db_results": 0, "exports": 0, "runs": 0, "sent_log": 0, "passwords": 0, "visitors": 0}
 
     # 1. results read from users' databases
-    for job in db.scalars(select(ConnectorJob).where(ConnectorJob.kind.in_(("query", "export", "explain")),
+    for job in db.scalars(select(ConnectorJob).where(ConnectorJob.kind.in_(("query", "export", "explain", "plan")),
                                                      ConnectorJob.finished_at.is_not(None),
                                                      ConnectorJob.finished_at < now - DB_RESULT_TTL,
                                                      ConnectorJob.result.is_not(None))):
@@ -141,6 +142,20 @@ def maintain(db: Session, now=None) -> dict:
             job.file_path = None
             done["exports"] += 1
         done["db_results"] += 1
+
+    # 1a. the statement text of changes (it can hold values) and the encrypted Undo copies after 7 days
+    for job in db.scalars(select(ConnectorJob).where(ConnectorJob.kind.in_(("change", "undo")), ConnectorJob.finished_at.is_not(None),
+                                                     ConnectorJob.finished_at < now - DB_RESULT_TTL, ConnectorJob.payload.is_not(None))):
+        p = loads(job.payload, {}) or {}
+        if "sql" in p:
+            p.pop("sql")
+            job.payload = dumps(p)
+    for job in db.scalars(select(ConnectorJob).where(ConnectorJob.undo_blob.is_not(None), ConnectorJob.finished_at < now - UNDO_TTL)):
+        job.undo_blob = None
+        r = loads(job.result, {}) or {}
+        if isinstance(r.get("undo"), dict):
+            r["undo"]["available"] = False
+            job.result = dumps(r)
 
     # 1b. live view snapshots (running queries etc.) are only for the moment they're shown
     for job in db.scalars(select(ConnectorJob).where(ConnectorJob.kind == "live", ConnectorJob.finished_at.is_not(None),

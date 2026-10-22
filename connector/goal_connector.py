@@ -51,6 +51,70 @@ def safe_sql(sql, allow_write=False):
     return sql
 
 
+# ---------------------------------------------------------------- approved changes (Level 3)
+MAX_CHANGE_ROWS = 1000
+UNDO_DAYS = 7
+_IDENT = r"(?P<table>`[^`]*`|\"[^\"]*\"|[A-Za-z_][\w$]*)"
+CHANGE_FORMS = {
+    "update": re.compile(r"^\s*update\s+" + _IDENT + r"\s+set\s+(?P<set>.+?)\s+where\s+(?P<where>.+)$", re.I | re.S),
+    "delete": re.compile(r"^\s*delete\s+from\s+" + _IDENT + r"\s+where\s+(?P<where>.+)$", re.I | re.S),
+    "insert": re.compile(r"^\s*insert\s+into\s+" + _IDENT + r"\s*(?P<cols>\([^)]*\))?\s*values\s*(?P<values>\(.+)$", re.I | re.S),
+}
+NOT_IN_CHANGES = re.compile(r"\b(drop|alter|create|truncate|rename|grant|revoke|lock|unlock|call|exec|execute|handler|load_file|"
+                            r"sleep|benchmark|pg_sleep|copy|vacuum|returning|into\s+outfile|into\s+dumpfile|on\s+duplicate|on\s+conflict)\b", re.I)
+
+
+def _mask(sql):
+    """Blank out strings and comments but keep every position, so a WHERE inside a string can't fool the parser."""
+    keep = lambda m: m.group(0)[0] + " " * (len(m.group(0)) - 2) + m.group(0)[-1] if len(m.group(0)) >= 2 else " "  # noqa: E731
+    sql = re.sub(r"'(?:[^'\\]|\\.)*'", keep, sql)
+    sql = re.sub(r"\"(?:[^\"\\]|\\.)*\"", keep, sql)
+    return re.sub(r"/\*.*?\*/|--[^\n]*|#[^\n]*", lambda m: " " * len(m.group(0)), sql, flags=re.S)
+
+
+def parse_change(sql):
+    """One table, one simple statement: UPDATE ... WHERE, DELETE FROM ... WHERE, or INSERT INTO ... VALUES."""
+    sql = (sql or "").strip().rstrip(";").strip()
+    masked = _mask(sql)
+    if not sql or ";" in masked:
+        raise ValueError("One statement at a time, please")
+    if NOT_IN_CHANGES.search(masked):
+        raise ValueError("Only simple UPDATE, DELETE or INSERT ... VALUES changes are allowed")
+    for op, form in CHANGE_FORMS.items():
+        m = form.match(masked)
+        if not m:
+            continue
+        if op == "insert" and re.search(r"\bselect\b", masked[m.start("values"):], re.I):
+            raise ValueError("INSERT ... SELECT isn't supported; use INSERT ... VALUES")
+        if op == "update" and re.search(r"\bjoin\b", masked[:m.start("set")], re.I):
+            raise ValueError("Changes work on one table at a time")
+        table = sql[m.start("table"):m.end("table")].strip("`\"")
+        where = sql[m.start("where"):m.end("where")] if op != "insert" else None
+        return {"op": op, "table": table, "where": where, "sql": sql}
+    raise ValueError("Write it as UPDATE table SET ... WHERE ..., DELETE FROM table WHERE ..., or INSERT INTO table (...) VALUES (...)")
+
+
+class ChangeConflict(ValueError):
+    pass
+
+
+def enc(v):
+    """Keep a value exactly, so Undo can put it back."""
+    if v is None or isinstance(v, (bool, int, float, str)):
+        return v
+    if isinstance(v, (bytes, bytearray, memoryview)):
+        import base64
+        return {"$b": base64.b64encode(bytes(v)).decode()}
+    return str(v)
+
+
+def dec(v):
+    if isinstance(v, dict) and "$b" in v:
+        import base64
+        return base64.b64decode(v["$b"])
+    return v
+
+
 # ---------------------------------------------------------------- database drivers
 # ---------------------------------------------------------------- database drivers
 # Each database type is one small class. To support a new database (SQL Server, Oracle, ...),
@@ -199,6 +263,145 @@ class Driver:
         cols, rows = self.rows(self.explain_prefix + sql)
         return {"columns": cols, "rows": [[clean(v) for v in r] for r in rows], "row_count": len(rows)}
 
+    # --- writes (only for approved changes, on a separate connection with the writer's login)
+    ph = "%s"                 # query parameter placeholder
+
+    def q(self, ident):
+        return '"' + ident.replace('"', '""') + '"'
+
+    def primary_key(self, table):
+        """([pk columns], auto_increment?)"""
+        raise NotImplementedError
+
+    def start_write(self, cur):
+        pass
+
+    def lock_sql(self):
+        return " FOR UPDATE"
+
+    def _by_pk(self, cur, table, pk, keys, lock=False):
+        if not keys:
+            return [], []
+        cond = " OR ".join("(" + " AND ".join(f"{self.q(c)} = {self.ph}" for c in pk) + ")" for _ in keys)
+        cur.execute(f"SELECT * FROM {self.q(table)} WHERE {cond}" + (self.lock_sql() if lock else ""), [v for k in keys for v in k])
+        return [d[0] for d in cur.description], [list(r) for r in cur.fetchall()]
+
+    def plan_change(self, sql):
+        ch = parse_change(sql)
+        pk, auto = self.primary_key(ch["table"])
+        out = {"op": ch["op"], "table": ch["table"], "pk": pk}
+        if not pk:
+            out["blocked"] = "This table has no primary key, so a change couldn't be undone safely"
+        if ch["op"] == "insert":
+            out["count"] = None
+            if self.kind != "postgres" and not (auto and len(pk) == 1):
+                out["blocked"] = "INSERT can be undone only on tables with an auto-increment id"
+            return out
+        cols, rows = self.rows(f"SELECT * FROM {self.q(ch['table'])} WHERE {ch['where']}", limit=MAX_CHANGE_ROWS + 1)
+        n = self.rows(f"SELECT COUNT(*) FROM {self.q(ch['table'])} WHERE {ch['where']}")[1][0][0]
+        hidden = secret_columns(cols)
+        out.update({"count": int(n), "columns": cols, "rows": [mask_row([clean(v) for v in r], hidden) for r in rows[:20]]})
+        if n > MAX_CHANGE_ROWS:
+            out["blocked"] = f"This would change {n} rows; the limit is {MAX_CHANGE_ROWS} per change. Narrow the WHERE"
+        return out
+
+    def apply_change(self, sql, expected):
+        """Run an approved change in one transaction, after saving the rows it touches. Returns the undo record."""
+        ch = parse_change(sql)
+        table, pk = ch["table"], None
+        pk, auto = self.primary_key(table)
+        if not pk:
+            raise ValueError("This table has no primary key, so the change couldn't be undone safely. Nothing was changed")
+        cur = self.cursor(read_only=False)
+        try:
+            self.start_write(cur)
+            before, after, cols = [], [], []
+            if ch["op"] in ("update", "delete"):
+                cur.execute(f"SELECT * FROM {self.q(table)} WHERE {ch['where']}" + self.lock_sql())
+                cols = [d[0] for d in cur.description]
+                before = [list(r) for r in cur.fetchall()]
+                if expected is not None and len(before) != int(expected):
+                    raise ValueError(f"The data changed since the preview ({expected} rows then, {len(before)} now). Preview again")
+                if len(before) > MAX_CHANGE_ROWS:
+                    raise ValueError(f"More than {MAX_CHANGE_ROWS} rows. Narrow the WHERE")
+                cur.execute(ch["sql"])
+                if cur.rowcount not in (-1, len(before)):
+                    raise ValueError("The change touched a different set of rows than the preview. Nothing was changed")
+                idx = [cols.index(c) for c in pk]
+                keys = [[r[i] for i in idx] for r in before]
+                if ch["op"] == "update":
+                    _, after = self._by_pk(cur, table, pk, keys)
+            else:
+                keys = self._insert(cur, ch, pk, auto)
+                if len(keys) > MAX_CHANGE_ROWS:
+                    raise ValueError(f"More than {MAX_CHANGE_ROWS} rows. Insert fewer at a time")
+                cols, after = self._by_pk(cur, table, pk, keys)
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        finally:
+            cur.close()
+        record = {"op": ch["op"], "table": table, "pk": pk, "columns": cols,
+                  "before": [[enc(v) for v in r] for r in before], "after": [[enc(v) for v in r] for r in after]}
+        return record, {"op": ch["op"], "table": table, "rows": len(before) if ch["op"] != "insert" else len(after)}
+
+    def _insert(self, cur, ch, pk, auto):
+        if not (auto and len(pk) == 1):
+            raise ValueError("INSERT can be undone only on tables with an auto-increment id. Nothing was changed")
+        cur.execute(ch["sql"])
+        n, last = cur.rowcount, cur.lastrowid
+        first = self.first_insert_id(last, n)
+        return [[i] for i in range(first, first + n)]
+
+    def first_insert_id(self, last, n):
+        return last                 # MySQL reports the first id of a multi-row insert
+
+    def undo_change(self, record, force=False):
+        table, pk, cols = record["table"], record["pk"], record["columns"]
+        idx = [cols.index(c) for c in pk]
+        before = [[dec(v) for v in r] for r in record["before"]]
+        after = [[dec(v) for v in r] for r in record["after"]]
+        cur = self.cursor(read_only=False)
+        try:
+            self.start_write(cur)
+            rows = after if record["op"] in ("update", "insert") else before
+            keys = [[r[i] for i in idx] for r in rows]
+            _, current = self._by_pk(cur, table, pk, keys, lock=True)
+            now = {tuple(enc(r[i]) for i in idx): [enc(v) for v in r] for r in current}
+            conflicts = 0
+            if record["op"] in ("update", "insert"):
+                for r in record["after"]:
+                    k = tuple(r[i] for i in idx)
+                    if now.get(k) != r:
+                        conflicts += 1
+            else:
+                conflicts = len(now)            # a deleted row is back already
+            if conflicts and not force:
+                raise ChangeConflict(f"{conflicts} of these rows were changed again after this change. Undo would overwrite the newer edits")
+            where_pk = " AND ".join(f"{self.q(c)} = {self.ph}" for c in pk)
+            if record["op"] == "update":
+                others = [i for i, c in enumerate(cols) if c not in pk]
+                sql = f"UPDATE {self.q(table)} SET " + ", ".join(f"{self.q(cols[i])} = {self.ph}" for i in others) + f" WHERE {where_pk}"
+                for r in before:
+                    cur.execute(sql, [r[i] for i in others] + [r[i] for i in idx])
+            elif record["op"] == "delete":
+                sql = f"INSERT INTO {self.q(table)} (" + ", ".join(self.q(c) for c in cols) + ") VALUES (" + ", ".join([self.ph] * len(cols)) + ")"
+                for r in before:
+                    if tuple(enc(r[i]) for i in idx) in now:
+                        continue                 # forced: keep the row that's there now
+                    cur.execute(sql, r)
+            else:
+                for r in after:
+                    cur.execute(f"DELETE FROM {self.q(table)} WHERE {where_pk}", [r[i] for i in idx])
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        finally:
+            cur.close()
+        return {"op": "undo", "table": table, "rows": len(before) if record["op"] != "insert" else len(after), "forced": bool(force and conflicts)}
+
     def live(self):
         """What the database is doing right now. Query text has its values replaced by ?, so no data leaves."""
         out = {"at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}
@@ -256,8 +459,12 @@ class MySQL(Driver):
         except ImportError:
             sys.exit("Install the MySQL driver first:  pip3 install pymysql")
         c = self.cfg
+        from pymysql.constants import CLIENT
+
+        # FOUND_ROWS: an UPDATE reports the rows it matched, so we can check it touched exactly the previewed rows
         return pymysql.connect(host=c["host"], port=int(c.get("port") or 3306), user=c["user"], password=c["password"],
-                               database=c["database"], charset="utf8mb4", connect_timeout=5, read_timeout=120, autocommit=False)
+                               database=c["database"], charset="utf8mb4", connect_timeout=5, read_timeout=120, autocommit=False,
+                               client_flag=CLIENT.FOUND_ROWS)
 
     def alive(self):
         self.conn.ping()
@@ -272,6 +479,20 @@ class MySQL(Driver):
             except Exception:  # noqa: BLE001
                 continue
         cur.execute("START TRANSACTION READ ONLY")
+
+    def q(self, ident):
+        return "`" + ident.replace("`", "``") + "`"
+
+    def start_write(self, cur):
+        cur.execute("SET SESSION TRANSACTION READ WRITE")
+        cur.execute("START TRANSACTION")
+
+    def primary_key(self, table):
+        _, rows = self.rows("SELECT k.COLUMN_NAME, c.EXTRA FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.COLUMNS c "
+                            "ON c.TABLE_SCHEMA = k.TABLE_SCHEMA AND c.TABLE_NAME = k.TABLE_NAME AND c.COLUMN_NAME = k.COLUMN_NAME "
+                            "WHERE k.TABLE_SCHEMA = DATABASE() AND k.TABLE_NAME = %s AND k.CONSTRAINT_NAME = 'PRIMARY' "
+                            "ORDER BY k.ORDINAL_POSITION", (table,))
+        return [r[0] for r in rows], any("auto_increment" in str(r[1]).lower() for r in rows)
 
     def write_rights(self):
         _, grants = self.rows("SHOW GRANTS")
@@ -350,6 +571,21 @@ class Postgres(Driver):
         cur.execute("SET TRANSACTION READ ONLY")
         cur.execute("SET LOCAL statement_timeout = '120s'")
 
+    def start_write(self, cur):
+        self.conn.rollback()
+        cur.execute("SET TRANSACTION READ WRITE")
+        cur.execute("SET LOCAL statement_timeout = '60s'")
+
+    def primary_key(self, table):
+        _, rows = self.rows("SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) "
+                            "WHERE i.indrelid = (quote_ident(current_schema()) || '.' || quote_ident(%s))::regclass AND i.indisprimary "
+                            "ORDER BY array_position(i.indkey, a.attnum)", (table,))
+        return [r[0] for r in rows], True
+
+    def _insert(self, cur, ch, pk, auto):
+        cur.execute(ch["sql"] + " RETURNING " + ", ".join(self.q(c) for c in pk))
+        return [list(r) for r in cur.fetchall()]
+
     def write_rights(self):
         _, r = self.rows("SELECT count(*) FROM information_schema.table_privileges WHERE grantee = current_user "
                          "AND privilege_type IN ('INSERT','UPDATE','DELETE')")
@@ -393,9 +629,25 @@ Postgres.live_top = lambda self: {"columns": ["query", "runs", "total s", "avg m
 class SQLite(Driver):
     name, version_sql, explain_prefix = "SQLite", "SELECT sqlite_version()", "EXPLAIN QUERY PLAN "
 
+    ph = "?"
+
     def open(self):
         import sqlite3
-        return sqlite3.connect(f"file:{self.cfg['database']}?mode=ro", uri=True)   # the file itself is opened read-only
+        mode = "rw" if self.cfg.get("writer") else "ro"
+        return sqlite3.connect(f"file:{self.cfg['database']}?mode={mode}", uri=True)   # read-only unless it's the approved-changes login
+
+    def lock_sql(self):
+        return ""
+
+    def start_write(self, cur):
+        cur.execute("BEGIN IMMEDIATE")
+
+    def primary_key(self, table):
+        cols = sorted((c[5], c[1], c[2]) for c in self.rows(f"PRAGMA table_info({self.q(table)})")[1] if c[5])
+        return [c[1] for c in cols], len(cols) == 1 and str(cols[0][2]).upper() == "INTEGER"
+
+    def first_insert_id(self, last, n):
+        return last - n + 1         # SQLite reports the last id
 
     def tables(self):
         _, names = self.rows("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
@@ -463,10 +715,56 @@ def upload(cfg, job_id, path):
             resp.read()
 
 
-def handle(db, job, export_path=None):
+UNDO_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "undo")
+
+
+def save_undo(job_id, record):
+    """The rows a change touched, kept on THIS server (not sent to Goal Engine) so Undo can put them back."""
+    import gzip
+
+    os.makedirs(UNDO_DIR, mode=0o700, exist_ok=True)
+    path = os.path.join(UNDO_DIR, f"{int(job_id)}.json.gz")
+    with open(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "wb") as raw, \
+            gzip.open(raw, "wt", encoding="utf-8") as fh:
+        json.dump(record, fh)
+
+
+def load_undo(job_id):
+    import gzip
+
+    path = os.path.join(UNDO_DIR, f"{int(job_id)}.json.gz")
+    if not os.path.exists(path):
+        raise ValueError(f"The saved copy for this change is gone (kept {UNDO_DAYS} days), so it can't be undone")
+    with gzip.open(path, "rt", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def drop_undo(job_id=None):
+    if not os.path.isdir(UNDO_DIR):
+        return
+    for name in os.listdir(UNDO_DIR):
+        path = os.path.join(UNDO_DIR, name)
+        old = time.time() - os.path.getmtime(path) > UNDO_DAYS * 86400
+        if old or (job_id is not None and name == f"{int(job_id)}.json.gz"):
+            os.remove(path)
+
+
+def handle(db, job, export_path=None, writer=None):
     kind, payload = job["kind"], job.get("payload") or {}
     if kind == "export" and export_path:
         return db.export_file(payload.get("sql", ""), export_path)
+    if kind == "plan":
+        return db.plan_change(payload.get("sql", ""))
+    if kind in ("change", "undo"):
+        if writer is None:
+            raise ValueError("Changes are switched off for this database. Run the setup again and allow approved changes")
+        if kind == "change":
+            record, info = writer.apply_change(payload.get("sql", ""), payload.get("expected"))
+            save_undo(job["id"], record)
+            return {**info, "undo": {"available": True, "where": "your server"}}
+        info = writer.undo_change(load_undo(payload.get("change_job_id")), force=bool(payload.get("force")))
+        drop_undo(payload.get("change_job_id"))
+        return info
     if kind == "schema":
         return db.schema()
     if kind == "query":
@@ -484,8 +782,12 @@ def handle(db, job, export_path=None):
 
 def run(cfg):
     db = Database(cfg).connect()
+    writer = None
+    if cfg.get("writer"):                       # the owner allowed approved changes during setup
+        writer = Database({**cfg["writer"], "type": cfg["type"], "writer": True}).connect()
+    drop_undo()
     info = {"version": VERSION, "db_type": cfg["type"], "db_version": db.version(), "db_name": cfg["database"],
-            "host": socket.gethostname(), "can_write": db.can_write(), "allow_write": False}
+            "host": socket.gethostname(), "can_write": db.can_write(), "allow_write": False, "allow_changes": writer is not None}
     hello = call(cfg, "/api/connector/hello", info)
     wait = hello.get("poll_seconds", 4)
     long_poll = int(hello.get("long_poll") or 0)   # the server holds the request until a job arrives
@@ -510,10 +812,11 @@ def run(cfg):
                     upload(cfg, job["id"], tmp)          # streamed from disk, compressed
                     result = {"ok": True, "result": data, "uploaded": True}
                 else:
-                    result = {"ok": True, "result": handle(db, job)}
+                    result = {"ok": True, "result": handle(db, job, writer=writer)}
             except Exception as exc:  # noqa: BLE001 - report the error back, keep running
                 db.done()
-                result = {"ok": False, "error": str(exc)[:500]}
+                prefix = "CONFLICT: " if isinstance(exc, ChangeConflict) else ""
+                result = {"ok": False, "error": (prefix + str(exc))[:500]}
             finally:
                 if os.path.exists(tmp):
                     os.remove(tmp)
@@ -739,6 +1042,7 @@ def setup(args):
         sys.exit(f"\n{err}\nRun the same command again and choose 'm' to type the details.")
     print(f"Connected ({cfg['type']} {db.version()}, database {cfg['database']}).")
 
+    app_login = dict(cfg)
     if cfg["type"] != "sqlite" and db.can_write():
         print("\nThat user can change data. Goal Engine never writes, but a separate read-only user is safer.")
         if ask("Create a read-only user for Goal Engine now? (asks for your sudo password) [Y/n]: ", "y").lower().startswith("y"):
@@ -751,6 +1055,16 @@ def setup(args):
                 print("Couldn't create it (needs sudo access to the database). Continuing with the app's user; the connector itself stays read-only.")
 
     out = {"server": args.server, "token": args.token, **{k: cfg[k] for k in ("type", "host", "port", "database", "user", "password")}}
+    print("\nGoal Engine can also make changes you approve (UPDATE/DELETE/INSERT), each one shown first and undoable.")
+    if ask("Allow approved changes on this database? Off is safest. [y/N]: ", "n").lower().startswith("y"):
+        wdb, err = try_connect(app_login)
+        if wdb is not None and wdb.can_write():
+            out["writer"] = {k: app_login[k] for k in ("host", "port", "database", "user", "password")}
+            print("Approved changes: ON (using the app's own database login; the copy for Undo stays on this server).")
+        else:
+            print("That login can't change data, so approved changes stay OFF.")
+    else:
+        print("Approved changes: OFF. Goal Engine can only read.")
     with open(os.open(CONFIG, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as fh:
         json.dump(out, fh, indent=2)
     os.chmod(CONFIG, 0o600)

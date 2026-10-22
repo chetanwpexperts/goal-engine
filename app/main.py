@@ -470,6 +470,7 @@ class DirectIn(BaseModel):
     password: str = ""
     name: str = ""
     agent_id: int | None = None
+    allow_changes: bool = False
 
 
 class DbJobIn(BaseModel):
@@ -516,7 +517,7 @@ def create_connector(body: ConnectorIn, request: Request, db: Session = Depends(
 @app.post("/api/connectors/direct")
 def connect_direct(body: DirectIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     try:
-        connector = dbagent_direct.connect(db, visitor, body.model_dump(), body.name)
+        connector = dbagent_direct.connect(db, visitor, body.model_dump(), body.name, allow_changes=body.allow_changes)
     except (dbagent_direct.DirectError, dbagent.DatabaseError) as exc:
         return JSONResponse({"error": str(exc), "use_command": bool(getattr(exc, "use_command", False))}, status_code=400)
     if body.agent_id:
@@ -622,6 +623,52 @@ def create_db_job(connector_id: int, body: DbJobIn, db: Session = Depends(get_db
     except dbagent.DatabaseError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     return dbagent.job_dict(job)
+
+
+class PlanIn(BaseModel):
+    sql: str
+
+
+class ApplyIn(BaseModel):
+    plan_id: int
+
+
+class UndoIn(BaseModel):
+    change_id: int
+    force: bool = False
+
+
+def _own_conn(db: Session, connector_id: int, visitor: str):
+    try:
+        return dbagent.own_connector(db, connector_id, visitor)
+    except dbagent.DatabaseError:
+        raise HTTPException(404, "Not found")
+
+
+@app.post("/api/connectors/{connector_id}/plan")
+def plan_change(connector_id: int, body: PlanIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    """Step 1: show exactly which rows a change would touch. Nothing is changed."""
+    try:
+        return dbagent.job_dict(dbagent.queue(db, _own_conn(db, connector_id, visitor), "plan", {"sql": body.sql}))
+    except dbagent.DatabaseError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.post("/api/connectors/{connector_id}/apply")
+def apply_change(connector_id: int, body: ApplyIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    """Step 2: run exactly what was previewed (once, within 10 minutes), saving a copy for Undo first."""
+    try:
+        return dbagent.job_dict(dbagent.approve(db, _own_conn(db, connector_id, visitor), body.plan_id))
+    except dbagent.DatabaseError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+
+
+@app.post("/api/connectors/{connector_id}/undo")
+def undo_change(connector_id: int, body: UndoIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    try:
+        return dbagent.job_dict(dbagent.request_undo(db, _own_conn(db, connector_id, visitor), body.change_id, body.force))
+    except dbagent.DatabaseError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
 
 
 def _own_job(db: Session, job_id: int, visitor: str):

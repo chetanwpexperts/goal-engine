@@ -183,6 +183,7 @@ class Connector(Base):
     can_write: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
     host_label: Mapped[str | None] = mapped_column(String(120), nullable=True)
     kind: Mapped[str | None] = mapped_column(String(10), nullable=True, default="agent")   # agent (runs on their server) / direct
+    allow_changes: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)   # owner opted in to approved changes
     secret: Mapped[str | None] = mapped_column(Text, nullable=True)   # direct only: encrypted connection details
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -203,6 +204,7 @@ class ConnectorJob(Base):
     result: Mapped[str | None] = mapped_column(Text(4_000_000), nullable=True)   # MEDIUMTEXT on MySQL
     error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     file_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    undo_blob: Mapped[str | None] = mapped_column(Text(16_000_000), nullable=True)   # direct connections only: encrypted copy for Undo
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

@@ -167,7 +167,7 @@ def _clean_form(form: dict) -> dict:
     return details
 
 
-def connect(db: Session, visitor_id: str, form: dict, name: str = "") -> Connector:
+def connect(db: Session, visitor_id: str, form: dict, name: str = "", allow_changes: bool = False) -> Connector:
     from app.agents import database as dbagent
 
     details = _clean_form(form)
@@ -182,7 +182,10 @@ def connect(db: Session, visitor_id: str, form: dict, name: str = "") -> Connect
     connector.kind, connector.secret = "direct", secret
     connector.token_hint = "direct"
     connector.db_type, connector.db_name, connector.version = details["type"], details["database"], version[:20]
+    if allow_changes and not can_write:
+        raise DirectError("You asked for approved changes, but this database user can only read. Use a login that can change data, or leave changes off")
     connector.host_label, connector.can_write = details["host"], bool(can_write)
+    connector.allow_changes = bool(allow_changes and can_write)
     connector.status, connector.last_seen_at = "online", utcnow()
     db.commit()
     dbagent.queue(db, connector, "schema")
@@ -202,6 +205,25 @@ def start(job_id: int) -> None:
         run_job(job_id)
     else:
         threading.Thread(target=run_job, args=(job_id,), daemon=True, name=f"db-job-{job_id}").start()
+
+
+def _write_job(db: Session, connector: Connector, job: ConnectorJob) -> dict:
+    """Approved change or its undo, for a database connected with typed details. The undo copy is kept encrypted."""
+    from app import privacy
+
+    payload = loads(job.payload, {}) or {}
+    conn = _open({**decrypt(connector.secret or ""), "writer": True})
+    try:
+        if job.kind == "change":
+            record, info = conn.apply_change(payload.get("sql", ""), payload.get("expected"))
+            job.undo_blob = privacy.encrypt(record, "undo")
+            return {**info, "undo": {"available": True, "where": "Goal Engine, encrypted"}}
+        change = db.get(ConnectorJob, payload.get("change_job_id") or 0)
+        if change is None or not change.undo_blob:
+            raise ValueError("The saved copy for this change is gone, so it can't be undone")
+        return conn.undo_change(privacy.decrypt(change.undo_blob, "undo"), force=bool(payload.get("force")))
+    finally:
+        _close(conn)
 
 
 def run_job(job_id: int) -> None:
@@ -224,6 +246,8 @@ def run_job(job_id: int) -> None:
                     from app.agents import phpconn
 
                     data = phpconn.run(connector, job.kind, loads(job.payload, {}), export_path=path)
+                elif job.kind in ("change", "undo"):
+                    data = _write_job(db, connector, job)
                 else:
                     conn = _open(decrypt(connector.secret or ""))
                     try:
@@ -232,7 +256,8 @@ def run_job(job_id: int) -> None:
                         _close(conn)
                 body = {"ok": True, "result": data}
             except Exception as exc:  # noqa: BLE001 - every failure is reported on the job
-                body = {"ok": False, "error": str(exc)[:300]}
+                prefix = "CONFLICT: " if isinstance(exc, gc.ChangeConflict) else ""
+                body = {"ok": False, "error": (prefix + str(exc))[:300]}
                 if getattr(exc, "missing", False):
                     connector.status = "missing"      # the card will say the file needs uploading again
         if not body.get("ok") and path is not None:

@@ -23,7 +23,9 @@ from app.models import Agent, Connector, ConnectorJob, Goal, dumps, loads, utcno
 
 
 EXPORT_DIR = Path(__file__).resolve().parents[2] / "data" / "exports"
-JOB_KINDS = ("schema", "query", "export", "explain", "health", "live")
+JOB_KINDS = ("schema", "query", "export", "explain", "health", "live", "plan", "change", "undo")
+PLAN_TTL = timedelta(minutes=10)      # Apply must follow a fresh preview
+UNDO_TTL = timedelta(days=7)
 MAX_OPEN_JOBS = 4            # per user at once: keeps our server and theirs light
 MAX_UPLOAD_BYTES = 30 * 1024 * 1024
 JOB_TTL = timedelta(minutes=10)
@@ -118,6 +120,7 @@ def connector_dict(connector: Connector, db: Session | None = None) -> dict:
         "id": connector.id, "name": connector.name, "status": connector.status, "online": is_online(connector),
         "db_type": connector.db_type, "db_name": connector.db_name, "can_write": bool(connector.can_write),
         "host": connector.host_label, "token_hint": connector.token_hint, "kind": connector.kind or "agent",
+        "allow_changes": bool(connector.allow_changes),
         "last_seen_at": connector.last_seen_at.isoformat() if connector.last_seen_at else None,
         "tables": (schema or {}).get("tables", []),
         **({"file_url": _php_url(connector), "file_name": _php_name(connector)} if connector.kind == "php" else {}),
@@ -142,6 +145,7 @@ def hello(db: Session, connector: Connector, info: dict) -> None:
     connector.version = str(info.get("version", ""))[:20] or None
     connector.host_label = str(info.get("host", ""))[:120] or None
     connector.can_write = bool(info.get("can_write"))
+    connector.allow_changes = bool(info.get("allow_changes"))
     connector.status = "online"
     connector.last_seen_at = utcnow()
     db.commit()
@@ -169,6 +173,17 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
     payload = dict(payload or {})
     if kind in ("query", "export", "explain"):
         payload["sql"] = read_only_sql(payload.get("sql", ""))
+    if kind in ("plan", "change", "undo") and not connector.allow_changes:
+        raise DatabaseError("Changes are switched off for this database")
+    if kind == "plan":
+        from app.agents.direct import gc
+
+        try:
+            ch = gc.parse_change(payload.get("sql", ""))
+        except ValueError as exc:
+            raise DatabaseError(str(exc)) from exc
+        payload["sql"] = ch["sql"]
+        summary = f"Preview change · {ch['op'].upper()} {ch['table']} · {normalize_sql(ch['sql'])}"
     payload["limit"] = min(int(payload.get("limit") or (PREVIEW_ROWS if kind == "query" else 100000)), 100000)
     open_jobs = list(db.scalars(select(ConnectorJob).where(ConnectorJob.connector_id == connector.id,
                                                            ConnectorJob.status.in_(("queued", "claimed")))))
@@ -188,6 +203,46 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
         direct.start(job.id)
         db.refresh(job)
     return job
+
+
+def approve(db: Session, connector: Connector, plan_id: int) -> ConnectorJob:
+    """Apply = run exactly the previewed statement, once, within 10 minutes, expecting the previewed row count."""
+    plan = db.get(ConnectorJob, plan_id)
+    if plan is None or plan.connector_id != connector.id or plan.kind != "plan" or plan.status != "done":
+        raise DatabaseError("Preview the change first")
+    result = loads(plan.result, {}) or {}
+    if result.get("used"):
+        raise DatabaseError("This preview was already applied. Preview again for a new change")
+    if utcnow() - plan.finished_at > PLAN_TTL:
+        raise DatabaseError("The preview is more than 10 minutes old. Preview again")
+    if result.get("blocked"):
+        raise DatabaseError(result["blocked"])
+    sql = (loads(plan.payload, {}) or {}).get("sql", "")
+    result["used"] = True
+    plan.result = dumps(result)
+    db.commit()
+    from app.agents.direct import gc
+
+    ch = gc.parse_change(sql)
+    return queue(db, connector, "change", {"sql": sql, "expected": result.get("count"), "plan_id": plan.id},
+                 summary=f"{ch['op'].upper()} {ch['table']} · {normalize_sql(sql)}")
+
+
+def request_undo(db: Session, connector: Connector, change_id: int, force: bool = False) -> ConnectorJob:
+    change = db.get(ConnectorJob, change_id)
+    if change is None or change.connector_id != connector.id or change.kind != "change" or change.status != "done":
+        raise DatabaseError("Nothing to undo")
+    result = loads(change.result, {}) or {}
+    if result.get("undone"):
+        raise DatabaseError("Already undone")
+    if not (result.get("undo") or {}).get("available") or utcnow() - change.finished_at > UNDO_TTL:
+        raise DatabaseError("The saved copy for this change is gone (kept 7 days), so it can't be undone")
+    pending = db.scalar(select(ConnectorJob).where(ConnectorJob.connector_id == connector.id, ConnectorJob.kind == "undo",
+                                                   ConnectorJob.status.in_(("queued", "claimed"))))
+    if pending is not None:
+        raise DatabaseError("An undo is already running")
+    return queue(db, connector, "undo", {"change_job_id": change.id, "force": bool(force)},
+                 summary=f"Undo · {result.get('table', '')} · change #{change.id}" + (" (overwrite newer edits)" if force else ""))
 
 
 def save_upload_path(job: ConnectorJob) -> Path:
@@ -242,6 +297,12 @@ def complete(db: Session, connector: Connector, job_id: int, data: dict, file_pa
         job.status, job.error = "failed", "The export file didn't arrive. Try again"
         db.commit()
         return job
+    if job.kind == "undo":
+        change = db.get(ConnectorJob, (loads(job.payload, {}) or {}).get("change_job_id") or 0)
+        if change is not None:
+            cr = loads(change.result, {}) or {}
+            cr["undone"], cr["undone_by"] = True, job.id
+            change.result, change.undo_blob = dumps(cr), None
     raw = json.dumps(result, ensure_ascii=False, default=str)
     job.result = raw if len(raw) < 2_000_000 else json.dumps({"truncated": True})
     job.status = "done"
@@ -255,11 +316,20 @@ def activity(db: Session, connector: Connector, after: int = 0, limit: int = 40)
     for j in db.scalars(q.order_by(ConnectorJob.id.desc()).limit(limit)):
         r = loads(j.result, {}) or {}
         rows = r.get("row_count")
+        if rows is None and j.kind in ("change", "undo"):
+            rows = r.get("rows")
+        if rows is None and j.kind == "plan":
+            rows = r.get("count")
         if rows is None and j.kind == "schema":
             rows = len(r.get("tables", []))
         ms = int((j.finished_at - (j.claimed_at or j.created_at)).total_seconds() * 1000) if j.finished_at else None
+        undo = None
+        if j.kind == "change" and j.status == "done":
+            fresh = j.finished_at and utcnow() - j.finished_at < UNDO_TTL
+            undo = {"available": bool((r.get("undo") or {}).get("available") and fresh and not r.get("undone")),
+                    "undone": bool(r.get("undone")), "where": (r.get("undo") or {}).get("where")}
         out.append({"id": j.id, "kind": j.kind, "summary": j.summary or j.kind, "status": j.status, "error": j.error,
-                    "rows": rows, "ms": ms, "at": j.created_at.isoformat(), "undo": r.get("undo") if j.kind == "change" else None})
+                    "rows": rows, "ms": ms, "at": j.created_at.isoformat(), "undo": undo})
     return out
 
 

@@ -509,6 +509,10 @@
     const box = el("div", "slot inner");
     const step = (n, text) => { const p = el("p", "step"); p.append(el("b", null, `${n}`), el("span", null, text)); return p; };
     const dl = el("button", "btn solid", T(hi, "File download karo", "Download the file")); dl.type = "button";
+    const allowRow = el("label", "check");
+    const allow = el("input"); allow.type = "checkbox";
+    allowRow.append(allow, el("span", null, T(hi, "Approved changes bhi allow karo (har change pehle preview, Undo ke saath). Band rakhna sabse safe hai.",
+                                                  "Also allow approved changes (each previewed first, with Undo). Leaving this off is safest.")));
     const url = el("input"); url.type = "url"; url.placeholder = "https://aapki-site.com/goal-connector-….php";
     const check = el("button", "btn go", T(hi, "Jodo", "Connect")); check.type = "submit";
     const err = el("p", "note err"); err.hidden = true;
@@ -526,7 +530,7 @@
     }
     box.append(
       step(1, T(hi, "Ye file download karo (har database ke liye alag, isme ek secret key hai):", "Download this file (one per database; it has its own secret key):")),
-      dl,
+      dl, allowRow,
       step(2, T(hi, "Hosting ke File Manager mein website ke main folder mein upload karo, jahan wp-config.php ya .env hai.",
                     "Upload it with your hosting's File Manager into the website's main folder, where wp-config.php or .env is.")),
       step(3, T(hi, "Upload ki hui file ka link yahan paste karo:", "Paste the link of the uploaded file here:")),
@@ -541,7 +545,7 @@
           const data = await api(`/api/agents/${a.id}/php-connector`, { method: "POST" });
           cid = (data.agents.find((x) => x.id === a.id) || {}).connector.id;
         }
-        window.location.href = `/api/connectors/${cid}/php-file`;
+        window.location.href = `/api/connectors/${cid}/php-file?changes=${allow.checked ? 1 : 0}`;
         dl.textContent = T(hi, "Download ho gaya. Dobara?", "Downloaded. Again?");
         url.focus();
       } catch (ex) { addMachine(ex.message, [], true); }
@@ -577,7 +581,11 @@
     const pass = el("input"); pass.type = "password"; pass.autocomplete = "new-password";
     const r1 = el("div", "row two"); r1.append(field(T(hi, "Database", "Database"), type), field("Port", port));
     const r2 = el("div", "row two"); r2.append(field(T(hi, "Database ka naam", "Database name"), dbn), field(T(hi, "User", "User"), user));
-    form.append(r1, field("Host", host), r2, field(T(hi, "Password", "Password"), pass));
+    const allowRow = el("label", "check");
+    const allow = el("input"); allow.type = "checkbox";
+    allowRow.append(allow, el("span", null, T(hi, "Approved changes allow karo (preview + Undo). Iske liye login ko data badalne ka haq chahiye.",
+                                                  "Allow approved changes (preview + Undo). The login must be able to change data.")));
+    form.append(r1, field("Host", host), r2, field(T(hi, "Password", "Password"), pass), allowRow);
     const ipHint = el("p", "fine", T(hi, "Sirf-SELECT wala user sabse safe hai. Password encrypt karke rakha jaata hai.", "A SELECT-only user is safest. The password is stored encrypted."));
     api("/api/connector-info").then((d) => {
       if (d.server_ip) ipHint.textContent += T(hi, ` Provider ke "allowed IPs" mein ye daalo: ${d.server_ip}`, ` Add this to your provider's allowed IPs: ${d.server_ip}`);
@@ -591,9 +599,11 @@
       go.disabled = true; go.textContent = T(hi, "Jod raha hoon…", "Connecting…"); err.hidden = true;
       try {
         const data = await api("/api/connectors/direct", { method: "POST", body: JSON.stringify({
-          type: type.value, host: host.value, port: port.value, database: dbn.value, user: user.value, password: pass.value, agent_id: a.id }) });
+          type: type.value, host: host.value, port: port.value, database: dbn.value, user: user.value, password: pass.value, agent_id: a.id,
+          allow_changes: allow.checked }) });
         pass.value = "";
-        addMachine(T(hi, "Database jud gaya. Tables padh raha hoon.", "Database connected. Reading the tables."), [T(hi, "Read-only connection bana", "Read-only connection made")]);
+        addMachine(T(hi, "Database jud gaya. Tables padh raha hoon.", "Database connected. Reading the tables."),
+                   [allow.checked ? T(hi, "Connection bana: padhna + approved changes", "Connected: read + approved changes") : T(hi, "Read-only connection bana", "Read-only connection made")]);
         renderAgents(data.agents);
       } catch (ex) {
         err.textContent = ex.message; err.hidden = false;
@@ -750,7 +760,115 @@
     }, 3000);
   }
 
-  function undoButton() { return el("span"); }   // replaced when changes are switched on
+  async function doUndo(c, changeId, hi, force, onDone) {
+    const j0 = await api(`/api/connectors/${c.id}/undo`, { method: "POST", body: JSON.stringify({ change_id: changeId, force }) });
+    for (let i = 0; i < 90; i++) {
+      await sleep(i < 4 ? 600 : 1200);
+      const j = await api(`/api/connector-jobs/${j0.id}`);
+      if (j.status === "done") { onDone(null, j); return; }
+      if (j.status === "failed" || j.status === "expired") { onDone(j.error || "Undo failed", j); return; }
+    }
+    onDone(T(hi, "Undo ka jawab nahi aaya.", "The undo didn't answer."), null);
+  }
+
+  function undoButton(c, it, hi) {
+    const box = el("span", "undo");
+    if (it.undo.undone) { box.append(el("em", null, T(hi, "Undo ho gaya", "Undone"))); return box; }
+    if (!it.undo.available) return box;
+    const b = el("button", "tdl", "Undo"); b.type = "button";
+    b.addEventListener("click", async () => {
+      b.disabled = true; b.textContent = T(hi, "Undo ho raha hai…", "Undoing…");
+      const run = (force) => doUndo(c, it.id, hi, force, (err) => {
+        if (!err) { b.replaceWith(el("em", null, T(hi, "Undo ho gaya", "Undone"))); return; }
+        if (err.startsWith("CONFLICT")) {
+          const msg = el("span", "note err", err.replace(/^CONFLICT:\s*/, ""));
+          const f = el("button", "tdl danger", T(hi, "Phir bhi undo karo", "Undo anyway")); f.type = "button";
+          f.addEventListener("click", () => { f.disabled = true; run(true); });
+          b.replaceWith(msg, f);
+        } else { b.textContent = "Undo"; b.disabled = false; addMachine(err, [], true); }
+      });
+      try { await run(false); } catch (ex) { addMachine(ex.message, [], true); b.disabled = false; b.textContent = "Undo"; }
+    });
+    box.append(b);
+    return box;
+  }
+
+  // ---- approved changes: preview -> apply -> undo
+  function changesBox(c, a, hi) {
+    const box = el("details", "db-sql changes");
+    box.append(el("summary", null, T(hi, "Data badlo (pehle preview, phir Apply, Undo hamesha)", "Change data (preview first, then Apply, always undoable)")));
+    if (!c.allow_changes) {
+      const how = c.kind === "php"
+        ? T(hi, "Is website file mein changes band hain. Changes wali file download karke purani file ki jagah upload karo, phir \"Dobara check karo\" dabao.",
+                "Changes are off in this website file. Download the file with changes on, upload it over the old one, then tap \"Check again\".")
+        : c.kind === "direct"
+          ? T(hi, "Changes band hain. Disconnect karke dobara jodo aur \"Approved changes allow karo\" tick karo (login ko data badalne ka haq chahiye).",
+              "Changes are off. Disconnect and connect again with \"Allow approved changes\" ticked (the login must be able to change data).")
+          : T(hi, "Changes band hain. Server pe connector ka setup dobara chalao aur \"Allow approved changes\" pe y dabao.",
+              "Changes are off. Run the connector setup again on your server and answer y to \"Allow approved changes\".");
+      box.append(el("p", "fine", how));
+      if (c.kind === "php") {
+        const row = el("div", "acts flat");
+        const dl = el("button", "btn", T(hi, "Changes wali file download karo", "Download the file with changes on")); dl.type = "button";
+        dl.addEventListener("click", () => { window.location.href = `/api/connectors/${c.id}/php-file?changes=1`; });
+        const again = el("button", "btn solid", T(hi, "Dobara check karo", "Check again")); again.type = "button";
+        again.addEventListener("click", async () => {
+          again.disabled = true;
+          try { await api(`/api/connectors/${c.id}/php-link`, { method: "POST", body: JSON.stringify({ url: c.file_url }) }); await refreshGoal(); }
+          catch (ex) { addMachine(ex.message, [], true); again.disabled = false; }
+        });
+        row.append(dl, again);
+        box.append(row);
+      }
+      return box;
+    }
+    const ta = el("textarea"); ta.placeholder = "UPDATE orders SET status = 'paid' WHERE id = 42";
+    const result = el("div", "change-out");
+    const prev = el("button", "btn solid", T(hi, "Preview", "Preview")); prev.type = "button";
+    const row = el("div", "acts flat"); row.append(prev);
+    box.append(el("p", "fine", T(hi, "Ek table, ek statement: UPDATE … WHERE, DELETE FROM … WHERE, ya INSERT INTO … VALUES. Ek baar mein 1000 rows tak.",
+                                    "One table, one statement: UPDATE … WHERE, DELETE FROM … WHERE, or INSERT INTO … VALUES. Up to 1000 rows at a time.")), ta, row, result);
+    prev.addEventListener("click", async () => {
+      result.replaceChildren(el("p", "waiting", T(hi, "Dekh raha hoon kaun si rows badlengi…", "Finding the rows this would change…")));
+      try {
+        const p0 = await api(`/api/connectors/${c.id}/plan`, { method: "POST", body: JSON.stringify({ sql: ta.value }) });
+        let p = p0;
+        for (let i = 0; i < 90 && !["done", "failed", "expired"].includes(p.status); i++) { await sleep(i < 4 ? 500 : 1200); p = await api(`/api/connector-jobs/${p0.id}`); }
+        if (p.status !== "done") throw new Error(p.error || "Preview failed");
+        const r = p.result;
+        const parts = [];
+        const what = r.op === "insert" ? T(hi, `${r.table} mein nayi rows judengi`, `New rows will be added to ${r.table}`)
+          : T(hi, `${r.count} rows ${r.op === "delete" ? "delete hongi" : "badlengi"} · ${r.table}`, `${r.count} rows will be ${r.op === "delete" ? "deleted" : "changed"} · ${r.table}`);
+        parts.push(el("p", "change-what", what));
+        if (r.rows && r.rows.length) parts.push(el("p", "cap", T(hi, "Abhi ye rows aisi hain (pehli 20):", "These rows as they are now (first 20):")), grid({ columns: r.columns, rows: r.rows }));
+        if (r.blocked) { parts.push(el("p", "note err", r.blocked)); result.replaceChildren(...parts); return; }
+        if (r.op !== "insert" && !r.count) { parts.push(el("p", "fine", T(hi, "Koi row match nahi hui, kuch nahi badlega.", "No rows match; nothing would change."))); result.replaceChildren(...parts); return; }
+        const apply = el("button", "btn go", T(hi, "Apply karo", "Apply")); apply.type = "button";
+        const cancel = el("button", "btn", T(hi, "Rehne do", "Cancel")); cancel.type = "button";
+        cancel.addEventListener("click", () => result.replaceChildren());
+        apply.addEventListener("click", async () => {
+          apply.disabled = true; cancel.disabled = true; apply.textContent = T(hi, "Badal raha hoon…", "Applying…");
+          try {
+            const j0 = await api(`/api/connectors/${c.id}/apply`, { method: "POST", body: JSON.stringify({ plan_id: p.id }) });
+            let j = j0;
+            for (let i = 0; i < 90 && !["done", "failed", "expired"].includes(j.status); i++) { await sleep(i < 4 ? 500 : 1200); j = await api(`/api/connector-jobs/${j0.id}`); }
+            if (j.status !== "done") throw new Error(j.error || "The change failed. Nothing was changed");
+            const done = el("div", "change-done");
+            done.append(el("p", null, T(hi, `${j.result.rows} rows badal di. Purani copy ${j.result.undo.where === "your server" ? "aapke server" : j.result.undo.where === "your hosting" ? "aapki hosting" : "encrypted"} pe hai; 7 din tak Undo kar sakte ho.`,
+                                        `${j.result.rows} rows changed. The old copy is kept ${j.result.undo.where === "Goal Engine, encrypted" ? "encrypted" : "on " + j.result.undo.where}; you can Undo for 7 days.`)),
+                        undoButton(c, { id: j.id, undo: { available: true } }, hi));
+            result.replaceChildren(done);
+            addMachine(T(hi, `${j.result.rows} rows badli (${j.result.table}). Undo card mein hai.`, `Changed ${j.result.rows} rows in ${j.result.table}. Undo is on the card.`),
+                       [T(hi, "Purani rows save ki", "Saved the old rows"), T(hi, "Change apply kiya", "Applied the change")]);
+          } catch (ex) { result.replaceChildren(el("p", "note err", ex.message)); }
+        });
+        const acts2 = el("div", "acts flat"); acts2.append(apply, cancel);
+        parts.push(acts2);
+        result.replaceChildren(...parts);
+      } catch (ex) { result.replaceChildren(el("p", "note err", ex.message)); }
+    });
+    return box;
+  }
 
   function renderDatabase(a) {
     const w = W(a.lang);
@@ -771,9 +889,9 @@
     const out = el("div", "db-out");
     const say = (text) => { out.replaceChildren(el("p", "waiting", text)); };
     const fail = (err) => { out.replaceChildren(el("p", "note err", err.message)); };
-    const meta = el("p", "access connector", `${c.name}${c.db_name && c.db_name !== c.name ? ` · ${c.db_name}` : ""}${c.db_type ? ` (${c.db_type})` : ""} · ${T(hi, "sirf read-only", "read-only")}`);
+    const meta = el("p", "access connector", `${c.name}${c.db_name && c.db_name !== c.name ? ` · ${c.db_name}` : ""}${c.db_type ? ` (${c.db_type})` : ""} · ${c.allow_changes ? T(hi, "padhna + approved changes (Undo ke saath)", "read + approved changes (with Undo)") : T(hi, "sirf read-only", "read-only")}`);
     card.append(meta);
-    if (c.can_write) card.append(el("p", "note warn", T(hi, "Is database user ke paas data badalne ka haq hai. Goal Engine kabhi kuch badalta nahi, phir bhi sirf-SELECT wala user behtar hai.",
+    if (c.can_write && !c.allow_changes) card.append(el("p", "note warn", T(hi, "Is database user ke paas data badalne ka haq hai. Goal Engine kabhi kuch badalta nahi, phir bhi sirf-SELECT wala user behtar hai.",
                                                        "This database user can change data. Goal Engine never changes anything, but a SELECT-only user is safer.")));
     if (!c.online && c.kind !== "direct") {
       card.append(el("p", "note", T(hi, "Connector band hai. Server pe chalao: cd ~/goal-connector && .venv/bin/python goal_connector.py run &", "The connector isn't running. On your server: cd ~/goal-connector && .venv/bin/python goal_connector.py run &")));
@@ -874,6 +992,7 @@
     if (a.mode !== "explore" && a.mode !== "export") acts.append(el("span"));
     pane.append(acts);
     if (a.mode === "health" || a.mode === "report") pane.append(sql);
+    pane.append(changesBox(c, a, hi));
 
     if (a.mode === "report" && c.tables.length) {
       const rep = el("div", "slot");

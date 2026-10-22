@@ -314,3 +314,15 @@ body[data-state="active"]::after { content: ""; position: fixed; left: 0; right:
   .act { grid-template-columns: 1fr auto; }
   .act time { grid-column: 1 / -1; }
 }
+
+.changes summary { color: var(--ink); }
+.change-out { margin-top: 12px; display: grid; gap: 8px; }
+.change-what { margin: 0; font-weight: 600; font-size: 16px; }
+.change-done { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--ok-soft); border-radius: 12px; padding: 10px 12px; }
+.change-done p { margin: 0; flex: 1 1 260px; }
+.undo em { color: var(--muted); font-size: 13px; }
+.undo { display: inline-flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.tdl.danger { border-color: var(--alert); color: var(--alert); }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--ink); cursor: pointer; margin: 4px 0; }
+.check input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--ink); flex: none; }
+.act .undo { grid-column: 1 / -1; justify-content: flex-start; }

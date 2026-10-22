@@ -183,7 +183,7 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
         except ValueError as exc:
             raise DatabaseError(str(exc)) from exc
         payload["sql"] = ch["sql"]
-        summary = f"Preview change · {ch['op'].upper()} {ch['table']} · {normalize_sql(ch['sql'])}"
+        summary = f"Preview change · {normalize_sql(ch['sql'])}"
     payload["limit"] = min(int(payload.get("limit") or (PREVIEW_ROWS if kind == "query" else 100000)), 100000)
     open_jobs = list(db.scalars(select(ConnectorJob).where(ConnectorJob.connector_id == connector.id,
                                                            ConnectorJob.status.in_(("queued", "claimed")))))
@@ -225,7 +225,7 @@ def approve(db: Session, connector: Connector, plan_id: int) -> ConnectorJob:
 
     ch = gc.parse_change(sql)
     return queue(db, connector, "change", {"sql": sql, "expected": result.get("count"), "plan_id": plan.id},
-                 summary=f"{ch['op'].upper()} {ch['table']} · {normalize_sql(sql)}")
+                 summary=normalize_sql(sql))
 
 
 def request_undo(db: Session, connector: Connector, change_id: int, force: bool = False) -> ConnectorJob:
@@ -432,6 +432,14 @@ def blocks(mode: str, hi: bool) -> list[dict]:
     return steps
 
 
+def _blocks_for(mode: str, hi: bool, connector) -> list[dict]:
+    steps = blocks(mode, hi)
+    if connector is not None and connector.allow_changes:
+        steps[0] = {"kind": "connect", "text": "Database padhunga; badlaav sirf aapke preview aur Apply ke baad, hamesha Undo ke saath" if hi
+                    else "Read your database; change data only after your preview and Apply, always with Undo"}
+    return steps
+
+
 def database_dict(db: Session, agent: Agent, hi: bool) -> dict:
     inputs = loads(agent.inputs, {}) or {}
     mode = inputs.get("mode", "explore")
@@ -442,7 +450,7 @@ def database_dict(db: Session, agent: Agent, hi: bool) -> dict:
     return {
         "id": agent.id, "lang": "hi" if hi else "en", "recipe": "database", "database": True, "mode": mode,
         "name": MODE_TEXT[mode][0 if hi else 1].split(" (")[0], "status": agent.status, "access": "connector",
-        "available": mode not in ("backup", "write"), "blocks": blocks(mode, hi),
+        "available": mode not in ("backup", "write"), "blocks": _blocks_for(mode, hi, connector),
         "connector": connector_dict(connector, db) if connector else None, "connectors": others,
         "runs": [], "owner": _owner(db, agent.visitor_id), "needs_owner": mode == "report",
     }

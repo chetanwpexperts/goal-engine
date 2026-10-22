@@ -8,7 +8,11 @@
       "monthly total formula",
       "month wise sum",
       "mahine ke hisaab se amount jodna hai",
-      "sum by month excel"
+      "sum by month excel",
+      "har mahine kitna paisa aaya total",
+      "month wise kitni income hui",
+      "हर महीने का टोटल चाहिए",
+      "monthly kitni sale hui"
     ],
     "needs": [
       "date",
@@ -63,5 +67,414 @@
       "डुप्लीकेट नाम कैसे पता करें"
     ],
     "source": "https://support.microsoft.com/en-us/office/countif-function-e0de10c6-f885-4e71-abb4-1f464816df34"
+  },
+  {
+    "id": "invoice-due-date",
+    "title_en": "Due date of an invoice (invoice date + credit days)",
+    "title_hi": "Invoice ki due date (invoice date + credit days)",
+    "examples": [
+      "invoice ki due date nikalni hai",
+      "due date formula invoice date plus 30 days",
+      "credit period ke baad payment kab due hogi",
+      "net 30 due date calculate",
+      "bill date se 45 din baad ki date chahiye",
+      "payment terms se due date kaise nikale",
+      "party ko 60 din ka credit diya hai, last date kya hogi",
+      "add credit days to bill date",
+      "बिल की ड्यू डेट कैसे निकालें",
+      "इनवॉइस डेट में क्रेडिट दिन जोड़ना है",
+      "भुगतान की आखिरी तारीख निकालनी है",
+      "30 din jod ke due date banao",
+      "what date is payment due with 45 days terms",
+      "due date column from invoice date and terms"
+    ],
+    "needs": [
+      "invoice_date",
+      "credit_days"
+    ],
+    "templates": {
+      "excel365": "={invoice_date}+{credit_days}",
+      "excel2016": "={invoice_date}+{credit_days}",
+      "google_sheets": "={invoice_date}+{credit_days}"
+    },
+    "explain_en": "Excel stores dates as day numbers, so invoice date + 30 is the date 30 days later. Format the cell as a date. If the invoice date is text, upload the file and I convert it first.",
+    "explain_hi": "Excel date ko din ki ginti ki tarah rakhta hai, isliye invoice date + 30 matlab 30 din baad ki date. Cell ko Date format do. Agar invoice date text hai to file upload karo, main pehle theek kar dunga.",
+    "test_phrases": [
+      "when is this bill due if the customer gets 30 days credit",
+      "credit days jod ke payment ki last date chahiye",
+      "बिल की तारीख में 30 दिन जोड़कर ड्यू डेट निकालनी है"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/add-or-subtract-dates"
+  },
+  {
+    "id": "days-overdue",
+    "title_en": "How many days an invoice is overdue",
+    "title_hi": "Invoice kitne din se overdue hai",
+    "examples": [
+      "kitne din se payment pending hai",
+      "days overdue formula",
+      "how many days past due is the invoice",
+      "due date nikal gayi kitne din ho gaye",
+      "overdue days count from due date to today",
+      "late payment kitne din late hai",
+      "invoice kab se ruka hua hai din mein batao",
+      "days late column banana hai",
+      "कितने दिन से पेमेंट नहीं आया",
+      "ड्यू डेट निकले कितने दिन हो गए",
+      "बकाया बिल कितने दिन लेट है",
+      "number of days since due date for each open invoice",
+      "how late is each unpaid invoice in days",
+      "due date se aaj tak kitne din hue",
+      "days past due for unpaid bills"
+    ],
+    "needs": [
+      "due_date",
+      "balance"
+    ],
+    "templates": {
+      "excel365": "=IF({balance}<=0,0,MAX(0,TODAY()-{due_date}))",
+      "excel2016": "=IF({balance}<=0,0,MAX(0,TODAY()-{due_date}))",
+      "google_sheets": "=IF({balance}<=0,0,MAX(0,TODAY()-{due_date}))"
+    },
+    "explain_en": "Today minus the due date, never below 0, and 0 once the invoice is fully paid. TODAY() moves every day, so the count stays current.",
+    "explain_hi": "Aaj ki date minus due date, 0 se kam nahi, aur poora paid hone par 0. TODAY() roz badalta hai to ginti hamesha taaza rehti hai.",
+    "test_phrases": [
+      "count the days since the due date passed for unpaid bills",
+      "har invoice kitne din se late chal raha hai",
+      "भुगतान कितने दिन से बकाया है गिनना है"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/today-function"
+  },
+  {
+    "id": "invoice-aging-bucket",
+    "title_en": "Aging bucket for each invoice (0-30, 31-60, 61-90, 90+)",
+    "title_hi": "Har invoice ka aging bucket (0-30, 31-60, 61-90, 90+)",
+    "examples": [
+      "aging report banana hai 0-30 31-60 61-90",
+      "invoice aging buckets formula",
+      "ageing analysis excel",
+      "receivables aging 30 60 90 days",
+      "debtors ageing nikalna hai",
+      "outstanding ko 30 60 90 din ke group mein daalo",
+      "kaunsa bill 90 din se upar ka hai category lagao",
+      "ageing slab formula",
+      "aging category column with if formula",
+      "एजिंग बकेट फॉर्मूला चाहिए",
+      "बिलों को 30 60 90 दिन की श्रेणी में डालो",
+      "देनदारों की एजिंग बनानी है",
+      "group invoices by how overdue they are",
+      "classify receivables into 0-30 31-60 61-90 over 90"
+    ],
+    "needs": [
+      "due_date",
+      "balance"
+    ],
+    "templates": {
+      "excel365": "=LET(d,TODAY()-{due_date},IFS({balance}<=0,\"Paid\",d<=0,\"Not due\",d<=30,\"0-30\",d<=60,\"31-60\",d<=90,\"61-90\",TRUE,\"90+\"))",
+      "excel2016": "=IF({balance}<=0,\"Paid\",IF(TODAY()-{due_date}<=0,\"Not due\",IF(TODAY()-{due_date}<=30,\"0-30\",IF(TODAY()-{due_date}<=60,\"31-60\",IF(TODAY()-{due_date}<=90,\"61-90\",\"90+\")))))",
+      "google_sheets": "=IF({balance}<=0,\"Paid\",IF(TODAY()-{due_date}<=0,\"Not due\",IF(TODAY()-{due_date}<=30,\"0-30\",IF(TODAY()-{due_date}<=60,\"31-60\",IF(TODAY()-{due_date}<=90,\"61-90\",\"90+\")))))"
+    },
+    "explain_en": "Counts days past the due date and puts the invoice in a bucket; paid invoices say Paid. Common mistakes: dates typed as text, blank due dates (they land in 90+), and overlapping limits like 30 in two buckets. If your company ages from the invoice date instead, use the invoice date in place of the due date.",
+    "explain_hi": "Due date ke baad kitne din hue ginta hai aur invoice ko bucket mein daalta hai; paid invoice par Paid. Aam galtiyan: date text mein, khaali due date (90+ mein chali jaati hai), aur 30 jaisi limit do buckets mein. Agar aapki company invoice date se aging karti hai to due date ki jagah invoice date lo.",
+    "test_phrases": [
+      "put every unpaid invoice into 30 60 90 day groups",
+      "outstanding bills ko ageing slab mein baantna hai",
+      "उधारी को 0-30, 31-60, 61-90 दिन के हिसाब से बांटना है"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/ifs-function",
+    "seen_at": [
+      "https://www.mrexcel.com/board/threads/a-r-aging-schedule-if-statements.211580/",
+      "https://techcommunity.microsoft.com/discussions/excelgeneral/excel-formula-aging-report/3396619"
+    ]
+  },
+  {
+    "id": "aging-summary-by-customer",
+    "title_en": "Aging summary: amount per customer in each bucket",
+    "title_hi": "Aging summary: har party ka har bucket mein amount",
+    "examples": [
+      "customer wise aging summary",
+      "party wise outstanding 0-30 31-60 total",
+      "kis party ka kitna paisa 90 din se upar atka hai",
+      "aging pivot by customer",
+      "debtor wise ageing report summary table",
+      "client ke hisaab se bucket total",
+      "har customer ka 61-90 wala total",
+      "पार्टी वाइज आउटस्टैंडिंग समरी",
+      "हर ग्राहक का बकेट वाइज टोटल",
+      "total owed by each customer per bucket",
+      "party wise kitna paisa kis bucket mein"
+    ],
+    "needs": [
+      "balance",
+      "customer",
+      "customer_name",
+      "bucket",
+      "bucket_name"
+    ],
+    "templates": {
+      "excel365": "=SUMIFS({balance},{customer},{customer_name},{bucket},{bucket_name})",
+      "excel2016": "=SUMIFS({balance},{customer},{customer_name},{bucket},{bucket_name})",
+      "google_sheets": "=SUMIFS({balance},{customer},{customer_name},{bucket},{bucket_name})"
+    },
+    "explain_en": "Put customers down the side and buckets (0-30, 31-60, 61-90, 90+) across the top; this adds the open balance for that customer and bucket. A customer name with an extra space counts as a different customer: upload the file and I trim them.",
+    "explain_hi": "Customers ek taraf aur buckets (0-30, 31-60, 61-90, 90+) upar rakho; yeh us party aur bucket ka bacha balance jodta hai. Naam mein extra space ho to alag party ban jaati hai: file upload karo, main saaf kar dunga.",
+    "test_phrases": [
+      "which client owes how much in each ageing bucket",
+      "har party ka 90+ wala paisa alag total chahiye",
+      "हर ग्राहक का कितना पैसा 90 दिन से ज़्यादा से फंसा है"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/sumifs-function"
+  },
+  {
+    "id": "invoice-balance-due",
+    "title_en": "Balance left on an invoice after part payments",
+    "title_hi": "Part payment ke baad invoice ka bacha balance",
+    "examples": [
+      "invoice ka balance kitna bacha",
+      "part payment minus karke outstanding",
+      "remaining amount after partial payment",
+      "payments sheet se invoice ka paid amount ghatao",
+      "kitna paisa aana baaki hai har bill ka",
+      "open amount per invoice formula",
+      "receipts ko invoice se adjust karna hai",
+      "बिल में कितना पैसा बाकी है",
+      "आधा पैसा मिला बाकी कितना",
+      "किश्तों में भुगतान के बाद शेष राशि",
+      "how much is left to collect after a partial payment",
+      "amount still unpaid on an invoice after receipts",
+      "partial payment ke baad remaining kitna",
+      "client paid some of the invoice, what is still pending",
+      "remaining due on a half paid bill",
+      "aadha payment mila baaki kitna"
+    ],
+    "needs": [
+      "invoice_amount",
+      "paid_amount",
+      "paid_invoice_no",
+      "invoice_no"
+    ],
+    "templates": {
+      "excel365": "={invoice_amount}-SUMIFS({paid_amount},{paid_invoice_no},{invoice_no})",
+      "excel2016": "={invoice_amount}-SUMIFS({paid_amount},{paid_invoice_no},{invoice_no})",
+      "google_sheets": "={invoice_amount}-SUMIFS({paid_amount},{paid_invoice_no},{invoice_no})"
+    },
+    "explain_en": "Adds every payment recorded against this invoice number (on any sheet) and subtracts it from the invoice amount. If a payment doesn't reduce the balance, the invoice numbers don't match exactly (spaces, text vs number).",
+    "explain_hi": "Is invoice number par jitne bhi payment aaye (kisi bhi sheet mein) unhe jod kar invoice amount se ghatata hai. Agar payment ke baad bhi balance nahi ghata to invoice number exact match nahi ho rahe (space, text vs number).",
+    "test_phrases": [
+      "customer paid half, how much is still pending on that bill",
+      "teen kishton mein payment aaya, ab bill par kitna baaki",
+      "आंशिक भुगतान के बाद बिल में कितनी रकम बाकी है"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/sumifs-function"
+  },
+  {
+    "id": "collections-list",
+    "title_en": "Collections list: unpaid overdue invoices, biggest first",
+    "title_hi": "Collection list: overdue unpaid invoices, sabse bada pehle",
+    "examples": [
+      "collection list banani hai overdue invoices ki",
+      "follow up list of customers who haven't paid",
+      "kis kis se paisa lena hai list nikalo",
+      "only overdue unpaid invoices dikhao",
+      "recovery list sabse bade amount se",
+      "AR collections call list",
+      "payment reminder bhejne ke liye list chahiye",
+      "filter overdue bills sorted by amount",
+      "बकाया ग्राहकों की लिस्ट निकालो",
+      "किस किस से पैसा वसूलना है सूची",
+      "वसूली के लिए ग्राहकों की लिस्ट",
+      "list of customers with overdue unpaid amounts",
+      "jinse paisa lena hai unki list banao",
+      "pending payment walon ki list",
+      "list banao jinka payment late hai",
+      "जिनका पेमेंट बाकी है उनकी लिस्ट",
+      "बकाया वाले ग्राहकों की सूची बनाओ"
+    ],
+    "needs": [
+      "table",
+      "balance_col",
+      "due_col",
+      "sort_col",
+      "balance",
+      "due_date"
+    ],
+    "templates": {
+      "excel365": "=SORT(FILTER({table},({balance_col}>0)*({due_col}<TODAY()),\"Nothing overdue\"),{sort_col},-1)",
+      "excel2016": "=IF(AND({balance}>0,{due_date}<TODAY()),\"Follow up\",\"\")",
+      "google_sheets": "=SORT(FILTER({table},{balance_col}>0,{due_col}<TODAY()),{sort_col},FALSE)"
+    },
+    "explain_en": "Excel 365 and Google Sheets build the whole list in one cell: invoices with money still due and a due date already passed, largest amount on top (sort_col is the column number of the balance). In Excel 2016 the formula marks each row Follow up; then filter that column.",
+    "explain_hi": "Excel 365 aur Google Sheets ek hi cell mein poori list bana dete hain: jinka paisa baaki hai aur due date nikal gayi, sabse bada amount upar (sort_col balance wale column ka number hai). Excel 2016 mein formula har row par Follow up likhta hai; phir us column ko filter karo.",
+    "test_phrases": [
+      "give me the list of parties to call for pending payments",
+      "jinka payment due date ke baad bhi nahi aaya unki list",
+      "जिन ग्राहकों का भुगतान बाकी है उनकी सूची बनानी है"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/filter-function"
+  },
+  {
+    "id": "three-way-match",
+    "title_en": "Three-way match: PO vs goods receipt vs invoice",
+    "title_hi": "Three-way match: PO vs GRN vs invoice",
+    "examples": [
+      "three way matching excel",
+      "PO GRN invoice match karna hai",
+      "purchase order quantity aur bill quantity compare",
+      "goods received aur invoice mismatch check",
+      "vendor bill ka rate PO se alag hai kaise pakde",
+      "3 way match formula po receipt invoice",
+      "maal kam aaya par bill poora aaya check karo",
+      "purchase order vs grn vs vendor invoice",
+      "पीओ जीआरएन और बिल का मिलान",
+      "खरीद आदेश और बिल की मात्रा मिलानी है",
+      "supplier invoiced more quantity than received",
+      "check billed quantity against ordered and received",
+      "vendor ne zyada maal ka bill bheja check karo"
+    ],
+    "needs": [
+      "po_qty",
+      "grn_qty",
+      "inv_qty",
+      "po_rate",
+      "inv_rate"
+    ],
+    "templates": {
+      "excel365": "=IF(AND({po_qty}={grn_qty},{grn_qty}={inv_qty},ROUND({po_rate},2)=ROUND({inv_rate},2)),\"Matched\",\"Check\")",
+      "excel2016": "=IF(AND({po_qty}={grn_qty},{grn_qty}={inv_qty},ROUND({po_rate},2)=ROUND({inv_rate},2)),\"Matched\",\"Check\")",
+      "google_sheets": "=IF(AND({po_qty}={grn_qty},{grn_qty}={inv_qty},ROUND({po_rate},2)=ROUND({inv_rate},2)),\"Matched\",\"Check\")"
+    },
+    "explain_en": "Matched only when ordered, received and billed quantities are equal and the invoice rate equals the PO rate. If PO, GRN and invoices are on separate sheets, bring each quantity next to the invoice with XLOOKUP on the PO number first; upload them and I do the matching for you.",
+    "explain_hi": "Matched tabhi jab order, receive aur bill ki quantity barabar ho aur invoice ka rate PO ke rate jaisa ho. Agar PO, GRN aur invoice alag sheets mein hain to pehle PO number se XLOOKUP karke quantity saath laao; files upload karo, main matching kar dunga.",
+    "test_phrases": [
+      "check if the supplier billed for more than we received or ordered",
+      "PO, goods receipt aur bill teeno ka quantity rate milana hai",
+      "खरीद आदेश, माल प्राप्ति और बिल का मिलान करना है"
+    ],
+    "source": "https://learn.microsoft.com/en-us/training/modules/accounting-distributions-invoice-validation-dyn365-finance/10-three-way-match",
+    "seen_at": [
+      "https://imagetotable.ai/blog/three-way-matching-spreadsheet-without-erp"
+    ]
+  },
+  {
+    "id": "duplicate-vendor-payment",
+    "title_en": "Catch duplicate vendor payments (same vendor, bill no. and amount)",
+    "title_hi": "Vendor ko do baar payment pakdo (same vendor, bill no. aur amount)",
+    "examples": [
+      "vendor ko double payment to nahi hua check karo",
+      "duplicate payment same invoice number same supplier",
+      "ek hi bill do baar pay ho gaya kya",
+      "find duplicate vendor invoices in AP",
+      "supplier payment repeat check with amount",
+      "same party same amount same bill number twice",
+      "accounts payable double posting check",
+      "वेंडर को डबल पेमेंट हुआ क्या",
+      "एक बिल का दो बार भुगतान",
+      "paid the same vendor invoice twice"
+    ],
+    "needs": [
+      "vendor_col",
+      "vendor",
+      "invoice_col",
+      "invoice_no",
+      "amount_col",
+      "amount"
+    ],
+    "templates": {
+      "excel365": "=IF(COUNTIFS({vendor_col},{vendor},{invoice_col},{invoice_no},{amount_col},{amount})>1,\"Possible duplicate payment\",\"\")",
+      "excel2016": "=IF(COUNTIFS({vendor_col},{vendor},{invoice_col},{invoice_no},{amount_col},{amount})>1,\"Possible duplicate payment\",\"\")",
+      "google_sheets": "=IF(COUNTIFS({vendor_col},{vendor},{invoice_col},{invoice_no},{amount_col},{amount})>1,\"Possible duplicate payment\",\"\")"
+    },
+    "explain_en": "Flags a payment when the same vendor, bill number and amount appear more than once. Duplicates often hide behind small differences (INV-101 vs INV101, an extra space): upload the file and I clean those before checking, so nothing slips through.",
+    "explain_hi": "Same vendor, bill number aur amount ek se zyada baar ho to payment ko flag karta hai. Duplicate aksar chhote fark mein chhupte hain (INV-101 vs INV101, extra space): file upload karo, main pehle saaf karke check karunga.",
+    "test_phrases": [
+      "did we pay the same supplier bill two times",
+      "ek vendor ke ek hi invoice ka payment do baar to nahi gaya",
+      "एक ही विक्रेता को एक ही बिल का दो बार भुगतान तो नहीं हुआ"
+    ],
+    "source": "https://support.microsoft.com/office/countifs-function-dda3dc6e-f74e-4aee-88bc-aa8c2a866842",
+    "seen_at": [
+      "https://www.excelforum.com/excel-general/1309028-identify-duplicate-invoice-payments.html",
+      "https://chandoo.org/forum/threads/invoice-number.6432"
+    ]
+  },
+  {
+    "id": "early-payment-discount",
+    "title_en": "Early-payment discount (e.g. 2/10 net 30)",
+    "title_hi": "Jaldi payment par discount (jaise 2/10 net 30)",
+    "examples": [
+      "2/10 net 30 discount formula",
+      "early payment discount calculate",
+      "10 din mein payment kiya to 2% discount milega",
+      "cash discount if paid before discount date",
+      "prompt payment discount kitna banega",
+      "jaldi paisa dene par kitni chhoot",
+      "did we pay in time to get the discount",
+      "discount deadline miss ho gayi kya",
+      "जल्दी पेमेंट पर डिस्काउंट",
+      "समय से पहले भुगतान की छूट",
+      "discount for paying within 10 days"
+    ],
+    "needs": [
+      "pay_date",
+      "invoice_date",
+      "discount_days",
+      "amount",
+      "discount_pct"
+    ],
+    "templates": {
+      "excel365": "=IF({pay_date}<={invoice_date}+{discount_days},ROUND({amount}*{discount_pct},2),0)",
+      "excel2016": "=IF({pay_date}<={invoice_date}+{discount_days},ROUND({amount}*{discount_pct},2),0)",
+      "google_sheets": "=IF({pay_date}<={invoice_date}+{discount_days},ROUND({amount}*{discount_pct},2),0)"
+    },
+    "explain_en": "If payment is made within the discount days (10 in 2/10 net 30), the discount is amount x 2%; otherwise 0. The last day to pay for the discount is invoice date + discount days. Enter the percent as 2% (or 0.02), not 2.",
+    "explain_hi": "Agar payment discount ke dino mein hua (2/10 net 30 mein 10 din), to discount = amount x 2%; warna 0. Discount ki last date = invoice date + discount days. Percent ko 2% (ya 0.02) likho, 2 nahi.",
+    "test_phrases": [
+      "how much discount do we lose if we pay after 10 days",
+      "supplier 2 percent chhoot deta hai 10 din mein dene par, kitna bachega",
+      "जल्दी भुगतान करने पर कितनी छूट मिलेगी निकालना है"
+    ],
+    "source": "https://support.microsoft.com/excel/functions/if-function",
+    "seen_at": [
+      "https://www.excelforum.com/excel-formulas-and-functions/1373136-help-2-10-net-30-formula.html"
+    ]
+  },
+  {
+    "id": "days-sales-outstanding",
+    "title_en": "DSO: days sales outstanding",
+    "title_hi": "DSO: paisa aane mein average kitne din",
+    "examples": [
+      "DSO calculate karna hai",
+      "days sales outstanding formula",
+      "debtor days nikalne hain",
+      "average collection period excel",
+      "customers average kitne din mein pay karte hain",
+      "receivable days ratio",
+      "डेटर्स डेज़ निकालना है",
+      "औसत वसूली अवधि",
+      "डीएसओ फॉर्मूला",
+      "debtor days formula for the quarter",
+      "debtors days kaise nikale",
+      "how long customers take to pay on average",
+      "औसत कितने दिन में पेमेंट आता है",
+      "औसत संग्रह अवधि निकालो"
+    ],
+    "needs": [
+      "receivables",
+      "credit_sales",
+      "days"
+    ],
+    "templates": {
+      "excel365": "=ROUND({receivables}/{credit_sales}*{days},0)",
+      "excel2016": "=ROUND({receivables}/{credit_sales}*{days},0)",
+      "google_sheets": "=ROUND({receivables}/{credit_sales}*{days},0)"
+    },
+    "explain_en": "Closing receivables divided by credit sales for the period, times the days in the period (30, 90 or 365). Use credit sales only, not cash sales, and the same period for both.",
+    "explain_hi": "Period ke end ka receivable / us period ki credit sales x period ke din (30, 90 ya 365). Sirf credit sales lo, cash sales nahi, aur dono same period ke hon.",
+    "test_phrases": [
+      "on average how long do our customers take to pay",
+      "debtors days ka formula batao quarter ke liye",
+      "ग्राहक औसतन कितने दिन में भुगतान करते हैं"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/round-function"
   }
 ]

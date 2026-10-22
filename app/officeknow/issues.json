@@ -87,7 +87,12 @@
       "dono sheet mein same id hai par match nahi ho raha",
       "lookup returns n/a for some rows only",
       "xlookup not finding the value",
-      "do sheets ka data match nahi ho raha"
+      "do sheets ka data match nahi ho raha",
+      "वीलुकअप में N/A आ रहा है",
+      "दोनों लिस्ट में नाम है पर मैच नहीं हो रहा",
+      "lookup value hai phir bhi NA aata hai",
+      "code same hai fir bhi vlookup N/A de raha",
+      "vlookup can't find an id that is there"
     ],
     "causes": [
       {
@@ -276,5 +281,159 @@
       "मेरी एक्सेल फाइल खराब हो गई है खुल नहीं रही"
     ],
     "source": "https://support.microsoft.com/en-us/excel/repair-a-corrupted-workbook"
+  },
+  {
+    "id": "aging-report-wrong",
+    "apps": [
+      "excel",
+      "google_sheets"
+    ],
+    "category": "dates_numbers",
+    "title_en": "Aging report puts invoices in the wrong bucket",
+    "title_hi": "Aging report mein invoice galat bucket mein ja rahe",
+    "symptoms": [
+      "aging report galat aa raha hai",
+      "sab invoices 90+ mein dikh rahe hain",
+      "ageing days bahut bade number aa rahe 45000 jaise",
+      "aging buckets not updating every day",
+      "days overdue stuck on yesterday's number",
+      "aging formula shows #VALUE for some invoices",
+      "kuch bills ka ageing blank ya error aa raha",
+      "due date khaali hai to bhi 90+ dikha raha",
+      "ageing kal se change hi nahi hua",
+      "एजिंग रिपोर्ट गलत आ रही है",
+      "सब बिल 90+ में दिख रहे",
+      "एजिंग रोज़ अपडेट नहीं होती",
+      "ageing report shows everything over 90 days",
+      "my ageing report is wrong, all bills in 90 plus",
+      "aging days not changing day to day"
+    ],
+    "causes": [
+      {
+        "id": "text_dates",
+        "title_en": "Some due dates are text, not real dates",
+        "title_hi": "Kuch due dates text hain, asli date nahi"
+      },
+      {
+        "id": "blank_due",
+        "title_en": "Blank due dates count as day 0 (year 1900), so they land in 90+",
+        "title_hi": "Khaali due date 1900 ki date maani jaati hai, isliye 90+ mein jaati hai"
+      },
+      {
+        "id": "manual_calc",
+        "title_en": "Calculation is set to Manual, so TODAY() doesn't move",
+        "title_hi": "Calculation Manual par hai, isliye TODAY() nahi badalta"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "text_dates",
+        "action": "auto",
+        "auto": "fix_dates",
+        "steps_en": "I convert every text due date into a real date (checking DD/MM vs MM/DD) and show you the ones I changed.",
+        "steps_hi": "Main har text due date ko asli date mein badalta hoon (DD/MM vs MM/DD check karke) aur badli hui list dikhata hoon."
+      },
+      {
+        "cause": "blank_due",
+        "action": "auto",
+        "auto": "replace_formula",
+        "steps_en": "I change the aging formula so a blank due date shows 'No due date' instead of 90+, and list those invoices for you to fill.",
+        "steps_hi": "Main aging formula badal deta hoon taaki khaali due date par 90+ ki jagah 'No due date' aaye, aur un invoices ki list deta hoon."
+      },
+      {
+        "cause": "manual_calc",
+        "action": "steps",
+        "steps_en": "In Excel: File > Options > Formulas > Calculation options > Automatic > OK.",
+        "steps_hi": "Excel mein: File > Options > Formulas > Calculation options > Automatic > OK."
+      }
+    ],
+    "verify": {
+      "en": "Every unpaid invoice has a bucket, none of the blank-due-date ones sit in 90+, and tomorrow the day counts go up by one.",
+      "hi": "Har unpaid invoice ka bucket hai, khaali due date wale 90+ mein nahi, aur kal din ki ginti ek badh jaati hai."
+    },
+    "test_phrases": [
+      "my receivables ageing puts nearly every bill in over 90 days",
+      "ageing roz update nahi hota, wahi purane din dikha raha",
+      "एजिंग रिपोर्ट में सारे बिल 90 दिन से ऊपर दिख रहे हैं"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/today-function",
+    "seen_at": [
+      "https://techcommunity.microsoft.com/discussions/excelgeneral/excel-formula-aging-report/3396619"
+    ]
+  },
+  {
+    "id": "payment-not-matching-invoice",
+    "apps": [
+      "excel",
+      "google_sheets"
+    ],
+    "category": "lookup_matching",
+    "title_en": "Payment received but the invoice still shows outstanding",
+    "title_hi": "Payment aa gaya phir bhi invoice outstanding dikha raha",
+    "symptoms": [
+      "payment aa gaya phir bhi outstanding dikha raha hai",
+      "receipt entry ki par balance kam nahi hua",
+      "paid invoice still showing as due",
+      "sumifs payment not picking up for some invoices",
+      "bank receipt invoice se match nahi ho raha",
+      "customer says paid but my sheet shows pending",
+      "kuch invoices ka collection zero dikh raha",
+      "पेमेंट आ गया फिर भी बकाया दिखा रहा",
+      "रसीद डाली पर बैलेंस कम नहीं हुआ",
+      "customer cleared invoice but it still shows open",
+      "paisa mil gaya phir bhi pending dikha raha"
+    ],
+    "causes": [
+      {
+        "id": "spaces",
+        "title_en": "Invoice numbers have extra or hidden spaces on one side",
+        "title_hi": "Ek taraf invoice number mein extra ya chhupe space hain"
+      },
+      {
+        "id": "text_number",
+        "title_en": "Invoice number is a number on one sheet and text on the other",
+        "title_hi": "Ek sheet mein invoice number number hai, doosri mein text"
+      },
+      {
+        "id": "format",
+        "title_en": "Different styles: INV-0012 vs 12 vs inv12",
+        "title_hi": "Alag likhawat: INV-0012 vs 12 vs inv12"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "spaces",
+        "action": "auto",
+        "auto": "trim_spaces",
+        "steps_en": "I remove extra and hidden spaces from both invoice-number columns and show which balances changed.",
+        "steps_hi": "Main dono invoice-number columns se extra aur chhupe space hata deta hoon aur dikhata hoon kaunse balance badle."
+      },
+      {
+        "cause": "text_number",
+        "action": "auto",
+        "auto": "text_to_number",
+        "steps_en": "I make both invoice-number columns the same type so every payment finds its invoice.",
+        "steps_hi": "Main dono invoice-number columns ek hi type ke kar deta hoon taaki har payment apna invoice dhoond le."
+      },
+      {
+        "cause": "format",
+        "action": "steps",
+        "steps_en": "Tell me which style is right (e.g. INV-0012). Upload both sheets and I rewrite the other column in that style, then re-match.",
+        "steps_hi": "Batao kaunsi likhawat sahi hai (jaise INV-0012). Dono sheets upload karo, main doosre column ko usi style mein likh kar dobara match karunga."
+      }
+    ],
+    "verify": {
+      "en": "Every payment line finds an invoice, and invoices paid in full show a balance of 0.",
+      "hi": "Har payment line ko invoice mil jaata hai, aur poore paid invoices ka balance 0 dikhta hai."
+    },
+    "test_phrases": [
+      "the client cleared the bill but my receivables sheet still has it open",
+      "party ne paisa de diya fir bhi sheet mein baaki dikha raha hai",
+      "भुगतान मिल गया फिर भी बिल बकाया दिख रहा है"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/trim-function-410388fa-c5df-49c6-b16c-9e5630b479f9",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/"
+    ]
   }
 ]

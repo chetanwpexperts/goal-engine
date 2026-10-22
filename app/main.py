@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -129,6 +129,12 @@ class MessageIn(BaseModel):
 
 class StatusIn(BaseModel):
     status: Literal["active", "done", "dropped"]
+
+
+@app.get("/connector/install.sh")
+def connector_installer(request: Request) -> Response:
+    text = (Path(__file__).resolve().parents[1] / "connector" / "install.sh").read_text()
+    return Response(text.replace("__SERVER__", _public_base(request)), media_type="text/x-shellscript")
 
 
 @app.get("/connector/goal_connector.py")
@@ -415,8 +421,7 @@ def create_connector(body: ConnectorIn, request: Request, db: Session = Depends(
         agent.inputs = dumps(inputs)
         db.commit()
     base = _public_base(request)
-    command = (f"curl -fsSL {base}/connector/goal_connector.py -o goal_connector.py && "
-               f"python3 goal_connector.py setup --server {base} --token {token}")
+    command = f"curl -fsSL {base}/connector/install.sh | bash -s -- {token}"
     return {"connector": dbagent.connector_dict(connector, db), "token": token, "command": command}
 
 

@@ -87,7 +87,7 @@ def test_connector_end_to_end(client, ml_mode, shop_db, monkeypatch):
     agent = say(client, "mere mysql database ki tables dikhao")["agents"][0]
     made = client.post("/api/connectors", json={"name": "Shop", "agent_id": agent["id"]}).json()
     token = made["token"]
-    assert token.startswith("gec_") and token in made["command"] and "goal_connector.py setup" in made["command"]
+    assert token.startswith("gec_") and token in made["command"] and "install.sh | bash" in made["command"]
     assert made["connector"]["status"] == "waiting"
     assert client.post("/api/connector/poll", headers={"Authorization": "Bearer gec_wrong"}).status_code == 401
     assert token not in str(client.get("/api/connectors").json())   # never shown again
@@ -154,3 +154,29 @@ def test_scheduled_report_emails_csv(client, ml_mode, shop_db, monkeypatch):
     sent = mail.sent[-1]
     assert sent["to"] == "owner@shop.com" and sent["attachments"][0][0].endswith(".csv")
     assert sent["attachments"][0][1].decode("utf-8-sig").count("\n") == 80
+
+
+def test_finds_database_settings_in_projects(tmp_path):
+    (tmp_path / "shop").mkdir()
+    (tmp_path / "shop" / ".env").write_text('APP_NAME=Shop\nDB_CONNECTION=mysql\nDB_HOST=127.0.0.1\nDB_PORT=3306\nDB_DATABASE=shop_db\nDB_USERNAME=shop\nDB_PASSWORD="p@ss word"\n')
+    (tmp_path / "blog").mkdir()
+    (tmp_path / "blog" / "wp-config.php").write_text("<?php\ndefine( 'DB_NAME', 'blog' );\ndefine( 'DB_USER', 'wp' );\ndefine( 'DB_PASSWORD', 's3cr3t' );\ndefine( 'DB_HOST', 'localhost:3307' );\n")
+    ci = tmp_path / "portal" / "application" / "config"
+    ci.mkdir(parents=True)
+    (ci / "database.php").write_text("<?php\n$db['default']['hostname'] = 'localhost';\n$db['default']['username'] = 'ci';\n$db['default']['password'] = 'x';\n$db['default']['database'] = 'portal';\n$db['default']['dbdriver'] = 'mysqli';\n")
+    (tmp_path / "node_app").mkdir()
+    (tmp_path / "node_app" / ".env").write_text("DATABASE_URL=postgres://app:pw%40x@db.local:5433/appdb?sslmode=disable\n")
+    (tmp_path / "other").mkdir()
+    (tmp_path / "other" / ".env").write_text("APP_KEY=x\n")   # no database: ignored
+    found = {p["database"]: p for p in gc.find_projects([str(tmp_path)])}
+    assert set(found) == {"shop_db", "blog", "portal", "appdb"}
+    assert found["shop_db"]["password"] == "p@ss word" and found["shop_db"]["app"] == "Laravel"
+    assert found["blog"]["port"] == "3307" and found["blog"]["host"] == "localhost" and found["blog"]["app"] == "WordPress"
+    assert found["portal"]["path"].endswith("portal") and found["portal"]["app"] == "CodeIgniter 3"
+    assert found["appdb"]["type"] == "postgres" and found["appdb"]["password"] == "pw@x" and found["appdb"]["port"] == "5433"
+
+
+def test_installer_is_served_with_server_address(client):
+    res = client.get("/connector/install.sh")
+    assert res.status_code == 200 and "http://testserver" in res.text and "__SERVER__" not in res.text
+    assert "</dev/tty" in res.text

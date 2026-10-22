@@ -66,7 +66,7 @@ class Database:
             except ImportError:
                 sys.exit("Install the MySQL driver first:  pip3 install pymysql")
             self.conn = pymysql.connect(host=c["host"], port=int(c.get("port") or 3306), user=c["user"], password=c["password"],
-                                        database=c["database"], charset="utf8mb4", connect_timeout=10, read_timeout=120,
+                                        database=c["database"], charset="utf8mb4", connect_timeout=5, read_timeout=120,
                                         autocommit=False)
         elif self.kind == "postgres":
             try:
@@ -77,7 +77,10 @@ class Database:
                 try:
                     import psycopg2 as psycopg
                 except ImportError:
-                    sys.exit("Install the PostgreSQL driver first:  pip3 install 'psycopg[binary]'")
+                    import subprocess
+                    if subprocess.run([sys.executable, "-m", "pip", "install", "-q", "psycopg[binary]"]).returncode != 0:
+                        sys.exit("Install the PostgreSQL driver first:  pip3 install 'psycopg[binary]'")
+                    import psycopg
                 self.conn = psycopg.connect(host=c["host"], port=int(c.get("port") or 5432), user=c["user"], password=c["password"],
                                             dbname=c["database"], connect_timeout=10)
         elif self.kind == "sqlite":
@@ -321,53 +324,250 @@ def run(cfg):
         time.sleep(backoff if not jobs else 0.5)
 
 
-def setup(args):
-    print("Goal Engine connector setup. Your password is saved only on this server.\n")
-    kind = (input("Database type [mysql/postgres] (mysql): ").strip().lower() or "mysql")
+# ---------------------------------------------------------------- finding the database settings by itself
+SEARCH_ROOTS = ["{cwd}", "{home}", "/var/www", "/srv", "/opt", "/cdata", "/usr/share/nginx", "/home/*/public_html", "/home/*/www", "/home/*/htdocs"]
+SKIP_DIRS = {"node_modules", "vendor", ".git", "storage", "cache", "wp-content", "public", "assets", "tmp", ".venv", "venv", "__pycache__"}
+
+
+def _unquote(v):
+    v = (v or "").strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
+        v = v[1:-1]
+    return v
+
+
+def parse_env(text):
+    """Laravel / CodeIgniter 4 / most frameworks: KEY=value lines."""
+    env = {}
+    for line in text.splitlines():
+        m = re.match(r"^\s*([A-Za-z_][\w.]*)\s*=\s*(.*)$", line)
+        if m and not line.lstrip().startswith("#"):
+            env[m.group(1)] = _unquote(m.group(2).split(" #")[0])
+    if env.get("DB_DATABASE"):
+        kind = {"mysql": "mysql", "mariadb": "mysql", "pgsql": "postgres", "postgres": "postgres"}.get(env.get("DB_CONNECTION", "mysql"))
+        if kind:
+            return {"type": kind, "host": env.get("DB_HOST", "127.0.0.1"), "port": env.get("DB_PORT", ""), "database": env["DB_DATABASE"],
+                    "user": env.get("DB_USERNAME", ""), "password": env.get("DB_PASSWORD", ""), "app": "Laravel"}
+    if env.get("database.default.database"):
+        kind = {"MySQLi": "mysql", "Postgre": "postgres"}.get(env.get("database.default.DBDriver", "MySQLi"), "mysql")
+        return {"type": kind, "host": env.get("database.default.hostname", "localhost"), "port": env.get("database.default.port", ""),
+                "database": env["database.default.database"], "user": env.get("database.default.username", ""),
+                "password": env.get("database.default.password", ""), "app": "CodeIgniter 4"}
+    if env.get("DATABASE_URL", "").startswith(("mysql", "postgres")):
+        m = re.match(r"^(mysql\w*|postgres\w*)://([^:@/]*)(?::([^@/]*))?@([^:/]+)(?::(\d+))?/([^?]+)", env["DATABASE_URL"])
+        if m:
+            from urllib.parse import unquote
+            return {"type": "mysql" if m.group(1).startswith("mysql") else "postgres", "host": m.group(4), "port": m.group(5) or "",
+                    "database": m.group(6), "user": unquote(m.group(2)), "password": unquote(m.group(3) or ""), "app": "App"}
+    return None
+
+
+def parse_wp(text):
+    vals = dict(re.findall(r"define\(\s*['\"](DB_NAME|DB_USER|DB_PASSWORD|DB_HOST)['\"]\s*,\s*['\"](.*?)['\"]\s*\)", text))
+    if not vals.get("DB_NAME"):
+        return None
+    host, _, port = vals.get("DB_HOST", "localhost").partition(":")
+    return {"type": "mysql", "host": host or "localhost", "port": port if port.isdigit() else "", "database": vals["DB_NAME"],
+            "user": vals.get("DB_USER", ""), "password": vals.get("DB_PASSWORD", ""), "app": "WordPress"}
+
+
+def parse_ci3(text):
+    vals = dict(re.findall(r"\$db\[['\"]default['\"]\]\[['\"](hostname|username|password|database|dbdriver|port)['\"]\]\s*=\s*['\"]?(.*?)['\"]?\s*;", text))
+    if not vals.get("database"):
+        return None
+    return {"type": "postgres" if "postgre" in vals.get("dbdriver", "") else "mysql", "host": vals.get("hostname", "localhost"),
+            "port": vals.get("port", ""), "database": vals["database"], "user": vals.get("username", ""),
+            "password": vals.get("password", ""), "app": "CodeIgniter 3"}
+
+
+PARSERS = {".env": parse_env, "wp-config.php": parse_wp, "database.php": parse_ci3}
+
+
+def find_projects(roots=None, max_depth=4):
+    import glob
+
+    home = os.path.expanduser("~")
+    seen, found = set(), []
+    for pattern in roots or SEARCH_ROOTS:
+        for root in glob.glob(pattern.format(cwd=os.getcwd(), home=home)):
+            if not os.path.isdir(root):
+                continue
+            base_depth = root.rstrip("/").count("/")
+            for dirpath, dirnames, filenames in os.walk(root):
+                depth = dirpath.count("/") - base_depth
+                dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")] if depth < max_depth else []
+                for name, parser in PARSERS.items():
+                    if name not in filenames:
+                        continue
+                    path = os.path.join(dirpath, name)
+                    if name == "database.php" and not dirpath.endswith(os.path.join("application", "config")):
+                        continue
+                    real = os.path.realpath(path)
+                    if real in seen:
+                        continue
+                    seen.add(real)
+                    try:
+                        with open(path, errors="ignore") as fh:
+                            cfg = parser(fh.read(200_000))
+                    except OSError:
+                        continue
+                    if cfg and cfg["database"] and cfg["user"]:
+                        project = dirpath[: -len("/application/config")] if name == "database.php" else dirpath
+                        found.append({**cfg, "path": project})
+    # one entry per database (staging and live copies of the same site stay separate)
+    unique = {}
+    for f in found:
+        unique.setdefault((f["type"], f["host"], f["database"], f["user"]), f)
+    return list(unique.values())
+
+
+def ask(prompt, default=""):
+    try:
+        v = input(prompt).strip()
+    except EOFError:
+        v = ""
+    return v or default
+
+
+def manual_details():
+    kind = ask("Database type [mysql/postgres] (mysql): ", "mysql").lower()
     kind = {"mariadb": "mysql", "postgresql": "postgres", "pg": "postgres"}.get(kind, kind)
     if kind not in ("mysql", "postgres", "sqlite"):
         sys.exit("Only mysql (or MariaDB) and postgres for now.")
-    cfg = {"server": args.server, "token": args.token, "type": kind}
     if kind == "sqlite":
-        cfg.update(host="", port="", user="", password="", database=input("Path to the .sqlite file: ").strip())
+        return {"type": "sqlite", "host": "", "port": "", "user": "", "password": "", "database": ask("Path to the .sqlite file: ")}
+    return {"type": kind, "host": ask("Host (127.0.0.1): ", "127.0.0.1"),
+            "port": ask(f"Port ({3306 if kind == 'mysql' else 5432}): ", str(3306 if kind == "mysql" else 5432)),
+            "database": ask("Database name: "), "user": ask("Database user: "), "password": getpass.getpass("Password (hidden): ")}
+
+
+def make_reader(cfg):
+    """Create a read-only database user with a random password (needs sudo). Returns new user/password or None."""
+    import secrets
+    import subprocess
+
+    pw = secrets.token_urlsafe(18)
+    db = cfg["database"].replace("`", "").replace('"', "")
+    if cfg["type"] == "mysql":
+        hosts = ["localhost", "127.0.0.1"] if cfg["host"] in ("localhost", "127.0.0.1", "") else ["%"]
+        sql = ""
+        for h in hosts:
+            sql += (f"CREATE USER IF NOT EXISTS 'goal_reader'@'{h}' IDENTIFIED BY '{pw}';\n"
+                    f"ALTER USER 'goal_reader'@'{h}' IDENTIFIED BY '{pw}';\n"
+                    f"GRANT SELECT, SHOW VIEW ON `{db}`.* TO 'goal_reader'@'{h}';\n"
+                    f"GRANT PROCESS ON *.* TO 'goal_reader'@'{h}';\n")
+        cmd = ["sudo", "mysql"]
     else:
-        cfg["host"] = input("Host (127.0.0.1): ").strip() or "127.0.0.1"
-        cfg["port"] = input(f"Port ({3306 if kind == 'mysql' else 5432}): ").strip() or (3306 if kind == "mysql" else 5432)
-        cfg["database"] = input("Database name: ").strip()
-        cfg["user"] = input("Database user: ").strip()
-        cfg["password"] = getpass.getpass("Password (hidden): ")
+        sql = (f"DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='goal_reader') THEN CREATE ROLE goal_reader LOGIN; END IF; END $$;\n"
+               f"ALTER ROLE goal_reader LOGIN PASSWORD '{pw}';\n"
+               f'GRANT CONNECT ON DATABASE "{db}" TO goal_reader;\n'
+               f"\\c \"{db}\"\n"
+               "GRANT USAGE ON SCHEMA public TO goal_reader;\n"
+               "GRANT SELECT ON ALL TABLES IN SCHEMA public TO goal_reader;\n"
+               "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO goal_reader;\n"
+               "GRANT pg_read_all_stats TO goal_reader;\n")
+        cmd = ["sudo", "-u", "postgres", "psql", "-q", "-v", "ON_ERROR_STOP=1"]
     try:
-        db = Database(cfg).connect()
+        # the SQL (with the password) goes in through stdin, so it never shows in the process list
+        r = subprocess.run(cmd, input=sql, text=True, capture_output=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0:
+        return None
+    return {**cfg, "user": "goal_reader", "password": pw}
+
+
+def try_connect(cfg):
+    try:
+        return Database(cfg).connect(), None
+    except SystemExit as exc:
+        return None, str(exc)
     except Exception as exc:  # noqa: BLE001 - show a short reason, not a traceback
         msg = str(exc)
-        if "1045" in msg or "password authentication failed" in msg:
-            sys.exit("\nThe database said no to this user/password. Check them and run setup again.")
-        if "cryptography" in msg:
-            sys.exit("\nThis MySQL needs one more package:  pip3 install cryptography   then run setup again.")
+        if "1045" in msg or "1698" in msg or "Access denied" in msg or "password authentication failed" in msg:
+            return None, "The database said no to this user/password."
         if "1049" in msg or "does not exist" in msg:
-            sys.exit("\nNo database with that name. Check the name and run setup again.")
-        sys.exit(f"\nCouldn't connect: {msg[:200]}")
-    print(f"\nConnection OK ({kind} {db.version()}).")
-    if db.can_write():
-        print("\nNote: this database user can change data. The connector never writes, but a read-only user is safer.")
-        if kind == "mysql":
-            print("Create one (run as root in MySQL), then run setup again with it:\n"
-                  f"  CREATE USER 'goal_reader'@'localhost' IDENTIFIED BY 'choose-a-password';\n"
-                  f"  GRANT SELECT, SHOW VIEW, PROCESS ON `{cfg['database']}`.* TO 'goal_reader'@'localhost';\n"
-                  f"  GRANT PROCESS ON *.* TO 'goal_reader'@'localhost';")
+            return None, "No database with that name."
+        return None, f"Couldn't connect: {msg[:200]}"
+
+
+def setup(args):
+    print("Goal Engine connector. Your database password stays on this server; it is never sent anywhere.\n")
+    cfg = None
+    if not args.manual:
+        print("Looking for your projects...")
+        projects = find_projects()
+        if projects:
+            print(f"Found {len(projects)}. Checking which ones connect...")
+            working = []
+            for p in projects:
+                probe = dict(p)
+                probe["port"] = probe.get("port") or ("3306" if p["type"] == "mysql" else "5432")
+                db, _ = try_connect(probe)
+                if db is not None:
+                    working.append(p)
+                    try:
+                        db.conn.close()
+                    except Exception:  # noqa: BLE001
+                        pass
+            if working:
+                projects = working
+            else:
+                print("None of them connected from here, so type the details instead.")
+                projects = []
+        if projects:
+            for i, p in enumerate(projects, 1):
+                print(f"  {i}) {p['path']}  ·  {p['app']}  ·  {p['type']}  ·  {p['database']}")
+            print("  m) Type the details myself")
+            pick = ask(f"Which database should Goal Engine read? [1]: ", "1").lower()
+            if pick != "m":
+                if not pick.isdigit() or not 1 <= int(pick) <= len(projects):
+                    sys.exit("Please run it again and pick a number from the list.")
+                cfg = dict(projects[int(pick) - 1])
+                cfg.pop("app", None)
+                cfg.pop("path", None)
         else:
-            print("Create one (as postgres), then run setup again with it:\n"
-                  "  CREATE ROLE goal_reader LOGIN PASSWORD 'choose-a-password';\n"
-                  f"  GRANT CONNECT ON DATABASE {cfg['database']} TO goal_reader;\n"
-                  "  GRANT USAGE ON SCHEMA public TO goal_reader;\n"
-                  "  GRANT SELECT ON ALL TABLES IN SCHEMA public TO goal_reader;\n"
-                  "  GRANT pg_read_all_stats TO goal_reader;")
+            print("No project settings found. Type the details instead.")
+    if cfg is None:
+        cfg = manual_details()
+    if cfg["type"] != "sqlite" and not cfg.get("port"):
+        cfg["port"] = "3306" if cfg["type"] == "mysql" else "5432"
+    db, err = try_connect(cfg)
+    if db is None:
+        sys.exit(f"\n{err}\nRun the same command again and choose 'm' to type the details.")
+    print(f"Connected ({cfg['type']} {db.version()}, database {cfg['database']}).")
+
+    if cfg["type"] != "sqlite" and db.can_write():
+        print("\nThat user can change data. Goal Engine never writes, but a separate read-only user is safer.")
+        if ask("Create a read-only user for Goal Engine now? (asks for your sudo password) [Y/n]: ", "y").lower().startswith("y"):
+            reader = make_reader(cfg)
+            rdb, _ = try_connect(reader) if reader else (None, None)
+            if rdb is not None:
+                cfg, db = reader, rdb
+                print("Done. Goal Engine will use the read-only user 'goal_reader' (random password, saved only here).")
+            else:
+                print("Couldn't create it (needs sudo access to the database). Continuing with the app's user; the connector itself stays read-only.")
+
+    out = {"server": args.server, "token": args.token, **{k: cfg[k] for k in ("type", "host", "port", "database", "user", "password")}}
     with open(os.open(CONFIG, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as fh:
-        json.dump(cfg, fh, indent=2)
+        json.dump(out, fh, indent=2)
     os.chmod(CONFIG, 0o600)
-    print(f"\nSaved {CONFIG} (only you can read it).")
-    print("Start it now:            python3 goal_connector.py run")
-    print("Keep it running (tmux):  tmux new -d -s goal 'python3 goal_connector.py run'")
+    print(f"\nSaved the settings in {CONFIG} (only you can read it).")
+
+
+PIDFILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "goal_connector.pid")
+
+
+def already_running():
+    try:
+        with open(PIDFILE) as fh:
+            pid = int(fh.read().strip() or 0)
+        if pid and pid != os.getpid():
+            os.kill(pid, 0)
+            return pid
+    except (OSError, ValueError):
+        pass
+    return 0
 
 
 def main():
@@ -376,8 +576,18 @@ def main():
     s = sub.add_parser("setup")
     s.add_argument("--server", required=True)
     s.add_argument("--token", required=True)
+    s.add_argument("--manual", action="store_true", help="type the database details instead of finding them")
     sub.add_parser("run")
+    sub.add_parser("stop")
     args = ap.parse_args()
+    if args.cmd == "stop":
+        pid = already_running()
+        if pid:
+            os.kill(pid, 15)
+            print("Stopped.")
+        else:
+            print("It isn't running.")
+        return
     if args.cmd == "setup":
         setup(args)
         return
@@ -386,10 +596,19 @@ def main():
     with open(CONFIG) as fh:
         cfg = json.load(fh)
     cfg["allow_write"] = False  # Level 1: never writes, whatever the file says
+    if already_running():
+        sys.exit("The connector is already running.")
+    with open(PIDFILE, "w") as fh:
+        fh.write(str(os.getpid()))
     try:
         run(cfg)
     except KeyboardInterrupt:
         print("\nStopped.")
+    finally:
+        try:
+            os.remove(PIDFILE)
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":

@@ -517,8 +517,8 @@
       }
       box.append(row);
     }
-    const name = el("input"); name.type = "text"; name.placeholder = T(hi, "Database ka naam (jaise Shop DB)", "A name for it (e.g. Shop DB)");
-    const make = el("button", "btn solid", T(hi, "Connector banao", "Create connector")); make.type = "button";
+    const name = el("input"); name.type = "text"; name.placeholder = T(hi, "Naam (optional, jaise Shop DB)", "Name (optional, e.g. Shop DB)");
+    const make = el("button", "btn solid", T(hi, "Database jodo", "Connect database")); make.type = "button";
     const row = el("div", "row"); row.append(name, make);
     box.append(row);
     make.addEventListener("click", async () => {
@@ -527,11 +527,11 @@
         const data = await api("/api/connectors", { method: "POST", body: JSON.stringify({ name: name.value, agent_id: a.id }) });
         const w = W(a.lang);
         box.replaceChildren(
-          el("label", null, T(hi, "Ye command apne server pe chalao (jahan database hai). Ye sirf ek baar dikhega:",
-                                  "Run this on your server (where the database is). It's shown only once:")),
+          el("label", null, T(hi, "Ye ek command apne server ke terminal mein paste karo (jahan database hai). Ye sirf ek baar dikhega:",
+                                  "Paste this one command in your server's terminal (where the database is). It's shown only once:")),
           codeBox("", data.command, w),
-          el("p", "fine", T(hi, "Setup database ka user aur password poochega. Password wahin save hota hai, humein nahi aata. Phir: python3 goal_connector.py run",
-                                "Setup asks for the database user and password. They're saved on your server only, never sent here. Then: python3 goal_connector.py run")),
+          el("p", "fine", T(hi, "Ye aapke project ki settings khud dhoondh lega, aap bas Enter dabao. Password aapke server pe hi rehta hai, humein nahi aata.",
+                                "It finds your project's database settings by itself; you just press Enter. The password stays on your server, it never comes here.")),
           el("p", "waiting", T(hi, "Connector ka intezaar…", "Waiting for the connector…")));
         watchConnector(data.connector.id, a.id);
       } catch (err) { addMachine(err.message, [], true); make.disabled = false; }
@@ -562,7 +562,7 @@
     if (c.can_write) card.append(el("p", "note warn", T(hi, "Is database user ke paas likhne ka haq hai. Connector kabhi likhta nahi, phir bhi read-only user behtar hai (setup command dikhata hai).",
                                                        "This database user can change data. The connector never writes, but a read-only user is safer (setup shows how).")));
     if (!c.online) {
-      card.append(el("p", "note", T(hi, "Connector band hai. Server pe chalao: python3 goal_connector.py run", "The connector isn't running. On your server: python3 goal_connector.py run")));
+      card.append(el("p", "note", T(hi, "Connector band hai. Server pe chalao: cd ~/goal-connector && .venv/bin/python goal_connector.py run &", "The connector isn't running. On your server: cd ~/goal-connector && .venv/bin/python goal_connector.py run &")));
       watchConnector(c.id, a.id);
     }
 

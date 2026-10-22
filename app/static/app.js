@@ -510,32 +510,77 @@
       box.append(el("label", null, T(hi, "Pehle se juda database use karo", "Use a database you already connected")));
       const row = el("div", "acts flat");
       for (const c of a.connectors) {
-        const b = el("button", "btn", `${c.name}${c.db_name ? ` · ${c.db_name}` : ""}`);
+        const b = el("button", "btn", `${c.name}${c.db_name && c.db_name !== c.name ? ` · ${c.db_name}` : ""}`);
         b.type = "button";
         b.addEventListener("click", async () => renderAgents((await api(`/api/agents/${a.id}/connect/${c.id}`, { method: "POST" })).agents));
         row.append(b);
       }
-      box.append(row);
+      box.append(row, el("label", null, T(hi, "Ya naya database jodo", "Or connect a new one")));
     }
-    const name = el("input"); name.type = "text"; name.placeholder = T(hi, "Naam (optional, jaise Shop DB)", "Name (optional, e.g. Shop DB)");
-    const make = el("button", "btn solid", T(hi, "Database jodo", "Connect database")); make.type = "button";
-    const row = el("div", "row"); row.append(name, make);
-    box.append(row);
+
+    // Typed on Goal Engine: no terminal
+    const form = el("form", "dbform");
+    const field = (label, input) => { const l = el("label", "f"); l.append(el("span", null, label), input); return l; };
+    const type = el("select");
+    for (const [v, t] of [["mysql", "MySQL / MariaDB"], ["postgres", "PostgreSQL"]]) { const o = el("option", null, t); o.value = v; type.append(o); }
+    const host = el("input"); host.placeholder = T(hi, "jaise db.mysite.com ya server ka IP", "e.g. db.mysite.com or the server IP"); host.autocomplete = "off"; host.required = true;
+    const port = el("input"); port.inputMode = "numeric"; port.placeholder = "3306"; port.maxLength = 5;
+    type.addEventListener("change", () => { port.placeholder = type.value === "postgres" ? "5432" : "3306"; });
+    const dbn = el("input"); dbn.autocomplete = "off"; dbn.required = true;
+    const user = el("input"); user.autocomplete = "off"; user.required = true;
+    const pass = el("input"); pass.type = "password"; pass.autocomplete = "new-password";
+    const r1 = el("div", "row two"); r1.append(field(T(hi, "Database", "Database"), type), field("Port", port));
+    const r2 = el("div", "row two"); r2.append(field(T(hi, "Database ka naam", "Database name"), dbn), field(T(hi, "User", "User"), user));
+    form.append(r1, field("Host", host), r2, field(T(hi, "Password", "Password"), pass));
+    const hint = el("p", "fine", T(hi, "Sirf padhne wala (read-only) user sabse safe hai. cPanel mein: MySQL Databases → naya user, sirf SELECT. Password encrypt karke rakha jaata hai, hum data badal nahi sakte.",
+                                     "A read-only user is safest. In cPanel: MySQL Databases → new user with SELECT only. The password is stored encrypted, and nothing can change your data."));
+    const ipHint = el("p", "fine");
+    api("/api/connector-info").then((d) => {
+      if (d.server_ip) ipHint.textContent = T(hi, `Remote access mein ye IP allow karo: ${d.server_ip}`, `Allow this IP for remote access: ${d.server_ip}`);
+    }).catch(() => {});
+    const go = el("button", "btn solid", T(hi, "Jodo", "Connect")); go.type = "submit";
+    const err = el("p", "note err");
+    err.hidden = true;
+    const ga = el("div", "acts flat"); ga.append(go);
+    form.append(hint, ipHint, ga, err);
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      go.disabled = true; go.textContent = T(hi, "Jod raha hoon…", "Connecting…"); err.hidden = true;
+      try {
+        const data = await api("/api/connectors/direct", { method: "POST", body: JSON.stringify({
+          type: type.value, host: host.value, port: port.value, database: dbn.value, user: user.value, password: pass.value, agent_id: a.id }) });
+        pass.value = "";
+        addMachine(T(hi, "Database jud gaya. Tables padh raha hoon.", "Database connected. Reading the tables."), [T(hi, "Read-only connection bana", "Read-only connection made")]);
+        renderAgents(data.agents);
+      } catch (ex) {
+        err.textContent = ex.message; err.hidden = false;
+        go.disabled = false; go.textContent = T(hi, "Jodo", "Connect");
+      }
+    });
+    box.append(form);
+
+    // On a VPS where the database only listens locally: one command on the server
+    const vps = el("details", "vps");
+    vps.append(el("summary", null, T(hi, "Database sirf server ke andar chalta hai (VPS)? Ek command se jodo", "Database only reachable inside your server (VPS)? Connect with one command")));
+    const make = el("button", "btn", T(hi, "Command banao", "Get the command")); make.type = "button";
+    const inner = el("div", "slot inner"); inner.append(make);
+    vps.append(inner);
     make.addEventListener("click", async () => {
       make.disabled = true;
       try {
-        const data = await api("/api/connectors", { method: "POST", body: JSON.stringify({ name: name.value, agent_id: a.id }) });
+        const data = await api("/api/connectors", { method: "POST", body: JSON.stringify({ agent_id: a.id }) });
         const w = W(a.lang);
-        box.replaceChildren(
-          el("label", null, T(hi, "Ye ek command apne server ke terminal mein paste karo (jahan database hai). Ye sirf ek baar dikhega:",
-                                  "Paste this one command in your server's terminal (where the database is). It's shown only once:")),
+        inner.replaceChildren(
+          el("label", null, T(hi, "Ye ek command server ke terminal mein paste karo. Ye sirf ek baar dikhega:",
+                                  "Paste this one command in your server's terminal. It's shown only once:")),
           codeBox("", data.command, w),
-          el("p", "fine", T(hi, "Ye aapke project ki settings khud dhoondh lega, aap bas Enter dabao. Password aapke server pe hi rehta hai, humein nahi aata.",
-                                "It finds your project's database settings by itself; you just press Enter. The password stays on your server, it never comes here.")),
+          el("p", "fine", T(hi, "Ye aapke project ki settings khud dhoondh lega, aap bas Enter dabao. Password aapke server pe hi rehta hai.",
+                                "It finds your project's database settings by itself; you just press Enter. The password stays on your server.")),
           el("p", "waiting", T(hi, "Connector ka intezaar…", "Waiting for the connector…")));
         watchConnector(data.connector.id, a.id);
-      } catch (err) { addMachine(err.message, [], true); make.disabled = false; }
+      } catch (ex) { addMachine(ex.message, [], true); make.disabled = false; }
     });
+    box.append(vps);
     return box;
   }
 
@@ -557,11 +602,11 @@
     const out = el("div", "db-out");
     const say = (text) => { out.replaceChildren(el("p", "waiting", text)); };
     const fail = (err) => { out.replaceChildren(el("p", "note err", err.message)); };
-    const meta = el("p", "access connector", `${c.name}${c.db_name ? ` · ${c.db_name}` : ""}${c.db_type ? ` (${c.db_type})` : ""} · ${T(hi, "sirf read-only", "read-only")}`);
+    const meta = el("p", "access connector", `${c.name}${c.db_name && c.db_name !== c.name ? ` · ${c.db_name}` : ""}${c.db_type ? ` (${c.db_type})` : ""} · ${T(hi, "sirf read-only", "read-only")}`);
     card.append(meta);
-    if (c.can_write) card.append(el("p", "note warn", T(hi, "Is database user ke paas likhne ka haq hai. Connector kabhi likhta nahi, phir bhi read-only user behtar hai (setup command dikhata hai).",
-                                                       "This database user can change data. The connector never writes, but a read-only user is safer (setup shows how).")));
-    if (!c.online) {
+    if (c.can_write) card.append(el("p", "note warn", T(hi, "Is database user ke paas data badalne ka haq hai. Goal Engine kabhi kuch badalta nahi, phir bhi sirf-SELECT wala user behtar hai.",
+                                                       "This database user can change data. Goal Engine never changes anything, but a SELECT-only user is safer.")));
+    if (!c.online && c.kind !== "direct") {
       card.append(el("p", "note", T(hi, "Connector band hai. Server pe chalao: cd ~/goal-connector && .venv/bin/python goal_connector.py run &", "The connector isn't running. On your server: cd ~/goal-connector && .venv/bin/python goal_connector.py run &")));
       watchConnector(c.id, a.id);
     }

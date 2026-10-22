@@ -93,12 +93,14 @@ def authenticate(db: Session, token: str) -> Connector | None:
     if not token or not token.startswith("gec_"):
         return None
     connector = db.scalar(select(Connector).where(Connector.token_hash == _hash(token)))
-    if connector is None or connector.status == "disconnected":
+    if connector is None or connector.status == "disconnected" or connector.kind == "direct":
         return None
     return connector
 
 
 def is_online(connector: Connector) -> bool:
+    if connector.kind == "direct":
+        return connector.status == "online"
     return bool(connector.last_seen_at and utcnow() - connector.last_seen_at < ONLINE_WINDOW
                 and connector.status != "disconnected")
 
@@ -112,7 +114,7 @@ def connector_dict(connector: Connector, db: Session | None = None) -> dict:
     return {
         "id": connector.id, "name": connector.name, "status": connector.status, "online": is_online(connector),
         "db_type": connector.db_type, "db_name": connector.db_name, "can_write": bool(connector.can_write),
-        "host": connector.host_label, "token_hint": connector.token_hint,
+        "host": connector.host_label, "token_hint": connector.token_hint, "kind": connector.kind or "agent",
         "last_seen_at": connector.last_seen_at.isoformat() if connector.last_seen_at else None,
         "tables": (schema or {}).get("tables", []),
     }
@@ -142,6 +144,11 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
     job = ConnectorJob(connector_id=connector.id, agent_id=agent_id, kind=kind, payload=dumps(payload), status="queued")
     db.add(job)
     db.commit()
+    if connector.kind == "direct":
+        from app.agents import direct
+
+        direct.start(job.id)
+        db.refresh(job)
     return job
 
 
@@ -269,8 +276,8 @@ MODE_TEXT = {
 
 
 def blocks(mode: str, hi: bool) -> list[dict]:
-    steps = [{"kind": "connect", "text": "Aapke server pe connector se judunga; password wahin rehta hai, sirf read-only" if hi
-              else "Connect through the connector on your server; the password stays there, read-only"}]
+    steps = [{"kind": "connect", "text": "Aapke database se sirf padhne ke liye judunga (read-only), kuch badlunga nahi" if hi
+              else "Connect to your database read-only; nothing gets changed"}]
     if mode == "export":
         steps += [{"kind": "think", "text": "Table ya query chuno, pehle 50 rows ka preview" if hi else "Pick a table or write a query; preview 50 rows first"},
                   {"kind": "do", "text": "Poora data CSV/Excel file mein dunga" if hi else "Give you the full data as a CSV/Excel file"}]
@@ -326,8 +333,8 @@ def plan_reply(mode: str, hi: bool, has_connector: bool, later: list[str] | None
     if has_connector:
         return (f"Main ye karunga: {title}. Aapka database juda hua hai, table chuno." if hi
                 else f"Here's what I'll do: {title}. Your database is connected; pick a table.")
-    return (f"Main ye karunga: {title}. Pehle apne server pe connector lagao (ek command); password aapke server pe hi rahega."
-            if hi else f"Here's what I'll do: {title}. First run the connector on your server (one command); your password stays there.")
+    return (f"Main ye karunga: {title}. Bas database ki details bharo aur Jodo dabao."
+            if hi else f"Here's what I'll do: {title}. Just fill in the database details and tap Connect.")
 
 
 def clean_exports(max_age_hours: int = 24) -> None:

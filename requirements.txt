@@ -7,3 +7,5 @@ SQLAlchemy==2.1.5
 uvicorn[standard]==0.54.0
 scikit-learn==1.9.1
 beautifulsoup4==4.15.0
+cryptography==50.0.2
+psycopg[binary]==3.3.6

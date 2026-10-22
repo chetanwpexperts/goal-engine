@@ -182,6 +182,8 @@ class Connector(Base):
     version: Mapped[str | None] = mapped_column(String(20), nullable=True)
     can_write: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
     host_label: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    kind: Mapped[str | None] = mapped_column(String(10), nullable=True, default="agent")   # agent (runs on their server) / direct
+    secret: Mapped[str | None] = mapped_column(Text, nullable=True)   # direct only: encrypted connection details
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

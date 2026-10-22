@@ -257,3 +257,13 @@ body[data-state="active"]::after { content: ""; position: fixed; left: 0; right:
 @media (prefers-reduced-motion: reduce) { .waiting::before { animation: none; } }
 @media (max-width: 640px) { .db-tables, .db-sql, .db-out, .linkish { margin-left: 0; } }
 .db-out .result, .db-out .result .found { margin-left: 0; }
+
+.dbform { display: grid; gap: 10px; }
+.dbform .f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.dbform .row.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dbform .row.two .f:last-child input { max-width: none; }
+.dbform input, .dbform select { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--panel); color: var(--ink); font: inherit; font-size: 15px; outline: none; }
+.dbform input:focus, .dbform select:focus { border-color: var(--ink); }
+.vps { margin-top: 6px; }
+.vps summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.vps .inner { margin: 10px 0 0; }

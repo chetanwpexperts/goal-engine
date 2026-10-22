@@ -74,7 +74,7 @@ def test_sentence_builds_database_agent_not_sheet_automation(client, ml_mode):
     assert res["relation"] == "agent_plan"
     agent = res["agents"][0]
     assert agent["recipe"] == "database" and agent["mode"] == "export" and agent["available"]
-    assert "connector" in res["reply"].lower()
+    assert "details" in res["reply"].lower()
     # Pasted SQL still goes to the query checker, not the connector
     client.post("/api/new-chat")
     res2 = say(client, "ye query slow hai SELECT * FROM orders WHERE YEAR(created) = 2024")
@@ -180,3 +180,82 @@ def test_installer_is_served_with_server_address(client):
     res = client.get("/connector/install.sh")
     assert res.status_code == 200 and "http://testserver" in res.text and "__SERVER__" not in res.text
     assert "</dev/tty" in res.text
+
+
+# ---------------------------------------------------------------- direct connection (typed on Goal Engine)
+from app.agents import direct  # noqa: E402
+
+
+def test_direct_refuses_private_addresses_and_needs_a_secret(client, monkeypatch):
+    monkeypatch.delenv("DIRECT_DB_ALLOW_PRIVATE", raising=False)
+    monkeypatch.setenv("APP_SECRET", "x" * 32)
+    for host in ("127.0.0.1", "localhost", "10.0.0.5", "192.168.1.10", "169.254.169.254", "[::1]"):
+        res = client.post("/api/connectors/direct", json={"host": host, "database": "d", "user": "u", "password": "p"})
+        assert res.status_code == 400 and ("private or local" in res.json()["error"] or "Couldn't find" in res.json()["error"]), host
+    monkeypatch.setenv("APP_SECRET", "")
+    res = client.post("/api/connectors/direct", json={"host": "db.example.com", "database": "d", "user": "u", "password": "p"})
+    assert res.status_code == 400 and "APP_SECRET" in res.json()["error"]
+    assert direct._clean_form({"host": "https://db.example.com:3307/x", "database": "d", "user": "u"})["port"] == "3307"
+
+
+def test_direct_rate_limit(client, monkeypatch):
+    monkeypatch.setenv("APP_SECRET", "x" * 32)
+    direct._attempts.clear()
+    codes = [client.post("/api/connectors/direct", json={"host": "10.1.1.1", "database": "d", "user": "u"}).json()["error"] for _ in range(10)]
+    assert "Too many tries" in codes[-1]
+    direct._attempts.clear()
+
+
+def test_secret_round_trip(monkeypatch):
+    monkeypatch.setenv("APP_SECRET", "y" * 32)
+    token = direct.encrypt({"password": "p@ss"})
+    assert "p@ss" not in token and direct.decrypt(token)["password"] == "p@ss"
+    monkeypatch.setenv("APP_SECRET", "z" * 32)
+    with pytest.raises(direct.DirectError):
+        direct.decrypt(token)
+
+
+def _local_mysql():
+    try:
+        socket.create_connection(("127.0.0.1", 3306), timeout=1).close()
+        return True
+    except OSError:
+        return False
+
+
+import socket  # noqa: E402
+
+
+@pytest.mark.skipif(not _local_mysql(), reason="needs a local MySQL/MariaDB with the shop_db test user")
+def test_direct_end_to_end_with_real_mysql(client, ml_mode, monkeypatch):
+    monkeypatch.setenv("APP_SECRET", "s" * 32)
+    monkeypatch.setenv("DIRECT_DB_ALLOW_PRIVATE", "1")
+    monkeypatch.setenv("DIRECT_DB_SYNC", "1")
+    direct._attempts.clear()
+    agent = say(client, "database se data Excel mein chahiye")["agents"][0]
+    bad = client.post("/api/connectors/direct", json={"host": "127.0.0.1", "database": "shop_db", "user": "shopapp", "password": "wrong"})
+    assert bad.status_code == 400 and "said no" in bad.json()["error"]
+    res = client.post("/api/connectors/direct", json={"host": "127.0.0.1", "database": "shop_db", "user": "shopapp",
+                                                      "password": "app pass", "agent_id": agent["id"]})
+    assert res.status_code == 200, res.text
+    card = res.json()["agents"][0]
+    c = card["connector"]
+    assert c["kind"] == "direct" and c["online"] and c["can_write"] is True and [t["name"] for t in c["tables"]] == ["orders"]
+
+    from app.db import get_db
+    from app.models import Connector
+    s = next(get_db())
+    saved = s.get(Connector, c["id"]).secret
+    assert "app pass" not in saved and "shopapp" not in saved
+
+    job = client.post(f"/api/connectors/{c['id']}/jobs", json={"kind": "query", "table": "orders"}).json()
+    assert client.get(f"/api/connector-jobs/{job['id']}").json()["result"]["row_count"] >= 2
+    exp = client.post(f"/api/connectors/{c['id']}/jobs", json={"kind": "export", "table": "orders"}).json()
+    assert "amount" in client.get(f"/api/connector-jobs/{exp['id']}/download").text
+    assert client.post(f"/api/connectors/{c['id']}/jobs", json={"kind": "query", "sql": "DELETE FROM orders"}).status_code == 400
+    health = client.post(f"/api/connectors/{c['id']}/jobs", json={"kind": "health"}).json()
+    assert client.get(f"/api/connector-jobs/{health['id']}").json()["status"] == "done"
+    # a token can't be used to impersonate a direct connector, and disconnect forgets the password
+    client.post(f"/api/connectors/{c['id']}/disconnect")
+    s.expire_all()
+    assert s.get(Connector, c["id"]).secret is None

@@ -18,6 +18,7 @@ from app.ai.router import AIRouter, AIUnavailable
 from app.ml.brain import Brain
 from app.agents import automation
 from app.agents import database as dbagent
+from app.agents import direct as dbagent_direct
 from app.agents.core import AgentError, agent_dict, claim_due, goal_agents, run_agent
 from app.agents.mailer import SmtpMailer
 from app.engine import _after_run
@@ -357,6 +358,7 @@ async def connector_result(job_id: int, request: Request, db: Session = Depends(
     return {"ok": True}
 
 
+@dbagent_direct.on_done
 def _after_db_job(db: Session, job) -> None:
     """A scheduled database report finished: email the CSV to the verified owner."""
     if not job.agent_id or job.status != "done" or not job.file_path:
@@ -380,6 +382,17 @@ def _after_db_job(db: Session, job) -> None:
 
 
 class ConnectorIn(BaseModel):
+    name: str = ""
+    agent_id: int | None = None
+
+
+class DirectIn(BaseModel):
+    type: str = "mysql"
+    host: str = ""
+    port: str = ""
+    database: str = ""
+    user: str = ""
+    password: str = ""
     name: str = ""
     agent_id: int | None = None
 
@@ -425,6 +438,27 @@ def create_connector(body: ConnectorIn, request: Request, db: Session = Depends(
     return {"connector": dbagent.connector_dict(connector, db), "token": token, "command": command}
 
 
+@app.post("/api/connectors/direct")
+def connect_direct(body: DirectIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    try:
+        connector = dbagent_direct.connect(db, visitor, body.model_dump(), body.name)
+    except (dbagent_direct.DirectError, dbagent.DatabaseError) as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    if body.agent_id:
+        agent = own_agent(db, body.agent_id, visitor)
+        inputs = loads(agent.inputs, {}) or {}
+        inputs["connector_id"] = connector.id
+        agent.inputs = dumps(inputs)
+        db.commit()
+        return _agent_payload(db, agent, visitor)
+    return {"connector": dbagent.connector_dict(connector, db)}
+
+
+@app.get("/api/connector-info")
+def connector_info():
+    return {"server_ip": dbagent_direct.server_ip()}
+
+
 @app.get("/api/connectors")
 def list_connectors(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     return {"connectors": [dbagent.connector_dict(c, db) for c in dbagent.visitor_connectors(db, visitor)]}
@@ -437,6 +471,7 @@ def disconnect_connector(connector_id: int, db: Session = Depends(get_db), visit
     except dbagent.DatabaseError:
         raise HTTPException(404, "Connector not found")
     connector.status = "disconnected"
+    connector.secret = None          # forget the saved password
     db.commit()
     return {"ok": True}
 

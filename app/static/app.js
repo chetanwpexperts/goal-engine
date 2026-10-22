@@ -1607,6 +1607,114 @@
   setInterval(refreshStatus, 30000);
   document.addEventListener("visibilitychange", refreshStatus);
 
+  // ---------------------------------------------------------------- home: the brain tiles and the living network
+  for (const tile of document.querySelectorAll(".brain-tile")) {
+    tile.addEventListener("click", () => {
+      input.value = tile.dataset.example;
+      autosize();
+      input.dispatchEvent(new Event("input"));
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
+  }
+  const syncTyping = () => body.classList.toggle("typing", !!input.value.trim() && !$("#options").hidden);
+  input.addEventListener("input", syncTyping);
+
+  const neural = (() => {
+    const cv = $("#neural");
+    if (!cv || !cv.getContext) return { excite() {}, burst() {} };
+    const ctx = cv.getContext("2d");
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let W = 0, H = 0, nodes = [], edges = [], pulses = [], heat = 0, raf = 0, last = 0;
+    const INK = "27, 35, 64", AMBER = "242, 163, 58";
+
+    function build() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      W = cv.clientWidth; H = cv.clientHeight;
+      cv.width = W * dpr; cv.height = H * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const count = Math.round(Math.min(140, Math.max(46, (W * H) / 9000)));
+      nodes = [];
+      for (let i = 0; i < count; i++) {
+        const x = Math.random() * W, y = 60 + Math.random() * (H - 80);
+        nodes.push({ x, y, r: 1.2 + Math.random() * 1.8, glow: 0, quiet: quietAt(x, y) });
+      }
+      edges = [];
+      nodes.forEach((n, i) => {
+        const near = nodes.map((m, j) => [j, (m.x - n.x) ** 2 + (m.y - n.y) ** 2]).filter(([j]) => j !== i).sort((a, b) => a[1] - b[1]).slice(0, 3);
+        for (const [j, d] of near) if (j > i || !edges.some((e) => e[0] === j && e[1] === i)) if (d < (W / 5) ** 2) edges.push([i, j]);
+      });
+    }
+    // calmer where the words are, so the network never fights the text
+    function quietAt(x, y) {
+      const cx = W / 2, cy = H * (W > 900 ? 0.42 : 0.34) + 20, hw = Math.min(460, W / 2), hh = 190;
+      const dx = Math.max(0, Math.abs(x - cx) - hw), dy = Math.max(0, Math.abs(y - cy) - hh);
+      return Math.min(1, Math.hypot(dx, dy) / 160);
+    }
+    function fire(fromNear) {
+      if (!edges.length) return;
+      let e;
+      if (fromNear) {
+        const cy = H * (W > 900 ? 0.42 : 0.34);
+        const close = edges.filter(([a]) => Math.abs(nodes[a].y - cy) < 220);
+        e = (close.length ? close : edges)[Math.floor(Math.random() * (close.length || edges.length))];
+      } else e = edges[Math.floor(Math.random() * edges.length)];
+      const flip = Math.random() < 0.5;
+      pulses.push({ a: flip ? e[1] : e[0], b: flip ? e[0] : e[1], t: 0, v: 0.6 + Math.random() * 0.9, hops: 2 + Math.floor(Math.random() * 3) });
+    }
+    function draw(now) {
+      const dt = Math.min(0.05, (now - last) / 1000 || 0.016); last = now;
+      ctx.clearRect(0, 0, W, H);
+      ctx.lineWidth = 1;
+      for (const [a, b] of edges) {
+        const n = nodes[a], m = nodes[b], q = Math.min(n.quiet, m.quiet);
+        ctx.strokeStyle = `rgba(${INK}, ${0.04 + 0.09 * q})`;
+        ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.lineTo(m.x, m.y); ctx.stroke();
+      }
+      for (const n of nodes) {
+        n.glow = Math.max(0, n.glow - dt * 1.6);
+        ctx.fillStyle = n.glow > 0.02 ? `rgba(${AMBER}, ${0.35 + 0.65 * n.glow})` : `rgba(${INK}, ${0.08 + 0.22 * n.quiet})`;
+        ctx.beginPath(); ctx.arc(n.x, n.y, n.r + n.glow * 3, 0, 7); ctx.fill();
+      }
+      if (still) return;
+      heat = Math.max(0, heat - dt * 0.6);
+      if (Math.random() < dt * (2.4 + heat * 16)) fire(heat > 0.2);
+      const next = [];
+      for (const p of pulses) {
+        p.t += dt * p.v * 2.2;
+        const n = nodes[p.a], m = nodes[p.b];
+        if (p.t >= 1) {
+          m.glow = 1;
+          if (p.hops > 0) {
+            const outs = edges.filter((e) => e[0] === p.b || e[1] === p.b);
+            const e = outs[Math.floor(Math.random() * outs.length)];
+            if (e) next.push({ a: p.b, b: e[0] === p.b ? e[1] : e[0], t: 0, v: p.v, hops: p.hops - 1 });
+          }
+          continue;
+        }
+        const x = n.x + (m.x - n.x) * p.t, y = n.y + (m.y - n.y) * p.t;
+        ctx.strokeStyle = `rgba(${AMBER}, .9)`; ctx.lineWidth = 1.6;
+        ctx.beginPath(); ctx.moveTo(n.x + (m.x - n.x) * Math.max(0, p.t - 0.25), n.y + (m.y - n.y) * Math.max(0, p.t - 0.25)); ctx.lineTo(x, y); ctx.stroke();
+        ctx.lineWidth = 1;
+        next.push(p);
+      }
+      pulses = next.slice(-220);
+      loop();
+    }
+    function loop() { if (!document.hidden && body.dataset.state === "idle") raf = requestAnimationFrame(draw); else raf = 0; }
+    function start() { if (!raf && body.dataset.state === "idle") { last = performance.now(); raf = requestAnimationFrame(draw); } }
+    build(); start();
+    if (still) draw(performance.now());
+    let t; window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { build(); if (still) draw(performance.now()); }, 150); });
+    document.addEventListener("visibilitychange", start);
+    return {
+      excite() { heat = Math.min(1, heat + 0.12); start(); },
+      burst() { for (let i = 0; i < 28; i++) fire(true); heat = 1; },
+      start,
+    };
+  })();
+  input.addEventListener("input", () => neural.excite());
+
   $("#composer").addEventListener("submit", (e) => { e.preventDefault(); sendMessage(input.value); });
   input.addEventListener("input", autosize);
   input.addEventListener("keydown", (e) => {

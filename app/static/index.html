@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body data-state="idle">
+  <canvas id="neural" class="neural" aria-hidden="true"></canvas>
   <header class="bar">
     <a class="mark" href="/" aria-label="Goal Engine">
       <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="16" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="24" cy="24" r="4"/><path d="M12 16h4l4-6M16 16l4 6"/></svg>
@@ -57,6 +58,24 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
     </button>
   </form>
+  <h1 class="hero" id="hero">Problem batao.<br>Brain khud solve karega.</h1>
+  <section class="brains" id="brains" aria-label="Brains">
+    <button type="button" class="brain-tile" data-example="Mera database bahut slow chal raha hai, check karke theek karo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6"/></svg>
+      <b>Database</b>
+      <span>Slow query, errors, hacked data. Khud check, fix aur Undo.</span>
+    </button>
+    <button type="button" class="brain-tile" data-example="Meri WordPress site pe error aa raha hai, theek karo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg>
+      <b>PHP · WordPress · Laravel</b>
+      <span>White screen, plugin crash, PHP errors, hacked site.</span>
+    </button>
+    <button type="button" class="brain-tile" data-example="Meri Excel sheet mein #REF! aa raha hai, theek karo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M3.5 15h17M9.5 4v16"/></svg>
+      <b>Excel · Word · Office</b>
+      <span>Formula errors, data match, lakhs of rows. Fixed copy milti hai.</span>
+    </button>
+  </section>
   <div id="options" class="options" hidden></div>
   <div id="status" class="status" aria-live="polite" hidden></div>
   <p id="fineprint" class="fineprint">Please don't type passwords or card numbers here. <a href="/privacy">Privacy &amp; delete my data</a></p>

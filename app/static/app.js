@@ -1620,98 +1620,182 @@
   const syncTyping = () => body.classList.toggle("typing", !!input.value.trim() && !$("#options").hidden);
   input.addEventListener("input", syncTyping);
 
+  // A brain drawn in code: a slowly turning 3D cloud of neurons. Signals fire along its connections,
+  // faster while the person types. Light colours; still for reduced motion; paused when not visible.
   const neural = (() => {
-    const cv = $("#neural");
-    if (!cv || !cv.getContext) return { excite() {}, burst() {} };
+    const cv = $("#brain");
+    if (!cv || !cv.getContext) return { excite() {} };
     const ctx = cv.getContext("2d");
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let W = 0, H = 0, nodes = [], edges = [], pulses = [], heat = 0, raf = 0, last = 0;
-    const INK = "27, 35, 64", AMBER = "242, 163, 58";
+    let W = 0, H = 0, pts = [], edges = [], adj = [], pulses = [], heat = 0, raf = 0, last = 0, t0 = performance.now();
+
+    // Side view of a brain (front to the right): the outline, the folds, the cerebellum and the stem.
+    const OUTLINE = [[-0.92, -0.05], [-0.95, 0.15], [-0.86, 0.4], [-0.66, 0.6], [-0.38, 0.72], [-0.05, 0.77], [0.28, 0.71], [0.55, 0.56],
+      [0.78, 0.34], [0.92, 0.09], [0.94, -0.12], [0.83, -0.28], [0.63, -0.33], [0.47, -0.27], [0.4, -0.33], [0.31, -0.48], [0.1, -0.58],
+      [-0.15, -0.56], [-0.36, -0.46], [-0.56, -0.38], [-0.76, -0.28], [-0.88, -0.18]];
+    const FOLDS = [
+      [[0.43, -0.24], [0.2, -0.1], [-0.05, -0.02], [-0.3, 0.06]],                    // lateral fissure
+      [[-0.06, 0.75], [0.0, 0.5], [0.08, 0.3], [0.14, 0.05], [0.2, -0.08]],          // central sulcus
+      [[-0.25, 0.71], [-0.2, 0.45], [-0.12, 0.25], [-0.05, 0.08]],
+      [[0.25, 0.7], [0.32, 0.45], [0.42, 0.25], [0.55, 0.1]],
+      [[0.55, 0.55], [0.6, 0.35], [0.72, 0.18], [0.86, 0.05]],
+      [[0.45, 0.62], [0.5, 0.42], [0.62, 0.3], [0.8, 0.25]],
+      [[-0.6, 0.6], [-0.55, 0.35], [-0.6, 0.1], [-0.75, -0.05]],
+      [[-0.45, 0.66], [-0.4, 0.4], [-0.45, 0.2], [-0.55, 0.0], [-0.7, -0.15]],
+      [[0.35, -0.38], [0.1, -0.3], [-0.15, -0.3], [-0.4, -0.25]],                    // temporal folds
+      [[0.25, -0.5], [0.0, -0.45], [-0.25, -0.42]],
+      [[-0.85, 0.3], [-0.72, 0.25], [-0.62, 0.32]],
+      [[0.7, -0.1], [0.55, -0.05], [0.4, 0.05], [0.3, 0.2]],
+    ];
+    function inside([x, y], poly) {
+      let ok = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const [xi, yi] = poly[i], [xj, yj] = poly[j];
+        if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) ok = !ok;
+      }
+      return ok;
+    }
+    function edgeDist(x, y) {
+      let best = 9;
+      for (let i = 0, j = OUTLINE.length - 1; i < OUTLINE.length; j = i++) {
+        const [ax, ay] = OUTLINE[j], [bx, by] = OUTLINE[i], dx = bx - ax, dy = by - ay;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
+        best = Math.min(best, Math.hypot(x - ax - t * dx, y - ay - t * dy));
+      }
+      return best;
+    }
+    const half = (x, y) => 0.62 * Math.sqrt(Math.min(1, edgeDist(x, y) / 0.42));   // how thick the hemisphere is here
+    function shape(n) {
+      const out = [], rnd = (a, b) => a + Math.random() * (b - a);
+      let guard = 0;
+      while (out.length < n * 0.5 && guard++ < n * 60) {        // the two surfaces
+        const x = rnd(-1, 1), y = rnd(-0.65, 0.8);
+        if (!inside([x, y], OUTLINE)) continue;
+        out.push({ x, y, z: (Math.random() < 0.5 ? 1 : -1) * half(x, y), k: 0 });
+      }
+      for (let i = 0; i < OUTLINE.length; i++) {               // the silhouette
+        const [ax, ay] = OUTLINE[i], [bx, by] = OUTLINE[(i + 1) % OUTLINE.length];
+        for (let t = 0; t < 1; t += 0.2) out.push({ x: ax + (bx - ax) * t, y: ay + (by - ay) * t, z: rnd(-0.08, 0.08), k: 0 });
+      }
+      for (const f of FOLDS) {                                  // folds, drawn as rows of neurons on both sides
+        for (let i = 0; i < f.length - 1; i++) {
+          const [ax, ay] = f[i], [bx, by] = f[i + 1];
+          for (let t = 0; t < 1; t += 0.12) {
+            const x = ax + (bx - ax) * t + rnd(-0.01, 0.01), y = ay + (by - ay) * t + rnd(-0.01, 0.01);
+            const h = half(x, y);
+            out.push({ x, y, z: h * 1.02, k: 3 }, { x, y, z: -h * 1.02, k: 3 });
+          }
+        }
+      }
+      let c = 0;
+      while (c < n * 0.12) {                                    // cerebellum
+        const a = rnd(0, Math.PI * 2), r = Math.sqrt(Math.random());
+        const x = -0.6 + 0.28 * r * Math.cos(a), y = -0.56 + 0.15 * r * Math.sin(a);
+        if (inside([x, y], OUTLINE)) continue;
+        out.push({ x, y, z: rnd(-0.42, 0.42) * Math.sqrt(1 - r * r), k: 1 }); c++;
+      }
+      for (let i = 0; i < n * 0.04; i++) {                      // brain stem
+        const h = Math.random();
+        out.push({ x: -0.2 - 0.1 * h + rnd(-0.05, 0.05), y: -0.55 - 0.38 * h, z: rnd(-0.07, 0.07), k: 2 });
+      }
+      return out;
+    }
 
     function build() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       W = cv.clientWidth; H = cv.clientHeight;
+      if (!W || !H) return;
       cv.width = W * dpr; cv.height = H * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const count = Math.round(Math.min(140, Math.max(46, (W * H) / 9000)));
-      nodes = [];
-      for (let i = 0; i < count; i++) {
-        const x = Math.random() * W, y = 60 + Math.random() * (H - 80);
-        nodes.push({ x, y, r: 1.2 + Math.random() * 1.8, glow: 0, quiet: quietAt(x, y) });
-      }
-      edges = [];
-      nodes.forEach((n, i) => {
-        const near = nodes.map((m, j) => [j, (m.x - n.x) ** 2 + (m.y - n.y) ** 2]).filter(([j]) => j !== i).sort((a, b) => a[1] - b[1]).slice(0, 3);
-        for (const [j, d] of near) if (j > i || !edges.some((e) => e[0] === j && e[1] === i)) if (d < (W / 5) ** 2) edges.push([i, j]);
+      pts = shape(W < 360 ? 380 : 760);
+      edges = []; adj = pts.map(() => []);
+      pts.forEach((p, i) => {
+        const near = [];
+        for (let j = 0; j < pts.length; j++) {
+          if (j === i) continue;
+          const q = pts[j], d = (p.x - q.x) ** 2 + (p.y - q.y) ** 2 + (p.z - q.z) ** 2;
+          if (near.length < 3) { near.push([j, d]); near.sort((a, b) => a[1] - b[1]); }
+          else if (d < near[2][1]) { near[2] = [j, d]; near.sort((a, b) => a[1] - b[1]); }
+        }
+        for (const [j, d] of near) if (d < 0.045 && i < j) { edges.push([i, j]); adj[i].push(j); adj[j].push(i); }
       });
+      pts.forEach((p) => { p.glow = 0; });
     }
-    // calmer where the words are, so the network never fights the text
-    function quietAt(x, y) {
-      const cx = W / 2, cy = H * (W > 900 ? 0.42 : 0.34) + 20, hw = Math.min(460, W / 2), hh = 190;
-      const dx = Math.max(0, Math.abs(x - cx) - hw), dy = Math.max(0, Math.abs(y - cy) - hh);
-      return Math.min(1, Math.hypot(dx, dy) / 160);
+
+    function project(time) {
+      const a = Math.sin(time * 0.00028) * 0.42;             // turns a little left and right, always recognisable
+      const tilt = 0.06 + Math.sin(time * 0.00019) * 0.05;
+      const ca = Math.cos(a), sa = Math.sin(a), ct = Math.cos(tilt), st = Math.sin(tilt);
+      const s = Math.min(W / 2.15, H / 1.95), cx = W / 2, cy = H / 2 + s * 0.08;
+      for (const p of pts) {
+        const x1 = p.x * ca + p.z * sa, z1 = -p.x * sa + p.z * ca;
+        const y1 = p.y * ct - z1 * st, z2 = p.y * st + z1 * ct;
+        const f = 3.2 / (3.2 - z2);
+        p.sx = cx + x1 * s * f; p.sy = cy - y1 * s * f; p.d = (z2 + 1.2) / 2.4;
+      }
     }
-    function fire(fromNear) {
+
+    function fire() {
       if (!edges.length) return;
-      let e;
-      if (fromNear) {
-        const cy = H * (W > 900 ? 0.42 : 0.34);
-        const close = edges.filter(([a]) => Math.abs(nodes[a].y - cy) < 220);
-        e = (close.length ? close : edges)[Math.floor(Math.random() * (close.length || edges.length))];
-      } else e = edges[Math.floor(Math.random() * edges.length)];
+      const e = edges[Math.floor(Math.random() * edges.length)];
       const flip = Math.random() < 0.5;
-      pulses.push({ a: flip ? e[1] : e[0], b: flip ? e[0] : e[1], t: 0, v: 0.6 + Math.random() * 0.9, hops: 2 + Math.floor(Math.random() * 3) });
+      pulses.push({ a: flip ? e[1] : e[0], b: flip ? e[0] : e[1], t: 0, v: 1.4 + Math.random() * 1.6, hops: 4 + Math.floor(Math.random() * 6),
+                    c: Math.random() < 0.7 ? "242, 163, 58" : "46, 170, 196" });
     }
+
     function draw(now) {
       const dt = Math.min(0.05, (now - last) / 1000 || 0.016); last = now;
+      if (!W) build();
       ctx.clearRect(0, 0, W, H);
+      project(still ? 0 : now - t0);
+      // soft light halo, so the brain reads as lit from inside
+      const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.min(W, H) * 0.55);
+      g.addColorStop(0, `rgba(196, 206, 255, ${0.45 + heat * 0.25})`); g.addColorStop(1, "rgba(196, 206, 255, 0)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
       ctx.lineWidth = 1;
-      for (const [a, b] of edges) {
-        const n = nodes[a], m = nodes[b], q = Math.min(n.quiet, m.quiet);
-        ctx.strokeStyle = `rgba(${INK}, ${0.04 + 0.09 * q})`;
-        ctx.beginPath(); ctx.moveTo(n.x, n.y); ctx.lineTo(m.x, m.y); ctx.stroke();
+      for (const [i, j] of edges) {
+        const p = pts[i], q = pts[j], d = (p.d + q.d) / 2;
+        ctx.strokeStyle = `rgba(79, 99, 214, ${0.05 + 0.2 * d})`;
+        ctx.beginPath(); ctx.moveTo(p.sx, p.sy); ctx.lineTo(q.sx, q.sy); ctx.stroke();
       }
-      for (const n of nodes) {
-        n.glow = Math.max(0, n.glow - dt * 1.6);
-        ctx.fillStyle = n.glow > 0.02 ? `rgba(${AMBER}, ${0.35 + 0.65 * n.glow})` : `rgba(${INK}, ${0.08 + 0.22 * n.quiet})`;
-        ctx.beginPath(); ctx.arc(n.x, n.y, n.r + n.glow * 3, 0, 7); ctx.fill();
+      for (const p of pts) {
+        p.glow = Math.max(0, p.glow - dt * 1.4);
+        const r = (W < 360 ? 0.5 : 0.7) + (W < 360 ? 1 : 1.5) * p.d + p.glow * (W < 360 ? 2 : 3.2);
+        ctx.fillStyle = p.glow > 0.03 ? `rgba(242, 163, 58, ${0.4 + 0.6 * p.glow})` : `rgba(${p.k === 3 ? "52, 66, 160" : p.k ? "108, 92, 231" : "79, 99, 214"}, ${(p.k === 3 ? 0.3 : 0.14) + 0.55 * p.d})`;
+        ctx.beginPath(); ctx.arc(p.sx, p.sy, r, 0, 7); ctx.fill();
       }
-      if (still) return;
-      heat = Math.max(0, heat - dt * 0.6);
-      if (Math.random() < dt * (2.4 + heat * 16)) fire(heat > 0.2);
-      const next = [];
-      for (const p of pulses) {
-        p.t += dt * p.v * 2.2;
-        const n = nodes[p.a], m = nodes[p.b];
-        if (p.t >= 1) {
-          m.glow = 1;
-          if (p.hops > 0) {
-            const outs = edges.filter((e) => e[0] === p.b || e[1] === p.b);
-            const e = outs[Math.floor(Math.random() * outs.length)];
-            if (e) next.push({ a: p.b, b: e[0] === p.b ? e[1] : e[0], t: 0, v: p.v, hops: p.hops - 1 });
+      if (!still) {
+        heat = Math.max(0, heat - dt * 0.5);
+        const rate = 6 + heat * 40;
+        for (let k = 0; k < 3; k++) if (Math.random() < dt * rate / 3) fire();
+        const next = [];
+        for (const pu of pulses) {
+          pu.t += dt * pu.v * 3;
+          const p = pts[pu.a], q = pts[pu.b];
+          if (pu.t >= 1) {
+            q.glow = 1;
+            if (pu.hops > 0 && adj[pu.b].length) next.push({ ...pu, a: pu.b, b: adj[pu.b][Math.floor(Math.random() * adj[pu.b].length)], t: 0, hops: pu.hops - 1 });
+            continue;
           }
-          continue;
+          const back = Math.max(0, pu.t - 0.35);
+          ctx.strokeStyle = `rgba(${pu.c}, .95)`; ctx.lineWidth = 1.8;
+          ctx.beginPath(); ctx.moveTo(p.sx + (q.sx - p.sx) * back, p.sy + (q.sy - p.sy) * back);
+          ctx.lineTo(p.sx + (q.sx - p.sx) * pu.t, p.sy + (q.sy - p.sy) * pu.t); ctx.stroke();
+          ctx.lineWidth = 1;
+          next.push(pu);
         }
-        const x = n.x + (m.x - n.x) * p.t, y = n.y + (m.y - n.y) * p.t;
-        ctx.strokeStyle = `rgba(${AMBER}, .9)`; ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.moveTo(n.x + (m.x - n.x) * Math.max(0, p.t - 0.25), n.y + (m.y - n.y) * Math.max(0, p.t - 0.25)); ctx.lineTo(x, y); ctx.stroke();
-        ctx.lineWidth = 1;
-        next.push(p);
+        pulses = next.slice(-260);
       }
-      pulses = next.slice(-220);
-      loop();
+      raf = 0;
+      if (!still) start();
     }
-    function loop() { if (!document.hidden && body.dataset.state === "idle") raf = requestAnimationFrame(draw); else raf = 0; }
-    function start() { if (!raf && body.dataset.state === "idle") { last = performance.now(); raf = requestAnimationFrame(draw); } }
-    build(); start();
-    if (still) draw(performance.now());
-    let t; window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { build(); if (still) draw(performance.now()); }, 150); });
+    function start() { if (!raf && !document.hidden && body.dataset.state === "idle" && cv.getClientRects().length) { raf = requestAnimationFrame(draw); } }
+    build();
+    last = performance.now();
+    if (still) draw(last); else start();
+    let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { build(); if (still) draw(performance.now()); else start(); }, 150); });
     document.addEventListener("visibilitychange", start);
-    return {
-      excite() { heat = Math.min(1, heat + 0.12); start(); },
-      burst() { for (let i = 0; i < 28; i++) fire(true); heat = 1; },
-      start,
-    };
+    return { excite() { heat = Math.min(1, heat + 0.1); start(); } };
   })();
   input.addEventListener("input", () => neural.excite());
 

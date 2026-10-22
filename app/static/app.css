@@ -399,10 +399,10 @@ body[data-state="active"] .status { display: none; }
 .office a.btn { text-decoration: none; display: inline-block; margin-top: 10px; }
 .office .fine.small { margin: 6px 0 0; }
 
-/* ---------------------------------------------------------------- home: a living brain behind one question */
-.neural { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-body[data-state="active"] .neural, body[data-state="active"] .hero, body[data-state="active"] .brains { display: none; }
+/* ---------------------------------------------------------------- home: one question, and a brain that's alive */
+body[data-state="active"] .brain-art, body[data-state="active"] .hero, body[data-state="active"] .brains { display: none; }
 .bar, .composer, .options, .status, .fineprint { z-index: 6; }
+.brain-art { position: fixed; z-index: 1; pointer-events: none; display: none; }
 .hero { position: fixed; left: 50%; transform: translateX(-50%); width: min(860px, calc(100% - 2 * var(--gutter)));
   bottom: calc(58% + 22px); margin: 0; z-index: 5; text-wrap: balance;
   font-size: clamp(40px, 5.6vw, 80px); font-weight: 800; letter-spacing: -0.04em; line-height: .94; color: var(--ink); }
@@ -412,12 +412,22 @@ body[data-state="idle"] .status { top: calc(42% + 84px); }
   top: calc(42% + 128px); z-index: 5; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 body.typing .brains { visibility: hidden; }
 .brain-tile { text-align: left; display: grid; gap: 4px; align-content: start; padding: 16px 16px 18px; cursor: pointer;
-  background: rgba(248, 250, 253, .86); border: 1px solid var(--line); border-top: 3px solid var(--ink); border-radius: 4px 4px 14px 14px;
-  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); transition: border-color .15s, transform .15s; }
+  background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--ink); border-radius: 4px 4px 14px 14px;
+  transition: border-color .15s, transform .15s; }
 .brain-tile svg { width: 26px; height: 26px; color: var(--signal-ink); margin-bottom: 6px; }
 .brain-tile b { font-size: 17px; letter-spacing: -0.01em; }
 .brain-tile span { font-size: 14px; color: var(--muted); line-height: 1.4; }
 .brain-tile:hover, .brain-tile:focus-visible { border-top-color: var(--signal); transform: translateY(-2px); }
+
+/* wide screens: words on the left, the brain on the right */
+@media (min-width: 1100px) {
+  body[data-state="idle"] { --col-left: max(var(--gutter), calc(50% - 620px)); --col-w: 690px; }
+  body[data-state="idle"] .composer, body[data-state="idle"] .hero, body[data-state="idle"] .brains,
+  body[data-state="idle"] .status, body[data-state="idle"] .options { left: var(--col-left); transform: none; width: var(--col-w); }
+  body[data-state="idle"] .hero { font-size: clamp(48px, 4.9vw, 74px); }
+  body[data-state="idle"] .brain-art { display: block; left: calc(var(--col-left) + var(--col-w) + 30px);
+    width: min(560px, calc(100vw - var(--col-left) - var(--col-w) - 30px - var(--gutter))); top: calc(42% - 290px); height: 560px; }
+}
 @media (max-width: 900px) {
   .hero { bottom: calc(66% + 18px); font-size: clamp(34px, 8.5vw, 64px); }
   body[data-state="idle"] .status { top: calc(34% + 92px); }
@@ -425,4 +435,20 @@ body.typing .brains { visibility: hidden; }
   .brain-tile { grid-template-columns: auto 1fr; column-gap: 12px; padding: 12px 14px; }
   .brain-tile svg { grid-row: span 2; margin: 2px 0 0; }
 }
+/* phones and tablets: a smaller brain above the words, when there's room */
+@media (max-width: 1099px) and (min-height: 760px) {
+  body[data-state="idle"] .brain-art { display: block; left: 50%; transform: translateX(-50%); top: 58px; width: min(300px, 70vw); height: 150px; }
+}
+@media (max-width: 1099px) and (min-width: 901px) and (min-height: 760px) { body[data-state="idle"] .brain-art { top: 64px; height: 170px; } }
 @media (max-height: 700px) and (min-width: 901px) { .brains { top: calc(42% + 112px); } .brain-tile span { display: none; } }
+@media (max-width: 900px) and (min-height: 760px) {
+  body[data-state="idle"] .composer { top: 40%; }
+  body[data-state="idle"] .hero { bottom: calc(60% + 18px); }
+  body[data-state="idle"] .status { top: calc(40% + 92px); }
+  body[data-state="idle"] .brains { top: calc(40% + 132px); }
+  body[data-state="idle"] .options { top: calc(40% + 110px); }
+  body[data-state="idle"] .brain-art { height: 140px; }
+}
+@media (max-width: 1099px) and (min-height: 1000px) {
+  body[data-state="idle"] .brain-art { top: 70px; height: calc(40vh - 215px); width: min(520px, 80vw); }
+}

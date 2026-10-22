@@ -94,7 +94,7 @@ NO_EXPERT_DOMAINS = {"health"}
 
 def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: str, relation: str,
              options: list[str] | None = None, ask_words: int = 0, intent: str = "", confidence: float = 0.0,
-             hi: bool = True) -> dict[str, Any]:
+             hi: bool = False) -> dict[str, Any]:
     gid = goal.id if goal else None
     db.add(Message(visitor_id=visitor_id, goal_id=gid, role="user", text=text, relation=relation,
                    intent=intent or None, confidence=confidence or None))
@@ -135,7 +135,7 @@ SMALL_TALK_RE = re.compile(r"^\s*(hi|hello|hey|thanks?|thank you|thx|ok|okay|bye
 
 def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | None) -> dict[str, Any]:
     focus = focus_goal(db, visitor_id, goal_id)
-    hi_focus = (focus.detected_language in ("Hinglish", "Hindi")) if focus is not None else True
+    hi_focus = (focus.detected_language in ("Hinglish", "Hindi")) if focus is not None else False
 
     # Tap: "show me the steps instead"
     if text.strip() in STEPS_LABELS and focus is not None and focus.intent:

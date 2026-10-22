@@ -39,7 +39,7 @@
   const wordcount = $("#wordcount");
   let currentGoalId = null;
   let wordTarget = 0;
-  let lastLang = "hi";
+  let lastLang = "en";                      // English unless the person writes Hinglish or Hindi
 
   const RUN_WORDS = {
     hi: { preview: "Preview dekho", start: "Start", pause: "Roko", again: "Phir se chalao", checking: "Chal raha hai…",
@@ -71,12 +71,12 @@
 
   // ---------------------------------------------------------------- composer
   const EXAMPLES = [
-    "Jinka payment baaki hai unko har Monday reminder chala jaye",
-    "Meri website slow hai, check karo",
-    "Patients ko appointment se ek din pehle yaad dilao",
-    "Roz subah 9 baje pending payments ki report chahiye",
-    "Database se orders ka data Excel mein chahiye",
-    "Jo customer 30 din se nahi aaye unko message bhejo",
+    "My Excel sheet shows #REF! errors, fix them",
+    "My database is slow, check it",
+    "Remind customers with pending payments every Monday",
+    "Send me a report of pending payments every morning at 9",
+    "Export the orders table from my database to Excel",
+    "Find duplicate entries in my sheet",
   ];
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let typer = null;
@@ -2023,8 +2023,8 @@
   const micLang = $("#mic-lang");
   let recognition = null;
   let listening = false;
-  let voiceLang = "hi-IN";
-  try { voiceLang = localStorage.getItem("ge_voice_lang") || "hi-IN"; } catch (_) { /* storage blocked */ }
+  let voiceLang = "en-IN";
+  try { voiceLang = localStorage.getItem("ge_voice_lang") || "en-IN"; } catch (_) { /* storage blocked */ }
   function stopListening() { if (recognition && listening) recognition.stop(); }
   function paintMicLang() { micLang.textContent = voiceLang === "hi-IN" ? "हिंदी" : "English"; }
   if (Recognition) {

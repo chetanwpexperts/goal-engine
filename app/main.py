@@ -639,7 +639,7 @@ def activate_agent(agent_id: int, db: Session = Depends(get_db), visitor: str = 
 @app.post("/api/owner/code")
 def owner_code(body: OwnerIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     try:
-        automation.request_code(db, visitor, body.email, body.business, mailer(), hi=True)
+        automation.request_code(db, visitor, body.email, body.business, mailer(), hi=getattr(body, "lang", "en") != "en")
     except automation.AutomationError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     except RuntimeError as exc:
@@ -902,7 +902,7 @@ class OptimizeIn(BaseModel):
 
 class RecognizeIn(BaseModel):
     text: str
-    lang: str = "hi"
+    lang: str = "en"
 
 
 @app.post("/api/dbbrain/recognize")

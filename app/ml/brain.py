@@ -60,7 +60,7 @@ class Turn:
     ask_words: int = 0                  # >0: UI shows a word counter with this target
     intent: str = ""
     confidence: float = 0.0
-    hi: bool = True
+    hi: bool = False
 
 
 # ---------------------------------------------------------------- goal state helpers

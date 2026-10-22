@@ -85,3 +85,13 @@ def test_not_understood_can_be_sent_to_learning(client, open_file):
 def test_plain_orders_change_the_file(client, open_file, text):
     r = say(client, text, open_file)
     assert "theek kar raha" in r["reply"] or "Fixing" in r["reply"], (text, r["reply"])
+
+
+def test_english_by_default(client, ml_mode):
+    r = say(client, "I need to work on my excel file")
+    assert "Drop the file" in r["reply"], r["reply"]
+    agent = next(a for a in r["agents"] if a.get("office"))
+    assert agent["lang"] == "en" and agent["name"] == "Excel and file work"
+    _upload(client, agent["id"], PRACTICE.read_bytes(), "Excel_Practice.xlsx")
+    r = say(client, "total sales by region", r["goal"]["id"])
+    assert "Sales Data" in r["reply"] and "Formula" in r["reply"] and "jod di" not in r["reply"], r["reply"]

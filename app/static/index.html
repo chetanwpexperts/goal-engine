@@ -60,32 +60,32 @@
   <main class="home" id="home">
     <div id="status" class="status" aria-live="polite" hidden></div>
     <div class="hero" id="hero">
-      <h1>Problem batao.<br><span class="accent">Brain khud solve karega.</span></h1>
-      <p>Database, PHP aur Excel ki problem apni bhasha mein likho ya bolo. Agent khud check karta hai, theek karta hai, aur dikhata hai ki theek hua.</p>
+      <h1>Describe the problem.<br><span class="accent">Your agent fixes it.</span></h1>
+      <p>Database, PHP and Excel problems, in your own words, typed or spoken. The agent checks it, fixes it, and shows you that it's fixed.</p>
     </div>
     <div class="brain-stage" aria-hidden="true">
       <canvas id="brain" class="brain-art"></canvas>
-      <span class="orbit-tag t1"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>Samjho</span>
-      <span class="orbit-tag t2"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Jaancho</span>
+      <span class="orbit-tag t1"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>Understand</span>
+      <span class="orbit-tag t2"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Check</span>
       <span class="orbit-tag t3"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/></svg>Plan</span>
-      <span class="orbit-tag t4"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>Theek karo</span>
+      <span class="orbit-tag t4"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>Fix</span>
     </div>
     <div id="composer-slot" class="composer-slot"></div>
     <section class="brains" id="brains" aria-label="Agents">
-      <button type="button" class="brain-tile" data-example="Mera database bahut slow chal raha hai, check karke theek karo">
+      <button type="button" class="brain-tile" data-example="My database is very slow, please check it and fix it">
         <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6"/></svg>
         <b>Database</b>
       </button>
-      <button type="button" class="brain-tile" data-example="Meri WordPress site pe error aa raha hai, theek karo">
+      <button type="button" class="brain-tile" data-example="My WordPress site is showing an error, please fix it">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg>
         <b>PHP · WordPress</b>
       </button>
-      <button type="button" class="brain-tile" data-example="Meri Excel sheet mein #REF! aa raha hai, theek karo">
+      <button type="button" class="brain-tile" data-example="My Excel sheet shows #REF! errors, please fix them">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M3.5 15h17M9.5 4v16"/></svg>
         <b>Excel · Office</b>
       </button>
     </section>
-    <p class="home-hint">Hindi, Hinglish ya English mein likho, ya mic dabake bolo.</p>
+    <p class="home-hint">Type or speak in English, Hindi or Hinglish.</p>
   </main>
   <div id="options" class="options" hidden></div>
   <p id="fineprint" class="fineprint">Please don't type passwords or card numbers here. <a href="/privacy">Privacy &amp; delete my data</a></p>

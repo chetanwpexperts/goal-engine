@@ -95,3 +95,16 @@ def test_lost_card_and_fatty_liver_get_real_answers_not_sales(client, ml_mode):
     client.post("/api/new-chat"); client.cookies.delete("ge_vid")
     liver = say(client, "mera fatty lever hai kaise thik kru")
     assert liver["goal"]["intent"] == "liver_health" and "doctor" in liver["reply"].lower() and liver["offer_expert"] is False
+
+
+def test_many_ways_of_saying_lost_card_and_fatty_liver(client, ml_mode):
+    card = ["mera atm kho gya hai kya kru", "atm kho gaya kya karu", "mera debit card gum ho gaya", "atm card chori ho gaya",
+            "mera card kho gya hai", "lost my atm card", "credit card kho gaya kya kare", "एटीएम कार्ड खो गया है"]
+    liver = ["mera fatty lever hai kaise thik kru", "fatty liver hai kya kare", "liver mein fat hai", "sgpt high aaya hai report mein",
+             "fatty liver grade 2 hai", "मुझे फैटी लिवर है"]
+    for texts, intent in ((card, "lost_card"), (liver, "liver_health")):
+        for t in texts:
+            client.post("/api/new-chat"); client.cookies.delete("ge_vid")
+            r = say(client, t)
+            assert r["goal"]["intent"] == intent, (t, r["goal"]["intent"])
+            assert r["offer_expert"] is False

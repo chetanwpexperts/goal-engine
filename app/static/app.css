@@ -347,7 +347,7 @@ body[data-state="active"]::after { content: ""; position: fixed; left: 0; right:
 /* live status strip (home screen) */
 .status { position: fixed; left: 50%; transform: translateX(-50%); top: calc(42% + 104px); width: min(860px, calc(100% - 2 * var(--gutter))); display: grid; gap: 6px; z-index: 5; }
 body[data-state="active"] .status { display: none; }
-.st-line { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--ink); }
+.st-line { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .st-line.soft { color: var(--muted); }
 .st-ask { margin: 6px 0 0; font-size: 14px; color: var(--muted); }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--ok); }

@@ -89,10 +89,10 @@ def office_dict(db: Session, agent: Agent, hi: bool) -> dict:
                             .order_by(OfficeFile.id.desc()).limit(6)))
     has_file = any(f.status in ("ready", "queued", "working") for f in files)
     if has_file:
-        inputs = {k: v for k, v in inputs.items() if k != "brain"}     # the agent works on the file; no formula homework
+        inputs = {k: v for k, v in inputs.items() if k != "brain"}     # the agent works on the file; no generic formula
     return {"id": agent.id, "lang": "hi" if hi else "en", "recipe": "office", "office": True, "status": agent.status,
             "name": "Excel / file ka kaam" if hi else "Excel and file work", "access": "upload", "available": True,
-            "blocks": [], "runs": [], "brain": _brain_view(inputs.get("brain"), hi), "formula": _formula_view(inputs.get("brain"), hi),
+            "blocks": [], "runs": [], "brain": _brain_view(inputs.get("brain"), hi), "formula": inputs.get("file_formula") if has_file and inputs.get("file_formula") else _formula_view(inputs.get("brain"), hi),
             "files": [file_dict(f) for f in files]}
 
 
@@ -367,6 +367,7 @@ FIND_WORDS = {"find", "show", "check", "list", "dhoondo", "dhundo", "dhoond", "d
 DO_WORDS = {"remove", "delete", "hatao", "hata", "hatado", "hataye", "hatana", "fix", "theek", "thik", "saaf", "clean", "correct",
             "sudharo", "badlo", "drop", "mitao", "delete karo"}
 YES_RE = re.compile(r"^\s*(haan|ha|haa|han|yes|yep|ok|okay|theek hai|thik hai|kar do|karo|hata do|hatao|do it|go ahead|please)\b", re.I)
+FORMULA_RE = re.compile(r"\b(formula|formule|formulae|fourmula|farmula|function)\b", re.I)
 UNDO_RE = re.compile(r"\b(undo|wapas|vapas|pehle jaisa|revert|purana wala)\b", re.I)
 ALL_RE = re.compile(r"\b(sab|saari|saare|everything|all)\b.{0,20}\b(theek|thik|fix|saaf|clean)", re.I)
 REPORT_RE = re.compile(r"\b(kya galat|kya problem|what.{0,10}wrong|check (karo|my|the|this)|problems?|errors?|galti|galtiyan|issues?)\b", re.I)
@@ -487,6 +488,9 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
         return "Aakhri badlav wapas le raha hoon." if hi else "Undoing the last change."
     ops = ops_in(text)
     sheets = sheets_in(text, report)
+    if FORMULA_RE.search(text or "") and (ops or "remove_duplicates" in ops_in(text + " duplicate")):
+        # "duplicate ka formula do": they want the formula for THEIR file, not a change
+        return formula_reply(agent, f, report, ops or ["remove_duplicates"], sheets, hi)
     if not ops and ALL_RE.search(text or ""):
         s = report.get("summary", {})
         ops = [op for key, op in (("spaces", "trim_spaces"), ("text_numbers", "text_to_number"), ("broken_refs", "fix_broken_refs"),
@@ -587,3 +591,63 @@ def _extract_reply(f: OfficeFile, r: dict, sheets: list[str], report: dict, hi: 
              "kis row jaisi. Aapka data nahi badla. Card pe Download karo. Hatane hain to 'duplicate hatao' likho.") if hi else
             (f"Found {r['count']} duplicates ({'; '.join(parts)}). They're all in a new sheet \"Duplicates (Goal Engine)\": which row, "
              "and which row it repeats. Your data wasn't changed. Download it from the card. To remove them, type 'remove duplicates'."))
+
+
+# ------------------------------------------------------------------ "formula do": a formula written for the person's own sheet
+def _sheet_with(report: dict, key: str, sheets: list[str]) -> dict | None:
+    cands = [sh for sh in report.get("sheets", []) if not sheets or sh["name"] in sheets]
+    return max(cands, key=lambda sh: sh.get(key, 0) if not isinstance(sh.get(key), list) else len(sh[key]), default=None)
+
+
+def _col_of(cell: str) -> str:
+    return re.match(r"[A-Z]+", cell).group(0) if cell else "B"
+
+
+def formula_reply(agent: Agent, f: OfficeFile, report: dict, ops: list[str], sheets: list[str], hi: bool) -> str:
+    from openpyxl.utils import get_column_letter
+
+    op = ops[0]
+    sh = _sheet_with(report, {"remove_duplicates": "duplicate_rows", "trim_spaces": "spaces", "fix_case": "case_mixed",
+                              "text_to_number": "text_numbers"}.get(op, "rows"), sheets)
+    if sh is None:
+        return None
+    name, last = sh["name"], max(sh["rows"], 2)
+    header = sh.get("header", [])
+    q = f"'{name}'!" if re.search(r"\W", name) else f"{name}!"
+    if op == "remove_duplicates":
+        from app.office import _ROWNO
+
+        cols = [get_column_letter(i + 1) for i, h in enumerate(header) if h and not _ROWNO.match(str(h))][:6] or ["A"]
+        new_col = get_column_letter(len(header) + 1)
+        parts = ",".join(f"${c}$2:${c}2,{c}2" for c in cols)
+        excel = f'=IF(COUNTIFS({parts})>1,"Duplicate","")'
+        names = ", ".join(header[ord(c) - 65] for c in cols if len(c) == 1 and ord(c) - 65 < len(header))
+        unique = f"=UNIQUE({q}{cols[0]}1:{cols[-1]}{last})"            # without a row-number column, or nothing looks repeated
+        title = (f"Duplicate pehchanne ka formula ({name})" if hi else f"Formula to mark duplicates ({name})")
+        explain = (f"{new_col}2 mein daalo aur {new_col}{last} tak neeche kheencho. Jo row upar wali kisi row jaisi hai ({names} sab same), "
+                   f"uspe \"Duplicate\" likha aayega; pehli wali nahi. Phir filter lagao, \"Duplicate\" chuno aur wo rows delete karo. "
+                   f"Excel 365 mein bina duplicate ki poori list ek nayi sheet mein: {unique}" if hi else
+                   f"Put it in {new_col}2 and drag down to {new_col}{last}. A row that repeats an earlier row ({names} all the same) "
+                   f"shows \"Duplicate\"; the first one doesn't. Then filter on \"Duplicate\" and delete those rows. "
+                   f"In Excel 365, the whole list without duplicates on a new sheet: {unique}")
+        tail = (" Excel mein formula khud kuch delete nahi karta; main ye aapke liye kar sakta hoon: 'duplicate hatao' likho." if hi
+                else " A formula can't delete rows by itself in Excel; I can do it for you: type 'remove duplicates'.")
+    else:
+        cell = {"trim_spaces": sh.get("space_cells"), "fix_case": sh.get("case_cells"), "text_to_number": sh.get("text_number_cells")}.get(op) or ["B2"]
+        col = _col_of(cell[0])
+        fx = {"trim_spaces": f"=TRIM({col}2)", "fix_case": f"=PROPER({col}2)", "text_to_number": f'=VALUE(SUBSTITUTE(SUBSTITUTE({col}2,",",""),"₹",""))',
+              "fix_broken_refs": None}[op]
+        if fx is None:
+            return ("Toote formula (#REF!) ka koi ek formula nahi hota; main inhe khud theek kar deta hoon: 'formula theek karo' likho." if hi
+                    else "There's no single formula for broken #REF! formulas; I can rebuild them for you: type 'fix formulas'.")
+        excel = fx
+        title = {"trim_spaces": ("Extra space hatane ka formula", "Formula to remove extra spaces"),
+                 "fix_case": ("Ek jaise capital letters ka formula", "Formula for consistent capitals"),
+                 "text_to_number": ("Text ko number banane ka formula", "Formula to turn text into numbers")}[op][0 if hi else 1] + f" ({name}, {col})"
+        explain = (f"Ek khaali column mein row 2 pe daalo aur {last} tak kheencho; phir Copy > Paste Special > Values se {col} column pe daal do." if hi
+                   else f"Put it in an empty column on row 2 and drag down to row {last}; then Copy > Paste Special > Values over column {col}.")
+        tail = (" Ya main seedha file mein kar deta hoon: 'theek karo' likho." if hi else " Or I can do it in the file directly: type 'fix it'.")
+    inputs = loads(agent.inputs, {}) or {}
+    inputs["file_formula"] = {"title": title, "excel": excel, "explain": explain, "sheets": "", "needs": []}
+    agent.inputs = dumps(inputs)
+    return f"{title}: {excel}  {explain}{tail}"

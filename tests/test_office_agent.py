@@ -238,3 +238,21 @@ def test_chetans_hinglish_requests_never_delete(client, ml_mode):
     r = say(client, "duplicate hatao", goal_id)
     f = _wait(client, f["id"])
     assert f["report"]["summary"]["duplicate_rows"] == 0
+
+
+def test_formula_requests_get_a_formula_for_their_sheet(client, ml_mode):
+    from pathlib import Path
+
+    r = say(client, "muje excel sheet me kaam krna hai")
+    goal_id = r["goal"]["id"]
+    agent = next(a for a in r["agents"] if a.get("office"))
+    f = _upload(client, agent["id"], (Path(__file__).parent / "data" / "practice.xlsx").read_bytes(), "Excel_Practice.xlsx")
+    for text in ("give me duplicate formula", "I am asking muje formula do dupliate delete krne ka"):
+        r = say(client, text, goal_id)
+        assert "COUNTIFS(" in r["reply"] and "Messy Data" in r["reply"], (text, r["reply"])
+        card = next(a for a in r["agents"] if a.get("office"))
+        assert card["formula"] and "COUNTIFS(" in card["formula"]["excel"]
+        f = _wait(client, f["id"])
+        assert f["report"]["summary"]["duplicate_rows"] == 2, text        # nothing was deleted
+    r = say(client, "extra space hatane ka formula batao", goal_id)
+    assert "TRIM(" in r["reply"], r["reply"]

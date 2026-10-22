@@ -239,6 +239,18 @@ def _work(file_id: int, task: str, args: dict) -> None:
                 f.versions, f.path = dumps(st), out
                 f.result = dumps({"task": "extract", **res})
                 f.report = dumps(office.scan(out))
+            elif task == "ask":
+                from app.office import ask as asker
+
+                st = steps(f)
+                n = 1 + sum(1 for x in st if "answer" in x["ops"])
+                root, ext = os.path.splitext(st[0]["path"])
+                out = f"{root}.v{len(st)}{ext}"
+                res = asker.run(args["plan"], f.path, out, args.get("hi", True), n)
+                if os.path.exists(out):
+                    st.append({"path": out, "ops": ["answer"], "changes": {"answer": 1}})
+                    f.versions, f.path = dumps(st), out
+                f.result = dumps({"task": "ask", **res})
             elif task == "undo":
                 st = steps(f)
                 if len(st) > 1:
@@ -488,7 +500,7 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
         return "Aakhri badlav wapas le raha hoon." if hi else "Undoing the last change."
     ops = ops_in(text)
     sheets = sheets_in(text, report)
-    if FORMULA_RE.search(text or "") and (ops or "remove_duplicates" in ops_in(text + " duplicate")):
+    if FORMULA_RE.search(text or "") and ops:
         # "duplicate ka formula do": they want the formula for THEIR file, not a change
         return formula_reply(agent, f, report, ops or ["remove_duplicates"], sheets, hi)
     if not ops and ALL_RE.search(text or ""):
@@ -502,7 +514,7 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
         ops = [op for op in _OP_NAMES]          # "kya galat hai?" -> everything the scan knows
         return _answer(agent, report, ops, sheets, hi, f)
     if not ops:
-        return None
+        return ask_task(db, agent, f, text, hi)
     if ops == ["remove_duplicates"] and not wants_do(text):
         # "duplicates dhund ke do", "alag sheet mein daalo": list them in a new sheet, delete nothing
         _set_offer(agent, {"ops": ["remove_duplicates"], "sheets": sheets})
@@ -651,3 +663,43 @@ def formula_reply(agent: Agent, f: OfficeFile, report: dict, ops: list[str], she
     inputs["file_formula"] = {"title": title, "excel": excel, "explain": explain, "sheets": "", "needs": []}
     agent.inputs = dumps(inputs)
     return f"{title}: {excel}  {explain}{tail}"
+
+
+# ------------------------------------------------------------------ any other question about the open file
+def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
+    """Totals, counts, X-wise, lists, lookups, aging, combining, highlighting... on the person's own sheets.
+    Returns the reply, or (question, options) when one detail is missing. Never a random answer."""
+    from app.office import ask as asker
+    from app.office.sheetdata import load_tables
+
+    _set_offer(agent, None)
+    inputs = loads(agent.inputs, {}) or {}
+    pending = inputs.pop("pending_q", None)
+    if pending and len((text or "").split()) <= 5:
+        text = f"{pending} {text}"                        # the answer to "which sheet / which column?"
+    try:
+        plan = asker.understand(text, load_tables(f.path))
+    except asker.NeedMore as need:
+        inputs["pending_q"] = text
+        agent.inputs = dumps(inputs)
+        db.commit()
+        return (need.hi if hi else need.en), need.options
+    agent.inputs = dumps(inputs)
+    args = {"plan": plan, "hi": hi}
+    if f.size <= BIG:
+        f.status, f.task, f.args = "queued", "ask", dumps(args)
+        db.commit()
+        _work(f.id, "ask", args)
+        db.refresh(f)
+        r = loads(f.result, {}) or {}
+        if f.status == "ready" and r.get("task") == "ask":
+            tail = ""
+            if r.get("sheet"):
+                tail = (f" Nayi sheet \"{r['sheet']}\" file mein jod di; card pe Download karo." if hi and r["sheet"].startswith("Answer") else
+                        f" Ye \"{r['sheet']}\" sheet mein hai; card pe Download karo." if hi else
+                        f" Added to the file as \"{r['sheet']}\"; download it from the card.")
+            fx = (f" Formula: {r['formula']}" if r.get("formula") else "")
+            return f"{r['say']}.{fx}{tail}".replace("..", ".")
+        return f.error or ("Ye kaam poora nahi ho saka." if hi else "Couldn't finish that.")
+    _start(db, f, "ask", args)
+    return "Badi file hai, kaam chal raha hai; card pe jawab aayega." if hi else "Big file, working on it; the answer will show on the card."

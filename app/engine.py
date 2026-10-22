@@ -16,6 +16,7 @@ from app.agents.core import (YES_RE, AgentError, agent_dict, assign, goal_agents
 from app.agents import automation as auto
 from app.agents import database as dbagent
 from app.agents import office_agent as officeagent
+from app.agents.core import URL_RE
 from app.agents.planner import plan as plan_automation
 from app.ml.brain import SKIP_RE, steps_text
 from app.ml.registry import domain_of
@@ -127,6 +128,11 @@ def _after_run(agent, run, hi: bool) -> tuple[str, list[str]]:
     return reply, options
 
 
+ANOTHER_SITE_RE = re.compile(r"\b(koi|ek|aur|or|another|dusri|doosri|dusra|doosra|new|nayi|naya|one more|ek aur)\b.{0,25}\b(website|site|web ?site|url|domain)\b"
+                             r"|\b(website|site)\b.{0,25}\b(aur|or|another|dusri|doosri|bhi)\b", re.I)
+SMALL_TALK_RE = re.compile(r"^\s*(hi|hello|hey|thanks?|thank you|thx|ok|okay|bye|shukriya|dhanyavaad|namaste|good (morning|night|evening))\W*$", re.I)
+
+
 def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | None) -> dict[str, Any]:
     focus = focus_goal(db, visitor_id, goal_id)
     hi_focus = (focus.detected_language in ("Hinglish", "Hindi")) if focus is not None else True
@@ -152,6 +158,38 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
             except AgentError as exc:
                 reply = str(exc)
             return _respond(db, visitor_id, text, focus, reply, "agent_run", hi=hi)
+
+    # "koi aur website check kar sakte ho?": same agent, new address. Ask for it; don't start a different topic.
+    if focus is not None and ANOTHER_SITE_RE.search(text or "") and not URL_RE.search(text or ""):
+        site = next((a for a in goal_agents(db, focus.id) if a.recipe in ("website_check", "website_watch")), None)
+        if site is not None:
+            from app.ml.normalize import detect_language
+
+            hi = detect_language(text) in ("Hinglish", "Hindi") or (focus.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 8)
+            reply = ("Haan. Doosri website ka address bhejo (jaise example.com), main turant check karta hoon." if hi
+                     else "Yes. Send the other website's address (like example.com) and I'll check it right away.")
+            return _respond(db, visitor_id, text, focus, reply, "agent_plan", hi=hi)
+
+    # A file is open in this conversation: what the person types is about that file. Stay on it; don't re-guess the topic.
+    if focus is not None:
+        _oa = officeagent.goal_agent(db, focus)
+        if _oa is not None and officeagent.open_file(db, _oa) is not None and not dbagent.DB_WORDS.search(text or "") \
+                and not URL_RE.search(text or "") and not SMALL_TALK_RE.search(text or ""):
+            from app.ml.normalize import HINGLISH_MARKERS, detect_language, tokens
+
+            lang = detect_language(text)
+            if lang == "English" and focus.detected_language in ("Hinglish", "Hindi") and (
+                    len(text.split()) < 4 or any(w in HINGLISH_MARKERS for w in tokens(text))):
+                lang = focus.detected_language
+            hi = lang in ("Hinglish", "Hindi")
+            task_reply = officeagent.chat_task(db, _oa, text, hi)
+            options = []
+            if isinstance(task_reply, tuple):
+                task_reply, options = task_reply
+            if not task_reply:
+                task_reply = officeagent.cant_yet(officeagent.open_file(db, _oa), hi)
+            db.commit()
+            return _respond(db, visitor_id, text, focus, task_reply, "agent_plan", options=options, hi=hi)
 
     # A sheet link for a waiting automation agent: save it and show the preview straight away.
     if focus is not None:
@@ -238,7 +276,10 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
         opened = officeagent.open_file(db, agent)
         if not task_reply and opened is not None:
             task_reply = officeagent.cant_yet(opened, turn.hi)
-        reply, options, relation = (task_reply or officeagent.plan_reply(rec, turn.hi)), [], "agent_plan"
+        task_options = []
+        if isinstance(task_reply, tuple):
+            task_reply, task_options = task_reply
+        reply, options, relation = (task_reply or officeagent.plan_reply(rec, turn.hi)), task_options, "agent_plan"
     elif goal is not None and relation not in ("howto", "safety", "chit_chat") and dbagent.wants_database(goal, text):
         # Database work: the agent works through a connector on the user's own server.
         from app.dbknow import brain as dbbrain

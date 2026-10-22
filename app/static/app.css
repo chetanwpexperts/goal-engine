@@ -461,3 +461,6 @@ body.typing .brains { visibility: hidden; }
 .office.has-file .dropzone .lead, .office.has-file .dropzone .fine { display: none; }
 .office.has-file .dropzone .another { display: inline; }
 .office.has-file .dropzone .btn { padding: 6px 14px; font-size: 14px; background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+.office .answer { margin: 4px 0 8px; font-size: 16px; }
+.office .formula { display: grid; gap: 8px; justify-items: start; margin-bottom: 8px; }
+.office .formula code { white-space: pre-wrap; word-break: break-all; }

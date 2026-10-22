@@ -1,0 +1,713 @@
+"""Questions and jobs on the person's own sheets, in English / Hinglish / Hindi. No AI.
+
+understand(question, tables) -> a plan:
+  totals, counts, averages, highest/lowest, "X-wise" summaries (also by month), top N, filtered lists,
+  lookups from another sheet, invoice aging, combining sheets, highlighting rows, describing a sheet.
+run(plan, path, out) -> the answer in words + a new sheet with the result + the Excel formula that does the same.
+If the question isn't clear enough, it says exactly what's missing and offers the columns to pick. It never guesses wildly.
+"""
+
+import difflib
+import re
+from collections import defaultdict
+from datetime import date, datetime
+
+from openpyxl import load_workbook
+from openpyxl.formatting.rule import FormulaRule
+from openpyxl.styles import Font, PatternFill
+from openpyxl.utils import get_column_letter
+
+from app.ml.normalize import tokens
+from app.office.sheetdata import Table, load_tables
+
+SYNONYMS = {
+    "amount": {"amount", "total", "sales", "sale", "revenue", "value", "bikri", "paisa", "paise", "rakam", "turnover", "net"},
+    "salary": {"salary", "tankhwah", "tankha", "pay", "ctc", "wage"},
+    "quantity": {"quantity", "qty", "units", "matra", "pieces", "nag"},
+    "price": {"price", "rate", "daam", "cost", "mrp"},
+    "date": {"date", "tarikh", "tareekh", "day", "din", "joining"},
+    "name": {"name", "naam"},
+    "department": {"department", "dept", "vibhag", "team"},
+    "status": {"status", "sthiti", "state"},
+    "city": {"city", "shehar", "location", "place", "jagah"},
+    "region": {"region", "area", "zone", "kshetra"},
+    "customer": {"customer", "client", "grahak", "party"},
+    "vendor": {"vendor", "supplier"},
+    "product": {"product", "item", "saman", "maal"},
+    "rep": {"rep", "salesperson", "salesman", "executive", "employee"},
+    "stock": {"stock", "inventory"},
+    "invoice": {"invoice", "bill"},
+    "tax": {"tax", "gst"},
+    "discount": {"discount", "chhoot", "off"},
+}
+STOP = {"the", "a", "an", "of", "in", "on", "for", "to", "me", "mein", "mai", "ka", "ki", "ke", "ko", "se", "hai", "hain", "kya", "kitna",
+        "kitne", "kitni", "batao", "bata", "do", "de", "dena", "chahiye", "karo", "kar", "is", "are", "what", "show", "give", "please", "pls",
+        "and", "or", "aur", "sheet", "sheets", "data", "file", "excel", "wise", "har", "per", "each", "by", "total", "sum", "count",
+        "average", "avg", "my", "mera", "meri", "mere", "this", "that", "yeh", "ye", "wo", "which", "kaun", "kaunsa", "kaunse", "sabse",
+        "all", "sab", "saare", "list", "dikhao", "nikalo", "find", "how", "many", "much", "with", "jinka", "jinki", "jiska", "jo", "hua"}
+
+AGG_WORDS = {
+    "sum": {"total", "sum", "jod", "jodo", "kul", "sum", "totals", "jumla"},
+    "count": {"count", "kitne", "kitni", "ginti", "number", "how many", "kitna"},
+    "avg": {"average", "avg", "ausat", "mean", "aoast", "average"},
+    "max": {"highest", "max", "maximum", "sabse zyada", "top", "most", "largest", "biggest", "zyada"},
+    "min": {"lowest", "min", "minimum", "sabse kam", "least", "smallest", "kam"},
+}
+GROUP_RE = re.compile(r"\b(\w+)[- ]?wise\b|\bhar\s+(\w+)|\bper\s+(\w+)|\beach\s+(\w+)|\bby\s+(\w+)|\b(\w+)\s+ke\s+hisaab|\baccording to\s+(\w+)", re.I)
+MONTH_RE = re.compile(r"\b(month|months|monthly|mahina|mahine|mahinewise|mahine ke hisaab|month[- ]?wise)\b", re.I)
+TOPN_RE = re.compile(r"\b(?:top|pehle|first|sabse (?:zyada|upar))\s*(\d{1,3})\b|\b(\d{1,3})\s*(?:sabse|top|best)\b", re.I)
+
+
+class NeedMore(Exception):
+    """The question needs one more detail; options are what the person can pick."""
+
+    def __init__(self, msg_hi, msg_en, options=()):
+        super().__init__(msg_en)
+        self.hi, self.en, self.options = msg_hi, msg_en, list(options)
+
+
+# ------------------------------------------------------------------ matching words to sheets, columns and values
+def _close(w, choices, cutoff=0.82):
+    return bool(difflib.get_close_matches(w, list(choices), n=1, cutoff=cutoff)) if len(w) >= 4 else w in choices
+
+
+def _header_words(h: str) -> list[str]:
+    return [w for w in re.findall(r"[a-z0-9]+", h.lower()) if w not in {"of", "the", "no", "id", "practice"} or len(h) <= 3]
+
+
+def _col_score(h: str, words: list[str]) -> float:
+    hw = _header_words(h)
+    if not hw:
+        return 0.0
+    hit = 0.0
+    for x in hw:
+        syn = next((s for s in SYNONYMS.values() if x in s), {x})
+        if any(w == x or (len(w) >= 4 and _close(w, [x])) for w in words):
+            hit += 1
+        elif any(w in syn for w in words):
+            hit += 0.6                                    # "sales" ~ "amount": weaker than the real word
+    return hit / len(hw) + (0.01 * hit)
+
+
+def pick_sheet(text: str, tables: list[Table]) -> Table | None:
+    words = set(tokens(text))
+    best, score = None, 0
+    for t in tables:
+        key = [w for w in re.findall(r"[a-z0-9]+", t.name.lower()) if w not in ("data", "sheet", "sheets")]
+        if key and all(any(w == k or _close(w, [k]) for w in words) for k in key):
+            if len(key) > score:
+                best, score = t, len(key)
+    return best
+
+
+def columns_in(text: str, t: Table, kinds=None) -> list[tuple[int, float]]:
+    words = [w for w in tokens(text) if w not in STOP or w in ("total", "sales", "net")]
+    out = []
+    for i, h in enumerate(t.header):
+        if not h or (kinds and t.kind(i) not in kinds):
+            continue
+        s = _col_score(h, words)
+        if s >= 0.5:
+            if re.search(r"closing|current|final|balance", h, re.I):
+                s += 0.005                                 # "stock" usually means the stock now
+            out.append((i, s))
+    return sorted(out, key=lambda x: -x[1])
+
+
+def values_in(text: str, t: Table, skip_cols=()) -> list[tuple[int, str]]:
+    """'East', 'pending', 'Priya' mentioned in the question -> (column, value) filters."""
+    words = [w for w in tokens(text) if w not in STOP and len(w) >= 3]
+    raw = (text or "").lower()
+    found = []
+    for i, h in enumerate(t.header):
+        if i in skip_cols or t.kind(i) != "text":
+            continue
+        vals = {}
+        for v in t.col(i):
+            if isinstance(v, str) and v.strip():
+                vals.setdefault(v.strip().lower(), v.strip())
+            if len(vals) > 300:
+                break
+        if len(vals) > 300:
+            continue
+        for low, orig in vals.items():
+            if len(low) < 3:
+                continue
+            if (" " in low and low in raw) or any(w == low or (len(w) >= 5 and _close(w, [low], 0.85)) for w in words):
+                found.append((i, orig))
+        for low, orig in vals.items():                    # "IT", "HR": short values only when written in capitals
+            if len(low) == 2 and re.search(rf"\b{re.escape(orig.upper())}\b", text or ""):
+                found.append((i, orig))
+    # one value per column; prefer exact
+    seen, out = set(), []
+    for i, v in found:
+        if i not in seen:
+            seen.add(i)
+            out.append((i, v))
+    return out
+
+
+def _agg_of(text: str) -> str | None:
+    low = " " + (text or "").lower() + " "
+    ws = set(tokens(text))
+    has = lambda name: any((" " in w and f" {w} " in low) or w in ws for w in AGG_WORDS[name])  # noqa: E731
+    if has("sum") and has("count") and not has("avg") and not re.search(r"\b(sabse|highest|lowest|max|min|top)\b", low):
+        # "total sales kitni hai" is a total; "total orders kitne hain" is a count
+        return "count" if re.search(r"\b(kitne|how many|count|ginti)\b", low) and not re.search(
+            r"\b(sales|amount|salary|revenue|value|price|paisa|tax|bikri)\b", low) else "sum"
+    for name in ("avg", "max", "min", "count", "sum"):
+        for w in AGG_WORDS[name]:
+            if (" " in w and f" {w} " in low) or w in ws:
+                if name == "max" and w in ("zyada",) and "sabse" not in low and "top" not in low:
+                    continue
+                if name == "min" and w == "kam" and "sabse" not in low:
+                    continue
+                return name
+    return None
+
+
+# ------------------------------------------------------------------ understanding the question
+JOBS = [
+    ("aging", re.compile(r"\b(aging|ageing|overdue|kitne din se|days? (pending|unpaid|outstanding)|purane bill|bucket)\b", re.I)),
+    ("lookup", re.compile(r"\b(lookup|look up|vlookup|xlookup|fetch|le ?aao|lao|laao|bring|pull|match karke|nikaal ke daalo)\b", re.I)),
+    ("combine", re.compile(r"\b(combine|consolidate|merge|jodo|ek sheet|one sheet|stack|vstack|ek saath)\b.*\bsheets?\b|\bsheets?\b.*\b(combine|consolidate|merge|jodo|ek saath)\b", re.I)),
+    ("highlight", re.compile(r"\b(highlight|rang|colou?r|mark|laal|red|yellow|peela)\b", re.I)),
+    ("describe", re.compile(r"\b(kya hai is|kya kya hai|file mein kya|sheet mein kya|what.{0,10}(in|inside)|columns?|structure|samjhao|explain|kitni rows|how many rows|overview|summary of)\b", re.I)),
+]
+
+
+def understand(text: str, tables: list[Table]) -> dict:
+    if not tables:
+        raise NeedMore("Is file mein padhne layak koi sheet nahi mili.", "No readable sheet in this file.")
+    for job, rx in JOBS:
+        if rx.search(text or ""):
+            if job == "describe" and _agg_of(text) and not re.search(r"\b(columns?|structure|samjhao|explain|overview)\b", text, re.I):
+                continue
+            return globals()[f"_plan_{job}"](text, tables)
+    return _plan_question(text, tables)
+
+
+SHEET_HINTS = {"sales": {"bika", "bike", "biki", "bikti", "sold", "bikri", "becha", "orders", "order"},
+               "purchase": {"kharida", "khareeda", "bought", "purchase", "vendor", "vendors", "supplier"},
+               "employee": {"employee", "employees", "staff", "karmchari", "salary", "tankhwah", "log", "people", "log", "joining"},
+               "inventory": {"stock", "inventory", "reorder"}}
+
+
+def _choose_table(text, tables, need_kinds=None) -> Table:
+    t = pick_sheet(text, tables)
+    if t:
+        return t
+    words = set(tokens(text))
+    scored = []
+    for t in tables:
+        cols = columns_in(text, t, need_kinds)
+        hint = sum(1 for k, hw in SHEET_HINTS.items() if k in t.name.lower() and words & hw)
+        scored.append((sum(s for _, s in cols) + 0.5 * len(values_in(text, t)) + hint, len(t.rows), t))
+    scored.sort(key=lambda x: (-x[0], -x[1]))
+    if scored and scored[0][0] > 0 and (len(scored) == 1 or scored[0][0] > scored[1][0]):
+        return scored[0][2]
+    if scored and scored[0][0] > 0 and scored[0][1] >= 2 * max(scored[1][1], 1):
+        return scored[0][2]                               # same score: the main sheet (many more rows), not a sample tab
+    data = [t for t in tables if len(t.rows) >= 3]
+    if len(data) == 1:
+        return data[0]
+    raise NeedMore("Kis sheet mein dekhun?", "Which sheet should I look in?", [t.name for t in data][:8])
+
+
+def _plan_question(text, tables) -> dict:
+    agg = _agg_of(text)
+    t = _choose_table(text, tables)
+    num_cols = columns_in(text, t, {"number"})
+    txt_cols = columns_in(text, t, {"text"})
+    date_cols = [i for i in range(len(t.header)) if t.kind(i) == "date"]
+    filters = values_in(text, t)
+    group = None
+    m = GROUP_RE.search(text or "")
+    if m:
+        gword = next(g for g in m.groups() if g)
+        for i, h in enumerate(t.header):
+            if h and t.kind(i) == "text" and _col_score(h, [gword.lower()]) >= 0.5:
+                group = i
+                break
+    month_text = text or ""
+    for i, _ in num_cols:                                  # "Monthly Salary" is a column, not "month-wise"
+        month_text = re.sub(re.escape(t.header[i]), " ", month_text, flags=re.I)
+    if group is None and MONTH_RE.search(month_text) and date_cols:
+        group = ("month", (columns_in(text, t, {"date"}) or [(date_cols[0], 1)])[0][0])
+    if group is None and agg and txt_cols and re.search(r"\b(wise|har|per|each|by|hisaab|according)\b", text or "", re.I):
+        group = txt_cols[0][0]
+    if group is not None and not isinstance(group, tuple):
+        vals = [v for v in t.col(group) if v not in (None, "")]
+        if vals and len({str(v).strip().lower() for v in vals}) > 0.95 * len(vals):
+            group = None                                   # "top 5 orders": each order is its own row, so rank rows
+    filters = [(i, v) for i, v in filters if i != group]
+    if group is not None and not isinstance(group, tuple) and re.search(r"\bby\s+\w+", text or "", re.I) and \
+            any(i == group for i, _ in num_cols):
+        group = None
+    if group is None and _agg_of(text) in ("max", "min"):
+        # "which vendor has the highest invoice total": per vendor, then the top
+        strong = [i for i, sc in txt_cols if sc >= 1 and i not in [f for f, _ in filters]]
+        wm = re.search(r"\b(?:which|kaun|kaunsa|kaunse|kis|kisne|kiska|kiski)\s+(\w+)", text or "", re.I)
+        if wm:
+            named = [i for i in strong if _col_score(t.header[i], [wm.group(1).lower()]) >= 0.5]
+            strong = named + [i for i in strong if i not in named]
+        msr = num_cols[0][0] if num_cols else None
+        if msr is None and strong and wm:
+            sold = set(tokens(text)) & {"bika", "bike", "biki", "sold", "becha", "units", "pieces", "quantity", "qty"}
+            pat = r"qty|quantity|units" if sold else r"amount|total|net|sales|value"
+            msr = next((i for i in range(len(t.header)) if t.kind(i) == "number" and re.search(pat, t.header[i], re.I)), None)
+        if strong and wm and msr is not None:
+            return {"job": "aggregate", "table": t.name, "agg": "sum", "measure": msr, "group": strong[0],
+                    "filters": filters, "topn": 3, "ranked": _agg_of(text)}
+    topn = TOPN_RE.search(text or "")
+    topn = int(next(g for g in topn.groups() if g)) if topn else None
+    measure = num_cols[0][0] if num_cols else None
+    sold = set(tokens(text)) & {"bika", "bike", "biki", "sold", "becha", "units", "pieces", "nag"}
+    if agg == "count" and sold:
+        qty = next((i for i in range(len(t.header)) if t.kind(i) == "number" and re.search(r"qty|quantity|units", t.header[i], re.I)), None)
+        if qty is not None:
+            agg, measure = "sum", qty                    # "laptop kitne bike": units sold, not number of orders
+    if agg is None:
+        if topn and measure is not None:
+            agg = "max"
+        elif filters or re.search(r"\b(list|dikhao|show|kaun|kaunse|which|jinka|jinki|wale|wali)\b", text or "", re.I):
+            return {"job": "list", "table": t.name, "filters": filters, "measure": measure, "topn": topn}
+        elif group is not None and measure is not None:
+            agg = "sum"
+        else:
+            raise NeedMore("Main is file pe ye kar sakta hoon: total, ginti, average, sabse zyada/kam, X-wise summary, list, doosri sheet se value laana, "
+                           "aging, sheets jodna, rows highlight karna. Thoda batao kya chahiye, jaise: \"region wise total sales\".",
+                           "I can do totals, counts, averages, highest/lowest, X-wise summaries, lists, lookups from another sheet, aging, "
+                           "combining sheets and highlighting rows. Tell me which, e.g. \"total sales by region\".")
+    if agg in ("sum", "avg", "max", "min") and measure is None:
+        cands = [i for i in range(len(t.header)) if t.kind(i) == "number" and t.header[i]]
+        amountish = [i for i in cands if re.search(r"amount|total|net|sales|salary|price|value", t.header[i], re.I)]
+        if len(amountish) == 1 or (amountish and agg == "sum"):
+            measure = amountish[-1] if agg == "sum" else amountish[0]
+        else:
+            raise NeedMore(f"{t.name} mein kis column ka {_AGG_HI[agg]} chahiye?", f"Which column in {t.name} should I {_AGG_EN[agg]}?",
+                           [t.header[i] for i in cands][:8])
+    return {"job": "aggregate", "table": t.name, "agg": agg, "measure": measure, "group": group, "filters": filters, "topn": topn}
+
+
+_AGG_HI = {"sum": "total", "avg": "average", "max": "sabse zyada", "min": "sabse kam", "count": "ginti"}
+_AGG_EN = {"sum": "total", "avg": "average", "max": "find the highest of", "min": "find the lowest of", "count": "count"}
+
+
+def _plan_describe(text, tables):
+    t = pick_sheet(text, tables)
+    return {"job": "describe", "table": t.name if t else None}
+
+
+def _plan_aging(text, tables):
+    t = _choose_table(text, tables)
+    dates = columns_in(text, t, {"date"}) or [(i, 1) for i in range(len(t.header)) if t.kind(i) == "date"]
+    if not dates:
+        raise NeedMore(f"{t.name} mein koi date column nahi mila; aging ke liye bill/invoice ki date chahiye.",
+                       f"{t.name} has no date column; aging needs the invoice date.")
+    nums = columns_in(text, t, {"number"})
+    amount = nums[0][0] if nums else next((i for i in range(len(t.header)) if t.kind(i) == "number"
+                                          and re.search(r"total|amount|value|net", t.header[i], re.I)), None)
+    return {"job": "aging", "table": t.name, "date": dates[0][0], "amount": amount, "filters": values_in(text, t)}
+
+
+def _plan_lookup(text, tables):
+    named = [t for t in tables if pick_sheet(t.name, [t]) and pick_sheet(text, [t])]
+    if len(named) < 2:
+        raise NeedMore("Kis sheet se kis sheet mein laana hai? Dono sheets ke naam likho, jaise: \"Purchase Data se unit price Sales Data mein laao\".",
+                       "From which sheet into which? Name both, e.g. \"bring unit price from Purchase Data into Sales Data\".",
+                       [t.name for t in tables][:8])
+    low = (text or "").lower()
+    pos = {t.name: min((low.find(w) for w in re.findall(r"[a-z0-9]+", t.name.lower()) if w not in ("data", "sheet") and low.find(w) >= 0), default=999)
+           for t in named}
+    m = re.search(r"\b(\w[\w ]*?)\s+se\b", low)
+    src = None
+    for t in named:
+        key = [w for w in re.findall(r"[a-z0-9]+", t.name.lower()) if w not in ("data", "sheet")]
+        if re.search(r"\b(from|se)\b", low) and any(re.search(rf"\b(from\s+(the\s+)?{k}|{k}\w*\s+(data\s+)?(sheet\s+)?se)\b", low) for k in key):
+            src = t
+    if src is None:
+        src = sorted(named, key=lambda t: pos[t.name])[-1]
+    dst = next(t for t in named if t is not src)
+    want = [i for i, _ in columns_in(text, src) if not any(_col_score(dst.header[j], _header_words(src.header[i])) >= 1 for j in range(len(dst.header)) if dst.header[j])]
+    if not want:
+        raise NeedMore(f"{src.name} se kaunsa column laana hai?", f"Which column should I bring from {src.name}?", [h for h in src.header if h][:8])
+    key = _join_key(dst, src)
+    if key is None:
+        raise NeedMore(f"{dst.name} aur {src.name} mein koi milta-julta column nahi mila (jaise Item Code). Kaunse column se milaun?",
+                       f"No matching column between {dst.name} and {src.name} (like Item Code). Which column should I match on?",
+                       [h for h in dst.header if h][:8])
+    return {"job": "lookup", "table": dst.name, "source": src.name, "key": key, "want": want[0]}
+
+
+def _join_key(dst: Table, src: Table):
+    best, score = None, 0.0
+    for i, h in enumerate(dst.header):
+        if not h or dst.kind(i) in ("number", "date", "empty"):
+            continue
+        dvals = {str(v).strip().lower() for v in dst.col(i) if v not in (None, "")}
+        if not dvals:
+            continue
+        for j, h2 in enumerate(src.header):
+            if not h2 or src.kind(j) in ("date", "empty"):
+                continue
+            svals = {str(v).strip().lower() for v in src.col(j) if v not in (None, "")}
+            overlap = len(dvals & svals) / len(dvals)
+            if overlap > score:
+                best, score = (i, j), overlap
+    return best if score >= 0.5 else None
+
+
+def _plan_combine(text, tables):
+    named = [t for t in tables if pick_sheet(text, [t])]
+    groups = defaultdict(list)
+    for t in (named or tables):
+        groups[tuple(h.strip().lower() for h in t.header if h)].append(t)
+    same = max(groups.values(), key=len)
+    if len(same) < 2:
+        raise NeedMore("Jodne ke liye kam se kam 2 sheets mein same columns chahiye; is file mein aisi sheets nahi hain.",
+                       "Combining needs at least 2 sheets with the same columns; this file has none.")
+    return {"job": "combine", "tables": [t.name for t in same]}
+
+
+_LESS = re.compile(r"\b(kam|less|below|under|neeche|chhota|chota|lower|<)\b|<", re.I)
+_MORE = re.compile(r"\b(zyada|jyada|more|above|over|upar|bada|greater|higher|>)\b|>", re.I)
+
+
+def _plan_highlight(text, tables):
+    t = _choose_table(text, tables, {"number"})
+    nums = columns_in(text, t, {"number"})
+    filters = values_in(text, t)
+    op = "<" if _LESS.search(text or "") else (">" if _MORE.search(text or "") else None)
+    number = re.findall(r"(?<![\w.])(\d[\d,]*(?:\.\d+)?)\s*(k|lakh|lac|hazar|hazaar|thousand)?\b", text or "")
+    if filters and not op:
+        return {"job": "highlight", "table": t.name, "filters": filters}
+    if op and nums and number:
+        n, unit = number[-1]
+        val = float(n.replace(",", "")) * {"k": 1e3, "lakh": 1e5, "lac": 1e5, "hazar": 1e3, "hazaar": 1e3, "thousand": 1e3}.get(unit.lower(), 1)
+        return {"job": "highlight", "table": t.name, "left": nums[0][0], "op": op, "right_val": val}
+    if op and len(nums) >= 2:
+        return {"job": "highlight", "table": t.name, "left": nums[0][0], "op": op, "right_col": nums[1][0]}
+    if op and nums and number:
+        n, unit = number[-1]
+        val = float(n.replace(",", "")) * {"k": 1e3, "lakh": 1e5, "lac": 1e5, "hazar": 1e3, "hazaar": 1e3, "thousand": 1e3}.get(unit.lower(), 1)
+        return {"job": "highlight", "table": t.name, "left": nums[0][0], "op": op, "right_val": val}
+    raise NeedMore("Kaunsi rows highlight karun? Jaise: \"jahan closing stock reorder level se kam hai\" ya \"net sales 10000 se zyada\".",
+                   "Which rows should I highlight? E.g. \"where closing stock is below reorder level\" or \"net sales above 10000\".")
+
+
+# ------------------------------------------------------------------ doing it
+def _num(v):
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
+def _match_filters(row, filters):
+    return all(isinstance(row[i] if i < len(row) else None, str) and row[i].strip().lower() == v.lower() for i, v in filters)
+
+
+def _fmt(n):
+    if n is None:
+        return "-"
+    if isinstance(n, float) and not n.is_integer():
+        n = round(n, 2)
+    if isinstance(n, float):
+        n = int(n)
+    s = str(abs(n))
+    if isinstance(n, int) and len(s) > 3:                 # Indian grouping: 12,34,567
+        head, tail = s[:-3], s[-3:]
+        head = ",".join(re.findall(r"\d{1,2}(?=(?:\d{2})*$)", head))
+        s = f"{head},{tail}"
+    return ("-" if n < 0 else "") + s
+
+
+def _label(t: Table):
+    """The column that names a row: a filled 'Name' column, else first + last name, else the first text column."""
+    names = [i for i, h in enumerate(t.header) if h and re.search(r"name", h, re.I) and t.kind(i) == "text"]
+    first = next((i for i in names if re.search(r"first", t.header[i], re.I)), None)
+    last = next((i for i in names if re.search(r"last|sur", t.header[i], re.I)), None)
+    full = [i for i in names if i not in (first, last)]
+    if full:
+        return full[0]
+    if first is not None:
+        return (first, last)
+    return next((i for i in range(len(t.header)) if t.kind(i) == "text" and t.header[i]), 0)
+
+
+def _name(t, r, label) -> str:
+    if isinstance(label, tuple):
+        return " ".join(str(r[i]) for i in label if i is not None and i < len(r) and r[i])
+    return str(r[label]) if label < len(r) else ""
+
+
+def _crit(t: Table, filters):
+    return "".join(f',{t.ref(i)},"{v}"' for i, v in filters)
+
+
+def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:
+    """Do the plan on a copy of the file (new sheet / new column / colours). Returns {'say', 'formula', 'sheet'}."""
+    tables = {t.name: t for t in load_tables(path)}
+    wb = load_workbook(path, keep_vba=path.lower().endswith(".xlsm")) if path.lower().endswith((".xlsx", ".xlsm")) else None
+    job = plan["job"]
+    res = globals()[f"_run_{job}"](plan, tables, wb, hi, n)
+    if wb is not None:
+        wb.calculation.fullCalcOnLoad = True
+        wb.save(out)
+    return res
+
+
+def _answer_sheet(wb, n, title):
+    name = f"Answer {n} - {title}"[:31]
+    name = re.sub(r"[\[\]:*?/\\]", "", name)
+    ws = wb.create_sheet(name, 0)
+    return ws, name
+
+
+def _write_table(ws, header, rows, formula_note=None):
+    ws.append(header)
+    for c in ws[1]:
+        c.font = Font(bold=True)
+    for r in rows:
+        ws.append(list(r))
+    if formula_note:
+        ws.append([])
+        ws.append(["Excel formula:", formula_note])
+    for i, h in enumerate(header, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = max(12, min(40, len(str(h)) + 4))
+
+
+def _run_aggregate(p, tables, wb, hi, n):
+    t = tables[p["table"]]
+    agg, m, g, filters, topn = p["agg"], p["measure"], p["group"], p["filters"], p["topn"]
+    rows = [r for r in t.rows if _match_filters(r, filters)]
+    mname = t.header[m] if m is not None and agg != "count" else "rows"
+    fdesc = ", ".join(f"{t.header[i]} = {v}" for i, v in filters)
+
+    def calc(vals):
+        nums = [x for x in (_num(v) for v in vals) if x is not None]
+        if agg == "count":
+            return len(vals)
+        if not nums:
+            return None
+        return {"sum": sum(nums), "avg": sum(nums) / len(nums), "max": max(nums), "min": min(nums)}[agg]
+
+    crit = _crit(t, filters)
+    fn = {"sum": "SUMIFS" if filters else "SUM", "avg": "AVERAGEIFS" if filters else "AVERAGE", "max": "MAXIFS" if filters else "MAX",
+          "min": "MINIFS" if filters else "MIN", "count": "COUNTIFS" if filters else "COUNTA"}[agg]
+    if g is None:
+        if agg in ("max", "min") and m is not None and (topn or True):
+            ranked = sorted([r for r in rows if _num(r[m]) is not None], key=lambda r: r[m], reverse=agg == "max")[: (topn or 1)]
+            label = _label(t)
+            val = ranked[0][m] if ranked else None
+            formula = f"={fn}({t.ref(m)}{crit})"
+            if ranked and topn:
+                formula = f"=TAKE(SORT(FILTER({t.ref(0)[:t.ref(0).index('!') + 1]}A{t.header_row + 1}:{get_column_letter(len(t.header))}{t.header_row + len(t.rows)},{t.ref(m)}<>\"\"),{m + 1},{-1 if agg == 'max' else 1}),{topn})"
+            if wb is not None:
+                ws, sname = _answer_sheet(wb, n, f"{'Top' if agg == 'max' else 'Lowest'} {mname}")
+                _write_table(ws, t.header, ranked, formula)
+            who = ", ".join(f"{_name(t, r, label)} ({_fmt(r[m])})" for r in ranked[:5])
+            say = (f"{t.name}{' (' + fdesc + ')' if fdesc else ''}: {_AGG_HI[agg]} {mname} = {_fmt(val)}. {who}" if hi else
+                   f"{t.name}{' (' + fdesc + ')' if fdesc else ''}: {'highest' if agg == 'max' else 'lowest'} {mname} = {_fmt(val)}. {who}")
+            return {"say": say, "formula": formula, "sheet": sname if wb is not None else None}
+        val = calc([r[m] for r in rows] if m is not None else rows)
+        target = t.ref(m) if m is not None else t.ref(0)
+        formula = f"={fn}({target}{crit})" if filters or agg != "count" else f"=COUNTA({t.ref(0)})"
+        if agg == "count" and filters:
+            formula = f"=COUNTIFS({crit[1:]})"
+        if wb is not None:
+            ws, sname = _answer_sheet(wb, n, f"{_AGG_EN[agg].split()[-1].title()} {mname}")
+            _write_table(ws, ["Kya (what)", "Jawab (answer)"], [[f"{_AGG_EN[agg]} {mname}{' (' + fdesc + ')' if fdesc else ''}", val]], formula)
+        what = f"{_AGG_HI[agg]} {mname}" if hi else f"{_AGG_EN[agg]} {mname}".replace("count rows", "number of rows")
+        say = f"{t.name}{' (' + fdesc + ')' if fdesc else ''}: {what} = {_fmt(val)}"
+        if t.truncated:
+            say += " (sirf pehli 5 lakh rows)" if hi else " (first 5 lakh rows only)"
+        return {"say": say, "formula": formula, "sheet": sname if wb is not None else None}
+
+    # X-wise / month-wise
+    buckets = defaultdict(list)
+    if isinstance(g, tuple):
+        gname = "Month"
+        for r in rows:
+            d = r[g[1]] if g[1] < len(r) else None
+            if isinstance(d, (datetime, date)):
+                buckets[d.strftime("%Y-%m")].append(r[m] if m is not None else 1)
+        keys = sorted(buckets)
+        formula = (f'=SUMPRODUCT((TEXT({t.ref(g[1])},"yyyy-mm")=A2)*{t.ref(m)})' if agg == "sum" and m is not None else
+                   f'=SUMPRODUCT(--(TEXT({t.ref(g[1])},"yyyy-mm")=A2))')
+    else:
+        gname = t.header[g]
+        for r in rows:
+            k = r[g] if g < len(r) else None
+            if k not in (None, ""):
+                buckets[str(k).strip()].append(r[m] if m is not None else 1)
+        keys = list(buckets)
+        fn2 = {"sum": "SUMIFS", "avg": "AVERAGEIFS", "max": "MAXIFS", "min": "MINIFS", "count": "COUNTIFS"}[agg]
+        formula = (f"=UNIQUE({t.ref(g)}) in A2, then in B2: " +
+                   (f"={fn2}({t.ref(m)},{t.ref(g)},A2{crit})" if agg != "count" else f"=COUNTIFS({t.ref(g)},A2{crit})"))
+    table = [(k, calc(buckets[k])) for k in keys]
+    if not isinstance(g, tuple):
+        table.sort(key=lambda x: -(x[1] or 0))
+    if topn:
+        table = table[:topn]
+    if wb is not None:
+        ws, sname = _answer_sheet(wb, n, f"{mname} by {gname}")
+        _write_table(ws, [gname, f"{_AGG_EN[agg].split()[-1].title()} {mname}"], table, formula)
+    if p.get("ranked"):
+        table.sort(key=lambda x: (x[1] or 0), reverse=p["ranked"] == "max")
+        table = table[:3]
+        best = table[0] if table else ("-", None)
+        say = (f"{t.name}: sabse {'zyada' if p['ranked'] == 'max' else 'kam'} {mname} {best[0]} ka hai ({_fmt(best[1])}). "
+               + "; ".join(f"{k}: {_fmt(v)}" for k, v in table) if hi else
+               f"{t.name}: {best[0]} has the {'highest' if p['ranked'] == 'max' else 'lowest'} {mname} ({_fmt(best[1])}). "
+               + "; ".join(f"{k}: {_fmt(v)}" for k, v in table))
+        if wb is not None:
+            ws, sname = _answer_sheet(wb, n, f"{mname} by {gname}")
+            _write_table(ws, [gname, f"Total {mname}"], table, formula)
+        return {"say": say, "formula": formula, "sheet": sname if wb is not None else None}
+    lines = "; ".join(f"{k}: {_fmt(v)}" for k, v in table[:8])
+    more = f" (+{len(table) - 8})" if len(table) > 8 else ""
+    say = (f"{t.name}{' (' + fdesc + ')' if fdesc else ''}, {gname} wise {_AGG_HI[agg]} {mname}: {lines}{more}" if hi else
+           f"{t.name}{' (' + fdesc + ')' if fdesc else ''}, {_AGG_EN[agg]} {mname} by {gname}: {lines}{more}")
+    return {"say": say, "formula": formula, "sheet": sname if wb is not None else None}
+
+
+def _run_list(p, tables, wb, hi, n):
+    t = tables[p["table"]]
+    rows = [r for r in t.rows if _match_filters(r, p["filters"])]
+    if p.get("measure") is not None and p.get("topn"):
+        rows = sorted([r for r in rows if _num(r[p["measure"]]) is not None], key=lambda r: -r[p["measure"]])[: p["topn"]]
+    fdesc = ", ".join(f"{t.header[i]} = {v}" for i, v in p["filters"]) or ("sab" if hi else "all")
+    span = f"{t.ref(0)[:t.ref(0).index('!') + 1]}A{t.header_row + 1}:{get_column_letter(len(t.header))}{t.header_row + len(t.rows)}"
+    cond = "*".join(f'({t.ref(i)}="{v}")' for i, v in p["filters"]) or "TRUE"
+    formula = f"=FILTER({span},{cond})"
+    sname = None
+    if wb is not None:
+        ws, sname = _answer_sheet(wb, n, f"List {fdesc}")
+        _write_table(ws, t.header, rows, formula)
+    label = _label(t)
+    names = ", ".join(_name(t, r, label) for r in rows[:10])
+    say = (f"{t.name} ({fdesc}): {len(rows)} rows. {names}{' …' if len(rows) > 10 else ''}" if hi else
+           f"{t.name} ({fdesc}): {len(rows)} rows. {names}{' …' if len(rows) > 10 else ''}")
+    return {"say": say, "formula": formula, "sheet": sname}
+
+
+def _run_describe(p, tables, wb, hi, n):
+    ts = [tables[p["table"]]] if p.get("table") else list(tables.values())
+    parts = []
+    for t in ts:
+        cols = ", ".join(f"{h} ({ {'number': 'number', 'date': 'date', 'text': 'text', 'empty': 'khaali' if hi else 'empty'}[t.kind(i)]})"
+                         for i, h in enumerate(t.header) if h)
+        parts.append(f"{t.name}: {len(t.rows)} rows; {cols}")
+    return {"say": " | ".join(parts), "formula": "", "sheet": None}
+
+
+def _run_aging(p, tables, wb, hi, n):
+    t = tables[p["table"]]
+    today = date.today()
+    di, ai = p["date"], p["amount"]
+    order = ["0-30", "31-60", "61-90", "90+"]
+    rows, summary = [], {b: [0, 0] for b in order}
+    for r in t.rows:
+        if not _match_filters(r, p["filters"]):
+            continue
+        d = r[di] if di < len(r) else None
+        if not isinstance(d, (datetime, date)):
+            continue
+        days = (today - (d.date() if isinstance(d, datetime) else d)).days
+        b = "0-30" if days <= 30 else "31-60" if days <= 60 else "61-90" if days <= 90 else "90+"
+        amt = _num(r[ai]) if ai is not None and ai < len(r) else None
+        summary[b][0] += 1
+        summary[b][1] += amt or 0
+        rows.append(list(r) + [days, b])
+    c = get_column_letter(di + 1)
+    formula = f'=TODAY()-{c}{t.header_row + 1}  then  =IF(X2<=30,"0-30",IF(X2<=60,"31-60",IF(X2<=90,"61-90","90+")))'
+    sname = None
+    if wb is not None:
+        ws, sname = _answer_sheet(wb, n, "Aging")
+        _write_table(ws, ["Bucket (days)", "Count", t.header[ai] if ai is not None else "Amount"], [(b, *summary[b]) for b in order])
+        ws.append([])
+        ws.append(t.header + ["Days", "Bucket"])
+        for r in rows:
+            ws.append(r)
+        ws.append([])
+        ws.append(["Excel formula:", formula])
+    lines = "; ".join(f"{b} din: {summary[b][0]} ({_fmt(summary[b][1])})" if hi else f"{b} days: {summary[b][0]} ({_fmt(summary[b][1])})" for b in order)
+    say = (f"{t.name} aging (aaj {today:%d-%b-%Y} tak, {t.header[di]} se): {lines}" if hi else
+           f"{t.name} aging (as of {today:%d-%b-%Y}, from {t.header[di]}): {lines}")
+    return {"say": say, "formula": formula, "sheet": sname}
+
+
+def _run_lookup(p, tables, wb, hi, n):
+    dst, src = tables[p["table"]], tables[p["source"]]
+    ki, kj = p["key"]
+    wj = p["want"]
+    index = {}
+    for r in src.rows:
+        k = r[kj] if kj < len(r) else None
+        if k not in (None, ""):
+            index.setdefault(str(k).strip().lower(), r[wj] if wj < len(r) else None)
+    found = missing = 0
+    col_letter = get_column_letter(len(dst.header) + 1)
+    k_letter = get_column_letter(ki + 1)
+    first = dst.header_row + 1
+    formula = (f"=IFERROR(INDEX({src.ref(wj)},MATCH({k_letter}{first},{src.ref(kj)},0)),\"Not found\")")
+    if wb is not None:
+        ws = wb[dst.name]
+        hdr_cell = ws.cell(dst.header_row, len(dst.header) + 1, f"{src.header[wj]} (from {src.name})")
+        hdr_cell.font = Font(bold=True)
+        r_i = first
+        for row in ws.iter_rows(min_row=first, max_row=ws.max_row):
+            k = row[ki].value if ki < len(row) else None
+            if k in (None, ""):
+                continue
+            ws.cell(row[0].row, len(dst.header) + 1, formula.replace(f"{k_letter}{first}", f"{k_letter}{row[0].row}"))
+            if str(k).strip().lower() in index:
+                found += 1
+            else:
+                missing += 1
+            r_i += 1
+    say = (f"{dst.name} mein naya column {col_letter} \"{src.header[wj]} (from {src.name})\" jod diya, {dst.header[ki]} ko {src.name} ke "
+           f"{src.header[kj]} se milake. {found} rows mein value mili, {missing} mein nahi (wahan \"Not found\")." if hi else
+           f"Added column {col_letter} \"{src.header[wj]} (from {src.name})\" to {dst.name}, matching {dst.header[ki]} with {src.name}'s "
+           f"{src.header[kj]}. Found for {found} rows, not found for {missing} (shown as \"Not found\").")
+    return {"say": say, "formula": formula, "sheet": dst.name}
+
+
+def _run_combine(p, tables, wb, hi, n):
+    ts = [tables[name] for name in p["tables"]]
+    total = sum(len(t.rows) for t in ts)
+    formula = "=VSTACK(" + ",".join(f"{t.ref(0)[:t.ref(0).index('!') + 1]}A{t.header_row + 1}:{get_column_letter(len(t.header))}{t.header_row + len(t.rows)}" for t in ts) + ")"
+    sname = None
+    if wb is not None:
+        ws, sname = _answer_sheet(wb, n, "Combined")
+        _write_table(ws, ts[0].header + ["From sheet"], [list(r) + [t.name] for t in ts for r in t.rows], formula)
+    say = (f"{', '.join(p['tables'])} ko ek sheet \"{sname}\" mein jod diya: {total} rows, har row ke saath uski sheet ka naam." if hi else
+           f"Combined {', '.join(p['tables'])} into one sheet \"{sname}\": {total} rows, each with the sheet it came from.")
+    return {"say": say, "formula": formula, "sheet": sname}
+
+
+def _run_highlight(p, tables, wb, hi, n):
+    t = tables[p["table"]]
+    first, last = t.header_row + 1, t.header_row + len(t.rows)
+    end = get_column_letter(len(t.header))
+    if "filters" in p:
+        cond = "AND(" + ",".join(f'${get_column_letter(i + 1)}{first}="{v}"' for i, v in p["filters"]) + ")"
+        hits = sum(1 for r in t.rows if _match_filters(r, p["filters"]))
+        what = ", ".join(f"{t.header[i]} = {v}" for i, v in p["filters"])
+    else:
+        L = f"${get_column_letter(p['left'] + 1)}{first}"
+        R = f"${get_column_letter(p['right_col'] + 1)}{first}" if "right_col" in p else _fmt(p["right_val"]).replace(",", "")
+        cond = f"{L}{p['op']}{R}"
+        hits = 0
+        for r in t.rows:
+            a = _num(r[p["left"]]) if p["left"] < len(r) else None
+            b = _num(r[p["right_col"]]) if "right_col" in p and p["right_col"] < len(r) else p.get("right_val")
+            if a is not None and b is not None and (a < b if p["op"] == "<" else a > b):
+                hits += 1
+        rname = t.header[p["right_col"]] if "right_col" in p else _fmt(p["right_val"])
+        what = f"{t.header[p['left']]} {p['op']} {rname}"
+    if wb is not None:
+        wb[t.name].conditional_formatting.add(f"A{first}:{end}{last}",
+                                              FormulaRule(formula=[cond], fill=PatternFill("solid", start_color="FFF2CC", end_color="FFF2CC")))
+    say = (f"{t.name} mein {hits} rows highlight kar di (peela rang) jahan {what}. Ye rule live hai: data badlega to rang bhi badlega." if hi else
+           f"Highlighted {hits} rows in {t.name} (yellow) where {what}. The rule is live: change the data and the colour follows.")
+    return {"say": say, "formula": f"Conditional formatting rule: ={cond}", "sheet": t.name}

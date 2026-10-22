@@ -1169,6 +1169,7 @@
       remove_duplicates: T(hi, "duplicate rows hatayi", "duplicate rows removed"),
       fix_case: T(hi, "cells mein capital/small letters ek jaise kiye", "cells made to use the same spelling"),
       list_duplicates: T(hi, "duplicate nayi sheet mein list kiye (data nahi badla)", "duplicates listed in a new sheet (data unchanged)"),
+      answer: T(hi, "sawaal ka jawab nayi sheet mein", "answer added as a new sheet"),
     };
     let watching = "";
 
@@ -1202,6 +1203,17 @@
           : T(hi, `${g.sheet}: ${fmt(g.count)} baar same ${g.what}`, `${g.sheet}: same ${g.what} used ${fmt(g.count)} more times`)));
         if (!r.count) ul.append(el("li", null, T(hi, "Koi duplicate nahi mila.", "No duplicates found.")));
         parts.push(ul, el("p", "fine small", T(hi, "Aapka data nahi badla. \"Duplicates (Goal Engine)\" sheet file ki pehli sheet hai.", "Your data wasn't changed. The \"Duplicates (Goal Engine)\" sheet is the first sheet in the file.")));
+      }
+      if (r.task === "ask") {
+        parts.push(el("p", "cap", T(hi, "Jawab", "Answer")), el("p", "answer", r.say));
+        if (r.formula) {
+          const fx = el("div", "formula");
+          const code = el("code", null, r.formula);
+          const copy = el("button", "btn", T(hi, "Formula copy karo", "Copy formula")); copy.type = "button";
+          copy.addEventListener("click", () => { navigator.clipboard && navigator.clipboard.writeText(r.formula); copy.textContent = T(hi, "Copy ho gaya", "Copied"); });
+          fx.append(code, copy);
+          parts.push(fx);
+        }
       }
       if (r.task === "undo") parts.push(el("p", "fine", T(hi, "Aakhri badlav wapas le liya.", "The last change was undone.")));
       if (r.task === "compare") {

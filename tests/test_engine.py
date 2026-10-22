@@ -151,3 +151,13 @@ def test_page_and_health(client, use_provider):
     use_provider(FakeProvider(answers=[]))
     assert "Say what you need" in client.get("/").text
     assert client.get("/api/health").json()["ok"] is True
+
+
+def test_another_website_keeps_the_website_agent(client, ml_mode):
+    from tests.test_ml import say
+
+    r = say(client, "meri website slow hai")
+    goal_id = r["goal"]["id"]
+    r = say(client, "koi or website check kr skte hai abi", goal_id)
+    assert r["goal"]["id"] == goal_id
+    assert "address" in r["reply"].lower(), r["reply"]

@@ -161,7 +161,7 @@ def test_php_file_hides_password_columns(wp_site, env):
     url = f"{wp_site.base}/m.php"
     import subprocess as sp
     sp.run(["mysql", "-e", "USE shop_db; CREATE TABLE IF NOT EXISTS wp_users (ID INT PRIMARY KEY, user_login VARCHAR(50), "
-            "user_pass VARCHAR(255), user_email VARCHAR(100)); REPLACE INTO wp_users VALUES (1,'admin','$P$Bsecrethash','a@b.com');"])
+            "user_pass VARCHAR(255), user_email VARCHAR(100)); REPLACE INTO wp_users (ID, user_login, user_pass, user_email) VALUES (1,'admin','$P$Bsecrethash','a@b.com');"])
     q = phpconn.call(url, key, "query", {"sql": "SELECT * FROM wp_users", "limit": 5})
     assert q["ok"] and "secrethash" not in str(q) and q["result"]["rows"][0][1] == "admin"
     import gzip

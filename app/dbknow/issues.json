@@ -209,7 +209,12 @@
       "website hack ho gayi hai",
       "site hack ho gaya",
       "वेबसाइट हैक हो गई है",
-      "my site has been hacked check the database"
+      "my site has been hacked check the database",
+      "how do i check if someone broke into my db",
+      "find out if an intruder was inside my database",
+      "mujhe shak hai koi database mein ghus gaya tha",
+      "check karo kisi ne mere database mein ghuspaith ki ya nahi",
+      "क्या किसी ने मेरे डेटाबेस में घुसपैठ की"
     ],
     "diagnose": [
       {
@@ -2035,6 +2040,1694 @@
       "visitors see strange pop up ads but our developer says the files are clean",
       "site pe ajeeb pop up ads aa rahe hain, developer bolta hai files theek hain",
       "साइट पर अजीब पॉपअप विज्ञापन आते हैं फाइलें ठीक हैं"
+    ]
+  },
+  {
+    "id": "hacked-how-did-they-get-in",
+    "title_en": "How did the hacker get into my database? (find the way in before cleaning)",
+    "title_hi": "Hacker database mein ghusa kaise? (saaf karne se pehle raasta dhundo)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "how did the hacker get into my database",
+      "how did they get access to my db",
+      "which way did the attacker come in",
+      "hacker andar kaise aaya database mein",
+      "database ka password hacker ko kaise mila",
+      "kis raste se hack hua pata karna hai",
+      "find the root cause of the database hack",
+      "we cleaned it but it got hacked again, how are they getting in",
+      "baar baar hack ho raha hai, wo andar kaise aa raha hai",
+      "हैकर डेटाबेस में कैसे घुसा",
+      "हैक किस रास्ते से हुआ पता करना है",
+      "entry point of the breach",
+      "how was my site's database compromised in the first place",
+      "kaise pata kare ki hack ki shuruaat kahan se hui",
+      "from where did the attacker enter",
+      "which route did the intruder use to reach our data",
+      "hacker kahan se ghusa ye jaanna hai",
+      "hacker ne andar aane ka raasta kaise banaya",
+      "attacker ne pahunch kaise banayi hamare data tak",
+      "हैकर कहां से अंदर आया ये जानना है",
+      "हैकर ने अंदर आने का रास्ता कैसे बनाया",
+      "how was the breach possible, what was the weak spot"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT USER, HOST, CURRENT_CONNECTIONS, TOTAL_CONNECTIONS FROM performance_schema.accounts WHERE USER IS NOT NULL ORDER BY TOTAL_CONNECTIONS DESC",
+        "look_for": "an account that logged in from a host/IP that is not your web server: the password was used from outside (leaked or guessed)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'port', 'require_secure_transport', 'general_log', 'log_error')",
+        "look_for": "bind_address 0.0.0.0 or * means the database listens on every network; no general log means there is no record of what was run"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT SCHEMA_NAME, LEFT(DIGEST_TEXT, 200) AS query_shape, COUNT_STAR, SUM_ERRORS, FIRST_SEEN, LAST_SEEN FROM performance_schema.events_statements_summary_by_digest WHERE SUM_ERRORS > 0 ORDER BY SUM_ERRORS DESC LIMIT 20",
+        "look_for": "many failing query shapes from the website's database, or shapes that read information_schema: a sign someone was probing the site through a form or URL"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT usename, client_addr, application_name, backend_start FROM pg_stat_activity WHERE backend_type = 'client backend' ORDER BY backend_start",
+        "look_for": "connections from an IP that is not your app server"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'ssl', 'password_encryption', 'log_connections', 'log_statement')",
+        "look_for": "listen_addresses '*' with weak passwords is the most common way in; log_connections off means logins are not recorded"
+      }
+    ],
+    "causes": [
+      {
+        "id": "sqli",
+        "title_en": "SQL injection through a form, search box or URL of the website/app",
+        "title_hi": "Website/app ke form, search box ya URL se SQL injection"
+      },
+      {
+        "id": "leaked_config",
+        "title_en": "Database password leaked from a config file (.env, wp-config.php, a backup in the web folder, a public git repo)",
+        "title_hi": "Config file se database password leak hua (.env, wp-config.php, web folder mein pada backup, public git repo)"
+      },
+      {
+        "id": "weak_password",
+        "title_en": "Weak, default or reused password guessed or taken from another breach",
+        "title_hi": "Kamzor, default ya dusri jagah use hua password guess ho gaya"
+      },
+      {
+        "id": "open_port",
+        "title_en": "Database port (3306/5432) open to the whole internet",
+        "title_hi": "Database port (3306/5432) poore internet ke liye khula"
+      },
+      {
+        "id": "outdated_software",
+        "title_en": "Outdated CMS, plugin, theme or admin tool (phpMyAdmin/Adminer) with a known hole",
+        "title_hi": "Purana CMS, plugin, theme ya admin tool (phpMyAdmin/Adminer) jisme jaana-maana chhed hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "sqli",
+        "action": "code",
+        "steps_en": "Find the page from the web server access log at the time of the hack and change its code to use prepared statements (parameterised queries). See the SQL injection playbook.",
+        "steps_hi": "Hack ke time ka web server access log dekh ke page dhundo aur uska code prepared statements (parameterised queries) wala karo. SQL injection playbook dekho."
+      },
+      {
+        "cause": "leaked_config",
+        "action": "advice",
+        "steps_en": "Block public access to config/backup files, remove backups and .git from the web folder, then change the database password and update the app config.",
+        "steps_hi": "Config/backup files ka public access band karo, web folder se backups aur .git hatao, phir database password badlo aur app config update karo."
+      },
+      {
+        "cause": "weak_password",
+        "action": "config",
+        "steps_en": "Give every database account a long unique password (a password manager can generate it) and turn on a password-strength check.",
+        "steps_hi": "Har database account ko lamba aur alag password do (password manager bana dega) aur password-strength check on karo."
+      },
+      {
+        "cause": "open_port",
+        "action": "config",
+        "steps_en": "Make the database listen only on localhost/private network and allow the port only from your app server in the firewall.",
+        "steps_hi": "Database ko sirf localhost/private network par sunne do aur firewall mein port sirf app server ke liye kholo."
+      },
+      {
+        "cause": "outdated_software",
+        "action": "advice",
+        "steps_en": "Update the CMS, plugins, themes and admin tools; remove the ones you don't use (especially an old phpMyAdmin on a public URL).",
+        "steps_hi": "CMS, plugins, themes aur admin tools update karo; jo use nahi hote unhe hatao (khaas kar public URL par pada purana phpMyAdmin)."
+      }
+    ],
+    "verify": {
+      "en": "You can name the way in, it is closed, and the database shows no new logins from unknown hosts for two weeks.",
+      "hi": "Aap bata sakte ho ki hacker kis raste aaya, wo raasta band hai, aur do hafte tak anjaan host se koi naya login nahi dikhta."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.4/en/security-against-attack.html",
+    "seen_at": [
+      "https://wordpress.org/documentation/article/faq-my-site-was-hacked/",
+      "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html",
+      "https://wordpress.org/support/topic/my-site-keeps-getting-hacked-over-and-over-again/",
+      "https://www.helpnetsecurity.com/2024/01/18/postgresql-mysql-ransomware-bot/"
+    ],
+    "test_phrases": [
+      "i need to know from where the hacker entered our database",
+      "pata karna hai hacker ne hamare database tak pahunch kaise banayi",
+      "हमें जानना है कि हैकर हमारे डेटाबेस तक कैसे पहुंचा"
+    ]
+  },
+  {
+    "id": "hacked-sql-injection-signs",
+    "title_en": "Signs of SQL injection (someone attacking the database through the website)",
+    "title_hi": "SQL injection ke nishaan (koi website ke through database par hamla kar raha hai)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "is someone doing sql injection on my website",
+      "sql injection attack signs in logs",
+      "strange queries in the database log from the website",
+      "access log mein ajeeb URL hain jinme sql likha hai",
+      "lagta hai koi sql injection kar raha hai",
+      "website ke search box se database hack hua",
+      "lots of sql syntax errors from the web app suddenly",
+      "achanak bahut saare sql error aa rahe hain website se",
+      "हमारी वेबसाइट पर SQL इंजेक्शन हो रहा है क्या",
+      "लॉग में अजीब क्वेरी दिख रही हैं",
+      "my website form was used to steal data from the database",
+      "union and information_schema showing up in the url logs",
+      "contact form se kisi ne poora data nikal liya",
+      "security scanner says sql injection vulnerability",
+      "someone is putting database code into my search box",
+      "attacker typing sql commands into the website fields",
+      "search box mein koi query daal ke data nikal raha hai",
+      "form ke andar sql code daal ke hamla",
+      "फॉर्म में कोड डालकर डेटाबेस पर हमला",
+      "वेबसाइट के सर्च बॉक्स से डेटाबेस हैक"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT SCHEMA_NAME, LEFT(DIGEST_TEXT, 200) AS query_shape, COUNT_STAR, SUM_ERRORS, FIRST_SEEN, LAST_SEEN FROM performance_schema.events_statements_summary_by_digest WHERE SUM_ERRORS > 0 ORDER BY SUM_ERRORS DESC LIMIT 20",
+        "look_for": "a burst of failing query shapes from the app's database around the time of the attack (probing makes many syntax errors)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT SCHEMA_NAME, LEFT(DIGEST_TEXT, 200) AS query_shape, COUNT_STAR, FIRST_SEEN, LAST_SEEN FROM performance_schema.events_statements_summary_by_digest WHERE DIGEST_TEXT LIKE '%information_schema%' OR DIGEST_TEXT LIKE '%UNION%' ORDER BY LAST_SEEN DESC LIMIT 20",
+        "look_for": "your app normally never reads information_schema; such shapes from the app's database are a strong sign of injection"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('general_log', 'log_output', 'slow_query_log', 'log_error', 'performance_schema')",
+        "look_for": "whether any log exists to look back in; performance_schema OFF means the digest checks above will be empty"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT datname, xact_commit, xact_rollback, conflicts, deadlocks, stats_reset FROM pg_stat_database WHERE datname = current_database()",
+        "look_for": "a high rollback count compared to commits can mean many failing (injected) statements"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('log_min_error_statement', 'log_statement', 'log_destination', 'logging_collector')",
+        "look_for": "whether failed statements are written to the server log, so you can search it"
+      }
+    ],
+    "causes": [
+      {
+        "id": "string_concat",
+        "title_en": "The app builds SQL by gluing user input into the query text (no prepared statements)",
+        "title_hi": "App user ka input seedha query text mein jodta hai (prepared statements nahi)"
+      },
+      {
+        "id": "vulnerable_plugin",
+        "title_en": "A plugin/theme/module with a known injection bug",
+        "title_hi": "Kisi plugin/theme/module mein jaana-maana injection bug"
+      },
+      {
+        "id": "too_much_privilege",
+        "title_en": "The app's database user can do far more than it needs, so one hole exposes everything",
+        "title_hi": "App ka database user zarurat se kahin zyada kar sakta hai, to ek chhed se sab khul jata hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "string_concat",
+        "action": "code",
+        "steps_en": "Change every query that uses request data to a prepared statement with bound parameters; allow-list values like sort column names. Never try to filter 'bad words' as the fix.",
+        "steps_hi": "Jo bhi query request ka data use karti hai use bound parameters wala prepared statement banao; sort column jaise values ki allow-list rakho. 'Bure shabd' filter karna fix nahi hai."
+      },
+      {
+        "cause": "vulnerable_plugin",
+        "action": "advice",
+        "steps_en": "Update or remove the plugin named in your security scanner / vendor advisory, then rotate the database password.",
+        "steps_hi": "Security scanner / vendor advisory mein bataya plugin update ya remove karo, phir database password badlo."
+      },
+      {
+        "cause": "too_much_privilege",
+        "action": "approved_change",
+        "steps_en": "Give the app its own user with only SELECT/INSERT/UPDATE/DELETE on its own database (no FILE, SUPER, GRANT or superuser).",
+        "steps_hi": "App ko apna user do jiske paas sirf apne database par SELECT/INSERT/UPDATE/DELETE ho (FILE, SUPER, GRANT ya superuser nahi)."
+      }
+    ],
+    "verify": {
+      "en": "The injection-looking query shapes stop appearing, a re-scan of the site finds no injection, and the app user has least privilege.",
+      "hi": "Injection jaisi queries aana band ho jaati hain, site ka dobara scan koi injection nahi dikhata, aur app user ke paas kam se kam rights hain."
+    },
+    "source": "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/performance-schema-statement-summary-tables.html",
+      "https://www.postgresql.org/docs/current/runtime-config-logging.html",
+      "https://www.dbvis.com/thetable/sql-injection-cheat-sheet-sqli-101",
+      "https://www.indusface.com/learning/sql-injection-in-logs-what-to-look-for/"
+    ],
+    "test_phrases": [
+      "i think a hacker is typing database commands into my website search",
+      "koi hamari website ke form mein sql daal ke data chura raha hai shayad",
+      "लगता है कोई वेबसाइट के फॉर्म से डेटाबेस पर हमला कर रहा है"
+    ]
+  },
+  {
+    "id": "hacked-leaked-config-file",
+    "title_en": "Database password leaked from a config file (.env, wp-config.php, backup or git)",
+    "title_hi": "Config file se database password leak (.env, wp-config.php, backup ya git)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "my .env file was publicly accessible",
+      "wp-config.php was downloaded by someone",
+      "database password leaked on github",
+      ".env file browser mein khul rahi thi",
+      "galti se database password github pe push ho gaya",
+      "wp-config ka backup public folder mein pada tha",
+      "database credentials exposed",
+      "someone is logging into the database with our app password from another IP",
+      "हमारी .env फाइल पब्लिक हो गई थी",
+      "डेटाबेस का पासवर्ड लीक हो गया",
+      "sql backup file was in public_html and anyone could download it",
+      "kisi ne hamara db username password chura liya",
+      "credentials leaked in a public repository",
+      "debug page was showing the database password",
+      "file with database login details was visible to everyone online",
+      "config file khuli padi thi internet par",
+      "कॉन्फ़िग फाइल इंटरनेट पर खुली पड़ी थी"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT USER, HOST, CURRENT_CONNECTIONS, TOTAL_CONNECTIONS FROM performance_schema.accounts WHERE USER IS NOT NULL ORDER BY USER, HOST",
+        "look_for": "the app's account seen from a host that is not your web server means the leaked password is being used"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT USER, HOST, DB, COMMAND, TIME FROM information_schema.PROCESSLIST ORDER BY HOST",
+        "look_for": "live connections from unexpected IPs"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, TABLE_SCHEMA, PRIVILEGE_TYPE FROM information_schema.SCHEMA_PRIVILEGES ORDER BY GRANTEE, TABLE_SCHEMA",
+        "look_for": "what the leaked account can reach: if it covers every database, all of them are at risk"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT usename, client_addr, application_name, backend_start, state FROM pg_stat_activity WHERE backend_type = 'client backend' ORDER BY client_addr",
+        "look_for": "the app's role connected from an address that is not the app server"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin FROM pg_roles WHERE rolname = current_user",
+        "look_for": "how powerful the leaked role is (superuser = the whole server is exposed)"
+      }
+    ],
+    "causes": [
+      {
+        "id": "web_folder",
+        "title_en": "Config or .env file readable through the web server (wrong document root, missing deny rule)",
+        "title_hi": "Config ya .env file web server se padhi ja sakti thi (galat document root, deny rule nahi)"
+      },
+      {
+        "id": "backup_in_public",
+        "title_en": "A database dump or config copy (wp-config.php.bak, db.sql, site.zip) left in a public folder",
+        "title_hi": "Database dump ya config ki copy (wp-config.php.bak, db.sql, site.zip) public folder mein chhodi"
+      },
+      {
+        "id": "git_or_chat",
+        "title_en": "Password committed to a git repository or shared in chat/email",
+        "title_hi": "Password git repo mein commit hua ya chat/email mein share hua"
+      },
+      {
+        "id": "debug_mode",
+        "title_en": "Debug/error page shows environment variables or connection details",
+        "title_hi": "Debug/error page environment variables ya connection details dikhata hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "web_folder",
+        "action": "config",
+        "steps_en": "Change the database password now and update the app config; deny web access to .env/config files (keep them outside the public folder).",
+        "steps_hi": "Abhi database password badlo aur app config update karo; .env/config files ka web access band karo (unhe public folder ke bahar rakho)."
+      },
+      {
+        "cause": "backup_in_public",
+        "action": "advice",
+        "steps_en": "Delete backups and archives from public folders, store them off the web server, then change every password they contain.",
+        "steps_hi": "Public folders se backups aur archives hatao, unhe web server ke bahar rakho, phir unme likhe har password ko badlo."
+      },
+      {
+        "cause": "git_or_chat",
+        "action": "advice",
+        "steps_en": "Treat the password as public forever: change it, remove it from the repo history with the git host's guidance, and use environment secrets instead.",
+        "steps_hi": "Password ko hamesha ke liye public maano: badlo, git host ke tarike se repo history se hatao, aur environment secrets use karo."
+      },
+      {
+        "cause": "debug_mode",
+        "action": "config",
+        "steps_en": "Turn debug mode off in production (APP_DEBUG=false, WP_DEBUG_DISPLAY off) and change the password that was shown.",
+        "steps_hi": "Production mein debug mode band karo (APP_DEBUG=false, WP_DEBUG_DISPLAY off) aur jo password dikha use badlo."
+      }
+    ],
+    "verify": {
+      "en": "The old password no longer works, the config file returns 403/404 from the browser, and no connections come from unknown hosts.",
+      "hi": "Purana password ab kaam nahi karta, browser mein config file 403/404 deti hai, aur anjaan host se koi connection nahi aata."
+    },
+    "source": "https://developer.wordpress.org/advanced-administration/security/hardening/",
+    "seen_at": [
+      "https://mailgun.com/blog/it-and-engineering/a-word-of-caution-for-laravel-developers",
+      "https://laracasts.com/discuss/channels/laravel/laravel-security-issue-1",
+      "https://blog.sucuri.net/2022/06/tips-for-wp-config-how-to-avoid-sensitive-data-exposure.html",
+      "https://dev.mysql.com/doc/refman/8.0/en/performance-schema-accounts-table.html"
+    ],
+    "test_phrases": [
+      "our config file with the db login was open on the internet",
+      "hamari config file mein db ka login tha aur wo internet pe khuli padi thi",
+      "हमारी कॉन्फ़िग फाइल जिसमें डीबी का लॉगिन था वो इंटरनेट पर खुली थी"
+    ]
+  },
+  {
+    "id": "hacked-brute-force-logins",
+    "title_en": "Someone keeps trying to guess the database password (failed logins)",
+    "title_hi": "Koi baar baar database ka password guess karne ki koshish kar raha hai (failed logins)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "lots of failed login attempts on mysql",
+      "access denied for user root many times in the error log",
+      "password authentication failed for user postgres again and again in logs",
+      "bots trying to log in to my database",
+      "error log mein baar baar access denied aa raha hai anjaan IP se",
+      "koi password guess kar raha hai database ka",
+      "brute force attack on database port",
+      "हज़ारों बार गलत पासवर्ड से लॉगिन की कोशिश",
+      "कोई डेटाबेस का पासवर्ड गेस कर रहा है",
+      "unknown IPs hammering port 3306",
+      "postgres log full of failed authentication from china russia",
+      "har second login fail ki entries aa rahi hain",
+      "unknown machines keep trying different passwords on the database",
+      "someone trying password after password on the db",
+      "anjaan computer baar baar password try kar rahe hain",
+      "koi lagataar galat password daal ke login try kar raha hai",
+      "रात भर कोई डेटाबेस पर पासवर्ड पर पासवर्ड आज़मा रहा है",
+      "अनजान मशीनें बार बार लॉगिन की कोशिश कर रही हैं",
+      "endless login attempts all night from strange addresses"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT IP, HOST, SUM_CONNECT_ERRORS, COUNT_AUTHENTICATION_ERRORS, FIRST_SEEN, LAST_SEEN FROM performance_schema.host_cache ORDER BY COUNT_AUTHENTICATION_ERRORS DESC LIMIT 20",
+        "look_for": "IPs with many authentication errors that are not yours"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Aborted_connects', 'Access_denied_errors', 'Connection_errors_internal', 'Connection_errors_max_connections')",
+        "look_for": "Aborted_connects / Access_denied_errors climbing fast between two checks = ongoing guessing"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'max_connect_errors', 'log_warnings', 'log_error_verbosity')",
+        "look_for": "listening on all addresses makes guessing possible; low log verbosity hides the failed logins"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'log_connections', 'password_encryption', 'authentication_timeout')",
+        "look_for": "listen_addresses '*' and log_connections off: guesses can happen and you can't see them"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcanlogin, rolvaliduntil FROM pg_roles WHERE rolcanlogin ORDER BY rolsuper DESC, rolname",
+        "look_for": "accounts that can log in: the 'postgres' superuser with a password reachable from the internet is the usual target"
+      }
+    ],
+    "causes": [
+      {
+        "id": "exposed",
+        "title_en": "Database port reachable from the internet, so bots find it within hours",
+        "title_hi": "Database port internet se pahunch mein hai, bots kuch ghanton mein dhundh lete hain"
+      },
+      {
+        "id": "guessable",
+        "title_en": "Common user names (root, postgres, admin) with password logins allowed from anywhere",
+        "title_hi": "Aam usernames (root, postgres, admin) ka password login kahin se bhi allowed"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "exposed",
+        "action": "config",
+        "steps_en": "Close the port in the firewall for everyone except your app server/VPN; bind the database to localhost or the private network.",
+        "steps_hi": "Firewall mein port sabke liye band karo, sirf app server/VPN ke liye kholo; database ko localhost ya private network par bind karo."
+      },
+      {
+        "cause": "guessable",
+        "action": "config",
+        "steps_en": "Disable remote login for root/postgres, use long unique passwords (scram-sha-256 on PostgreSQL), and check logs for a successful login from the same IPs.",
+        "steps_hi": "root/postgres ka remote login band karo, lambe alag passwords rakho (PostgreSQL par scram-sha-256), aur logs mein dekho ki unhi IPs se koi login safal to nahi hua."
+      }
+    ],
+    "verify": {
+      "en": "Failed-login counters stop growing and the port is not reachable from outside (test from a phone hotspot).",
+      "hi": "Failed-login counters badhna band ho jaate hain aur port bahar se nahi khulta (phone hotspot se test karo)."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/performance-schema-host-cache-table.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/auth-password.html",
+      "https://www.postgresql.org/docs/current/runtime-config-logging.html",
+      "https://pulse.support/kb/mysql-error-1129-host-blocked-connection-errors",
+      "https://dev.mysql.com/doc/refman/8.4/en/security-against-attack.html"
+    ],
+    "test_phrases": [
+      "random computers keep trying passwords on my db all night",
+      "raat bhar anjaan computers mere db pe password try karte rehte hain",
+      "रात भर अनजान कंप्यूटर मेरे डेटाबेस पर पासवर्ड आज़माते रहते हैं"
+    ]
+  },
+  {
+    "id": "hacked-weak-or-reused-password",
+    "title_en": "Weak, default or reused database passwords",
+    "title_hi": "Database ke kamzor, default ya dobara use hue passwords",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "database password is too simple",
+      "root user has no password",
+      "we use the same password everywhere including the database",
+      "db ka password 123456 hai kya ye safe hai",
+      "root ka password khali hai",
+      "sab jagah ek hi password use karte hain",
+      "how to enforce strong passwords in mysql",
+      "postgres password still the default one",
+      "डेटाबेस का पासवर्ड बहुत आसान है",
+      "रूट यूज़र का कोई पासवर्ड नहीं है",
+      "password policy for database users",
+      "developer ne password admin123 rakha tha",
+      "my database password is just our company name and some numbers",
+      "db ka password bas naam aur 123 hai",
+      "password bahut aasaan rakha hai db login ka",
+      "is a password like company123 safe for the db",
+      "पासवर्ड बस कंपनी का नाम और कुछ नंबर है",
+      "डीबी लॉगिन का पासवर्ड बहुत आसान है"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name LIKE 'validate_password%' OR Variable_name LIKE 'simple_password_check%' OR Variable_name LIKE 'cracklib_password_check%'",
+        "look_for": "empty result = no password-strength check is active on this server"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT PLUGIN_NAME, PLUGIN_STATUS, PLUGIN_TYPE FROM information_schema.PLUGINS WHERE PLUGIN_TYPE = 'PASSWORD VALIDATION' OR PLUGIN_NAME LIKE '%password%'",
+        "look_for": "which password plugins are loaded (mysql_native_password is old and weak; caching_sha2_password / ed25519 are stronger)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE PRIVILEGE_TYPE IN ('SUPER', 'CREATE USER', 'FILE', 'SHUTDOWN') ORDER BY GRANTEE",
+        "look_for": "every admin-level account must have a strong unique password (an admin user sees all accounts here)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('password_encryption', 'listen_addresses')",
+        "look_for": "password_encryption md5 is the old method; scram-sha-256 is the safe one"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcanlogin, rolvaliduntil FROM pg_roles WHERE rolcanlogin AND rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC",
+        "look_for": "login roles to rotate; superusers first"
+      }
+    ],
+    "causes": [
+      {
+        "id": "weak",
+        "title_en": "Short, common or default passwords (empty root, 'postgres', 'admin123')",
+        "title_hi": "Chhote, aam ya default passwords (khali root, 'postgres', 'admin123')"
+      },
+      {
+        "id": "reused",
+        "title_en": "The same password used for the database, hosting panel, email and WordPress",
+        "title_hi": "Database, hosting panel, email aur WordPress mein ek hi password"
+      },
+      {
+        "id": "old_hash",
+        "title_en": "Old password hashing (mysql_native_password / md5)",
+        "title_hi": "Purana password hashing (mysql_native_password / md5)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "weak",
+        "action": "approved_change",
+        "steps_en": "Set a long random password for every account (ALTER USER ... IDENTIFIED BY / ALTER ROLE ... PASSWORD) and turn on the password validation component/plugin.",
+        "steps_hi": "Har account ka lamba random password set karo (ALTER USER ... IDENTIFIED BY / ALTER ROLE ... PASSWORD) aur password validation component/plugin on karo."
+      },
+      {
+        "cause": "reused",
+        "action": "advice",
+        "steps_en": "Give each system its own password stored in a password manager; change the database one first, then the others.",
+        "steps_hi": "Har system ka alag password password manager mein rakho; pehle database wala badlo, phir baaki."
+      },
+      {
+        "cause": "old_hash",
+        "action": "config",
+        "steps_en": "PostgreSQL: set password_encryption = scram-sha-256 and reset passwords, then use scram-sha-256 in pg_hba.conf. MySQL 8: move users to caching_sha2_password.",
+        "steps_hi": "PostgreSQL: password_encryption = scram-sha-256 karo aur passwords reset karo, phir pg_hba.conf mein scram-sha-256. MySQL 8: users ko caching_sha2_password par le jao."
+      }
+    ],
+    "verify": {
+      "en": "A password-strength check is active, every login account has a new unique password, and the app still connects.",
+      "hi": "Password-strength check chalu hai, har login account ka naya alag password hai, aur app abhi bhi connect hota hai."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/validate-password.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/auth-password.html",
+      "https://dev.mysql.com/doc/refman/8.0/en/caching-sha2-pluggable-authentication.html",
+      "https://dev.mysql.com/doc/refman/8.0/en/security-guidelines.html"
+    ],
+    "test_phrases": [
+      "my db login is just the company name with 123, is that a problem",
+      "mera db login bas company ka naam aur 123 hai, kya ye galat hai",
+      "मेरे डेटाबेस का पासवर्ड बस कंपनी का नाम और 123 है, क्या ये ठीक है"
+    ]
+  },
+  {
+    "id": "hacked-db-port-open-to-internet",
+    "title_en": "Database is open to the whole internet (port 3306/5432 exposed)",
+    "title_hi": "Database poore internet ke liye khula hai (port 3306/5432 khula)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "port 3306 is open to the internet",
+      "postgres 5432 publicly accessible",
+      "can anyone connect to my database from outside",
+      "database bahar se connect ho jata hai kisi bhi computer se",
+      "bind address 0.0.0.0 kar diya tha remote access ke liye",
+      "listen_addresses star kar diya hai",
+      "security scan says mysql port exposed",
+      "क्या कोई भी बाहर से मेरे डेटाबेस से जुड़ सकता है",
+      "डेटाबेस का पोर्ट इंटरनेट पर खुला है",
+      "shodan shows my database",
+      "remote mysql allow kar diya hai sab IP ke liye",
+      "how to stop outside access to my db server",
+      "anyone online can reach my db server",
+      "internet se koi bhi database server tak pahunch jata hai",
+      "database server sabke liye khula hai internet pe",
+      "इंटरनेट से कोई भी डेटाबेस सर्वर तक पहुंच जाता है",
+      "outsiders can connect straight to my database machine"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'port', 'require_secure_transport')",
+        "look_for": "bind_address 0.0.0.0, :: or * with no firewall means the whole internet can try to log in"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE GRANTEE LIKE '%@''\\%''' ORDER BY GRANTEE",
+        "look_for": "accounts allowed from any host ('%'): together with an open port these are reachable by anyone"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT HOST, COUNT(*) AS connections FROM information_schema.PROCESSLIST GROUP BY HOST ORDER BY connections DESC",
+        "look_for": "client hosts that are not localhost/your app server"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'ssl')",
+        "look_for": "listen_addresses '*' listens on every network card"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT client_addr, count(*) FROM pg_stat_activity WHERE client_addr IS NOT NULL GROUP BY client_addr ORDER BY 2 DESC",
+        "look_for": "public IP addresses that are not yours"
+      }
+    ],
+    "causes": [
+      {
+        "id": "listen_all",
+        "title_en": "The database listens on all network interfaces (bind_address / listen_addresses)",
+        "title_hi": "Database sabhi network interfaces par sunta hai (bind_address / listen_addresses)"
+      },
+      {
+        "id": "no_firewall",
+        "title_en": "No firewall / security group rule limiting the port",
+        "title_hi": "Port ko limit karne wala koi firewall / security group rule nahi"
+      },
+      {
+        "id": "any_host_accounts",
+        "title_en": "Accounts allowed from any host ('user'@'%' or 0.0.0.0/0 in pg_hba.conf)",
+        "title_hi": "Accounts har host se allowed ('user'@'%' ya pg_hba.conf mein 0.0.0.0/0)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "listen_all",
+        "action": "config",
+        "steps_en": "Set bind_address=127.0.0.1 (or the private IP) / listen_addresses='localhost' (or private IP) and restart in a quiet hour.",
+        "steps_hi": "bind_address=127.0.0.1 (ya private IP) / listen_addresses='localhost' (ya private IP) karo aur shant time par restart karo."
+      },
+      {
+        "cause": "no_firewall",
+        "action": "config",
+        "steps_en": "Allow the port only from the app server or your VPN in the firewall/cloud security group; for remote work use an SSH tunnel.",
+        "steps_hi": "Firewall/cloud security group mein port sirf app server ya VPN ke liye kholo; bahar se kaam ke liye SSH tunnel use karo."
+      },
+      {
+        "cause": "any_host_accounts",
+        "action": "approved_change",
+        "steps_en": "Recreate accounts for the exact app host (user@'10.0.0.5') and replace 0.0.0.0/0 lines in pg_hba.conf with the app's address.",
+        "steps_hi": "Accounts ko exact app host ke liye banao (user@'10.0.0.5') aur pg_hba.conf ki 0.0.0.0/0 lines ko app ke address se badlo."
+      }
+    ],
+    "verify": {
+      "en": "From a network outside yours, connecting to the port times out, and the app still works.",
+      "hi": "Aapke network ke bahar se port par connect karne par timeout aata hai, aur app phir bhi chalta hai."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config-connection.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html",
+      "https://dev.mysql.com/doc/refman/8.4/en/security-against-attack.html",
+      "https://www.postgresql.org/docs/current/auth-pg-hba-conf.html",
+      "https://www.akamai.com/blog/security/please-read-me-opportunistic-ransomware-devastating-mysql-servers"
+    ],
+    "test_phrases": [
+      "anybody on the internet can reach my database server is that bad",
+      "internet pe koi bhi mere database server tak pahunch sakta hai kya",
+      "इंटरनेट पर कोई भी मेरे डेटाबेस सर्वर तक पहुंच सकता है"
+    ]
+  },
+  {
+    "id": "hacked-remote-root-superuser",
+    "title_en": "root / postgres superuser can log in from anywhere",
+    "title_hi": "root / postgres superuser kahin se bhi login kar sakta hai",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "root can login remotely",
+      "root@% exists in mysql",
+      "remote root access enabled",
+      "website uses the root user to connect to the database",
+      "app root user se chal raha hai database mein",
+      "root ka login bahar se ho jata hai",
+      "postgres superuser login from outside allowed",
+      "रूट यूज़र बाहर से लॉगिन हो जाता है",
+      "वेबसाइट रूट यूज़र से डेटाबेस चलाती है",
+      "how to disable remote root login mysql",
+      "superuser use kar rahe hain app ke liye",
+      "the top admin login of the database works from any machine",
+      "database ka sabse bada admin login har jagah se chalta hai",
+      "main admin account kisi bhi computer se login ho jata hai",
+      "डेटाबेस का सबसे बड़ा एडमिन लॉगिन किसी भी मशीन से चलता है",
+      "मुख्य एडमिन अकाउंट हर कंप्यूटर से खुल जाता है",
+      "master database account usable from anywhere"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES WHERE GRANTEE LIKE '''root''@%' AND GRANTEE NOT LIKE '%@''localhost''' AND GRANTEE NOT LIKE '%@''127.0.0.1''' AND GRANTEE NOT LIKE '%@''::1''' ORDER BY GRANTEE",
+        "look_for": "any row = root can log in from a non-local host (an admin user sees all accounts here)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT CURRENT_USER() AS connected_as",
+        "look_for": "if the app connects as root, every bug in the app becomes a full server takeover"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcanlogin FROM pg_roles WHERE rolsuper AND rolcanlogin ORDER BY rolname",
+        "look_for": "superusers that can log in; only 'postgres' (local only) should be here"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT current_user, (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS is_superuser",
+        "look_for": "the app must not connect as a superuser"
+      }
+    ],
+    "causes": [
+      {
+        "id": "remote_root",
+        "title_en": "root/superuser allowed from any host for convenience during setup",
+        "title_hi": "Setup ke time suvidha ke liye root/superuser ko har host se allow kar diya"
+      },
+      {
+        "id": "app_as_root",
+        "title_en": "The application connects with the root/superuser account",
+        "title_hi": "Application root/superuser account se connect hoti hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "remote_root",
+        "action": "approved_change",
+        "steps_en": "Remove the non-local root accounts (DROP USER 'root'@'%') after confirming a local admin login works; in pg_hba.conf allow postgres only via local/peer.",
+        "steps_hi": "Local admin login chalne ki pushti ke baad non-local root accounts hatao (DROP USER 'root'@'%'); pg_hba.conf mein postgres ko sirf local/peer se allow karo."
+      },
+      {
+        "cause": "app_as_root",
+        "action": "approved_change",
+        "steps_en": "Create a dedicated app user with rights only on its own database, switch the app config to it, then change the root password.",
+        "steps_hi": "App ke liye alag user banao jiske rights sirf uske database par hon, app config usme badlo, phir root ka password badlo."
+      }
+    ],
+    "verify": {
+      "en": "No root/superuser row from a remote host remains, and the app runs as its own limited user.",
+      "hi": "Remote host wali koi root/superuser entry nahi bachi, aur app apne limited user se chalti hai."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/security-guidelines.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/default-privileges.html",
+      "https://www.postgresql.org/docs/current/role-attributes.html",
+      "https://www.postgresql.org/docs/current/auth-pg-hba-conf.html"
+    ],
+    "test_phrases": [
+      "the main admin account of the database can be used from any computer",
+      "database ka main admin account kisi bhi computer se chal jata hai",
+      "डेटाबेस का मेन एडमिन अकाउंट किसी भी कंप्यूटर से चल जाता है"
+    ]
+  },
+  {
+    "id": "hacked-app-user-too-powerful",
+    "title_en": "The app's database user has more rights than it needs (least privilege)",
+    "title_hi": "App ke database user ke paas zarurat se zyada rights hain (least privilege)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "app user has all privileges on all databases",
+      "grant all on *.* to the website user",
+      "how to create a least privilege user for my app",
+      "website ke user ko saare rights de rakhe hain",
+      "ek hi user se saari websites chal rahi hain",
+      "app user ko kitni permission deni chahiye",
+      "limit what the application database account can do",
+      "वेबसाइट के यूज़र को सारे अधिकार दे रखे हैं",
+      "ऐप वाले डेटाबेस यूज़र को कितनी परमिशन चाहिए",
+      "one database user shared by all my client sites",
+      "remove drop and grant permission from app user",
+      "the account my site connects with has unlimited power",
+      "website wala db login sab kuch kar sakta hai, kuch bhi delete kar sakta hai",
+      "site ke login ke paas poore server ki power hai",
+      "वेबसाइट वाले लॉगिन के पास पूरी पावर है, कुछ भी कर सकता है",
+      "app ka login har cheez badal sakta hai",
+      "my website's db account can do whatever it wants"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE, PRIVILEGE_TYPE",
+        "look_for": "global rights (ON *.*) for the app user, especially SUPER, FILE, PROCESS, CREATE USER, GRANT OPTION, SHUTDOWN"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, TABLE_SCHEMA, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.SCHEMA_PRIVILEGES ORDER BY GRANTEE, TABLE_SCHEMA",
+        "look_for": "the app user should appear only on its own database; DROP, GRANT OPTION, ALTER ROUTINE, EVENT, TRIGGER are rarely needed at run time"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls FROM pg_roles WHERE rolname = current_user",
+        "look_for": "the app role should have all of these false"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT d.datname, pg_get_userbyid(d.datdba) AS owner FROM pg_database d WHERE NOT d.datistemplate ORDER BY 1",
+        "look_for": "if the app role owns the database it can change or drop anything; a separate owner role is safer"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT r.rolname AS member, g.rolname AS member_of FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid ORDER BY 1, 2",
+        "look_for": "membership in powerful roles (pg_read_server_files, pg_write_server_files, pg_execute_server_program, pg_read_all_data)"
+      }
+    ],
+    "causes": [
+      {
+        "id": "global_all",
+        "title_en": "App user created with ALL PRIVILEGES on *.* (or as superuser) during setup",
+        "title_hi": "Setup ke time app user ko *.* par ALL PRIVILEGES (ya superuser) de diya"
+      },
+      {
+        "id": "shared_user",
+        "title_en": "One user shared by several sites/apps, so one hacked site exposes all",
+        "title_hi": "Kai sites/apps ka ek hi user, to ek site hack hui to sab khul jaati hain"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "global_all",
+        "action": "approved_change",
+        "steps_en": "Create a new app user with SELECT, INSERT, UPDATE, DELETE on its own database only (plus what migrations need, from a separate deploy user), switch the app to it, then remove the old rights.",
+        "steps_hi": "Naya app user banao jiske paas sirf apne database par SELECT, INSERT, UPDATE, DELETE ho (migrations ke liye alag deploy user), app usme switch karo, phir purane rights hatao."
+      },
+      {
+        "cause": "shared_user",
+        "action": "approved_change",
+        "steps_en": "Give each site its own user and its own password; keep a separate admin account that the websites never use.",
+        "steps_hi": "Har site ka apna user aur apna password do; ek alag admin account rakho jo websites kabhi use na karein."
+      }
+    ],
+    "verify": {
+      "en": "The app user's rights list shows only its own database and data rights, and the site works normally.",
+      "hi": "App user ki rights list mein sirf uska database aur data wale rights dikhte hain, aur site normal chalti hai."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/privileges-provided.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/ddl-priv.html",
+      "https://www.postgresql.org/docs/current/predefined-roles.html",
+      "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html",
+      "https://developer.wordpress.org/advanced-administration/security/hardening/"
+    ],
+    "test_phrases": [
+      "the login my website uses can do absolutely anything on the server",
+      "website jis login se chalti hai wo server pe kuch bhi kar sakta hai",
+      "वेबसाइट जिस लॉगिन से चलती है वो सर्वर पर कुछ भी कर सकता है"
+    ]
+  },
+  {
+    "id": "hacked-db-can-read-write-files",
+    "title_en": "The database can read or write files on the server (FILE privilege, secure_file_priv, COPY PROGRAM)",
+    "title_hi": "Database server ki files padh ya likh sakta hai (FILE privilege, secure_file_priv, COPY PROGRAM)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "secure_file_priv is empty",
+      "mysql user has FILE privilege",
+      "hacker wrote a php file through mysql",
+      "database se server pe file ban gayi",
+      "kisi ne mysql se shell file likh di",
+      "copy program used by attacker in postgres",
+      "load data local infile security risk",
+      "डेटाबेस से सर्वर पर फाइल बन गई",
+      "can the database user read my server files",
+      "into outfile se backdoor bana diya",
+      "postgres se server pe command chal gayi",
+      "a suspicious php file showed up in my site folder created by mysql",
+      "unknown file appeared in public_html and the database seems to have made it",
+      "site folder mein anjaan file aayi jo database ne likhi",
+      "ajeeb file ban gayi website folder mein database ki taraf se",
+      "डेटाबेस ने वेबसाइट फोल्डर में अजीब फाइल बना दी",
+      "वेबसाइट फोल्डर में अनजान फाइल आ गई"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('secure_file_priv', 'local_infile')",
+        "look_for": "secure_file_priv empty = the server may read/write files anywhere it has OS access; NULL or a fixed folder is safe; local_infile ON lets clients load local files"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE PRIVILEGE_TYPE = 'FILE' ORDER BY GRANTEE",
+        "look_for": "only an admin should have FILE; an app user with FILE can drop files into the web folder"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT r.rolname AS member, g.rolname AS powerful_role FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid WHERE g.rolname IN ('pg_read_server_files', 'pg_write_server_files', 'pg_execute_server_program')",
+        "look_for": "members of these roles can read/write server files or run programs, like a superuser"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname FROM pg_roles WHERE rolsuper AND rolcanlogin",
+        "look_for": "superusers can run server programs through COPY ... PROGRAM; keep them few and local"
+      }
+    ],
+    "causes": [
+      {
+        "id": "file_priv",
+        "title_en": "MySQL: FILE privilege given to app users and secure_file_priv not limited",
+        "title_hi": "MySQL: app users ko FILE privilege diya aur secure_file_priv limit nahi"
+      },
+      {
+        "id": "pg_server_roles",
+        "title_en": "PostgreSQL: superuser or server-file roles given to an app or remote role",
+        "title_hi": "PostgreSQL: app ya remote role ko superuser ya server-file roles diye"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "file_priv",
+        "action": "config",
+        "steps_en": "Set secure_file_priv to NULL or a private folder (needs restart), set local_infile=OFF, and REVOKE FILE ON *.* from every non-admin user (approved change). Then search the web folder for files the database wrote.",
+        "steps_hi": "secure_file_priv ko NULL ya private folder karo (restart chahiye), local_infile=OFF karo, aur har non-admin user se FILE ON *.* REVOKE karo (approved change). Phir web folder mein database ki likhi files dhundo."
+      },
+      {
+        "cause": "pg_server_roles",
+        "action": "approved_change",
+        "steps_en": "Remove those role memberships and superuser from app roles (ALTER ROLE ... NOSUPERUSER), then check the server for unknown processes and cron jobs.",
+        "steps_hi": "App roles se ye memberships aur superuser hatao (ALTER ROLE ... NOSUPERUSER), phir server par anjaan processes aur cron jobs dekho."
+      }
+    ],
+    "verify": {
+      "en": "secure_file_priv is limited, no app user has FILE or server-file roles, and no unknown files appear in the web folder.",
+      "hi": "secure_file_priv limited hai, kisi app user ke paas FILE ya server-file roles nahi, aur web folder mein koi anjaan file nahi aati."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_secure_file_priv",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/load-data-local-security.html",
+      "https://www.postgresql.org/docs/current/predefined-roles.html",
+      "https://www.postgresql.org/docs/current/sql-copy.html",
+      "https://www.wiz.io/fr-fr/blog/postgresql-cryptomining"
+    ],
+    "test_phrases": [
+      "a strange php file appeared in my website folder and it seems the database created it",
+      "website folder mein ajeeb php file aa gayi, lagta hai database ne banayi",
+      "वेबसाइट फोल्डर में अजीब फाइल आ गई, लगता है डेटाबेस ने बनाई"
+    ]
+  },
+  {
+    "id": "hacked-no-encryption-tls",
+    "title_en": "Database connections are not encrypted (no SSL/TLS)",
+    "title_hi": "Database connections encrypted nahi hain (SSL/TLS nahi)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "is my database connection encrypted",
+      "how to enable ssl for mysql connections",
+      "postgres ssl off",
+      "require ssl for remote database users",
+      "database ka connection encrypt karna hai",
+      "password network pe plain text ja raha hai kya",
+      "app aur database ke beech data encrypt hai ya nahi",
+      "क्या डेटाबेस का कनेक्शन एन्क्रिप्टेड है",
+      "डेटाबेस के लिए SSL कैसे चालू करें",
+      "tls for database traffic between servers",
+      "compliance audit asks for encryption in transit for the db"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('have_ssl', 'have_openssl', 'require_secure_transport', 'tls_version', 'ssl_cert')",
+        "look_for": "have_ssl DISABLED / no certificate = connections cannot be encrypted; require_secure_transport OFF = plain connections are allowed"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW SESSION STATUS WHERE Variable_name IN ('Ssl_cipher', 'Ssl_version')",
+        "look_for": "an empty Ssl_cipher means this very connection is not encrypted"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('ssl', 'ssl_min_protocol_version', 'listen_addresses')",
+        "look_for": "ssl off means every remote login and query travels in plain text"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT s.pid, a.usename, a.client_addr, s.ssl, s.version FROM pg_stat_ssl s JOIN pg_stat_activity a ON a.pid = s.pid WHERE a.client_addr IS NOT NULL",
+        "look_for": "remote connections with ssl = false"
+      }
+    ],
+    "causes": [
+      {
+        "id": "no_cert",
+        "title_en": "The server has no certificate configured / SSL turned off",
+        "title_hi": "Server par certificate set nahi / SSL band"
+      },
+      {
+        "id": "not_required",
+        "title_en": "SSL exists but clients are allowed to connect without it",
+        "title_hi": "SSL hai par clients bina uske bhi connect kar sakte hain"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "no_cert",
+        "action": "config",
+        "steps_en": "Configure a certificate (ssl_cert/ssl_key in MySQL; ssl=on with server.crt/server.key in PostgreSQL) and restart in a quiet hour. Managed clouds: turn on 'require SSL' in the console.",
+        "steps_hi": "Certificate set karo (MySQL mein ssl_cert/ssl_key; PostgreSQL mein ssl=on aur server.crt/server.key) aur shant time par restart karo. Managed cloud: console mein 'require SSL' on karo."
+      },
+      {
+        "cause": "not_required",
+        "action": "config",
+        "steps_en": "Require it: require_secure_transport=ON (MySQL) or hostssl lines instead of host in pg_hba.conf (PostgreSQL); set the app's connection to sslmode=require / verify-full.",
+        "steps_hi": "Zaroori banao: require_secure_transport=ON (MySQL) ya pg_hba.conf mein host ki jagah hostssl (PostgreSQL); app ke connection mein sslmode=require / verify-full."
+      }
+    ],
+    "verify": {
+      "en": "Ssl_cipher (MySQL) or pg_stat_ssl.ssl (PostgreSQL) shows encryption for the app's connection, and a plain connection is refused.",
+      "hi": "App ke connection ke liye Ssl_cipher (MySQL) ya pg_stat_ssl.ssl (PostgreSQL) encryption dikhata hai, aur bina SSL ka connection mana ho jata hai."
+    },
+    "source": "https://www.postgresql.org/docs/current/ssl-tcp.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/using-encrypted-connections.html",
+      "https://www.postgresql.org/docs/current/monitoring-stats.html",
+      "https://dev.mysql.com/doc/refman/8.0/en/security-guidelines.html"
+    ],
+    "test_phrases": [
+      "can someone on the network read what goes between my app and the db",
+      "kya network pe koi app aur db ke beech ki baatein padh sakta hai",
+      "क्या नेटवर्क पर कोई ऐप और डेटाबेस के बीच का डेटा पढ़ सकता है"
+    ]
+  },
+  {
+    "id": "hacked-no-audit-logging",
+    "title_en": "No record of who did what in the database (turn on audit / connection logging)",
+    "title_hi": "Database mein kisne kya kiya iska koi record nahi (audit / connection logging on karo)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "how to know who changed data in my database",
+      "no logs of who logged in to the database",
+      "enable audit log mysql",
+      "pgaudit setup for tracking changes",
+      "kisne data badla pata kaise kare",
+      "database mein login ka record nahi hai",
+      "har query ka record rakhna hai",
+      "डेटाबेस में किसने क्या बदला पता नहीं चलता",
+      "कौन कब लॉगिन हुआ उसका रिकॉर्ड चाहिए",
+      "auditor wants database activity logs",
+      "track all logins and changes made to the db",
+      "i want evidence of who modified the data and at what time",
+      "keep a trail of everyone who touches the database",
+      "record rakhna hai ki data kisne kab badla",
+      "saboot chahiye kisne kab data chheda",
+      "किसने कब डेटा बदला इसका सबूत चाहिए",
+      "डेटा कौन कब छेड़ता है उसका रिकॉर्ड रखना है",
+      "proof for the future of who changed what"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('general_log', 'general_log_file', 'log_output', 'log_error', 'server_audit_logging', 'audit_log_file')",
+        "look_for": "general_log OFF and no audit plugin = no record of logins or statements"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT PLUGIN_NAME, PLUGIN_STATUS FROM information_schema.PLUGINS WHERE PLUGIN_NAME LIKE '%audit%'",
+        "look_for": "MariaDB server_audit or MySQL Enterprise audit_log loaded?"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'binlog_expire_logs_seconds', 'expire_logs_days')",
+        "look_for": "the binary log records every data change: needed to find and undo what an attacker changed"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('log_connections', 'log_disconnections', 'log_statement', 'log_line_prefix', 'logging_collector', 'shared_preload_libraries')",
+        "look_for": "log_connections off and log_statement none = nothing to look back at; 'pgaudit' in shared_preload_libraries means auditing is available"
+      }
+    ],
+    "causes": [
+      {
+        "id": "logs_off",
+        "title_en": "Default settings keep almost no history (general log off, connections not logged)",
+        "title_hi": "Default settings lagbhag koi history nahi rakhti (general log band, connections log nahi)"
+      },
+      {
+        "id": "no_retention",
+        "title_en": "Logs exist but are deleted too quickly or kept only on the same server",
+        "title_hi": "Logs hain par jaldi delete ho jaate hain ya sirf usi server par rakhe hain"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "logs_off",
+        "action": "config",
+        "steps_en": "Log logins and changes, not everything: MariaDB server_audit plugin (CONNECT, QUERY_DDL, QUERY_DCL), MySQL audit plugin or binary log; PostgreSQL log_connections=on, log_disconnections=on, log_statement='ddl' (or pgaudit). Watch disk use.",
+        "steps_hi": "Sab nahi, sirf logins aur changes log karo: MariaDB server_audit plugin (CONNECT, QUERY_DDL, QUERY_DCL), MySQL audit plugin ya binary log; PostgreSQL log_connections=on, log_disconnections=on, log_statement='ddl' (ya pgaudit). Disk par nazar rakho."
+      },
+      {
+        "cause": "no_retention",
+        "action": "advice",
+        "steps_en": "Ship logs to another machine or log service and keep them at least 90 days, so an attacker can't wipe them.",
+        "steps_hi": "Logs dusri machine ya log service par bhejo aur kam se kam 90 din rakho, taaki hacker unhe mita na sake."
+      }
+    ],
+    "verify": {
+      "en": "A test login and a test table change appear in the log, and the log is copied off the server.",
+      "hi": "Ek test login aur ek test table change log mein dikhta hai, aur log server ke bahar copy hota hai."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config-logging.html",
+    "seen_at": [
+      "https://mariadb.com/kb/en/mariadb-audit-plugin/",
+      "https://dev.mysql.com/doc/refman/8.0/en/query-log.html",
+      "https://dev.mysql.com/doc/refman/8.0/en/binary-log.html"
+    ],
+    "test_phrases": [
+      "next time i want proof of who touched our data and when",
+      "agli baar saboot chahiye ki data ko kisne aur kab chheda",
+      "अगली बार सबूत चाहिए कि डेटा को किसने और कब छेड़ा"
+    ]
+  },
+  {
+    "id": "hacked-outdated-wordpress-plugins",
+    "title_en": "Outdated WordPress, plugins or themes (the most common way WordPress databases get hacked)",
+    "title_hi": "Purana WordPress, plugins ya themes (WordPress database hack hone ka sabse aam raasta)",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "which plugins are active on my wordpress from the database",
+      "old plugin caused the hack",
+      "wordpress version is very old",
+      "plugin update nahi kiya tha isliye hack hua kya",
+      "purane plugins se site hack hoti hai kya",
+      "nulled theme use kar rahe the",
+      "abandoned plugin with a security vulnerability",
+      "पुराने प्लगइन की वजह से साइट हैक हुई",
+      "वर्डप्रेस बहुत पुराना है अपडेट नहीं किया",
+      "list installed plugins without logging into wp-admin",
+      "admin panel khul nahi raha, database se plugins ki list chahiye",
+      "we haven't updated wordpress add-ons in years, is that the reason for the hack",
+      "never updated the plugins, did that let the hackers in",
+      "add-ons purane hain kabhi update nahi kiye",
+      "ऐड-ऑन कभी अपडेट नहीं किए, क्या इसी वजह से हैक",
+      "प्लगइन सालों से अपडेट नहीं हुए"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LEFT(option_value, 1000) AS value FROM wp_options WHERE option_name IN ('active_plugins', 'template', 'stylesheet', 'db_version', 'siteurl')",
+        "look_for": "active_plugins lists every running plugin; compare each with wordpress.org for updates and known holes; db_version tells the WordPress version range"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LENGTH(option_value) AS size FROM wp_options WHERE option_name LIKE '%\\_site\\_transient\\_update%' OR option_name LIKE '%update\\_core%'",
+        "look_for": "update-check data; missing or very old means WordPress hasn't checked for updates in a long time"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('recently_activated', 'uninstall_plugins') OR option_name LIKE '%\\_plugin\\_%version%' ORDER BY option_name LIMIT 50",
+        "look_for": "plugins switched recently, and versions stored by plugins themselves"
+      }
+    ],
+    "causes": [
+      {
+        "id": "outdated",
+        "title_en": "Plugins/themes/core not updated after a security fix was released",
+        "title_hi": "Security fix aane ke baad bhi plugins/themes/core update nahi kiye"
+      },
+      {
+        "id": "nulled",
+        "title_en": "Pirated (nulled) or abandoned plugins/themes, often with backdoors",
+        "title_hi": "Pirated (nulled) ya band ho chuke plugins/themes, aksar backdoor ke saath"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "outdated",
+        "action": "advice",
+        "steps_en": "Take a backup, update WordPress core, all plugins and themes, delete inactive ones, and turn on automatic updates for minor and security releases.",
+        "steps_hi": "Backup lo, WordPress core, saare plugins aur themes update karo, inactive wale delete karo, aur minor/security releases ke auto updates on karo."
+      },
+      {
+        "cause": "nulled",
+        "action": "advice",
+        "steps_en": "Remove nulled/abandoned items and replace them with versions from wordpress.org or the real vendor; then run the 'prove it's clean' checks and change passwords.",
+        "steps_hi": "Nulled/band ho chuke items hatao aur wordpress.org ya asli vendor wale version lagao; phir 'prove it's clean' checks chalao aur passwords badlo."
+      }
+    ],
+    "verify": {
+      "en": "Dashboard > Updates shows nothing pending, active_plugins lists only plugins you recognise, and a security scan is clean.",
+      "hi": "Dashboard > Updates mein kuch pending nahi, active_plugins mein sirf pehchaane hue plugins hain, aur security scan saaf hai."
+    },
+    "source": "https://wordpress.org/documentation/article/updating-wordpress/",
+    "seen_at": [
+      "https://developer.wordpress.org/advanced-administration/security/hardening/",
+      "https://wordpress.org/documentation/article/faq-my-site-was-hacked/",
+      "https://codex.wordpress.org/Database_Description",
+      "https://wordpress.org/support/topic/i-was-hacked-11/"
+    ],
+    "test_phrases": [
+      "we never updated the add-ons on our wordpress site for years, could that be how we got hacked",
+      "wordpress ke add-ons saalon se update nahi kiye, kya isi se hack hua",
+      "वर्डप्रेस के ऐड-ऑन सालों से अपडेट नहीं किए, क्या इसी से हैक हुआ"
+    ]
+  },
+  {
+    "id": "hacked-backups-not-tested",
+    "title_en": "Backups exist but were never tested (will they really restore after a hack?)",
+    "title_hi": "Backups hain par kabhi test nahi kiye (hack ke baad sach mein restore honge?)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "backup_restore",
+    "symptoms": [
+      "how do i know my database backups actually work",
+      "backup was empty when we tried to restore",
+      "test restore of database backup",
+      "backup to ho raha hai par chalta hai ya nahi pata nahi",
+      "restore karne gaye to backup kharab nikla",
+      "hosting backup pe bharosa kar sakte hain kya",
+      "क्या मेरा डेटाबेस बैकअप सच में काम करता है",
+      "बैकअप से रिस्टोर किया तो डेटा नहीं आया",
+      "backup strategy so ransomware cannot delete them",
+      "pg_dump backups have been 0 bytes for weeks",
+      "backup same server pe hi rakha hai"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'binlog_expire_logs_seconds', 'expire_logs_days')",
+        "look_for": "with log_bin ON you can replay changes after the last backup (point-in-time recovery); OFF means you lose everything since the last dump"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_SCHEMA, ROUND(SUM(DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 1) AS size_mb, COUNT(*) AS tables_count FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys') GROUP BY TABLE_SCHEMA",
+        "look_for": "the size and table count a good backup must roughly match; a much smaller backup file is a warning"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT archived_count, last_archived_wal, last_archived_time, failed_count, last_failed_time FROM pg_stat_archiver",
+        "look_for": "failed_count growing or last_archived_time old = continuous backup is broken"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('wal_level', 'archive_mode', 'archive_timeout')",
+        "look_for": "archive_mode off = only nightly dumps; no point-in-time recovery"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT pg_size_pretty(pg_database_size(current_database())) AS db_size, (SELECT count(*) FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema')) AS tables_count",
+        "look_for": "what a full restore should bring back"
+      }
+    ],
+    "causes": [
+      {
+        "id": "never_restored",
+        "title_en": "Backups are made but nobody has ever restored one, so silent failures go unnoticed",
+        "title_hi": "Backups bante hain par kisi ne kabhi restore karke nahi dekha, to chupchap fail hote rehte hain"
+      },
+      {
+        "id": "same_place",
+        "title_en": "Backups kept on the same server/account the attacker can reach",
+        "title_hi": "Backups usi server/account par jahan hacker pahunch sakta hai"
+      },
+      {
+        "id": "no_pitr",
+        "title_en": "Only nightly dumps, no binary log / WAL archive, so a day of data is lost",
+        "title_hi": "Sirf raat ke dumps, binary log / WAL archive nahi, to ek din ka data jaata hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "never_restored",
+        "action": "advice",
+        "steps_en": "Once a month restore the latest backup into a separate test database and compare table counts and a few row counts with production.",
+        "steps_hi": "Har mahine latest backup ko alag test database mein restore karo aur production se table count aur kuch row counts milao."
+      },
+      {
+        "cause": "same_place",
+        "action": "advice",
+        "steps_en": "Keep at least one copy off the server, in an account the database server cannot delete from (versioned/immutable storage).",
+        "steps_hi": "Kam se kam ek copy server ke bahar rakho, aise account mein jahan se database server delete na kar sake (versioned/immutable storage)."
+      },
+      {
+        "cause": "no_pitr",
+        "action": "config",
+        "steps_en": "Turn on the binary log (MySQL) or WAL archiving (PostgreSQL) so you can recover to just before the attack.",
+        "steps_hi": "Binary log (MySQL) ya WAL archiving (PostgreSQL) on karo taaki hamle se thik pehle tak recover kar sako."
+      }
+    ],
+    "verify": {
+      "en": "A restore test this month succeeded with matching table counts, and one copy lives off the server.",
+      "hi": "Is mahine ka restore test safal raha aur table counts mile, aur ek copy server ke bahar hai."
+    },
+    "source": "https://www.postgresql.org/docs/current/backup.html",
+    "seen_at": [
+      "https://about.gitlab.com/blog/postmortem-of-database-outage-of-january-31/",
+      "https://dev.mysql.com/doc/refman/8.0/en/backup-and-recovery.html",
+      "https://dev.mysql.com/doc/refman/8.0/en/point-in-time-recovery-binlog.html",
+      "https://wordpress.org/documentation/article/wordpress-backups/"
+    ],
+    "test_phrases": [
+      "we pay for backups every night but no one ever checked if we can get the data back from them",
+      "har raat backup hota hai par kisi ne check nahi kiya ki usse data wapas aayega ya nahi",
+      "हर रात बैकअप होता है पर किसी ने नहीं देखा कि उससे डेटा वापस आएगा या नहीं"
+    ]
+  },
+  {
+    "id": "hacked-prevention-checklist",
+    "title_en": "How to make sure my database never gets hacked again (security checklist)",
+    "title_hi": "Database dobara kabhi hack na ho, iske liye kya karein (security checklist)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "how to secure my database",
+      "database security best practices checklist",
+      "harden mysql server",
+      "database ko secure kaise kare",
+      "dobara hack na ho iske liye kya karna chahiye",
+      "postgres ko safe kaise banaye",
+      "security audit of my db",
+      "डेटाबेस को सुरक्षित कैसे करें",
+      "दोबारा हैक न हो इसके लिए क्या करें",
+      "after cleaning the hack what should we change to stay safe",
+      "mysql security checklist for production",
+      "database protection steps for small business",
+      "what should i lock down so this never happens again",
+      "steps to protect the db going forward",
+      "list of things to make my database safe from hackers",
+      "database ko surakshit karne ki list chahiye",
+      "phir kabhi aisa na ho iske liye database mein kya band karein",
+      "डेटाबेस को सुरक्षित करने की लिस्ट चाहिए",
+      "ताकि ये फिर कभी न हो डेटाबेस में क्या बदलें"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'require_secure_transport', 'have_ssl', 'secure_file_priv', 'local_infile', 'log_bin', 'general_log', 'version')",
+        "look_for": "network: local/private only; TLS required; secure_file_priv limited; local_infile OFF; binary log ON; a supported version"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE PRIVILEGE_TYPE IN ('SUPER', 'FILE', 'CREATE USER', 'PROCESS', 'SHUTDOWN', 'RELOAD') ORDER BY GRANTEE",
+        "look_for": "admin-level rights only on a few local admin accounts, never on app users or '%' hosts"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name LIKE 'validate_password%' OR Variable_name LIKE 'simple_password_check%'",
+        "look_for": "a password-strength check should be active"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'ssl', 'password_encryption', 'log_connections', 'log_statement', 'archive_mode', 'server_version')",
+        "look_for": "listen_addresses not '*' (or firewalled), ssl on, scram-sha-256, connections logged, archiving on, a supported version"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolbypassrls, rolcanlogin FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
+        "look_for": "only one local superuser; app roles without special attributes"
+      }
+    ],
+    "causes": [
+      {
+        "id": "network",
+        "title_en": "Reachable from the internet",
+        "title_hi": "Internet se pahunch mein"
+      },
+      {
+        "id": "accounts",
+        "title_en": "Too many powerful or shared accounts, weak passwords",
+        "title_hi": "Bahut saare powerful ya shared accounts, kamzor passwords"
+      },
+      {
+        "id": "visibility",
+        "title_en": "No logs, no tested backups, outdated software",
+        "title_hi": "Logs nahi, test kiye backups nahi, purana software"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "network",
+        "action": "config",
+        "steps_en": "Database on localhost/private network, port firewalled to the app server, TLS required, no public phpMyAdmin/Adminer.",
+        "steps_hi": "Database localhost/private network par, port sirf app server ke liye firewall mein khula, TLS zaroori, public phpMyAdmin/Adminer nahi."
+      },
+      {
+        "cause": "accounts",
+        "action": "approved_change",
+        "steps_en": "One limited user per app, no remote root/superuser, long unique passwords with a strength check, remove accounts nobody uses.",
+        "steps_hi": "Har app ka ek limited user, remote root/superuser nahi, strength check ke saath lambe alag passwords, jo accounts koi use nahi karta unhe hatao."
+      },
+      {
+        "cause": "visibility",
+        "action": "advice",
+        "steps_en": "Log logins and schema changes, keep backups off the server and test a restore monthly, update the database and the app/CMS regularly.",
+        "steps_hi": "Logins aur schema changes log karo, backups server ke bahar rakho aur har mahine restore test karo, database aur app/CMS niyamit update karo."
+      }
+    ],
+    "verify": {
+      "en": "Every check above shows the safe value, and the same checks are re-run monthly.",
+      "hi": "Upar ke har check mein safe value dikhti hai, aur yahi checks har mahine dobara chalte hain."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/security-guidelines.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/auth-pg-hba-conf.html",
+      "https://www.postgresql.org/docs/current/ssl-tcp.html",
+      "https://developer.wordpress.org/advanced-administration/security/hardening/",
+      "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html",
+      "https://dev.mysql.com/doc/refman/8.4/en/security-against-attack.html"
+    ],
+    "test_phrases": [
+      "give me a list of things to lock down on my database so this never happens again",
+      "database ko pakka band karne ki list do taaki ye phir kabhi na ho",
+      "डेटाबेस को पक्का सुरक्षित करने की लिस्ट दो ताकि ये फिर कभी न हो"
+    ]
+  },
+  {
+    "id": "hacked-mongodb-ransom-exposed",
+    "title_en": "MongoDB wiped and a ransom note left (database open without a password)",
+    "title_hi": "MongoDB khali ho gaya aur phirauti (ransom) note chhoda (database bina password khula tha)",
+    "engines": [
+      "mongodb"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "mongodb collections deleted and a README collection asking for bitcoin",
+      "my mongo database is empty and there is a ransom message",
+      "mongodb hacked warning database",
+      "mongo db mein saara data gayab aur bitcoin maang rahe hain",
+      "mongodb mein naya database aa gaya READ_ME naam ka",
+      "mongo ka data delete karke paise maang rahe hain",
+      "मोंगो डीबी का सारा डेटा गायब और बिटकॉइन मांग रहे हैं",
+      "मोंगोडीबी हैक हो गया फिरौती का मैसेज",
+      "mongodb without authentication exposed on 27017",
+      "all my mongo collections replaced by one with a ransom note",
+      "mongo db hack hua kya karein",
+      "mongo data vanished and a message asks for crypto",
+      "mongo database emptied and they want payment in bitcoin",
+      "mongo ka data chala gaya aur crypto maang rahe hain",
+      "मोंगो का डेटा चला गया और क्रिप्टो मांग रहे हैं",
+      "nosql mongo wiped with a pay us note"
+    ],
+    "diagnose": [
+      {
+        "engine": "mongodb",
+        "cmd": "db.adminCommand({ listDatabases: 1, nameOnly: true })",
+        "look_for": "a database/collection named like README, READ_ME_TO_RECOVER, WARNING or PLEASE_READ that you didn't create; your own databases missing"
+      },
+      {
+        "engine": "mongodb",
+        "cmd": "db.adminCommand({ getCmdLineOpts: 1 })",
+        "look_for": "net.bindIp 0.0.0.0 / bindIpAll and no security.authorization: enabled = anyone could connect without a password"
+      },
+      {
+        "engine": "mongodb",
+        "cmd": "db.getSiblingDB('admin').getUsers()",
+        "look_for": "no users at all (auth was never set up) or admin users you don't know"
+      }
+    ],
+    "causes": [
+      {
+        "id": "no_auth",
+        "title_en": "MongoDB was reachable from the internet with access control off (no password)",
+        "title_hi": "MongoDB internet se khula tha aur access control band tha (koi password nahi)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "no_auth",
+        "action": "config",
+        "steps_en": "Do not pay: in most such attacks the data was never copied, only deleted. Firewall port 27017 now, enable security.authorization and bind to localhost/private IP, create an admin and app users, restore from your last backup, and report it if personal data was exposed.",
+        "steps_hi": "Paise mat do: aise zyada hamlon mein data copy hi nahi hua, sirf delete hua. Abhi port 27017 firewall karo, security.authorization on aur localhost/private IP par bind karo, admin aur app users banao, aakhri backup se restore karo, aur personal data tha to report karo."
+      }
+    ],
+    "verify": {
+      "en": "Connecting without a password is refused, the port is not reachable from outside, and your data is back from backup.",
+      "hi": "Bina password connection mana hota hai, port bahar se nahi khulta, aur backup se data wapas aa gaya."
+    },
+    "source": "https://www.mongodb.com/docs/manual/administration/security-checklist/",
+    "seen_at": [
+      "https://www.bleepingcomputer.com/news/security/mongodb-databases-held-for-ransom-by-mysterious-attacker",
+      "https://www.darkreading.com/cloud-security/22-900-mongodb-databases-affected-in-ransomware-attack",
+      "https://www.imperva.com/blog/2017/10/ransomware-attacks-on-mysql-and-mongodb/"
+    ],
+    "test_phrases": [
+      "our mongo data disappeared and someone left a note asking for crypto payment",
+      "hamara mongo ka data udd gaya aur koi crypto mein paise maang raha hai",
+      "हमारा मोंगो का डेटा उड़ गया और कोई क्रिप्टो में पैसे मांग रहा है"
+    ]
+  },
+  {
+    "id": "hacked-elasticsearch-ransom-exposed",
+    "title_en": "Elasticsearch indices deleted and a ransom index left (cluster open to the internet)",
+    "title_hi": "Elasticsearch ke indices delete aur ransom index chhoda (cluster internet par khula)",
+    "engines": [
+      "elasticsearch"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "elasticsearch indices got deleted and there is a read_me index",
+      "all my elastic indexes are gone",
+      "kibana data suddenly missing and a warning index",
+      "elasticsearch ke saare index gayab ho gaye",
+      "elastic mein read me naam ka index aa gaya bitcoin wala",
+      "search data ud gaya elastic se",
+      "इलास्टिकसर्च के सारे इंडेक्स गायब हो गए",
+      "elasticsearch port 9200 open without password",
+      "opensearch cluster wiped with ransom message",
+      "elastic hack ho gaya kya karein"
+    ],
+    "diagnose": [
+      {
+        "engine": "elasticsearch",
+        "cmd": "GET /_cat/indices?v&s=creation.date",
+        "look_for": "an index named like read_me / warning / recover you didn't create, created at the time your data vanished"
+      },
+      {
+        "engine": "elasticsearch",
+        "cmd": "GET /_security/_authenticate",
+        "look_for": "if this works without credentials (or security is not enabled), the cluster is open to anyone who can reach it"
+      },
+      {
+        "engine": "elasticsearch",
+        "cmd": "GET /_nodes/settings?filter_path=**.network,**.http",
+        "look_for": "network.host 0.0.0.0 / a public IP on port 9200"
+      }
+    ],
+    "causes": [
+      {
+        "id": "no_security",
+        "title_en": "Cluster reachable from the internet with security (authentication) disabled",
+        "title_hi": "Cluster internet se khula aur security (authentication) band"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "no_security",
+        "action": "config",
+        "steps_en": "Do not pay. Block port 9200/9300 in the firewall, turn on security (xpack.security.enabled: true) with passwords and TLS, bind to a private address, then restore from a snapshot or re-index from the main database.",
+        "steps_hi": "Paise mat do. Firewall mein port 9200/9300 band karo, security (xpack.security.enabled: true) passwords aur TLS ke saath on karo, private address par bind karo, phir snapshot se restore karo ya main database se re-index karo."
+      }
+    ],
+    "verify": {
+      "en": "An unauthenticated request gets 401, the port is closed to the internet, and your indices are back.",
+      "hi": "Bina login request ko 401 milta hai, port internet ke liye band hai, aur aapke indices wapas aa gaye."
+    },
+    "source": "https://www.elastic.co/guide/en/elasticsearch/reference/current/security-minimal-setup.html",
+    "seen_at": [
+      "https://discuss.elastic.co/t/indices-got-deleted-anonymously/346641",
+      "https://www.bleepingcomputer.com/news/security/hundreds-of-elasticsearch-databases-targeted-in-ransom-attacks/amp/",
+      "https://discuss.elastic.co/t/index-got-deleted-twice/179323"
+    ],
+    "test_phrases": [
+      "the search server lost every index overnight and a new one says pay us",
+      "search server ke saare index raat mein gaye aur naya index paise maang raha hai",
+      "सर्च सर्वर के सारे इंडेक्स रात में गायब, नया इंडेक्स पैसे मांग रहा है"
+    ]
+  },
+  {
+    "id": "hacked-redis-exposed",
+    "title_en": "Redis open to the internet (keys wiped, strange keys, crypto-miner on the server)",
+    "title_hi": "Redis internet par khula (keys mit gayi, ajeeb keys, server par crypto-miner)",
+    "engines": [
+      "redis"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "redis keys disappeared and strange keys appeared",
+      "redis hacked crypto miner on server",
+      "redis 6379 open to internet without password",
+      "redis ki saari keys gayab ho gayi",
+      "redis mein ajeeb keys aa gayi aur CPU 100 percent",
+      "redis config change ho gaya apne aap",
+      "रेडिस की सारी कीज़ गायब हो गईं",
+      "रेडिस हैक हो गया सर्वर पर माइनर चल रहा है",
+      "someone flushed my redis cache",
+      "unknown cron job appeared after redis was exposed",
+      "cache server emptied and server cpu went to full",
+      "the redis cache machine got wiped and cpu is maxed",
+      "cache server khali ho gaya aur cpu full chal raha hai",
+      "redis wala cache khali aur machine garam ho gayi",
+      "कैश सर्वर खाली हो गया और सीपीयू पूरा चल रहा है",
+      "redis cache server suddenly empty, high cpu, unknown process"
+    ],
+    "diagnose": [
+      {
+        "engine": "redis",
+        "cmd": "INFO keyspace",
+        "look_for": "key counts per database dropping to 0, or a db you don't use filling up"
+      },
+      {
+        "engine": "redis",
+        "cmd": "CONFIG GET protected-mode",
+        "look_for": "protected-mode no + bind 0.0.0.0 + no password = anyone can run commands"
+      },
+      {
+        "engine": "redis",
+        "cmd": "CONFIG GET bind",
+        "look_for": "a public or 0.0.0.0 bind address"
+      },
+      {
+        "engine": "redis",
+        "cmd": "ACL LIST",
+        "look_for": "the default user with 'nopass' and all commands (on Redis 6+)"
+      },
+      {
+        "engine": "redis",
+        "cmd": "CONFIG GET dir",
+        "look_for": "dir changed to a system folder (like /etc/cron.d or .ssh) is a sign it was used to plant files"
+      }
+    ],
+    "causes": [
+      {
+        "id": "open",
+        "title_en": "Redis reachable from the internet without a password (protected mode off)",
+        "title_hi": "Redis bina password internet se pahunch mein (protected mode band)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "open",
+        "action": "config",
+        "steps_en": "Firewall port 6379, bind to 127.0.0.1/private IP, keep protected-mode yes, set a strong password/ACL users, rename or disable CONFIG for app users, run Redis as a non-root user; then check the server for unknown cron jobs, SSH keys and processes.",
+        "steps_hi": "Port 6379 firewall karo, 127.0.0.1/private IP par bind karo, protected-mode yes rakho, strong password/ACL users set karo, app users ke liye CONFIG band karo, Redis ko non-root user se chalao; phir server par anjaan cron jobs, SSH keys aur processes dekho."
+      }
+    ],
+    "verify": {
+      "en": "From outside the port is closed, commands without a password are refused, and no unknown processes or cron jobs remain.",
+      "hi": "Bahar se port band hai, bina password commands mana hote hain, aur koi anjaan process ya cron job nahi bacha."
+    },
+    "source": "https://redis.io/docs/latest/operate/oss_and_stack/management/security/",
+    "seen_at": [
+      "https://www.trendmicro.com/en_gb/research/20/d/more-than-8-000-unsecured-redis-instances-found-in-the-cloud.html",
+      "https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/"
+    ],
+    "test_phrases": [
+      "our cache server got emptied and the machine is now using full cpu",
+      "hamare cache server ka sab khali ho gaya aur machine full cpu pe chal rahi hai",
+      "हमारा कैश सर्वर खाली हो गया और मशीन पूरा सीपीयू खा रही है"
     ]
   }
 ]

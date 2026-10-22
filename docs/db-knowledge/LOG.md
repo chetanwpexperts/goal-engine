@@ -2,6 +2,27 @@
 
 Newest first. One entry per nightly run.
 
+## 2026-10-22 (nightly: hacked database, part 2)
+- Feed: not read this run (the fetch needed a permission nobody was there to give), so no feed request ids covered.
+- Backlog: "Hacked database part 2" done. 17 new defensive playbooks in `issues.json`:
+  how did they get in (entry-point triage), SQL injection signs, leaked config (.env / wp-config / backup / git), brute-force logins,
+  weak or reused passwords, DB port open to the internet, remote root / superuser, app user too powerful (least privilege),
+  database can read/write server files (FILE, secure_file_priv, server-file roles), no TLS, no audit logging,
+  outdated WordPress/plugins, backups never tested, prevention checklist, exposed MongoDB ransom, exposed Elasticsearch ransom, exposed Redis.
+- MySQL/PostgreSQL checks are read-only (information_schema, performance_schema, pg_catalog, wp_options) and run on the MariaDB + PostgreSQL test DBs.
+  MongoDB/Elasticsearch/Redis playbooks carry read-only commands in `cmd` (not run by the SQL checks; no test DB for them yet).
+  `SHOW GRANTS` deliberately not used: on MariaDB it prints the password hash.
+- 51 new test phrases (English, Hinglish, Hindi script) all recognised; all 109 test phrases in the brain pass. Added a few more symptoms to
+  "is my database hacked" because a new playbook had pulled two of its phrases away.
+- No `codes` added: these problems have no error code of their own (1129 "host blocked" is usually a connection problem, left for the Connection item).
+- Fixed `tests/test_phpconn.py`: its positional `REPLACE INTO wp_users VALUES (...)` broke after part 1 added WordPress columns to the test table;
+  it now names its 4 columns (same assertions, nothing weakened).
+- Sources: MySQL security guidelines / privileges / validate_password / host_cache, PostgreSQL ssl-tcp / logging / connection / auth-password / backup,
+  OWASP SQL Injection Prevention Cheat Sheet, WordPress hardening + updating, MongoDB security checklist, Elastic minimal security, Redis security.
+  Ideas from GitLab 2017 post-mortem, Sucuri, Mailgun, Laracasts, Akamai, Imperva, BleepingComputer, Trend Micro, discuss.elastic.co (in `seen_at`). Defensive only.
+- For Chetan: (1) Full suite: 6 failed + 35 errors, all because `tests/data/practice.xlsx` is ignored by `.gitignore` (`data/`) and missing on a fresh clone;
+  not from this change. (2) Should `cmd` checks for MongoDB/Redis/Elasticsearch get a runner + test containers later?
+
 ## 2026-10-22 (nightly: hacked database, part 1)
 - Feed: not read this run (the fetch needed a permission nobody was there to give), so no feed request ids covered.
 - Backlog: "Hacked database part 1" done. 16 new defensive playbooks in `issues.json`: is my database hacked (triage), what to do right now (contain),

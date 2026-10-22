@@ -13,9 +13,11 @@ from app.config import Settings
 from app.limits import release_ai_call, reserve_ai_call
 from app.agents.core import (YES_RE, AgentError, agent_dict, assign, goal_agents, inputs_from_text,
                              recipe_for, run_agent)
+from app.agents import automation as auto
+from app.agents.planner import plan as plan_automation
 from app.ml.brain import SKIP_RE, steps_text
 from app.ml.normalize import normalize
-from app.models import Agent, Goal, Message, dumps
+from app.models import Agent, Goal, Message, dumps, loads
 
 
 MAX_CONTEXT_GOALS = 6
@@ -76,6 +78,7 @@ def focus_goal(db: Session, visitor_id: str, goal_id: int | None) -> Goal | None
     return goals[0] if goals else None
 
 
+SHEET_RE = re.compile(r"https?://(?:docs\.google\.com/spreadsheets/[^\s]+|[^\s]+\.csv\b[^\s]*)", re.I)
 STEPS_LABELS = {"Khud karne ke steps dikhao": True, "Show me the steps instead": False}
 WATCH_LABELS = {"Haan, roz check karo": True, "Yes, check it daily": False}
 
@@ -139,6 +142,19 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
                 reply = str(exc)
             return _respond(db, visitor_id, text, focus, reply, "agent_run", hi=hi)
 
+    # A sheet link for a waiting automation agent: save it and show the preview straight away.
+    if focus is not None:
+        pending_auto = next((a for a in goal_agents(db, focus.id) if a.recipe == "automation"
+                             and a.status in ("proposed", "paused")), None)
+        link = SHEET_RE.search(text)
+        if pending_auto is not None and link:
+            inputs = loads(pending_auto.inputs, {}) or {}
+            inputs["sheet_url"] = link.group(0)
+            pending_auto.inputs = dumps(inputs)
+            db.commit()
+            run = auto.run(db, pending_auto, hi_focus, preview=True)
+            return _respond(db, visitor_id, text, focus, run.summary or "", "agent_run", hi=hi_focus)
+
     # The message carries what a waiting agent needs (a URL, a pasted query): use it, don't re-classify.
     if focus is not None:
         recipe = recipe_for(focus)
@@ -167,7 +183,18 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
         db.add(goal)
     db.flush()
     reply, options, relation = turn.reply, turn.options, turn.relation
+    spec = None
     if goal is not None and relation not in ("howto", "safety", "chit_chat"):
+        spec = plan_automation(text)
+    if spec is not None:
+        # "Do this automatically" -> build the agent from blocks; the owner only checks the preview and taps Start.
+        existing = next((a for a in goal_agents(db, goal.id) if a.recipe == "automation"
+                         and (loads(a.inputs, {}) or {}).get("spec", {}).get("template") == spec.get("template")), None)
+        if existing is None:
+            auto.create_agent(db, goal, spec)
+        db.commit()
+        reply, options, relation = auto.plan_reply(spec, turn.hi), [], "agent_plan"
+    elif goal is not None and relation not in ("howto", "safety", "chit_chat"):
         agent, override, run_now = assign(db, goal, text, turn.hi, asking=bool(goal.pending))
         if run_now:
             try:

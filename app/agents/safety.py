@@ -87,7 +87,8 @@ def fetch(url: str, *, verify: bool = True, timeout: float = 12.0, resolve=asser
             page.status = response.status_code
             page.final_url = current
             page.headers = {k.lower(): v for k, v in response.headers.items()}
-            if "html" in page.headers.get("content-type", "html"):
+            ctype = page.headers.get("content-type", "text/html")
+            if any(t in ctype for t in ("html", "csv", "text/plain", "json")):
                 raw = response.raw.read(MAX_BYTES, decode_content=True)
                 page.text = raw.decode(response.encoding or "utf-8", errors="replace")
             response.close()

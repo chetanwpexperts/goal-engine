@@ -152,6 +152,10 @@ def recipe_for(goal: Goal | None) -> Recipe | None:
 
 
 def agent_dict(agent: Agent, db: Session, hi: bool) -> dict:
+    if agent.recipe == "automation":
+        from app.agents.automation import automation_dict
+
+        return automation_dict(db, agent, hi)
     recipe = RECIPES[agent.recipe]
     runs = list(db.scalars(select(AgentRun).where(AgentRun.agent_id == agent.id).order_by(AgentRun.id.desc()).limit(5)))
     inputs = loads(agent.inputs, {}) or {}
@@ -217,6 +221,8 @@ def assign(db: Session, goal: Goal | None, text: str, hi: bool, asking: bool) ->
     recipe = recipe_for(goal)
     if recipe is None or goal is None:
         return None, None, False
+    if any(a.recipe == "automation" for a in goal_agents(db, goal.id)):
+        return None, None, False  # this goal already has its automation agent
     slots = loads(goal.slots, {}) or {}
     agent = next((a for a in goal_agents(db, goal.id) if a.recipe == recipe.key), None)
     found = inputs_from_text(recipe, text, slots)

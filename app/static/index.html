@@ -14,8 +14,14 @@
   <header class="top">
     <div class="brand"><span class="mark" aria-hidden="true"></span>Goal Engine</div>
     <p class="tagline">You describe the problem. It keeps the goal.</p>
+    <button id="my-agents" type="button" class="new-chat">My agents</button>
     <button id="new-chat" type="button" class="new-chat">+ New chat</button>
   </header>
+
+  <div id="agents-panel" class="agents-panel" hidden>
+    <h2>My agents</h2>
+    <div id="agents-list"></div>
+  </div>
 
   <main class="layout">
     <aside class="goals" aria-label="Your goals">

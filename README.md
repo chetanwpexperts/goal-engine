@@ -45,6 +45,24 @@ The user describes the problem; the system assigns an agent, shows the plan in p
 - **Safety**: user URLs are checked against private/internal addresses on every redirect (SSRF);
   agent runs are rate-limited per visitor; scheduled runs are claimed once even with several workers.
 
+## Automation agents: one sentence -> a working agent
+
+"Jinka payment baaki hai unko har Monday reminder chala jaye" becomes an agent built from blocks:
+when (schedule, India time) -> read (Google Sheet link or pasted CSV) -> find the right rows
+(due soon / overdue / tomorrow's appointments / inactive N days / birthdays / yesterday's visitors /
+amount due) -> write each message -> send -> summary to the owner. Reports work the same way
+but go to the owner.
+
+- **Planner** (`app/agents/planner.py`): understands payment, fee, appointment, win-back, review,
+  birthday and report requests in Hinglish/Hindi/English, plus when ("har Monday 10 baje",
+  "har mahine 5 tarikh", "shaam 7 baje"). Optional AI planner (`PLANNER_AI=on`) for anything else.
+- **Validator** (`app/agents/spec.py`): only real blocks, needed columns, safe schedules.
+- **Columns by meaning** (`app/agents/blocks.py`): "Customer Name", "Amount Due", "naam" all map
+  automatically; missing columns are explained with the sheet's own column names.
+- **Trust**: preview shows exactly who gets what; nothing goes to customers until the owner
+  verifies their email; replies go to the owner (Reply-To); max 50 per run / 100 per day;
+  never the same person twice within 20 hours; every email logged.
+
 `ENGINE_MODE=ai` uses Gemini/Groq instead (the path described below).
 
 ## How it works (AI mode)

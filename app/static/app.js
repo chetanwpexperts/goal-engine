@@ -55,6 +55,7 @@
     unknown: "",
     howto: "How to",
     corrected: "Corrected",
+    agent_plan: "Agent",
     agent_run: "Agent",
     safety: "",
     list: "",
@@ -242,10 +243,158 @@
     return wrap;
   }
 
+  const AT = {
+    hi: { preview: "Preview dekho", previewing: "Dekh raha hoon…", start: "Start", pause: "Roko", next: "Agla run",
+          sheet: "Sheet", paste: "Ya rows paste karo (CSV)", msg: "Jo message jayega", to: "Kisko", none: "Aaj kisi ko message nahi jayega.",
+          skipped: "bina email (chhoda)", mapping: "Columns samjhe", owner: "Aapka email (summary aur replies ke liye)",
+          business: "Business ka naam (message isi naam se jayega)", send: "Code bhejo", code: "Email mein aaya 6-digit code",
+          verify: "Verify", verified: "✓ Verified", needsVerify: "Start se pehle apna email verify karo.", report: "Report",
+          cols: "Sheet mein ye columns chahiye" },
+    en: { preview: "Preview", previewing: "Checking…", start: "Start", pause: "Pause", next: "Next run",
+          sheet: "Sheet", paste: "Or paste the rows (CSV)", msg: "Message that will go", to: "To", none: "Nobody would get a message today.",
+          skipped: "without email (skipped)", mapping: "Columns understood", owner: "Your email (for summaries and replies)",
+          business: "Business name (messages are sent in this name)", send: "Send code", code: "6-digit code from your email",
+          verify: "Verify", verified: "✓ Verified", needsVerify: "Verify your email before Start.", report: "Report",
+          cols: "Your sheet needs these columns" },
+  };
+
+  function renderAutomation(a) {
+    const t = a.lang === "hi" ? AT.hi : AT.en;
+    const card = el("article", "agent automation");
+    const head = el("div", "agent-head");
+    const st = (a.lang === "hi" ? T.hi : T.en).status;
+    head.append(el("h3", null, a.name), el("span", `agent-status ${a.status}`, st[a.status] || a.status));
+    card.append(head, el("p", "chip", "⏰ " + a.schedule));
+    const ol = el("ol");
+    for (const b of a.blocks) {
+      const li = el("li");
+      li.append(el("span", "kind", b.kind), document.createTextNode(b.text));
+      ol.append(li);
+    }
+    card.append(ol);
+    if (a.message) {
+      const d = el("details");
+      d.append(el("summary", "plan-title", t.msg), el("pre", "msg", a.message));
+      card.append(d);
+    }
+    if (a.needs_columns && a.needs_columns.length) card.append(el("p", "score", `${t.cols}: ${a.needs_columns.join(", ")}`));
+
+    const run = a.runs && a.runs[0];
+    const lastPreviewOk = run && run.status === "done";
+    if (a.status !== "active") {
+      const url = el("input");
+      url.type = "url";
+      url.placeholder = "https://docs.google.com/spreadsheets/d/…";
+      url.value = a.inputs[0].value || "";
+      const paste = el("details");
+      const csv = el("textarea");
+      csv.value = a.inputs[1].value || "";
+      csv.placeholder = "Name,Email,Amount,Due Date\nRavi,ravi@example.com,2500,25/10/2026";
+      paste.append(el("summary", "plan-title", t.paste), csv);
+      if (csv.value) paste.open = true;
+      card.append(el("label", null, a.inputs[0].label), url, paste);
+      const actions = el("div", "agent-actions");
+      const pv = el("button", "primary", t.preview);
+      pv.type = "button";
+      pv.addEventListener("click", async () => {
+        pv.disabled = true; pv.textContent = t.previewing;
+        try {
+          const data = await api(`/api/agents/${a.id}/preview`, { method: "POST",
+            body: JSON.stringify({ inputs: { sheet_url: url.value, csv_text: csv.value } }) });
+          if (data.reply) addMessage("assistant", data.reply, "Agent");
+          renderAgents(data.agents);
+        } catch (err) { addMessage("error", err.message); pv.disabled = false; pv.textContent = t.preview; }
+      });
+      actions.append(pv);
+      if (lastPreviewOk) {
+        const go = el("button", "primary go", t.start);
+        go.type = "button";
+        go.disabled = a.needs_owner && !a.owner.verified;
+        go.addEventListener("click", async () => {
+          go.disabled = true;
+          try {
+            const data = await api(`/api/agents/${a.id}/activate`, { method: "POST" });
+            addMessage("assistant", data.reply, "Agent");
+            renderAgents(data.agents);
+          } catch (err) { addMessage("error", err.message); go.disabled = false; }
+        });
+        actions.append(go);
+      }
+      card.append(actions);
+    } else {
+      const actions = el("div", "agent-actions");
+      if (a.next_run_at) card.append(el("p", "score", `${t.next}: ${new Date(a.next_run_at + "Z").toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`));
+      const pause = el("button", "primary", t.pause);
+      pause.type = "button";
+      pause.addEventListener("click", async () => renderAgents((await api(`/api/agents/${a.id}/pause`, { method: "POST" })).agents));
+      actions.append(pause);
+      card.append(actions);
+    }
+
+    if (a.needs_owner && lastPreviewOk && a.status !== "active") card.append(ownerBox(a, t));
+    if (run) card.append(automationResult(run, t));
+    return card;
+  }
+
+  function ownerBox(a, t) {
+    const box = el("div", "owner");
+    if (a.owner.verified) {
+      box.append(el("p", "ok", `${t.verified}: ${a.owner.email}`));
+      return box;
+    }
+    box.append(el("p", "warn", t.needsVerify));
+    const email = el("input"); email.type = "email"; email.placeholder = "you@business.com"; email.value = a.owner.email || "";
+    const biz = el("input"); biz.type = "text"; biz.value = a.owner.business || "";
+    const send = el("button", "primary", t.send); send.type = "button";
+    const code = el("input"); code.type = "text"; code.inputMode = "numeric"; code.maxLength = 6; code.hidden = true;
+    const verify = el("button", "primary", t.verify); verify.type = "button"; verify.hidden = true;
+    send.addEventListener("click", async () => {
+      send.disabled = true;
+      try {
+        await api("/api/owner/code", { method: "POST", body: JSON.stringify({ email: email.value, business: biz.value }) });
+        code.hidden = false; verify.hidden = false; code.placeholder = t.code; code.focus();
+      } catch (err) { addMessage("error", err.message); }
+      send.disabled = false;
+    });
+    verify.addEventListener("click", async () => {
+      try {
+        await api("/api/owner/verify", { method: "POST", body: JSON.stringify({ code: code.value }) });
+        const data = await api(`/api/goals/${currentGoalId}`);
+        renderAgents(data.agents || []);
+      } catch (err) { addMessage("error", err.message); }
+    });
+    box.append(el("label", null, t.owner), email, el("label", null, t.business), biz, send, code, verify);
+    return box;
+  }
+
+  function automationResult(run, t) {
+    const wrap = el("div", "result");
+    wrap.append(el("p", "summary", run.summary || ""));
+    const r = run.result || {};
+    if (r.mapping && Object.keys(r.mapping).length) {
+      wrap.append(el("p", "score", `${t.mapping}: ` + Object.entries(r.mapping).map(([k, v]) => `${k} → ${v}`).join(" · ")));
+    }
+    if (r.report) wrap.append(codeBox(r.report.subject || t.report, r.report.body, { copy: "Copy", copied: "Copied" }));
+    if (r.messages) {
+      if (!r.messages.length) wrap.append(el("p", "score", t.none));
+      const ul = el("ul", "findings");
+      for (const m of r.messages.slice(0, 10)) {
+        const li = el("li", "s1");
+        li.append(el("div", "f-title", `${t.to}: ${m.to}`), el("div", "f-fix", m.subject), el("pre", "msg small", m.body));
+        ul.append(li);
+      }
+      wrap.append(ul);
+      if (r.messages.length > 10) wrap.append(el("p", "score", `+${r.messages.length - 10} more`));
+    }
+    if (r.skipped && r.skipped.length) wrap.append(el("p", "score", `${r.skipped.length} ${t.skipped}`));
+    return wrap;
+  }
+
   function renderAgents(agents) {
     const box = $("#agents");
     box.replaceChildren();
     for (const a of agents || []) {
+      if (a.automation) { box.append(renderAutomation(a)); continue; }
       const isHi = a.lang === "hi";
       const t = isHi ? T.hi : T.en;
       const card = el("article", "agent");
@@ -422,6 +571,25 @@
       recognition.start();
     });
   }
+
+  $("#my-agents").addEventListener("click", async () => {
+    const panel = $("#agents-panel");
+    if (!panel.hidden) { panel.hidden = true; return; }
+    const data = await api("/api/agents");
+    const list = $("#agents-list");
+    list.replaceChildren();
+    if (!data.agents.length) list.append(el("p", "muted", "No agents yet. Describe what you want automated."));
+    for (const a of data.agents) {
+      const row = el("button", "agent-row");
+      row.type = "button";
+      const run = a.runs && a.runs[0];
+      row.append(el("strong", null, a.name), el("span", `agent-status ${a.status}`, a.status),
+                 el("span", "muted", a.schedule || ""), el("span", "muted", run ? run.summary : ""));
+      row.addEventListener("click", () => { panel.hidden = true; openGoal(a.goal_id); });
+      list.append(row);
+    }
+    panel.hidden = false;
+  });
 
   $("#new-chat").addEventListener("click", async () => {
     try { await api("/api/new-chat", { method: "POST" }); } catch (_) { /* reload anyway */ }

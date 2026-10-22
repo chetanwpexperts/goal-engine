@@ -16,7 +16,9 @@ from sqlalchemy.orm import Session
 
 from app.ai.router import AIRouter, AIUnavailable
 from app.ml.brain import Brain
+from app.agents import automation
 from app.agents.core import AgentError, agent_dict, claim_due, goal_agents, run_agent
+from app.agents.mailer import SmtpMailer
 from app.engine import _after_run
 from app.models import Agent, dumps, loads, utcnow
 from app.config import get_settings
@@ -63,7 +65,10 @@ def _scheduler(stop: threading.Event) -> None:
                     goal = db.get(Goal, agent.goal_id)
                     hi = bool(goal and goal.detected_language in ("Hinglish", "Hindi"))
                     try:
-                        run_agent(db, agent, hi, scheduled=True)
+                        if agent.recipe == "automation":
+                            automation.run(db, agent, hi, preview=False, scheduled=True)
+                        else:
+                            run_agent(db, agent, hi, scheduled=True)
                     except AgentError as exc:
                         log.warning("Scheduled agent %s: %s", agent.id, exc)
             finally:
@@ -192,6 +197,96 @@ def start_agent(agent_id: int, body: StartIn, db: Session = Depends(get_db), vis
             "goal": goal.as_dict() if goal else None,
             "goals": [g.summary() for g in all_goals(db, visitor)],
             "agents": [agent_dict(a, db, hi) for a in goal_agents(db, agent.goal_id)]}
+
+
+class OwnerIn(BaseModel):
+    email: str = ""
+    business: str = ""
+    code: str = ""
+
+
+def _agent_payload(db: Session, agent: Agent, visitor: str, reply: str = "") -> dict:
+    goal = db.get(Goal, agent.goal_id)
+    hi = _goal_hi(goal)
+    return {"reply": reply, "relation": "agent_run", "goal": goal.as_dict() if goal else None,
+            "goals": [g.summary() for g in all_goals(db, visitor)],
+            "agents": [agent_dict(a, db, hi) for a in goal_agents(db, agent.goal_id)]}
+
+
+def mailer() -> SmtpMailer:
+    return SmtpMailer()
+
+
+@app.post("/api/agents/{agent_id}/preview")
+def preview_agent(agent_id: int, body: StartIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    agent = own_agent(db, agent_id, visitor)
+    if agent.recipe != "automation":
+        raise HTTPException(400, "Preview is for automation agents")
+    inputs = loads(agent.inputs, {}) or {}
+    for key in ("sheet_url", "csv_text"):
+        if key in body.inputs:
+            inputs[key] = (body.inputs[key] or "").strip()[:200000]
+    agent.inputs = dumps(inputs)
+    db.commit()
+    hi = _goal_hi(db.get(Goal, agent.goal_id))
+    run = automation.run(db, agent, hi, preview=True)
+    reply = run.summary or ""
+    db.add(Message(visitor_id=visitor, goal_id=agent.goal_id, role="assistant", text=reply, relation="agent_run", provider="agent"))
+    db.commit()
+    return _agent_payload(db, agent, visitor, reply)
+
+
+@app.post("/api/agents/{agent_id}/activate")
+def activate_agent(agent_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    agent = own_agent(db, agent_id, visitor)
+    if agent.recipe != "automation":
+        raise HTTPException(400, "Only automation agents run on a schedule")
+    try:
+        automation.activate(db, agent)
+    except automation.AutomationError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    goal = db.get(Goal, agent.goal_id)
+    hi = _goal_hi(goal)
+    spec = automation.spec_of(agent)
+    when = automation.schedule_text(spec["schedule"], hi)
+    reply = (f"Agent chalu ho gaya. {when} apne aap chalega. Har run ke baad aapko summary email aayegi." if hi
+             else f"Agent is on. It runs {when.lower()} by itself, and emails you a summary after each run.")
+    db.add(Message(visitor_id=visitor, goal_id=agent.goal_id, role="assistant", text=reply, relation="agent_run", provider="agent"))
+    db.commit()
+    return _agent_payload(db, agent, visitor, reply)
+
+
+@app.post("/api/owner/code")
+def owner_code(body: OwnerIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    try:
+        automation.request_code(db, visitor, body.email, body.business, mailer(), hi=True)
+    except automation.AutomationError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except RuntimeError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=503)
+    return {"ok": True}
+
+
+@app.post("/api/owner/verify")
+def owner_verify(body: OwnerIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    try:
+        owner = automation.verify_code(db, visitor, body.code)
+    except automation.AutomationError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return {"ok": True, "email": owner.email}
+
+
+@app.get("/api/agents")
+def my_agents(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)) -> dict:
+    """My Agents: every agent this visitor has, newest first."""
+    rows = list(db.scalars(select(Agent).where(Agent.visitor_id == visitor).order_by(Agent.id.desc()).limit(50)))
+    out = []
+    for agent in rows:
+        goal = db.get(Goal, agent.goal_id)
+        item = agent_dict(agent, db, _goal_hi(goal))
+        item["goal_id"], item["goal_title"] = agent.goal_id, goal.title if goal else ""
+        out.append(item)
+    return {"agents": out}
 
 
 @app.post("/api/agents/{agent_id}/pause")

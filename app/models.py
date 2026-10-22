@@ -133,3 +133,34 @@ class AgentRun(Base):
     result: Mapped[str | None] = mapped_column(Text, nullable=True)       # JSON
     started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class OwnerContact(Base):
+    """The business owner's verified email. Nothing is sent to customers until it's verified."""
+
+    __tablename__ = "owner_contacts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    visitor_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(320))
+    business_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    code_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    code_sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    codes_today: Mapped[int] = mapped_column(Integer, default=0)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class SentEmail(Base):
+    """Every email an agent sends to someone, for caps, the owner's log, and stopping requests."""
+
+    __tablename__ = "sent_emails"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    visitor_id: Mapped[str] = mapped_column(String(64), index=True)
+    agent_id: Mapped[int] = mapped_column(Integer, index=True)
+    to_email: Mapped[str] = mapped_column(String(320), index=True)
+    subject: Mapped[str] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(20))   # sent / failed
+    error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    sent_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)

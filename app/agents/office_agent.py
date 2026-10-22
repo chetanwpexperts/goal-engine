@@ -666,6 +666,9 @@ def formula_reply(agent: Agent, f: OfficeFile, report: dict, ops: list[str], she
 
 
 # ------------------------------------------------------------------ any other question about the open file
+TEACH = ("Agent ko sikhao", "Teach the agent")
+
+
 def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
     """Totals, counts, X-wise, lists, lookups, aging, combining, highlighting... on the person's own sheets.
     Returns the reply, or (question, options) when one detail is missing. Never a random answer."""
@@ -675,6 +678,14 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
     _set_offer(agent, None)
     inputs = loads(agent.inputs, {}) or {}
     pending = inputs.pop("pending_q", None)
+    if (text or "").strip() in TEACH and pending:
+        from app import learning
+
+        learning.ask_to_learn(db, "office", pending)
+        agent.inputs = dumps(inputs)
+        db.commit()
+        return ("Note kar liya. Ye kaam agent ki learning list mein chala gaya; seekhte hi ye bhi karega. Tab tak koi aur kaam bolo."
+                if hi else "Noted. It's on the agent's learning list; once learned it'll do this too. Meanwhile, ask for something else.")
     if pending and len((text or "").split()) <= 5:
         text = f"{pending} {text}"                        # the answer to "which sheet / which column?"
     try:
@@ -683,7 +694,10 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
         inputs["pending_q"] = text
         agent.inputs = dumps(inputs)
         db.commit()
-        return (need.hi if hi else need.en), need.options
+        opts = list(need.options)
+        if need.hi.startswith("Ye poori tarah samajh nahi aaya"):
+            opts = opts[:6] + ["Agent ko sikhao" if hi else "Teach the agent"]
+        return (need.hi if hi else need.en), opts
     agent.inputs = dumps(inputs)
     args = {"plan": plan, "hi": hi}
     if f.size <= BIG:

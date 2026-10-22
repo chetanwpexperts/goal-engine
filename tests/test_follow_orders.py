@@ -67,3 +67,15 @@ def test_asks_instead_of_guessing_then_uses_the_answer(client, open_file):
 def test_small_talk_and_database_go_elsewhere(client, open_file):
     r = say(client, "thanks", open_file)
     assert "Answer" not in r["reply"]
+
+
+def test_not_understood_can_be_sent_to_learning(client, open_file):
+    r = say(client, "is sheet ka mausam kaisa hai", open_file)
+    assert "Agent ko sikhao" in r["options"], r
+    r = say(client, "Agent ko sikhao", open_file)
+    assert "learning list" in r["reply"]
+    from app.db import _SessionLocal
+    from app.models import LearnRequest
+
+    with _SessionLocal() as db:
+        assert db.query(LearnRequest).filter(LearnRequest.brain == "office", LearnRequest.text.like("%mausam%")).count() == 1

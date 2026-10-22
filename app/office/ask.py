@@ -265,6 +265,13 @@ def _choose_table(text, tables, need_kinds=None) -> Table:
 
 def _plan_question(text, tables) -> dict:
     agg = _agg_of(text)
+    if agg is None and not pick_sheet(text, tables) and not any(columns_in(text, t) or values_in(text, t) for t in tables):
+        # nothing in the question points at this file: say so plainly, don't ask which sheet
+        names = ", ".join(t.name for t in tables if len(t.rows) >= 2)
+        raise NeedMore(f"Ye poori tarah samajh nahi aaya. Is file mein ye sheets hain: {names}. Sheet ya column ke naam ke saath likho, jaise: "
+                       "\"region wise total sales\", \"pending wale dikhao\", \"amount ka 5% nikalo\".",
+                       f"I didn't fully get that. This file has: {names}. Ask using a sheet or column name, e.g. \"total sales by region\", "
+                       "\"show pending rows\", \"5% of amount\".", [])
     t = _choose_table(text, tables)
     num_cols = columns_in(text, t, {"number"})
     txt_cols = columns_in(text, t, {"text"})

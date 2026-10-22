@@ -45,12 +45,12 @@ def _general(_slots: dict, hi: bool) -> tuple[list[str], str]:
                  "Kab se ho raha hai aur us samay kya badla tha, ye note karo.",
                  "Ab tak kya try kiya aur uska kya result aaya, likho.",
                  "Sabse chhota aur safe upaay pehle karo, phir dekho fark pada ya nahi."],
-                "Maine ye problem save kar li hai, taaki main is tarah ki problem seekh sakoon. Aur detail doge to plan aur sahi hoga.")
+                "Thodi aur detail likhoge to main behtar samajh paunga.")
     return (["Write the problem in one line: what's happening vs what should happen.",
              "Note when it started and what changed around then.",
              "List what you've tried so far and what happened.",
              "Try the smallest, safest fix first, then check if it helped."],
-            "I've saved this so I can learn this kind of problem. More detail will make the plan sharper.")
+            "A little more detail will help me understand it better.")
 
 
 def install() -> None:
@@ -75,3 +75,8 @@ def short_title(text: str) -> str:
 BUSINESS_DOMAIN = {k for k, t in KNOWLEDGE.items() if t.domain == "business"}
 
 install()
+
+
+def domain_of(intent: str) -> str:
+    t = KNOWLEDGE.get(intent or "")
+    return t.domain if t else ""

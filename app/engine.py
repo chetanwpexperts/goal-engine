@@ -17,6 +17,7 @@ from app.agents import automation as auto
 from app.agents import database as dbagent
 from app.agents.planner import plan as plan_automation
 from app.ml.brain import SKIP_RE, steps_text
+from app.ml.registry import domain_of
 from app.ml.normalize import normalize
 from app.models import Agent, Goal, Message, dumps, loads
 
@@ -84,7 +85,9 @@ STEPS_LABELS = {"Khud karne ke steps dikhao": True, "Show me the steps instead":
 WATCH_LABELS = {"Haan, roz check karo": True, "Yes, check it daily": False}
 
 
-NO_EXPERT = {"health_symptom", "stress_burnout"}   # these get safety guidance and real professionals, not a sales offer
+# These get safety guidance and the right real-world help (doctor, bank, 1930), never a sales offer
+NO_EXPERT = {"health_symptom", "stress_burnout", "lost_card", "online_fraud"}
+NO_EXPERT_DOMAINS = {"health"}
 
 
 def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: str, relation: str,
@@ -106,7 +109,7 @@ def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: 
         "ask_words": ask_words,
         "agents": agents,
         "offer_expert": bool(goal is not None and not agents and relation in ("new_goal", "corrected", "update_goal")
-                             and (goal.intent or "") not in NO_EXPERT),
+                             and (goal.intent or "") not in NO_EXPERT and domain_of(goal.intent or "") not in NO_EXPERT_DOMAINS),
     }
 
 

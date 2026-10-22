@@ -86,3 +86,12 @@ def test_phone_cleaning():
     assert expert.clean_phone("+1 (415) 555-0100") == "+14155550100"
     assert expert.clean_phone("0044 7700 900123") == "+447700900123"
     assert expert.clean_phone("12") == ""
+
+
+def test_lost_card_and_fatty_liver_get_real_answers_not_sales(client, ml_mode):
+    card = say(client, "mera atm card kho gya hai kaise milega")
+    assert card["goal"]["intent"] == "lost_card" and "block" in card["reply"].lower() and card["offer_expert"] is False
+    assert "seekh" not in card["reply"]
+    client.post("/api/new-chat"); client.cookies.delete("ge_vid")
+    liver = say(client, "mera fatty lever hai kaise thik kru")
+    assert liver["goal"]["intent"] == "liver_health" and "doctor" in liver["reply"].lower() and liver["offer_expert"] is False

@@ -426,8 +426,8 @@ class Brain:
         goal.title = short_title(text)
         _merge(goal, extract_all("general", text))
         turn = _next_step(goal, hi)
-        lead = ("Is tarah ki problem main abhi seekh raha hoon, par shuruaat aise karo:" if hi
-                else "I'm still learning this kind of problem, but here's how to start:")
+        lead = ("Is problem ke liye mere paas abhi pakka jawab nahi hai. Ye tareeka shuruaat mein madad karega:" if hi
+                else "I don't have a specific answer for this yet. This will help you start:")
         turn.reply = lead + "\n" + turn.reply.split("\n", 1)[1]
         turn.options = [INTENT_LABELS[i] for i, c in pred.ranking if i in INTENT_LABELS and c >= 0.12][:3]
         if turn.options:

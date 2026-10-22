@@ -67,3 +67,17 @@ def test_brain_understands_new_phrasings_of_every_problem():
                 if (r["kind"], r["id"]) != (kind, e["id"]):
                     misses.append(f"{e['id']}: '{t}' -> {r['kind']}:{r['id']} ({r['confidence']})")
     assert not misses, "\n".join(misses)
+
+
+def test_brain_understands_hindi_script_and_voice_style():
+    from app.dbknow import brain
+
+    cases = {
+        "मेरा डेटाबेस बहुत धीरे चल रहा है": "do:slow_query",
+        "डेटाबेस में बहुत सारे कनेक्शन की एरर आ रही है": "issue:too-many-connections",
+        "डुप्लीकेट ईमेल ढूंढो": "question:duplicates",
+        "database ka structure samjhao mujhe": "do:understand",
+    }
+    for text, want in cases.items():
+        r = brain.recognize(text)
+        assert f"{r['kind']}:{r['id']}" == want, (text, r)

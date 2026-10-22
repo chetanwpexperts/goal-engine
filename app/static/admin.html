@@ -33,6 +33,12 @@
     textarea { width: 100%; min-height: 56px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font: inherit; font-size: 14px; background: #fff; resize: vertical; }
     .saved { color: var(--ok); font-size: 13px; }
     .empty { color: var(--muted); }
+    .learn-head { margin-top: 40px; }
+    .lrow { display: flex; gap: 10px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 10px 0; flex-wrap: wrap; }
+    .lrow .t { flex: 1 1 320px; }
+    .lrow small { color: var(--muted); display: block; }
+    .lrow button { border: 1px solid var(--ink); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 13px; background: transparent; color: var(--ink); cursor: pointer; }
+    h2 { font-size: 18px; margin: 20px 0 4px; }
     a:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   </style>
 </head>
@@ -41,6 +47,9 @@
   <header><h1>Expert requests</h1><span class="count" id="count"></span></header>
   <div class="filters" id="filters"></div>
   <section id="list"></section>
+  <header class="learn-head"><h1>Learning</h1><span class="count" id="lcount"></span></header>
+  <p class="who">Sentences people asked the agents to learn ("None of these"), most asked first. The nightly learning reads them too. Below: sentences the brains learned from 3+ people agreeing. Reject anything wrong.</p>
+  <section id="learn"></section>
 </main>
 <script>
 (() => {
@@ -91,7 +100,34 @@
     }));
   }
 
+  const learnBox = document.getElementById("learn");
+  async function setL(kind, id, status) {
+    await fetch(`/api/admin/learning/${kind}/${id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+    loadLearning();
+  }
+  async function loadLearning() {
+    const r = await fetch("/api/admin/learning?status=new");
+    if (!r.ok) return;
+    const { requests, learned } = await r.json();
+    document.getElementById("lcount").textContent = `${requests.length} to learn`;
+    const row = (text, meta, buttons) => {
+      const d = el("div", "lrow"); const t = el("div", "t", text); t.append(el("small", null, meta)); d.append(t);
+      for (const [label, fn] of buttons) { const b = el("button", null, label); b.type = "button"; b.addEventListener("click", fn); d.append(b); }
+      return d;
+    };
+    const parts = [el("h2", null, "Asked to learn")];
+    if (!requests.length) parts.push(el("p", "empty", "Nothing waiting."));
+    for (const q of requests) parts.push(row(q.text, `${q.brain} · asked ${q.count}× · best guess ${q.guess || "none"}`,
+      [["Learned", () => setL("request", q.id, "learned")], ["Ignore", () => setL("request", q.id, "ignored")]]));
+    parts.push(el("h2", null, "Learned from users"));
+    if (!learned.length) parts.push(el("p", "empty", "Nothing yet."));
+    for (const p of learned) parts.push(row(p.text, `${p.brain} → ${p.label} · ${p.status}`,
+      p.status === "rejected" ? [["Allow", () => setL("phrase", p.id, "approved")]] : [["Reject", () => setL("phrase", p.id, "rejected")]]));
+    learnBox.replaceChildren(...parts);
+  }
+
   load();
+  loadLearning();
   setInterval(() => { if (!document.hidden && document.activeElement.tagName !== "TEXTAREA") load(); }, 30000);
 })();
 </script>

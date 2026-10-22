@@ -16,7 +16,9 @@ SQL_RE = re.compile(r"\b(select\b[\s\S]+?\bfrom\b|update\s+[`\"\w.]+\s+set\b|del
 # Built-in things the brain can do besides playbooks
 BUILTIN = {
     "slow_query": ["query slow hai", "query bahut time le rahi hai", "optimize my query", "query fast karni hai",
-                   "slow sql", "is query ko optimize karo", "query speed badhao", "query hang ho jaati hai"],
+                   "slow sql", "is query ko optimize karo", "query speed badhao", "query hang ho jaati hai",
+                   "database bahut slow chal raha hai", "my database is very slow", "db slow ho gaya hai",
+                   "database dhima ho gaya", "data load hone mein bahut time lagta hai", "report nikalne mein minute lag jaate hain"],
     "health": ["database ki health check karo", "database theek hai kya", "database check karo", "db health",
                "database mein kya problem hai", "check my database"],
     "understand": ["database samjhao", "is database ka structure batao", "kaunsi table kya karti hai", "explain my database",
@@ -47,9 +49,22 @@ def _examples():
     return texts, labels
 
 
+def _training():
+    """Knowledge files + what real users taught it (app/learning.py)."""
+    from app import learning
+
+    texts, labels = _examples()
+    known = set(labels)
+    for text, label in learning.examples("database"):
+        if label in known:
+            texts.append(text)
+            labels.append(label)
+    return texts, labels
+
+
 def _train():
     global _model, _fingerprint
-    texts, labels = _examples()
+    texts, labels = _training()
     fp = hashlib.sha256(repr((texts, labels)).encode()).hexdigest()
     if _model is not None and fp == _fingerprint:
         return _model

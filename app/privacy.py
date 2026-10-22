@@ -105,6 +105,9 @@ def delete_visitor(db: Session, visitor_id: str) -> dict:
     counts["expert_requests"] = db.execute(delete(ExpertRequest).where(ExpertRequest.visitor_id == visitor_id)).rowcount
     counts["messages"] = db.execute(delete(Message).where(Message.visitor_id == visitor_id)).rowcount
     counts["goals"] = db.execute(delete(Goal).where(Goal.visitor_id == visitor_id)).rowcount
+    from app import learning
+
+    counts["learning_votes"] = learning.delete_voter(db, visitor_id)
     db.execute(delete(UsageCounter).where(UsageCounter.scope == f"visitor:{visitor_id}"))
     db.commit()
     return counts
@@ -184,6 +187,11 @@ def maintain(db: Session, now=None) -> dict:
 
     # 2b. expert requests: 180 days
     db.execute(delete(ExpertRequest).where(ExpertRequest.created_at < now - timedelta(days=180)))
+
+    # 2c. learning: votes 90 days, "please learn this" sentences 180 days (scrubbed, no visitor id)
+    from app import learning
+
+    done.update(learning.maintain(db, now))
 
     # 3. "already emailed" log
     done["sent_log"] = db.execute(delete(SentEmail).where(SentEmail.sent_at < now - SENT_LOG_TTL)).rowcount

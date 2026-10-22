@@ -14,7 +14,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -115,7 +115,7 @@ def _scheduler(stop: threading.Event) -> None:
 # ---------------------------------------------------------------- coming soon (closed until SITE_MODE=open)
 PREVIEW_COOKIE = "ge_preview"
 OPEN_PATHS = ("/api/health", "/api/connector/", "/connector/", "/robots.txt", "/preview", "/static/coming-soon.html",
-              "/admin", "/api/admin/")      # admin has its own key
+              "/admin", "/api/admin/", "/api/learning/feed")      # admin and the feed have their own keys
 
 
 def _site_open() -> bool:
@@ -271,6 +271,74 @@ def admin_update(req_id: int, body: ExpertUpdate, request: Request, db: Session 
         return expert.as_dict(expert.update(db, req_id, body.status, body.note), admin=True)
     except expert.ExpertError:
         raise HTTPException(404, "Not Found")
+
+
+# ---------------------------------------------------------------- brains learning from users (app/learning.py)
+class LearnVoteIn(BaseModel):
+    brain: str
+    text: str = Field(max_length=2000)
+    label: str = Field(max_length=80)
+
+
+class LearnAskIn(BaseModel):
+    brain: str
+    text: str = Field(max_length=2000)
+    guess: str = ""
+    confidence: float = 0.0
+
+
+class LearnStatusIn(BaseModel):
+    status: str
+
+
+@app.post("/api/learn/choice")
+def learn_choice(body: LearnVoteIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    from app import learning
+
+    try:
+        return learning.vote(db, body.brain, body.text, body.label, visitor)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/learn/ask")
+def learn_ask(body: LearnAskIn, db: Session = Depends(get_db)):
+    from app import learning
+
+    try:
+        learning.ask_to_learn(db, body.brain, body.text, body.guess, body.confidence)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {"ok": True}
+
+
+@app.get("/api/admin/learning")
+def admin_learning(request: Request, status: str = "new", db: Session = Depends(get_db)):
+    from app import learning
+
+    if not _is_admin(request):
+        raise HTTPException(404, "Not Found")
+    return learning.overview(db, status)
+
+
+@app.post("/api/admin/learning/{kind}/{item_id}")
+def admin_learning_set(kind: str, item_id: int, body: LearnStatusIn, request: Request, db: Session = Depends(get_db)):
+    from app import learning
+
+    if not _is_admin(request) or not learning.set_status(db, kind, item_id, body.status):
+        raise HTTPException(404, "Not Found")
+    return {"ok": True}
+
+
+@app.get("/api/learning/feed")
+def learning_feed(key: str = "", db: Session = Depends(get_db)):
+    """For the nightly learning only (LEARN_KEY): scrubbed sentences people asked us to learn."""
+    from app import learning
+
+    want = os.getenv("LEARN_KEY", "")
+    if len(want) < 16 or not hmac.compare_digest(key, want):
+        raise HTTPException(404, "Not Found")
+    return {"requests": learning.feed(db)}
 
 
 class MessageIn(BaseModel):
@@ -732,7 +800,9 @@ def brain_recognize(body: RecognizeIn):
     from app.dbknow import brain
 
     rec = brain.recognize(body.text)
-    return {**rec, "text": brain.describe(rec, body.lang != "en")}
+    hi = body.lang != "en"
+    alts = [{**a, "text": brain.describe(a, hi)} for a in rec.get("alternatives", [])]
+    return {**rec, "alternatives": [a for a in alts if a["text"]], "text": brain.describe(rec, hi)}
 
 
 @app.get("/api/dbbrain/playbook/{issue_id}")

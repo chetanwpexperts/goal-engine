@@ -826,7 +826,8 @@
       if (!q.value.trim()) return;
       try {
         const r = await api("/api/dbbrain/recognize", { method: "POST", body: JSON.stringify({ text: q.value, lang: hi ? "hi" : "en" }) });
-        show({ ...r, sql: r.kind === "sql" ? q.value : "" });
+        if (r.kind !== "sql" && r.confidence < 0.6) choose(r, q.value);
+        else show({ ...r, sql: r.kind === "sql" ? q.value : "" });
       } catch (ex) { body2.replaceChildren(el("p", "note err", ex.message)); }
     });
     box.append(ask, body2);
@@ -842,6 +843,29 @@
       else if (b.kind === "error") errorFlow(b.id);
       else if (b.kind === "sql" || b.id === "slow_query") queryFlow(b.sql || "");
       else if (b.id === "health") body2.append(el("p", "fine", T(hi, "Neeche Health check dabao.", "Use Health check below.")));
+    };
+
+    // Not sure: the person picks the meaning. Their pick teaches the brain (3 different people = learned).
+    const choose = (r, text) => {
+      body2.replaceChildren(el("p", "brain-seen", T(hi, "Aapka matlab inmein se kaunsa hai?", "Which of these do you mean?")));
+      const row = el("div", "brain-choices");
+      for (const o of [r, ...(r.alternatives || [])].filter((x) => x.text).slice(0, 4)) {
+        const b = el("button", "chip", o.text); b.type = "button";
+        b.addEventListener("click", () => {
+          api("/api/learn/choice", { method: "POST", body: JSON.stringify({ brain: "database", text, label: `${o.kind}:${o.id}` }) }).catch(() => {});
+          show({ ...o, sql: "" });
+        });
+        row.append(b);
+      }
+      const none = el("button", "chip ghost", T(hi, "Inmein se koi nahi", "None of these")); none.type = "button";
+      none.addEventListener("click", async () => {
+        try { await api("/api/learn/ask", { method: "POST", body: JSON.stringify({ brain: "database", text, guess: `${r.kind}:${r.id}`, confidence: r.confidence }) }); } catch (_) { /* still fine */ }
+        body2.replaceChildren(el("p", "fine", T(hi, "Note kar liya. Agent ise seekh raha hai. Tab tak Health check chalao, ya expert se baat karo.",
+          "Noted. The agent is learning this one. Meanwhile run Health check, or talk to an expert.")));
+      });
+      row.append(none);
+      body2.append(row, el("p", "fine small", T(hi, "Aapka jawab agent ko sikhata hai. Sirf sawaal ki line rakhi jaati hai, bina naam, email ya number ke.",
+        "Your pick teaches the agent. Only the sentence is kept, without names, emails or numbers.")));
     };
 
     const issueFlow = (id) => {

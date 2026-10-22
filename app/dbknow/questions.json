@@ -58,7 +58,12 @@
     "examples": [
       "jo customer 60 din se nahi aaye",
       "customers who haven't ordered in 3 months",
-      "purane customers jo wapas nahi aaye"
+      "purane customers jo wapas nahi aaye",
+      "jin customers ne kaafi time se kuch nahi khareeda",
+      "customers jo 90 din se order nahi kar rahe",
+      "inactive customers ki list",
+      "kaun log ab order nahi karte",
+      "last order bahut purana hai jin customers ka"
     ],
     "needs": {
       "table": "customers table",

@@ -230,3 +230,53 @@ class ExpertRequest(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)            # Chetan's own note
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class LearnRequest(Base):
+    """A problem an agent couldn't understand well, sent by the user with one click ("None of these").
+    Only the scrubbed sentence is kept (no emails, links, numbers, keys, no visitor id). The nightly learning reads
+    these first. Deleted after 180 days."""
+
+    __tablename__ = "learn_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    brain: Mapped[str] = mapped_column(String(20), index=True)          # database / php / office / general
+    fingerprint: Mapped[str] = mapped_column(String(64), unique=True)  # brain + normalized text
+    text: Mapped[str] = mapped_column(String(300))
+    guess: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0)
+    count: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(12), default="new", index=True)   # new / learned / ignored
+    first_seen: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class LearnVote(Base):
+    """'I meant this one': a user picked the right meaning for a sentence. voter = keyed fingerprint, never the id.
+    Deleted after 90 days; three different people agreeing teaches the brain (LearnedPhrase)."""
+
+    __tablename__ = "learn_votes"
+    __table_args__ = (UniqueConstraint("phrase_fp", "voter"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    brain: Mapped[str] = mapped_column(String(20))
+    phrase_fp: Mapped[str] = mapped_column(String(64), index=True)
+    text: Mapped[str] = mapped_column(String(300))
+    label: Mapped[str] = mapped_column(String(80))
+    voter: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class LearnedPhrase(Base):
+    """A new way of saying a known problem, learned from users. The brains train on these (auto/approved)."""
+
+    __tablename__ = "learned_phrases"
+    __table_args__ = (UniqueConstraint("brain", "phrase_fp"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    brain: Mapped[str] = mapped_column(String(20), index=True)
+    phrase_fp: Mapped[str] = mapped_column(String(64))
+    text: Mapped[str] = mapped_column(String(300))
+    label: Mapped[str] = mapped_column(String(80))
+    status: Mapped[str] = mapped_column(String(12), default="auto", index=True)   # auto / approved / rejected
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

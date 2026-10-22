@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -34,7 +35,7 @@ class Prediction:
     ranking: list[tuple[str, float]]
 
 
-def training_examples() -> tuple[list[str], list[str]]:
+def training_examples(include_learned: bool = True) -> tuple[list[str], list[str]]:
     from app.ml.knowledge import all_types
 
     texts, labels = [], []
@@ -59,7 +60,14 @@ def training_examples() -> tuple[list[str], list[str]]:
             texts.append(label)
             labels.append(intent)
     known = set(labels)
-    if LEARNED_PATH.exists():
+    if include_learned:
+        from app import learning
+
+        for text, label in learning.examples("general"):
+            if label in known:
+                texts.append(text)
+                labels.append(label)
+    if include_learned and LEARNED_PATH.exists():
         for line in LEARNED_PATH.read_text(encoding="utf-8").splitlines():
             try:
                 row = json.loads(line)
@@ -94,6 +102,8 @@ class IntentModel:
         self.path = path
         self._pipeline: Pipeline | None = None
         self._lock = threading.Lock()
+        self._fp = ""
+        self._checked = 0.0
 
     def train(self) -> Pipeline:
         texts, labels = training_examples()
@@ -109,9 +119,19 @@ class IntentModel:
     def load(self) -> Pipeline:
         with self._lock:
             if self._pipeline is not None:
+                if time.monotonic() - self._checked < 120:
+                    return self._pipeline
+                self._checked = time.monotonic()   # users may have taught it something: retrain if so
+                texts, labels = training_examples()
+                if _fingerprint(texts, labels) == self._fp:
+                    return self._pipeline
+                self._pipeline = self.train()
+                self._fp = _fingerprint(texts, labels)
                 return self._pipeline
+            self._checked = time.monotonic()
             texts, labels = training_examples()
             wanted = _fingerprint(texts, labels)
+            self._fp = wanted
             if self.path.exists():
                 try:
                     saved = joblib.load(self.path)

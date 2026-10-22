@@ -379,3 +379,8 @@ body[data-state="active"] .status { display: none; }
 .tag.config { background: var(--signal-soft); color: var(--signal-ink); }
 .why { margin: 0; padding-left: 18px; font-size: 14px; }
 @media (max-width: 640px) { .brain { margin-left: 0; } .brain-ask { flex-direction: column; } }
+.brain-choices { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.brain-choices .chip { border: 1px solid var(--ink); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 14px; cursor: pointer; text-align: left; }
+.brain-choices .chip:hover { background: var(--ink); color: var(--paper); }
+.brain-choices .chip.ghost { border-style: dashed; color: var(--muted); }
+.fine.small { font-size: 12px; }

@@ -95,3 +95,9 @@ def test_english_by_default(client, ml_mode):
     _upload(client, agent["id"], PRACTICE.read_bytes(), "Excel_Practice.xlsx")
     r = say(client, "total sales by region", r["goal"]["id"])
     assert "Sales Data" in r["reply"] and "Formula" in r["reply"] and "jod di" not in r["reply"], r["reply"]
+
+
+@pytest.mark.parametrize("text", ["fix everything", "clean the file", "sab theek karo", "fix all problems"])
+def test_fix_everything_in_any_order(client, open_file, text):
+    r = say(client, text, open_file)
+    assert "Fixing" in r["reply"] or "theek kar raha" in r["reply"] or "Nothing left" in r["reply"] or "kuch nahi bacha" in r["reply"], (text, r["reply"])

@@ -200,7 +200,8 @@ def scan(path: str) -> dict:
             continue
         info = {"name": name, "rows": 0, "columns": 0, "header": [], "formulas": 0, "broken_refs": [],
                 "odd_formulas": [], "errors": {}, "text_numbers": 0, "text_number_cells": [], "spaces": 0,
-                "space_cells": [], "duplicate_rows": 0, "columns_info": [], "case_mixed": 0, "case_cells": [], "duplicate_list": []}
+                "space_cells": [], "duplicate_rows": 0, "columns_info": [], "case_mixed": 0, "case_cells": [], "duplicate_list": [],
+                "samples": {"trim_spaces": [], "text_to_number": [], "fix_case": [], "fix_broken_refs": []}}
         col_shapes = defaultdict(Counter)
         col_words = defaultdict(lambda: defaultdict(Counter))   # column -> "finance" -> {"Finance": 3, "finance": 1}
         col_word_cells = defaultdict(list)
@@ -220,6 +221,8 @@ def scan(path: str) -> dict:
                     info["duplicate_rows"] += 1
                     if len(info["duplicate_list"]) < MAX_LISTED:
                         info["duplicate_list"].append([r_i, seen_rows[h]])     # this row repeats that one
+                    if len(info.setdefault("dup_samples", [])) < 3:
+                        info["dup_samples"].append([r_i, seen_rows[h], " · ".join(str(v) for v in row if v not in (None, ""))[:90]])
                 elif len(seen_rows) < 3_000_000:
                     seen_rows[h] = r_i
             for c_i, v in enumerate(row, start=1):
@@ -231,6 +234,8 @@ def scan(path: str) -> dict:
                     if "#REF!" in v:
                         if len(info["broken_refs"]) < MAX_LISTED:
                             info["broken_refs"].append(_addr(c_i, r_i))
+                        if len(info["samples"]["fix_broken_refs"]) < 4:
+                            info["samples"]["fix_broken_refs"].append([_addr(c_i, r_i), v, ""])
                         info.setdefault("broken_ref_count", 0)
                         info["broken_ref_count"] += 1
                     else:
@@ -251,6 +256,8 @@ def scan(path: str) -> dict:
                     info["text_numbers"] += 1
                     if len(info["text_number_cells"]) < MAX_LISTED:
                         info["text_number_cells"].append(_addr(c_i, r_i))
+                    if len(info["samples"]["text_to_number"]) < 4:
+                        info["samples"]["text_to_number"].append([_addr(c_i, r_i), v, text_number(v)])
                 else:
                     col_types[c_i]["text"] += 1
                     w = clean_spaces(v)
@@ -262,6 +269,8 @@ def scan(path: str) -> dict:
                     info["spaces"] += 1
                     if len(info["space_cells"]) < MAX_LISTED:
                         info["space_cells"].append(_addr(c_i, r_i))
+                    if len(info["samples"]["trim_spaces"]) < 4:          # the real value and what the fix makes of it
+                        info["samples"]["trim_spaces"].append([_addr(c_i, r_i), v, clean_spaces(v)])
         # the odd formula out: one row whose formula differs from the 80%+ of its column
         for c_i, counter in col_shapes.items():
             total = sum(counter.values())
@@ -280,6 +289,8 @@ def scan(path: str) -> dict:
                     info["case_mixed"] += 1
                     if len(info["case_cells"]) < MAX_LISTED:
                         info["case_cells"].append(_addr(c_i, r_i))
+                    if len(info["samples"]["fix_case"]) < 4:
+                        info["samples"]["fix_case"].append([_addr(c_i, r_i), w, m])
         for c_i in sorted(col_types):
             t = col_types[c_i]
             head = info["header"][c_i - 1] if c_i - 1 < len(info["header"]) else ""
@@ -368,6 +379,13 @@ class _Log:
         self.counts = Counter()
         self.rows = []
 
+    def examples(self, per_op: int = 4) -> dict:
+        out = {}
+        for op, sheet, cell, old, new in self.rows:
+            if len(out.setdefault(op, [])) < per_op:
+                out[op].append([sheet, cell, old, new])
+        return out
+
     def add(self, op, sheet, cell, old, new):
         self.counts[op] += 1
         if len(self.rows) < MAX_CHANGES_LISTED:
@@ -438,7 +456,7 @@ def _fix_full(path, out, ops, only_sheets=None):
     had = CHANGES_SHEET in wb.sheetnames
     _changes_sheet(wb[CHANGES_SHEET] if had else wb.create_sheet(CHANGES_SHEET), log, fresh=not had)
     wb.save(out)
-    return {"changes": dict(log.counts), "formatting_kept": True}
+    return {"changes": dict(log.counts), "formatting_kept": True, "examples": log.examples()}
 
 
 def _dedupe_sheet(wb, ws, log):
@@ -449,18 +467,19 @@ def _dedupe_sheet(wb, ws, log):
     if has_formulas or referenced:
         log.counts["duplicates_skipped_sheets"] += 1
         return
-    seen, dupes = set(), []
+    seen, dupes = {}, []
     header = [c.value for c in next(ws.iter_rows(max_row=1), [])]
     for row in ws.iter_rows(min_row=2):
         vals = row_key(header, [c.value for c in row])
         if all(v in (None, "") for v in vals):
             continue
         if vals in seen:
-            dupes.append(row[0].row)
+            dupes.append((row[0].row, seen[vals], " · ".join(str(c.value) for c in row if c.value not in (None, ""))[:90]))
         else:
-            seen.add(vals)
-    for r in reversed(dupes):
-        log.add("remove_duplicates", ws.title, f"row {r}", "", "")
+            seen[vals] = row[0].row
+    for r, same, text in dupes:
+        log.add("remove_duplicates", ws.title, f"row {r}", text, f"same as row {same}")
+    for r, _, _ in reversed(dupes):
         ws.delete_rows(r)
 
 
@@ -507,7 +526,7 @@ def _fix_stream(path, out, ops, only_sheets=None):
             earlier = [r for i, r in enumerate(rows) if i > 0]
     _changes_sheet(wb_out.create_sheet(CHANGES_SHEET), log, earlier)
     wb_out.save(out)
-    return {"changes": dict(log.counts), "formatting_kept": False}
+    return {"changes": dict(log.counts), "formatting_kept": False, "examples": log.examples()}
 
 
 def _fix_csv(path, out, ops):
@@ -529,7 +548,7 @@ def _fix_csv(path, out, ops):
                     continue
                 seen.add(h)
             w.writerow(row)
-    return {"changes": dict(log.counts), "formatting_kept": True}
+    return {"changes": dict(log.counts), "formatting_kept": True, "examples": log.examples()}
 
 
 def _changes_sheet(ws, log, earlier=(), fresh=True):

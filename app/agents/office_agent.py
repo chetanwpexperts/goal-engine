@@ -384,7 +384,7 @@ DO_WORDS = {"remove", "delete", "hatao", "hata", "hatado", "hataye", "hatana", "
 YES_RE = re.compile(r"^\s*(haan|ha|haa|han|yes|yep|ok|okay|theek hai|thik hai|kar do|karo|hata do|hatao|do it|go ahead|please)\b", re.I)
 FORMULA_RE = re.compile(r"\b(formula|formule|formulae|fourmula|farmula|function)\b", re.I)
 UNDO_RE = re.compile(r"\b(undo|wapas|vapas|pehle jaisa|revert|purana wala)\b", re.I)
-ALL_RE = re.compile(r"\b(sab|saari|saare|everything|all)\b.{0,20}\b(theek|thik|fix|saaf|clean)", re.I)
+ALL_RE = re.compile(r"\b(sab|saari|saare|everything|all)\b.{0,20}\b(theek|thik|fix|saaf|clean)|\b(fix|clean|correct)\b.{0,12}\b(everything|all|it all|them all|the file|my file)\b", re.I)
 REPORT_RE = re.compile(r"\b(kya galat|kya problem|what.{0,10}wrong|check (karo|my|the|this)|problems?|errors?|galti|galtiyan|issues?)\b", re.I)
 _OP_NAMES = {"trim_spaces": ("extra space", "extra spaces"), "remove_duplicates": ("duplicate rows", "duplicate rows"),
              "fix_case": ("capital/small letters", "capital letters"), "text_to_number": ("text wale numbers", "text-numbers"),

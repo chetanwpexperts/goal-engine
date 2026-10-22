@@ -534,3 +534,16 @@ body.typing .brains { visibility: hidden; }
 .ans-chart-title .lg::before { content: ""; width: 10px; height: 10px; border-radius: 3px; }
 .ans-chart-title .lg.before::before { background: #E8817A; }
 .ans-chart-title .lg.after::before { background: #2FA58F; }
+.ans-rail li.wait { color: var(--muted); border-style: dashed; }
+.ans-card { border: 1px solid var(--line); border-left-width: 4px; border-radius: 12px; padding: 12px 14px; background: var(--panel); display: grid; gap: 6px; }
+.ans-card.bad { border-left-color: #E8817A; }
+.ans-card.good { border-left-color: #2FA58F; }
+.ans-card.info { border-left-color: #B9C0DA; }
+.ans-card h4 { margin: 0; font-size: 15px; }
+.ans-card .examples { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.ans-card .examples li { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.ans-card .where { color: var(--muted); font-size: 12px; min-width: 110px; }
+.ans-card .from { color: #8E2B22; background: #FDECEA; border-radius: 6px; padding: 0 6px; white-space: pre; font-family: ui-monospace, monospace; font-size: 12.5px; }
+.ans-card .to { color: #135F55; background: #E3F5F1; border-radius: 6px; padding: 0 6px; white-space: pre; font-family: ui-monospace, monospace; font-size: 12.5px; }
+.ans-card .arrow { color: var(--muted); }
+.ans-visual > .btn.solid { justify-self: start; }

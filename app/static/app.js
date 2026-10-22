@@ -1155,59 +1155,63 @@
   }
 
   function answerView(f, hi) {
-    const r = f.result || {}, now = (f.report || {}).summary || {}, before = f.before || now;
-    // rail: what the agent did, in order
-    const rail = el("ol", "ans-rail");
-    const working = f.status !== "ready";
-    [[T(hi, "Samjha", "Understood"), true], [T(hi, "File jaanchi", "Checked the file"), true],
-     [T(hi, "Hal banaya", "Built the fix"), !working], [T(hi, "Taiyar", "Ready"), !working]].forEach(([t, done], i) => {
-      const li = el("li", done ? "done" : i === 2 ? "now" : "");
-      li.append(el("span", "dot"), el("span", null, t));
-      rail.append(li);
-    });
-    // overview
-    const overview = el("div", "ans-overview");
-    const ic = el("span", "ans-icon"); ic.append(svgIcon(ICON_BRAIN));
+    const r = f.result || {}, rep = f.report || { sheets: [], summary: {} }, now = rep.summary || {}, before = f.before || now;
+    const fmtN = (n) => Number(n || 0).toLocaleString("en-IN");
     const total = Object.keys(PROBLEM).reduce((n, k) => n + (now[k] || 0), 0);
     const totalBefore = Object.keys(PROBLEM).reduce((n, k) => n + (before[k] || 0), 0);
-    let title = T(hi, "File ki jaanch", "File check"), text = total ? T(hi, `${total} galtiyan mili. Neeche dekho kya theek ho sakta hai.`, `${total} problems found. See what can be fixed below.`)
-      : T(hi, "Is file mein koi galti nahi mili.", "No problems found in this file.");
+    const steps = f.steps || [];
+    const changed = steps.reduce((n, st) => n + Object.entries(st.changes || {}).filter(([op]) => FIXNAME[op]).reduce((m, [, v]) => m + v, 0), 0);
+
+    // what really happened, in order; nothing shown as done unless it was
+    const rail = el("ol", "ans-rail");
+    const step = (text, state) => { const li = el("li", state); li.append(el("span", "dot"), el("span", null, text)); rail.append(li); };
+    step(T(hi, `File padhi: ${fmtN(now.sheets)} sheets, ${fmtN(now.rows)} rows`, `Read the file: ${fmtN(now.sheets)} sheets, ${fmtN(now.rows)} rows`), "done");
+    if (r.task === "ask") step(T(hi, "Sawaal ka jawab nikala", "Answered your question"), "done");
+    else step(totalBefore ? T(hi, `${fmtN(totalBefore)} galtiyan mili`, `Found ${fmtN(totalBefore)} problems`) : T(hi, "Koi galti nahi mili", "No problems found"), "done");
+    if (r.task !== "ask" && totalBefore) step(changed ? T(hi, `${fmtN(changed)} cells/rows theek kiye`, `Fixed ${fmtN(changed)} cells/rows`) : T(hi, "Abhi kuch nahi badla", "Nothing changed yet"), changed ? "done" : "wait");
+    if (f.status !== "ready") step(T(hi, "Kaam chal raha hai…", "Working…"), "now");
+
+    const overview = el("div", "ans-overview");
+    const ic = el("span", "ans-icon"); ic.append(svgIcon(ICON_BRAIN));
+    let title = T(hi, "File ki jaanch", "File check");
+    let text = total ? T(hi, `${fmtN(total)} galtiyan hain. Neeche asli cells aur unka theek kiya hua roop dekho.`, `${fmtN(total)} problems. Below are the actual cells and what each fix will make of them.`)
+      : T(hi, "Is file mein koi galti nahi hai.", "No problems in this file.");
     if (r.task === "ask") { title = (r.chart && r.chart.title) || T(hi, "Jawab", "Answer"); text = r.say; }
-    else if (r.task === "fix") { title = T(hi, "Theek kar diya", "Fixed"); text = T(hi, `Pehle ${totalBefore} galtiyan thi, ab ${total}.`, `${totalBefore} problems before, ${total} now.`); }
-    else if (r.task === "extract") { title = T(hi, "Duplicates ki list", "Duplicates listed"); text = T(hi, `${r.count} duplicate nayi sheet mein. Data nahi badla.`, `${r.count} duplicates in a new sheet. Data unchanged.`); }
-    else if (r.task === "compare") { title = T(hi, "Dono files ka milan", "Files compared"); text = T(hi, `${r.only_in_a} sirf pehli mein, ${r.only_in_b} sirf doosri mein, ${r.changed_rows} rows badli.`, `${r.only_in_a} only in the first, ${r.only_in_b} only in the second, ${r.changed_rows} rows changed.`); }
+    else if (r.task === "fix") { title = T(hi, "Theek kar diya", "Fixed"); text = T(hi, `Pehle ${fmtN(totalBefore)} galtiyan thi, ab ${fmtN(total)}.`, `${fmtN(totalBefore)} problems before, ${fmtN(total)} now.`); }
+    else if (r.task === "extract") { title = T(hi, "Duplicates ki list", "Duplicates listed"); text = T(hi, `${fmtN(r.count)} duplicate nayi sheet mein. Data nahi badla.`, `${fmtN(r.count)} duplicates listed in a new sheet. Your data wasn't changed.`); }
+    else if (r.task === "compare") { title = T(hi, "Dono files ka milan", "Files compared"); text = T(hi, `${fmtN(r.only_in_a)} sirf pehli mein, ${fmtN(r.only_in_b)} sirf doosri mein, ${fmtN(r.changed_rows)} rows badli.`, `${fmtN(r.only_in_a)} only in the first, ${fmtN(r.only_in_b)} only in the second, ${fmtN(r.changed_rows)} rows changed.`); }
     const ot = el("div"); ot.append(el("h3", null, title), el("p", null, text));
     overview.append(ic, ot);
-    if (r.formula) { const fx = el("code", "ans-formula", r.formula); overview.append(fx); }
+    if (r.formula) overview.append(el("code", "ans-formula", r.formula));
 
-    // visual
     const visual = el("div", "ans-visual");
+    const exampleLine = (where, from, to) => {
+      const li = el("li");
+      li.append(el("span", "where", where), el("span", "from", JSON.stringify(String(from ?? ""))), el("span", "arrow", "→"),
+                el("span", "to", to === "" || to == null ? T(hi, "(khud dekhna hoga)", "(needs a look)") : JSON.stringify(String(to))));
+      return li;
+    };
+
     if (r.task === "ask" && r.chart && r.chart.rows && r.chart.rows.length) {
       visual.append(barChart(r.chart.rows, r.chart.title, r.chart.line));
-    } else {
-      const keys = Object.keys(PROBLEM).filter((k) => (before[k] || 0) > 0);
-      if (keys.length) {
-        const flow = el("div", "ans-flow");
-        const left = el("div", "col probs"), right = el("div", "col fixes");
-        const done = {};
-        for (const st of f.steps || []) for (const [op, n] of Object.entries(st.changes || {})) done[op] = (done[op] || 0) + n;
-        for (const k of keys) {
-          const [h, e, op] = PROBLEM[k];
-          const p = el("div", "node bad"); p.append(el("b", null, T(hi, h, e)), el("span", null, Number(before[k]).toLocaleString("en-IN")));
-          left.append(p);
-          const fixed = op && done[op];
-          const fx = el("div", `node ${fixed ? "good" : op ? "todo" : "info"}`);
-          fx.append(el("b", null, op ? T(hi, ...FIXNAME[op]) : T(hi, "Dekhna padega", "Needs a look")),
-                    el("span", null, fixed ? T(hi, `${Number(done[op]).toLocaleString("en-IN")} theek`, `${Number(done[op]).toLocaleString("en-IN")} fixed`)
-                      : op ? T(hi, "Theek ho sakta hai", "Can be fixed") : T(hi, "Khud nahi badlunga", "Won't auto-change")));
-          right.append(fx);
+    } else if (r.task === "fix" && r.examples && Object.keys(r.examples).length) {
+      // what actually changed in the file, with the real values
+      for (const [op, rows] of Object.entries(r.examples)) {
+        if (!FIXNAME[op]) continue;
+        const card = el("div", "ans-card good");
+        card.append(el("h4", null, `${T(hi, ...FIXNAME[op])}: ${fmtN((r.changes || {})[op])}`));
+        const ul = el("ul", "examples");
+        for (const [sheet, cell, from, to] of rows) {
+          if (op === "remove_duplicates") {
+            const li = el("li"); li.append(el("span", "where", `${sheet} ${cell}`), el("span", "from", from || ""), el("span", null, T(hi, `hata di (${to || "duplicate"})`, `removed (${to || "duplicate"})`)));
+            ul.append(li);
+          } else ul.append(exampleLine(`${sheet}!${cell}`, from, to));
         }
-        const hub = el("div", "hub"); const hi_ = el("span", "hub-ring");
-        hi_.append(el("b", null, f.name.length > 22 ? f.name.slice(0, 20) + "…" : f.name), el("span", null, T(hi, `${total} baaki`, `${total} left`)));
-        hub.append(hi_);
-        flow.append(left, hub, right);
-        visual.append(flow);
-        // before / after
+        card.append(ul);
+        visual.append(card);
+      }
+      const keys = Object.keys(PROBLEM).filter((k) => (before[k] || 0) !== (now[k] || 0));
+      if (keys.length) {
         const ba = el("div", "ans-ba");
         const legend = el("p", "ans-chart-title");
         legend.append(document.createTextNode(T(hi, "Pehle vs ab ", "Before vs now ")), el("span", "lg before", T(hi, "pehle", "before")), el("span", "lg after", T(hi, "ab", "now")));
@@ -1218,14 +1222,44 @@
           const b1 = el("span", "b before"); b1.style.width = `${((before[k] || 0) / max) * 100}%`;
           const b2 = el("span", "b after"); b2.style.width = `${((now[k] || 0) / max) * 100}%`;
           const bars = el("span", "bars"); bars.append(b1, b2);
-          row.append(el("span", "lbl", T(hi, PROBLEM[k][0], PROBLEM[k][1])), bars, el("span", "val", `${before[k] || 0} → ${now[k] || 0}`));
+          row.append(el("span", "lbl", T(hi, PROBLEM[k][0], PROBLEM[k][1])), bars, el("span", "val", `${fmtN(before[k])} → ${fmtN(now[k])}`));
           ba.append(row);
         }
         visual.append(ba);
-      } else {
-        visual.append(el("p", "fine", T(hi, "Is file mein koi galti nahi hai. Ab koi bhi sawaal poocho: \"region wise total\", \"pending dikhao\"...",
-                                          "No problems in this file. Ask anything: \"total by region\", \"show pending\"...")));
       }
+    }
+    // problems still in the file: the real cells, and exactly what the fix would do
+    const open = Object.keys(PROBLEM).filter((k) => (now[k] || 0) > 0);
+    if (open.length && r.task !== "ask") {
+      const fixable = [];
+      for (const k of open) {
+        const [h, e, op] = PROBLEM[k];
+        const card = el("div", `ans-card ${op ? "bad" : "info"}`);
+        card.append(el("h4", null, `${T(hi, h, e)}: ${fmtN(now[k])}`));
+        const ul = el("ul", "examples");
+        for (const sh of rep.sheets || []) {
+          if (k === "duplicate_rows") for (const [row, same, txt] of (sh.dup_samples || [])) {
+            const li = el("li"); li.append(el("span", "where", `${sh.name} row ${row}`), el("span", null, T(hi, `row ${same} jaisi: ${txt}`, `same as row ${same}: ${txt}`))); ul.append(li);
+          } else if (op && sh.samples && sh.samples[op]) for (const [cell, from, to] of sh.samples[op]) ul.append(exampleLine(`${sh.name}!${cell}`, from, to));
+          else if (k === "errors") for (const [code, e2] of Object.entries(sh.errors || {})) { const li = el("li"); li.append(el("span", "where", sh.name), el("span", null, `${code}: ${e2.cells.slice(0, 5).join(", ")}`)); ul.append(li); }
+          else if (k === "odd_formulas" && (sh.odd_formulas || []).length) { const li = el("li"); li.append(el("span", "where", sh.name), el("span", null, sh.odd_formulas.slice(0, 6).join(", "))); ul.append(li); }
+        }
+        card.append(ul);
+        if (!op) card.append(el("p", "fine small", T(hi, "Ye main khud nahi badlunga; inhe ek baar dekh lo.", "I won't change these by myself; please take a look.")));
+        else fixable.push(op);
+        visual.append(card);
+      }
+      if (fixable.length) {
+        const go = el("button", "btn solid", fixable.includes("remove_duplicates")
+          ? T(hi, `Ye sab theek karo (${fmtN(now.duplicate_rows)} duplicate rows hatengi)`, `Fix all of these (removes ${fmtN(now.duplicate_rows)} duplicate rows)`)
+          : T(hi, "Ye sab theek karo", "Fix all of these"));
+        go.type = "button";
+        go.addEventListener("click", () => { visual.dispatchEvent(new CustomEvent("fix", { detail: fixable, bubbles: true })); });
+        visual.append(go);
+      }
+    } else if (!open.length && r.task !== "ask" && !(r.task === "fix")) {
+      visual.append(el("p", "fine", T(hi, "Is file mein koi galti nahi hai. Ab koi bhi sawaal poocho: \"region wise total\", \"pending dikhao\"...",
+                                        "No problems in this file. Ask anything: \"total by region\", \"show pending rows\"...")));
     }
     return { rail, overview, visual };
   }
@@ -1407,6 +1441,10 @@
         "The file stays open: type the next task in the chat (like \"remove duplicates too\") or pick above. Every change is listed in the file's \"Changes by Goal Engine\" sheet. Left alone, it's deleted after an hour.")));
       // The answer, shown visually first; the full details sit in the second tab.
       const view = answerView(f, hi);
+      view.visual.addEventListener("fix", async (ev) => {
+        try { showFile(await api(`/api/office/files/${f.id}/fix`, { method: "POST", body: JSON.stringify({ ops: ev.detail }) })); }
+        catch (ex) { out.replaceChildren(el("p", "note err", ex.message)); }
+      });
       const details = el("div", "pane-details"); details.append(...parts);
       const tabs = el("div", "ans-tabs"); tabs.setAttribute("role", "tablist");
       const panes = [view.visual, details];

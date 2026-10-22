@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -164,3 +164,42 @@ class SentEmail(Base):
     status: Mapped[str] = mapped_column(String(20))   # sent / failed
     error: Mapped[str | None] = mapped_column(String(300), nullable=True)
     sent_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class Connector(Base):
+    """A small program on the user's own server that talks to their database. Its token is shown once."""
+
+    __tablename__ = "connectors"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    visitor_id: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    token_hint: Mapped[str] = mapped_column(String(12))
+    status: Mapped[str] = mapped_column(String(20), default="waiting")   # waiting / online / disconnected
+    db_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    db_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    can_write: Mapped[bool | None] = mapped_column(Boolean, nullable=True, default=False)
+    host_label: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class ConnectorJob(Base):
+    """One approved piece of work for a connector: look at tables, run a read-only query, export, health."""
+
+    __tablename__ = "connector_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    connector_id: Mapped[int] = mapped_column(ForeignKey("connectors.id"), index=True)
+    agent_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    kind: Mapped[str] = mapped_column(String(20))        # schema / query / export / explain / health
+    payload: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="queued", index=True)   # queued / claimed / done / failed / expired
+    result: Mapped[str | None] = mapped_column(Text(4_000_000), nullable=True)   # MEDIUMTEXT on MySQL
+    error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    file_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

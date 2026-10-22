@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.ai.router import AIRouter, AIUnavailable
 from app.ml.brain import Brain
 from app.agents import automation
+from app.agents import database as dbagent
 from app.agents.core import AgentError, agent_dict, claim_due, goal_agents, run_agent
 from app.agents.mailer import SmtpMailer
 from app.engine import _after_run
@@ -52,6 +53,19 @@ app = FastAPI(title="Goal Engine", docs_url=None, redoc_url=None, lifespan=lifes
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
+def _run_db_report(db: Session, agent: Agent) -> None:
+    from app.agents.spec import next_run
+    from app.models import Connector
+
+    inputs = loads(agent.inputs, {}) or {}
+    connector = db.get(Connector, inputs.get("connector_id") or 0)
+    agent.next_run_at = next_run(inputs.get("schedule") or {"every": "day", "at": "09:00"}, utcnow())
+    agent.last_run_at = utcnow()
+    db.commit()
+    if connector is not None and connector.status != "disconnected":
+        dbagent.queue(db, connector, "export", {"sql": inputs.get("sql", "")}, agent_id=agent.id)
+
+
 def _scheduler(stop: threading.Event) -> None:
     """Runs daily agents when they're due. Safe with several workers (each run is claimed once)."""
     log = logging.getLogger("agent-scheduler")
@@ -67,10 +81,13 @@ def _scheduler(stop: threading.Event) -> None:
                     try:
                         if agent.recipe == "automation":
                             automation.run(db, agent, hi, preview=False, scheduled=True)
+                        elif agent.recipe == "db_report":
+                            _run_db_report(db, agent)
                         else:
                             run_agent(db, agent, hi, scheduled=True)
                     except AgentError as exc:
                         log.warning("Scheduled agent %s: %s", agent.id, exc)
+                dbagent.clean_exports()
             finally:
                 db.close()
         except Exception:  # noqa: BLE001 - the scheduler must keep going
@@ -112,6 +129,11 @@ class MessageIn(BaseModel):
 
 class StatusIn(BaseModel):
     status: Literal["active", "done", "dropped"]
+
+
+@app.get("/connector/goal_connector.py")
+def connector_script() -> FileResponse:
+    return FileResponse(Path(__file__).resolve().parents[1] / "connector" / "goal_connector.py", media_type="text/x-python")
 
 
 @app.get("/")
@@ -287,6 +309,213 @@ def my_agents(db: Session = Depends(get_db), visitor: str = Depends(visitor_id))
         item["goal_id"], item["goal_title"] = agent.goal_id, goal.title if goal else ""
         out.append(item)
     return {"agents": out}
+
+
+# ---------------------------------------------------------------- database connector (runs on the user's server)
+def _connector_from(request: Request, db: Session):
+    auth = request.headers.get("authorization", "")
+    token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+    connector = dbagent.authenticate(db, token)
+    if connector is None:
+        raise HTTPException(401, "Unknown or disconnected connector")
+    return connector
+
+
+@app.post("/api/connector/hello")
+async def connector_hello(request: Request, db: Session = Depends(get_db)):
+    connector = _connector_from(request, db)
+    info = await request.json()
+    dbagent.hello(db, connector, info if isinstance(info, dict) else {})
+    dbagent.queue(db, connector, "schema")   # fresh table list every time it starts
+    if connector.can_write:
+        logging.getLogger(__name__).info("Connector %s reports a database user that can write", connector.id)
+    return {"ok": True, "poll_seconds": 4}
+
+
+@app.post("/api/connector/poll")
+def connector_poll(request: Request, db: Session = Depends(get_db)):
+    connector = _connector_from(request, db)
+    jobs = dbagent.claim(db, connector)
+    return {"jobs": [{"id": j.id, "kind": j.kind, "payload": loads(j.payload, {})} for j in jobs]}
+
+
+@app.post("/api/connector/result/{job_id}")
+async def connector_result(job_id: int, request: Request, db: Session = Depends(get_db)):
+    connector = _connector_from(request, db)
+    data = await request.json()
+    try:
+        job = dbagent.complete(db, connector, job_id, data if isinstance(data, dict) else {})
+    except dbagent.DatabaseError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    _after_db_job(db, job)
+    return {"ok": True}
+
+
+def _after_db_job(db: Session, job) -> None:
+    """A scheduled database report finished: email the CSV to the verified owner."""
+    if not job.agent_id or job.status != "done" or not job.file_path:
+        return
+    agent = db.get(Agent, job.agent_id)
+    if agent is None or agent.recipe != "db_report":
+        return
+    owner = automation.owner_of(db, agent.visitor_id)
+    if owner is None or not owner.verified_at:
+        return
+    inputs = loads(agent.inputs, {}) or {}
+    title = inputs.get("title") or "Database report"
+    try:
+        with open(job.file_path, "rb") as fh:
+            data = fh.read()
+        rows = (loads(job.result, {}) or {}).get("row_count", "")
+        mailer().send(owner.email, f"{title} · {utcnow():%d %b}", f"{title}\n\nRows: {rows}\nThe CSV file is attached (opens in Excel).",
+                      from_name="Goal Engine", attachments=[(f"{title[:40]}.csv", data, "text/csv")])
+    except Exception:  # noqa: BLE001 - the next run will try again
+        logging.getLogger(__name__).exception("Database report email failed")
+
+
+class ConnectorIn(BaseModel):
+    name: str = ""
+    agent_id: int | None = None
+
+
+class DbJobIn(BaseModel):
+    kind: str
+    sql: str = ""
+    table: str = ""
+
+
+class DbReportIn(BaseModel):
+    sql: str = ""
+    table: str = ""
+    every: str = "day"
+    at: str = "09:00"
+    weekday: int = 0
+    title: str = ""
+
+
+def _public_base(request: Request) -> str:
+    if os.getenv("PUBLIC_URL"):
+        return os.getenv("PUBLIC_URL", "").rstrip("/")
+    base = str(request.base_url).rstrip("/")
+    if request.headers.get("x-forwarded-proto") == "https" and base.startswith("http://"):
+        base = "https://" + base[7:]
+    return base
+
+
+@app.post("/api/connectors")
+def create_connector(body: ConnectorIn, request: Request, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    try:
+        connector, token = dbagent.create_connector(db, visitor, body.name)
+    except dbagent.DatabaseError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    if body.agent_id:
+        agent = own_agent(db, body.agent_id, visitor)
+        inputs = loads(agent.inputs, {}) or {}
+        inputs["connector_id"] = connector.id
+        agent.inputs = dumps(inputs)
+        db.commit()
+    base = _public_base(request)
+    command = (f"curl -fsSL {base}/connector/goal_connector.py -o goal_connector.py && "
+               f"python3 goal_connector.py setup --server {base} --token {token}")
+    return {"connector": dbagent.connector_dict(connector, db), "token": token, "command": command}
+
+
+@app.get("/api/connectors")
+def list_connectors(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    return {"connectors": [dbagent.connector_dict(c, db) for c in dbagent.visitor_connectors(db, visitor)]}
+
+
+@app.post("/api/connectors/{connector_id}/disconnect")
+def disconnect_connector(connector_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    try:
+        connector = dbagent.own_connector(db, connector_id, visitor)
+    except dbagent.DatabaseError:
+        raise HTTPException(404, "Connector not found")
+    connector.status = "disconnected"
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/agents/{agent_id}/connect/{connector_id}")
+def link_connector(agent_id: int, connector_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    agent = own_agent(db, agent_id, visitor)
+    try:
+        connector = dbagent.own_connector(db, connector_id, visitor)
+    except dbagent.DatabaseError:
+        raise HTTPException(404, "Connector not found")
+    inputs = loads(agent.inputs, {}) or {}
+    inputs["connector_id"] = connector.id
+    agent.inputs = dumps(inputs)
+    db.commit()
+    return _agent_payload(db, agent, visitor)
+
+
+@app.post("/api/connectors/{connector_id}/jobs")
+def create_db_job(connector_id: int, body: DbJobIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    try:
+        connector = dbagent.own_connector(db, connector_id, visitor)
+        sql = body.sql
+        if body.table and body.kind == "query":
+            sql = dbagent.table_preview_sql(body.table)
+        elif body.table and body.kind == "export":
+            sql = dbagent.table_export_sql(body.table)
+        job = dbagent.queue(db, connector, body.kind, {"sql": sql} if sql else {})
+    except dbagent.DatabaseError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return dbagent.job_dict(job)
+
+
+def _own_job(db: Session, job_id: int, visitor: str):
+    from app.models import Connector, ConnectorJob
+
+    job = db.get(ConnectorJob, job_id)
+    connector = db.get(Connector, job.connector_id) if job else None
+    if job is None or connector is None or connector.visitor_id != visitor:
+        raise HTTPException(404, "Job not found")
+    return job
+
+
+@app.get("/api/connector-jobs/{job_id}")
+def get_db_job(job_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    return dbagent.job_dict(_own_job(db, job_id, visitor))
+
+
+@app.get("/api/connector-jobs/{job_id}/download")
+def download_db_job(job_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    job = _own_job(db, job_id, visitor)
+    if not job.file_path or not os.path.exists(job.file_path):
+        raise HTTPException(404, "No file for this job")
+    return FileResponse(job.file_path, media_type="text/csv", filename=f"export_{job.id}.csv")
+
+
+@app.post("/api/agents/{agent_id}/db-report")
+def schedule_db_report(agent_id: int, body: DbReportIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    agent = own_agent(db, agent_id, visitor)
+    inputs = loads(agent.inputs, {}) or {}
+    try:
+        connector = dbagent.own_connector(db, inputs.get("connector_id") or 0, visitor)
+        sql = dbagent.table_export_sql(body.table) if body.table else dbagent.read_only_sql(body.sql)
+    except dbagent.DatabaseError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    owner = automation.owner_of(db, visitor)
+    if owner is None or not owner.verified_at:
+        return JSONResponse({"error": "Verify your email first, so the report has somewhere to go"}, status_code=400)
+    schedule = {"every": body.every if body.every in ("day", "week", "month") else "day", "at": body.at, "weekday": body.weekday, "day": 1}
+    from app.agents.spec import next_run, schedule_text
+
+    goal = db.get(Goal, agent.goal_id)
+    hi = _goal_hi(goal)
+    title = (body.title or (f"{body.table} report" if body.table else "Database report"))[:80]
+    report = Agent(visitor_id=visitor, goal_id=agent.goal_id, recipe="db_report", status="active",
+                   inputs=dumps({"connector_id": connector.id, "sql": sql, "schedule": schedule, "title": title}),
+                   next_run_at=next_run(schedule, utcnow()))
+    db.add(report)
+    db.commit()
+    reply = (f"{title}: {schedule_text(schedule, hi)} apne aap aapko email aayegi (CSV, Excel mein khulegi)." if hi
+             else f"{title}: emailed to you {schedule_text(schedule, hi).lower()}, as a CSV that opens in Excel.")
+    db.add(Message(visitor_id=visitor, goal_id=agent.goal_id, role="assistant", text=reply, relation="agent_run", provider="agent"))
+    db.commit()
+    return _agent_payload(db, agent, visitor, reply)
 
 
 @app.post("/api/agents/{agent_id}/pause")

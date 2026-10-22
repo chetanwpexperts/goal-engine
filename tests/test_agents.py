@@ -136,10 +136,10 @@ def test_start_endpoint_with_inputs(client, ml_mode):
     assert client.post(f"/api/agents/{agent_id}/start", json={}).status_code == 404   # someone else's agent
 
 
-def test_connector_agent_is_honest_that_it_is_not_ready(client, ml_mode):
+def test_database_request_gets_working_agent_and_honest_later_levels(client, ml_mode):
     res = say(client, "mujhe apne database mein automation chahiye roz backup aur report email pe")
-    assert res["goal"]["intent"] == "db_automation"
-    assert "ban raha hai" in res["reply"]
-    assert res["agents"][0]["available"] is False
-    steps = say(client, res["options"][0])
-    assert steps["relation"] == "howto"
+    agent = res["agents"][0]
+    assert agent["recipe"] == "database" and agent["mode"] == "report" and agent["available"] is True
+    assert "agle level" in res["reply"] and "Backup" in res["reply"]
+
+

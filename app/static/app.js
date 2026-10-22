@@ -75,7 +75,7 @@
     "Meri website slow hai, check karo",
     "Patients ko appointment se ek din pehle yaad dilao",
     "Roz subah 9 baje pending payments ki report chahiye",
-    "Database ki query slow hai",
+    "Database se orders ka data Excel mein chahiye",
     "Jo customer 30 din se nahi aaye unko message bhejo",
   ];
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -433,10 +433,277 @@
     return card;
   }
 
+  // ---------------------------------------------------------------- database agent (through the connector)
+  const T = (hi, h, e) => (hi ? h : e);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let connectorWatch = null;
+
+  function fmtBytes(n) {
+    if (!n) return "";
+    const u = ["B", "KB", "MB", "GB"]; let i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    return `${n.toFixed(i ? 1 : 0)} ${u[i]}`;
+  }
+
+  async function runJob(cid, body, onWait) {
+    const job = await api(`/api/connectors/${cid}/jobs`, { method: "POST", body: JSON.stringify(body) });
+    for (let i = 0; i < 90; i++) {
+      await sleep(i < 4 ? 800 : 1500);
+      const j = await api(`/api/connector-jobs/${job.id}`);
+      if (j.status === "done") return j;
+      if (j.status === "failed" || j.status === "expired") throw new Error(j.error || "The job didn't finish");
+      if (onWait && i === 6) onWait();
+    }
+    throw new Error("The connector isn't answering. Is it running on your server?");
+  }
+
+  function grid(result) {
+    const wrap = el("div", "grid");
+    const table = el("table");
+    const tr = el("tr");
+    for (const c of result.columns || []) tr.append(el("th", null, c));
+    const thead = el("thead"); thead.append(tr); table.append(thead);
+    const tb = el("tbody");
+    for (const row of result.rows || []) {
+      const r = el("tr");
+      for (const v of row) r.append(el("td", v === null ? "nil" : null, v === null ? "NULL" : String(v)));
+      tb.append(r);
+    }
+    table.append(tb); wrap.append(table);
+    return wrap;
+  }
+
+  function healthView(r, hi) {
+    const wrap = el("div", "result");
+    wrap.append(el("p", "result-head", T(hi, `Database ${r.version}`, `Database ${r.version}`)));
+    const ul = el("ul", "found");
+    for (const c of r.checks || []) {
+      const li = el("li", c.level === "warn" ? "s2" : c.level === "ok" ? "s0" : "s1");
+      li.append(el("div", "t", c.text));
+      ul.append(li);
+    }
+    wrap.append(ul);
+    if (r.biggest && r.biggest.length) {
+      wrap.append(el("p", "cap", T(hi, "Sabse badi tables", "Biggest tables")));
+      wrap.append(grid({ columns: [T(hi, "Table", "Table"), T(hi, "Rows", "Rows"), T(hi, "Size", "Size")],
+                         rows: r.biggest.map((t) => [t.name, t.rows, fmtBytes(t.bytes)]) }));
+    }
+    return wrap;
+  }
+
+  function watchConnector(cid, agentId) {
+    clearInterval(connectorWatch);
+    let n = 0;
+    connectorWatch = setInterval(async () => {
+      if (++n > 200) { clearInterval(connectorWatch); return; }
+      try {
+        const { connectors } = await api("/api/connectors");
+        const c = connectors.find((x) => x.id === cid);
+        if (c && c.online && c.tables.length) { clearInterval(connectorWatch); await refreshGoal(); }
+      } catch (_) { /* keep waiting */ }
+    }, 3000);
+  }
+
+  function setupBox(a, hi) {
+    const box = el("div", "slot");
+    if (a.connectors && a.connectors.length) {
+      box.append(el("label", null, T(hi, "Pehle se juda database use karo", "Use a database you already connected")));
+      const row = el("div", "acts flat");
+      for (const c of a.connectors) {
+        const b = el("button", "btn", `${c.name}${c.db_name ? ` · ${c.db_name}` : ""}`);
+        b.type = "button";
+        b.addEventListener("click", async () => renderAgents((await api(`/api/agents/${a.id}/connect/${c.id}`, { method: "POST" })).agents));
+        row.append(b);
+      }
+      box.append(row);
+    }
+    const name = el("input"); name.type = "text"; name.placeholder = T(hi, "Database ka naam (jaise Shop DB)", "A name for it (e.g. Shop DB)");
+    const make = el("button", "btn solid", T(hi, "Connector banao", "Create connector")); make.type = "button";
+    const row = el("div", "row"); row.append(name, make);
+    box.append(row);
+    make.addEventListener("click", async () => {
+      make.disabled = true;
+      try {
+        const data = await api("/api/connectors", { method: "POST", body: JSON.stringify({ name: name.value, agent_id: a.id }) });
+        const w = W(a.lang);
+        box.replaceChildren(
+          el("label", null, T(hi, "Ye command apne server pe chalao (jahan database hai). Ye sirf ek baar dikhega:",
+                                  "Run this on your server (where the database is). It's shown only once:")),
+          codeBox("", data.command, w),
+          el("p", "fine", T(hi, "Setup database ka user aur password poochega. Password wahin save hota hai, humein nahi aata. Phir: python3 goal_connector.py run",
+                                "Setup asks for the database user and password. They're saved on your server only, never sent here. Then: python3 goal_connector.py run")),
+          el("p", "waiting", T(hi, "Connector ka intezaar…", "Waiting for the connector…")));
+        watchConnector(data.connector.id, a.id);
+      } catch (err) { addMachine(err.message, [], true); make.disabled = false; }
+    });
+    return box;
+  }
+
+  function renderDatabase(a) {
+    const w = W(a.lang);
+    const hi = a.lang !== "en";
+    const card = el("article", "agent db");
+    const head = el("div", "agent-name");
+    head.append(el("h2", null, a.name));
+    const c = a.connector;
+    const st = el("span", `state ${c && c.online ? "active" : c ? "paused" : "proposed"}`,
+                  c && c.online ? T(hi, "Juda hua", "Connected") : c ? T(hi, "Offline", "Offline") : T(hi, "Taiyar", "Ready"));
+    head.append(st);
+    card.append(head, blockLine(a.blocks));
+    if (!a.available) card.append(el("p", "note", T(hi, "Ye level abhi ban raha hai. Tab tak data dekh, export aur report kar sakte ho.",
+                                                      "This level is being built. Until then you can view, export and report.")));
+    if (!c) { card.append(setupBox(a, hi)); return card; }
+
+    const out = el("div", "db-out");
+    const say = (text) => { out.replaceChildren(el("p", "waiting", text)); };
+    const fail = (err) => { out.replaceChildren(el("p", "note err", err.message)); };
+    const meta = el("p", "access connector", `${c.name}${c.db_name ? ` · ${c.db_name}` : ""}${c.db_type ? ` (${c.db_type})` : ""} · ${T(hi, "sirf read-only", "read-only")}`);
+    card.append(meta);
+    if (c.can_write) card.append(el("p", "note warn", T(hi, "Is database user ke paas likhne ka haq hai. Connector kabhi likhta nahi, phir bhi read-only user behtar hai (setup command dikhata hai).",
+                                                       "This database user can change data. The connector never writes, but a read-only user is safer (setup shows how).")));
+    if (!c.online) {
+      card.append(el("p", "note", T(hi, "Connector band hai. Server pe chalao: python3 goal_connector.py run", "The connector isn't running. On your server: python3 goal_connector.py run")));
+      watchConnector(c.id, a.id);
+    }
+
+    const tables = el("div", "db-tables");
+    if (c.tables.length) {
+      const filter = el("input"); filter.type = "search"; filter.placeholder = T(hi, `${c.tables.length} tables, naam se dhoondo`, `${c.tables.length} tables, search by name`);
+      const list = el("ul");
+      const draw = () => {
+        list.replaceChildren();
+        const q = filter.value.toLowerCase();
+        for (const t of c.tables.filter((x) => x.name.toLowerCase().includes(q)).slice(0, 60)) {
+          const li = el("li");
+          const nm = el("button", "tname", t.name); nm.type = "button";
+          const info = el("span", "tinfo", `${t.rows.toLocaleString("en-IN")} ${T(hi, "rows", "rows")}${t.bytes ? ` · ${fmtBytes(t.bytes)}` : ""}`);
+          const dl = el("button", "tdl", T(hi, "Excel", "Excel")); dl.type = "button";
+          dl.setAttribute("aria-label", `${T(hi, "Download", "Download")} ${t.name}`);
+          nm.addEventListener("click", async () => {
+            say(T(hi, `${t.name} padh raha hoon…`, `Reading ${t.name}…`));
+            try {
+              const j = await runJob(c.id, { kind: "query", table: t.name });
+              out.replaceChildren(el("p", "cap", T(hi, `${t.name}: pehli ${j.result.row_count} rows`, `${t.name}: first ${j.result.row_count} rows`)), grid(j.result));
+            } catch (err) { fail(err); }
+          });
+          dl.addEventListener("click", async () => {
+            say(T(hi, `${t.name} ka poora data nikaal raha hoon…`, `Exporting all of ${t.name}…`));
+            try {
+              const j = await runJob(c.id, { kind: "export", table: t.name });
+              out.replaceChildren(el("p", "cap", T(hi, `${j.result.row_count.toLocaleString("en-IN")} rows taiyar`, `${j.result.row_count.toLocaleString("en-IN")} rows ready`)));
+              window.location.href = `/api/connector-jobs/${j.id}/download`;
+            } catch (err) { fail(err); }
+          });
+          li.append(nm, info, dl);
+          list.append(li);
+        }
+      };
+      filter.addEventListener("input", draw);
+      draw();
+      tables.append(filter, list);
+    } else if (c.online) {
+      tables.append(el("p", "waiting", T(hi, "Tables padh raha hoon…", "Reading the tables…")));
+      watchConnector(c.id, a.id);
+    }
+    card.append(tables);
+
+    // Custom read-only SQL, EXPLAIN and health
+    const sql = el("details", "db-sql");
+    sql.append(el("summary", null, T(hi, "Apni SQL query chalao (read-only)", "Run your own SQL (read-only)")));
+    const ta = el("textarea"); ta.placeholder = "SELECT status, COUNT(*) FROM orders GROUP BY status";
+    const row = el("div", "acts flat");
+    const mk = (label, kind, solid) => {
+      const b = el("button", solid ? "btn solid" : "btn", label); b.type = "button";
+      b.addEventListener("click", async () => {
+        say(T(hi, "Chal raha hai…", "Running…"));
+        try {
+          const j = await runJob(c.id, { kind, sql: ta.value });
+          if (kind === "export") { out.replaceChildren(el("p", "cap", `${j.result.row_count} rows`)); window.location.href = `/api/connector-jobs/${j.id}/download`; }
+          else out.replaceChildren(el("p", "cap", kind === "explain" ? "EXPLAIN" : `${j.result.row_count} rows${j.result.limited ? T(hi, " (pehli 50)", " (first 50)") : ""}`), grid(j.result));
+        } catch (err) { fail(err); }
+      });
+      return b;
+    };
+    row.append(mk(T(hi, "Chalao", "Run"), "query", true), mk("Excel", "export"), mk("EXPLAIN", "explain"));
+    sql.append(ta, row);
+    if (a.mode === "explore" || a.mode === "export") card.append(sql);
+
+    const acts = el("div", "acts");
+    const hb = el("button", a.mode === "health" ? "btn solid" : "btn", T(hi, "Health check", "Health check")); hb.type = "button";
+    hb.addEventListener("click", async () => {
+      say(T(hi, "Database check kar raha hoon…", "Checking the database…"));
+      try { out.replaceChildren(healthView((await runJob(c.id, { kind: "health" })).result, hi)); } catch (err) { fail(err); }
+    });
+    acts.append(hb);
+    if (a.mode !== "explore" && a.mode !== "export") acts.append(el("span"));
+    card.append(acts);
+    if (a.mode === "health" || a.mode === "report") card.append(sql);
+
+    if (a.mode === "report" && c.tables.length) {
+      const rep = el("div", "slot");
+      rep.append(el("label", null, T(hi, "Report kis cheez ki? Table chuno ya upar SQL likho", "Report on what? Pick a table, or write SQL above")));
+      const sel = el("select");
+      sel.append(el("option", null, T(hi, "— SQL wali query —", "— the SQL query above —")));
+      sel.options[0].value = "";
+      for (const t of c.tables) { const o = el("option", null, t.name); o.value = t.name; sel.append(o); }
+      const every = el("select");
+      for (const [v, h, e] of [["day", "Roz", "Every day"], ["week", "Har hafte (Somvar)", "Every week (Monday)"], ["month", "Har mahine (1 tarikh)", "Every month (1st)"]]) {
+        const o = el("option", null, T(hi, h, e)); o.value = v; every.append(o);
+      }
+      const at = el("input"); at.type = "time"; at.value = "09:00";
+      const r2 = el("div", "row"); r2.append(sel, every, at);
+      const go = el("button", "btn go", T(hi, "Report chalu karo", "Start the report")); go.type = "button";
+      go.disabled = !a.owner.verified;
+      go.addEventListener("click", async () => {
+        go.disabled = true;
+        try {
+          const data = await api(`/api/agents/${a.id}/db-report`, { method: "POST", body: JSON.stringify({ table: sel.value, sql: sel.value ? "" : ta.value, every: every.value, at: at.value }) });
+          addMachine(data.reply, [T(hi, "Report agent chalu", "Report agent switched on")]);
+          renderAgents(data.agents); refreshCount();
+        } catch (err) { addMachine(err.message, [], true); go.disabled = false; }
+      });
+      rep.append(r2);
+      card.append(rep);
+      const ga = el("div", "acts"); ga.append(go); card.append(ga);
+      card.append(ownerBox(a, w));
+    }
+    card.append(out);
+
+    const off = el("button", "linkish", T(hi, "Is database ko disconnect karo", "Disconnect this database")); off.type = "button";
+    off.addEventListener("click", async () => {
+      await api(`/api/connectors/${c.id}/disconnect`, { method: "POST" });
+      await refreshGoal();
+    });
+    card.append(off);
+    return card;
+  }
+
+  function renderDbReport(a) {
+    const w = W(a.lang);
+    const card = el("article", `agent${a.status === "active" ? " is-active" : ""}`);
+    const head = el("div", "agent-name");
+    head.append(el("h2", null, a.name), stateBadge(a, w));
+    card.append(head);
+    card.append(el("p", "access connector", a.schedule));
+    if (a.next_run_at) {
+      const when = new Date(`${a.next_run_at}Z`).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+      card.append(el("p", "note", `${w.next}: ${when}`));
+    }
+    if (a.status === "active") {
+      const acts = el("div", "acts");
+      const pause = el("button", "btn", w.pause); pause.type = "button";
+      pause.addEventListener("click", async () => renderAgents((await api(`/api/agents/${a.id}/pause`, { method: "POST" })).agents));
+      acts.append(pause); card.append(acts);
+    }
+    return card;
+  }
+
   function renderAgents(agents) {
     const box = $("#agents");
     box.replaceChildren();
-    for (const a of agents || []) box.append(a.automation ? renderAutomation(a) : renderCheckAgent(a));
+    for (const a of agents || []) {
+      box.append(a.automation ? renderAutomation(a) : a.database ? renderDatabase(a) : a.db_report ? renderDbReport(a) : renderCheckAgent(a));
+    }
     if (agents && agents[0]) lastLang = agents[0].lang;
   }
 

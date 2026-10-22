@@ -129,7 +129,6 @@ RECIPE_FOR_INTENT = {
     "no_customers": "website_check",
     "server_down": "website_watch",
     "slow_db_query": "sql_review",
-    "db_automation": "db_automation",
 }
 
 INPUT_SLOTS = {"website_check": ("website_url",), "website_watch": ("website_url",)}
@@ -156,6 +155,19 @@ def agent_dict(agent: Agent, db: Session, hi: bool) -> dict:
         from app.agents.automation import automation_dict
 
         return automation_dict(db, agent, hi)
+    if agent.recipe == "database":
+        from app.agents.database import database_dict
+
+        return database_dict(db, agent, hi)
+    if agent.recipe == "db_report":
+        inputs = loads(agent.inputs, {}) or {}
+        from app.agents.spec import schedule_text
+
+        return {"id": agent.id, "lang": "hi" if hi else "en", "recipe": "db_report", "db_report": True,
+                "name": inputs.get("title", "Database report"), "status": agent.status,
+                "schedule": schedule_text(inputs.get("schedule") or {"every": "day", "at": "09:00"}, hi),
+                "next_run_at": agent.next_run_at.isoformat() if agent.next_run_at else None, "sql": inputs.get("sql", ""),
+                "blocks": [], "runs": [], "access": "connector", "available": True}
     recipe = RECIPES[agent.recipe]
     runs = list(db.scalars(select(AgentRun).where(AgentRun.agent_id == agent.id).order_by(AgentRun.id.desc()).limit(5)))
     inputs = loads(agent.inputs, {}) or {}

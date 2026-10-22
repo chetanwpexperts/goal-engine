@@ -222,3 +222,38 @@ body[data-state="active"]::after { content: ""; position: fixed; left: 0; right:
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .trace li, .line li { opacity: 1; }
 }
+
+/* database agent */
+.db .row, .slot .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.slot .row > * { flex: 1 1 140px; }
+.slot select { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--panel); color: var(--ink); font: inherit; }
+.acts.flat { margin: 8px 0 0; }
+.db-tables { margin: 14px 0 0 46px; }
+.db-tables input { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 10px 13px; background: var(--panel); outline: none; }
+.db-tables input:focus { border-color: var(--ink); }
+.db-tables ul { list-style: none; margin: 8px 0 0; padding: 0; max-height: 300px; overflow: auto; border-top: 1px solid var(--line); }
+.db-tables li { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+.db-tables .tname { text-align: left; background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; overflow-wrap: anywhere; }
+.db-tables .tname:hover { text-decoration: underline; }
+.db-tables .tinfo { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.db-tables .tdl { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 4px 12px; font-size: 13px; cursor: pointer; color: var(--ink); }
+.db-tables .tdl:hover { border-color: var(--ink); }
+.db-sql { margin: 14px 0 0 46px; }
+.db-sql summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+.db-sql textarea { width: 100%; min-height: 90px; margin-top: 8px; border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; background: var(--panel); font: 14px/1.5 ui-monospace, Menlo, Consolas, monospace; resize: vertical; outline: none; }
+.db-out { margin: 14px 0 0 46px; }
+.db-out .cap, .result .cap { font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+.grid { overflow: auto; max-height: 360px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.grid table { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+.grid th, .grid td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+.grid th { position: sticky; top: 0; background: var(--paper); font-weight: 600; }
+.grid td.nil { color: var(--muted); font-style: italic; }
+.waiting { font-size: 14px; color: var(--signal-ink); margin: 10px 0 0; }
+.waiting::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--signal); margin-right: 8px; animation: blink .8s steps(1) infinite; }
+.fine { font-size: 13px; color: var(--muted); margin: 0; }
+.note.warn { color: var(--signal-ink); }
+.note.err { color: var(--alert); margin-left: 0; }
+.linkish { margin: 18px 0 0 46px; background: none; border: 0; padding: 0; font: inherit; font-size: 13px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .waiting::before { animation: none; } }
+@media (max-width: 640px) { .db-tables, .db-sql, .db-out, .linkish { margin-left: 0; } }
+.db-out .result, .db-out .result .found { margin-left: 0; }

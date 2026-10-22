@@ -14,6 +14,7 @@ from app.limits import release_ai_call, reserve_ai_call
 from app.agents.core import (YES_RE, AgentError, agent_dict, assign, goal_agents, inputs_from_text,
                              recipe_for, run_agent)
 from app.agents import automation as auto
+from app.agents import database as dbagent
 from app.agents.planner import plan as plan_automation
 from app.ml.brain import SKIP_RE, steps_text
 from app.ml.normalize import normalize
@@ -200,6 +201,24 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
         goal.next_action = "Add the sheet, check the preview, then Start"
         db.commit()
         reply, options, relation = auto.plan_reply(spec, turn.hi), [], "agent_plan"
+    elif goal is not None and relation not in ("howto", "safety", "chit_chat") and dbagent.wants_database(goal, text):
+        # Database work: the agent works through a connector on the user's own server.
+        mode = dbagent.detect_mode(text)
+        agent = dbagent.goal_agent(db, goal)
+        if agent is None:
+            agent = dbagent.create_agent(db, goal, mode)
+        elif mode != "explore":
+            inputs = loads(agent.inputs, {}) or {}
+            inputs["mode"] = mode
+            agent.inputs = dumps(inputs)
+        goal.title = dbagent.MODE_TEXT[agent_mode(agent)][0 if turn.hi else 1].split(" (")[0]
+        goal.missing_info = "[]"
+        goal.pending = None
+        goal.next_action_type = "execute"
+        goal.next_action = "Connect the database, then pick a table"
+        db.commit()
+        has = bool(dbagent.visitor_connectors(db, visitor_id))
+        reply, options, relation = dbagent.plan_reply(mode, turn.hi, has, dbagent.later_parts(text)), [], "agent_plan"
     elif goal is not None and relation not in ("howto", "safety", "chit_chat"):
         agent, override, run_now = assign(db, goal, text, turn.hi, asking=bool(goal.pending))
         if run_now:
@@ -217,6 +236,10 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
             options = [next(k for k, v in STEPS_LABELS.items() if v == turn.hi)]
     return _respond(db, visitor_id, text, goal, reply, relation, options=options, ask_words=turn.ask_words,
                     intent=turn.intent, confidence=turn.confidence, hi=turn.hi)
+
+
+def agent_mode(agent) -> str:
+    return (loads(agent.inputs, {}) or {}).get("mode", "explore")
 
 
 def handle_message(db: Session, visitor_id: str, text: str, router: AIRouter, settings: Settings,

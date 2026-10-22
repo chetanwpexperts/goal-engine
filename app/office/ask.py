@@ -583,9 +583,10 @@ def _run_aggregate(p, tables, wb, hi, n):
                 ws, sname = _answer_sheet(wb, n, f"{'Top' if agg == 'max' else 'Lowest'} {mname}")
                 _write_table(ws, t.header, ranked, formula)
             who = ", ".join(f"{_name(t, r, label)} ({_fmt(r[m])})" for r in ranked[:5])
+            chart = {"title": mname, "rows": [[_name(t, r, label), r[m]] for r in ranked[:10]]}
             say = (f"{t.name}{' (' + fdesc + ')' if fdesc else ''}: {_AGG_HI[agg]} {mname} = {_fmt(val)}. {who}" if hi else
                    f"{t.name}{' (' + fdesc + ')' if fdesc else ''}: {'highest' if agg == 'max' else 'lowest'} {mname} = {_fmt(val)}. {who}")
-            return {"say": say, "formula": formula, "sheet": sname if wb is not None else None}
+            return {"say": say, "formula": formula, "sheet": sname if wb is not None else None, "chart": chart}
         val = calc([r[m] for r in rows] if m is not None else rows)
         target = t.ref(m) if m is not None else t.ref(0)
         formula = f"={fn}({target}{crit})" if filters or agg != "count" else f"=COUNTA({t.ref(0)})"
@@ -641,12 +642,14 @@ def _run_aggregate(p, tables, wb, hi, n):
         if wb is not None:
             ws, sname = _answer_sheet(wb, n, f"{mname} by {gname}")
             _write_table(ws, [gname, f"Total {mname}"], table, formula)
-        return {"say": say, "formula": formula, "sheet": sname if wb is not None else None}
+        return {"say": say, "formula": formula, "sheet": sname if wb is not None else None,
+                "chart": {"title": f"{mname} by {gname}", "rows": [[k, v] for k, v in table]}}
     lines = "; ".join(f"{k}: {_fmt(v)}" for k, v in table[:8])
     more = f" (+{len(table) - 8})" if len(table) > 8 else ""
     say = (f"{t.name}{' (' + fdesc + ')' if fdesc else ''}, {gname} wise {_AGG_HI[agg]} {mname}: {lines}{more}" if hi else
            f"{t.name}{' (' + fdesc + ')' if fdesc else ''}, {_AGG_EN[agg]} {mname} by {gname}: {lines}{more}")
-    return {"say": say, "formula": formula, "sheet": sname if wb is not None else None}
+    return {"say": say, "formula": formula, "sheet": sname if wb is not None else None,
+            "chart": {"title": f"{mname} by {gname}", "rows": [[k, v] for k, v in table[:12]], "line": isinstance(g, tuple)}}
 
 
 def _run_list(p, tables, wb, hi, n):

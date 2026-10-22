@@ -125,7 +125,7 @@ def file_dict(f: OfficeFile) -> dict:
     st = steps(f)
     return {"id": f.token, "name": f.name, "size": f.size, "received": f.received, "status": f.status, "task": f.task,
             "report": loads(f.report, None), "result": loads(f.result, None), "error": f.error,
-            "steps": [{"ops": x["ops"], "changes": x["changes"]} for x in st[1:]],
+            "steps": [{"ops": x["ops"], "changes": x["changes"]} for x in st[1:]], "before": st[0].get("summary"),
             "download": len(st) > 1 and bool(f.path and os.path.exists(f.path)),
             "compare_download": bool(f.result_path and os.path.exists(f.result_path)), "result_name": f.result_name}
 
@@ -219,7 +219,10 @@ def _work(file_id: int, task: str, args: dict) -> None:
             f.status = "working"
             db.commit()
             if task == "scan":
-                f.report = dumps(office.scan(f.path))
+                rep = office.scan(f.path)
+                f.report = dumps(rep)
+                if not f.versions:                       # remember how the file looked on arrival, for before/after
+                    f.versions = dumps([{"path": f.path, "ops": [], "changes": {}, "summary": rep["summary"]}])
             elif task == "fix":
                 # every fix builds on the latest version; the file stays open for the next task
                 st = steps(f)

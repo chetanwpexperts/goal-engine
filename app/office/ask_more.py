@@ -180,7 +180,7 @@ def _run_growth(p, tables, wb, hi, n):
             f" Sabse zyada badha: {best[0]} ({best[2]:+.1f}%), sabse zyada gira: {worst[0]} ({worst[2]:+.1f}%)." if best else "")
     else:
         say = f"{t.name}, {mname} month on month: {lines}." + (f" Best: {best[0]} ({best[2]:+.1f}%), worst: {worst[0]} ({worst[2]:+.1f}%)." if best else "")
-    return {"say": say, "formula": formula, "sheet": sname}
+    return {"say": say, "formula": formula, "sheet": sname, "chart": {"title": f"{mname} by month", "rows": [[k, v] for k, v, _ in table[-12:]], "line": True}}
 
 
 # ------------------------------------------------------------------ running total

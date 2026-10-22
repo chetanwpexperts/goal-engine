@@ -1113,6 +1113,123 @@
     }
   }
 
+  // ---- answer view: steps rail, overview, cause -> fix diagram, before/after and result charts (real data only)
+  const PROBLEM = {
+    broken_refs: ["Toote formula (#REF!)", "Broken formulas (#REF!)", "fix_broken_refs"],
+    errors: ["Error wale cells", "Error cells", null],
+    duplicate_rows: ["Duplicate rows", "Duplicate rows", "remove_duplicates"],
+    text_numbers: ["Text wale numbers", "Numbers saved as text", "text_to_number"],
+    spaces: ["Extra space", "Extra spaces", "trim_spaces"],
+    case_mixed: ["Capital/small alag", "Mixed capitals", "fix_case"],
+    odd_formulas: ["Alag formula wali rows", "Odd formulas", null],
+  };
+  const FIXNAME = { fix_broken_refs: ["Formula dobara banaye", "Formulas rebuilt"], remove_duplicates: ["Duplicate hataye", "Duplicates removed"],
+    text_to_number: ["Asli number banaye", "Turned into numbers"], trim_spaces: ["Space hataye", "Spaces removed"], fix_case: ["Spelling ek jaisi", "Same spelling"] };
+  const svgIcon = (d) => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.innerHTML = d; return s; };
+  const ICON_BRAIN = '<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a3 3 0 0 0-3-1zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/>';
+
+  function barChart(rows, title, line) {
+    const box = el("div", "ans-chart");
+    box.append(el("p", "ans-chart-title", title));
+    const nums = rows.map((r) => Number(r[1]) || 0);
+    const max = Math.max(1, ...nums.map(Math.abs));
+    if (line && rows.length > 1) {
+      const w = 320, h = 120, pad = 8;
+      const pts = nums.map((v, i) => [pad + (i * (w - 2 * pad)) / (rows.length - 1), h - pad - (v / max) * (h - 2 * pad)]);
+      const svg = svgIcon(`<polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="#5B4FD6" stroke-width="2.5" stroke-linejoin="round"/>` +
+        pts.map((p) => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#F2A33A"/>`).join(""));
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`); svg.classList.add("ans-line");
+      const labels = el("div", "ans-line-labels");
+      labels.append(el("span", null, String(rows[0][0])), el("span", null, String(rows[rows.length - 1][0])));
+      box.append(svg, labels);
+      return box;
+    }
+    for (const [label, v] of rows.slice(0, 10)) {
+      const row = el("div", "ans-bar");
+      const fill = el("span", "fill"); fill.style.width = `${Math.max(2, (Math.abs(Number(v) || 0) / max) * 100)}%`;
+      const track = el("span", "track"); track.append(fill);
+      row.append(el("span", "lbl", String(label)), track, el("span", "val", Number(v || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })));
+      box.append(row);
+    }
+    return box;
+  }
+
+  function answerView(f, hi) {
+    const r = f.result || {}, now = (f.report || {}).summary || {}, before = f.before || now;
+    // rail: what the agent did, in order
+    const rail = el("ol", "ans-rail");
+    const working = f.status !== "ready";
+    [[T(hi, "Samjha", "Understood"), true], [T(hi, "File jaanchi", "Checked the file"), true],
+     [T(hi, "Hal banaya", "Built the fix"), !working], [T(hi, "Taiyar", "Ready"), !working]].forEach(([t, done], i) => {
+      const li = el("li", done ? "done" : i === 2 ? "now" : "");
+      li.append(el("span", "dot"), el("span", null, t));
+      rail.append(li);
+    });
+    // overview
+    const overview = el("div", "ans-overview");
+    const ic = el("span", "ans-icon"); ic.append(svgIcon(ICON_BRAIN));
+    const total = Object.keys(PROBLEM).reduce((n, k) => n + (now[k] || 0), 0);
+    const totalBefore = Object.keys(PROBLEM).reduce((n, k) => n + (before[k] || 0), 0);
+    let title = T(hi, "File ki jaanch", "File check"), text = total ? T(hi, `${total} galtiyan mili. Neeche dekho kya theek ho sakta hai.`, `${total} problems found. See what can be fixed below.`)
+      : T(hi, "Is file mein koi galti nahi mili.", "No problems found in this file.");
+    if (r.task === "ask") { title = (r.chart && r.chart.title) || T(hi, "Jawab", "Answer"); text = r.say; }
+    else if (r.task === "fix") { title = T(hi, "Theek kar diya", "Fixed"); text = T(hi, `Pehle ${totalBefore} galtiyan thi, ab ${total}.`, `${totalBefore} problems before, ${total} now.`); }
+    else if (r.task === "extract") { title = T(hi, "Duplicates ki list", "Duplicates listed"); text = T(hi, `${r.count} duplicate nayi sheet mein. Data nahi badla.`, `${r.count} duplicates in a new sheet. Data unchanged.`); }
+    else if (r.task === "compare") { title = T(hi, "Dono files ka milan", "Files compared"); text = T(hi, `${r.only_in_a} sirf pehli mein, ${r.only_in_b} sirf doosri mein, ${r.changed_rows} rows badli.`, `${r.only_in_a} only in the first, ${r.only_in_b} only in the second, ${r.changed_rows} rows changed.`); }
+    const ot = el("div"); ot.append(el("h3", null, title), el("p", null, text));
+    overview.append(ic, ot);
+    if (r.formula) { const fx = el("code", "ans-formula", r.formula); overview.append(fx); }
+
+    // visual
+    const visual = el("div", "ans-visual");
+    if (r.task === "ask" && r.chart && r.chart.rows && r.chart.rows.length) {
+      visual.append(barChart(r.chart.rows, r.chart.title, r.chart.line));
+    } else {
+      const keys = Object.keys(PROBLEM).filter((k) => (before[k] || 0) > 0);
+      if (keys.length) {
+        const flow = el("div", "ans-flow");
+        const left = el("div", "col probs"), right = el("div", "col fixes");
+        const done = {};
+        for (const st of f.steps || []) for (const [op, n] of Object.entries(st.changes || {})) done[op] = (done[op] || 0) + n;
+        for (const k of keys) {
+          const [h, e, op] = PROBLEM[k];
+          const p = el("div", "node bad"); p.append(el("b", null, T(hi, h, e)), el("span", null, Number(before[k]).toLocaleString("en-IN")));
+          left.append(p);
+          const fixed = op && done[op];
+          const fx = el("div", `node ${fixed ? "good" : op ? "todo" : "info"}`);
+          fx.append(el("b", null, op ? T(hi, ...FIXNAME[op]) : T(hi, "Dekhna padega", "Needs a look")),
+                    el("span", null, fixed ? T(hi, `${Number(done[op]).toLocaleString("en-IN")} theek`, `${Number(done[op]).toLocaleString("en-IN")} fixed`)
+                      : op ? T(hi, "Theek ho sakta hai", "Can be fixed") : T(hi, "Khud nahi badlunga", "Won't auto-change")));
+          right.append(fx);
+        }
+        const hub = el("div", "hub"); const hi_ = el("span", "hub-ring");
+        hi_.append(el("b", null, f.name.length > 22 ? f.name.slice(0, 20) + "…" : f.name), el("span", null, T(hi, `${total} baaki`, `${total} left`)));
+        hub.append(hi_);
+        flow.append(left, hub, right);
+        visual.append(flow);
+        // before / after
+        const ba = el("div", "ans-ba");
+        const legend = el("p", "ans-chart-title");
+        legend.append(document.createTextNode(T(hi, "Pehle vs ab ", "Before vs now ")), el("span", "lg before", T(hi, "pehle", "before")), el("span", "lg after", T(hi, "ab", "now")));
+        ba.append(legend);
+        const max = Math.max(1, ...keys.map((k) => before[k] || 0));
+        for (const k of keys) {
+          const row = el("div", "ba-row");
+          const b1 = el("span", "b before"); b1.style.width = `${((before[k] || 0) / max) * 100}%`;
+          const b2 = el("span", "b after"); b2.style.width = `${((now[k] || 0) / max) * 100}%`;
+          const bars = el("span", "bars"); bars.append(b1, b2);
+          row.append(el("span", "lbl", T(hi, PROBLEM[k][0], PROBLEM[k][1])), bars, el("span", "val", `${before[k] || 0} → ${now[k] || 0}`));
+          ba.append(row);
+        }
+        visual.append(ba);
+      } else {
+        visual.append(el("p", "fine", T(hi, "Is file mein koi galti nahi hai. Ab koi bhi sawaal poocho: \"region wise total\", \"pending dikhao\"...",
+                                          "No problems in this file. Ask anything: \"total by region\", \"show pending\"...")));
+      }
+    }
+    return { rail, overview, visual };
+  }
+
   function officePanel(a, hi) {
     const box = el("section", "office");
     const out = el("div", "office-out");
@@ -1288,7 +1405,20 @@
       parts.push(acts, el("p", "fine small", T(hi,
         "File khuli hai: agla kaam chat mein likho (jaise \"duplicate bhi hatao\") ya upar chuno. Har badlav file ki \"Changes by Goal Engine\" sheet mein likha hai. Kuch na karo to 1 ghante baad file apne aap delete.",
         "The file stays open: type the next task in the chat (like \"remove duplicates too\") or pick above. Every change is listed in the file's \"Changes by Goal Engine\" sheet. Left alone, it's deleted after an hour.")));
-      out.replaceChildren(...parts);
+      // The answer, shown visually first; the full details sit in the second tab.
+      const view = answerView(f, hi);
+      const details = el("div", "pane-details"); details.append(...parts);
+      const tabs = el("div", "ans-tabs"); tabs.setAttribute("role", "tablist");
+      const panes = [view.visual, details];
+      const names = [T(hi, "Visual", "Visual"), T(hi, "Poori detail", "Details")];
+      const btns = names.map((nm, i) => {
+        const b = el("button", "ans-tab", nm); b.type = "button"; b.setAttribute("role", "tab");
+        b.addEventListener("click", () => { btns.forEach((x, j) => x.setAttribute("aria-selected", String(i === j))); panes.forEach((pn, j) => { pn.hidden = i !== j; }); });
+        return b;
+      });
+      btns[0].setAttribute("aria-selected", "true"); details.hidden = true;
+      tabs.append(...btns);
+      out.replaceChildren(view.rail, view.overview, tabs, ...panes);
     };
 
     box.append(drop, out);

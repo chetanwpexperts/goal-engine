@@ -72,10 +72,13 @@ def _close(w, choices, cutoff=0.82):
 
 
 def _header_words(h: str) -> list[str]:
-    return [w for w in re.findall(r"[a-z0-9]+", h.lower()) if w not in {"of", "the", "no", "id", "practice"} or len(h) <= 3]
+    """Header words in the same spelling the question gets (Hindi script is written in Roman letters, like the question)."""
+    ws = tokens(h) if re.search(r"[\u0900-\u097f]", h or "") else re.findall(r"[a-z0-9]+", (h or "").lower())
+    return [w for w in ws if w not in {"of", "the", "no", "id", "practice"} or len(h) <= 3]
 
 
 def _col_score(h: str, words: list[str]) -> float:
+    words = [x for w in words for x in (tokens(w) if re.search(r"[\u0900-\u097f]", w) else [w])]
     hw = _header_words(h)
     if not hw:
         return 0.0
@@ -138,12 +141,37 @@ def values_in(text: str, t: Table, skip_cols=()) -> list[tuple[int, str]]:
         for low, orig in vals.items():                    # "IT", "HR": short values only when written in capitals
             if len(low) == 2 and re.search(rf"\b{re.escape(orig.upper())}\b", text or ""):
                 found.append((i, orig))
+    # "approved expenses", "paid bills": a Yes/No column named in the question means Yes (or No when negated)
+    YES, NO = {"yes", "y", "haan", "true", "done", "ok"}, {"no", "n", "nahi", "false"}
+    for i, h in enumerate(t.header):
+        if i in skip_cols or not h or t.kind(i) != "text" or any(c == i for c, _ in found):
+            continue
+        vals = {str(v).strip() for v in t.col(i)[:5000] if v not in (None, "")}
+        if vals and {v.lower() for v in vals} <= YES | NO and _col_score(h, words) >= 0.5:
+            neg = re.search(r"\b(not|nahi|nahin|bina|unapproved|unpaid|pending)\b", raw)
+            pick = next((v for v in vals if v.lower() in (NO if neg else YES)), None)
+            if pick:
+                found.append((i, pick))
     # one value per column; prefer exact
     seen, out = set(), []
     for i, v in found:
         if i not in seen:
             seen.add(i)
             out.append((i, v))
+    return out
+
+
+def _number_filters(text, t, num_cols):
+    """'18% gst wale': a number that is one of the values of a named number column -> filter on it."""
+    out = []
+    for m in re.finditer(r"(?<![\w.])(\d+(?:\.\d+)?)\s*(%?)", text or ""):
+        n = float(m.group(1))
+        for i, _ in num_cols:
+            vals = {v for v in t.col(i)[:20000] if isinstance(v, (int, float))}
+            for cand in (n, n / 100 if m.group(2) else None):
+                if cand is not None and cand in vals and len(vals) <= 50:
+                    out.append((i, int(cand) if float(cand).is_integer() else cand))
+                    return out
     return out
 
 
@@ -196,6 +224,12 @@ SHEET_HINTS = {"sales": {"bika", "bike", "biki", "bikti", "sold", "bikri", "bech
 def _choose_table(text, tables, need_kinds=None) -> Table:
     t = pick_sheet(text, tables)
     if t:
+        if not any(sc >= 1 for _, sc in columns_in(text, t, {"number"})):
+            # "kis customer ka taxable value": 'customer' names the Customers sheet, but the value lives in Invoices
+            other = [(max((sc for _, sc in columns_in(text, o, {"number"})), default=0), o) for o in tables if o is not t]
+            other = [x for x in other if x[0] >= 1]
+            if other and _agg_of(text):
+                return max(other, key=lambda x: x[0])[1]
         return t
     words = set(tokens(text))
     scored = []
@@ -240,13 +274,17 @@ def _plan_question(text, tables) -> dict:
         vals = [v for v in t.col(group) if v not in (None, "")]
         if vals and len({str(v).strip().lower() for v in vals}) > 0.95 * len(vals):
             group = None                                   # "top 5 orders": each order is its own row, so rank rows
-    filters = [(i, v) for i, v in filters if i != group]
+    filters = [(i, v) for i, v in filters if i != group] + _number_filters(text, t, num_cols)
+    num_cols = [(i, sc) for i, sc in num_cols if i not in [f for f, _ in filters]]
     if group is not None and not isinstance(group, tuple) and re.search(r"\bby\s+\w+", text or "", re.I) and \
             any(i == group for i, _ in num_cols):
         group = None
     if group is None and _agg_of(text) in ("max", "min"):
         # "which vendor has the highest invoice total": per vendor, then the top
         strong = [i for i, sc in txt_cols if sc >= 1 and i not in [f for f, _ in filters]]
+        wm0 = re.search(r"\b(?:which|kaun|kaunsa|kaunse|kis|kisne|kiska|kiski)\s+(\w+)", text or "", re.I)
+        if wm0:
+            strong += [i for i, sc in txt_cols if 0.5 <= sc < 1 and _col_score(t.header[i], [wm0.group(1).lower()]) >= 0.5]
         wm = re.search(r"\b(?:which|kaun|kaunsa|kaunse|kis|kisne|kiska|kiski)\s+(\w+)", text or "", re.I)
         if wm:
             named = [i for i in strong if _col_score(t.header[i], [wm.group(1).lower()]) >= 0.5]
@@ -280,11 +318,13 @@ def _plan_question(text, tables) -> dict:
                            "I can do totals, counts, averages, highest/lowest, X-wise summaries, lists, lookups from another sheet, aging, "
                            "combining sheets and highlighting rows. Tell me which, e.g. \"total sales by region\".")
     if agg in ("sum", "avg", "max", "min") and measure is None:
-        cands = [i for i in range(len(t.header)) if t.kind(i) == "number" and t.header[i]]
-        amountish = [i for i in cands if re.search(r"amount|total|net|sales|salary|price|value", t.header[i], re.I)]
-        if len(amountish) == 1 or (amountish and agg == "sum"):
+        cands = [i for i in range(len(t.header)) if t.kind(i) == "number" and t.header[i] and i not in [f for f, _ in filters]]
+        amountish = [i for i in cands if re.search(r"amount|total|net|sales|salary|price|value|fee|fees|charges|revenue|bill", t.header[i], re.I)]
+        if len(cands) == 1:
+            measure = cands[0]
+        elif len(amountish) == 1 or (amountish and agg == "sum"):
             measure = amountish[-1] if agg == "sum" else amountish[0]
-        else:
+        if measure is None:
             raise NeedMore(f"{t.name} mein kis column ka {_AGG_HI[agg]} chahiye?", f"Which column in {t.name} should I {_AGG_EN[agg]}?",
                            [t.header[i] for i in cands][:8])
     return {"job": "aggregate", "table": t.name, "agg": agg, "measure": measure, "group": group, "filters": filters, "topn": topn}
@@ -402,7 +442,12 @@ def _num(v):
 
 
 def _match_filters(row, filters):
-    return all(isinstance(row[i] if i < len(row) else None, str) and row[i].strip().lower() == v.lower() for i, v in filters)
+    def ok(i, v):
+        x = row[i] if i < len(row) else None
+        if isinstance(v, (int, float)):
+            return isinstance(x, (int, float)) and abs(x - v) < 1e-9
+        return isinstance(x, str) and x.strip().lower() == v.lower()
+    return all(ok(i, v) for i, v in filters)
 
 
 def _fmt(n):
@@ -440,7 +485,7 @@ def _name(t, r, label) -> str:
 
 
 def _crit(t: Table, filters):
-    return "".join(f',{t.ref(i)},"{v}"' for i, v in filters)
+    return "".join(f',{t.ref(i)},{v}' if isinstance(v, (int, float)) else f',{t.ref(i)},"{v}"' for i, v in filters)
 
 
 def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:

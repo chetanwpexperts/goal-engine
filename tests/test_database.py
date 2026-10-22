@@ -259,3 +259,15 @@ def test_direct_end_to_end_with_real_mysql(client, ml_mode, monkeypatch):
     client.post(f"/api/connectors/{c['id']}/disconnect")
     s.expire_all()
     assert s.get(Connector, c["id"]).secret is None
+
+
+def test_direct_refuses_our_own_server(client, monkeypatch):
+    monkeypatch.delenv("DIRECT_DB_ALLOW_PRIVATE", raising=False)
+    monkeypatch.setenv("APP_SECRET", "x" * 32)
+    monkeypatch.setenv("SERVER_IP", "93.184.215.14")
+    monkeypatch.setattr(direct.socket, "getaddrinfo",
+                        lambda host, *a, **k: [(2, 1, 6, "", ("93.184.215.14", 3306))])
+    direct._attempts.clear()
+    res = client.post("/api/connectors/direct", json={"host": "mysite.example", "database": "d", "user": "u"})
+    assert res.status_code == 400 and "own server" in res.json()["error"]
+    direct._attempts.clear()

@@ -74,6 +74,24 @@ def server_ip() -> str:
     return os.getenv("SERVER_IP", "").strip()
 
 
+def _own_addresses() -> set[str]:
+    """This server's own addresses: the form must never reach databases on our own machine."""
+    own = {a.strip() for a in os.getenv("SERVER_IP", "").split(",") if a.strip()}
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None):
+            own.add(info[4][0])
+    except OSError:
+        pass
+    try:
+        import subprocess
+
+        out = subprocess.run(["hostname", "-I"], capture_output=True, text=True, timeout=3).stdout
+        own.update(out.split())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return own
+
+
 def public_ip(host: str, port: int) -> str:
     """Resolve the host and refuse private, local or reserved addresses (checked again at every job)."""
     try:
@@ -88,6 +106,8 @@ def public_ip(host: str, port: int) -> str:
                                   or ip.is_unspecified or (ip.version == 6 and ip.ipv4_mapped and not ip.ipv4_mapped.is_global)):
             raise DirectError("That address is a private or local one, so Goal Engine can't reach it. "
                               "Use the database's public host name or IP (or the one-command connector on your server)")
+        if not allow_private and str(ip) in _own_addresses():
+            raise DirectError("That's Goal Engine's own server, so it can't be connected this way")
         ips.append(ip)
     ips.sort(key=lambda ip: ip.version)          # IPv4 first
     return str(ips[0])

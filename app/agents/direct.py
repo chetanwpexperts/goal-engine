@@ -36,7 +36,9 @@ _done_hooks = []
 
 
 class DirectError(ValueError):
-    pass
+    def __init__(self, message: str, use_command: bool = False):
+        super().__init__(message)
+        self.use_command = use_command
 
 
 def on_done(fn):
@@ -93,12 +95,17 @@ def public_ip(host: str, port: int) -> str:
     ips = []
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
+        if not allow_private and (ip.is_loopback or ip.is_unspecified):
+            raise DirectError(f"'{host}' means \"this same server\", so your database only works inside your own server. "
+                              "Use the one-command option below: it connects from inside, and your password stays there",
+                              use_command=True)
         if not allow_private and (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast
                                   or ip.is_unspecified or (ip.version == 6 and ip.ipv4_mapped and not ip.ipv4_mapped.is_global)):
-            raise DirectError("That address is a private or local one, so Goal Engine can't reach it. "
-                              "Use the database's public host name or IP (or the one-command connector on your server)")
+            raise DirectError("That's a private network address, so Goal Engine can't reach it from outside. "
+                              "Use the one-command option below instead", use_command=True)
         if not allow_private and str(ip) in _own_addresses():
-            raise DirectError("That's Goal Engine's own server, so it can't be connected this way")
+            raise DirectError("That's Goal Engine's own server, so it can't be connected this way. Use the one-command option below",
+                              use_command=True)
         ips.append(ip)
     ips.sort(key=lambda ip: ip.version)          # IPv4 first
     return str(ips[0])
@@ -135,7 +142,7 @@ def _open(details: dict):
             ip = server_ip()
             raise DirectError(f"Couldn't reach {details['host']}:{port}. The database may only accept local connections. "
                               "On cPanel, add " + (f"IP {ip}" if ip else "our server's IP") + " under Remote MySQL. "
-                              "On a VPS, use the one-command connector instead") from exc
+                              "On a VPS, use the one-command option below", use_command=True) from exc
         raise DirectError(f"Couldn't connect: {msg[:160]}") from exc
 
 

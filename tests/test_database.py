@@ -191,7 +191,8 @@ def test_direct_refuses_private_addresses(client, monkeypatch):
     monkeypatch.setenv("APP_SECRET", "x" * 32)
     for host in ("127.0.0.1", "localhost", "10.0.0.5", "192.168.1.10", "169.254.169.254", "[::1]"):
         res = client.post("/api/connectors/direct", json={"host": host, "database": "d", "user": "u", "password": "p"})
-        assert res.status_code == 400 and ("private or local" in res.json()["error"] or "Couldn't find" in res.json()["error"]), host
+        err = res.json()
+        assert res.status_code == 400 and (err["use_command"] or "Couldn't find" in err["error"]), host
     assert direct._clean_form({"host": "https://db.example.com:3307/x", "database": "d", "user": "u"})["port"] == "3307"
 
 

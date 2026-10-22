@@ -65,7 +65,7 @@
     const res = await fetch(path, { headers: { "Content-Type": "application/json" }, credentials: "same-origin", ...options });
     let data = {};
     try { data = await res.json(); } catch (_) { /* empty */ }
-    if (!res.ok) throw new Error(data.error || data.detail || "Something went wrong. Try again.");
+    if (!res.ok) { const e = new Error(data.error || data.detail || "Something went wrong. Try again."); e.data = data; throw e; }
     return data;
   }
 
@@ -519,6 +519,7 @@
     }
 
     // Typed on Goal Engine: no terminal
+    const vps = el("details", "vps");
     const form = el("form", "dbform");
     const field = (label, input) => { const l = el("label", "f"); l.append(el("span", null, label), input); return l; };
     const type = el("select");
@@ -555,12 +556,12 @@
       } catch (ex) {
         err.textContent = ex.message; err.hidden = false;
         go.disabled = false; go.textContent = T(hi, "Jodo", "Connect");
+        if (ex.data && ex.data.use_command) { vps.open = true; vps.classList.add("hint"); vps.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" }); }
       }
     });
     box.append(form);
 
     // On a VPS where the database only listens locally: one command on the server
-    const vps = el("details", "vps");
     vps.append(el("summary", null, T(hi, "Database sirf server ke andar chalta hai (VPS)? Ek command se jodo", "Database only reachable inside your server (VPS)? Connect with one command")));
     const make = el("button", "btn", T(hi, "Command banao", "Get the command")); make.type = "button";
     const inner = el("div", "slot inner"); inner.append(make);

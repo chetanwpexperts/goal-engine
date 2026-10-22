@@ -469,7 +469,7 @@ def connect_direct(body: DirectIn, db: Session = Depends(get_db), visitor: str =
     try:
         connector = dbagent_direct.connect(db, visitor, body.model_dump(), body.name)
     except (dbagent_direct.DirectError, dbagent.DatabaseError) as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
+        return JSONResponse({"error": str(exc), "use_command": bool(getattr(exc, "use_command", False))}, status_code=400)
     if body.agent_id:
         agent = own_agent(db, body.agent_id, visitor)
         inputs = loads(agent.inputs, {}) or {}

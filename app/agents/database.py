@@ -117,7 +117,20 @@ def connector_dict(connector: Connector, db: Session | None = None) -> dict:
         "host": connector.host_label, "token_hint": connector.token_hint, "kind": connector.kind or "agent",
         "last_seen_at": connector.last_seen_at.isoformat() if connector.last_seen_at else None,
         "tables": (schema or {}).get("tables", []),
+        **({"file_url": _php_url(connector), "file_name": _php_name(connector)} if connector.kind == "php" else {}),
     }
+
+
+def _php_url(connector: Connector) -> str:
+    from app.agents import phpconn
+
+    return phpconn.file_url(connector)
+
+
+def _php_name(connector: Connector) -> str:
+    from app.agents import phpconn
+
+    return phpconn.file_name(connector)
 
 
 def hello(db: Session, connector: Connector, info: dict) -> None:

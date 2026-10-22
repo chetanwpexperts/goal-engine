@@ -26,7 +26,29 @@ MAX_RESPONSE = 32 * 1024 * 1024
 
 
 class PhpError(direct.DirectError):
-    pass
+    def __init__(self, message: str, missing: bool = False):
+        super().__init__(message)
+        self.missing = missing   # the file is gone or not answering like the connector (e.g. removed by a security scanner)
+
+
+def _aes_key(key: str) -> bytes:
+    return hashlib.sha256(("goal-engine-transport:" + key).encode()).digest()
+
+
+def seal(key: str, data: dict) -> str:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    import base64
+
+    iv = secrets.token_bytes(12)
+    return base64.b64encode(iv + AESGCM(_aes_key(key)).encrypt(iv, json.dumps(data).encode(), None)).decode()
+
+
+def unseal(key: str, sealed: str) -> dict:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    import base64
+
+    raw = base64.b64decode(sealed)
+    return json.loads(AESGCM(_aes_key(key)).decrypt(raw[:12], raw[12:], None))
 
 
 def create(db: Session, visitor_id: str, name: str = "") -> Connector:
@@ -70,7 +92,7 @@ def _check_url(url: str) -> str:
 
 
 def call(url: str, key: str, kind: str, payload: dict | None = None, timeout: int = 100) -> dict:
-    body = json.dumps({"kind": kind, "payload": payload or {}})
+    body = json.dumps({"sealed": seal(key, {"kind": kind, "payload": payload or {}})})   # firewalls see no SQL
     for _ in range(3):                     # follow up to 2 redirects (http->https, www), each one re-checked
         url = _check_url(url)
         ts, nonce = str(int(time.time())), secrets.token_urlsafe(18)
@@ -98,12 +120,19 @@ def call(url: str, key: str, kind: str, payload: dict | None = None, timeout: in
         out = json.loads(data.decode("utf-8", "replace"))
     except ValueError:
         out = None
-    if r.status_code == 404 and not isinstance(out, dict):
-        raise PhpError("No file at that link. Check the file was uploaded and the link is right")
+    if r.status_code in (404, 410) and not isinstance(out, dict):
+        raise PhpError("No file at that link. It was removed (often by the hosting's security scanner) or the link is wrong", missing=True)
     if not isinstance(out, dict) or "ok" not in out:
-        raise PhpError("That link didn't answer like the Goal Engine file. Upload the downloaded file as-is, without editing it")
+        if r.status_code in (403, 406, 501):
+            raise PhpError("The hosting's firewall blocked the request. Add the file to its allow list, then try again", missing=True)
+        raise PhpError("That link didn't answer like the Goal Engine file. Upload the downloaded file as-is, without editing it", missing=True)
     if r.status_code == 403:
-        raise PhpError("The file refused the request. Download the file again from this card and upload it (replace the old one)")
+        raise PhpError("The file refused the request. Download the file again from this card and upload it (replace the old one)", missing=True)
+    if "sealed" in out:
+        try:
+            out = unseal(key, out["sealed"])
+        except Exception as exc:  # noqa: BLE001
+            raise PhpError("The answer couldn't be verified. Download the file again and replace the old one", missing=True) from exc
     return out
 
 
@@ -140,3 +169,34 @@ def run(connector: Connector, kind: str, payload: dict) -> dict:
     if out.get("csv") is not None:
         result["csv"] = out["csv"]
     return result
+
+
+def check_all(db: Session) -> int:
+    """Every few hours: is each website file still there? (Security scanners sometimes remove it.)"""
+    from sqlalchemy import select
+
+    changed = 0
+    for c in db.scalars(select(Connector).where(Connector.kind == "php", Connector.status.in_(("online", "missing")))):
+        try:
+            secret = direct.decrypt(c.secret or "")
+            if not secret.get("url"):
+                continue
+            out = call(secret["url"], secret["key"], "hello", timeout=30)
+            status = "online" if out.get("ok") else "missing"
+        except PhpError as exc:
+            status = "missing" if exc.missing else c.status
+        except Exception:  # noqa: BLE001 - network blip: leave as is
+            continue
+        if status != c.status:
+            c.status, changed = status, changed + 1
+        if status == "online":
+            c.last_seen_at = utcnow()
+    db.commit()
+    return changed
+
+
+def file_url(connector: Connector) -> str:
+    try:
+        return direct.decrypt(connector.secret or "").get("url", "")
+    except Exception:  # noqa: BLE001
+        return ""

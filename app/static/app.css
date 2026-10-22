@@ -284,3 +284,6 @@ body[data-state="active"]::after { content: ""; position: fixed; left: 0; right:
 .step b { width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: var(--paper); display: grid; place-items: center; font-size: 12px; }
 .slot.inner form.row input { flex: 1 1 220px; }
 @media (max-width: 480px) { .where { grid-template-columns: 1fr; } }
+.missing { border: 1px solid var(--signal); background: var(--signal-soft); border-radius: 14px; padding: 12px 14px; display: grid; gap: 4px; font-size: 14px; }
+.missing b { color: var(--signal-ink); }
+.missing p { margin: 0; color: var(--ink); }

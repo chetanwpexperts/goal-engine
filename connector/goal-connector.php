@@ -23,9 +23,23 @@ header('Content-Type: application/json; charset=utf-8');
 header('X-Robots-Tag: noindex, nofollow');
 header('Cache-Control: no-store');
 
+$GOAL_ENCRYPT = false;
+
+// Requests and answers are encrypted with this file's key (AES-256-GCM), so firewalls see no SQL
+// and nobody in between can read your data.
+function goal_aes_key() { return hash('sha256', 'goal-engine-transport:' . GOAL_KEY, true); }
+
 function goal_out($data, $code = 200) {
+    global $GOAL_ENCRYPT;
     http_response_code($code);
-    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    if ($GOAL_ENCRYPT) {
+        $iv = random_bytes(12);
+        $tag = '';
+        $ct = openssl_encrypt($json, 'aes-256-gcm', goal_aes_key(), OPENSSL_RAW_DATA, $iv, $tag);
+        $json = json_encode(['ok' => true, 'sealed' => base64_encode($iv . $ct . $tag)]);
+    }
+    echo $json;
     exit;
 }
 
@@ -51,8 +65,16 @@ if (isset($seen[$nonce])) goal_out(['ok' => false, 'error' => 'Request already u
 $seen[$nonce] = time();
 @file_put_contents($seen_file, json_encode($seen), LOCK_EX);
 
-$job = json_decode($body, true);
+if (!function_exists('openssl_decrypt')) goal_out(['ok' => false, 'error' => 'This hosting has PHP without OpenSSL; ask your host to enable it'], 500);
+$outer = json_decode($body, true);
+$raw = (is_array($outer) && isset($outer['sealed'])) ? base64_decode($outer['sealed'], true) : false;
+$job = null;
+if ($raw !== false && strlen($raw) > 28) {
+    $plain = openssl_decrypt(substr($raw, 12, -16), 'aes-256-gcm', goal_aes_key(), OPENSSL_RAW_DATA, substr($raw, 0, 12), substr($raw, -16));
+    if ($plain !== false) $job = json_decode($plain, true);
+}
 if (!is_array($job) || empty($job['kind'])) goal_out(['ok' => false, 'error' => 'Bad request'], 400);
+$GOAL_ENCRYPT = true;
 
 // ---------------------------------------------------------------- finding the database settings
 function goal_unquote($v) {

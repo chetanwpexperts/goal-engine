@@ -74,6 +74,7 @@ def _run_db_report(db: Session, agent: Agent) -> None:
 
 
 _last_maintenance = 0.0
+_last_file_check = 0.0
 
 
 def _scheduler(stop: threading.Event) -> None:
@@ -98,6 +99,10 @@ def _scheduler(stop: threading.Event) -> None:
                     except AgentError as exc:
                         log.warning("Scheduled agent %s: %s", agent.id, exc)
                 global _last_maintenance
+                global _last_file_check
+                if time.monotonic() - _last_file_check > 6 * 3600:
+                    _last_file_check = time.monotonic()
+                    log.info("Website files changed state: %s", phpconn.check_all(db))
                 if time.monotonic() - _last_maintenance > 600:
                     _last_maintenance = time.monotonic()
                     log.info("Privacy clean-up: %s", privacy.maintain(db))

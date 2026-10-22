@@ -513,6 +513,17 @@
     const check = el("button", "btn go", T(hi, "Jodo", "Connect")); check.type = "submit";
     const err = el("p", "note err"); err.hidden = true;
     const form = el("form", "row"); form.append(url, check);
+    if (c && c.file_url) url.value = c.file_url;
+    if (c && c.status === "missing") {
+      const warn = el("div", "missing");
+      warn.append(
+        el("b", null, T(hi, "File nahi mil rahi", "The file isn't answering")),
+        el("p", null, T(hi, "Aksar hosting ka security scanner (Imunify360, Wordfence, Sucuri) nayi PHP files hata deta hai, ya firewall rok deta hai. Aapka data safe hai.",
+                            "Hosting security scanners (Imunify360, Wordfence, Sucuri) often remove new PHP files, or a firewall blocks them. Your data is safe.")),
+        el("p", null, T(hi, `Theek karne ke liye: 1) Neeche se file dobara download karke upload karo. 2) Scanner mein "${c.file_name}" ko allow / ignore list mein daalo. 3) Jodo dabao.`,
+                            `To fix: 1) Download the file again below and upload it. 2) Add "${c.file_name}" to the scanner's allow / ignore list. 3) Tap Connect.`)));
+      box.append(warn);
+    }
     box.append(
       step(1, T(hi, "Ye file download karo (har database ke liye alag, isme ek secret key hai):", "Download this file (one per database; it has its own secret key):")),
       dl,

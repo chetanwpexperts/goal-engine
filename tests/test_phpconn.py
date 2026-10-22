@@ -85,12 +85,19 @@ def test_php_file_refuses_unsigned_replayed_and_writes(wp_site, env):
     assert out["ok"] is False
     # a captured request can't be sent again
     import hashlib, hmac, json as _json, time as _t
-    body = _json.dumps({"kind": "schema", "payload": {}})
+    body = _json.dumps({"sealed": phpconn.seal(key, {"kind": "schema", "payload": {}})})
     ts, nonce = str(int(_t.time())), __import__("secrets").token_urlsafe(16)
     sig = hmac.new(key.encode(), f"{ts}\n{nonce}\n{body}".encode(), hashlib.sha256).hexdigest()
     h = {"X-Goal-Time": ts, "X-Goal-Nonce": nonce, "X-Goal-Signature": sig}
-    assert requests.post(url, data=body, headers=h, timeout=10).status_code == 200
+    first = requests.post(url, data=body, headers=h, timeout=10)
+    assert first.status_code == 200 and "orders" not in first.text and "sealed" in first.text   # answer is encrypted
+    assert phpconn.unseal(key, first.json()["sealed"])["result"]["tables"][0]["name"] == "orders"
     assert requests.post(url, data=body, headers=h, timeout=10).status_code == 403
+    # a plain (unencrypted) request with SQL in it is refused
+    plain = _json.dumps({"kind": "query", "payload": {"sql": "SELECT * FROM orders"}})
+    ts2, n2 = str(int(_t.time())), __import__("secrets").token_urlsafe(16)
+    sig2 = hmac.new(key.encode(), f"{ts2}\n{n2}\n{plain}".encode(), hashlib.sha256).hexdigest()
+    assert requests.post(url, data=plain, headers={"X-Goal-Time": ts2, "X-Goal-Nonce": n2, "X-Goal-Signature": sig2}, timeout=10).status_code == 400
     # an old request is refused
     ts = str(int(_t.time()) - 600)
     sig = hmac.new(key.encode(), f"{ts}\n{'m' * 20}\n{body}".encode(), hashlib.sha256).hexdigest()
@@ -104,6 +111,30 @@ def test_php_link_must_be_public_https(monkeypatch):
                 "https://example.com:8443/x.php"):
         with pytest.raises(direct.DirectError):
             phpconn._check_url(url)
+
+
+def test_removed_file_is_noticed_and_fixed_by_uploading_again(client, ml_mode, wp_site, env):
+    from app.db import get_db
+    from app.models import Connector
+
+    agent = say(client, "database ki tables dikhao")["agents"][0]
+    cid = client.post(f"/api/agents/{agent['id']}/php-connector").json()["agents"][0]["connector"]["id"]
+    f = client.get(f"/api/connectors/{cid}/php-file")
+    name = re.search(r'filename="([^"]+)"', f.headers["content-disposition"]).group(1)
+    (wp_site / name).write_text(f.text)
+    link = f"http://127.0.0.1:8099/{name}"
+    assert client.post(f"/api/connectors/{cid}/php-link", json={"url": link}).status_code == 200
+
+    (wp_site / name).unlink()                      # a security scanner removed it
+    job = client.post(f"/api/connectors/{cid}/jobs", json={"kind": "health"}).json()
+    assert client.get(f"/api/connector-jobs/{job['id']}").json()["status"] == "failed"
+    c = client.get("/api/connectors").json()["connectors"][0]
+    assert c["status"] == "missing" and not c["online"] and c["file_url"] == link and c["file_name"] == name
+
+    (wp_site / name).write_text(f.text)            # uploaded again
+    s = next(get_db())
+    assert phpconn.check_all(s) == 1
+    assert s.get(Connector, cid).status == "online"
 
 
 import re  # noqa: E402

@@ -233,6 +233,8 @@ def run_job(job_id: int) -> None:
                 body = {"ok": True, "result": data, **({"csv": csv_text} if csv_text is not None else {})}
             except Exception as exc:  # noqa: BLE001 - every failure is reported on the job
                 body = {"ok": False, "error": str(exc)[:300]}
+                if getattr(exc, "missing", False):
+                    connector.status = "missing"      # the card will say the file needs uploading again
         job = dbagent.complete(db, connector, job.id, body)
         for hook in _done_hooks:
             try:

@@ -267,3 +267,4 @@ body[data-state="active"]::after { content: ""; position: fixed; left: 0; right:
 .vps { margin-top: 6px; }
 .vps summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 .vps .inner { margin: 10px 0 0; }
+.fineprint a { color: inherit; text-underline-offset: 2px; }

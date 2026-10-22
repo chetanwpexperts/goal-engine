@@ -21,6 +21,7 @@ from app.agents.blocks import (RULE_FIELDS, BlockError, Table, fill, load_sheet,
                                summarize, valid_email)
 from app.agents.mailer import Mailer, SmtpMailer
 from app.agents.spec import describe, next_run, schedule_text, validate
+from app import privacy
 from app.models import Agent, AgentRun, Goal, Message, OwnerContact, SentEmail, dumps, loads, utcnow
 
 
@@ -127,8 +128,8 @@ def automation_dict(db: Session, agent: Agent, hi: bool) -> dict:
                     else "Google Sheet ka link (Anyone with the link: Viewer)", "required": False, "multiline": False,
                     "value": inputs.get("sheet_url", "")},
                    {"key": "csv_text", "kind": "text", "label": "…or paste the rows (CSV)" if not hi else "…ya rows yahan paste karo (CSV)",
-                    "required": False, "multiline": True, "value": inputs.get("csv_text", "")}],
-        "ready": bool(inputs.get("sheet_url") or inputs.get("csv_text")),
+                    "required": False, "multiline": True, "value": privacy.get_rows(inputs)}],
+        "ready": bool(inputs.get("sheet_url") or privacy.get_rows(inputs)),
         "needs_owner": spec.get("send_to") == "row_email" or spec.get("kind") == "report",
         "owner": {"email": owner.email if owner else "", "verified": bool(owner and owner.verified_at),
                   "business": owner.business_name if owner else ""},
@@ -142,8 +143,9 @@ def automation_dict(db: Session, agent: Agent, hi: bool) -> dict:
 def _table(inputs: dict, fetcher=None) -> Table:
     if inputs.get("sheet_url"):
         return load_sheet(inputs["sheet_url"], fetcher) if fetcher else load_sheet(inputs["sheet_url"])
-    if inputs.get("csv_text"):
-        return parse_csv(inputs["csv_text"])
+    rows = privacy.get_rows(inputs)
+    if rows:
+        return parse_csv(rows)
     raise BlockError("Add your Google Sheet link, or paste the rows")
 
 
@@ -210,12 +212,13 @@ def execute(db: Session, agent: Agent, hi: bool, *, preview: bool, mailer: Maile
                                                                      SentEmail.sent_at >= utcnow() - REPEAT_GAP))}
     sent, failed, held = [], [], 0
     for m in messages:
-        if m["to"].lower() in recent:
+        mark = privacy.fingerprint(m["to"])
+        if mark in recent:
             continue
         if len(sent) >= room:
             held += 1
             continue
-        record = SentEmail(visitor_id=agent.visitor_id, agent_id=agent.id, to_email=m["to"].lower(), subject=m["subject"], status="sent")
+        record = SentEmail(visitor_id=agent.visitor_id, agent_id=agent.id, to_email=mark, subject=m["subject"][:200], status="sent")
         try:
             mailer.send(m["to"], m["subject"], m["body"], reply_to=owner.email, from_name=sender_name)
             sent.append(m["to"])
@@ -223,7 +226,7 @@ def execute(db: Session, agent: Agent, hi: bool, *, preview: bool, mailer: Maile
             record.status, record.error = "failed", str(exc)[:300]
             failed.append(m["to"])
         db.add(record)
-        recent.add(m["to"].lower())
+        recent.add(mark)
     db.commit()
     result.update({"sent": len(sent), "failed": failed, "held_for_cap": held, "sent_to": sent[:MAX_PER_RUN]})
     summary = (f"{spec['title']}: {len(sent)} bheje, {len(failed)} fail, {len(skipped)} bina email." if hi
@@ -282,7 +285,7 @@ def activate(db: Session, agent: Agent) -> None:
     if not owner or not owner.verified_at:
         raise AutomationError("Verify your email first")
     inputs = loads(agent.inputs, {}) or {}
-    if not (inputs.get("sheet_url") or inputs.get("csv_text")):
+    if not (inputs.get("sheet_url") or privacy.get_rows(inputs)):
         raise AutomationError("Add your sheet first")
     agent.status = "active"
     agent.next_run_at = next_run(spec_of(agent)["schedule"], utcnow())

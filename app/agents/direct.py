@@ -7,8 +7,6 @@
 * A few attempts per visitor, so the form can't be used to guess passwords.
 """
 
-import base64
-import hashlib
 import importlib.util
 import ipaddress
 import json
@@ -46,26 +44,19 @@ def on_done(fn):
     return fn
 
 
-# ---------------------------------------------------------------- secrets
-def _fernet():
-    from cryptography.fernet import Fernet
-
-    secret = os.getenv("APP_SECRET", "")
-    if len(secret) < 16:
-        raise DirectError("Direct database connections aren't switched on on this server yet (APP_SECRET missing)")
-    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(("db-credentials:" + secret).encode()).digest()))
-
-
+# ---------------------------------------------------------------- secrets (see app/privacy.py)
 def encrypt(data: dict) -> str:
-    return _fernet().encrypt(json.dumps(data).encode()).decode()
+    from app import privacy
+
+    return privacy.encrypt(data, "db-credentials")
 
 
 def decrypt(token: str) -> dict:
-    from cryptography.fernet import InvalidToken
+    from app import privacy
 
     try:
-        return json.loads(_fernet().decrypt(token.encode()))
-    except InvalidToken as exc:
+        return privacy.decrypt(token, "db-credentials")
+    except Exception as exc:  # noqa: BLE001
         raise DirectError("Saved database details can't be read any more. Connect it again") from exc
 
 

@@ -186,15 +186,12 @@ def test_installer_is_served_with_server_address(client):
 from app.agents import direct  # noqa: E402
 
 
-def test_direct_refuses_private_addresses_and_needs_a_secret(client, monkeypatch):
+def test_direct_refuses_private_addresses(client, monkeypatch):
     monkeypatch.delenv("DIRECT_DB_ALLOW_PRIVATE", raising=False)
     monkeypatch.setenv("APP_SECRET", "x" * 32)
     for host in ("127.0.0.1", "localhost", "10.0.0.5", "192.168.1.10", "169.254.169.254", "[::1]"):
         res = client.post("/api/connectors/direct", json={"host": host, "database": "d", "user": "u", "password": "p"})
         assert res.status_code == 400 and ("private or local" in res.json()["error"] or "Couldn't find" in res.json()["error"]), host
-    monkeypatch.setenv("APP_SECRET", "")
-    res = client.post("/api/connectors/direct", json={"host": "db.example.com", "database": "d", "user": "u", "password": "p"})
-    assert res.status_code == 400 and "APP_SECRET" in res.json()["error"]
     assert direct._clean_form({"host": "https://db.example.com:3307/x", "database": "d", "user": "u"})["port"] == "3307"
 
 

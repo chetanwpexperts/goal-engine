@@ -1,5 +1,7 @@
 import logging
+import hmac
 import os
+import time
 import threading
 from contextlib import asynccontextmanager
 import re
@@ -17,6 +19,7 @@ from sqlalchemy.orm import Session
 from app.ai.router import AIRouter, AIUnavailable
 from app.ml.brain import Brain
 from app.agents import automation
+from app import privacy
 from app.agents import database as dbagent
 from app.agents import direct as dbagent_direct
 from app.agents.core import AgentError, agent_dict, claim_due, goal_agents, run_agent
@@ -67,6 +70,9 @@ def _run_db_report(db: Session, agent: Agent) -> None:
         dbagent.queue(db, connector, "export", {"sql": inputs.get("sql", "")}, agent_id=agent.id)
 
 
+_last_maintenance = 0.0
+
+
 def _scheduler(stop: threading.Event) -> None:
     """Runs daily agents when they're due. Safe with several workers (each run is claimed once)."""
     log = logging.getLogger("agent-scheduler")
@@ -88,7 +94,10 @@ def _scheduler(stop: threading.Event) -> None:
                             run_agent(db, agent, hi, scheduled=True)
                     except AgentError as exc:
                         log.warning("Scheduled agent %s: %s", agent.id, exc)
-                dbagent.clean_exports()
+                global _last_maintenance
+                if time.monotonic() - _last_maintenance > 600:
+                    _last_maintenance = time.monotonic()
+                    log.info("Privacy clean-up: %s", privacy.maintain(db))
             finally:
                 db.close()
         except Exception:  # noqa: BLE001 - the scheduler must keep going
@@ -130,6 +139,22 @@ class MessageIn(BaseModel):
 
 class StatusIn(BaseModel):
     status: Literal["active", "done", "dropped"]
+
+
+@app.post("/api/privacy/delete-all")
+def delete_all(request: Request, response: Response, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    counts = {}
+    for vid in [visitor] + _earlier_ids(request):
+        for k, v in privacy.delete_visitor(db, vid).items():
+            counts[k] = counts.get(k, 0) + (v or 0)
+    response.delete_cookie(COOKIE)
+    response.delete_cookie(PREV_COOKIE)
+    return {"ok": True, "deleted": counts}
+
+
+@app.get("/privacy")
+def privacy_page() -> FileResponse:
+    return FileResponse(STATIC / "privacy.html")
 
 
 @app.get("/connector/install.sh")
@@ -252,9 +277,10 @@ def preview_agent(agent_id: int, body: StartIn, db: Session = Depends(get_db), v
     if agent.recipe != "automation":
         raise HTTPException(400, "Preview is for automation agents")
     inputs = loads(agent.inputs, {}) or {}
-    for key in ("sheet_url", "csv_text"):
-        if key in body.inputs:
-            inputs[key] = (body.inputs[key] or "").strip()[:200000]
+    if "sheet_url" in body.inputs:
+        inputs["sheet_url"] = (body.inputs["sheet_url"] or "").strip()[:2000]
+    if "csv_text" in body.inputs:
+        privacy.set_rows(inputs, (body.inputs["csv_text"] or "").strip()[:200000])   # stored encrypted
     agent.inputs = dumps(inputs)
     db.commit()
     hi = _goal_hi(db.get(Goal, agent.goal_id))
@@ -567,10 +593,25 @@ def pause_agent(agent_id: int, db: Session = Depends(get_db), visitor: str = Dep
     return {"agents": [agent_dict(a, db, _goal_hi(goal)) for a in goal_agents(db, agent.goal_id)]}
 
 
+PREV_COOKIE = "ge_prev"
+
+
+def _earlier_ids(request: Request) -> list[str]:
+    """Earlier anonymous ids of this browser (from 'start fresh'), signed so nobody can add someone else's."""
+    raw = request.cookies.get(PREV_COOKIE, "")
+    ids, _, sig = raw.rpartition(".")
+    if not ids or not hmac.compare_digest(sig, privacy.fingerprint("prev:" + ids)[2:]):
+        return []
+    return [i for i in ids.split(",") if VISITOR_RE.match(i)]
+
+
 @app.post("/api/new-chat")
-def new_chat() -> JSONResponse:
-    """Start fresh: the browser gets a new anonymous id. Old messages stay stored for learning."""
+def new_chat(request: Request) -> JSONResponse:
+    """Start fresh: the browser gets a new anonymous id, and remembers the old ones so 'Delete all my data' still covers them."""
     response = JSONResponse({"ok": True})
+    ids = ",".join(([request.state.visitor_id] + _earlier_ids(request))[:30])
+    response.set_cookie(PREV_COOKIE, f"{ids}.{privacy.fingerprint('prev:' + ids)[2:]}", max_age=60 * 60 * 24 * 180,
+                        httponly=True, samesite="lax", secure=get_settings().cookie_secure)
     response.delete_cookie(COOKIE)
     return response
 

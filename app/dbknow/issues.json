@@ -174,5 +174,1867 @@
     "codes": [
       "1366"
     ]
+  },
+  {
+    "id": "hacked-is-my-database-hacked",
+    "title_en": "Is my database hacked? Check for signs of a break-in",
+    "title_hi": "Kya mera database hack hua hai? Break-in ke nishaan check karo",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "I think someone hacked my database",
+      "how do I know if my database was compromised",
+      "suspicious activity in database",
+      "lagta hai kisi ne database hack kar liya",
+      "database hack hua hai ya nahi kaise pata karein",
+      "database mein kuch ajeeb ho raha hai, shayad hacker",
+      "kisi ne bina permission database mein ghus ke kuch kiya hai",
+      "signs of intrusion in mysql",
+      "check if postgres server is compromised",
+      "unknown changes in database nobody on team made",
+      "मुझे शक है डेटाबेस में किसी ने घुसपैठ की है",
+      "did a hacker get access to my db",
+      "find out if my database was broken into",
+      "kya koi hacker mere db tak pahunch gaya",
+      "database mein ghuspaith hui hai kya, jaanch karo",
+      "shak hai kisi ne chupke se database access kiya",
+      "क्या किसी हैकर ने मेरे डेटाबेस तक पहुंच बनाई",
+      "डेटाबेस सुरक्षित है या हैक हुआ जांच करो",
+      "my website was hacked",
+      "wordpress site got hacked",
+      "website hack ho gayi hai",
+      "site hack ho gaya",
+      "वेबसाइट हैक हो गई है",
+      "my site has been hacked check the database"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE",
+        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT USER, HOST, DB, COMMAND, TIME FROM information_schema.PROCESSLIST ORDER BY TIME DESC",
+        "look_for": "sessions from an IP/host that isn't your app server or your office"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, DEFINER, SECURITY_TYPE, CREATED, LAST_ALTERED FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA NOT IN ('sys', 'mysql') ORDER BY CREATED DESC",
+        "look_for": "procedures/functions with names you don't recognise, recently created, or with an unknown DEFINER"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_SCHEMA, TABLE_NAME, CREATE_TIME, TABLE_ROWS FROM information_schema.TABLES WHERE LOWER(TABLE_NAME) LIKE '%recover%' OR LOWER(TABLE_NAME) LIKE '%readme%' OR LOWER(TABLE_NAME) LIKE '%read_me%' OR LOWER(TABLE_NAME) LIKE '%warning%' OR LOWER(TABLE_NAME) LIKE '%bitcoin%' OR LOWER(TABLE_NAME) LIKE '%ransom%' OR LOWER(TABLE_NAME) LIKE '%hacked%' OR LOWER(TABLE_SCHEMA) LIKE '%recover%' OR LOWER(TABLE_SCHEMA) LIKE '%readme%' OR LOWER(TABLE_SCHEMA) LIKE '%read_me%'",
+        "look_for": "a table/database like RECOVER_YOUR_DATA, README, PLEASE_READ_ME or WARNING: that is the ransom note"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_ROWS, CREATE_TIME, UPDATE_TIME FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys') ORDER BY CREATE_TIME DESC LIMIT 30",
+        "look_for": "tables created recently that nobody made, or important tables now with 0 rows"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'port', 'require_secure_transport', 'local_infile', 'secure_file_priv')",
+        "look_for": "bind_address 0.0.0.0 or * (open to every network), local_infile ON, secure_file_priv empty"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT g.rolname AS powerful_role, r.rolname AS member FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid WHERE g.rolname IN ('pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files', 'pg_signal_backend', 'pg_read_all_data', 'pg_write_all_data')",
+        "look_for": "an app or unknown role allowed to run server programs or read/write server files"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT usename, client_addr, application_name, backend_start, state FROM pg_stat_activity WHERE backend_type = 'client backend' ORDER BY backend_start",
+        "look_for": "connections from addresses that aren't your app or office, or a strange application_name"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT evtname, evtevent, evtowner::regrole AS owner, evtfoid::regproc AS runs_function, evtenabled FROM pg_event_trigger",
+        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT t.tgrelid::regclass AS on_table, t.tgname, t.tgfoid::regproc AS runs_function, t.tgenabled FROM pg_trigger t WHERE NOT t.tgisinternal ORDER BY 1",
+        "look_for": "a trigger you don't know, especially one running a function you didn't write"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT table_schema, table_name FROM information_schema.tables WHERE lower(table_name) LIKE '%recover%' OR lower(table_name) LIKE '%readme%' OR lower(table_name) LIKE '%read_me%' OR lower(table_name) LIKE '%warning%' OR lower(table_name) LIKE '%bitcoin%' OR lower(table_name) LIKE '%ransom%' OR lower(table_name) LIKE '%hacked%'",
+        "look_for": "a ransom-note table (README, RECOVER_YOUR_DATA, WARNING...) in this database"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT datname, pg_database_size(datname) AS bytes FROM pg_database WHERE NOT datistemplate ORDER BY datname",
+        "look_for": "a new database like readme_to_recover, or your database suddenly tiny"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'ssl', 'password_encryption', 'log_connections', 'log_statement')",
+        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off"
+      }
+    ],
+    "causes": [
+      {
+        "id": "unknown_account",
+        "title_en": "An account or permission exists that nobody on your team created",
+        "title_hi": "Koi account ya permission hai jo aapki team ne nahi banaya"
+      },
+      {
+        "id": "hidden_code",
+        "title_en": "Triggers, scheduled events or procedures were planted to keep access or change data",
+        "title_hi": "Triggers, scheduled events ya procedures daale gaye hain taaki access bana rahe ya data badle"
+      },
+      {
+        "id": "ransom",
+        "title_en": "Data was deleted and a ransom note left",
+        "title_hi": "Data delete karke ransom note chhoda gaya"
+      },
+      {
+        "id": "exposed",
+        "title_en": "The database is open to the whole internet",
+        "title_hi": "Database poore internet ke liye khula hai"
+      },
+      {
+        "id": "false_alarm",
+        "title_en": "Nothing suspicious found: the change came from a plugin, update or teammate",
+        "title_hi": "Kuch shak wala nahi mila: badlaav plugin, update ya team ke kisi member se aaya"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "unknown_account",
+        "action": "advice",
+        "steps_en": "Treat it as a break-in: follow 'Hacked: what to do right now' (copy for evidence, change every password, remove the unknown account).",
+        "steps_hi": "Ise break-in maano: 'Hack ho gaya: abhi turant kya karein' follow karo (saboot ke liye copy, har password badlo, anjaan account hatao)."
+      },
+      {
+        "cause": "hidden_code",
+        "action": "advice",
+        "steps_en": "Open the 'unknown triggers' or 'unknown scheduled events/procedures' playbook and remove only what you have confirmed is not yours.",
+        "steps_hi": "'Anjaan triggers' ya 'anjaan scheduled events/procedures' playbook kholo aur sirf wahi hatao jo pakka aapka nahi hai."
+      },
+      {
+        "cause": "ransom",
+        "action": "advice",
+        "steps_en": "Don't pay. Follow the ransom-note playbook: keep the note as evidence, close access, restore from your backup.",
+        "steps_hi": "Paise mat do. Ransom-note playbook follow karo: note saboot ke liye rakho, access band karo, backup se restore karo."
+      },
+      {
+        "cause": "exposed",
+        "action": "config",
+        "steps_en": "Make the database listen only on the private network/localhost and allow its port only from your app server in the firewall.",
+        "steps_hi": "Database ko sirf private network/localhost pe sunne do aur firewall mein port sirf app server ke liye kholo."
+      },
+      {
+        "cause": "false_alarm",
+        "action": "advice",
+        "steps_en": "Keep the check results; turn on connection/query logging so a real break-in would be visible next time.",
+        "steps_hi": "Check ke results rakh lo; connection/query logging on karo taaki agli baar asli break-in dikh jaye."
+      }
+    ],
+    "verify": {
+      "en": "Every account, trigger, event and procedure in the results is known to your team, and no ransom table exists.",
+      "hi": "Results mein har account, trigger, event aur procedure aapki team ka jaana-pehchana hai, aur koi ransom table nahi hai."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/security-guidelines.html",
+    "seen_at": [
+      "https://dev.to/aws-builders/help-my-database-was-compromised-3o2j",
+      "https://border0.com/blogs/help-my-postgres-database-was-compromised",
+      "https://blog.sucuri.net/2021/02/sql-triggers-in-website-backdoors.html",
+      "https://wordpress.org/support/topic/i-was-hacked-11/"
+    ],
+    "test_phrases": [
+      "how can I find out whether a hacker got into my db",
+      "mujhe doubt hai koi mere database mein ghusa tha, check karo",
+      "क्या मेरा डेटाबेस किसी ने हैक कर लिया है"
+    ]
+  },
+  {
+    "id": "hacked-what-to-do-now",
+    "title_en": "Database hacked: what to do right now (contain it)",
+    "title_hi": "Database hack ho gaya: abhi turant kya karein (rok lagao)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "my database got hacked what should I do first",
+      "database was hacked, how do I stop the attacker",
+      "first steps after database breach",
+      "database hack ho gaya ab kya karu",
+      "hacker ko database se bahar kaise nikale",
+      "hack hone ke baad turant kya karna chahiye",
+      "attacker abhi bhi andar hai, rokna hai",
+      "emergency: db compromised, contain it",
+      "hacked database incident response steps",
+      "डेटाबेस हैक हो गया अब तुरंत क्या करूँ",
+      "we were attacked, immediate actions for the database",
+      "breach hua hai turant kya kadam uthayein",
+      "database pe hamla ho gaya pehla kadam batao",
+      "हमला हो गया अब पहला कदम क्या है",
+      "हैकर ने हमला किया है तुरंत क्या करना है"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT USER, HOST, DB, COMMAND, TIME FROM information_schema.PROCESSLIST ORDER BY TIME DESC",
+        "look_for": "sessions from an IP/host that isn't your app server or your office"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE",
+        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'port', 'require_secure_transport', 'local_infile', 'secure_file_priv')",
+        "look_for": "bind_address 0.0.0.0 or * (open to every network), local_infile ON, secure_file_priv empty"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'general_log', 'log_error', 'expire_logs_days', 'binlog_expire_logs_seconds')",
+        "look_for": "log_bin ON means the changes (and the attack) are recorded and can be replayed up to a point in time"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT usename, client_addr, application_name, backend_start, state FROM pg_stat_activity WHERE backend_type = 'client backend' ORDER BY backend_start",
+        "look_for": "connections from addresses that aren't your app or office, or a strange application_name"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'ssl', 'password_encryption', 'log_connections', 'log_statement')",
+        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('wal_level', 'archive_mode', 'archive_command', 'archive_library')",
+        "look_for": "archive_mode on with a working archive: point-in-time recovery to just before the attack is possible"
+      }
+    ],
+    "causes": [
+      {
+        "id": "still_connected",
+        "title_en": "The attacker may still be connected or able to log in",
+        "title_hi": "Attacker abhi bhi connected ho sakta hai ya login kar sakta hai"
+      },
+      {
+        "id": "passwords_known",
+        "title_en": "The database and app passwords must be treated as stolen",
+        "title_hi": "Database aur app ke passwords ko chori hua maano"
+      },
+      {
+        "id": "open_port",
+        "title_en": "The database port is reachable from the internet",
+        "title_hi": "Database ka port internet se pahuncha ja sakta hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "still_connected",
+        "action": "advice",
+        "steps_en": "1) Take a full copy (dump or disk snapshot) of the database AS IT IS now and keep it aside as evidence; don't clean before this. 2) Note the time you noticed it. 3) Put the site in maintenance mode so customers aren't served infected pages.",
+        "steps_hi": "1) Database ki abhi jaisi hai waisi poori copy (dump ya disk snapshot) lo aur saboot ke liye alag rakho; isse pehle safai mat karo. 2) Kab pata chala, time likh lo. 3) Site maintenance mode mein daalo taaki customers ko infected page na dikhe."
+      },
+      {
+        "cause": "passwords_known",
+        "action": "approved_change",
+        "steps_en": "Change the password of every database account (ALTER USER ... IDENTIFIED BY / ALTER ROLE ... PASSWORD), put the new app password in the app config (wp-config.php, .env), change hosting/cPanel/SSH/FTP and admin-panel passwords, and replace the WordPress secret keys so every session is logged out.",
+        "steps_hi": "Har database account ka password badlo (ALTER USER ... IDENTIFIED BY / ALTER ROLE ... PASSWORD), naya app password config mein daalo (wp-config.php, .env), hosting/cPanel/SSH/FTP aur admin panel ke password badlo, aur WordPress secret keys badlo taaki sab log out ho jayein."
+      },
+      {
+        "cause": "open_port",
+        "action": "config",
+        "steps_en": "Close the port to the internet now: bind the server to localhost/private IP (bind_address / listen_addresses), allow only your app server in the firewall, and remove accounts that can log in from any host ('%').",
+        "steps_hi": "Port abhi internet ke liye band karo: server ko localhost/private IP pe bind karo (bind_address / listen_addresses), firewall mein sirf app server allow karo, aur jo account kisi bhi host ('%') se login kar sakte hain unhe hatao."
+      }
+    ],
+    "verify": {
+      "en": "Only your app and your team's known accounts are connected; old passwords no longer work; the port can't be reached from outside.",
+      "hi": "Sirf aapki app aur team ke jaane-pehchane account connected hain; purane password kaam nahi karte; bahar se port nahi khulta."
+    },
+    "source": "https://wordpress.org/documentation/article/faq-my-site-was-hacked/",
+    "seen_at": [
+      "https://dev.to/aws-builders/help-my-database-was-compromised-3o2j",
+      "https://border0.com/blogs/help-my-postgres-database-was-compromised",
+      "https://dev.mysql.com/doc/refman/8.0/en/alter-user.html",
+      "https://www.postgresql.org/docs/current/sql-alterrole.html"
+    ],
+    "test_phrases": [
+      "a hacker broke into our database, what are the very first things I must do",
+      "database pe attack hua hai, sabse pehle kya karna hai batao",
+      "हमारे डेटाबेस पर हमला हुआ है सबसे पहले क्या करें"
+    ]
+  },
+  {
+    "id": "hacked-unknown-wordpress-admin",
+    "title_en": "Unknown admin user appeared in WordPress",
+    "title_hi": "WordPress mein anjaan admin user aa gaya",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "new admin user I didn't create in wordpress",
+      "unknown administrator account in wp_users",
+      "hidden admin user not showing in users list",
+      "admin user keeps coming back after deleting",
+      "wordpress mein naya admin ban gaya jo maine nahi banaya",
+      "users list mein ek anjaan administrator hai",
+      "admin delete karta hu phir se aa jata hai",
+      "wp-admin mein users ki ginti database se kam dikhti hai",
+      "strange user with administrator role",
+      "वर्डप्रेस में एक अनजान एडमिन यूजर बन गया",
+      "someone made themselves admin on my wordpress",
+      "admin account on the site that nobody on our team created",
+      "website pe anjaan admin dikh raha hai",
+      "अनजान एडमिन अकाउंट वेबसाइट पर दिख रहा है",
+      "वर्डप्रेस यूजर लिस्ट में बाहरी एडमिन"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT u.ID, u.user_login, u.display_name, u.user_registered FROM wp_users u JOIN wp_usermeta m ON m.user_id = u.ID WHERE m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%' ORDER BY u.user_registered DESC",
+        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT m.user_id, m.meta_key, m.meta_value, u.user_login FROM wp_usermeta m LEFT JOIN wp_users u ON u.ID = m.user_id WHERE (m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%') OR (m.meta_key LIKE '%user_level' AND m.meta_value = '10')",
+        "look_for": "admin rights given to a user id that has no row in wp_users (user_login empty) or to a user you don't recognise"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ID, user_login, display_name, user_registered FROM wp_users ORDER BY ID DESC LIMIT 20",
+        "look_for": "the newest user ids: a high id with an old registration date was added later and back-dated"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'admin_email', 'users_can_register', 'default_role', 'template', 'stylesheet')",
+        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+      }
+    ],
+    "causes": [
+      {
+        "id": "rogue_admin",
+        "title_en": "An attacker added an administrator account",
+        "title_hi": "Attacker ne administrator account jod diya"
+      },
+      {
+        "id": "meta_only",
+        "title_en": "Admin rights were written straight into wp_usermeta (sometimes for a user id that isn't in wp_users)",
+        "title_hi": "Admin rights seedhe wp_usermeta mein likh diye (kabhi aise user id ke liye jo wp_users mein hai hi nahi)"
+      },
+      {
+        "id": "backdoor_recreates",
+        "title_en": "A trigger, event or infected file re-creates the admin after you delete it",
+        "title_hi": "Koi trigger, event ya infected file admin ko delete ke baad phir bana deti hai"
+      },
+      {
+        "id": "open_registration",
+        "title_en": "Anyone can register, and new users get the administrator role",
+        "title_hi": "Koi bhi register kar sakta hai, aur naye user ko administrator role milta hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "rogue_admin",
+        "action": "approved_change",
+        "steps_en": "After the evidence copy: in Users, delete the unknown admin and give its content to a real user (or delete its wp_users row and its wp_usermeta rows). Reset every real admin's password.",
+        "steps_hi": "Saboot wali copy ke baad: Users mein anjaan admin delete karo aur uska content asli user ko do (ya wp_users ki row aur uski wp_usermeta rows hatao). Har asli admin ka password reset karo."
+      },
+      {
+        "cause": "meta_only",
+        "action": "approved_change",
+        "steps_en": "Delete the wp_usermeta capability/user_level rows that give admin to unknown or missing user ids.",
+        "steps_hi": "wp_usermeta ki woh capability/user_level rows hatao jo anjaan ya gayab user id ko admin banati hain."
+      },
+      {
+        "cause": "backdoor_recreates",
+        "action": "advice",
+        "steps_en": "Remove the trigger/event first (see the triggers and events playbooks), replace WordPress core files with a fresh copy and scan themes/plugins; then delete the admin again.",
+        "steps_hi": "Pehle trigger/event hatao (triggers aur events playbook dekho), WordPress core files fresh copy se badlo aur themes/plugins scan karo; phir admin dobara delete karo."
+      },
+      {
+        "cause": "open_registration",
+        "action": "approved_change",
+        "steps_en": "Set users_can_register to 0 (or default_role back to subscriber) in Settings > General.",
+        "steps_hi": "Settings > General mein users_can_register 0 karo (ya default_role wapas subscriber)."
+      }
+    ],
+    "verify": {
+      "en": "The admin list holds only people you know, and stays that way after a day (nothing re-creates it).",
+      "hi": "Admin list mein sirf jaane-pehchane log hain, aur ek din baad bhi waisa hi hai (koi dobara nahi banata)."
+    },
+    "source": "https://wordpress.org/documentation/article/faq-my-site-was-hacked/",
+    "seen_at": [
+      "https://blog.sucuri.net/2022/03/the-mystery-admin-user.html",
+      "https://blog.nintechnet.com/how-hackers-create-hidden-admin-users-on-your-wordpress-blog/",
+      "https://blog.sucuri.net/2021/02/sql-triggers-in-website-backdoors.html",
+      "https://codex.wordpress.org/Database_Description"
+    ],
+    "test_phrases": [
+      "there is an admin login on my wordpress site that none of us made",
+      "site ke users mein ek admin hai jisko hum jaante hi nahi",
+      "मेरी वेबसाइट में कोई अनजान एडमिन दिख रहा है जिसे हमने नहीं बनाया"
+    ]
+  },
+  {
+    "id": "hacked-locked-out-admin-changed",
+    "title_en": "Locked out after a hack: admin password or email was changed",
+    "title_hi": "Hack ke baad login band: admin ka password ya email badal diya",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "can't login to wordpress admin after hack",
+      "hacker changed my admin password and email",
+      "admin email changed and password reset doesn't reach me",
+      "mera admin password kisi ne badal diya",
+      "wp-admin mein login nahi ho raha, email bhi badal gaya",
+      "password reset ka mail mere paas nahi aata, kisi ne admin email change kar diya",
+      "locked out of my own website admin",
+      "my admin account was taken over",
+      "मेरा एडमिन पासवर्ड किसी ने बदल दिया लॉगिन नहीं होता"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT u.ID, u.user_login, u.display_name, u.user_registered FROM wp_users u JOIN wp_usermeta m ON m.user_id = u.ID WHERE m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%' ORDER BY u.user_registered DESC",
+        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ID, user_login, user_registered FROM wp_users WHERE user_activation_key <> ''",
+        "look_for": "password-reset keys you didn't ask for"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'admin_email', 'users_can_register', 'default_role', 'template', 'stylesheet')",
+        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ID, user_login, display_name, user_registered FROM wp_users ORDER BY ID DESC LIMIT 20",
+        "look_for": "the newest user ids: a high id with an old registration date was added later and back-dated"
+      }
+    ],
+    "causes": [
+      {
+        "id": "takeover",
+        "title_en": "The attacker changed your admin account's password and/or email",
+        "title_hi": "Attacker ne aapke admin account ka password aur/ya email badla"
+      },
+      {
+        "id": "admin_email",
+        "title_en": "The site's admin_email setting now points to the attacker",
+        "title_hi": "Site ki admin_email setting ab attacker ki taraf hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "takeover",
+        "action": "approved_change",
+        "steps_en": "Through the database (phpMyAdmin/Adminer or this tool after approval) set your user's user_email back to your address, then use 'Lost your password?' on the login page. Clear user_activation_key on accounts that didn't ask for a reset.",
+        "steps_hi": "Database se (phpMyAdmin/Adminer ya approval ke baad yeh tool) apne user ka user_email wapas apna karo, phir login page pe 'Lost your password?' use karo. Jinhone reset nahi maanga unka user_activation_key khaali karo."
+      },
+      {
+        "cause": "admin_email",
+        "action": "approved_change",
+        "steps_en": "Set the admin_email option back to your address, then change all admin passwords and the WordPress secret keys.",
+        "steps_hi": "admin_email option wapas apne address pe karo, phir sab admin passwords aur WordPress secret keys badlo."
+      }
+    ],
+    "verify": {
+      "en": "You can log in, the reset email reaches you, and no other admin or reset key exists that you don't know.",
+      "hi": "Aap login kar paate ho, reset mail aapko milta hai, aur koi anjaan admin ya reset key nahi bachi."
+    },
+    "source": "https://wordpress.org/documentation/article/resetting-your-password/",
+    "seen_at": [
+      "https://wordpress.org/documentation/article/faq-my-site-was-hacked/",
+      "https://wordpress.org/support/topic/i-was-hacked-11/"
+    ],
+    "test_phrases": [
+      "somebody took over my site's admin and now my password does not work",
+      "kisi ne admin account le liya, ab mera password chal hi nahi raha",
+      "किसी ने मेरी साइट का एडमिन अकाउंट ले लिया अब पासवर्ड नहीं चलता"
+    ]
+  },
+  {
+    "id": "hacked-unknown-db-accounts",
+    "title_en": "Unknown database users or permissions appeared",
+    "title_hi": "Database mein anjaan users ya permissions aa gaye",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "new mysql user I didn't create",
+      "unknown postgres role with superuser",
+      "someone granted all privileges to a strange user",
+      "mysql user list mein anjaan user hai",
+      "postgres mein naya superuser role ban gaya",
+      "kisi ne ek user ko saari permissions de di",
+      "user with host % appeared",
+      "app user suddenly has GRANT OPTION and SUPER",
+      "role bana hua hai jiska naam hum nahi jaante",
+      "डेटाबेस में नया यूजर बन गया जो हमने नहीं बनाया",
+      "unknown login on the database server",
+      "database server pe anjaan login hai full access ke saath",
+      "डेटाबेस सर्वर पर नया लॉगिन किसने बनाया",
+      "अनजान डेटाबेस यूजर के पास सारी अनुमति है",
+      "someone added a db login with all privileges"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE",
+        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, TABLE_SCHEMA, PRIVILEGE_TYPE FROM information_schema.SCHEMA_PRIVILEGES ORDER BY GRANTEE, TABLE_SCHEMA",
+        "look_for": "unknown accounts with rights on your database"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT USER, HOST, DB, COMMAND, TIME FROM information_schema.PROCESSLIST ORDER BY TIME DESC",
+        "look_for": "sessions from an IP/host that isn't your app server or your office"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT g.rolname AS powerful_role, r.rolname AS member FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid WHERE g.rolname IN ('pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files', 'pg_signal_backend', 'pg_read_all_data', 'pg_write_all_data')",
+        "look_for": "an app or unknown role allowed to run server programs or read/write server files"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT grantee, table_schema, privilege_type, count(*) AS tables FROM information_schema.role_table_grants WHERE table_schema NOT IN ('pg_catalog', 'information_schema') GROUP BY 1, 2, 3 ORDER BY 1",
+        "look_for": "unknown roles (or PUBLIC) with write rights on your tables"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT usename, client_addr, application_name, backend_start, state FROM pg_stat_activity WHERE backend_type = 'client backend' ORDER BY backend_start",
+        "look_for": "connections from addresses that aren't your app or office, or a strange application_name"
+      }
+    ],
+    "causes": [
+      {
+        "id": "backdoor_account",
+        "title_en": "An attacker created their own account to come back later",
+        "title_hi": "Attacker ne wapas aane ke liye apna account bana liya"
+      },
+      {
+        "id": "escalated",
+        "title_en": "An existing app account was given admin powers (SUPER/FILE/GRANT, superuser, server-program roles)",
+        "title_hi": "Pehle wale app account ko admin powers de di gayi (SUPER/FILE/GRANT, superuser, server-program roles)"
+      },
+      {
+        "id": "forgotten",
+        "title_en": "An old account from a previous developer or tool, still active",
+        "title_hi": "Purane developer ya tool ka account, abhi bhi chalu"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "backdoor_account",
+        "action": "approved_change",
+        "steps_en": "After the evidence copy: lock it first (ALTER USER ... ACCOUNT LOCK / ALTER ROLE ... NOLOGIN), end its sessions, then DROP USER / DROP ROLE (reassign or drop what it owns first in PostgreSQL).",
+        "steps_hi": "Saboot wali copy ke baad: pehle lock karo (ALTER USER ... ACCOUNT LOCK / ALTER ROLE ... NOLOGIN), uske sessions band karo, phir DROP USER / DROP ROLE (PostgreSQL mein pehle uski cheezein reassign/drop karo)."
+      },
+      {
+        "cause": "escalated",
+        "action": "approved_change",
+        "steps_en": "REVOKE the extra rights so the app user has only SELECT/INSERT/UPDATE/DELETE on its own database (ALTER ROLE ... NOSUPERUSER; REVOKE pg_execute_server_program ...), then change its password.",
+        "steps_hi": "Extra rights REVOKE karo taaki app user ke paas sirf apne database pe SELECT/INSERT/UPDATE/DELETE ho (ALTER ROLE ... NOSUPERUSER; REVOKE pg_execute_server_program ...), phir password badlo."
+      },
+      {
+        "cause": "forgotten",
+        "action": "approved_change",
+        "steps_en": "Confirm with the team, then lock or drop it; keep one named account per person or app.",
+        "steps_hi": "Team se confirm karo, phir lock ya drop karo; har insaan ya app ka ek apna naam wala account rakho."
+      }
+    ],
+    "verify": {
+      "en": "Every account and grant in the list is known, app accounts have only data rights, and no account allows any host ('%') unless needed.",
+      "hi": "List ka har account aur grant jaana-pehchana hai, app accounts ke paas sirf data rights hain, aur koi account bina zaroorat kisi bhi host ('%') se nahi aata."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/drop-user.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/predefined-roles.html",
+      "https://www.postgresql.org/docs/current/view-pg-roles.html",
+      "https://border0.com/blogs/help-my-postgres-database-was-compromised",
+      "https://www.wiz.io/fr-fr/blog/postgresql-cryptomining"
+    ],
+    "test_phrases": [
+      "there's a login on the database server that none of us added",
+      "db mein ek extra user dikh raha hai jisko kisi ne nahi banaya, uske paas full access hai",
+      "डेटाबेस सर्वर पर कोई अनजान लॉगिन है जिसके पास पूरा एक्सेस है"
+    ]
+  },
+  {
+    "id": "hacked-unknown-triggers",
+    "title_en": "Unknown triggers planted in the database (backdoor)",
+    "title_hi": "Database mein anjaan triggers daale gaye (backdoor)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "found a trigger I didn't create",
+      "suspicious trigger on wp_comments",
+      "trigger that inserts into users table",
+      "malware hidden in database trigger",
+      "database mein ek trigger mila jo humne nahi banaya",
+      "comment aate hi naya user ban jata hai",
+      "har insert pe kuch ajeeb ho jata hai, trigger ka shak hai",
+      "cleaned the files but site got reinfected from database",
+      "data apne aap badal jata hai jab koi order ya comment aata hai",
+      "डेटाबेस में अजीब ट्रिगर मिला है",
+      "something hidden inside the database brings the hack back",
+      "safai ke baad bhi hack database se wapas aa jata hai",
+      "database ke andar koi chhupa code hai jo hack wapas lata hai",
+      "डेटाबेस के अंदर छुपा कोड हैक वापस लाता है",
+      "फाइल साफ करने पर भी डेटाबेस से संक्रमण लौट आता है"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT u.ID, u.user_login, u.display_name, u.user_registered FROM wp_users u JOIN wp_usermeta m ON m.user_id = u.ID WHERE m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%' ORDER BY u.user_registered DESC",
+        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT t.tgrelid::regclass AS on_table, t.tgname, t.tgfoid::regproc AS runs_function, t.tgenabled FROM pg_trigger t WHERE NOT t.tgisinternal ORDER BY 1",
+        "look_for": "a trigger you don't know, especially one running a function you didn't write"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT evtname, evtevent, evtowner::regrole AS owner, evtfoid::regproc AS runs_function, evtenabled FROM pg_event_trigger",
+        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT n.nspname AS schema, p.proname AS function, r.rolname AS owner, l.lanname AS language, p.prosecdef AS security_definer FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_roles r ON r.oid = p.proowner JOIN pg_language l ON l.oid = p.prolang WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') ORDER BY n.nspname, p.proname",
+        "look_for": "functions with odd names, written in C or an untrusted language (plpython3u, plperlu), or SECURITY DEFINER owned by a superuser"
+      }
+    ],
+    "causes": [
+      {
+        "id": "backdoor_trigger",
+        "title_en": "A trigger fires on a normal action (new comment/order/user) and secretly adds an admin or changes data",
+        "title_hi": "Ek trigger normal kaam (naya comment/order/user) pe chalta hai aur chupke se admin banata ya data badalta hai"
+      },
+      {
+        "id": "event_trigger",
+        "title_en": "(PostgreSQL) an event trigger fires on every CREATE/ALTER/DROP",
+        "title_hi": "(PostgreSQL) ek event trigger har CREATE/ALTER/DROP pe chalta hai"
+      },
+      {
+        "id": "legit",
+        "title_en": "The trigger belongs to a plugin, audit tool or your own app",
+        "title_hi": "Trigger kisi plugin, audit tool ya aapki apni app ka hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "backdoor_trigger",
+        "action": "approved_change",
+        "steps_en": "Save its definition (SHOW CREATE TRIGGER / pg_get_triggerdef) as evidence, then DROP TRIGGER it; drop the function it called (PostgreSQL) and undo what it created (users, rows).",
+        "steps_hi": "Uski definition (SHOW CREATE TRIGGER / pg_get_triggerdef) saboot ke liye save karo, phir DROP TRIGGER karo; jo function woh chalata tha use hatao (PostgreSQL) aur jo usne banaya (users, rows) use undo karo."
+      },
+      {
+        "cause": "event_trigger",
+        "action": "approved_change",
+        "steps_en": "Save it, then DROP EVENT TRIGGER (needs a superuser) and check who owns it: that role is likely compromised too.",
+        "steps_hi": "Save karo, phir DROP EVENT TRIGGER (superuser chahiye) aur dekho owner kaun hai: woh role bhi shayad compromised hai."
+      },
+      {
+        "cause": "legit",
+        "action": "advice",
+        "steps_en": "Keep it; write down which plugin/app owns it so the next check is quick.",
+        "steps_hi": "Rehne do; likh lo kaunse plugin/app ka hai taaki agla check jaldi ho."
+      }
+    ],
+    "verify": {
+      "en": "The trigger list has only triggers you can name the owner of, and new comments/orders no longer create users or change data.",
+      "hi": "Trigger list mein sirf woh triggers hain jinka owner aap bata sakte ho, aur naye comment/order ab user nahi banate na data badalte."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/information-schema-triggers-table.html",
+    "seen_at": [
+      "https://blog.sucuri.net/2021/02/sql-triggers-in-website-backdoors.html",
+      "https://www.postgresql.org/docs/current/catalog-pg-trigger.html",
+      "https://www.postgresql.org/docs/current/catalog-pg-event-trigger.html"
+    ],
+    "test_phrases": [
+      "every time a visitor leaves a comment a new admin shows up, I think something is hidden in the db",
+      "files saaf kar di phir bhi hack wapas aa jata hai, database ke andar kuch chupa hai kya",
+      "फाइलें साफ करने के बाद भी हैक वापस आ जाता है डेटाबेस के अंदर कुछ छुपा है क्या"
+    ]
+  },
+  {
+    "id": "hacked-unknown-events-procedures",
+    "title_en": "Unknown scheduled events, stored procedures or functions",
+    "title_hi": "Anjaan scheduled events, stored procedures ya functions",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "unknown mysql event running every minute",
+      "strange stored procedure appeared",
+      "data changes by itself at fixed times",
+      "har kuch minute mein data apne aap badal jata hai",
+      "mysql event scheduler mein anjaan event hai",
+      "ek procedure mila jiska naam ajeeb hai",
+      "postgres function written in plpython that we never made",
+      "spam keeps coming back every hour after cleaning",
+      "pg_cron job nobody created",
+      "हर घंटे डेटा अपने आप बदल जाता है",
+      "rows disappear at the same time every day",
+      "roz same time pe data gayab ho jata hai",
+      "koi scheduled job data mita raha hai",
+      "रोज़ एक तय समय पर रिकॉर्ड गायब हो जाते हैं",
+      "something runs on a schedule and changes prices"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES LIKE 'event_scheduler'",
+        "look_for": "ON means scheduled events really run"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, DEFINER, SECURITY_TYPE, CREATED, LAST_ALTERED FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA NOT IN ('sys', 'mysql') ORDER BY CREATED DESC",
+        "look_for": "procedures/functions with names you don't recognise, recently created, or with an unknown DEFINER"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT n.nspname AS schema, p.proname AS function, r.rolname AS owner, l.lanname AS language, p.prosecdef AS security_definer FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_roles r ON r.oid = p.proowner JOIN pg_language l ON l.oid = p.prolang WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') ORDER BY n.nspname, p.proname",
+        "look_for": "functions with odd names, written in C or an untrusted language (plpython3u, plperlu), or SECURITY DEFINER owned by a superuser"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT 'extension' AS kind, extname AS name FROM pg_extension UNION ALL SELECT 'language', lanname FROM pg_language WHERE NOT lanpltrusted AND lanname NOT IN ('c', 'internal')",
+        "look_for": "extensions or untrusted languages nobody installed on purpose (pg_cron jobs and untrusted languages can run things on a schedule or on the server)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT evtname, evtevent, evtowner::regrole AS owner, evtfoid::regproc AS runs_function, evtenabled FROM pg_event_trigger",
+        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)"
+      }
+    ],
+    "causes": [
+      {
+        "id": "rogue_event",
+        "title_en": "A scheduled event re-adds spam, users or deletes data on a timer",
+        "title_hi": "Ek scheduled event timer pe spam, users wapas daalta ya data delete karta hai"
+      },
+      {
+        "id": "rogue_routine",
+        "title_en": "A planted procedure/function (MySQL routine, PostgreSQL function in C or an untrusted language) gives the attacker a way back",
+        "title_hi": "Ek chhupa procedure/function (MySQL routine, PostgreSQL ka C ya untrusted language function) attacker ko wapas aane ka raasta deta hai"
+      },
+      {
+        "id": "legit",
+        "title_en": "It belongs to your app, a backup/cleanup job or a plugin",
+        "title_hi": "Yeh aapki app, backup/cleanup job ya plugin ka hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "rogue_event",
+        "action": "approved_change",
+        "steps_en": "Save SHOW CREATE EVENT as evidence, ALTER EVENT ... DISABLE at once, then DROP EVENT; in PostgreSQL unschedule the pg_cron job.",
+        "steps_hi": "SHOW CREATE EVENT saboot ke liye save karo, turant ALTER EVENT ... DISABLE, phir DROP EVENT; PostgreSQL mein pg_cron job unschedule karo."
+      },
+      {
+        "cause": "rogue_routine",
+        "action": "approved_change",
+        "steps_en": "Save its code, DROP PROCEDURE/FUNCTION, and check its DEFINER/owner account: lock that account and change its password. Drop untrusted languages you don't use.",
+        "steps_hi": "Uska code save karo, DROP PROCEDURE/FUNCTION karo, aur uska DEFINER/owner account dekho: use lock karo aur password badlo. Jo untrusted language use nahi hoti use hatao."
+      },
+      {
+        "cause": "legit",
+        "action": "advice",
+        "steps_en": "Keep it and note its owner.",
+        "steps_hi": "Rehne do aur uska owner likh lo."
+      }
+    ],
+    "verify": {
+      "en": "No unknown events/routines are left, and the spam or data change doesn't come back at the next scheduled time.",
+      "hi": "Koi anjaan event/routine nahi bacha, aur agle scheduled time pe spam ya data badlaav wapas nahi aata."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/information-schema-events-table.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/information-schema-routines-table.html",
+      "https://www.postgresql.org/docs/current/catalog-pg-proc.html",
+      "https://aquasec.com/blog/pg_mem-a-malware-hidden-in-the-postgres-processes/",
+      "https://www.wiz.io/fr-fr/blog/postgresql-cryptomining"
+    ],
+    "test_phrases": [
+      "every night at the same time my product prices get changed and nobody is doing it",
+      "roz ek hi time pe kuch rows gayab ho jaati hain, koi scheduled cheez chal rahi hai kya",
+      "रोज़ एक ही समय पर डेटा अपने आप बदल जाता है कोई नहीं करता"
+    ]
+  },
+  {
+    "id": "hacked-spam-links-in-posts",
+    "title_en": "Spam links or scripts injected into posts and pages",
+    "title_hi": "Posts aur pages mein spam links ya scripts daal diye gaye",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "spam links injected in all my posts",
+      "malicious javascript added to wordpress posts",
+      "hidden links in post content",
+      "thousands of spam pages created on my site",
+      "japanese keyword spam pages in google",
+      "saare posts mein ajeeb script tag aa gaya",
+      "post ke andar chhupe hue casino pharma links",
+      "google mein meri site ke japanese spam pages dikh rahe hain",
+      "har page ke content mein kisi ne code daal diya",
+      "पोस्ट में स्पैम लिंक अपने आप जुड़ गए हैं",
+      "weird gambling links at the end of my blog articles",
+      "blog articles mein casino ke links jo humne nahi daale",
+      "ब्लॉग लेखों के नीचे जुए वाले लिंक"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT ID, post_type, post_status, post_title, post_modified FROM wp_posts WHERE post_content LIKE '%<script%' OR post_content LIKE '%<iframe%' OR post_content LIKE '%display:none%' OR post_content LIKE '%eval(%' OR post_content LIKE '%fromCharCode%' ORDER BY post_modified DESC LIMIT 50",
+        "look_for": "posts/pages carrying hidden links or scripts; many posts changed at the same minute is a mass injection"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT DATE(post_modified) AS day, COUNT(*) AS changed FROM wp_posts GROUP BY DATE(post_modified) ORDER BY day DESC LIMIT 14",
+        "look_for": "a day where hundreds of posts changed at once, or thousands of new pages you didn't write"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT post_type, post_status, COUNT(*) AS n, MIN(post_date) AS first_seen, MAX(post_date) AS last_seen FROM wp_posts GROUP BY post_type, post_status ORDER BY n DESC",
+        "look_for": "a huge count of published pages/posts (spam pages in Japanese, pharma, casino) that your team didn't create"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LENGTH(option_value) AS size, autoload FROM wp_options WHERE option_value LIKE '%<script%' OR option_value LIKE '%<iframe%' OR option_value LIKE '%eval(%' OR option_value LIKE '%base64_decode%' OR option_value LIKE '%fromCharCode%' OR option_value LIKE '%atob(%' ORDER BY size DESC LIMIT 50",
+        "look_for": "settings (widgets, theme options, header/footer code) holding scripts or encoded code you didn't add"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+      }
+    ],
+    "causes": [
+      {
+        "id": "mass_injection",
+        "title_en": "A script/link was added to many existing posts at once",
+        "title_hi": "Bahut saare purane posts mein ek saath script/link jod diya gaya"
+      },
+      {
+        "id": "spam_pages",
+        "title_en": "The attacker created many new spam pages/posts",
+        "title_hi": "Attacker ne bahut saare naye spam pages/posts bana diye"
+      },
+      {
+        "id": "reinfect",
+        "title_en": "Something keeps putting it back (infected file, trigger or event)",
+        "title_hi": "Koi cheez ise wapas daalti rehti hai (infected file, trigger ya event)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "mass_injection",
+        "action": "approved_change",
+        "steps_en": "Best: restore posts from a clean backup taken before the injection day. Otherwise remove the exact injected snippet from the affected rows after approval (we show every changed row; Undo keeps the old text). Don't run a blind search-replace on serialized data in wp_options/wp_postmeta: it breaks it.",
+        "steps_hi": "Sabse accha: injection wale din se pehle ke saaf backup se posts restore karo. Warna approval ke baad affected rows se wahi daala gaya code hatao (har badli row dikhegi; Undo purana text rakhta hai). wp_options/wp_postmeta ke serialized data pe andha search-replace mat chalao: woh toot jata hai."
+      },
+      {
+        "cause": "spam_pages",
+        "action": "approved_change",
+        "steps_en": "Delete the spam posts by the date range/author they share (after reviewing the list), then ask Google to re-crawl and remove them from search.",
+        "steps_hi": "List dekh ke, spam posts ko unki common date range/author se delete karo, phir Google se re-crawl karwao taaki search se hatein."
+      },
+      {
+        "cause": "reinfect",
+        "action": "advice",
+        "steps_en": "Remove the source first: replace core files, scan themes/plugins, and check the triggers/events playbooks; otherwise the cleaning is undone.",
+        "steps_hi": "Pehle jad hatao: core files badlo, themes/plugins scan karo, aur triggers/events playbook dekho; warna safai phir se bekaar ho jayegi."
+      }
+    ],
+    "verify": {
+      "en": "The check finds no injected script/link in posts, the spam page count is back to normal, and it stays clean for a few days.",
+      "hi": "Check ko posts mein koi daala hua script/link nahi milta, spam pages normal ho gaye, aur kuch din tak saaf rehta hai."
+    },
+    "source": "https://wordpress.org/documentation/article/faq-my-site-was-hacked/",
+    "seen_at": [
+      "https://blog.sucuri.net/?p=20018",
+      "https://www.sitepoint.com/community/t/how-to-remove-script-code-injecteded-in-all-my-wordpress-post/300341",
+      "https://wordpress.org/support/topic/my-site-keeps-getting-hacked-over-and-over-again/"
+    ],
+    "test_phrases": [
+      "people say my blog articles have weird casino links at the bottom that we never added",
+      "mere blog ke har article mein koi gande links daal gaya",
+      "मेरे ब्लॉग के हर लेख में किसी ने गंदे लिंक डाल दिए"
+    ]
+  },
+  {
+    "id": "hacked-site-redirects-siteurl",
+    "title_en": "Site redirects to a spam site (siteurl/home or settings changed)",
+    "title_hi": "Site spam site pe redirect ho rahi hai (siteurl/home ya settings badli)",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "wordpress site redirects to another domain",
+      "siteurl and home changed in wp_options",
+      "website opens some spam site instead",
+      "meri website khulte hi kisi aur site pe chali jaati hai",
+      "wp_options mein siteurl badal gaya",
+      "site kholo to dusri ajeeb website khul jaati hai",
+      "visitors from google get redirected to scam page",
+      "malicious redirect in header code setting",
+      "वेबसाइट खोलते ही किसी और साइट पर चली जाती है"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'admin_email', 'users_can_register', 'default_role', 'template', 'stylesheet')",
+        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LENGTH(option_value) AS size, autoload FROM wp_options WHERE option_value LIKE '%<script%' OR option_value LIKE '%<iframe%' OR option_value LIKE '%eval(%' OR option_value LIKE '%base64_decode%' OR option_value LIKE '%fromCharCode%' OR option_value LIKE '%atob(%' ORDER BY size DESC LIMIT 50",
+        "look_for": "settings (widgets, theme options, header/footer code) holding scripts or encoded code you didn't add"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ID, post_type, post_status, post_title, post_modified FROM wp_posts WHERE post_content LIKE '%<script%' OR post_content LIKE '%<iframe%' OR post_content LIKE '%display:none%' OR post_content LIKE '%eval(%' OR post_content LIKE '%fromCharCode%' ORDER BY post_modified DESC LIMIT 50",
+        "look_for": "posts/pages carrying hidden links or scripts; many posts changed at the same minute is a mass injection"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+      }
+    ],
+    "causes": [
+      {
+        "id": "siteurl",
+        "title_en": "siteurl/home now point to the attacker's domain",
+        "title_hi": "siteurl/home ab attacker ke domain ki taraf hain"
+      },
+      {
+        "id": "script_option",
+        "title_en": "A redirect script sits in a setting (widget, theme options, header/footer code) or in posts",
+        "title_hi": "Redirect script kisi setting (widget, theme options, header/footer code) ya posts mein baitha hai"
+      },
+      {
+        "id": "not_db",
+        "title_en": "The database is clean: the redirect is in files (.htaccess, index.php) or the hosting",
+        "title_hi": "Database saaf hai: redirect files (.htaccess, index.php) ya hosting mein hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "siteurl",
+        "action": "approved_change",
+        "steps_en": "Set siteurl and home back to your real address (https://yourdomain), or pin them with WP_HOME/WP_SITEURL in wp-config.php; then change all passwords.",
+        "steps_hi": "siteurl aur home wapas apne asli address (https://aapkadomain) pe karo, ya wp-config.php mein WP_HOME/WP_SITEURL se fix karo; phir sab passwords badlo."
+      },
+      {
+        "cause": "script_option",
+        "action": "approved_change",
+        "steps_en": "Remove the script from that option/post after review (Undo kept). Edit serialized options through WordPress screens, not raw text replace.",
+        "steps_hi": "Review ke baad us option/post se script hatao (Undo rehta hai). Serialized options WordPress screens se badlo, raw text replace se nahi."
+      },
+      {
+        "cause": "not_db",
+        "action": "advice",
+        "steps_en": "Check .htaccess, index.php, wp-config.php and theme header/footer files, replace core files, and ask your host to scan.",
+        "steps_hi": ".htaccess, index.php, wp-config.php aur theme header/footer files check karo, core files badlo, aur host se scan karwao."
+      }
+    ],
+    "verify": {
+      "en": "Opening the site (also from a phone and from a Google result) shows your site, and siteurl/home are your domain.",
+      "hi": "Site kholne pe (phone se aur Google result se bhi) aapki hi site khulti hai, aur siteurl/home aapka domain hai."
+    },
+    "source": "https://developer.wordpress.org/advanced-administration/upgrade/migrating/",
+    "seen_at": [
+      "https://jetpack.com/resources/wordpress-hacked-redirecting-to-spam/",
+      "https://blog.sucuri.net/2010/04/mass-infection-of-wordpress-blogs-at-network-solutions.html",
+      "https://wordpress.org/support/?p=10877664",
+      "https://wordpress.org/documentation/article/faq-my-site-was-hacked/"
+    ],
+    "test_phrases": [
+      "when customers click my link from google they land on a scam website",
+      "google se meri site pe aate hi koi fraud wali site khul jaati hai",
+      "गूगल से मेरी साइट पर आते ही कोई फ्रॉड वेबसाइट खुल जाती है"
+    ]
+  },
+  {
+    "id": "hacked-ransom-note-table",
+    "title_en": "Data gone and a ransom note (pay bitcoin) left in the database",
+    "title_hi": "Data gayab aur database mein ransom note (bitcoin do) chhoda gaya",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "all tables deleted and a table asking for bitcoin",
+      "found table README_TO_RECOVER with ransom message",
+      "database ransom note pay to get data back",
+      "saari tables gayab, sirf ek warning table hai",
+      "database mein bitcoin maangne wala message hai",
+      "hacker data wapas dene ke paise maang raha hai",
+      "RECOVER_YOUR_DATA database appeared",
+      "PLEASE_READ_ME table in mysql",
+      "डेटाबेस में बिटकॉइन मांगने वाला मैसेज है",
+      "database is empty and they want payment to return it",
+      "data wapas chahiye to payment karo likha hai",
+      "डेटाबेस खाली है और पैसे मांगे जा रहे हैं",
+      "डेटा वापस करने के लिए फिरौती मांगी",
+      "tables gone, note says send money"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_SCHEMA, TABLE_NAME, CREATE_TIME, TABLE_ROWS FROM information_schema.TABLES WHERE LOWER(TABLE_NAME) LIKE '%recover%' OR LOWER(TABLE_NAME) LIKE '%readme%' OR LOWER(TABLE_NAME) LIKE '%read_me%' OR LOWER(TABLE_NAME) LIKE '%warning%' OR LOWER(TABLE_NAME) LIKE '%bitcoin%' OR LOWER(TABLE_NAME) LIKE '%ransom%' OR LOWER(TABLE_NAME) LIKE '%hacked%' OR LOWER(TABLE_SCHEMA) LIKE '%recover%' OR LOWER(TABLE_SCHEMA) LIKE '%readme%' OR LOWER(TABLE_SCHEMA) LIKE '%read_me%'",
+        "look_for": "a table/database like RECOVER_YOUR_DATA, README, PLEASE_READ_ME or WARNING: that is the ransom note"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT s.SCHEMA_NAME, COUNT(t.TABLE_NAME) AS tables FROM information_schema.SCHEMATA s LEFT JOIN information_schema.TABLES t ON t.TABLE_SCHEMA = s.SCHEMA_NAME GROUP BY s.SCHEMA_NAME ORDER BY tables",
+        "look_for": "your databases now empty (0 tables) or a new database you never created"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_ROWS, CREATE_TIME, UPDATE_TIME FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys') ORDER BY CREATE_TIME DESC LIMIT 30",
+        "look_for": "tables created recently that nobody made, or important tables now with 0 rows"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE",
+        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'port', 'require_secure_transport', 'local_infile', 'secure_file_priv')",
+        "look_for": "bind_address 0.0.0.0 or * (open to every network), local_infile ON, secure_file_priv empty"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'general_log', 'log_error', 'expire_logs_days', 'binlog_expire_logs_seconds')",
+        "look_for": "log_bin ON means the changes (and the attack) are recorded and can be replayed up to a point in time"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT table_schema, table_name FROM information_schema.tables WHERE lower(table_name) LIKE '%recover%' OR lower(table_name) LIKE '%readme%' OR lower(table_name) LIKE '%read_me%' OR lower(table_name) LIKE '%warning%' OR lower(table_name) LIKE '%bitcoin%' OR lower(table_name) LIKE '%ransom%' OR lower(table_name) LIKE '%hacked%'",
+        "look_for": "a ransom-note table (README, RECOVER_YOUR_DATA, WARNING...) in this database"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT datname, pg_database_size(datname) AS bytes FROM pg_database WHERE NOT datistemplate ORDER BY datname",
+        "look_for": "a new database like readme_to_recover, or your database suddenly tiny"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'ssl', 'password_encryption', 'log_connections', 'log_statement')",
+        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('wal_level', 'archive_mode', 'archive_command', 'archive_library')",
+        "look_for": "archive_mode on with a working archive: point-in-time recovery to just before the attack is possible"
+      }
+    ],
+    "causes": [
+      {
+        "id": "exposed_weak",
+        "title_en": "The database was reachable from the internet with a weak or default password; a bot dropped the data",
+        "title_hi": "Database internet se khula tha aur password kamzor/default tha; ek bot ne data mita diya"
+      },
+      {
+        "id": "stolen_creds",
+        "title_en": "Someone used leaked credentials (from config files, old developer, reused password)",
+        "title_hi": "Kisi ne leak hue credentials use kiye (config files, purana developer, dobara use hua password)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "exposed_weak",
+        "action": "advice",
+        "steps_en": "Don't pay: these bots usually read only a few rows and drop the rest, so paying rarely gets data back. Keep the note table as evidence, close the port (localhost/private network + firewall), change every database password, then restore your latest backup (or point-in-time recovery from binlog/WAL up to just before the drop).",
+        "steps_hi": "Paise mat do: aise bots aksar sirf kuch rows padhte hain aur baaki mita dete hain, isliye dene se data wapas kam hi milta hai. Note wali table saboot ke liye rakho, port band karo (localhost/private network + firewall), har database password badlo, phir latest backup restore karo (ya binlog/WAL se drop se theek pehle tak point-in-time recovery)."
+      },
+      {
+        "cause": "stolen_creds",
+        "action": "advice",
+        "steps_en": "Change the leaked passwords everywhere they were used, remove unknown accounts, restore from backup, and report it (police cyber cell / your data-protection duties if customer data was involved).",
+        "steps_hi": "Leak hue password jahan-jahan use hue sab jagah badlo, anjaan accounts hatao, backup se restore karo, aur report karo (cyber cell / customer data tha to data-protection ki zimmedari)."
+      }
+    ],
+    "verify": {
+      "en": "Your tables and row counts are back, the ransom table is kept only in the evidence copy, and the port can't be reached from outside.",
+      "hi": "Aapki tables aur rows wapas aa gayi, ransom table sirf saboot wali copy mein hai, aur bahar se port nahi khulta."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/point-in-time-recovery-binlog.html",
+    "seen_at": [
+      "https://border0.com/blogs/help-my-postgres-database-was-compromised",
+      "https://www.akamai.com/blog/security/please-read-me-opportunistic-ransomware-devastating-mysql-servers",
+      "https://www.imperva.com/blog/2017/10/ransomware-attacks-on-mysql-and-mongodb/",
+      "https://www.helpnetsecurity.com/2024/01/18/postgresql-mysql-ransomware-bot/",
+      "https://www.postgresql.org/docs/current/continuous-archiving.html"
+    ],
+    "test_phrases": [
+      "my db is empty and there's a message saying send crypto to get the data back",
+      "database khali ho gaya aur ek message hai ki paise bhejo tabhi data milega",
+      "डेटाबेस खाली हो गया और लिखा है पैसे भेजो तभी डेटा मिलेगा"
+    ]
+  },
+  {
+    "id": "hacked-data-deleted-or-changed",
+    "title_en": "Data deleted or changed by an attacker: find what and when",
+    "title_hi": "Attacker ne data delete ya badal diya: kya aur kab, pata karo",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "someone deleted rows from my database",
+      "customer records were modified without reason",
+      "prices changed in database by hacker",
+      "kisi ne database se records delete kar diye",
+      "orders ki table khali ho gayi pata nahi kaise",
+      "data kisi ne badal diya, kab hua kaise pata kare",
+      "who deleted my data mysql",
+      "find which rows the attacker changed",
+      "bank account numbers changed in vendor table",
+      "किसी ने डेटाबेस से रिकॉर्ड डिलीट कर दिए",
+      "customer data vanished overnight, who did it",
+      "half the customers disappeared from the table",
+      "raat ko data gayab ho gaya kisne kiya",
+      "ग्राहकों का डेटा किसने हटाया पता करना है",
+      "रात को रिकॉर्ड गायब हो गए",
+      "need to find who removed records"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_ROWS, CREATE_TIME, UPDATE_TIME FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys') ORDER BY CREATE_TIME DESC LIMIT 30",
+        "look_for": "tables created recently that nobody made, or important tables now with 0 rows"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'general_log', 'log_error', 'expire_logs_days', 'binlog_expire_logs_seconds')",
+        "look_for": "log_bin ON means the changes (and the attack) are recorded and can be replayed up to a point in time"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE",
+        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, n_live_tup, n_tup_ins, n_tup_upd, n_tup_del, last_autovacuum, last_autoanalyze FROM pg_stat_user_tables ORDER BY n_tup_del DESC LIMIT 30",
+        "look_for": "tables with very many deletes/updates since the last stats reset, or live rows suddenly near 0"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('wal_level', 'archive_mode', 'archive_command', 'archive_library')",
+        "look_for": "archive_mode on with a working archive: point-in-time recovery to just before the attack is possible"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT t.tgrelid::regclass AS on_table, t.tgname, t.tgfoid::regproc AS runs_function, t.tgenabled FROM pg_trigger t WHERE NOT t.tgisinternal ORDER BY 1",
+        "look_for": "a trigger you don't know, especially one running a function you didn't write"
+      }
+    ],
+    "causes": [
+      {
+        "id": "attacker",
+        "title_en": "An outsider with stolen or weak credentials changed data",
+        "title_hi": "Bahar ke kisi ne chori ya kamzor credentials se data badla"
+      },
+      {
+        "id": "planted",
+        "title_en": "A planted trigger/event changes data on its own",
+        "title_hi": "Chhupa trigger/event khud data badalta hai"
+      },
+      {
+        "id": "insider_bug",
+        "title_en": "An app bug, import or a person with access did it (not a hack)",
+        "title_hi": "App bug, import ya access wale kisi insaan ne kiya (hack nahi)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "attacker",
+        "action": "advice",
+        "steps_en": "Take the evidence copy, then find the time window: MySQL binary log (mysqlbinlog) or PostgreSQL logs/WAL show the changes. Restore only the affected tables/rows from the backup made before that time (restore it into a separate database and copy the rows back after approval), then close the way in.",
+        "steps_hi": "Saboot wali copy lo, phir time window dhoondo: MySQL binary log (mysqlbinlog) ya PostgreSQL logs/WAL badlaav dikhate hain. Us time se pehle ke backup se sirf affected tables/rows restore karo (alag database mein restore karke approval ke baad rows wapas copy karo), phir andar aane ka raasta band karo."
+      },
+      {
+        "cause": "planted",
+        "action": "advice",
+        "steps_en": "Follow the triggers and events playbooks first, then repair the data.",
+        "steps_hi": "Pehle triggers aur events playbook follow karo, phir data theek karo."
+      },
+      {
+        "cause": "insider_bug",
+        "action": "advice",
+        "steps_en": "Give each person/app its own account and turn on logging so the next change can be traced; restore the rows from backup.",
+        "steps_hi": "Har insaan/app ko apna account do aur logging on karo taaki agla badlaav trace ho; rows backup se restore karo."
+      }
+    ],
+    "verify": {
+      "en": "Row counts and spot-checked records match the backup/books, and logging is on so future changes can be traced.",
+      "hi": "Row counts aur kuch records backup/hisaab se milte hain, aur logging on hai taaki aage ke badlaav trace ho sakein."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/mysqlbinlog.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/monitoring-stats.html",
+      "https://dev.mysql.com/doc/refman/8.0/en/point-in-time-recovery-binlog.html",
+      "https://border0.com/blogs/help-my-postgres-database-was-compromised"
+    ],
+    "test_phrases": [
+      "half of our customer list vanished overnight and I need to know who did it",
+      "raat mein aadhe customers ka data gayab ho gaya, kisne kiya kaise pata chalega",
+      "रात में आधे ग्राहकों का डेटा गायब हो गया किसने किया"
+    ]
+  },
+  {
+    "id": "hacked-postgres-cryptominer",
+    "title_en": "PostgreSQL server taken over (CPU 100%, unknown superuser, miner)",
+    "title_hi": "PostgreSQL server pe kabza (CPU 100%, anjaan superuser, miner)",
+    "engines": [
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "postgres process using 100% cpu with no queries from my app",
+      "crypto miner running as postgres user",
+      "unknown process started by postgres user",
+      "postgres server hacked cpu full",
+      "postgres user se koi ajeeb process chal raha hai",
+      "server ka cpu 100% hai aur postgres ke naam se miner chal raha hai",
+      "kdevtmpfsi kinsing process on database server",
+      "postgres password was weak and now server is slow and hot",
+      "पोस्टग्रेस सर्वर पर कोई माइनर चल रहा है सीपीयू पूरा भरा है"
+    ],
+    "diagnose": [
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT g.rolname AS powerful_role, r.rolname AS member FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid WHERE g.rolname IN ('pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files', 'pg_signal_backend', 'pg_read_all_data', 'pg_write_all_data')",
+        "look_for": "an app or unknown role allowed to run server programs or read/write server files"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT usename, client_addr, state, now() - query_start AS running_for, left(query, 120) AS query FROM pg_stat_activity WHERE backend_type = 'client backend' AND state <> 'idle' ORDER BY query_start",
+        "look_for": "a long-running statement from an unknown user or address (miners and data thieves run for hours)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT usename, client_addr, application_name, backend_start, state FROM pg_stat_activity WHERE backend_type = 'client backend' ORDER BY backend_start",
+        "look_for": "connections from addresses that aren't your app or office, or a strange application_name"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT n.nspname AS schema, p.proname AS function, r.rolname AS owner, l.lanname AS language, p.prosecdef AS security_definer FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_roles r ON r.oid = p.proowner JOIN pg_language l ON l.oid = p.prolang WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') ORDER BY n.nspname, p.proname",
+        "look_for": "functions with odd names, written in C or an untrusted language (plpython3u, plperlu), or SECURITY DEFINER owned by a superuser"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT 'extension' AS kind, extname AS name FROM pg_extension UNION ALL SELECT 'language', lanname FROM pg_language WHERE NOT lanpltrusted AND lanname NOT IN ('c', 'internal')",
+        "look_for": "extensions or untrusted languages nobody installed on purpose (pg_cron jobs and untrusted languages can run things on a schedule or on the server)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'ssl', 'password_encryption', 'log_connections', 'log_statement')",
+        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off"
+      }
+    ],
+    "causes": [
+      {
+        "id": "weak_superuser",
+        "title_en": "A superuser (often 'postgres') with a weak password was reachable from the internet; the attacker ran programs on the server",
+        "title_hi": "Kamzor password wala superuser (aksar 'postgres') internet se khula tha; attacker ne server pe programs chalaye"
+      },
+      {
+        "id": "server_program_role",
+        "title_en": "An app role was given superuser or pg_execute_server_program",
+        "title_hi": "App role ko superuser ya pg_execute_server_program de diya gaya"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "weak_superuser",
+        "action": "advice",
+        "steps_en": "Treat the whole server as compromised: take the evidence copy, cut it off the internet (listen_addresses, pg_hba.conf, firewall), change all role passwords to strong ones with scram-sha-256, remove unknown roles, and ask your host/admin to clean the OS (kill the miner, check cron and startup files) or rebuild the server and restore the data from a clean backup.",
+        "steps_hi": "Poore server ko compromised maano: saboot wali copy lo, internet se kaato (listen_addresses, pg_hba.conf, firewall), sab roles ke password scram-sha-256 ke saath mazboot karo, anjaan roles hatao, aur host/admin se OS saaf karwao (miner band, cron aur startup files check) ya server naya banake saaf backup se data restore karo."
+      },
+      {
+        "cause": "server_program_role",
+        "action": "approved_change",
+        "steps_en": "ALTER ROLE app NOSUPERUSER; REVOKE pg_execute_server_program / pg_read_server_files / pg_write_server_files FROM the app role; apps never need them.",
+        "steps_hi": "ALTER ROLE app NOSUPERUSER; app role se pg_execute_server_program / pg_read_server_files / pg_write_server_files REVOKE karo; apps ko inki zaroorat nahi hoti."
+      }
+    ],
+    "verify": {
+      "en": "Only expected roles are superuser, no unknown sessions or long statements remain, CPU is back to normal and the port isn't reachable from outside.",
+      "hi": "Sirf expected roles superuser hain, koi anjaan session ya lamba statement nahi, CPU normal hai aur bahar se port nahi khulta."
+    },
+    "source": "https://www.postgresql.org/docs/current/predefined-roles.html",
+    "seen_at": [
+      "https://www.wiz.io/fr-fr/blog/postgresql-cryptomining",
+      "https://aquasec.com/blog/pg_mem-a-malware-hidden-in-the-postgres-processes/",
+      "https://www.bigbinary.com/blog/how-my-server-got-infected-with-a-crypto-mining-malware-and-how-I-fixed-it",
+      "https://www.postgresql.org/docs/current/auth-pg-hba-conf.html",
+      "https://www.postgresql.org/docs/current/sql-copy.html"
+    ],
+    "test_phrases": [
+      "our postgres box is burning all the cpu even at night when nobody uses the app",
+      "raat ko bhi postgres server ka processor full chal raha hai, koi app use nahi kar raha",
+      "रात को भी पोस्टग्रेस सर्वर का प्रोसेसर फुल चल रहा है"
+    ]
+  },
+  {
+    "id": "hacked-restore-clean-backup",
+    "title_en": "Restore a clean backup after a hack (pick the right one)",
+    "title_hi": "Hack ke baad saaf backup restore karo (sahi wala chuno)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "backup_restore",
+    "symptoms": [
+      "restore database from backup after hack",
+      "which backup is clean after being hacked",
+      "go back to the database from before the attack",
+      "hack se pehle wala backup kaise lagaye",
+      "kaunsa backup saaf hai, hack se pehle ka",
+      "database ko hack se pehle ki halat mein le jaana hai",
+      "backup restore karne ke baad bhi hack wapas aa gaya",
+      "point in time recovery to just before the attack",
+      "हैक से पहले वाला बैकअप कैसे लगाएं",
+      "want the old database back from before the hacker",
+      "hacker se pehle wala database wapas lagana hai",
+      "हैकर आने से पहले का डेटाबेस वापस लाना है",
+      "last week's clean copy of the database",
+      "purana saaf database wapas chahiye"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'general_log', 'log_error', 'expire_logs_days', 'binlog_expire_logs_seconds')",
+        "look_for": "log_bin ON means the changes (and the attack) are recorded and can be replayed up to a point in time"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_ROWS, CREATE_TIME, UPDATE_TIME FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys') ORDER BY CREATE_TIME DESC LIMIT 30",
+        "look_for": "tables created recently that nobody made, or important tables now with 0 rows"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('wal_level', 'archive_mode', 'archive_command', 'archive_library')",
+        "look_for": "archive_mode on with a working archive: point-in-time recovery to just before the attack is possible"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT datname, pg_database_size(datname) AS bytes FROM pg_database WHERE NOT datistemplate ORDER BY datname",
+        "look_for": "a new database like readme_to_recover, or your database suddenly tiny"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT t.tgrelid::regclass AS on_table, t.tgname, t.tgfoid::regproc AS runs_function, t.tgenabled FROM pg_trigger t WHERE NOT t.tgisinternal ORDER BY 1",
+        "look_for": "a trigger you don't know, especially one running a function you didn't write"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT evtname, evtevent, evtowner::regrole AS owner, evtfoid::regproc AS runs_function, evtenabled FROM pg_event_trigger",
+        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)"
+      }
+    ],
+    "causes": [
+      {
+        "id": "need_clean_point",
+        "title_en": "You need a backup taken before the first sign of the break-in",
+        "title_hi": "Break-in ke pehle nishaan se pehle ka backup chahiye"
+      },
+      {
+        "id": "backup_infected",
+        "title_en": "The backup you restored already contained the backdoor (user, trigger, event, injected content)",
+        "title_hi": "Jo backup restore kiya usme pehle se backdoor tha (user, trigger, event, daala hua content)"
+      },
+      {
+        "id": "no_backup",
+        "title_en": "There is no usable backup",
+        "title_hi": "Koi kaam ka backup nahi hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "need_clean_point",
+        "action": "advice",
+        "steps_en": "Find the earliest sign (oldest unknown admin, first injected post, trigger CREATED time). Restore the backup from before that date into a NEW database first, run the hacked checks on it, then switch the app to it. With binlog/WAL you can replay up to just before the attack (point-in-time recovery). Orders/sign-ups made after the backup must be copied over by hand.",
+        "steps_hi": "Sabse pehla nishaan dhoondo (sabse purana anjaan admin, pehla infected post, trigger ka CREATED time). Us date se pehle ka backup pehle ek NAYE database mein restore karo, us pe hacked checks chalao, phir app ko us pe shift karo. binlog/WAL ho to attack se theek pehle tak replay ho sakta hai (point-in-time recovery). Backup ke baad ke orders/sign-ups haath se copy karne honge."
+      },
+      {
+        "cause": "backup_infected",
+        "action": "advice",
+        "steps_en": "Pick an older backup, or clean the restored copy with the triggers/events/admin/spam playbooks before going live. And close the way in, or it will happen again.",
+        "steps_hi": "Aur purana backup lo, ya live karne se pehle restored copy ko triggers/events/admin/spam playbooks se saaf karo. Aur andar aane ka raasta band karo, warna phir hoga."
+      },
+      {
+        "cause": "no_backup",
+        "action": "advice",
+        "steps_en": "Ask your hosting provider for their snapshots; otherwise clean the current database in place with the playbooks. Then set up daily backups stored away from the server and test a restore.",
+        "steps_hi": "Hosting provider se unke snapshots maango; warna playbooks se current database ko wahin saaf karo. Phir roz ka backup server se alag jagah rakho aur restore test karo."
+      }
+    ],
+    "verify": {
+      "en": "The restored database passes all the hacked checks (no unknown admins, triggers, events, spam) and the site works with today's real data copied in.",
+      "hi": "Restored database saare hacked checks pass karta hai (koi anjaan admin, trigger, event, spam nahi) aur aaj ka asli data copy karke site chal rahi hai."
+    },
+    "source": "https://www.postgresql.org/docs/current/continuous-archiving.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/point-in-time-recovery-binlog.html",
+      "https://wordpress.org/documentation/article/wordpress-backups/",
+      "https://developer.wordpress.org/advanced-administration/security/hardening/",
+      "https://border0.com/blogs/help-my-postgres-database-was-compromised"
+    ],
+    "test_phrases": [
+      "i want my shop database back the way it was last week before the hackers came",
+      "pichle hafte wala database wapas chahiye jab hacker nahi aaya tha",
+      "पिछले हफ्ते वाला डेटाबेस वापस चाहिए जब हैकर नहीं आया था"
+    ]
+  },
+  {
+    "id": "hacked-prove-clean",
+    "title_en": "Prove the database is clean after a hack",
+    "title_hi": "Hack ke baad saabit karo ki database saaf hai",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "how to confirm database is clean after hack",
+      "is the hacker gone from my database",
+      "verify no backdoor left in database",
+      "hack ke baad database ab saaf hai ya nahi",
+      "kaise pakka karein ki hacker ka kuch nahi bacha",
+      "cleanup ke baad dobara check karna hai",
+      "site keeps getting hacked again and again",
+      "baar baar hack ho jati hai site",
+      "हैक के बाद डेटाबेस अब साफ है या नहीं कैसे पता करें"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT u.ID, u.user_login, u.display_name, u.user_registered FROM wp_users u JOIN wp_usermeta m ON m.user_id = u.ID WHERE m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%' ORDER BY u.user_registered DESC",
+        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT m.user_id, m.meta_key, m.meta_value, u.user_login FROM wp_usermeta m LEFT JOIN wp_users u ON u.ID = m.user_id WHERE (m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%') OR (m.meta_key LIKE '%user_level' AND m.meta_value = '10')",
+        "look_for": "admin rights given to a user id that has no row in wp_users (user_login empty) or to a user you don't recognise"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'admin_email', 'users_can_register', 'default_role', 'template', 'stylesheet')",
+        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LENGTH(option_value) AS size, autoload FROM wp_options WHERE option_value LIKE '%<script%' OR option_value LIKE '%<iframe%' OR option_value LIKE '%eval(%' OR option_value LIKE '%base64_decode%' OR option_value LIKE '%fromCharCode%' OR option_value LIKE '%atob(%' ORDER BY size DESC LIMIT 50",
+        "look_for": "settings (widgets, theme options, header/footer code) holding scripts or encoded code you didn't add"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ID, post_type, post_status, post_title, post_modified FROM wp_posts WHERE post_content LIKE '%<script%' OR post_content LIKE '%<iframe%' OR post_content LIKE '%display:none%' OR post_content LIKE '%eval(%' OR post_content LIKE '%fromCharCode%' ORDER BY post_modified DESC LIMIT 50",
+        "look_for": "posts/pages carrying hidden links or scripts; many posts changed at the same minute is a mass injection"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, DEFINER, SECURITY_TYPE, CREATED, LAST_ALTERED FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA NOT IN ('sys', 'mysql') ORDER BY CREATED DESC",
+        "look_for": "procedures/functions with names you don't recognise, recently created, or with an unknown DEFINER"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE",
+        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'port', 'require_secure_transport', 'local_infile', 'secure_file_priv')",
+        "look_for": "bind_address 0.0.0.0 or * (open to every network), local_infile ON, secure_file_priv empty"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT g.rolname AS powerful_role, r.rolname AS member FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid WHERE g.rolname IN ('pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files', 'pg_signal_backend', 'pg_read_all_data', 'pg_write_all_data')",
+        "look_for": "an app or unknown role allowed to run server programs or read/write server files"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT t.tgrelid::regclass AS on_table, t.tgname, t.tgfoid::regproc AS runs_function, t.tgenabled FROM pg_trigger t WHERE NOT t.tgisinternal ORDER BY 1",
+        "look_for": "a trigger you don't know, especially one running a function you didn't write"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT evtname, evtevent, evtowner::regrole AS owner, evtfoid::regproc AS runs_function, evtenabled FROM pg_event_trigger",
+        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT n.nspname AS schema, p.proname AS function, r.rolname AS owner, l.lanname AS language, p.prosecdef AS security_definer FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_roles r ON r.oid = p.proowner JOIN pg_language l ON l.oid = p.prolang WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') ORDER BY n.nspname, p.proname",
+        "look_for": "functions with odd names, written in C or an untrusted language (plpython3u, plperlu), or SECURITY DEFINER owned by a superuser"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'ssl', 'password_encryption', 'log_connections', 'log_statement')",
+        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off"
+      }
+    ],
+    "causes": [
+      {
+        "id": "leftover",
+        "title_en": "Something the attacker left is still there (account, trigger, event, injected content)",
+        "title_hi": "Attacker ki chhodi koi cheez abhi bhi hai (account, trigger, event, daala hua content)"
+      },
+      {
+        "id": "door_open",
+        "title_en": "The way in is still open (same passwords, open port, outdated plugin), so it comes back",
+        "title_hi": "Andar aane ka raasta abhi bhi khula hai (wahi password, khula port, purana plugin), isliye wapas aata hai"
+      },
+      {
+        "id": "clean",
+        "title_en": "All checks are clean",
+        "title_hi": "Saare checks saaf hain"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "leftover",
+        "action": "advice",
+        "steps_en": "Open the matching playbook for each finding and remove it, then run these checks again.",
+        "steps_hi": "Har finding ke liye uska playbook kholo aur hatao, phir yeh checks dobara chalao."
+      },
+      {
+        "cause": "door_open",
+        "action": "advice",
+        "steps_en": "Change passwords again AFTER cleaning, update WordPress/plugins/themes, remove unused plugins, close the database port, and give the app user only data rights.",
+        "steps_hi": "Safai ke BAAD password phir se badlo, WordPress/plugins/themes update karo, bekaar plugins hatao, database port band karo, aur app user ko sirf data rights do."
+      },
+      {
+        "cause": "clean",
+        "action": "advice",
+        "steps_en": "Save today's results as the 'known good' list and run the checks weekly; any new account/trigger/event is then easy to spot.",
+        "steps_hi": "Aaj ke results 'known good' list ki tarah save karo aur har hafte checks chalao; koi naya account/trigger/event turant dikh jayega."
+      }
+    ],
+    "verify": {
+      "en": "Two runs a few days apart show the same known accounts, triggers, events and settings, and no injected content.",
+      "hi": "Kuch din ke gap pe do baar check chalane pe wahi jaane-pehchane accounts, triggers, events aur settings dikhte hain, aur koi daala hua content nahi."
+    },
+    "source": "https://developer.wordpress.org/advanced-administration/security/hardening/",
+    "seen_at": [
+      "https://wordpress.org/documentation/article/faq-my-site-was-hacked/",
+      "https://wordpress.org/support/topic/my-site-keeps-getting-hacked-over-and-over-again/",
+      "https://blog.sucuri.net/2021/02/sql-triggers-in-website-backdoors.html",
+      "https://dev.mysql.com/doc/refman/8.0/en/security-guidelines.html"
+    ],
+    "test_phrases": [
+      "we cleaned everything after the attack, can you double check nothing bad is left",
+      "safai kar li hai hack ke baad, ek baar check karo kuch bacha to nahi",
+      "हैक के बाद सफाई कर दी है एक बार देखो कुछ बचा तो नहीं"
+    ]
+  },
+  {
+    "id": "hacked-open-registration-admin-role",
+    "title_en": "Anyone can sign up as administrator (registration settings tampered)",
+    "title_hi": "Koi bhi administrator ban ke sign up kar sakta hai (registration settings chhedi gayi)",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "new user registrations get administrator role",
+      "default role changed to administrator",
+      "membership anyone can register turned on by itself",
+      "naye register hone wale users admin ban jaate hain",
+      "default role administrator kisne kar diya",
+      "bahut saare naye users register ho rahe hain jo admin hain",
+      "users_can_register enabled without me",
+      "नए रजिस्टर होने वाले यूजर एडमिन बन जाते हैं",
+      "every new signup gets full admin rights",
+      "account banate hi admin ban jata hai koi bhi",
+      "नया अकाउंट बनाते ही एडमिन बन जाता है",
+      "people creating accounts become administrators",
+      "koi bhi sign up kare to admin",
+      "whoever registers on the website gets full admin",
+      "creating an account makes the person a full administrator"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'admin_email', 'users_can_register', 'default_role', 'template', 'stylesheet')",
+        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT u.ID, u.user_login, u.display_name, u.user_registered FROM wp_users u JOIN wp_usermeta m ON m.user_id = u.ID WHERE m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%' ORDER BY u.user_registered DESC",
+        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ID, user_login, display_name, user_registered FROM wp_users ORDER BY ID DESC LIMIT 20",
+        "look_for": "the newest user ids: a high id with an old registration date was added later and back-dated"
+      }
+    ],
+    "causes": [
+      {
+        "id": "tampered",
+        "title_en": "users_can_register was turned on and default_role set to administrator (a classic sign of a vulnerable plugin being abused)",
+        "title_hi": "users_can_register on aur default_role administrator kar diya gaya (kamzor plugin ke galat use ka purana nishaan)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "tampered",
+        "action": "approved_change",
+        "steps_en": "Set default_role back to subscriber and users_can_register to 0, remove admins created since then, update/remove the vulnerable plugin, then change all admin passwords.",
+        "steps_hi": "default_role wapas subscriber aur users_can_register 0 karo, tab se bane admins hatao, kamzor plugin update/remove karo, phir sab admin passwords badlo."
+      }
+    ],
+    "verify": {
+      "en": "default_role is subscriber (or what you chose), registration is as you want it, and no new admins appear for a week.",
+      "hi": "default_role subscriber hai (ya jo aapne chuna), registration aapki marzi ki hai, aur ek hafte tak naye admin nahi aate."
+    },
+    "source": "https://wordpress.org/documentation/article/settings-general-screen/",
+    "seen_at": [
+      "https://wordpress.org/documentation/article/faq-my-site-was-hacked/",
+      "https://blog.nintechnet.com/how-hackers-create-hidden-admin-users-on-your-wordpress-blog/",
+      "https://codex.wordpress.org/Database_Description"
+    ],
+    "test_phrases": [
+      "anyone who creates an account on my site becomes a full admin",
+      "jo bhi site pe account banata hai wo seedha admin ban jata hai",
+      "जो भी साइट पर अकाउंट बनाता है वो सीधा एडमिन बन जाता है"
+    ]
+  },
+  {
+    "id": "hacked-malicious-code-in-settings",
+    "title_en": "Malicious code hidden in site settings (wp_options, widgets)",
+    "title_hi": "Site settings mein chhupa malicious code (wp_options, widgets)",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "base64 code in wp_options",
+      "malware in wordpress widget text",
+      "eval code stored in database options table",
+      "popup ads on my site but files are clean",
+      "files saaf hai phir bhi site pe ajeeb popup ads aate hain",
+      "wp_options mein ajeeb lamba encoded code hai",
+      "widget mein kisi ne script daal di",
+      "header footer setting mein unknown javascript",
+      "सेटिंग्स में किसी ने अजीब कोड डाल दिया है",
+      "developer says files are fine but ads keep popping up",
+      "site pe apne aap popup ads khulte hain",
+      "पॉपअप विज्ञापन साइट पर अपने आप आते हैं",
+      "strange pop up advertisements on website"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LENGTH(option_value) AS size, autoload FROM wp_options WHERE option_value LIKE '%<script%' OR option_value LIKE '%<iframe%' OR option_value LIKE '%eval(%' OR option_value LIKE '%base64_decode%' OR option_value LIKE '%fromCharCode%' OR option_value LIKE '%atob(%' ORDER BY size DESC LIMIT 50",
+        "look_for": "settings (widgets, theme options, header/footer code) holding scripts or encoded code you didn't add"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'admin_email', 'users_can_register', 'default_role', 'template', 'stylesheet')",
+        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+      }
+    ],
+    "causes": [
+      {
+        "id": "option_payload",
+        "title_en": "Encoded/obfuscated code or a script was saved in an option (widgets, theme options, header/footer code, a fake plugin option)",
+        "title_hi": "Encoded/chhupa code ya script kisi option mein save kiya gaya (widgets, theme options, header/footer code, nakli plugin option)"
+      },
+      {
+        "id": "legit_code",
+        "title_en": "It's your own tracking/analytics or ad code added on purpose",
+        "title_hi": "Yeh aapka apna tracking/analytics ya ad code hai jo jaan-boojh ke dala"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "option_payload",
+        "action": "approved_change",
+        "steps_en": "Save the option value as evidence, then remove the script through the WordPress screen that owns it (widget, theme options) or delete the fake option after approval (Undo kept). Don't text-replace serialized values. Then look for the file/plugin that wrote it.",
+        "steps_hi": "Option ki value saboot ke liye save karo, phir jis WordPress screen ka woh option hai (widget, theme options) wahan se script hatao ya approval ke baad nakli option delete karo (Undo rehta hai). Serialized values pe text-replace mat karo. Phir woh file/plugin dhoondo jisne ise likha."
+      },
+      {
+        "cause": "legit_code",
+        "action": "advice",
+        "steps_en": "Keep it and write down what it is.",
+        "steps_hi": "Rehne do aur likh lo kya hai."
+      }
+    ],
+    "verify": {
+      "en": "The check finds no unknown script/encoded code in options, and the popups/redirects are gone in a private browser window.",
+      "hi": "Check ko options mein koi anjaan script/encoded code nahi milta, aur private browser window mein popups/redirect band hain."
+    },
+    "source": "https://wordpress.org/documentation/article/faq-my-site-was-hacked/",
+    "seen_at": [
+      "https://blog.sucuri.net/?p=20018",
+      "https://gotmls.net/support-topic/how-to-clean-db",
+      "https://codex.wordpress.org/Database_Description"
+    ],
+    "test_phrases": [
+      "visitors see strange pop up ads but our developer says the files are clean",
+      "site pe ajeeb pop up ads aa rahe hain, developer bolta hai files theek hain",
+      "साइट पर अजीब पॉपअप विज्ञापन आते हैं फाइलें ठीक हैं"
+    ]
   }
 ]

@@ -110,3 +110,24 @@ def test_old_files_removed_after_an_hour(client, ml_mode):
     import os
 
     assert not os.path.exists(path)
+
+
+def test_work_cut_off_by_a_restart_carries_on(client, ml_mode):
+    from datetime import timedelta
+
+    from app.agents import office_agent
+    from app.db import _SessionLocal
+    from app.models import OfficeFile, utcnow
+
+    r = say(client, "excel file ke formula check karo")
+    agent = next(a for a in r["agents"] if a.get("office"))
+    f = _upload(client, agent["id"], _xlsx(ROWS))
+    with _SessionLocal() as db:                       # pretend the server restarted in the middle of a fix
+        row = db.query(OfficeFile).filter(OfficeFile.token == f["id"]).one()
+        row.status, row.task, row.args = "working", "fix", '{"ops": ["trim_spaces"]}'
+        row.updated_at = utcnow() - timedelta(minutes=1)
+        db.commit()
+    assert office_agent.resume_interrupted(utcnow()) == 1
+    assert office_agent.resume_interrupted(utcnow()) == 0     # the other worker doesn't run it again
+    f = _wait(client, f["id"])
+    assert f["status"] == "ready" and f["result"]["changes"]["trim_spaces"] >= 8

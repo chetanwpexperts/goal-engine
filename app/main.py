@@ -49,6 +49,12 @@ async def lifespan(application: FastAPI):
     if not hasattr(application.state, "brain"):
         application.state.brain = Brain()
     application.state.brain.model.load()  # train or load the ML model before the first visitor
+    from app.agents import office_agent
+
+    try:
+        office_agent.resume_interrupted(utcnow())   # file work cut off by a restart carries on by itself
+    except Exception:  # noqa: BLE001
+        logging.getLogger("goal-engine").warning("Could not resume file work", exc_info=True)
     stop = threading.Event()
     if os.getenv("AGENT_SCHEDULER", "on") != "off":
         threading.Thread(target=_scheduler, args=(stop,), daemon=True, name="agent-scheduler").start()

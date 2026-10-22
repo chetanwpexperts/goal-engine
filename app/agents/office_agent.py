@@ -179,7 +179,7 @@ def start_compare(db: Session, a: OfficeFile, b: OfficeFile, key: str = "") -> O
 
 
 def _start(db: Session, f: OfficeFile, task: str, args: dict) -> OfficeFile:
-    f.status, f.task, f.error = "queued", task, None
+    f.status, f.task, f.error, f.args = "queued", task, None, dumps(args)
     db.commit()
     threading.Thread(target=_work, args=(f.id, task, args), daemon=True).start()
     return f
@@ -250,4 +250,26 @@ def maintain(db: Session, now=None) -> int:
     for f in db.scalars(select(OfficeFile).where(OfficeFile.status == "removed", OfficeFile.created_at < now - timedelta(days=1))):
         db.delete(f)
     db.commit()
+    return n
+
+
+def resume_interrupted(boot) -> int:
+    """After a restart (an update, a crash), carry on with work that was running. Each file is claimed by one
+    worker only: the update succeeds for whoever changes it first."""
+    from sqlalchemy import update
+
+    from app.db import _SessionLocal, get_engine
+
+    get_engine()
+    n = 0
+    with _SessionLocal() as db:
+        ids = list(db.scalars(select(OfficeFile.id).where(OfficeFile.status.in_(("queued", "working")), OfficeFile.updated_at < boot)))
+        for fid in ids:
+            claimed = db.execute(update(OfficeFile).where(OfficeFile.id == fid, OfficeFile.status.in_(("queued", "working")),
+                                                          OfficeFile.updated_at < boot).values(status="queued", updated_at=utcnow())).rowcount
+            db.commit()
+            if claimed:
+                f = db.get(OfficeFile, fid)
+                threading.Thread(target=_work, args=(f.id, f.task or "scan", loads(f.args, {}) or {}), daemon=True).start()
+                n += 1
     return n

@@ -112,6 +112,60 @@ def _scheduler(stop: threading.Event) -> None:
             log.exception("Scheduler tick failed")
 
 
+# ---------------------------------------------------------------- coming soon (closed until SITE_MODE=open)
+PREVIEW_COOKIE = "ge_preview"
+OPEN_PATHS = ("/api/health", "/api/connector/", "/connector/", "/robots.txt", "/preview", "/static/coming-soon.html")
+
+
+def _site_open() -> bool:
+    return os.getenv("SITE_MODE", "closed").strip().lower() == "open"
+
+
+def _preview_token() -> str:
+    key = os.getenv("PREVIEW_KEY", "")
+    return hmac.new(key.encode(), b"goal-engine-preview", "sha256").hexdigest() if len(key) >= 16 else ""
+
+
+def _has_preview(request: Request) -> bool:
+    token = _preview_token()
+    return bool(token) and hmac.compare_digest(request.cookies.get(PREVIEW_COOKIE, ""), token)
+
+
+@app.middleware("http")
+async def coming_soon(request: Request, call_next):
+    """Until launch only people with the private preview link get in. Connectors keep working (they use their own token)."""
+    path = request.url.path
+    if _site_open() or _has_preview(request) or path.startswith(OPEN_PATHS):
+        response = await call_next(request)
+    elif path.startswith("/api/"):
+        response = JSONResponse({"error": "Goal Engine is coming soon"}, status_code=503)
+    else:
+        response = FileResponse(STATIC / "coming-soon.html", status_code=200)
+    if not _site_open():
+        response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    return response
+
+
+@app.get("/robots.txt")
+def robots() -> Response:
+    return Response("User-agent: *\nDisallow: /\n" if not _site_open() else "User-agent: *\nAllow: /\n", media_type="text/plain")
+
+
+@app.get("/preview")
+def preview(key: str = "") -> Response:
+    """Private entry while the site is closed: /preview?key=<PREVIEW_KEY>. /preview?off=1 leaves preview."""
+    from fastapi.responses import RedirectResponse
+
+    response = RedirectResponse("/", status_code=303)
+    token = _preview_token()
+    if token and key and hmac.compare_digest(hmac.new(key.encode(), b"goal-engine-preview", "sha256").hexdigest(), token):
+        response.set_cookie(PREVIEW_COOKIE, token, max_age=60 * 60 * 24 * 30, httponly=True, samesite="lax",
+                            secure=get_settings().cookie_secure)
+    else:
+        response.delete_cookie(PREVIEW_COOKIE)
+    return response
+
+
 @app.middleware("http")
 async def visitor_cookie(request: Request, call_next):
     """Anonymous visitor id, so each person only ever sees their own goals."""

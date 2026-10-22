@@ -12,6 +12,7 @@ os.environ["VISITOR_DAILY_CAP"] = "5"
 os.environ["AI_DAILY_CAP"] = "8"
 os.environ["ENGINE_MODE"] = "ai"   # AI-path tests; ML tests switch it on per test
 os.environ["AGENT_SCHEDULER"] = "off"
+os.environ["SITE_MODE"] = "open"   # the coming-soon gate has its own test
 
 from fastapi.testclient import TestClient  # noqa: E402
 

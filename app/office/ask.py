@@ -195,7 +195,19 @@ def _agg_of(text: str) -> str | None:
 
 
 # ------------------------------------------------------------------ understanding the question
+class Skip(Exception):
+    """This job doesn't fit after a closer look; try the next one."""
+
+
 JOBS = [
+    ("review", re.compile(r"\b(review|audit|jaanch|janch)\b|\b(check|dekho|dekh lo)\b.{0,15}\b(file|sheet|workbook|poori|puri)\b|\b(file|sheet)\b.{0,10}\b(check|review)\b", re.I)),
+    ("reconcile", re.compile(r"\b(reconcil\w*|bank statement|milan|ledger\b.{0,25}\bbank|bank\b.{0,25}\bledger|books?\b.{0,15}\bbank)\b", re.I)),
+    ("growth", re.compile(r"\b(growth|badhat|badhotri|month on month|mom|pichle mahine se|increase|decrease|ghata|badha|change)\b", re.I)),
+    ("running", re.compile(r"\b(running total|cumulative|ab tak ka total|progressive total)\b", re.I)),
+    ("missing", re.compile(r"\b(khaali|khali|blank|empty|missing|nahi bhara|bhara nahi|null)\b", re.I)),
+    ("sort", re.compile(r"\b(sort|arrange|kram|ascending|descending|chhote se bade|bade se chhote|a to z|z to a|order mein laga)\b", re.I)),
+    ("variance", re.compile(r"\b(variance|vs|versus|antar|farak|difference|budget)\b", re.I)),
+    ("calc", re.compile(r"(\b(multiply|multiplied|guna|into|times|minus|divide|bhag|ratio|plus|full name|naam jodo|naam milao|line total|commission|gst amount|tax amount nikalo)\b|[×*/+]|\s x\s|\d+\s*%)", re.I)),
     ("aging", re.compile(r"\b(aging|ageing|overdue|kitne din se|days? (pending|unpaid|outstanding)|purane bill|bucket)\b", re.I)),
     ("lookup", re.compile(r"\b(lookup|look up|vlookup|xlookup|fetch|le ?aao|lao|laao|bring|pull|match karke|nikaal ke daalo)\b", re.I)),
     ("combine", re.compile(r"\b(combine|consolidate|merge|jodo|ek sheet|one sheet|stack|vstack|ek saath)\b.*\bsheets?\b|\bsheets?\b.*\b(combine|consolidate|merge|jodo|ek saath)\b", re.I)),
@@ -211,7 +223,10 @@ def understand(text: str, tables: list[Table]) -> dict:
         if rx.search(text or ""):
             if job == "describe" and _agg_of(text) and not re.search(r"\b(columns?|structure|samjhao|explain|overview)\b", text, re.I):
                 continue
-            return globals()[f"_plan_{job}"](text, tables)
+            try:
+                return globals()[f"_plan_{job}"](text, tables)
+            except Skip:
+                continue
     return _plan_question(text, tables)
 
 
@@ -266,6 +281,15 @@ def _plan_question(text, tables) -> dict:
     month_text = text or ""
     for i, _ in num_cols:                                  # "Monthly Salary" is a column, not "month-wise"
         month_text = re.sub(re.escape(t.header[i]), " ", month_text, flags=re.I)
+    strong_txt = [i for i, sc in txt_cols if sc >= 0.5 and i not in [f for f, _ in filters]]
+    if group is not None and not isinstance(group, tuple) and len(strong_txt) >= 2 and re.search(
+            r"\b(aur|and|&|x|vs)\b", text or "", re.I) and re.search(r"\b(wise|har|per|by|hisaab)\b", text or "", re.I):
+        low = (text or "").lower()
+        pos = lambda i: min((low.find(w) for w in _header_words(t.header[i]) if low.find(w) >= 0), default=999)  # noqa: E731
+        group, other = sorted({group, *strong_txt[:2]} if group in strong_txt[:2] else {group, strong_txt[0]}, key=pos)[:2]
+        msr = num_cols[0][0] if num_cols else None
+        return {"job": "pivot", "table": t.name, "rows": group, "cols": other, "measure": msr,
+                "agg": "count" if msr is None else (_agg_of(text) if _agg_of(text) in ("sum", "avg", "count") else "sum"), "filters": filters}
     if group is None and MONTH_RE.search(month_text) and date_cols:
         group = ("month", (columns_in(text, t, {"date"}) or [(date_cols[0], 1)])[0][0])
     if group is None and agg and txt_cols and re.search(r"\b(wise|har|per|each|by|hisaab|according)\b", text or "", re.I):
@@ -313,10 +337,11 @@ def _plan_question(text, tables) -> dict:
         elif group is not None and measure is not None:
             agg = "sum"
         else:
-            raise NeedMore("Main is file pe ye kar sakta hoon: total, ginti, average, sabse zyada/kam, X-wise summary, list, doosri sheet se value laana, "
-                           "aging, sheets jodna, rows highlight karna. Thoda batao kya chahiye, jaise: \"region wise total sales\".",
-                           "I can do totals, counts, averages, highest/lowest, X-wise summaries, lists, lookups from another sheet, aging, "
-                           "combining sheets and highlighting rows. Tell me which, e.g. \"total sales by region\".")
+            cols = ", ".join(h for h in t.header if h)
+            raise NeedMore(f"Ye poori tarah samajh nahi aaya. {t.name} ke columns: {cols}. Inke naam ke saath likho, jaise: "
+                           "\"region wise total sales\", \"amount ka 5% nikalo\", \"status pending wale dikhao\".",
+                           f"I didn't fully get that. {t.name} has: {cols}. Ask using these names, e.g. \"total sales by region\", "
+                           "\"5% of amount\", \"show pending rows\".", [h for h in t.header if h][:8])
     if agg in ("sum", "avg", "max", "min") and measure is None:
         cands = [i for i in range(len(t.header)) if t.kind(i) == "number" and t.header[i] and i not in [f for f, _ in filters]]
         amountish = [i for i in cands if re.search(r"amount|total|net|sales|salary|price|value|fee|fees|charges|revenue|bill", t.header[i], re.I)]
@@ -493,6 +518,7 @@ def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:
     tables = {t.name: t for t in load_tables(path)}
     wb = load_workbook(path, keep_vba=path.lower().endswith(".xlsm")) if path.lower().endswith((".xlsx", ".xlsm")) else None
     job = plan["job"]
+    plan = {**plan, "_path": path}
     res = globals()[f"_run_{job}"](plan, tables, wb, hi, n)
     if wb is not None:
         wb.calculation.fullCalcOnLoad = True
@@ -596,6 +622,7 @@ def _run_aggregate(p, tables, wb, hi, n):
     if wb is not None:
         ws, sname = _answer_sheet(wb, n, f"{mname} by {gname}")
         _write_table(ws, [gname, f"{_AGG_EN[agg].split()[-1].title()} {mname}"], table, formula)
+        _chart(ws, len(table), f"{mname} by {gname}", line=isinstance(g, tuple))
     if p.get("ranked"):
         table.sort(key=lambda x: (x[1] or 0), reverse=p["ranked"] == "max")
         table = table[:3]
@@ -756,3 +783,8 @@ def _run_highlight(p, tables, wb, hi, n):
     say = (f"{t.name} mein {hits} rows highlight kar di (peela rang) jahan {what}. Ye rule live hai: data badlega to rang bhi badlega." if hi else
            f"Highlighted {hits} rows in {t.name} (yellow) where {what}. The rule is live: change the data and the colour follows.")
     return {"say": say, "formula": f"Conditional formatting rule: ={cond}", "sheet": t.name}
+
+
+from app.office.ask_more import (_chart, _plan_calc, _plan_growth, _plan_missing, _plan_reconcile, _plan_review,  # noqa: E402,F401
+                                 _plan_running, _plan_sort, _plan_variance, _run_calc, _run_growth, _run_missing, _run_pivot,
+                                 _run_reconcile, _run_review, _run_running, _run_sort, _run_variance)

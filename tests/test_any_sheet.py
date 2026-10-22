@@ -150,3 +150,66 @@ def test_messy_hindi_and_csv_sheets(tmp_path):
         if want not in got:
             misses.append(f"{f} {q!r} -> {got[:150]!r}, wanted {want}")
     assert not misses, "\n".join(misses)
+
+
+def test_department_jobs(tmp_path):
+    """Accounts / finance / sales / HR jobs from Chetan's list, on a fresh workbook."""
+    random.seed(11)
+    wb = Workbook()
+    wb.remove(wb.active)
+    led = wb.create_sheet("Ledger")
+    led.append(["Date", "Particulars", "Amount"])
+    bank = wb.create_sheet("Bank")
+    bank.append(["Txn Date", "Narration", "Withdrawal"])
+    missing_from_bank = 0
+    for i in range(40):
+        d = datetime.date(2026, 9, 1) + datetime.timedelta(days=random.randint(0, 29))
+        a = random.randint(5, 500) * 100
+        led.append([d, f"Pay {i}", a])
+        if i % 8 != 0:
+            bank.append([d + datetime.timedelta(days=random.randint(0, 3)), f"NEFT {i}", a])
+        else:
+            missing_from_bank += 1
+    bank.append([datetime.date(2026, 9, 30), "Bank charges", 590])
+    bud = wb.create_sheet("Budget")
+    bud.append(["Department", "Budget", "Actual"])
+    B = []
+    for dpt in ["HR", "IT", "Sales", "Admin"]:
+        r = [dpt, random.randint(5, 20) * 10000, random.randint(5, 20) * 10000]
+        bud.append(r)
+        B.append(r)
+    st = wb.create_sheet("Staff")
+    st.append(["First Name", "Last Name", "Region", "Product", "Sales", "Phone"])
+    S = []
+    for i in range(30):
+        r = [random.choice(["Asha", "Ravi", "Neha"]), random.choice(["Gill", "Rao"]), random.choice(["North", "South"]),
+             random.choice(["A", "B", "C"]), random.randint(1, 90) * 1000, None if i % 5 == 0 else "98xxxx"]
+        st.append(r)
+        S.append(r)
+    path = str(tmp_path / "office.xlsx")
+    wb.save(path)
+    fmt = ask._fmt
+    cases = [
+        ("bank aur ledger reconcile karo", [f"Sirf Ledger mein: {missing_from_bank}", "Sirf Bank mein: 1 (590)"]),
+        ("budget vs actual variance nikalo", [f"Kul farak {fmt(sum(r[2] - r[1] for r in B))}"]),
+        ("full name banao", ["Full Name", '=TRIM(A2&" "&B2)']),
+        ("sales ka 5% commission nikalo", ["Commission (5%)", fmt(sum(r[4] for r in S) * 5 / 100)]),
+        ("region aur product wise sales", ["Region × Product"]),
+        ("phone khaali kahan hai", [f"{sum(1 for r in S if r[5] is None)} rows mein Phone khaali"]),
+        ("sales ke hisaab se sort karo bade se chhote", ["SORT(", ",5,-1)"]),
+        ("ledger amount ka running total", ["Running total of Amount"]),
+        ("file review karo", ["Ledger: 40 rows", "Phone: 6 khaali"]),
+    ]
+    misses = []
+    for i, (q, want) in enumerate(cases, 1):
+        try:
+            r = ask.run(ask.understand(q, load_tables(path)), path, str(tmp_path / f"o{i}.xlsx"), True, i)
+            got = r["say"] + " " + r["formula"]
+        except ask.NeedMore as e:
+            got = "ASKED: " + e.hi
+        if not all(w in got for w in want):
+            misses.append(f"{q!r} -> {got[:180]!r}, wanted {want}")
+    assert not misses, "\n".join(misses)
+    # the file the person downloads opens with the new columns and formulas in place
+    out = load_workbook(str(tmp_path / "o4.xlsx"))
+    assert out["Staff"]["G1"].value == "Commission (5%)" and out["Staff"]["G2"].value == "=E2*5%"

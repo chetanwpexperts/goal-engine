@@ -1,0 +1,280 @@
+[
+  {
+    "id": "excel-ref-error",
+    "apps": [
+      "excel",
+      "google_sheets"
+    ],
+    "category": "formula_error",
+    "title_en": "Formulas show #REF!",
+    "title_hi": "Formula mein #REF! aa raha hai",
+    "codes": [
+      "#REF!"
+    ],
+    "symptoms": [
+      "formula me #REF aa raha hai",
+      "excel shows #REF error after deleting a column",
+      "row delete kiya to formula toot gaya",
+      "sheet delete karne ke baad sab cells mein ref error",
+      "my vlookup gives ref error",
+      "formula broken reference"
+    ],
+    "causes": [
+      {
+        "id": "deleted",
+        "title_en": "A row, column or sheet the formula used was deleted",
+        "title_hi": "Formula jis row, column ya sheet ko use karta tha woh delete ho gaya"
+      },
+      {
+        "id": "range",
+        "title_en": "The lookup column number is outside the table (VLOOKUP/INDEX)",
+        "title_hi": "VLOOKUP/INDEX mein column number table se bahar hai"
+      },
+      {
+        "id": "closed_link",
+        "title_en": "It points to another file that moved or was renamed",
+        "title_hi": "Doosri file ka link hai jo hil gayi ya naam badal gaya"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "deleted",
+        "action": "auto",
+        "auto": "fix_broken_refs",
+        "steps_en": "I find every #REF! formula, rebuild it from the same formula in the neighbouring rows, and give you the fixed copy with a list of what changed.",
+        "steps_hi": "Main har #REF! formula dhoondta hoon, aas-paas ki rows ke same formula se dobara banata hoon, aur fixed copy de deta hoon, badlav ki list ke saath."
+      },
+      {
+        "cause": "range",
+        "action": "auto",
+        "auto": "replace_formula",
+        "steps_en": "I correct the column number (or switch VLOOKUP to XLOOKUP, which can't break this way) and show you before and after.",
+        "steps_hi": "Main column number theek karta hoon (ya VLOOKUP ko XLOOKUP mein badal deta hoon jo aise nahi tootta) aur pehle-baad dikhata hoon."
+      },
+      {
+        "cause": "closed_link",
+        "action": "steps",
+        "steps_en": "Upload the other file too and I'll relink it. Or in Excel: Data > Edit Links > Change Source, and pick the file.",
+        "steps_hi": "Doosri file bhi upload karo, main link jod dunga. Ya Excel mein: Data > Edit Links > Change Source, aur file chuno."
+      }
+    ],
+    "verify": {
+      "en": "No cell in the workbook shows #REF! and the totals match the old values where the old values were right.",
+      "hi": "Workbook mein kahin #REF! nahi dikhta aur totals purani sahi values se milte hain."
+    },
+    "test_phrases": [
+      "after I removed a sheet all the totals say REF",
+      "column hataya aur ab har jagah ref likha aa raha",
+      "शीट डिलीट करने के बाद फॉर्मूला में रेफ एरर आ रहा है"
+    ],
+    "source": "https://support.microsoft.com/office/how-to-correct-a-ref-error-822c8e46-e610-4d02-bf29-ec4b8c5ff4be"
+  },
+  {
+    "id": "vlookup-na-no-match",
+    "apps": [
+      "excel",
+      "google_sheets"
+    ],
+    "category": "lookup_matching",
+    "title_en": "VLOOKUP / XLOOKUP gives #N/A although the value is there",
+    "title_hi": "Value hai phir bhi VLOOKUP #N/A de raha hai",
+    "codes": [
+      "#N/A"
+    ],
+    "symptoms": [
+      "vlookup not working even though value exists",
+      "vlookup #N/A aa raha hai jabki data hai",
+      "dono sheet mein same id hai par match nahi ho raha",
+      "lookup returns n/a for some rows only",
+      "xlookup not finding the value",
+      "do sheets ka data match nahi ho raha"
+    ],
+    "causes": [
+      {
+        "id": "spaces",
+        "title_en": "Hidden spaces before or after the value",
+        "title_hi": "Value ke aage-peeche chhupe hue space"
+      },
+      {
+        "id": "text_number",
+        "title_en": "One side is a number, the other is a number stored as text",
+        "title_hi": "Ek taraf number hai, doosri taraf text ki tarah save number"
+      },
+      {
+        "id": "approx",
+        "title_en": "The last argument is TRUE/blank (approximate match) on unsorted data",
+        "title_hi": "Aakhri argument TRUE ya khaali hai (approximate match) aur data sorted nahi hai"
+      },
+      {
+        "id": "missing",
+        "title_en": "The value really isn't in the lookup table",
+        "title_hi": "Value sach mein lookup table mein nahi hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "spaces",
+        "action": "auto",
+        "auto": "trim_spaces",
+        "steps_en": "I remove the hidden spaces in both key columns and re-run the lookup.",
+        "steps_hi": "Main dono key columns se chhupe space hata kar lookup dobara chalata hoon."
+      },
+      {
+        "cause": "text_number",
+        "action": "auto",
+        "auto": "text_to_number",
+        "steps_en": "I convert the text-numbers to real numbers on both sides so they match.",
+        "steps_hi": "Main dono taraf text wale numbers ko asli number bana deta hoon taaki match ho."
+      },
+      {
+        "cause": "approx",
+        "action": "auto",
+        "auto": "replace_formula",
+        "steps_en": "I set exact match (FALSE / 0) in every lookup formula.",
+        "steps_hi": "Main har lookup formula mein exact match (FALSE / 0) laga deta hoon."
+      },
+      {
+        "cause": "missing",
+        "action": "auto",
+        "auto": "compare_sheets",
+        "steps_en": "I list exactly which values are missing from the lookup table, so you know what to add.",
+        "steps_hi": "Main list deta hoon ki kaunsi values lookup table mein nahi hain, taaki aap jod sako."
+      }
+    ],
+    "verify": {
+      "en": "The #N/A cells now show values, and the only ones left are values listed as really missing.",
+      "hi": "#N/A wale cells mein ab value aati hai, bas wahi bache jo sach mein missing list mein hain."
+    },
+    "test_phrases": [
+      "lookup can't find names that are clearly in the other sheet",
+      "id dono jagah same hai phir bhi NA dikha raha",
+      "दोनों शीट में आईडी है फिर भी वीलुकअप काम नहीं कर रहा"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/how-to-correct-a-n-a-error",
+    "seen_at": [
+      "https://stackoverflow.com/questions/tagged/excel",
+      "https://www.reddit.com/r/excel/"
+    ]
+  },
+  {
+    "id": "numbers-stored-as-text",
+    "apps": [
+      "excel",
+      "csv",
+      "google_sheets"
+    ],
+    "category": "dates_numbers",
+    "title_en": "SUM shows 0 or numbers don't add up (numbers stored as text)",
+    "title_hi": "SUM 0 aa raha hai, numbers jud nahi rahe (text ki tarah save hain)",
+    "symptoms": [
+      "sum formula shows zero",
+      "total 0 aa raha hai",
+      "numbers left side aligned hain aur add nahi ho rahe",
+      "green triangle in cells number stored as text",
+      "csv import ke baad numbers jud nahi rahe",
+      "excel not adding numbers",
+      "column ka total nahi aa raha",
+      "the total of my column comes out wrong or zero",
+      "jod nahi ho raha numbers ka",
+      "autosum not working on these numbers",
+      "amount jodne par 0 dikhata hai",
+      "numbers add karne par kuch nahi hota"
+    ],
+    "causes": [
+      {
+        "id": "text",
+        "title_en": "The numbers are saved as text (often after a CSV/ERP/bank export)",
+        "title_hi": "Numbers text ki tarah save hain (aksar CSV/ERP/bank export ke baad)"
+      },
+      {
+        "id": "symbols",
+        "title_en": "Commas, currency signs or non-breaking spaces inside the numbers",
+        "title_hi": "Numbers ke andar comma, ₹ sign ya ajeeb space"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "text",
+        "action": "auto",
+        "auto": "text_to_number",
+        "steps_en": "I convert every text-number in the sheet to a real number and keep the formatting.",
+        "steps_hi": "Main sheet ke saare text-numbers ko asli number bana deta hoon, formatting wahi rehti hai."
+      },
+      {
+        "cause": "symbols",
+        "action": "auto",
+        "auto": "text_to_number",
+        "steps_en": "I strip ₹, $, commas and odd spaces, then convert to numbers. You see a sample before and after.",
+        "steps_hi": "Main ₹, $, comma aur ajeeb space hata kar number banata hoon. Pehle-baad ka sample dikhata hoon."
+      }
+    ],
+    "verify": {
+      "en": "SUM gives the right total and the cells are right-aligned numbers.",
+      "hi": "SUM sahi total deta hai aur cells right side wale number hain."
+    },
+    "test_phrases": [
+      "my total column adds up to nothing",
+      "amount column ka jod hi nahi ho raha",
+      "एक्सेल में टोटल ज़ीरो आ रहा है"
+    ],
+    "source": "https://support.microsoft.com/en-US/excel/convert-numbers-stored-as-text-to-numbers-in-excel",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/"
+    ]
+  },
+  {
+    "id": "excel-file-corrupt",
+    "apps": [
+      "excel"
+    ],
+    "category": "corrupt_recovery",
+    "title_en": "Excel file won't open / is corrupted",
+    "title_hi": "Excel file khul nahi rahi / corrupt ho gayi",
+    "symptoms": [
+      "excel file corrupt ho gayi",
+      "we found a problem with some content in the file",
+      "file open nahi ho rahi excel",
+      "excel cannot open the file because the file format or extension is not valid",
+      "file khulte hi error aata hai",
+      "my workbook is damaged"
+    ],
+    "causes": [
+      {
+        "id": "damaged",
+        "title_en": "The file's inner parts are damaged (crash, bad copy, interrupted download)",
+        "title_hi": "File andar se kharab ho gayi (crash, adhoori copy ya download)"
+      },
+      {
+        "id": "wrong_ext",
+        "title_en": "The file isn't really .xlsx (it's CSV, HTML or .xls renamed)",
+        "title_hi": "File asal mein .xlsx nahi hai (CSV, HTML ya .xls ka naam badla hai)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "damaged",
+        "action": "auto",
+        "auto": "recover_file",
+        "steps_en": "I open the file piece by piece, recover every sheet and value I can read, and give you a clean new file with a list of anything I couldn't save.",
+        "steps_hi": "Main file ko tukdon mein kholta hoon, jitni sheets aur values padh sakta hoon bachata hoon, aur nayi saaf file deta hoon, jo nahi bacha uski list ke saath."
+      },
+      {
+        "cause": "wrong_ext",
+        "action": "auto",
+        "auto": "convert_file",
+        "steps_en": "I detect the real format and convert it to a proper .xlsx.",
+        "steps_hi": "Main asli format pehchaan kar use sahi .xlsx bana deta hoon."
+      }
+    ],
+    "verify": {
+      "en": "The new file opens in Excel without a repair message and has the same sheets and row counts.",
+      "hi": "Nayi file Excel mein bina repair message ke khulti hai aur sheets aur rows utni hi hain."
+    },
+    "test_phrases": [
+      "excel says the file is broken and wants to repair it",
+      "kal tak file chal rahi thi aaj khul hi nahi rahi",
+      "मेरी एक्सेल फाइल खराब हो गई है खुल नहीं रही"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/repair-a-corrupted-workbook"
+  }
+]

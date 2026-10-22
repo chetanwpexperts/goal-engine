@@ -1,0 +1,67 @@
+[
+  {
+    "id": "sum-by-month",
+    "title_en": "Total for each month",
+    "title_hi": "Har mahine ka total",
+    "examples": [
+      "har mahine ka total chahiye",
+      "monthly total formula",
+      "month wise sum",
+      "mahine ke hisaab se amount jodna hai",
+      "sum by month excel"
+    ],
+    "needs": [
+      "date",
+      "amount",
+      "month_start"
+    ],
+    "templates": {
+      "excel365": "=SUMIFS({amount},{date},\">=\"&{month_start},{date},\"<\"&EDATE({month_start},1))",
+      "excel2016": "=SUMIFS({amount},{date},\">=\"&{month_start},{date},\"<\"&EDATE({month_start},1))",
+      "google_sheets": "=SUMIFS({amount},{date},\">=\"&{month_start},{date},\"<\"&EDATE({month_start},1))"
+    },
+    "explain_en": "Adds the amounts whose date is on or after the 1st of the month and before the 1st of the next month.",
+    "explain_hi": "Un amounts ko jodta hai jinki date mahine ki 1 tareekh se agle mahine ki 1 tareekh ke beech hai.",
+    "test_phrases": [
+      "how much did we sell in each month",
+      "mahine wise kitna paisa aaya",
+      "हर महीने की कुल बिक्री निकालनी है"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/sumifs-function"
+  },
+  {
+    "id": "find-duplicates",
+    "title_en": "Find duplicate values",
+    "title_hi": "Duplicate values dhoondo",
+    "examples": [
+      "duplicate entries dhoondo",
+      "find duplicates in excel column",
+      "ek hi naam do baar aaya hai kaise pata kare",
+      "duplicate check formula",
+      "repeat values highlight karo",
+      "kaunsi entry do baar daali gayi hai",
+      "which rows are repeated",
+      "same mobile number kitni baar hai",
+      "ek customer do baar likha hai dhoondo",
+      "repeated entries list karo",
+      "duplicate rows count"
+    ],
+    "needs": [
+      "column",
+      "cell"
+    ],
+    "templates": {
+      "excel365": "=IF(COUNTIF({column},{cell})>1,\"Duplicate\",\"\")",
+      "excel2016": "=IF(COUNTIF({column},{cell})>1,\"Duplicate\",\"\")",
+      "google_sheets": "=IF(COUNTIF({column},{cell})>1,\"Duplicate\",\"\")"
+    },
+    "explain_en": "Marks a row as Duplicate when its value appears more than once in the column. Upload the file and I can also remove them for you, keeping the first one.",
+    "explain_hi": "Agar value column mein ek se zyada baar hai to row par Duplicate likh deta hai. File upload karo to main hata bhi dunga, pehli wali rakh kar.",
+    "test_phrases": [
+      "which customers are entered twice",
+      "same phone number kitni baar aaya hai",
+      "डुप्लीकेट नाम कैसे पता करें"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/countif-function-e0de10c6-f885-4e71-abb4-1f464816df34"
+  }
+]

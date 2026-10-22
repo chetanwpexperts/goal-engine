@@ -1,0 +1,38 @@
+[
+  {
+    "id": "count-by-month",
+    "intent": "count_by_month",
+    "examples": ["har mahine kitne orders aaye", "monthly orders count", "pichle 6 mahine ke orders mahine ke hisaab se", "orders per month"],
+    "needs": {"table": "the table being counted", "date_col": "a date/datetime column", "months": "how many months back (default 6)"},
+    "templates": {
+      "mysql": "SELECT DATE_FORMAT({date_col}, '%Y-%m') AS month, COUNT(*) AS total FROM {table} WHERE {date_col} >= CURDATE() - INTERVAL {months} MONTH GROUP BY month ORDER BY month",
+      "mariadb": "SELECT DATE_FORMAT({date_col}, '%Y-%m') AS month, COUNT(*) AS total FROM {table} WHERE {date_col} >= CURDATE() - INTERVAL {months} MONTH GROUP BY month ORDER BY month",
+      "postgres": "SELECT to_char(date_trunc('month', {date_col}), 'YYYY-MM') AS month, COUNT(*) AS total FROM {table} WHERE {date_col} >= now() - interval '{months} months' GROUP BY 1 ORDER BY 1"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html"
+  },
+  {
+    "id": "duplicates",
+    "intent": "find_duplicates",
+    "examples": ["duplicate emails dikhao", "same phone number do baar", "find duplicate customers", "repeat entries"],
+    "needs": {"table": "the table", "column": "the column that should be unique"},
+    "templates": {
+      "mysql": "SELECT {column}, COUNT(*) AS times FROM {table} WHERE {column} IS NOT NULL AND {column} <> '' GROUP BY {column} HAVING COUNT(*) > 1 ORDER BY times DESC LIMIT 100",
+      "mariadb": "SELECT {column}, COUNT(*) AS times FROM {table} WHERE {column} IS NOT NULL AND {column} <> '' GROUP BY {column} HAVING COUNT(*) > 1 ORDER BY times DESC LIMIT 100",
+      "postgres": "SELECT {column}, COUNT(*) AS times FROM {table} WHERE {column} IS NOT NULL AND {column}::text <> '' GROUP BY {column} HAVING COUNT(*) > 1 ORDER BY times DESC LIMIT 100"
+    },
+    "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html"
+  },
+  {
+    "id": "inactive-customers",
+    "intent": "inactive_since",
+    "examples": ["jo customer 60 din se nahi aaye", "customers who haven't ordered in 3 months", "purane customers jo wapas nahi aaye"],
+    "needs": {"table": "customers table", "pk": "its id", "child": "orders table", "fk": "orders column pointing to customers", "date_col": "order date", "days": "days without activity (default 60)"},
+    "templates": {
+      "mysql": "SELECT c.* FROM {table} c WHERE NOT EXISTS (SELECT 1 FROM {child} o WHERE o.{fk} = c.{pk} AND o.{date_col} >= CURDATE() - INTERVAL {days} DAY) LIMIT 500",
+      "mariadb": "SELECT c.* FROM {table} c WHERE NOT EXISTS (SELECT 1 FROM {child} o WHERE o.{fk} = c.{pk} AND o.{date_col} >= CURDATE() - INTERVAL {days} DAY) LIMIT 500",
+      "postgres": "SELECT c.* FROM {table} c WHERE NOT EXISTS (SELECT 1 FROM {child} o WHERE o.{fk} = c.{pk} AND o.{date_col} >= now() - interval '{days} days') LIMIT 500"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/exists-and-not-exists-subqueries.html"
+  }
+]

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "fk-by-name-id-suffix",
+    "kind": "link_guess",
+    "rule": {"column_regex": "^(?P<base>[a-z][a-z0-9_]*?)_id$", "target_tables": ["{base}", "{base}s", "{base}es", "tbl_{base}"], "target_column": "id"},
+    "explain_en": "A column named customer_id usually points to the id of a customers (or customer) table.",
+    "explain_hi": "customer_id jaisa column aam taur pe customers (ya customer) table ki id ki taraf ishara karta hai.",
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/create-table-foreign-keys.html"
+  },
+  {
+    "id": "date-stored-as-text",
+    "kind": "type_smell",
+    "rule": {"name_regex": "(date|_at|_on|time|dob)$", "bad_types": ["varchar", "char", "text"]},
+    "explain_en": "A date kept as text can't be sorted or filtered by date properly and can't use date functions; use DATE/DATETIME/TIMESTAMP.",
+    "explain_hi": "Date ko text mein rakhne se sahi sorting/filtering nahi hoti aur date functions kaam nahi karte; DATE/DATETIME/TIMESTAMP use karo.",
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/date-and-time-types.html"
+  }
+]

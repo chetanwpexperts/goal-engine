@@ -16,7 +16,7 @@ import hashlib
 from app.ml.answers import PLAYBOOKS
 from app.ml.howto import BY_KEY, STEP_CHOICES, choices_for, find_howto, render
 from app.ml.intent import IntentModel, Prediction
-from app.ml.normalize import detect_language, normalize
+from app.ml.normalize import HINGLISH_MARKERS, detect_language, normalize, tokens
 from app.ml.registry import BUSINESS_DOMAIN, short_title
 from app.ml.slots import INTENT_LABELS, RELATED, SPECS, Slot, extract_all, main_issue
 from app.models import Goal, dumps, loads
@@ -285,6 +285,9 @@ class Brain:
         lang = detect_language(text)
         if words < 4 and focus is not None and focus.detected_language:
             lang = focus.detected_language  # "php me" stays in the conversation's language
+        elif lang == "English" and focus is not None and focus.detected_language in ("Hinglish", "Hindi") and \
+                any(w in HINGLISH_MARKERS for w in tokens(text)):
+            lang = focus.detected_language  # "capital letters ek jaise karo" in a Hinglish conversation stays Hinglish
         hi = lang in ("Hinglish", "Hindi")
         pred = self.model.predict(text)
 

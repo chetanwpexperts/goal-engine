@@ -298,6 +298,7 @@ class OfficeFile(Base):
     status: Mapped[str] = mapped_column(String(16), default="uploading")   # uploading / queued / working / ready / error / removed
     task: Mapped[str | None] = mapped_column(String(16), nullable=True)   # scan / fix / compare
     args: Mapped[str | None] = mapped_column(Text, nullable=True)         # JSON: what the task needs, so it can resume after a restart
+    versions: Mapped[str | None] = mapped_column(Text, nullable=True)     # JSON: every step [{path, ops, changes}], first = the upload
     report: Mapped[str | None] = mapped_column(Text(16_000_000), nullable=True)    # JSON: addresses and counts, no values
     result_path: Mapped[str | None] = mapped_column(String(300), nullable=True)
     result_name: Mapped[str | None] = mapped_column(String(200), nullable=True)

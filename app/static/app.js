@@ -1124,7 +1124,8 @@
 
     const drop = el("div", "dropzone");
     const [btn, inp] = pick(T(hi, "File chuno", "Choose a file"));
-    drop.append(el("p", null, T(hi, "Excel (.xlsx) ya CSV file yahan chhodo. 1.5 GB tak.", "Drop an Excel (.xlsx) or CSV file here. Up to 1.5 GB.")), btn, inp,
+    const another = el("span", "another", T(hi, "Nayi file?", "Another file?"));
+    drop.append(el("p", "lead", T(hi, "Excel (.xlsx) ya CSV file yahan chhodo. 1.5 GB tak.", "Drop an Excel (.xlsx) or CSV file here. Up to 1.5 GB.")), another, btn, inp,
                 el("p", "fine small", T(hi, "Original file kabhi nahi badalti; aapko theek ki hui copy milti hai. Files 1 ghante mein apne aap delete.",
                                          "Your original never changes; you get a fixed copy. Files are deleted automatically within an hour.")));
     const go = async (file) => {
@@ -1160,11 +1161,50 @@
       return list.join(", ");
     };
 
+    const fmt = (n) => Number(n || 0).toLocaleString("en-IN");
+    const DONE = {
+      fix_broken_refs: T(hi, "toote formula theek kiye", "broken formulas fixed"),
+      text_to_number: T(hi, "text wale numbers asli number banaye", "text-numbers turned into numbers"),
+      trim_spaces: T(hi, "cells se extra space hataye", "cells cleaned of extra spaces"),
+      remove_duplicates: T(hi, "duplicate rows hatayi", "duplicate rows removed"),
+      fix_case: T(hi, "cells mein capital/small letters ek jaise kiye", "cells made to use the same spelling"),
+    };
+    let watching = "";
+
+    // One file stays open: every task builds on the last one, until the person is done.
     const showFile = (f) => {
       if (f.status === "error") { out.replaceChildren(el("p", "note err", f.error)); return; }
-      if (f.result) { showResult(f); return; }
-      const rep = f.report, s = rep.summary;
-      const parts = [el("p", "cap", `${f.name} · ${s.sheets} ${T(hi, "sheet", s.sheets > 1 ? "sheets" : "sheet")} · ${(s.rows || 0).toLocaleString("en-IN")} ${T(hi, "rows", "rows")} · ${(s.formulas || 0).toLocaleString("en-IN")} ${T(hi, "formula", "formulas")}`)];
+      if (f.status !== "ready") {
+        status(T(hi, "Kaam chal raha hai…", "Working…"));
+        if (watching !== f.id) { watching = f.id; officeWait(f.id).then((g) => { watching = ""; showFile(g); }).catch(() => { watching = ""; }); }
+        return;
+      }
+      box.classList.add("has-file");
+      const rep = f.report, s = rep.summary, r = f.result || {};
+      const parts = [el("p", "cap", `${f.name} · ${s.sheets} ${T(hi, "sheet", s.sheets > 1 ? "sheets" : "sheet")} · ${fmt(s.rows)} ${T(hi, "rows", "rows")} · ${fmt(s.formulas)} ${T(hi, "formula", "formulas")}`)];
+
+      if ((f.steps || []).length) {
+        const ul = el("ul", "findings done");
+        for (const st of f.steps) for (const [op, n] of Object.entries(st.changes || {})) if (DONE[op] && n) ul.append(el("li", null, `${fmt(n)} ${DONE[op]}`));
+        if (!ul.children.length) ul.append(el("li", null, T(hi, "Kuch badalne ki zaroorat nahi padi.", "Nothing needed changing.")));
+        parts.push(el("p", "cap", T(hi, "Ab tak kiya", "Done so far")), ul);
+        const c = r.task === "fix" ? (r.changes || {}) : {};
+        if (c.broken_refs_left) parts.push(el("p", "note", T(hi, `${c.broken_refs_left} toote formula ka koi saaf pattern nahi mila; inhe khud dekhna padega.`, `${c.broken_refs_left} broken formulas had no clear pattern to rebuild from.`)));
+        if (c.duplicates_skipped_sheets) parts.push(el("p", "note", T(hi, "Jin sheets mein formula hain wahan duplicate rows nahi hatayi, taaki formula na toote.", "Duplicates weren't removed on sheets with formulas, so no formula breaks.")));
+        if (r.task === "fix" && r.formatting_kept === false) parts.push(el("p", "note", T(hi, "Badi file thi, isliye values aur formula rakhe hain, rang/format nahi.", "Big file: values and formulas are kept, colours and formatting aren't.")));
+      }
+      if (r.task === "undo") parts.push(el("p", "fine", T(hi, "Aakhri badlav wapas le liya.", "The last change was undone.")));
+      if (r.task === "compare") {
+        parts.push(el("p", "cap", T(hi, `${f.name} vs ${r.other} · "${r.key}" column se milaya`, `${f.name} vs ${r.other} · matched on "${r.key}"`)));
+        const ul = el("ul", "findings done");
+        ul.append(el("li", null, `${fmt(r.matched)} ${T(hi, "rows dono mein", "rows in both")}`),
+                  el("li", null, `${fmt(r.only_in_a)} ${T(hi, "sirf pehli file mein", "only in the first file")}`),
+                  el("li", null, `${fmt(r.only_in_b)} ${T(hi, "sirf doosri file mein", "only in the second file")}`),
+                  el("li", null, `${fmt(r.changed_rows)} ${T(hi, "rows mein value badli", "rows with changed values")} (${fmt(r.changed_cells)} cells)`));
+        parts.push(ul);
+        if (f.compare_download) { const dl = el("a", "btn", T(hi, "Comparison report download", "Download the comparison")); dl.href = `/api/office/files/${f.id}/download?what=compare`; parts.push(dl); }
+      }
+
       const ops = [];
       const ul = el("ul", "findings");
       for (const [key, op, on, text] of FIND) {
@@ -1173,15 +1213,16 @@
         const li = el("li");
         if (op) {
           const cb = el("input"); cb.type = "checkbox"; cb.checked = on; cb.id = `of-${f.id}-${op}`;
-          const lb = el("label", null, text(n.toLocaleString("en-IN"))); lb.htmlFor = cb.id;
+          const lb = el("label", null, text(fmt(n))); lb.htmlFor = cb.id;
           li.append(cb, lb); ops.push([op, cb]);
-        } else li.append(el("span", null, text(n.toLocaleString("en-IN"))));
+        } else li.append(el("span", null, text(fmt(n))));
         const where = cellsOf(rep, key);
         if (where) li.append(el("small", null, `${T(hi, "Kahan", "Where")}: ${where}${n > 8 ? " …" : ""}`));
         ul.append(li);
       }
-      if (!ul.children.length) parts.push(el("p", "fine", T(hi, "Is file mein mujhe koi galti nahi mili.", "I found no problems in this file.")));
-      else parts.push(ul);
+      parts.push(el("p", "cap", (f.steps || []).length ? T(hi, "Abhi bhi bacha hai", "Still in the file") : T(hi, "Jo maine dekha", "What I found")));
+      parts.push(ul.children.length ? ul : el("p", "fine", T(hi, "Ab is file mein mujhe koi galti nahi dikhi.", "I see no problems left in this file.")));
+
       const acts = el("div", "acts");
       if (ops.length) {
         const fixBtn = el("button", "btn solid", T(hi, "Theek karo", "Fix it")); fixBtn.type = "button";
@@ -1189,12 +1230,18 @@
           const chosen = ops.filter(([, cb]) => cb.checked).map(([op]) => op);
           if (!chosen.length) return;
           try {
-            await api(`/api/office/files/${f.id}/fix`, { method: "POST", body: JSON.stringify({ ops: chosen }) });
-            status(T(hi, "Theek kar raha hoon…", "Fixing…"));
-            showResult(await officeWait(f.id));
+            showFile(await api(`/api/office/files/${f.id}/fix`, { method: "POST", body: JSON.stringify({ ops: chosen }) }));
           } catch (ex) { out.replaceChildren(el("p", "note err", ex.message)); }
         });
         acts.append(fixBtn);
+      }
+      if (f.download) {
+        const dl = el("a", "btn solid", T(hi, "Download karo", "Download")); dl.href = `/api/office/files/${f.id}/download`;
+        const undo = el("button", "btn", T(hi, "Aakhri badlav wapas lo", "Undo the last change")); undo.type = "button";
+        undo.addEventListener("click", async () => {
+          try { showFile(await api(`/api/office/files/${f.id}/undo`, { method: "POST" })); } catch (ex) { out.replaceChildren(el("p", "note err", ex.message)); }
+        });
+        acts.append(dl, undo);
       }
       const [cmpBtn, cmpInp] = pick(T(hi, "Doosri file se compare karo", "Compare with another file"));
       cmpBtn.className = "btn";
@@ -1206,57 +1253,22 @@
           status(T(hi, "Doosri file check kar raha hoon…", "Checking the second file…"));
           const g2 = await officeWait(g.id);
           if (g2.status === "error") { out.replaceChildren(el("p", "note err", g2.error)); return; }
-          await api(`/api/office/files/${f.id}/compare`, { method: "POST", body: JSON.stringify({ other: g2.id }) });
-          status(T(hi, "Dono files mila raha hoon…", "Comparing both files…"));
-          showResult(await officeWait(f.id));
+          showFile(await api(`/api/office/files/${f.id}/compare`, { method: "POST", body: JSON.stringify({ other: g2.id }) }));
         } catch (ex) { out.replaceChildren(el("p", "note err", ex.message)); }
       });
       acts.append(cmpBtn, cmpInp);
-      parts.push(acts);
-      out.replaceChildren(...parts);
-    };
-
-    const showResult = (f) => {
-      if (f.status === "error") { out.replaceChildren(el("p", "note err", f.error)); return; }
-      const r = f.result, parts = [];
-      if (r.task === "fix") {
-        const c = r.changes || {};
-        const lines = [
-          [c.fix_broken_refs, T(hi, "toote formula theek kiye", "broken formulas fixed")],
-          [c.text_to_number, T(hi, "text wale numbers asli number banaye", "text-numbers turned into numbers")],
-          [c.trim_spaces, T(hi, "cells se extra space hataye", "cells cleaned of extra spaces")],
-          [c.remove_duplicates, T(hi, "duplicate rows hatayi", "duplicate rows removed")],
-          [c.fix_case, T(hi, "cells mein capital/small letters ek jaise kiye", "cells made to use the same spelling")],
-        ].filter(([n]) => n);
-        parts.push(el("p", "cap", T(hi, "Ho gaya", "Done")));
-        const ul = el("ul", "findings done");
-        for (const [n, t] of lines) ul.append(el("li", null, `${n.toLocaleString("en-IN")} ${t}`));
-        if (!lines.length) ul.append(el("li", null, T(hi, "Kuch badalne ki zaroorat nahi padi.", "Nothing needed changing.")));
-        parts.push(ul);
-        if (c.broken_refs_left) parts.push(el("p", "note", T(hi, `${c.broken_refs_left} toote formula main khud nahi bana saka (column mein koi saaf pattern nahi). Inhe "Changes" sheet mein dekho.`, `${c.broken_refs_left} broken formulas had no clear pattern to rebuild from; see the "Changes" sheet.`)));
-        if (c.duplicates_skipped_sheets) parts.push(el("p", "note", T(hi, "Jin sheets mein formula hain wahan duplicate rows nahi hatayi, taaki formula na toote.", "Duplicates weren't removed on sheets with formulas, so no formula breaks.")));
-        if (!r.formatting_kept) parts.push(el("p", "note", T(hi, "Badi file thi, isliye values aur formula rakhe hain, rang/format nahi.", "Big file: values and formulas are kept, colours and formatting aren't.")));
-        parts.push(el("p", "fine small", T(hi, "Har badlav fixed file ki \"Changes by Goal Engine\" sheet mein likha hai.", "Every change is listed in the fixed file's \"Changes by Goal Engine\" sheet.")));
-      } else {
-        parts.push(el("p", "cap", T(hi, `${f.name} vs ${r.other} · "${r.key}" column se milaya`, `${f.name} vs ${r.other} · matched on "${r.key}"`)));
-        const ul = el("ul", "findings done");
-        ul.append(el("li", null, `${(r.matched || 0).toLocaleString("en-IN")} ${T(hi, "rows dono mein", "rows in both")}`),
-                  el("li", null, `${(r.only_in_a || 0).toLocaleString("en-IN")} ${T(hi, "sirf pehli file mein", "only in the first file")}`),
-                  el("li", null, `${(r.only_in_b || 0).toLocaleString("en-IN")} ${T(hi, "sirf doosri file mein", "only in the second file")}`),
-                  el("li", null, `${(r.changed_rows || 0).toLocaleString("en-IN")} ${T(hi, "rows mein value badli", "rows with changed values")} (${(r.changed_cells || 0).toLocaleString("en-IN")} cells)`));
-        parts.push(ul, el("p", "fine small", T(hi, "Extra space, chhote-bade akshar aur text wale numbers ko farak nahi maana.", "Extra spaces, capital/small letters and numbers saved as text weren't counted as differences.")));
-      }
-      if (f.download) {
-        const dl = el("a", "btn solid", T(hi, "Download karo", "Download")); dl.href = `/api/office/files/${f.id}/download`;
-        parts.push(dl);
-      }
+      parts.push(acts, el("p", "fine small", T(hi,
+        "File khuli hai: agla kaam chat mein likho (jaise \"duplicate bhi hatao\") ya upar chuno. Har badlav file ki \"Changes by Goal Engine\" sheet mein likha hai. Kuch na karo to 1 ghante baad file apne aap delete.",
+        "The file stays open: type the next task in the chat (like \"remove duplicates too\") or pick above. Every change is listed in the file's \"Changes by Goal Engine\" sheet. Left alone, it's deleted after an hour.")));
       out.replaceChildren(...parts);
     };
 
     box.append(drop, out);
-    const last = (a.files || [])[0];
-    if (last && (last.status === "ready" || last.status === "error")) showFile(last);
-    else if (last && last.status !== "uploading") { status(T(hi, "Kaam chal raha hai…", "Working…")); officeWait(last.id).then(showFile).catch(() => {}); }
+    box._refresh = (a2) => {
+      const latest = (a2.files || [])[0];
+      if (latest && latest.status !== "uploading") showFile(latest);
+    };
+    box._refresh(a);
     return box;
   }
 
@@ -1275,7 +1287,9 @@
       fx.append(copy);
       card.append(fx);
     }
-    card.append(keep(`office:${a.id}`, () => officePanel(a, hi)));
+    const panel = keep(`office:${a.id}`, () => officePanel(a, hi));
+    if (panel._refresh) panel._refresh(a);
+    card.append(panel);
     return card;
   }
 

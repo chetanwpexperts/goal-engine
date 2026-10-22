@@ -211,23 +211,26 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
         goal.next_action = "Add the sheet, check the preview, then Start"
         db.commit()
         reply, options, relation = auto.plan_reply(spec, turn.hi), [], "agent_plan"
-    elif goal is not None and relation not in ("safety", "chit_chat") and officeagent.wants_office(goal, text):
+    elif goal is not None and relation not in ("safety", "chit_chat") and officeagent.wants_office(goal, text, db):
         # Excel / file work: the agent works on the file itself and gives back a fixed copy.
         from app.officeknow import brain as officebrain
 
         rec = officebrain.recognize(text)
         agent = officeagent.goal_agent(db, goal) or officeagent.create_agent(db, goal)
+        task_reply = officeagent.chat_task(db, agent, text, turn.hi)
         inputs = loads(agent.inputs, {}) or {}
-        if rec["confidence"] >= 0.35:
+        if rec["confidence"] >= 0.35 and not task_reply:
             inputs["brain"] = rec
+            goal.title = officebrain.describe(rec, turn.hi)
+        elif not goal.title:
+            goal.title = "Excel / file ka kaam" if turn.hi else "Excel and file work"
         agent.inputs = dumps(inputs)
-        goal.title = officebrain.describe(rec, turn.hi) if rec["confidence"] >= 0.35 else ("Excel / file ka kaam" if turn.hi else "Excel and file work")
         goal.missing_info = "[]"
         goal.pending = None
         goal.next_action_type = "execute"
         goal.next_action = "Give the file to the agent"
         db.commit()
-        reply, options, relation = officeagent.plan_reply(rec, turn.hi), [], "agent_plan"
+        reply, options, relation = (task_reply or officeagent.plan_reply(rec, turn.hi)), [], "agent_plan"
     elif goal is not None and relation not in ("howto", "safety", "chit_chat") and dbagent.wants_database(goal, text):
         # Database work: the agent works through a connector on the user's own server.
         from app.dbknow import brain as dbbrain

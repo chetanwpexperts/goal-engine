@@ -455,3 +455,9 @@ body.typing .brains { visibility: hidden; }
 }
 @media (max-width: 900px) { .hero p { display: none; } }
 @media (max-width: 900px) and (min-height: 760px) { body[data-state="idle"] .brain-art { top: 62px; height: 118px; } }
+.office .acts, .office .note, .office .findings small { margin-left: 0; }
+.office .dropzone .another { display: none; color: var(--muted); font-size: 14px; }
+.office.has-file .dropzone { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-width: 1px; }
+.office.has-file .dropzone .lead, .office.has-file .dropzone .fine { display: none; }
+.office.has-file .dropzone .another { display: inline; }
+.office.has-file .dropzone .btn { padding: 6px 14px; font-size: 14px; background: transparent; color: var(--ink); border: 1px solid var(--ink); }

@@ -22,7 +22,8 @@ from app.models import Agent, Goal, OfficeFile, dumps, loads, utcnow
 DATA = Path(__file__).resolve().parents[2] / "data" / "office"
 MAX_SIZE = 1536 * 1024 * 1024
 CHUNK_MAX = 8 * 1024 * 1024
-FILE_TTL = timedelta(hours=1)
+FILE_TTL = timedelta(hours=1)          # after the last thing done with the file
+FILE_MAX_AGE = timedelta(hours=8)      # whatever happens
 BIG = 50 * 1024 * 1024
 OPEN_FILES_PER_VISITOR = 6
 _big_lane = threading.Semaphore(1)          # one big file at a time, so the VPS stays responsive
@@ -36,9 +37,14 @@ class OfficeAgentError(Exception):
 
 
 # ------------------------------------------------------------------ chat side
-def wants_office(goal: Goal | None, text: str) -> bool:
+def wants_office(goal: Goal | None, text: str, db: Session | None = None) -> bool:
     if goal is None:
         return False
+    if db is not None:                                # a file is already open in this conversation: follow-up tasks go to it
+        agent = goal_agent(db, goal)
+        if agent is not None and open_file(db, agent) is not None and (
+                UNDO_RE.search(text or "") or ALL_RE.search(text or "") or any(rx.search(text or "") for _, rx in CHAT_OPS)):
+            return True
     from app.agents.database import DB_WORDS
     from app.officeknow import brain
 
@@ -104,10 +110,17 @@ def _formula_view(rec, hi):
 
 
 # ------------------------------------------------------------------ files
+def steps(f: OfficeFile) -> list[dict]:
+    return loads(f.versions, None) or [{"path": f.path, "ops": [], "changes": {}}]
+
+
 def file_dict(f: OfficeFile) -> dict:
+    st = steps(f)
     return {"id": f.token, "name": f.name, "size": f.size, "received": f.received, "status": f.status, "task": f.task,
             "report": loads(f.report, None), "result": loads(f.result, None), "error": f.error,
-            "download": bool(f.result_path and os.path.exists(f.result_path)), "result_name": f.result_name}
+            "steps": [{"ops": x["ops"], "changes": x["changes"]} for x in st[1:]],
+            "download": len(st) > 1 and bool(f.path and os.path.exists(f.path)),
+            "compare_download": bool(f.result_path and os.path.exists(f.result_path)), "result_name": f.result_name}
 
 
 def start_upload(db: Session, visitor_id: str, agent_id: int | None, name: str, size: int) -> OfficeFile:
@@ -201,15 +214,29 @@ def _work(file_id: int, task: str, args: dict) -> None:
             if task == "scan":
                 f.report = dumps(office.scan(f.path))
             elif task == "fix":
-                root, ext = os.path.splitext(f.path)
-                out = f"{root}.fixed{ext}"
-                f.result = dumps({"task": "fix", **office.fix(f.path, out, args["ops"])})
-                f.result_path, f.result_name = out, _named(f.name, "fixed")
+                # every fix builds on the latest version; the file stays open for the next task
+                st = steps(f)
+                root, ext = os.path.splitext(st[0]["path"])
+                out = f"{root}.v{len(st)}{ext}"
+                res = office.fix(f.path, out, args["ops"])
+                st.append({"path": out, "ops": args["ops"], "changes": res["changes"]})
+                f.versions, f.path = dumps(st), out
+                f.result = dumps({"task": "fix", **res})
+                f.report = dumps(office.scan(out))
+            elif task == "undo":
+                st = steps(f)
+                if len(st) > 1:
+                    last = st.pop()
+                    _rm(last["path"])
+                    f.versions, f.path = dumps(st), st[-1]["path"]
+                    f.result = dumps({"task": "undo", "undone": last["ops"]})
+                f.report = dumps(office.scan(f.path))
             elif task == "compare":
                 other = db.get(OfficeFile, args["other"])
                 out = f.path + ".compare.xlsx"
                 summary = office.compare(f.path, other.path, out, key=args.get("key", ""))
                 f.result = dumps({"task": "compare", "other": other.name, **summary})
+                _rm(f.result_path)
                 f.result_path, f.result_name = out, _named(f.name, "compare", ".xlsx")
             f.status = "ready"
         except office.OfficeError as exc:
@@ -227,13 +254,23 @@ def _named(name: str, suffix: str, ext: str = "") -> str:
     return f"{base} ({suffix}){ext or e}"
 
 
+def _rm(p) -> None:
+    try:
+        if p:
+            os.remove(p)
+    except OSError:
+        pass
+
+
+def start_undo(db: Session, f: OfficeFile) -> OfficeFile:
+    if f.status not in ("ready", "error") or len(steps(f)) < 2:
+        raise OfficeAgentError("Wapas lene ke liye koi badlav nahi hai.")
+    return _start(db, f, "undo", {})
+
+
 def remove_file(f: OfficeFile) -> None:
-    for p in (f.path, f.result_path):
-        try:
-            if p:
-                os.remove(p)
-        except OSError:
-            pass
+    for p in {f.path, f.result_path, *(x["path"] for x in steps(f))}:
+        _rm(p)
     f.path = f.result_path = None
     f.report = f.result = None
     f.status = "removed"
@@ -242,8 +279,11 @@ def remove_file(f: OfficeFile) -> None:
 def maintain(db: Session, now=None) -> int:
     now = now or utcnow()
     n = 0
-    for f in db.scalars(select(OfficeFile).where(OfficeFile.status != "removed", OfficeFile.created_at < now - FILE_TTL)):
-        if f.status in ("queued", "working") and f.created_at > now - FILE_TTL * 3:
+    from sqlalchemy import or_
+
+    for f in db.scalars(select(OfficeFile).where(OfficeFile.status != "removed",
+                                                 or_(OfficeFile.updated_at < now - FILE_TTL, OfficeFile.created_at < now - FILE_MAX_AGE))):
+        if f.status in ("queued", "working") and f.created_at > now - FILE_MAX_AGE:
             continue                                  # still working on a very big file
         remove_file(f)
         n += 1
@@ -295,3 +335,51 @@ def resume_interrupted(boot) -> int:
                 threading.Thread(target=_work, args=(f.id, f.task or "scan", loads(f.args, {}) or {}), daemon=True).start()
                 n += 1
     return n
+
+
+# ------------------------------------------------------------------ "duplicate bhi hatao": tasks on the open file from the chat
+CHAT_OPS = [
+    ("trim_spaces", re.compile(r"\b(space|spaces|spes|khali jagah)\b", re.I)),
+    ("remove_duplicates", re.compile(r"\b(duplicate|duplicates|duplicat|dublicate|do baar|repeat|repeated)\b", re.I)),
+    ("fix_case", re.compile(r"\b(capital|small letter|case|uppercase|lowercase|spelling ek)\b", re.I)),
+    ("text_to_number", re.compile(r"\b(text.{0,12}number|number.{0,20}(text|theek|thik|fix)|total (galat|0|zero)|sum (galat|0|zero))\b", re.I)),
+    ("fix_broken_refs", re.compile(r"(#ref|toote? (hue )?formula|broken formula|formula (theek|thik|fix))", re.I)),
+]
+UNDO_RE = re.compile(r"\b(undo|wapas|vapas|pehle jaisa|revert|purana wala)\b", re.I)
+ALL_RE = re.compile(r"\b(sab|saari|saare|everything|all)\b.{0,20}\b(theek|thik|fix|saaf|clean)", re.I)
+
+
+def open_file(db: Session, agent: Agent) -> OfficeFile | None:
+    return db.scalar(select(OfficeFile).where(OfficeFile.agent_id == agent.id, OfficeFile.status.in_(("ready", "queued", "working")))
+                     .order_by(OfficeFile.updated_at.desc()))
+
+
+def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
+    """A task typed in the chat for the file that's already open. Returns the reply, or None if it isn't one."""
+    f = open_file(db, agent)
+    if f is None:
+        return None
+    if f.status != "ready":
+        return "Pichla kaam abhi chal raha hai, khatam hote hi agla karta hoon. Card pe dikhega." if hi else "Still working on the last task; the card shows when it's done."
+    if UNDO_RE.search(text or ""):
+        try:
+            start_undo(db, f)
+        except OfficeAgentError as exc:
+            return str(exc)
+        return "Aakhri badlav wapas le raha hoon." if hi else "Undoing the last change."
+    ops = [op for op, rx in CHAT_OPS if rx.search(text or "")]
+    if not ops and ALL_RE.search(text or ""):
+        s = (loads(f.report, {}) or {}).get("summary", {})
+        ops = [op for key, op in (("spaces", "trim_spaces"), ("text_numbers", "text_to_number"), ("broken_refs", "fix_broken_refs"),
+                                  ("case_mixed", "fix_case"), ("duplicate_rows", "remove_duplicates")) if s.get(key)]
+        if not ops:
+            return "Is file mein theek karne layak kuch nahi bacha." if hi else "Nothing left to fix in this file."
+    if not ops:
+        return None
+    start_fix(db, f, ops)
+    names = {"trim_spaces": ("extra space", "extra spaces"), "remove_duplicates": ("duplicate rows", "duplicate rows"),
+             "fix_case": ("capital/small letters", "capital letters"), "text_to_number": ("text wale numbers", "text-numbers"),
+             "fix_broken_refs": ("toote formula", "broken formulas")}
+    what = ", ".join(names[o][0 if hi else 1] for o in ops)
+    return (f"{f.name} mein {what} theek kar raha hoon. Pichle badlav bhi saath rahenge." if hi
+            else f"Fixing {what} in {f.name}. Earlier changes stay in.")

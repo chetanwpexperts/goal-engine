@@ -430,9 +430,8 @@ def _fix_full(path, out, ops):
                         cell.number_format = "0%"
         if "remove_duplicates" in ops:
             _dedupe_sheet(wb, ws, log)
-    if CHANGES_SHEET in wb.sheetnames:
-        del wb[CHANGES_SHEET]
-    _changes_sheet(wb.create_sheet(CHANGES_SHEET), log)
+    had = CHANGES_SHEET in wb.sheetnames
+    _changes_sheet(wb[CHANGES_SHEET] if had else wb.create_sheet(CHANGES_SHEET), log, fresh=not had)
     wb.save(out)
     return {"changes": dict(log.counts), "formatting_kept": True}
 
@@ -489,7 +488,11 @@ def _fix_stream(path, out, ops):
             ws.append(row)
     if "fix_broken_refs" in ops:
         log.counts["broken_refs_need_small_file"] += 1
-    _changes_sheet(wb_out.create_sheet("Changes by Goal Engine"), log)
+    earlier = []
+    for name, rows in sheets(path, formulas=False):
+        if name == CHANGES_SHEET:
+            earlier = [r for i, r in enumerate(rows) if i > 0]
+    _changes_sheet(wb_out.create_sheet(CHANGES_SHEET), log, earlier)
     wb_out.save(out)
     return {"changes": dict(log.counts), "formatting_kept": False}
 
@@ -516,8 +519,12 @@ def _fix_csv(path, out, ops):
     return {"changes": dict(log.counts), "formatting_kept": True}
 
 
-def _changes_sheet(ws, log):
-    ws.append(["Kya kiya (what)", "Sheet", "Cell", "Pehle (before)", "Ab (after)"])
+def _changes_sheet(ws, log, earlier=(), fresh=True):
+    """The list of every change; a file fixed again keeps the earlier steps at the top."""
+    if fresh:
+        ws.append(["Kya kiya (what)", "Sheet", "Cell", "Pehle (before)", "Ab (after)"])
+    for r in earlier:
+        ws.append(list(r))
     for op, *rest in log.rows:
         ws.append([LABELS.get(op, op), *rest])
 

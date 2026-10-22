@@ -74,7 +74,7 @@ def test_compare_two_uploads(client, ml_mode):
     a = _wait(client, a["id"])
     res = a["result"]
     assert res["key"] == "Invoice No" and (res["only_in_a"], res["only_in_b"], res["changed_rows"]) == (1, 1, 1)
-    assert a["download"]
+    assert a["compare_download"]
 
 
 def test_files_are_private_and_cleaned(client, ml_mode):
@@ -147,3 +147,32 @@ def test_only_one_process_resumes(tmp_path):
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=str(__import__("pathlib").Path(o.__file__).parents[2]))
     assert out.stdout.strip() == "False", out.stderr
     held.close()
+
+
+def test_one_upload_many_tasks_from_chat_and_undo(client, ml_mode):
+    r = say(client, "meri excel file mein extra spaces hain, hata do")
+    goal_id = r["goal"]["id"]
+    agent = next(a for a in r["agents"] if a.get("office"))
+    rows = [(f"INV{i}", f" Cust  {i} ", i, "1,200" if i == 3 else 100) for i in range(1, 9)] + [("INV1", " Cust  1 ", 1, 100)]
+    f = _upload(client, agent["id"], _xlsx(rows))
+    token = f["id"]
+
+    r = say(client, "extra space hata do", goal_id)
+    assert "theek kar raha" in r["reply"] or "Fixing" in r["reply"], r["reply"]
+    f = _wait(client, token)
+    assert f["result"]["changes"]["trim_spaces"] >= 9 and f["report"]["summary"]["spaces"] == 0
+
+    r = say(client, "ab number wale text bhi theek karo", goal_id)
+    f = _wait(client, token)
+    assert len(f["steps"]) == 2 and f["report"]["summary"]["text_numbers"] == 0
+
+    d = client.get(f"/api/office/files/{token}/download")
+    wb = load_workbook(io.BytesIO(d.content))
+    ws = wb["Sales"]
+    assert ws["B2"].value == "Cust 1" and ws["D4"].value == 1200          # both tasks are in one file
+    changes = [r[0] for r in wb["Changes by Goal Engine"].iter_rows(min_row=2, values_only=True)]
+    assert any(c.startswith("Extra space") for c in changes) and any(c.startswith("Text ko number") for c in changes)
+
+    r = say(client, "undo karo", goal_id)
+    f = _wait(client, token)
+    assert len(f["steps"]) == 1 and f["report"]["summary"]["text_numbers"] == 1

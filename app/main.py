@@ -352,13 +352,25 @@ def office_compare(token: str, body: OfficeCompareIn, db: Session = Depends(get_
 
 
 @app.get("/api/office/files/{token}/download")
-def office_download(token: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+def office_download(token: str, what: str = "file", db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    """The latest version of the file (every fix so far), or the comparison report."""
     from app.agents import office_agent as oa
 
     f = _office_call(lambda: oa.own_file(db, token, visitor))
-    if not f.result_path or not os.path.exists(f.result_path):
+    if what == "compare":
+        path, name = f.result_path, f.result_name or "comparison.xlsx"
+    else:
+        path, name = (f.path if len(oa.steps(f)) > 1 else None), oa._named(f.name, "fixed")
+    if not path or not os.path.exists(path):
         raise HTTPException(404, "Not ready")
-    return FileResponse(f.result_path, filename=f.result_name or "result.xlsx", headers={"Cache-Control": "no-store"})
+    return FileResponse(path, filename=name, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/office/files/{token}/undo")
+def office_undo(token: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    from app.agents import office_agent as oa
+
+    return _office_call(lambda: oa.file_dict(oa.start_undo(db, oa.own_file(db, token, visitor))))
 
 
 @app.delete("/api/office/files/{token}")

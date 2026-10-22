@@ -107,7 +107,9 @@ HINGLISH_MARKERS = {
     "raha", "rahe", "rahi", "kar", "karna", "hoon", "bhi", "to", "main", "mujhe", "accha", "bahut",
     "kuch", "koi", "kab", "kyun", "dukaan", "hum", "humara", "apna", "abhi", "wala", "wali", "lagta",
     "chal", "aate", "aata", "jata", "jaye", "jae", "dono", "batao", "bata", "karo", "milta", "milega",
-    "mil", "gadi", "pata", "sab", "yaha", "waha", "kaam",
+    "mil", "gadi", "pata", "sab", "yaha", "waha", "kaam", "hatao", "hata", "jaise", "ek", "se", "ke", "banao", "nikalo",
+    "dikhao", "theek", "thik", "sirf", "wapas", "saare", "saari", "kitna", "kitne", "kaun", "kaunse", "kahan", "hua", "hui",
+    "gaya", "gayi", "kiya", "lo", "dena", "chahta", "chahti",
 }
 
 # Devanagari -> Hinglish letters, so spoken Hindi (which voice typing writes in Hindi script)

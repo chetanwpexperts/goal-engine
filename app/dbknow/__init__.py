@@ -84,3 +84,14 @@ def find_error(engine: str, message: str) -> dict | None:
 
 def slow_findings(engine: str, sql: str) -> list[dict]:
     return [r for r in load("slow_rules") if engine in r["engines"] and re.search(r["detect"], sql or "", re.I | re.S)]
+
+
+def stats() -> dict:
+    """For the home screen: how much the database agent knows, and when it last learned."""
+    total = sum(len(load(n)) for n in FILES)
+    updated = ""
+    log = HERE.parents[1] / "docs" / "db-knowledge" / "LOG.md"
+    if log.exists():
+        m = re.search(r"^## (\d{4}-\d{2}-\d{2})", log.read_text(encoding="utf-8"), re.M)
+        updated = m.group(1) if m else ""
+    return {"entries": total, "updated": updated}

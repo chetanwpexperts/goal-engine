@@ -314,6 +314,25 @@ def index() -> FileResponse:
     return FileResponse(STATIC / "index.html")
 
 
+READY_AGENTS = [("database", "Database agent", "Database agent"), ("website", "Website check", "Website check"),
+                ("reminders", "Reminders aur reports", "Reminders and reports"), ("sql", "SQL query checker", "SQL query checker"),
+                ("expert", "Expert se baat", "Talk to an expert")]
+
+
+@app.get("/api/status")
+def live_status(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    """The home screen's live strip: what's ready, what's running for you, what the machine learned."""
+    from app import dbknow
+    from sqlalchemy import select as _select
+
+    active = list(db.scalars(_select(Agent).where(Agent.visitor_id == visitor, Agent.status == "active")))
+    nxt = min((a.next_run_at for a in active if a.next_run_at), default=None)
+    conns = [{"name": c.name, "online": dbagent.is_online(c)} for c in dbagent.visitor_connectors(db, visitor)]
+    return {"ready": [{"key": k, "hi": hi, "en": en} for k, hi, en in READY_AGENTS],
+            "mine": {"active_agents": len(active), "next_run_at": nxt.isoformat() if nxt else None, "connections": conns},
+            "knowledge": dbknow.stats()}
+
+
 @app.get("/api/health")
 def health() -> dict:
     router: AIRouter = app.state.router

@@ -1193,6 +1193,42 @@
     }
   }
 
+  // ---------------------------------------------------------------- live status strip on the home screen
+  async function refreshStatus() {
+    const box = $("#status");
+    if (body.dataset.state !== "idle" || document.hidden) return;
+    let d;
+    try { d = await api("/api/status"); } catch (_) { return; }
+    const hi = lastLang !== "en";
+    const parts = [];
+    const ready = el("p", "st-line");
+    ready.append(el("span", "dot on"), el("span", null, d.ready.map((r) => (hi ? r.hi : r.en)).join(" · ") + T(hi, " — taiyar", " — ready")));
+    parts.push(ready);
+    const m = d.mine;
+    if (m.active_agents || m.connections.length) {
+      const bits = [];
+      if (m.active_agents) bits.push(T(hi, `${m.active_agents} agent chal rahe hain`, `${m.active_agents} agent${m.active_agents > 1 ? "s" : ""} running`));
+      if (m.next_run_at) bits.push(T(hi, "agla kaam ", "next run ") + new Date(`${m.next_run_at}Z`).toLocaleString("en-IN", { weekday: "short", hour: "2-digit", minute: "2-digit" }));
+      for (const c of m.connections.slice(0, 3)) bits.push(`${c.name} ${c.online ? T(hi, "juda hua", "connected") : "offline"}`);
+      const mine = el("p", "st-line");
+      mine.append(el("span", `dot ${m.active_agents ? "run" : "on"}`), el("span", null, bits.join(" · ")));
+      parts.push(mine);
+    }
+    if (d.knowledge.entries) {
+      const k = el("p", "st-line soft");
+      const when = d.knowledge.updated ? new Date(d.knowledge.updated).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "";
+      k.append(el("span", "dot learn"), el("span", null, T(hi, `Database knowledge: ${d.knowledge.entries} fixes aur rules${when ? ` · ${when} ko update` : ""}`,
+                                                            `Database knowledge: ${d.knowledge.entries} fixes and rules${when ? ` · updated ${when}` : ""}`)));
+      parts.push(k);
+    }
+    parts.push(el("p", "st-ask", T(hi, "Kuch bhi poocho — likho ya bolo.", "Ask anything — type or speak.")));
+    box.replaceChildren(...parts);
+    box.hidden = false;
+  }
+  refreshStatus();
+  setInterval(refreshStatus, 30000);
+  document.addEventListener("visibilitychange", refreshStatus);
+
   $("#composer").addEventListener("submit", (e) => { e.preventDefault(); sendMessage(input.value); });
   input.addEventListener("input", autosize);
   input.addEventListener("keydown", (e) => {

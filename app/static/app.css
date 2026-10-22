@@ -326,3 +326,20 @@ body[data-state="active"]::after { content: ""; position: fixed; left: 0; right:
 .check { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--ink); cursor: pointer; margin: 4px 0; }
 .check input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--ink); flex: none; }
 .act .undo { grid-column: 1 / -1; justify-content: flex-start; }
+
+/* expert hand-off */
+.expert { margin-top: 12px; }
+.expert-q { margin: 0 0 4px; font-weight: 600; color: var(--ink); }
+.expert-form { display: grid; gap: 10px; margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); max-width: 520px; }
+.expert-form .f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.expert-form input, .expert-form textarea { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fff; color: var(--ink); font: inherit; font-size: 15px; outline: none; }
+.expert-form textarea { min-height: 80px; resize: vertical; }
+.expert-form input:focus, .expert-form textarea:focus { border-color: var(--ink); }
+.expert-form .lbl { font-size: 13px; color: var(--muted); }
+.expert-form .f[hidden] { display: none; }
+.how { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 14px; cursor: pointer; color: var(--ink); }
+.pill[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.trap { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.expert-done { margin: 0; color: var(--ok); font-weight: 600; }
+.expert-link { margin: 4px 0 0; display: block; }

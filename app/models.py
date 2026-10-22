@@ -208,3 +208,25 @@ class ConnectorJob(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class ExpertRequest(Base):
+    """Someone asked for a human expert. Kept only to contact them; deleted on request or after 180 days."""
+
+    __tablename__ = "expert_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    visitor_id: Mapped[str] = mapped_column(String(64), index=True)
+    goal_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    topic: Mapped[str] = mapped_column(String(200))             # what Goal Engine understood (goal title)
+    intent: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    need: Mapped[str] = mapped_column(Text)                     # in the user's words
+    name: Mapped[str] = mapped_column(String(80))
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    contact: Mapped[str] = mapped_column(String(12), default="whatsapp")   # whatsapp / call / email
+    lang: Mapped[str] = mapped_column(String(4), default="hi")
+    status: Mapped[str] = mapped_column(String(12), default="new", index=True)   # new / talking / done / spam
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)            # Chetan's own note
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)

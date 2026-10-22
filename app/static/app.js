@@ -1063,6 +1063,19 @@
     for (const a of agents || []) {
       box.append(a.automation ? renderAutomation(a) : a.database ? renderDatabase(a) : a.db_report ? renderDbReport(a) : renderCheckAgent(a));
     }
+    if (agents && agents.length && currentGoalId) {
+      const hi = agents[0].lang !== "en";
+      const link = el("button", "linkish expert-link", T(hi, "Isme madad chahiye? Expert se baat karo", "Need a hand with this? Talk to an expert"));
+      link.type = "button";
+      link.addEventListener("click", () => {
+        const goal = { id: currentGoalId, title: (agents[0].name || "") };
+        const holder = el("div", "turn-machine");
+        holder.append(expertForm(goal, "", hi));
+        thread.append(holder);
+        holder.scrollIntoView({ block: "end", behavior: reduceMotion ? "auto" : "smooth" });
+      });
+      box.append(link);
+    }
     if (agents && agents[0]) lastLang = agents[0].lang;
   }
 
@@ -1084,6 +1097,67 @@
   }
 
   // ---------------------------------------------------------------- sending
+  // ---------------------------------------------------------------- a human expert, when no agent can do it
+  const expertAsked = new Set();
+
+  function expertOffer(goal, lastText, hi, always) {
+    const box = el("div", "expert");
+    if (expertAsked.has(goal.id) && !always) return box;
+    const q = el("p", "expert-q", always ? T(hi, "Kisi expert se baat karni hai?", "Want to talk to an expert?")
+                                         : T(hi, "Is kaam ke liye abhi agent nahi hai. Kisi expert se baat karni hai?", "There's no agent for this yet. Want to talk to an expert?"));
+    const yes = el("button", "btn solid", T(hi, "Haan, baat karni hai", "Yes, talk to an expert")); yes.type = "button";
+    const no = el("button", "btn", T(hi, "Abhi nahi", "Not now")); no.type = "button";
+    const row = el("div", "acts flat"); row.append(yes, no);
+    box.append(q, row);
+    no.addEventListener("click", () => box.remove());
+    yes.addEventListener("click", () => box.replaceChildren(expertForm(goal, lastText, hi)));
+    return box;
+  }
+
+  function expertForm(goal, lastText, hi) {
+    const form = el("form", "expert-form");
+    const field = (label, input) => { const l = el("label", "f"); l.append(el("span", null, label), input); return l; };
+    const need = el("textarea"); need.value = lastText || goal.title || ""; need.maxLength = 2000; need.required = true;
+    const name = el("input"); name.autocomplete = "name"; name.required = true; name.maxLength = 80;
+    const phone = el("input"); phone.type = "tel"; phone.autocomplete = "tel"; phone.placeholder = "98xxxxxxxx";
+    const email = el("input"); email.type = "email"; email.autocomplete = "email"; email.placeholder = "aap@email.com";
+    const how = el("div", "how");
+    let contact = "whatsapp";
+    const opts = [["whatsapp", "WhatsApp"], ["call", T(hi, "Call", "Call")], ["email", "Email"]];
+    for (const [v, label] of opts) {
+      const b = el("button", "pill", label); b.type = "button"; b.setAttribute("aria-pressed", String(v === contact));
+      b.addEventListener("click", () => {
+        contact = v;
+        for (const x of how.children) x.setAttribute("aria-pressed", String(x === b));
+        phoneField.hidden = v === "email"; emailField.hidden = v !== "email";
+      });
+      how.append(b);
+    }
+    const phoneField = field(T(hi, "Mobile number", "Mobile number"), phone);
+    const emailField = field("Email", email); emailField.hidden = true;
+    const trap = el("input"); trap.name = "website"; trap.tabIndex = -1; trap.autocomplete = "off"; trap.className = "trap"; trap.setAttribute("aria-hidden", "true");
+    const consentRow = el("label", "check");
+    const consent = el("input"); consent.type = "checkbox";
+    consentRow.append(consent, el("span", null, T(hi, "Chetan Sharma (Goal Engine) mujhse is baare mein contact kar sakte hain. Meri details sirf isi ke liye use hongi.",
+                                                    "Chetan Sharma (Goal Engine) may contact me about this. My details are used only for this.")));
+    const go = el("button", "btn go", T(hi, "Request bhejo", "Send request")); go.type = "submit";
+    const err = el("p", "note err"); err.hidden = true;
+    form.append(field(T(hi, "Aapko kya chahiye?", "What do you need?"), need), field(T(hi, "Aapka naam", "Your name"), name),
+                el("span", "lbl", T(hi, "Kaise baat karein?", "How should we reach you?")), how, phoneField, emailField, trap, consentRow, go, err);
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      go.disabled = true; err.hidden = true;
+      try {
+        await api("/api/expert", { method: "POST", body: JSON.stringify({ goal_id: goal.id, need: need.value, name: name.value,
+          phone: phone.value, email: email.value, contact, consent: consent.checked, website: trap.value }) });
+        expertAsked.add(goal.id);
+        form.replaceChildren(el("p", "expert-done", T(hi, `Request bhej di. Chetan aapse ${contact === "email" ? "email" : contact === "call" ? "call" : "WhatsApp"} pe jaldi baat karenge, aam taur pe kuch ghanton mein.`,
+                                                      `Request sent. Chetan will reach you on ${contact === "email" ? "email" : contact === "call" ? "a call" : "WhatsApp"} soon, usually within a few hours.`)));
+      } catch (ex) { err.textContent = ex.message; err.hidden = false; go.disabled = false; }
+    });
+    return form;
+  }
+
   async function sendMessage(text) {
     text = text.trim();
     if (!text) return;
@@ -1104,7 +1178,8 @@
         renderUnderstood(data.goal);
         renderAgents(data.agents || []);
       }
-      addMachine(data.reply, traceFor(data));
+      const box = addMachine(data.reply, traceFor(data));
+      if (data.offer_expert && data.goal) box.append(expertOffer(data.goal, text, data.goal.detected_language !== "English"));
       showOptions(data.options || []);
       wordTarget = data.ask_words || 0;
       updateWordcount();

@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.ai.router import AIRouter, AIUnavailable
 from app.ml.brain import Brain
 from app.agents import automation
-from app import privacy
+from app import expert, privacy
 from app.agents import database as dbagent
 from app.agents import direct as dbagent_direct
 from app.agents import phpconn
@@ -114,7 +114,8 @@ def _scheduler(stop: threading.Event) -> None:
 
 # ---------------------------------------------------------------- coming soon (closed until SITE_MODE=open)
 PREVIEW_COOKIE = "ge_preview"
-OPEN_PATHS = ("/api/health", "/api/connector/", "/connector/", "/robots.txt", "/preview", "/static/coming-soon.html")
+OPEN_PATHS = ("/api/health", "/api/connector/", "/connector/", "/robots.txt", "/preview", "/static/coming-soon.html",
+              "/admin", "/api/admin/")      # admin has its own key
 
 
 def _site_open() -> bool:
@@ -166,6 +167,36 @@ def preview(key: str = "") -> Response:
     return response
 
 
+# ---------------------------------------------------------------- expert hand-off
+ADMIN_COOKIE = "ge_admin"
+
+
+def _admin_token() -> str:
+    key = os.getenv("ADMIN_KEY", "")
+    return hmac.new(key.encode(), b"goal-engine-admin", "sha256").hexdigest() if len(key) >= 16 else ""
+
+
+def _is_admin(request: Request) -> bool:
+    token = _admin_token()
+    return bool(token) and hmac.compare_digest(request.cookies.get(ADMIN_COOKIE, ""), token)
+
+
+class ExpertIn(BaseModel):
+    goal_id: int | None = None
+    need: str = ""
+    name: str = ""
+    phone: str = ""
+    email: str = ""
+    contact: str = "whatsapp"
+    consent: bool = False
+    website: str = ""          # honeypot
+
+
+class ExpertUpdate(BaseModel):
+    status: str | None = None
+    note: str | None = None
+
+
 @app.middleware("http")
 async def visitor_cookie(request: Request, call_next):
     """Anonymous visitor id, so each person only ever sees their own goals."""
@@ -192,6 +223,54 @@ def own_goal(db: Session, goal_id: int, visitor: str) -> Goal:
     if not goal or goal.visitor_id != visitor:
         raise HTTPException(404, "Goal not found")
     return goal
+
+
+@app.post("/api/expert")
+def ask_expert(body: ExpertIn, request: Request, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    try:
+        req = expert.create(db, visitor, body.model_dump())
+    except expert.ExpertError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    expert.notify(req, mailer(), _public_base(request))
+    return {"ok": True, "request": expert.as_dict(req), "requests": expert.mine(db, visitor)}
+
+
+@app.get("/api/expert")
+def my_expert_requests(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    return {"requests": expert.mine(db, visitor)}
+
+
+@app.get("/admin")
+def admin_page(request: Request, key: str = "") -> Response:
+    from fastapi.responses import RedirectResponse
+
+    token = _admin_token()
+    if key:
+        response = RedirectResponse("/admin", status_code=303)
+        if token and hmac.compare_digest(hmac.new(key.encode(), b"goal-engine-admin", "sha256").hexdigest(), token):
+            response.set_cookie(ADMIN_COOKIE, token, max_age=60 * 60 * 24 * 30, httponly=True, samesite="strict",
+                                secure=get_settings().cookie_secure)
+        return response
+    if not _is_admin(request):
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    return FileResponse(STATIC / "admin.html", headers={"X-Robots-Tag": "noindex", "Cache-Control": "no-store"})
+
+
+@app.get("/api/admin/requests")
+def admin_requests(request: Request, status: str = "", db: Session = Depends(get_db)):
+    if not _is_admin(request):
+        raise HTTPException(404, "Not Found")
+    return {"requests": expert.all_requests(db, status)}
+
+
+@app.post("/api/admin/requests/{req_id}")
+def admin_update(req_id: int, body: ExpertUpdate, request: Request, db: Session = Depends(get_db)):
+    if not _is_admin(request):
+        raise HTTPException(404, "Not Found")
+    try:
+        return expert.as_dict(expert.update(db, req_id, body.status, body.note), admin=True)
+    except expert.ExpertError:
+        raise HTTPException(404, "Not Found")
 
 
 class MessageIn(BaseModel):

@@ -84,6 +84,9 @@ STEPS_LABELS = {"Khud karne ke steps dikhao": True, "Show me the steps instead":
 WATCH_LABELS = {"Haan, roz check karo": True, "Yes, check it daily": False}
 
 
+NO_EXPERT = {"health_symptom", "stress_burnout"}   # these get safety guidance and real professionals, not a sales offer
+
+
 def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: str, relation: str,
              options: list[str] | None = None, ask_words: int = 0, intent: str = "", confidence: float = 0.0,
              hi: bool = True) -> dict[str, Any]:
@@ -92,6 +95,7 @@ def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: 
                    intent=intent or None, confidence=confidence or None))
     db.add(Message(visitor_id=visitor_id, goal_id=gid, role="assistant", text=reply, relation=relation, provider="ml"))
     db.commit()
+    agents = [agent_dict(a, db, hi) for a in goal_agents(db, goal.id)] if goal else []
     return {
         "reply": reply,
         "relation": relation,
@@ -100,7 +104,9 @@ def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: 
         "provider": "ml",
         "options": options or [],
         "ask_words": ask_words,
-        "agents": [agent_dict(a, db, hi) for a in goal_agents(db, goal.id)] if goal else [],
+        "agents": agents,
+        "offer_expert": bool(goal is not None and not agents and relation in ("new_goal", "corrected", "update_goal")
+                             and (goal.intent or "") not in NO_EXPERT),
     }
 
 

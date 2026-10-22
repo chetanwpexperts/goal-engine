@@ -23,7 +23,7 @@ from pathlib import Path
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.models import (Agent, AgentRun, Connector, ConnectorJob, Goal, Message, OwnerContact, SentEmail, UsageCounter,
+from app.models import (Agent, AgentRun, Connector, ConnectorJob, ExpertRequest, Goal, Message, OwnerContact, SentEmail, UsageCounter,
                         dumps, loads, utcnow)
 
 DB_RESULT_TTL = timedelta(minutes=15)
@@ -102,6 +102,7 @@ def delete_visitor(db: Session, visitor_id: str) -> dict:
     counts["agents"] = db.execute(delete(Agent).where(Agent.visitor_id == visitor_id)).rowcount
     counts["email_log"] = db.execute(delete(SentEmail).where(SentEmail.visitor_id == visitor_id)).rowcount
     counts["email"] = db.execute(delete(OwnerContact).where(OwnerContact.visitor_id == visitor_id)).rowcount
+    counts["expert_requests"] = db.execute(delete(ExpertRequest).where(ExpertRequest.visitor_id == visitor_id)).rowcount
     counts["messages"] = db.execute(delete(Message).where(Message.visitor_id == visitor_id)).rowcount
     counts["goals"] = db.execute(delete(Goal).where(Goal.visitor_id == visitor_id)).rowcount
     db.execute(delete(UsageCounter).where(UsageCounter.scope == f"visitor:{visitor_id}"))
@@ -180,6 +181,9 @@ def maintain(db: Session, now=None) -> dict:
             result["details_removed"] = True
             run.result = dumps(result)
             done["runs"] += 1
+
+    # 2b. expert requests: 180 days
+    db.execute(delete(ExpertRequest).where(ExpertRequest.created_at < now - timedelta(days=180)))
 
     # 3. "already emailed" log
     done["sent_log"] = db.execute(delete(SentEmail).where(SentEmail.sent_at < now - SENT_LOG_TTL)).rowcount

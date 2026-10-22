@@ -104,7 +104,16 @@
     input.style.height = `${input.scrollHeight}px`;
     ghost.hidden = Boolean(input.value);
     updateWordcount();
+    placeBelow();
   }
+
+  // On the home page, the status line and the brain tiles always sit just under the input, however tall it grows.
+  function placeBelow() {
+    const r = document.getElementById("composer").getBoundingClientRect();
+    document.documentElement.style.setProperty("--below", `${Math.round(r.bottom)}px`);
+  }
+  window.addEventListener("resize", placeBelow);
+  requestAnimationFrame(placeBelow);
 
   function updateWordcount() {
     if (!wordTarget) { wordcount.hidden = true; return; }

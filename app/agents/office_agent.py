@@ -230,6 +230,15 @@ def _work(file_id: int, task: str, args: dict) -> None:
                 f.versions, f.path = dumps(st), out
                 f.result = dumps({"task": "fix", **res})
                 f.report = dumps(office.scan(out))
+            elif task == "extract":
+                st = steps(f)
+                root, ext = os.path.splitext(st[0]["path"])
+                res = office.extract_duplicates(f.path, f"{root}.v{len(st)}{ext}", args.get("sheets") or None)
+                out = res.pop("out")
+                st.append({"path": out, "ops": ["list_duplicates"], "changes": {"list_duplicates": res["count"]}})
+                f.versions, f.path = dumps(st), out
+                f.result = dumps({"task": "extract", **res})
+                f.report = dumps(office.scan(out))
             elif task == "undo":
                 st = steps(f)
                 if len(st) > 1:
@@ -355,8 +364,8 @@ OP_WORDS = {
 }
 FIND_WORDS = {"find", "show", "check", "list", "dhoondo", "dhundo", "dhoond", "dhund", "dikhao", "dikha", "batao", "bata", "kitne",
               "kitni", "kaun", "kaunse", "konse", "kahan", "where", "which", "how", "many", "any", "pata", "highlight", "search"}
-DO_WORDS = {"remove", "delete", "hatao", "hata", "hatado", "fix", "theek", "thik", "saaf", "clean", "correct", "sudharo",
-            "badlo", "merge", "drop", "nikaal", "nikal"}
+DO_WORDS = {"remove", "delete", "hatao", "hata", "hatado", "hataye", "hatana", "fix", "theek", "thik", "saaf", "clean", "correct",
+            "sudharo", "badlo", "drop", "mitao", "delete karo"}
 YES_RE = re.compile(r"^\s*(haan|ha|haa|han|yes|yep|ok|okay|theek hai|thik hai|kar do|karo|hata do|hatao|do it|go ahead|please)\b", re.I)
 UNDO_RE = re.compile(r"\b(undo|wapas|vapas|pehle jaisa|revert|purana wala)\b", re.I)
 ALL_RE = re.compile(r"\b(sab|saari|saare|everything|all)\b.{0,20}\b(theek|thik|fix|saaf|clean)", re.I)
@@ -398,6 +407,13 @@ def sheets_in(text: str, report: dict) -> list[str]:
         if key and all(any(w == k or _close(w, [k]) for w in ws) for k in key):
             out.append(name)
     return out
+
+
+def wants_do(text: str) -> bool:
+    """Only a clear 'remove / fix / hatao' changes the data. Anything else just finds and shows."""
+    ws = _words(text)
+    return any(w in DO_WORDS or _close(w, DO_WORDS) for w in ws) and not re.search(
+        r"\b(alag|separate|new sheet|nayi sheet|list|report|dikhao|check)\b", text or "", re.I)
 
 
 def wants_find(text: str) -> bool:
@@ -483,7 +499,26 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
         return _answer(agent, report, ops, sheets, hi, f)
     if not ops:
         return None
-    if wants_find(text):
+    if ops == ["remove_duplicates"] and not wants_do(text):
+        # "duplicates dhund ke do", "alag sheet mein daalo": list them in a new sheet, delete nothing
+        _set_offer(agent, {"ops": ["remove_duplicates"], "sheets": sheets})
+        where = f" ({', '.join(sheets)})" if sheets else ""
+        if f.size <= BIG:                        # small file: do it now and answer with the result
+            f.status, f.task, f.args = "queued", "extract", dumps({"sheets": sheets})
+            db.commit()
+            _work(f.id, "extract", {"sheets": sheets})
+            db.refresh(f)
+            r = loads(f.result, {}) or {}
+            if f.status == "ready" and r.get("task") == "extract":
+                return _extract_reply(f, r, sheets, report, hi)
+        _start(db, f, "extract", {"sheets": sheets})
+        return (f"{f.name}{where} ke saare duplicate ek nayi sheet \"Duplicates (Goal Engine)\" mein daal raha hoon: kaunsi row, "
+                "kis row jaisi, aur kaunsa ID/invoice/email do baar aaya. Aapka data nahi badlega. Ready hote hi card pe Download karo. "
+                "Baad mein hatane hain to 'duplicate hatao' likho." if hi else
+                f"Putting every duplicate in {f.name}{where} into a new sheet \"Duplicates (Goal Engine)\": which row, which row it repeats, "
+                "and any ID/invoice/email used twice. Your data isn't changed. Download it from the card when it's ready. "
+                "To remove them later, type 'remove duplicates'.")
+    if not wants_do(text):
         return _answer(agent, report, ops, sheets, hi, f)
     return _doing(start_fix(db, f, ops, sheets), ops, sheets, hi)
 
@@ -531,3 +566,24 @@ def cant_yet(f: OfficeFile, hi: bool) -> str:
             "tab tak inmein se koi kaam bolo." if hi else
             f"{f.name} is open. Right now I can find and fix extra spaces, duplicate rows, mixed capitals, numbers saved as text, "
             "broken formulas, and compare with another file. I'm still learning this one; meanwhile ask for any of those.")
+
+
+def _extract_reply(f: OfficeFile, r: dict, sheets: list[str], report: dict, hi: bool) -> str:
+    where = ", ".join(sheets) if sheets else f.name
+    if not r["count"]:
+        msg = f"{where} mein koi duplicate nahi mila." if hi else f"No duplicates in {where}."
+        if sheets:                                           # say where they ARE, if anywhere
+            other = [f"{s['name']}: {s['duplicate_rows']}" for s in report.get("sheets", []) if s.get("duplicate_rows") and s["name"] not in sheets]
+            if other:
+                msg += (f" Doosri sheets mein hain ({', '.join(other)}). 'poori file ke duplicate dikhao' likho." if hi
+                        else f" Other sheets have some ({', '.join(other)}). Type 'show duplicates in the whole file'.")
+        return msg
+    parts = []
+    for g in r["groups"][:5]:
+        parts.append((f"{g['sheet']}: {g['count']} poori rows do baar" if hi else f"{g['sheet']}: {g['count']} whole rows repeated")
+                     if g["what"] == "row" else
+                     (f"{g['sheet']}: {g['count']} baar same {g['what']}" if hi else f"{g['sheet']}: same {g['what']} {g['count']} times"))
+    return ((f"{r['count']} duplicate mile ({'; '.join(parts)}). Sab ek nayi sheet \"Duplicates (Goal Engine)\" mein daal diye: kaunsi row, "
+             "kis row jaisi. Aapka data nahi badla. Card pe Download karo. Hatane hain to 'duplicate hatao' likho.") if hi else
+            (f"Found {r['count']} duplicates ({'; '.join(parts)}). They're all in a new sheet \"Duplicates (Goal Engine)\": which row, "
+             "and which row it repeats. Your data wasn't changed. Download it from the card. To remove them, type 'remove duplicates'."))

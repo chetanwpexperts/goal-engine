@@ -189,11 +189,17 @@ def test_find_in_a_named_sheet_with_typos_then_yes(client, ml_mode):
     data = (Path(__file__).parent / "data" / "practice.xlsx").read_bytes()
     f = _upload(client, agent["id"], data, "Excel_Practice.xlsx")
 
-    r = say(client, "can you find dupicate entries from slaes sheet", goal_id)
-    reply = r["reply"]
-    assert "Sales Data" in reply and "Messy Data" in reply and ("yes" in reply or "haan" in reply), reply
+    r = say(client, "can you find dupicate entries", goal_id)
     card = next(a for a in r["agents"] if a.get("office"))
     assert card["formula"] is None                                  # no formula homework while the file is open
+    f = _wait(client, f["id"])
+    res = f["result"]
+    assert res["task"] == "extract" and res["rows"] == 2 and res["values"] == 0   # Item Code / Invoice No. repeat normally there
+    assert f["report"]["summary"]["duplicate_rows"] == 2           # listing changed nothing
+    wb = load_workbook(io.BytesIO(client.get(f"/api/office/files/{f['id']}/download").content))
+    assert wb.sheetnames[0] == "Duplicates (Goal Engine)"
+    listed = list(wb["Duplicates (Goal Engine)"].iter_rows(min_row=2, values_only=True))
+    assert ("Messy Data", 6, 2) in [r[:3] for r in listed]
 
     r = say(client, "yes", goal_id)
     assert "Fixing" in r["reply"] or "theek kar raha" in r["reply"], r["reply"]
@@ -213,3 +219,22 @@ def test_only_the_named_sheet_changes(client, ml_mode):
     f = _wait(client, f["id"])
     assert f["result"]["changes"].get("fix_case") == 4
     say(client, "kya galat hai is file mein?", goal_id)
+
+
+def test_chetans_hinglish_requests_never_delete(client, ml_mode):
+    from pathlib import Path
+
+    r = say(client, "muje excel sheet me kaam krna hai")
+    goal_id = r["goal"]["id"]
+    agent = next(a for a in r["agents"] if a.get("office"))
+    f = _upload(client, agent["id"], (Path(__file__).parent / "data" / "practice.xlsx").read_bytes(), "Excel_Practice.xlsx")
+    r = say(client, "muje sales sheet me duplicates dhund k do", goal_id)
+    assert "Sales Data mein koi duplicate nahi" in r["reply"] and "Messy Data: 2" in r["reply"], r["reply"]
+    for text in ("muej alag se sheet me do dalke muje chekc krna hai kon c values duplicate hai", "poori file ke duplicate dikhao"):
+        r = say(client, text, goal_id)
+        assert "2 duplicate mile" in r["reply"] and "Duplicates (Goal Engine)" in r["reply"], (text, r["reply"])
+        f = _wait(client, f["id"])
+        assert f["result"]["task"] == "extract" and f["report"]["summary"]["duplicate_rows"] == 2, text
+    r = say(client, "duplicate hatao", goal_id)
+    f = _wait(client, f["id"])
+    assert f["report"]["summary"]["duplicate_rows"] == 0

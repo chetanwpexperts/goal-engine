@@ -1168,6 +1168,7 @@
       trim_spaces: T(hi, "cells se extra space hataye", "cells cleaned of extra spaces"),
       remove_duplicates: T(hi, "duplicate rows hatayi", "duplicate rows removed"),
       fix_case: T(hi, "cells mein capital/small letters ek jaise kiye", "cells made to use the same spelling"),
+      list_duplicates: T(hi, "duplicate nayi sheet mein list kiye (data nahi badla)", "duplicates listed in a new sheet (data unchanged)"),
     };
     let watching = "";
 
@@ -1192,6 +1193,15 @@
         if (c.broken_refs_left) parts.push(el("p", "note", T(hi, `${c.broken_refs_left} toote formula ka koi saaf pattern nahi mila; inhe khud dekhna padega.`, `${c.broken_refs_left} broken formulas had no clear pattern to rebuild from.`)));
         if (c.duplicates_skipped_sheets) parts.push(el("p", "note", T(hi, "Jin sheets mein formula hain wahan duplicate rows nahi hatayi, taaki formula na toote.", "Duplicates weren't removed on sheets with formulas, so no formula breaks.")));
         if (r.task === "fix" && r.formatting_kept === false) parts.push(el("p", "note", T(hi, "Badi file thi, isliye values aur formula rakhe hain, rang/format nahi.", "Big file: values and formulas are kept, colours and formatting aren't.")));
+      }
+      if (r.task === "extract") {
+        parts.push(el("p", "cap", T(hi, `Duplicates nayi sheet mein: ${fmt(r.count)}`, `Duplicates in a new sheet: ${fmt(r.count)}`)));
+        const ul = el("ul", "findings done");
+        for (const g of r.groups || []) ul.append(el("li", null, g.what === "row"
+          ? T(hi, `${g.sheet}: ${fmt(g.count)} rows poori ki poori do baar`, `${g.sheet}: ${fmt(g.count)} whole rows repeated`)
+          : T(hi, `${g.sheet}: ${fmt(g.count)} baar same ${g.what}`, `${g.sheet}: same ${g.what} used ${fmt(g.count)} more times`)));
+        if (!r.count) ul.append(el("li", null, T(hi, "Koi duplicate nahi mila.", "No duplicates found.")));
+        parts.push(ul, el("p", "fine small", T(hi, "Aapka data nahi badla. \"Duplicates (Goal Engine)\" sheet file ki pehli sheet hai.", "Your data wasn't changed. The \"Duplicates (Goal Engine)\" sheet is the first sheet in the file.")));
       }
       if (r.task === "undo") parts.push(el("p", "fine", T(hi, "Aakhri badlav wapas le liya.", "The last change was undone.")));
       if (r.task === "compare") {

@@ -196,7 +196,7 @@ def scan(path: str) -> dict:
     report = {"kind": kind_of(path), "size": os.path.getsize(path), "sheets": []}
     shapes: dict = {}
     for name, rows in sheets(path, formulas=True):
-        if name == CHANGES_SHEET:
+        if name in (CHANGES_SHEET, "Duplicates (Goal Engine)"):
             continue
         info = {"name": name, "rows": 0, "columns": 0, "header": [], "formulas": 0, "broken_refs": [],
                 "odd_formulas": [], "errors": {}, "text_numbers": 0, "text_number_cells": [], "spaces": 0,
@@ -407,7 +407,7 @@ def _fix_full(path, out, ops, only_sheets=None):
                 if n >= 3 and n / sum(counter.values()) >= 0.6:
                     shapes[(ws.title, c)] = main
     for ws in wb.worksheets:
-        if ws.title == CHANGES_SHEET or (only_sheets and ws.title not in only_sheets):
+        if ws.title in (CHANGES_SHEET, "Duplicates (Goal Engine)") or (only_sheets and ws.title not in only_sheets):
             continue
         maps = case_maps(ws.iter_rows(values_only=True)) if "fix_case" in ops else {}
         for row in ws.iter_rows():
@@ -433,6 +433,8 @@ def _fix_full(path, out, ops, only_sheets=None):
                         cell.number_format = "0%"
         if "remove_duplicates" in ops:
             _dedupe_sheet(wb, ws, log)
+    if "remove_duplicates" in ops and "Duplicates (Goal Engine)" in wb.sheetnames and log.counts.get("remove_duplicates"):
+        del wb["Duplicates (Goal Engine)"]               # the list is out of date once they're removed
     had = CHANGES_SHEET in wb.sheetnames
     _changes_sheet(wb[CHANGES_SHEET] if had else wb.create_sheet(CHANGES_SHEET), log, fresh=not had)
     wb.save(out)
@@ -474,6 +476,10 @@ def _fix_stream(path, out, ops, only_sheets=None):
         if name == CHANGES_SHEET:
             continue
         ws = wb_out.create_sheet(name)
+        if name == "Duplicates (Goal Engine)":
+            for row in rows:
+                ws.append(list(row or ()))
+            continue
         if only_sheets and name not in only_sheets:
             for row in rows:
                 ws.append(list(row or ()))
@@ -534,6 +540,88 @@ def _changes_sheet(ws, log, earlier=(), fresh=True):
         ws.append(list(r))
     for op, *rest in log.rows:
         ws.append([LABELS.get(op, op), *rest])
+
+
+# ------------------------------------------------------------------ find duplicates and put them in their own sheet (changes nothing)
+DUP_SHEET = "Duplicates (Goal Engine)"
+_KEYCOL = re.compile(r"(\bid\b|\bno\.?$|\bnumber\b|\bcode\b|e-?mail|invoice|phone|mobile|sku|pan\b|gst|aadhaar|roll)", re.I)
+
+
+def find_duplicates(path: str, only_sheets=None) -> list[dict]:
+    """Two kinds: the same whole row twice, and the same ID / invoice / email used on more than one row."""
+    found = []
+    for name, rows in sheets(path, formulas=False):
+        if name in (CHANGES_SHEET, DUP_SHEET) or (only_sheets and name not in only_sheets):
+            continue
+        header, seen, keys, keycols, vals = None, {}, defaultdict(dict), [], defaultdict(list)
+        for r_i, row in enumerate(rows, start=1):
+            row = list(row or ())
+            if header is None:
+                header = [clean_spaces(str(h)) if h is not None else "" for h in row]
+                keycols = [i for i, h in enumerate(header) if h and _KEYCOL.search(h) and not _ROWNO.match(h)
+                           and not re.search(r"date|time|status|type|category", h, re.I)]
+                continue
+            if not any(v not in (None, "") for v in row):
+                continue
+            h = hash(row_key(header, row))
+            if h in seen:
+                found.append({"sheet": name, "row": r_i, "same_as": seen[h], "kind": "row", "column": "", "value": ""})
+                continue
+            seen[h] = r_i
+            for i in keycols:
+                v = row[i] if i < len(row) else None
+                if v not in (None, "") and len(vals[i]) < 2_000_000:
+                    vals[i].append((r_i, v))
+        # an ID column is one where almost every value is different; a few repeats there are real duplicates.
+        # (Item Code repeating on every purchase is normal, so it's not checked.)
+        for i, items in vals.items():
+            distinct = len({clean_spaces(str(v)).lower() for _, v in items})
+            if not items or distinct / len(items) < 0.9:
+                continue
+            first = {}
+            for r_i, v in items:
+                k = clean_spaces(str(v)).lower()
+                if k in first:
+                    found.append({"sheet": name, "row": r_i, "same_as": first[k], "kind": "value", "column": header[i], "value": str(v)})
+                else:
+                    first[k] = r_i
+    return found
+
+
+def extract_duplicates(path: str, out: str, only_sheets=None) -> dict:
+    """A copy of the file with one new sheet listing every duplicate. Nothing else changes."""
+    found = find_duplicates(path, only_sheets)
+    if kind_of(path) == "xlsx" and os.path.getsize(path) <= FULL_MODE_MAX:
+        wb = load_workbook(path, keep_vba=path.lower().endswith(".xlsm"))
+        if DUP_SHEET in wb.sheetnames:
+            del wb[DUP_SHEET]
+        ws = wb.create_sheet(DUP_SHEET, 0)
+    else:
+        wb = Workbook(write_only=True)
+        ws = wb.create_sheet(DUP_SHEET)
+        if kind_of(path) == "xlsx":
+            for name, rows in sheets(path, formulas=True):
+                if name == DUP_SHEET:
+                    continue
+                copy = wb.create_sheet(name)
+                for row in rows:
+                    copy.append(list(row or ()))
+        else:
+            copy = wb.create_sheet("Data")
+            for row in _csv_rows(path):
+                copy.append(row)
+        out = os.path.splitext(out)[0] + ".xlsx"
+    ws.append(["Sheet", "Row", "Same as row", "Kya same hai (what repeats)", "Column", "Value"])
+    for d in found:
+        what = "Poori row (whole row)" if d["kind"] == "row" else f"Same {d['column']}"
+        ws.append([d["sheet"], d["row"], d["same_as"], what, d["column"], d["value"]])
+    if not found:
+        ws.append(["Koi duplicate nahi mila (no duplicates found)"])
+    wb.save(out)
+    by = Counter((d["sheet"], d["kind"] if d["kind"] == "row" else d["column"]) for d in found)
+    return {"out": out, "count": len(found), "rows": sum(1 for d in found if d["kind"] == "row"),
+            "values": sum(1 for d in found if d["kind"] == "value"),
+            "groups": [{"sheet": sh, "what": w, "count": n} for (sh, w), n in by.most_common(12)]}
 
 
 # ------------------------------------------------------------------ compare two sheets / files

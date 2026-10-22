@@ -16,14 +16,20 @@ from functools import lru_cache
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ENGINES = {"mysql", "mariadb", "postgres", "sqlite", "sqlserver", "oracle"}
-FILES = ("errors", "questions", "slow_rules", "structure")
+ENGINES = {"mysql", "mariadb", "postgres", "sqlite", "sqlserver", "oracle", "mongodb", "redis", "db2", "cockroachdb",
+           "cassandra", "dynamodb", "elasticsearch", "firebird", "clickhouse", "any"}
+FILES = ("errors", "questions", "slow_rules", "structure", "issues")
+CATEGORIES = {"connection", "performance", "locking", "errors", "charset_encoding", "timezone", "storage_space", "backup_restore",
+              "replication", "security_permissions", "schema_design", "migration_upgrade", "config_tuning", "orm_framework",
+              "data_quality", "memory", "crash_recovery", "query_writing"}
 
 REQUIRED = {
     "errors": {"id", "engines", "code", "match", "title_en", "title_hi", "explain_en", "explain_hi", "fix", "source"},
     "questions": {"id", "intent", "examples", "needs", "templates", "source"},
     "slow_rules": {"id", "engines", "detect", "title_en", "title_hi", "fix_en", "fix_hi", "source"},
     "structure": {"id", "kind", "rule", "explain_en", "explain_hi", "source"},
+    # A playbook: how people describe it -> what the machine checks itself -> causes -> fixes -> how to prove it's fixed
+    "issues": {"id", "engines", "category", "symptoms", "diagnose", "causes", "fixes", "verify", "source"},
 }
 FIX_TYPES = {"advice", "closest_column", "closest_table", "qualify_column", "retry", "add_group_by", "cast", "limit"}
 
@@ -66,6 +72,20 @@ def validate() -> list[str]:
                         problems.append(f"{where}: bad regex in {key}: {exc}")
             if name == "errors" and e["fix"].get("type") not in FIX_TYPES:
                 problems.append(f"{where}: fix.type must be one of {sorted(FIX_TYPES)}")
+            if name == "issues":
+                if e["category"] not in CATEGORIES:
+                    problems.append(f"{where}: category must be one of {sorted(CATEGORIES)}")
+                if len(e["symptoms"]) < 3:
+                    problems.append(f"{where}: give at least 3 ways people describe it (English and Hinglish)")
+                cause_ids = {c.get("id") for c in e["causes"]}
+                for d in e["diagnose"]:
+                    if d.get("sql") and not re.match(r"^\s*(select|with|show|explain)\b", d["sql"], re.I):
+                        problems.append(f"{where}: diagnose queries must be read-only")
+                for f in e["fixes"]:
+                    if f.get("cause") not in cause_ids:
+                        problems.append(f"{where}: fix points to unknown cause {f.get('cause')}")
+                    if f.get("action") not in ("approved_change", "config", "advice", "code"):
+                        problems.append(f"{where}: fix.action must be approved_change/config/advice/code")
             if name == "questions":
                 for eng, tpl in e["templates"].items():
                     if eng not in ENGINES:

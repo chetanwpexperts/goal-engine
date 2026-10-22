@@ -1,6 +1,26 @@
 # Database knowledge backlog
 
 Work top to bottom, one item per run. Tick `[x]` when done (and note it in LOG.md).
+Stack Overflow / DBA Stack Exchange show which problems are most common for each item; official docs are the truth.
+
+## Issue playbooks, MySQL/MariaDB + PostgreSQL first  (issues.json, 10-20 playbooks per item)
+- [ ] Connection: refused, timeout, too many connections (done: 1), gone away / server closed the connection, SSL required, auth plugin, pg_hba, max_user_connections
+- [ ] Performance: site suddenly slow, one page slow, CPU 100%, high disk IO, slow after data grew, slow COUNT(*), slow LIKE search, slow ORDER BY + LIMIT, slow JOIN, temp tables on disk
+- [ ] Locking: deadlocks, lock wait timeout, long-running transaction blocking, metadata lock on ALTER, idle in transaction
+- [ ] Charset/encoding: ???? (done: 1), mixed collations "Illegal mix of collations", emoji, CSV import garbled, sorting wrong for Hindi
+- [ ] Timezone: dates off by 5:30, NOW() vs UTC, DST, TIMESTAMP vs DATETIME
+- [ ] Storage: disk full, table bigger than data (fragmentation), binlog/WAL filling disk, huge log tables, temp space
+- [ ] Backup/restore: mysqldump/pg_dump errors, restore fails, partial restore of one table, point-in-time recovery, backup too slow
+- [ ] Security/permissions: access denied variants, grant read-only user, remove root remote access, password policy, SQL injection signs
+- [ ] Schema design: no primary key, no foreign keys, EAV/meta tables, wrong types, NULL handling, soft deletes, big VARCHAR/TEXT
+- [ ] Migration/upgrade: MySQL 5.7 -> 8 breaking changes, MariaDB vs MySQL differences, PostgreSQL major upgrade, Laravel migration failures
+- [ ] Config tuning: innodb_buffer_pool_size, shared_buffers/work_mem, max_connections vs RAM, query cache (removed in 8.0)
+- [ ] ORM/framework: Laravel N+1, Eloquent slow queries, WordPress slow admin (wp_options autoload), WooCommerce order queries, CodeIgniter
+- [ ] Replication: replica lag, replication stopped, duplicate key on replica
+- [ ] Data quality: duplicates, orphans, bad dates, trailing spaces, inconsistent case
+- [ ] Crash/recovery: table marked as crashed, InnoDB recovery, corrupted index, PostgreSQL won't start
+- [ ] Memory: out of memory kills, too much RAM per connection, sort/join buffers
+- [ ] Query writing: how to do X in SQL (pivot, running total, top N per group, gaps and islands, upsert, delete duplicates keeping one)
 
 ## Errors -> plain words -> fix  (errors.json)
 - [ ] MySQL/MariaDB: the 40 most common server errors (syntax 1064, access 1045/1142/1227, duplicate key 1062, foreign key 1451/1452, data too long 1406, incorrect value 1366/1292, deadlock 1213, lock wait 1205, too many connections 1040, gone away 2006/2013, ONLY_FULL_GROUP_BY 1055, divide by zero, out of range 1264, ...)
@@ -37,6 +57,14 @@ Work top to bottom, one item per run. Tick `[x]` when done (and note it in LOG.m
 
 ## Ideas from well-known database tools (write our own rules; MIT/Apache only if copying)
 - [ ] MySQLTuner checks -> health rules; pt-query-digest / pgBadger report sections -> daily report ideas; SQL linter anti-patterns -> slow_rules
+
+## Every other database (errors + playbooks + structure queries + question templates)
+- [ ] SQL Server (T-SQL): common errors, playbooks (blocking, tempdb, log full, parameter sniffing), sys.* catalog queries
+- [ ] Oracle: ORA- errors, playbooks (tablespace full, ORA-01555, sessions), data dictionary
+- [ ] SQLite: database is locked, file corruption, WAL mode, size growth
+- [ ] MongoDB: slow queries without index, connection pool, duplicate key, schema validation, aggregation memory limit
+- [ ] Redis: OOM / maxmemory, eviction, keys growing, persistence (RDB/AOF), latency
+- [ ] Others as Stack Overflow shows demand: CockroachDB, ClickHouse, Elasticsearch, DynamoDB, Cassandra, DB2
 
 ## Later: more database engines
 - [ ] SQL Server: error numbers, catalog queries (sys.tables, sys.columns, sys.indexes), DMVs for live view, templates in T-SQL

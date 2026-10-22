@@ -5,11 +5,21 @@ A scheduled session adds to it every night. These rules are for that session (an
 
 ## Sources
 - **Truth comes from official documentation** (dev.mysql.com, mariadb.com/kb, postgresql.org/docs, learn.microsoft.com, docs.oracle.com, sqlite.org). Every entry's `source` is an official page.
-- **Stack Overflow / DBA Stack Exchange: to find WHAT real people get stuck on**, never to copy. Read questions to pick the most common real problems, then write our own entry from the official docs.
+- **Stack Overflow / DBA Stack Exchange are the teacher**: the best map of the real problems developers hit, for every database. Use them to discover the variety of issues, how people describe them, what the causes turned out to be, and which fixes worked; then write OUR OWN entry, checked against the official docs. Never copy answer text or code. Read questions to pick the most common real problems, then write our own entry from the official docs.
   Put the question links in the optional `seen_at` list. Never copy answer text or code (CC BY-SA would then apply to Goal Engine). Don't scrape in bulk; read pages normally.
 - **GitHub: facts and ideas, not code.**
   - Table structures of popular software (WordPress core, WooCommerce, Laravel defaults, Magento, Django auth, OpenCart, PrestaShop) are facts: record them in `structure.json` as recognisers ("this table set = WooCommerce").
   - Well-known database tools (MySQLTuner, pt-query-digest, pgBadger, SQL linters) show which problems are worth detecting: write our own rules. Copy text/code only from MIT/Apache/BSD projects with the license noted in the entry, and **never from GPL/AGPL projects**.
+
+- **Other good sites** (Percona, PlanetScale, Cybertec, Crunchy Data, Use The Index Luke, vendor blogs): ideas only, written in our own words, cited in `seen_at`.
+- **Your own experience as Claude** with the database questions people ask every day counts too: write it as our own entry, but every claim must match an official doc (`source`).
+
+## Goal
+One place where anyone can get ANY database problem solved without AI, for every database
+(MySQL, MariaDB, PostgreSQL, SQL Server, Oracle, SQLite, MongoDB, Redis and more).
+The most useful entry is an **issue playbook** (`issues.json`): how people describe it (English + Hinglish, at least 3 ways),
+the read-only checks the agent runs by itself to find the cause, the possible causes, the fix for each cause,
+and how to prove it's fixed.
 
 ## Never
 - Never look at, connect to, or collect anything from any user's database or Goal Engine's production data.

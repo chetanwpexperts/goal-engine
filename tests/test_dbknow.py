@@ -57,3 +57,18 @@ def test_templates_run_read_only(engine, port, cfg):
             continue
         sql = tpl.format(**{k: SAMPLE.get(k, "id") for k in re.findall(r"{(\w+)}", tpl)})
         db.query(sql, 50)          # raises if the template is broken or not read-only
+
+
+@pytest.mark.parametrize("engine,port,cfg", [
+    ("mysql", 3306, {"type": "mysql", "host": "127.0.0.1", "port": "3306", "database": "shop_db", "user": "shopapp", "password": "app pass"}),
+    ("postgres", 5432, {"type": "postgres", "host": "127.0.0.1", "port": "5432", "database": "shop_pg", "user": "shopapp", "password": "app pass"}),
+])
+def test_playbook_checks_run_read_only(engine, port, cfg):
+    """Every automatic check in an issue playbook must run, read-only, on a real database."""
+    if not _up(port):
+        pytest.skip(f"needs local {engine}")
+    db = gc.Database(cfg).connect()
+    for issue in dbknow.load("issues"):
+        for d in issue["diagnose"]:
+            if d.get("engine") == engine and d.get("sql"):
+                db.rows(gc.safe_sql(d["sql"]))

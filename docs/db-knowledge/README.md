@@ -12,6 +12,11 @@ A scheduled session adds to it every night. These rules are for that session (an
   - Well-known database tools (MySQLTuner, pt-query-digest, pgBadger, SQL linters) show which problems are worth detecting: write our own rules. Copy text/code only from MIT/Apache/BSD projects with the license noted in the entry, and **never from GPL/AGPL projects**.
 
 - **Other good sites** (Percona, PlanetScale, Cybertec, Crunchy Data, Use The Index Luke, vendor blogs): ideas only, written in our own words, cited in `seen_at`.
+- **Real incidents and post-mortems** (AWS / Azure / Google Cloud post-event summaries, GitLab's 2017 database incident write-up, GitHub, Uber, Shopify, Cloudflare engineering blogs): the best teacher for big failures (replication lag, split brain, failover, backups that didn't restore, cascading outages). Ideas only, our own words, cited in `seen_at`.
+- **Database hubs** (DbVisualizer "The Table", Sematext, Percona, Planet MySQL / Planet PostgreSQL): ideas only, cited in `seen_at`.
+- **Practice platforms** (LeetCode Database, HackerRank SQL): their problems are copyrighted. Use them only to learn WHICH kinds of query questions people struggle with (top N per group, running totals, gaps and islands, ...), then write our own question templates. Never copy a problem or its solution.
+- **Forums** (Reddit r/Database, r/SQL, r/PostgreSQL, r/mysql, r/Wordpress): how real people describe problems and which fixes worked. Ideas and wording only, never copied posts.
+- **Security** (OWASP, CISA advisories, MySQL/PostgreSQL security docs, WordPress.org hardening guide, vendor incident-response guides): for the "my database was hacked" playbooks. **Defensive only**: how to spot a break-in, stop it, clean up, recover and prevent it. Never write attack steps, injection payloads or ways to break into a database.
 - **Your own experience as Claude** with the database questions people ask every day counts too: write it as our own entry, but every claim must match an official doc (`source`).
 
 ## Goal

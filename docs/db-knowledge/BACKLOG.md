@@ -6,6 +6,8 @@ Stack Overflow / DBA Stack Exchange show which problems are most common for each
 ## Issue playbooks, MySQL/MariaDB + PostgreSQL first  (issues.json, 10-20 playbooks per item)
 - [ ] Connection: refused, timeout, too many connections (done: 1), gone away / server closed the connection, SSL required, auth plugin, pg_hba, max_user_connections
 - [ ] Performance: site suddenly slow, one page slow, CPU 100%, high disk IO, slow after data grew, slow COUNT(*), slow LIKE search, slow ORDER BY + LIMIT, slow JOIN, temp tables on disk
+- [ ] Hacked database (defensive incident response, part 1 of 2): signs of a break-in (unknown admin users, new MySQL/PostgreSQL accounts or grants, unexpected triggers/events/stored procedures, spam links or scripts injected in posts/options, wp_users/wp_usermeta admin added, changed siteurl/home, ransom note table, data deleted), read-only checks for each, what to do right now (contain: rotate DB + app passwords, remove unknown users/grants, block remote access, take a copy for evidence), clean up, restore from backup, how to prove it's clean
+- [ ] Hacked database part 2: how they got in and how to close it (SQL injection signs in logs, leaked .env / wp-config, weak or reused passwords, DB port open to the internet, outdated plugins), prevention checklist (least-privilege users, no remote root, TLS, backups tested, audit logging), ransomware / "pay bitcoin" tables on exposed MongoDB/Elasticsearch/MySQL
 - [ ] Locking: deadlocks, lock wait timeout, long-running transaction blocking, metadata lock on ALTER, idle in transaction
 - [ ] Charset/encoding: ???? (done: 1), mixed collations "Illegal mix of collations", emoji, CSV import garbled, sorting wrong for Hindi
 - [ ] Timezone: dates off by 5:30, NOW() vs UTC, DST, TIMESTAMP vs DATETIME
@@ -21,6 +23,9 @@ Stack Overflow / DBA Stack Exchange show which problems are most common for each
 - [ ] Crash/recovery: table marked as crashed, InnoDB recovery, corrupted index, PostgreSQL won't start
 - [ ] Memory: out of memory kills, too much RAM per connection, sort/join buffers
 - [ ] Query writing: how to do X in SQL (pivot, running total, top N per group, gaps and islands, upsert, delete duplicates keeping one)
+
+## Big failures (learned from public post-mortems)
+- [ ] Replication lag and broken replicas, failover gone wrong / split brain, backup that never restored (GitLab 2017), accidental DELETE/DROP in production and how to recover, runaway migration locking a big table, connection pool exhaustion cascading into an outage
 
 ## Errors -> plain words -> fix  (errors.json)
 - [ ] MySQL/MariaDB: the 40 most common server errors (syntax 1064, access 1045/1142/1227, duplicate key 1062, foreign key 1451/1452, data too long 1406, incorrect value 1366/1292, deadlock 1213, lock wait 1205, too many connections 1040, gone away 2006/2013, ONLY_FULL_GROUP_BY 1055, divide by zero, out of range 1264, ...)

@@ -199,6 +199,21 @@ class Driver:
         cols, rows = self.rows(self.explain_prefix + sql)
         return {"columns": cols, "rows": [[clean(v) for v in r] for r in rows], "row_count": len(rows)}
 
+    def live(self):
+        """What the database is doing right now. Query text has its values replaced by ?, so no data leaves."""
+        out = {"at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")}
+        for name in ("status", "running", "top", "slow", "errors"):
+            fn = getattr(self, f"live_{name}", None)
+            if fn is None:
+                out[name] = {"available": False, "reason": "Not available for this database"}
+                continue
+            try:
+                out[name] = {"available": True, **fn()}
+            except Exception as exc:  # noqa: BLE001 - usually a missing permission
+                self.done()
+                out[name] = {"available": False, "reason": _why(exc)}
+        return out
+
     def health(self):
         out = {"version": self.version(), "checks": []}
         schema = self.schema()["tables"]
@@ -214,6 +229,22 @@ class Driver:
         if not out["checks"]:
             out["checks"].append({"level": "ok", "text": "No problems found"})
         return out
+
+
+def shape(sql):
+    """The shape of a query without its values: WHERE email = ? (same rule as Goal Engine's activity log)."""
+    sql = re.sub(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"", "?", str(sql or ""))
+    sql = re.sub(r"\b\d+(\.\d+)?\b", "?", sql)
+    return re.sub(r"\s+", " ", sql).strip()[:300]
+
+
+def _why(exc):
+    msg = str(exc)
+    if any(w in msg.lower() for w in ("denied", "permission", "privilege", "1142", "1227")):
+        return "This database user isn't allowed to see it"
+    if "doesn't exist" in msg or "does not exist" in msg or "1146" in msg:
+        return "Not switched on in this database server"
+    return msg[:120]
 
 
 class MySQL(Driver):
@@ -268,6 +299,30 @@ class MySQL(Driver):
             out["checks"].append({"level": "warn", "text": f"{name} has {n} rows but no index besides the primary key"})
 
 
+MySQL.live_status = lambda self: {"values": {k: v for k, v in self.rows(
+    "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected','Threads_running','Questions','Slow_queries','Uptime','Aborted_connects')")[1]}}
+MySQL.live_running = lambda self: {"columns": ["id", "user", "seconds", "state", "query"], "rows": [
+    [r[0], r[1], r[2], r[3], shape(r[4])] for r in self.rows(
+        "SELECT ID, USER, TIME, STATE, INFO FROM information_schema.PROCESSLIST WHERE COMMAND <> 'Sleep' "
+        "AND ID <> CONNECTION_ID() AND INFO IS NOT NULL ORDER BY TIME DESC LIMIT 30")[1]]}
+MySQL.live_top = lambda self: {"columns": ["query", "runs", "total s", "avg ms", "rows read"], "rows": [
+    [shape(r[0]), int(r[1]), float(r[2] or 0), float(r[3] or 0), int(r[4] or 0)] for r in self.rows(
+        "SELECT DIGEST_TEXT, COUNT_STAR, ROUND(SUM_TIMER_WAIT/1e12, 3), ROUND(AVG_TIMER_WAIT/1e9, 1), SUM_ROWS_EXAMINED "
+        "FROM performance_schema.events_statements_summary_by_digest WHERE SCHEMA_NAME = DATABASE() "
+        "AND DIGEST_TEXT NOT LIKE '%performance_schema%' AND DIGEST_TEXT NOT LIKE '%information_schema%' "
+        "AND DIGEST_TEXT NOT LIKE 'SET %' AND DIGEST_TEXT NOT LIKE 'START TRANSACTION%' AND DIGEST_TEXT NOT LIKE 'ROLLBACK%' "
+        "ORDER BY SUM_TIMER_WAIT DESC LIMIT 15")[1]]}
+MySQL.live_slow = lambda self: {"columns": ["when", "seconds", "rows read", "query"], "rows": [
+    [str(r[0]), str(r[1]), int(r[2] or 0), shape(r[3])] for r in self.rows(
+        "SELECT start_time, query_time, rows_examined, sql_text FROM mysql.slow_log WHERE db = DATABASE() "
+        "AND sql_text NOT LIKE 'SET %' AND sql_text NOT LIKE 'START TRANSACTION%' AND sql_text NOT LIKE 'ROLLBACK%' "
+        "AND sql_text NOT LIKE 'SHOW %' AND sql_text NOT LIKE '%performance_schema.%' AND sql_text NOT LIKE '%information_schema.%' "
+        "AND sql_text NOT LIKE '%mysql.slow_log%' ORDER BY start_time DESC LIMIT 20")[1]]}
+MySQL.live_errors = lambda self: {"columns": ["when", "level", "code", "message"], "rows": [
+    [str(r[0]), r[1], r[2], str(r[3])[:300]] for r in self.rows(
+        "SELECT LOGGED, PRIO, ERROR_CODE, DATA FROM performance_schema.error_log ORDER BY LOGGED DESC LIMIT 20")[1]]}
+
+
 class Postgres(Driver):
     name, default_port, version_sql = "PostgreSQL", 5432, "SHOW server_version"
     has_primary_keys_in_schema = False
@@ -316,6 +371,23 @@ class Postgres(Driver):
                            "WHERE n_live_tup > 10000 AND seq_scan > coalesce(idx_scan, 0) * 10 ORDER BY seq_scan DESC LIMIT 8")
         for name, s, i, n in seq:
             out["checks"].append({"level": "warn", "text": f"{name} ({n} rows) is mostly read without an index ({s} full scans)"})
+
+
+Postgres.live_status = lambda self: {"values": {k: clean(v) for k, v in zip(
+    ["connections", "active", "commits", "rollbacks", "deadlocks", "cache_hit_%"], self.rows(
+        "SELECT (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()), "
+        "(SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND state = 'active'), "
+        "xact_commit, xact_rollback, deadlocks, round(100.0 * blks_hit / greatest(blks_hit + blks_read, 1), 1) "
+        "FROM pg_stat_database WHERE datname = current_database()")[1][0])}}
+Postgres.live_running = lambda self: {"columns": ["pid", "user", "seconds", "state", "query"], "rows": [
+    [r[0], r[1], r[2], r[3], shape(r[4])] for r in self.rows(
+        "SELECT pid, usename, extract(epoch FROM now() - query_start)::int, state, query FROM pg_stat_activity "
+        "WHERE datname = current_database() AND pid <> pg_backend_pid() AND state <> 'idle' ORDER BY query_start LIMIT 30")[1]]}
+Postgres.live_top = lambda self: {"columns": ["query", "runs", "total s", "avg ms", "rows"], "rows": [
+    [shape(r[0]), int(r[1]), float(r[2] or 0), float(r[3] or 0), int(r[4] or 0)] for r in self.rows(
+        "SELECT query, calls, round((total_exec_time / 1000)::numeric, 3), round(mean_exec_time::numeric, 1), rows "
+        "FROM pg_stat_statements WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database()) "
+        "ORDER BY total_exec_time DESC LIMIT 15")[1]]}
 
 
 class SQLite(Driver):
@@ -405,6 +477,8 @@ def handle(db, job, export_path=None):
         return db.explain(payload.get("sql", ""))
     if kind == "health":
         return db.health()
+    if kind == "live":
+        return db.live()
     raise ValueError(f"Unknown job: {kind}")
 
 
@@ -581,7 +655,9 @@ def make_reader(cfg):
             sql += (f"CREATE USER IF NOT EXISTS 'goal_reader'@'{h}' IDENTIFIED BY '{pw}';\n"
                     f"ALTER USER 'goal_reader'@'{h}' IDENTIFIED BY '{pw}';\n"
                     f"GRANT SELECT, SHOW VIEW ON `{db}`.* TO 'goal_reader'@'{h}';\n"
-                    f"GRANT PROCESS ON *.* TO 'goal_reader'@'{h}';\n")
+                    f"GRANT PROCESS ON *.* TO 'goal_reader'@'{h}';\n"
+                    f"GRANT SELECT ON performance_schema.* TO 'goal_reader'@'{h}';\n"
+                    f"GRANT SELECT ON mysql.slow_log TO 'goal_reader'@'{h}';\n")
         cmd = ["sudo", "mysql"]
     else:
         sql = (f"DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='goal_reader') THEN CREATE ROLE goal_reader LOGIN; END IF; END $$;\n"

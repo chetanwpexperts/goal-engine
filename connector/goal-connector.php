@@ -331,6 +331,68 @@ function goal_export_stream($pdo, $type, $sql) {
     exit;
 }
 
+// ---------------------------------------------------------------- live view (values in query text are replaced by ?)
+function goal_shape($sql) {
+    $sql = preg_replace('/\'(?:[^\'\\\\]|\\\\.)*\'|"(?:[^"\\\\]|\\\\.)*"/', '?', (string)$sql);
+    $sql = preg_replace('/\b\d+(\.\d+)?\b/', '?', $sql);
+    return substr(trim(preg_replace('/\s+/', ' ', $sql)), 0, 300);
+}
+
+function goal_section($fn) {
+    try { return array_merge(['available' => true], $fn()); }
+    catch (Exception $e) {
+        $m = $e->getMessage();
+        $why = preg_match('/denied|permission|privilege|1142|1227/i', $m) ? "This database user isn't allowed to see it"
+             : (preg_match("/doesn't exist|does not exist|1146/i", $m) ? 'Not switched on in this database server' : substr($m, 0, 120));
+        return ['available' => false, 'reason' => $why];
+    }
+}
+
+function goal_live($pdo, $type) {
+    $out = ['at' => gmdate('c')];
+    $na = ['available' => false, 'reason' => 'Not available for this database'];
+    if ($type === 'pgsql') {
+        $out['status'] = goal_section(function () use ($pdo, $type) {
+            list(, $r) = goal_rows($pdo, $type, "SELECT (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()), (SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND state = 'active'), xact_commit, xact_rollback, deadlocks, round(100.0 * blks_hit / greatest(blks_hit + blks_read, 1), 1) FROM pg_stat_database WHERE datname = current_database()");
+            return ['values' => array_combine(['connections', 'active', 'commits', 'rollbacks', 'deadlocks', 'cache_hit_%'], $r[0])];
+        });
+        $out['running'] = goal_section(function () use ($pdo, $type) {
+            list(, $r) = goal_rows($pdo, $type, "SELECT pid, usename, extract(epoch FROM now() - query_start)::int, state, query FROM pg_stat_activity WHERE datname = current_database() AND pid <> pg_backend_pid() AND state <> 'idle' ORDER BY query_start LIMIT 30");
+            return ['columns' => ['pid', 'user', 'seconds', 'state', 'query'], 'rows' => array_map(function ($x) { $x[4] = goal_shape($x[4]); return $x; }, $r)];
+        });
+        $out['top'] = goal_section(function () use ($pdo, $type) {
+            list(, $r) = goal_rows($pdo, $type, "SELECT query, calls, round((total_exec_time / 1000)::numeric, 3), round(mean_exec_time::numeric, 1), rows FROM pg_stat_statements WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database()) ORDER BY total_exec_time DESC LIMIT 15");
+            return ['columns' => ['query', 'runs', 'total s', 'avg ms', 'rows'], 'rows' => array_map(function ($x) { $x[0] = goal_shape($x[0]); return $x; }, $r)];
+        });
+        $out['slow'] = $na;
+        $out['errors'] = $na;
+        return $out;
+    }
+    $out['status'] = goal_section(function () use ($pdo, $type) {
+        list(, $r) = goal_rows($pdo, $type, "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected','Threads_running','Questions','Slow_queries','Uptime','Aborted_connects')");
+        $v = [];
+        foreach ($r as $x) $v[$x[0]] = $x[1];
+        return ['values' => $v];
+    });
+    $out['running'] = goal_section(function () use ($pdo, $type) {
+        list(, $r) = goal_rows($pdo, $type, "SELECT ID, USER, TIME, STATE, INFO FROM information_schema.PROCESSLIST WHERE COMMAND <> 'Sleep' AND ID <> CONNECTION_ID() AND INFO IS NOT NULL ORDER BY TIME DESC LIMIT 30");
+        return ['columns' => ['id', 'user', 'seconds', 'state', 'query'], 'rows' => array_map(function ($x) { $x[4] = goal_shape($x[4]); return $x; }, $r)];
+    });
+    $out['top'] = goal_section(function () use ($pdo, $type) {
+        list(, $r) = goal_rows($pdo, $type, "SELECT DIGEST_TEXT, COUNT_STAR, ROUND(SUM_TIMER_WAIT/1e12, 3), ROUND(AVG_TIMER_WAIT/1e9, 1), SUM_ROWS_EXAMINED FROM performance_schema.events_statements_summary_by_digest WHERE SCHEMA_NAME = DATABASE() AND DIGEST_TEXT NOT LIKE '%performance_schema%' AND DIGEST_TEXT NOT LIKE '%information_schema%' AND DIGEST_TEXT NOT LIKE 'SET %' AND DIGEST_TEXT NOT LIKE 'START TRANSACTION%' AND DIGEST_TEXT NOT LIKE 'ROLLBACK%' ORDER BY SUM_TIMER_WAIT DESC LIMIT 15");
+        return ['columns' => ['query', 'runs', 'total s', 'avg ms', 'rows read'], 'rows' => array_map(function ($x) { $x[0] = goal_shape($x[0]); return $x; }, $r)];
+    });
+    $out['slow'] = goal_section(function () use ($pdo, $type) {
+        list(, $r) = goal_rows($pdo, $type, "SELECT start_time, query_time, rows_examined, sql_text FROM mysql.slow_log WHERE db = DATABASE() AND sql_text NOT LIKE 'SET %' AND sql_text NOT LIKE 'START TRANSACTION%' AND sql_text NOT LIKE 'ROLLBACK%' AND sql_text NOT LIKE 'SHOW %' AND sql_text NOT LIKE '%performance_schema.%' AND sql_text NOT LIKE '%information_schema.%' AND sql_text NOT LIKE '%mysql.slow_log%' ORDER BY start_time DESC LIMIT 20");
+        return ['columns' => ['when', 'seconds', 'rows read', 'query'], 'rows' => array_map(function ($x) { $x[3] = goal_shape($x[3]); return $x; }, $r)];
+    });
+    $out['errors'] = goal_section(function () use ($pdo, $type) {
+        list(, $r) = goal_rows($pdo, $type, "SELECT LOGGED, PRIO, ERROR_CODE, DATA FROM performance_schema.error_log ORDER BY LOGGED DESC LIMIT 20");
+        return ['columns' => ['when', 'level', 'code', 'message'], 'rows' => $r];
+    });
+    return $out;
+}
+
 // ---------------------------------------------------------------- run the job
 $cfg = goal_find_settings($GOAL_DB);
 if (!$cfg) goal_out(['ok' => false, 'error' => "Couldn't find your database settings next to this file. Upload it into your website's main folder (where wp-config.php or .env is)."]);
@@ -362,6 +424,8 @@ try {
             goal_out(['ok' => true, 'result' => ['columns' => $cols, 'rows' => $rows, 'row_count' => count($rows)]]);
         case 'health':
             goal_out(['ok' => true, 'result' => goal_health($pdo, $type)]);
+        case 'live':
+            goal_out(['ok' => true, 'result' => goal_live($pdo, $type)]);
         default:
             goal_out(['ok' => false, 'error' => 'Unknown job']);
     }

@@ -347,3 +347,21 @@ def test_preview_and_export_never_contain_passwords(tmp_path):
     q = db.query("SELECT * FROM wp_users", 10)
     assert "$P$Bsecrethash" not in str(q) and q["hidden_columns"] == ["user_pass"] and q["rows"][0][1] == "admin"
     assert "$P$Bsecrethash" not in db.export("SELECT * FROM wp_users")["csv"]
+
+
+def test_live_view_hides_values_and_is_one_at_a_time(client, ml_mode, shop_db):
+    assert gc.shape("SELECT * FROM users WHERE email = 'a@b.com' AND id = 42") == "SELECT * FROM users WHERE email = ? AND id = ?"
+    db = gc.Database({"type": "sqlite", "database": shop_db}).connect()
+    live = db.live()
+    assert live["running"]["available"] is False and live["running"]["reason"]
+    agent = say(client, "mere mysql database ki tables dikhao")["agents"][0]
+    token = client.post("/api/connectors", json={"agent_id": agent["id"]}).json()["token"]
+    client.post("/api/connector/hello", headers={"Authorization": f"Bearer {token}"}, json={"db_type": "sqlite"})
+    pump(client, token, db)
+    cid = client.get("/api/connectors").json()["connectors"][0]["id"]
+    a = client.post(f"/api/connectors/{cid}/jobs", json={"kind": "live"}).json()
+    b = client.post(f"/api/connectors/{cid}/jobs", json={"kind": "live"}).json()
+    assert a["id"] == b["id"]                       # the screen asking twice doesn't make two jobs
+    pump(client, token, db)
+    assert client.get(f"/api/connector-jobs/{a['id']}").json()["status"] == "done"
+    assert all(i["kind"] != "live" for i in client.get(f"/api/connectors/{cid}/activity").json()["items"])

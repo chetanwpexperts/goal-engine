@@ -183,3 +183,14 @@ def test_php_big_export_streams_in_pieces(wp_site, env):
     assert out["result"]["row_count"] == 20000
     text = gzip.decompress(path.read_bytes()).decode("utf-8-sig")
     assert text.count("\n") == 20001 and path.stat().st_size < len(text) / 10      # several pieces, well compressed
+
+
+def test_php_live_view(wp_site, env):
+    key = "l" * 40
+    (wp_site / "v.php").write_text(phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "4").replace("__KEY__", key))
+    out = phpconn.call(f"{wp_site.base}/v.php", key, "live")
+    r = out["result"]
+    assert out["ok"] and r["status"]["available"] and "Questions" in r["status"]["values"]
+    assert r["running"]["available"] and set(r) >= {"top", "slow", "errors"}
+    for sec in ("top", "slow", "errors"):
+        assert r[sec]["available"] or r[sec]["reason"]

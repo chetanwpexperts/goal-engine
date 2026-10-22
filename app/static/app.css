@@ -287,3 +287,30 @@ body[data-state="active"]::after { content: ""; position: fixed; left: 0; right:
 .missing { border: 1px solid var(--signal); background: var(--signal-soft); border-radius: 14px; padding: 12px 14px; display: grid; gap: 4px; font-size: 14px; }
 .missing b { color: var(--signal-ink); }
 .missing p { margin: 0; color: var(--ink); }
+
+/* tabs on a connected database */
+.tabs { display: flex; gap: 4px; margin: 16px 0 0 46px; border-bottom: 1px solid var(--line); }
+.tab { border: 0; background: none; font: inherit; font-weight: 600; font-size: 14px; color: var(--muted); padding: 8px 12px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.tab:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.pane[hidden] { display: none; }
+.pane > .db-tables:first-child { margin-top: 14px; }
+.pane > .live-sec, .pane > .stats, .pane > .activity, .pane > .fine, .pane > .waiting { margin-left: 46px; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; display: grid; min-width: 92px; }
+.stat b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--muted); }
+.live-sec { margin-top: 14px; }
+.activity { list-style: none; padding: 0; margin: 14px 0 0; border-top: 1px solid var(--line); }
+.act { display: grid; grid-template-columns: 5.5rem 1fr auto; gap: 4px 12px; align-items: baseline; padding: 9px 2px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.act time { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+.act .what { overflow-wrap: anywhere; }
+.act .meta { color: var(--muted); font-size: 13px; text-align: right; }
+.act.failed .meta { color: var(--alert); }
+.act.queued .meta, .act.claimed .meta { color: var(--signal-ink); }
+@media (max-width: 640px) {
+  .tabs { margin-left: 0; }
+  .pane > .live-sec, .pane > .stats, .pane > .activity, .pane > .fine, .pane > .waiting { margin-left: 0; }
+  .act { grid-template-columns: 1fr auto; }
+  .act time { grid-column: 1 / -1; }
+}

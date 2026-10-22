@@ -666,6 +666,92 @@
     return box;
   }
 
+  // ---- live view and activity log (refresh only while open and the page is visible)
+  const dbTab = {};
+  let watchTimer = null;
+  let watchGen = 0;
+  function stopWatchers() { clearTimeout(watchTimer); watchGen++; }
+
+  function loop(fn, every) {
+    const gen = watchGen;
+    const tick = async () => {
+      if (gen !== watchGen) return;
+      if (!document.hidden) { try { await fn(); } catch (_) { /* next tick */ } }
+      if (gen === watchGen) watchTimer = setTimeout(tick, every);
+    };
+    tick();
+  }
+
+  function section(title, data, hi, empty) {
+    const box = el("div", "live-sec");
+    box.append(el("p", "cap", title));
+    if (!data || !data.available) { box.append(el("p", "fine", data && data.reason ? data.reason : T(hi, "Uplabdh nahi", "Not available"))); return box; }
+    if (!data.rows.length) { box.append(el("p", "fine", empty)); return box; }
+    box.append(grid(data));
+    return box;
+  }
+
+  function startLive(c, hi, paneEl) {
+    paneEl.replaceChildren(el("p", "waiting", T(hi, "Database se live judaa raha hoon…", "Connecting live…")));
+    let last = null;
+    loop(async () => {
+      const j = await runJob(c.id, { kind: "live" });
+      const r = j.result || {};
+      const parts = [];
+      const st = (r.status && r.status.available) ? r.status.values : null;
+      if (st) {
+        const strip = el("div", "stats");
+        const q = Number(st.Questions || st.commits || 0);
+        const t = Date.parse(r.at);
+        if (last && t > last.t) {
+          const qps = Math.max(0, (q - last.q) / ((t - last.t) / 1000));
+          strip.append(stat(qps.toFixed(1), T(hi, "queries/sec", "queries/sec")));
+        }
+        last = { q, t };
+        for (const [k, label] of [["Threads_connected", "connections"], ["connections", "connections"], ["Threads_running", "running"],
+                                  ["active", "running"], ["Slow_queries", "slow so far"], ["deadlocks", "deadlocks"], ["cache_hit_%", "cache hit %"]]) {
+          if (st[k] !== undefined) strip.append(stat(String(st[k]), label));
+        }
+        parts.push(strip);
+      }
+      parts.push(section(T(hi, "Abhi chal rahi queries", "Running now"), r.running, hi, T(hi, "Abhi koi query nahi chal rahi.", "Nothing running right now.")));
+      parts.push(section(T(hi, "Sabse zyada time lene wali queries", "Queries taking the most time"), r.top, hi, T(hi, "Abhi data nahi.", "No data yet.")));
+      parts.push(section(T(hi, "Slow query log", "Slow query log"), r.slow, hi, T(hi, "Koi slow query nahi.", "No slow queries.")));
+      parts.push(section(T(hi, "Database errors", "Database errors"), r.errors, hi, T(hi, "Koi error nahi.", "No errors.")));
+      parts.push(el("p", "fine", T(hi, "Har 3 second mein update. Queries ki values chhupi hain (?), aur kuch save nahi hota.",
+                                       "Updates every 3 seconds. Values in queries are hidden (?), and nothing is saved.")));
+      paneEl.replaceChildren(...parts);
+    }, 3000);
+  }
+
+  function stat(value, label) {
+    const d = el("div", "stat");
+    d.append(el("b", null, value), el("span", null, label));
+    return d;
+  }
+
+  function startActivity(c, hi, paneEl) {
+    paneEl.replaceChildren(el("p", "waiting", T(hi, "Activity la raha hoon…", "Loading activity…")));
+    loop(async () => {
+      const d = await api(`/api/connectors/${c.id}/activity`);
+      if (!d.items.length) { paneEl.replaceChildren(el("p", "fine", T(hi, "Abhi tak kuch nahi hua.", "Nothing yet."))); return; }
+      const ul = el("ul", "activity");
+      for (const it of d.items) {
+        const li = el("li", `act ${it.status}`);
+        const when = new Date(`${it.at}Z`).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        const meta = [it.rows !== null && it.rows !== undefined ? `${Number(it.rows).toLocaleString("en-IN")} rows` : "",
+                      it.ms !== null && it.ms !== undefined ? `${it.ms} ms` : "",
+                      it.status === "failed" ? (it.error || "failed") : it.status === "done" ? "" : it.status].filter(Boolean).join(" · ");
+        li.append(el("time", null, when), el("span", "what", it.summary), el("span", "meta", meta));
+        if (it.undo) li.append(undoButton(c, it, hi));
+        ul.append(li);
+      }
+      paneEl.replaceChildren(ul, el("p", "fine", T(hi, "Live update. Values chhupi hain; 30 din tak rakha jaata hai.", "Updates live. Values are hidden; kept for 30 days.")));
+    }, 3000);
+  }
+
+  function undoButton() { return el("span"); }   // replaced when changes are switched on
+
   function renderDatabase(a) {
     const w = W(a.lang);
     const hi = a.lang !== "en";
@@ -694,6 +780,28 @@
       watchConnector(c.id, a.id);
     }
 
+    // Tabs: tables and tools / what the database is doing now / what Goal Engine did
+    const tabs = el("div", "tabs");
+    tabs.setAttribute("role", "tablist");
+    const pane = el("div", "pane");
+    const livePane = el("div", "pane");
+    const actPane = el("div", "pane");
+    const views = { tables: pane, live: livePane, activity: actPane };
+    const labels = { tables: T(hi, "Tables", "Tables"), live: T(hi, "Live", "Live"), activity: T(hi, "Activity", "Activity") };
+    const show = (key) => {
+      stopWatchers();
+      for (const [k, el2] of Object.entries(views)) el2.hidden = k !== key;
+      for (const b2 of tabs.children) b2.setAttribute("aria-selected", String(b2.dataset.key === key));
+      dbTab[c.id] = key;
+      if (key === "live") startLive(c, hi, livePane);
+      if (key === "activity") startActivity(c, hi, actPane);
+    };
+    for (const key of Object.keys(views)) {
+      const b2 = el("button", "tab", labels[key]); b2.type = "button"; b2.dataset.key = key; b2.setAttribute("role", "tab");
+      b2.addEventListener("click", () => show(key));
+      tabs.append(b2);
+    }
+    card.append(tabs, pane, livePane, actPane);
     const tables = el("div", "db-tables");
     if (c.tables.length) {
       const filter = el("input"); filter.type = "search"; filter.placeholder = T(hi, `${c.tables.length} tables, naam se dhoondo`, `${c.tables.length} tables, search by name`);
@@ -733,7 +841,7 @@
       tables.append(el("p", "waiting", T(hi, "Tables padh raha hoon…", "Reading the tables…")));
       watchConnector(c.id, a.id);
     }
-    card.append(tables);
+    pane.append(tables);
 
     // Custom read-only SQL, EXPLAIN and health
     const sql = el("details", "db-sql");
@@ -754,7 +862,7 @@
     };
     row.append(mk(T(hi, "Chalao", "Run"), "query", true), mk("Excel", "export"), mk("EXPLAIN", "explain"));
     sql.append(ta, row);
-    if (a.mode === "explore" || a.mode === "export") card.append(sql);
+    if (a.mode === "explore" || a.mode === "export") pane.append(sql);
 
     const acts = el("div", "acts");
     const hb = el("button", a.mode === "health" ? "btn solid" : "btn", T(hi, "Health check", "Health check")); hb.type = "button";
@@ -764,8 +872,8 @@
     });
     acts.append(hb);
     if (a.mode !== "explore" && a.mode !== "export") acts.append(el("span"));
-    card.append(acts);
-    if (a.mode === "health" || a.mode === "report") card.append(sql);
+    pane.append(acts);
+    if (a.mode === "health" || a.mode === "report") pane.append(sql);
 
     if (a.mode === "report" && c.tables.length) {
       const rep = el("div", "slot");
@@ -791,11 +899,13 @@
         } catch (err) { addMachine(err.message, [], true); go.disabled = false; }
       });
       rep.append(r2);
-      card.append(rep);
+      pane.append(rep);
       const ga = el("div", "acts"); ga.append(go); card.append(ga);
-      card.append(ownerBox(a, w));
+      pane.append(ownerBox(a, w));
     }
-    card.append(out);
+    pane.append(out);
+
+    queueMicrotask(() => show(dbTab[c.id] || "tables"));
 
     const off = el("button", "linkish", T(hi, "Is database ko disconnect karo", "Disconnect this database")); off.type = "button";
     off.addEventListener("click", async () => {
@@ -827,6 +937,7 @@
   }
 
   function renderAgents(agents) {
+    stopWatchers();
     const box = $("#agents");
     box.replaceChildren();
     for (const a of agents || []) {

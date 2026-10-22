@@ -425,7 +425,24 @@ body[data-state="idle"] { background:
   -webkit-text-fill-color: transparent; }
 .hero p { margin: 18px auto 0; max-width: 56ch; font-size: clamp(15px, 1.3vw, 19px); line-height: 1.55; color: var(--muted); text-wrap: pretty; }
 
-.brain-art { display: block; width: min(560px, 92vw); height: clamp(170px, 30vh, 320px); margin: 6px 0 4px; pointer-events: none; }
+.brain-stage { position: relative; width: min(680px, 96vw); display: flex; justify-content: center; margin: 6px 0 4px; }
+.brain-art { display: block; width: min(560px, 92vw); height: clamp(170px, 30vh, 320px); pointer-events: none; }
+.orbit-tag { position: absolute; display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px 8px 11px; border-radius: 12px;
+  font-size: 14px; font-weight: 600; color: var(--ink); background: rgba(248, 250, 253, .9); border: 1px solid #D9DEF2;
+  box-shadow: 0 10px 24px -14px rgba(79, 99, 214, .45); animation: tagfloat 6s ease-in-out infinite; }
+.orbit-tag svg { width: 17px; height: 17px; color: #5B4FD6; }
+.orbit-tag.t1 { left: 2%; top: 14%; }
+.orbit-tag.t2 { right: 2%; top: 24%; animation-delay: -1.5s; }
+.orbit-tag.t3 { left: 6%; bottom: 14%; animation-delay: -3s; }
+.orbit-tag.t4 { right: 5%; bottom: 8%; animation-delay: -4.5s; }
+@keyframes tagfloat { 50% { transform: translateY(-6px); } }
+body.thinking .orbit-tag { animation: tagfloat 6s ease-in-out infinite, taglit 2.4s ease-in-out infinite; }
+body.thinking .orbit-tag.t2 { animation-delay: -1.5s, .6s; }
+body.thinking .orbit-tag.t3 { animation-delay: -3s, 1.2s; }
+body.thinking .orbit-tag.t4 { animation-delay: -4.5s, 1.8s; }
+@keyframes taglit { 0%, 60%, 100% { border-color: #D9DEF2; } 20% { border-color: #8E83F0; box-shadow: 0 0 0 4px rgba(142, 131, 240, .18), 0 10px 24px -14px rgba(79, 99, 214, .45); } }
+.hero h1 .accent { background: linear-gradient(90deg, #3E5BE0, #7B4FE0 60%, #9B5DE5); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; }
 
 .composer-slot { width: min(780px, 100%); }
 body[data-state="idle"] .composer { position: static; transform: none; width: 100%; padding: 10px 10px 10px 22px; align-items: center;
@@ -454,6 +471,9 @@ body.typing .brains { visibility: hidden; }
   .home .status { margin-bottom: 16px; }
   .hero p { display: none; }
   .brain-art { height: clamp(140px, 24vh, 220px); }
+  .orbit-tag { font-size: 12px; padding: 5px 10px 5px 8px; gap: 5px; }
+  .orbit-tag svg { width: 14px; height: 14px; }
+  .orbit-tag.t1 { left: 0; top: 6%; } .orbit-tag.t2 { right: 0; top: 10%; } .orbit-tag.t3 { left: 0; bottom: 4%; } .orbit-tag.t4 { right: 0; bottom: 0; }
   body[data-state="idle"] .composer { padding: 8px 8px 8px 16px; border-radius: 18px; }
   .brains { margin-top: 26px; }
 }

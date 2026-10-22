@@ -1863,7 +1863,13 @@
     document.addEventListener("visibilitychange", start);
     return { excite() { heat = Math.min(1, heat + 0.1); start(); } };
   })();
-  input.addEventListener("input", () => neural.excite());
+  let thinkTimer;
+  input.addEventListener("input", () => {
+    neural.excite();
+    body.classList.add("thinking");                     // the labels light up in turn while the person types
+    clearTimeout(thinkTimer);
+    thinkTimer = setTimeout(() => body.classList.remove("thinking"), 2500);
+  });
 
   $("#composer").addEventListener("submit", (e) => { e.preventDefault(); sendMessage(input.value); });
   input.addEventListener("input", autosize);

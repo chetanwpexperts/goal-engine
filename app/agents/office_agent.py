@@ -425,7 +425,8 @@ def sheets_in(text: str, report: dict) -> list[str]:
 def wants_do(text: str) -> bool:
     """Only a clear 'remove / fix / hatao' changes the data. Anything else just finds and shows."""
     ws = _words(text)
-    return any(w in DO_WORDS or _close(w, DO_WORDS) for w in ws) and not re.search(
+    order = re.search(r"\b(ek jaise|ek jaisa|same kar|kar do|kardo|kar dijiye|badal do|badlo|convert|bana do|banao|sudhar)\b", text or "", re.I)
+    return (bool(order) or any(w in DO_WORDS or _close(w, DO_WORDS) for w in ws)) and not re.search(
         r"\b(alag|separate|new sheet|nayi sheet|list|report|dikhao|check)\b", text or "", re.I)
 
 

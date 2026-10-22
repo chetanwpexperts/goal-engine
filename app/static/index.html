@@ -60,10 +60,16 @@
   <main class="home" id="home">
     <div id="status" class="status" aria-live="polite" hidden></div>
     <div class="hero" id="hero">
-      <h1>Problem batao.<br>Brain khud solve karega.</h1>
+      <h1>Problem batao.<br><span class="accent">Brain khud solve karega.</span></h1>
       <p>Database, PHP aur Excel ki problem apni bhasha mein likho ya bolo. Agent khud check karta hai, theek karta hai, aur dikhata hai ki theek hua.</p>
     </div>
-    <canvas id="brain" class="brain-art" aria-hidden="true"></canvas>
+    <div class="brain-stage" aria-hidden="true">
+      <canvas id="brain" class="brain-art"></canvas>
+      <span class="orbit-tag t1"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>Samjho</span>
+      <span class="orbit-tag t2"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Jaancho</span>
+      <span class="orbit-tag t3"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9zM9 12h6M9 16h4"/></svg>Plan</span>
+      <span class="orbit-tag t4"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>Theek karo</span>
+    </div>
     <div id="composer-slot" class="composer-slot"></div>
     <section class="brains" id="brains" aria-label="Agents">
       <button type="button" class="brain-tile" data-example="Mera database bahut slow chal raha hai, check karke theek karo">

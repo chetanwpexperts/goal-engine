@@ -79,3 +79,9 @@ def test_not_understood_can_be_sent_to_learning(client, open_file):
 
     with _SessionLocal() as db:
         assert db.query(LearnRequest).filter(LearnRequest.brain == "office", LearnRequest.text.like("%mausam%")).count() == 1
+
+
+@pytest.mark.parametrize("text", ["capital small letters ek jaise karo", "spelling same kar do", "text wale numbers ko number bana do"])
+def test_plain_orders_change_the_file(client, open_file, text):
+    r = say(client, text, open_file)
+    assert "theek kar raha" in r["reply"] or "Fixing" in r["reply"], (text, r["reply"])

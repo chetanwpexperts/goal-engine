@@ -245,7 +245,7 @@ def run_job(job_id: int) -> None:
                 if connector.kind == "php":
                     from app.agents import phpconn
 
-                    data = phpconn.run(connector, job.kind, loads(job.payload, {}), export_path=path)
+                    data = phpconn.run(connector, job.kind, loads(job.payload, {}), export_path=path, job_id=job.id)
                 elif job.kind in ("change", "undo"):
                     data = _write_job(db, connector, job)
                 else:

@@ -12,6 +12,9 @@
 $GOAL_DB = ['type' => '', 'host' => '', 'port' => '', 'database' => '', 'user' => '', 'password' => ''];
 
 define('GOAL_CONNECTOR_ID', '__CONNECTOR_ID__');
+define('GOAL_ALLOW_CHANGES', __ALLOW_CHANGES__);   // approved changes with Undo; chosen when you downloaded this file
+define('GOAL_MAX_CHANGE_ROWS', 1000);
+define('GOAL_UNDO_DAYS', 7);
 define('GOAL_KEY', '__KEY__');
 define('GOAL_VERSION', '1.0');
 define('GOAL_MAX_ROWS', 100000);
@@ -183,8 +186,11 @@ function goal_connect($c) {
     } else {
         $dsn = 'mysql:host=' . $c['host'] . ';port=' . $port . ';dbname=' . $c['database'] . ';charset=utf8mb4';
     }
-    $pdo = new PDO($dsn, $c['user'], $c['password'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 10,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_NUM, PDO::ATTR_EMULATE_PREPARES => false]);
+    $opts = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 10,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_NUM, PDO::ATTR_EMULATE_PREPARES => false];
+    // an UPDATE reports the rows it matched, so we can check it touched exactly the previewed rows
+    if ($c['type'] !== 'pgsql' && defined('PDO::MYSQL_ATTR_FOUND_ROWS')) $opts[PDO::MYSQL_ATTR_FOUND_ROWS] = true;
+    $pdo = new PDO($dsn, $c['user'], $c['password'], $opts);
     return $pdo;
 }
 
@@ -393,6 +399,198 @@ function goal_live($pdo, $type) {
     return $out;
 }
 
+// ---------------------------------------------------------------- approved changes with Undo
+function goal_mask_sql($sql) {
+    $keep = function ($m) { $n = strlen($m[0]); return $n >= 2 ? $m[0][0] . str_repeat(' ', $n - 2) . $m[0][$n - 1] : ' '; };
+    $sql = preg_replace_callback("/'(?:[^'\\\\]|\\\\.)*'/", $keep, $sql);
+    $sql = preg_replace_callback('/"(?:[^"\\\\]|\\\\.)*"/', $keep, $sql);
+    return preg_replace_callback('/\/\*.*?\*\/|--[^\n]*|#[^\n]*/s', function ($m) { return str_repeat(' ', strlen($m[0])); }, $sql);
+}
+
+function goal_parse_change($sql) {
+    $sql = trim(rtrim(trim((string)$sql), ';'));
+    $m = goal_mask_sql($sql);
+    if ($sql === '' || strpos($m, ';') !== false) throw new Exception('One statement at a time, please');
+    if (preg_match('/\b(drop|alter|create|truncate|rename|grant|revoke|lock|unlock|call|exec|execute|handler|load_file|sleep|benchmark|pg_sleep|copy|vacuum|returning|into\s+outfile|into\s+dumpfile|on\s+duplicate|on\s+conflict)\b/i', $m))
+        throw new Exception('Only simple UPDATE, DELETE or INSERT ... VALUES changes are allowed');
+    $id = '(?P<table>`[^`]*`|"[^"]*"|[A-Za-z_][\w$]*)';
+    $forms = ['update' => '/^\s*update\s+' . $id . '\s+set\s+(?P<set>.+?)\s+where\s+(?P<where>.+)$/is',
+              'delete' => '/^\s*delete\s+from\s+' . $id . '\s+where\s+(?P<where>.+)$/is',
+              'insert' => '/^\s*insert\s+into\s+' . $id . '\s*(?P<cols>\([^)]*\))?\s*values\s*(?P<values>\(.+)$/is'];
+    foreach ($forms as $op => $re) {
+        if (!preg_match($re, $m, $g, PREG_OFFSET_CAPTURE)) continue;
+        if ($op === 'insert' && preg_match('/\bselect\b/i', substr($m, $g['values'][1]))) throw new Exception("INSERT ... SELECT isn't supported; use INSERT ... VALUES");
+        if ($op === 'update' && preg_match('/\bjoin\b/i', substr($m, 0, $g['set'][1]))) throw new Exception('Changes work on one table at a time');
+        $table = trim(substr($sql, $g['table'][1], strlen($g['table'][0])), '`"');
+        $where = $op === 'insert' ? null : substr($sql, $g['where'][1], strlen($g['where'][0]));
+        return ['op' => $op, 'table' => $table, 'where' => $where, 'sql' => $sql];
+    }
+    throw new Exception('Write it as UPDATE table SET ... WHERE ..., DELETE FROM table WHERE ..., or INSERT INTO table (...) VALUES (...)');
+}
+
+function goal_q($type, $ident) { return $type === 'pgsql' ? '"' . str_replace('"', '""', $ident) . '"' : '`' . str_replace('`', '``', $ident) . '`'; }
+
+function goal_pk($pdo, $type, $table) {
+    if ($type === 'pgsql') {
+        $st = $pdo->prepare("SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) WHERE i.indrelid = (quote_ident(current_schema()) || '.' || quote_ident(?))::regclass AND i.indisprimary ORDER BY array_position(i.indkey, a.attnum)");
+        $st->execute([$table]);
+        return [array_map(function ($r) { return $r[0]; }, $st->fetchAll()), true];
+    }
+    $st = $pdo->prepare("SELECT k.COLUMN_NAME, c.EXTRA FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.COLUMNS c ON c.TABLE_SCHEMA = k.TABLE_SCHEMA AND c.TABLE_NAME = k.TABLE_NAME AND c.COLUMN_NAME = k.COLUMN_NAME WHERE k.TABLE_SCHEMA = DATABASE() AND k.TABLE_NAME = ? AND k.CONSTRAINT_NAME = 'PRIMARY' ORDER BY k.ORDINAL_POSITION");
+    $st->execute([$table]);
+    $rows = $st->fetchAll();
+    $auto = false;
+    foreach ($rows as $r) if (stripos((string)$r[1], 'auto_increment') !== false) $auto = true;
+    return [array_map(function ($r) { return $r[0]; }, $rows), $auto];
+}
+
+// keep a value exactly so Undo can put it back
+function goal_enc($v) {
+    if (is_resource($v)) $v = stream_get_contents($v);
+    if ($v === null || is_int($v) || is_float($v) || is_bool($v)) return $v;
+    $v = (string)$v;
+    return mb_check_encoding($v, 'UTF-8') ? $v : ['$b' => base64_encode($v)];
+}
+
+function goal_bind($st, $values) {
+    $i = 1;
+    foreach ($values as $v) {
+        if (is_array($v) && isset($v['$b'])) $st->bindValue($i++, base64_decode($v['$b']), PDO::PARAM_LOB);
+        elseif ($v === null) $st->bindValue($i++, null, PDO::PARAM_NULL);
+        else $st->bindValue($i++, is_bool($v) ? ($v ? 1 : 0) : (string)$v, PDO::PARAM_STR);
+    }
+    return $st;
+}
+
+function goal_by_pk($pdo, $type, $table, $pk, $keys, $lock = false) {
+    if (!$keys) return [[], []];
+    $one = '(' . implode(' AND ', array_map(function ($c) use ($type) { return goal_q($type, $c) . ' = ?'; }, $pk)) . ')';
+    $st = $pdo->prepare('SELECT * FROM ' . goal_q($type, $table) . ' WHERE ' . implode(' OR ', array_fill(0, count($keys), $one)) . ($lock ? ' FOR UPDATE' : ''));
+    goal_bind($st, array_merge(...$keys))->execute();
+    $cols = [];
+    for ($i = 0; $i < $st->columnCount(); $i++) { $m = $st->getColumnMeta($i); $cols[] = $m['name']; }
+    return [$cols, array_map(function ($r) { return array_map('goal_enc', $r); }, $st->fetchAll())];
+}
+
+function goal_write_begin($pdo, $type) {
+    try { $pdo->exec('ROLLBACK'); } catch (Exception $e) {}
+    if ($type !== 'pgsql') $pdo->exec('SET SESSION TRANSACTION READ WRITE');
+    $pdo->beginTransaction();
+}
+
+function goal_plan($pdo, $type, $sql) {
+    $ch = goal_parse_change($sql);
+    list($pk, $auto) = goal_pk($pdo, $type, $ch['table']);
+    $out = ['op' => $ch['op'], 'table' => $ch['table'], 'pk' => $pk];
+    if (!$pk) $out['blocked'] = 'This table has no primary key, so a change couldn\'t be undone safely';
+    if ($ch['op'] === 'insert') {
+        $out['count'] = null;
+        if ($type !== 'pgsql' && !($auto && count($pk) === 1)) $out['blocked'] = 'INSERT can be undone only on tables with an auto-increment id';
+        return $out;
+    }
+    $t = goal_q($type, $ch['table']);
+    list($cols, $rows) = goal_rows($pdo, $type, "SELECT * FROM $t WHERE {$ch['where']}", 20);
+    list(, $n) = goal_rows($pdo, $type, "SELECT COUNT(*) FROM $t WHERE {$ch['where']}");
+    $out['count'] = (int)$n[0][0];
+    $out['columns'] = $cols;
+    $out['rows'] = $rows;
+    if ($out['count'] > GOAL_MAX_CHANGE_ROWS) $out['blocked'] = "This would change {$out['count']} rows; the limit is " . GOAL_MAX_CHANGE_ROWS . ' per change. Narrow the WHERE';
+    return $out;
+}
+
+function goal_apply($pdo, $type, $sql, $expected) {
+    $ch = goal_parse_change($sql);
+    $table = $ch['table'];
+    list($pk, $auto) = goal_pk($pdo, $type, $table);
+    if (!$pk) throw new Exception("This table has no primary key, so the change couldn't be undone safely. Nothing was changed");
+    $t = goal_q($type, $table);
+    goal_write_begin($pdo, $type);
+    try {
+        $before = []; $after = []; $cols = [];
+        if ($ch['op'] !== 'insert') {
+            $st = $pdo->query("SELECT * FROM $t WHERE {$ch['where']} FOR UPDATE");
+            for ($i = 0; $i < $st->columnCount(); $i++) { $m = $st->getColumnMeta($i); $cols[] = $m['name']; }
+            $before = array_map(function ($r) { return array_map('goal_enc', $r); }, $st->fetchAll());
+            if ($expected !== null && count($before) !== (int)$expected) throw new Exception("The data changed since the preview ($expected rows then, " . count($before) . ' now). Preview again');
+            if (count($before) > GOAL_MAX_CHANGE_ROWS) throw new Exception('More than ' . GOAL_MAX_CHANGE_ROWS . ' rows. Narrow the WHERE');
+            $n = $pdo->exec($ch['sql']);
+            if ($n !== count($before)) throw new Exception('The change touched a different set of rows than the preview. Nothing was changed');
+            $idx = array_map(function ($c) use ($cols) { return array_search($c, $cols); }, $pk);
+            $keys = array_map(function ($r) use ($idx) { return array_map(function ($i) use ($r) { return $r[$i]; }, $idx); }, $before);
+            if ($ch['op'] === 'update') list(, $after) = goal_by_pk($pdo, $type, $table, $pk, $keys);
+        } else {
+            if ($type === 'pgsql') {
+                $st = $pdo->query($ch['sql'] . ' RETURNING ' . implode(', ', array_map(function ($c) use ($type) { return goal_q($type, $c); }, $pk)));
+                $keys = $st->fetchAll();
+            } else {
+                if (!($auto && count($pk) === 1)) throw new Exception('INSERT can be undone only on tables with an auto-increment id. Nothing was changed');
+                $n = $pdo->exec($ch['sql']);
+                $first = (int)$pdo->lastInsertId();
+                $keys = [];
+                for ($i = 0; $i < $n; $i++) $keys[] = [$first + $i];
+            }
+            if (count($keys) > GOAL_MAX_CHANGE_ROWS) throw new Exception('More than ' . GOAL_MAX_CHANGE_ROWS . ' rows. Insert fewer at a time');
+            list($cols, $after) = goal_by_pk($pdo, $type, $table, $pk, $keys);
+        }
+        $pdo->commit();
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    $record = ['op' => $ch['op'], 'table' => $table, 'pk' => $pk, 'columns' => $cols, 'before' => $before, 'after' => $after];
+    return [$record, ['op' => $ch['op'], 'table' => $table, 'rows' => $ch['op'] === 'insert' ? count($after) : count($before)]];
+}
+
+function goal_undo($pdo, $type, $rec, $force) {
+    $table = $rec['table']; $pk = $rec['pk']; $cols = $rec['columns'];
+    $idx = array_map(function ($c) use ($cols) { return array_search($c, $cols); }, $pk);
+    $keyof = function ($r) use ($idx) { return array_map(function ($i) use ($r) { return $r[$i]; }, $idx); };
+    $t = goal_q($type, $table);
+    goal_write_begin($pdo, $type);
+    try {
+        $rows = in_array($rec['op'], ['update', 'insert']) ? $rec['after'] : $rec['before'];
+        list(, $current) = goal_by_pk($pdo, $type, $table, $pk, array_map($keyof, $rows), true);
+        $now = [];
+        foreach ($current as $r) $now[json_encode($keyof($r))] = $r;
+        $conflicts = 0;
+        if ($rec['op'] === 'delete') $conflicts = count($now);
+        else foreach ($rec['after'] as $r) { $k = json_encode($keyof($r)); if (!isset($now[$k]) || $now[$k] != $r) $conflicts++; }
+        if ($conflicts && !$force) throw new Exception("CONFLICT: $conflicts of these rows were changed again after this change. Undo would overwrite the newer edits");
+        $wherepk = implode(' AND ', array_map(function ($c) use ($type) { return goal_q($type, $c) . ' = ?'; }, $pk));
+        if ($rec['op'] === 'update') {
+            $others = array_values(array_filter(array_keys($cols), function ($i) use ($cols, $pk) { return !in_array($cols[$i], $pk); }));
+            $st = $pdo->prepare("UPDATE $t SET " . implode(', ', array_map(function ($i) use ($cols, $type) { return goal_q($type, $cols[$i]) . ' = ?'; }, $others)) . " WHERE $wherepk");
+            foreach ($rec['before'] as $r) goal_bind($st, array_merge(array_map(function ($i) use ($r) { return $r[$i]; }, $others), $keyof($r)))->execute();
+        } elseif ($rec['op'] === 'delete') {
+            $st = $pdo->prepare("INSERT INTO $t (" . implode(', ', array_map(function ($c) use ($type) { return goal_q($type, $c); }, $cols)) . ') VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')');
+            foreach ($rec['before'] as $r) { if (isset($now[json_encode($keyof($r))])) continue; goal_bind($st, $r)->execute(); }
+        } else {
+            $st = $pdo->prepare("DELETE FROM $t WHERE $wherepk");
+            foreach ($rec['after'] as $r) goal_bind($st, $keyof($r))->execute();
+        }
+        $pdo->commit();
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    return ['op' => 'undo', 'table' => $table, 'rows' => count($rec['op'] === 'insert' ? $rec['after'] : $rec['before']), 'forced' => (bool)($force && $conflicts)];
+}
+
+// The copy for Undo stays on this hosting, encrypted, outside the website folder when possible.
+function goal_undo_dir() {
+    foreach ([dirname(__DIR__), sys_get_temp_dir()] as $base) {
+        $dir = rtrim($base, '/\\') . '/.goal-undo-' . substr(hash('sha256', GOAL_KEY), 0, 12);
+        if (is_dir($dir) || @mkdir($dir, 0700)) {
+            if (!file_exists($dir . '/.htaccess')) @file_put_contents($dir . '/.htaccess', "Require all denied\nDeny from all\n");
+            foreach (glob($dir . '/*.undo') ?: [] as $f) if (filemtime($f) < time() - GOAL_UNDO_DAYS * 86400) @unlink($f);
+            return $dir;
+        }
+    }
+    throw new Exception('No folder to keep the Undo copy in, so the change was not made');
+}
+
+function goal_undo_path($id) { return goal_undo_dir() . '/' . (int)$id . '.undo'; }
+
 // ---------------------------------------------------------------- run the job
 $cfg = goal_find_settings($GOAL_DB);
 if (!$cfg) goal_out(['ok' => false, 'error' => "Couldn't find your database settings next to this file. Upload it into your website's main folder (where wp-config.php or .env is)."]);
@@ -409,7 +607,32 @@ try {
     switch ($job['kind']) {
         case 'hello':
             goal_out(['ok' => true, 'result' => ['version' => GOAL_VERSION, 'php' => PHP_VERSION, 'db_type' => $type === 'pgsql' ? 'postgres' : 'mysql',
-                'db_name' => $cfg['database'], 'db_version' => goal_version($pdo, $type), 'can_write' => goal_can_write($pdo, $type), 'app' => $cfg['app']]]);
+                'db_name' => $cfg['database'], 'db_version' => goal_version($pdo, $type), 'can_write' => goal_can_write($pdo, $type), 'app' => $cfg['app'],
+                'allow_changes' => GOAL_ALLOW_CHANGES]]);
+        case 'plan':
+            if (!GOAL_ALLOW_CHANGES) goal_out(['ok' => false, 'error' => 'Changes are switched off in this file']);
+            goal_out(['ok' => true, 'result' => goal_plan($pdo, $type, isset($payload['sql']) ? $payload['sql'] : '')]);
+        case 'change':
+            if (!GOAL_ALLOW_CHANGES) goal_out(['ok' => false, 'error' => 'Changes are switched off in this file']);
+            $path = goal_undo_path(isset($job['id']) ? $job['id'] : 0);   // checked before anything changes
+            list($rec, $info) = goal_apply($pdo, $type, isset($payload['sql']) ? $payload['sql'] : '', isset($payload['expected']) ? $payload['expected'] : null);
+            file_put_contents($path, goal_seal(goal_json($rec)), LOCK_EX);
+            @chmod($path, 0600);
+            $info['undo'] = ['available' => true, 'where' => 'your hosting'];
+            goal_out(['ok' => true, 'result' => $info]);
+        case 'undo':
+            if (!GOAL_ALLOW_CHANGES) goal_out(['ok' => false, 'error' => 'Changes are switched off in this file']);
+            $path = goal_undo_path(isset($payload['change_job_id']) ? $payload['change_job_id'] : 0);
+            $raw = is_readable($path) ? base64_decode((string)file_get_contents($path)) : false;
+            $rec = null;
+            if ($raw !== false && strlen($raw) > 28) {
+                $plain = openssl_decrypt(substr($raw, 12, -16), 'aes-256-gcm', goal_aes_key(), OPENSSL_RAW_DATA, substr($raw, 0, 12), substr($raw, -16));
+                if ($plain !== false) $rec = json_decode($plain, true);
+            }
+            if (!is_array($rec)) goal_out(['ok' => false, 'error' => 'The saved copy for this change is gone (kept ' . GOAL_UNDO_DAYS . ' days), so it can\'t be undone']);
+            $info = goal_undo($pdo, $type, $rec, !empty($payload['force']));
+            @unlink($path);
+            goal_out(['ok' => true, 'result' => $info]);
         case 'schema':
             goal_out(['ok' => true, 'result' => goal_schema($pdo, $type)]);
         case 'query':

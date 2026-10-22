@@ -86,7 +86,7 @@ def test_php_file_end_to_end(client, ml_mode, wp_site, env):
 
 def test_php_file_refuses_unsigned_replayed_and_writes(wp_site, env):
     key = "k" * 40
-    text = phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "1").replace("__KEY__", key)
+    text = phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "1").replace("__KEY__", key).replace("__ALLOW_CHANGES__", "false")
     (wp_site / "c.php").write_text(text)
     url = f"{wp_site.base}/c.php"
     import requests
@@ -157,7 +157,7 @@ import re  # noqa: E402
 
 def test_php_file_hides_password_columns(wp_site, env):
     key = "p" * 40
-    (wp_site / "m.php").write_text(phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "2").replace("__KEY__", key))
+    (wp_site / "m.php").write_text(phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "2").replace("__KEY__", key).replace("__ALLOW_CHANGES__", "false"))
     url = f"{wp_site.base}/m.php"
     import subprocess as sp
     sp.run(["mysql", "-e", "USE shop_db; CREATE TABLE IF NOT EXISTS wp_users (ID INT PRIMARY KEY, user_login VARCHAR(50), "
@@ -177,7 +177,7 @@ def test_php_big_export_streams_in_pieces(wp_site, env):
     sp.run(["mysql", "-e", "USE shop_db; DROP TABLE IF EXISTS big; CREATE TABLE big (id INT PRIMARY KEY, note VARCHAR(200));"
             "INSERT INTO big SELECT seq, REPEAT('x', 150) FROM seq_1_to_20000;"], check=True)
     key = "b" * 40
-    (wp_site / "b.php").write_text(phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "3").replace("__KEY__", key))
+    (wp_site / "b.php").write_text(phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "3").replace("__KEY__", key).replace("__ALLOW_CHANGES__", "false"))
     path = wp_site / "big.csv.gz"
     out = phpconn.call(f"{wp_site.base}/b.php", key, "export", {"sql": "SELECT * FROM big"}, stream_to=path)
     assert out["result"]["row_count"] == 20000
@@ -187,10 +187,96 @@ def test_php_big_export_streams_in_pieces(wp_site, env):
 
 def test_php_live_view(wp_site, env):
     key = "l" * 40
-    (wp_site / "v.php").write_text(phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "4").replace("__KEY__", key))
+    (wp_site / "v.php").write_text(phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "4").replace("__KEY__", key).replace("__ALLOW_CHANGES__", "false"))
     out = phpconn.call(f"{wp_site.base}/v.php", key, "live")
     r = out["result"]
     assert out["ok"] and r["status"]["available"] and "Questions" in r["status"]["values"]
     assert r["running"]["available"] and set(r) >= {"top", "slow", "errors"}
     for sec in ("top", "slow", "errors"):
         assert r[sec]["available"] or r[sec]["reason"]
+
+
+def _items_reset():
+    import subprocess as sp
+    sp.run(["mysql", "-e", "USE shop_db; DELETE FROM items; INSERT INTO items (name, price, note, created, blob_col) VALUES "
+            "('pen', 10.50, 'a where b', '2026-01-02 03:04:05', 0x0102), ('book', 200, NULL, '2026-02-02 10:00:00', NULL), ('bag', 900, 'x', NULL, NULL);"],
+           check=True)
+
+
+def _items():
+    import subprocess as sp
+    return sp.run(["mysql", "-N", "-e", "USE shop_db; SELECT name, price, IFNULL(note,'NULL'), IFNULL(created,'NULL'), HEX(blob_col) FROM items ORDER BY name"],
+                  capture_output=True, text=True, check=True).stdout
+
+
+def test_php_changes_with_undo(wp_site, env):
+    _items_reset()
+    key = "c" * 40
+    text = phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "5").replace("__KEY__", key)
+    (wp_site / "on.php").write_text(text.replace("__ALLOW_CHANGES__", "true"))
+    (wp_site / "off.php").write_text(text.replace("__ALLOW_CHANGES__", "false"))
+    on, off = f"{wp_site.base}/on.php", f"{wp_site.base}/off.php"
+    assert phpconn.call(off, key, "plan", {"sql": "DELETE FROM items WHERE id = 1"})["ok"] is False
+    assert phpconn.call(on, key, "hello")["result"]["allow_changes"] is True
+    start = _items()
+
+    plan = phpconn.call(on, key, "plan", {"sql": "UPDATE items SET price = price + 1, blob_col = NULL WHERE price < 500"})
+    assert plan["ok"] and plan["result"]["count"] == 2 and _items() == start
+    ch = phpconn.call(on, key, "change", {"sql": "UPDATE items SET price = price + 1, blob_col = NULL WHERE price < 500", "expected": 2}, job_id=101)
+    assert ch["ok"], ch
+    assert _items() != start
+    assert phpconn.call(on, key, "undo", {"change_job_id": 101}, job_id=102)["ok"]
+    assert _items() == start                           # binary column and dates restored exactly
+
+    ch = phpconn.call(on, key, "change", {"sql": "DELETE FROM items WHERE name = 'bag'", "expected": 1}, job_id=103)
+    assert ch["ok"] and "bag" not in _items()
+    assert phpconn.call(on, key, "undo", {"change_job_id": 103}, job_id=104)["ok"] and _items() == start
+
+    ch = phpconn.call(on, key, "change", {"sql": "INSERT INTO items (name, price) VALUES ('cup', 3), ('mug', 4)"}, job_id=105)
+    assert ch["ok"] and ch["result"]["rows"] == 2
+    assert phpconn.call(on, key, "undo", {"change_job_id": 105}, job_id=106)["ok"] and _items() == start
+
+    # stale preview count: nothing happens
+    bad = phpconn.call(on, key, "change", {"sql": "DELETE FROM items WHERE price > 100", "expected": 7}, job_id=107)
+    assert bad["ok"] is False and "changed since the preview" in bad["error"] and _items() == start
+
+    # someone edits after our change: undo refuses, then works when forced
+    phpconn.call(on, key, "change", {"sql": "UPDATE items SET note = 'v2' WHERE name = 'book'", "expected": 1}, job_id=108)
+    import subprocess as sp
+    sp.run(["mysql", "-e", "USE shop_db; UPDATE items SET note = 'by the app' WHERE name = 'book'"], check=True)
+    c = phpconn.call(on, key, "undo", {"change_job_id": 108}, job_id=109)
+    assert c["ok"] is False and c["error"].startswith("CONFLICT") and "by the app" in _items()
+    assert phpconn.call(on, key, "undo", {"change_job_id": 108, "force": True}, job_id=110)["ok"] and _items() == start
+
+    # the undo copy is encrypted on the hosting, outside the web folder
+    copies = list((wp_site.path.parent).glob(".goal-undo-*/*.undo"))
+    assert all("book" not in p.read_text() for p in copies)
+
+
+@pytest.mark.skipif(not _up(5432), reason="needs local PostgreSQL")
+def test_php_changes_with_undo_on_postgres(wp_site, env):
+    import subprocess as sp
+    psql = ["psql", "-h", "127.0.0.1", "-U", "shopapp", "shop_pg", "-At", "-c"]
+    envp = {**__import__("os").environ, "PGPASSWORD": "app pass"}
+    sp.run(psql + ["DELETE FROM items; INSERT INTO items (name, price, note, created, blob_col) VALUES ('pen', 10.50, 'a where b', "
+                   "'2026-01-02 03:04:05', '\\x0102'), ('book', 200, NULL, '2026-02-02 10:00:00', NULL), ('bag', 900, 'x', NULL, NULL);"],
+           env=envp, check=True)
+    snap = lambda: sp.run(psql + ["SELECT name, price, note, created, encode(blob_col, 'hex') FROM items ORDER BY name"],  # noqa: E731
+                          env=envp, capture_output=True, text=True, check=True).stdout
+    key = "g" * 40
+    text = (phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "6").replace("__KEY__", key).replace("__ALLOW_CHANGES__", "true")
+            .replace("$GOAL_DB = ['type' => '', 'host' => '', 'port' => '', 'database' => '', 'user' => '', 'password' => ''];",
+                     "$GOAL_DB = ['type' => 'pgsql', 'host' => '127.0.0.1', 'port' => '5432', 'database' => 'shop_pg', 'user' => 'shopapp', 'password' => 'app pass'];"))
+    (wp_site / "pg.php").write_text(text)
+    url = f"{wp_site.base}/pg.php"
+    start = snap()
+    for n, sql in enumerate(("UPDATE items SET price = 1, blob_col = NULL WHERE name IN ('pen', 'book')",
+                             "DELETE FROM items WHERE name = 'pen'", "INSERT INTO items (name, price) VALUES ('cup', 3)")):
+        plan = phpconn.call(url, key, "plan", {"sql": sql})
+        assert plan["ok"], plan
+        ch = phpconn.call(url, key, "change", {"sql": sql, "expected": plan["result"]["count"]}, job_id=200 + n)
+        assert ch["ok"], ch
+        assert snap() != start
+        u = phpconn.call(url, key, "undo", {"change_job_id": 200 + n}, job_id=300 + n)
+        assert u["ok"], u
+        assert snap() == start, sql

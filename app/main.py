@@ -549,13 +549,14 @@ def create_php_connector(agent_id: int, db: Session = Depends(get_db), visitor: 
 
 
 @app.get("/api/connectors/{connector_id}/php-file")
-def download_php_file(connector_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+def download_php_file(connector_id: int, changes: int = 0, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     try:
         connector = dbagent.own_connector(db, connector_id, visitor)
     except dbagent.DatabaseError:
         raise HTTPException(404, "Not found")
     if connector.kind != "php" or not connector.secret:
         raise HTTPException(404, "Not found")
+    phpconn.set_allow_changes(db, connector, bool(changes))
     return Response(phpconn.file_text(connector), media_type="application/x-httpd-php",
                     headers={"Content-Disposition": f'attachment; filename="{phpconn.file_name(connector)}"',
                              "Cache-Control": "no-store"})

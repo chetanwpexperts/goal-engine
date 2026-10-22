@@ -68,7 +68,16 @@ def file_name(connector: Connector) -> str:
 
 def file_text(connector: Connector) -> str:
     key = direct.decrypt(connector.secret or "")["key"]
-    return TEMPLATE.read_text().replace("__CONNECTOR_ID__", str(connector.id)).replace("__KEY__", key)
+    allow = bool(direct.decrypt(connector.secret or "").get("allow_changes"))
+    return (TEMPLATE.read_text().replace("__CONNECTOR_ID__", str(connector.id)).replace("__KEY__", key)
+            .replace("__ALLOW_CHANGES__", "true" if allow else "false"))
+
+
+def set_allow_changes(db: Session, connector: Connector, allow: bool) -> None:
+    secret = direct.decrypt(connector.secret or "")
+    secret["allow_changes"] = bool(allow)
+    connector.secret = direct.encrypt(secret)
+    db.commit()
 
 
 def _check_url(url: str) -> str:
@@ -91,8 +100,8 @@ def _check_url(url: str) -> str:
     return url
 
 
-def call(url: str, key: str, kind: str, payload: dict | None = None, timeout: int = 100, stream_to=None) -> dict:
-    body = json.dumps({"sealed": seal(key, {"kind": kind, "payload": payload or {}})})   # firewalls see no SQL
+def call(url: str, key: str, kind: str, payload: dict | None = None, timeout: int = 100, stream_to=None, job_id=None) -> dict:
+    body = json.dumps({"sealed": seal(key, {"kind": kind, "payload": payload or {}, "id": job_id})})   # firewalls see no SQL
     for _ in range(3):                     # follow up to 2 redirects (http->https, www), each one re-checked
         url = _check_url(url)
         ts, nonce = str(int(time.time())), secrets.token_urlsafe(18)
@@ -185,17 +194,18 @@ def link(db: Session, connector: Connector, url: str) -> Connector:
     connector.db_name = str(info.get("db_name", ""))[:120]
     connector.version = str(info.get("db_version", ""))[:20]
     connector.can_write = bool(info.get("can_write"))
+    connector.allow_changes = bool(info.get("allow_changes"))       # what the uploaded file itself says
     connector.status, connector.last_seen_at = "online", utcnow()
     db.commit()
     dbagent.queue(db, connector, "schema")
     return connector
 
 
-def run(connector: Connector, kind: str, payload: dict, export_path=None) -> dict:
+def run(connector: Connector, kind: str, payload: dict, export_path=None, job_id: int | None = None) -> dict:
     secret = direct.decrypt(connector.secret or "")
     if not secret.get("url"):
         raise PhpError("Paste the link of the uploaded file first")
-    out = call(secret["url"], secret["key"], kind, payload, stream_to=export_path)
+    out = call(secret["url"], secret["key"], kind, payload, stream_to=export_path, job_id=job_id)
     if not out.get("ok"):
         raise PhpError(out.get("error") or "The file couldn't run that")
     return out.get("result") or {}

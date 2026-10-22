@@ -291,3 +291,25 @@ def test_php_blocks_cascade_deletes(wp_site, env):
     assert plan["ok"] and "order_lines" in plan["result"]["blocked"]
     bad = phpconn.call(url, key, "change", {"sql": "DELETE FROM parents WHERE id = 1", "expected": 1}, job_id=900)
     assert bad["ok"] is False and "cascade" in bad["error"]
+
+
+def test_php_checks_optimize_and_index_fix(wp_site, env):
+    key = "o" * 40
+    (wp_site / "opt.php").write_text(phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "8").replace("__KEY__", key)
+                                     .replace("__ALLOW_CHANGES__", "true"))
+    url = f"{wp_site.base}/opt.php"
+    c = phpconn.call(url, key, "checks", {"queries": ["SHOW VARIABLES LIKE 'max_connections'", "SELECT * FROM no_such_table"]})
+    assert c["ok"] and c["result"]["results"][0]["rows"] and "error" in c["result"]["results"][1]
+    o = phpconn.call(url, key, "optimize", {"sql": "SELECT id, note FROM big WHERE id + 0 > 19000 ORDER BY id",
+                                            "rewrites": ["SELECT id, note FROM big WHERE id > 19000 ORDER BY id"], "index_tables": ["big"]})
+    r = o["result"]
+    assert r["candidates"][0]["same"] is True and r["candidates"][0]["plan"] < r["original"]["plan"] and r["tables"]["big"]["rows"] == 20000
+    import subprocess as sp
+    sp.run(["mysql", "-e", "USE shop_db; ALTER TABLE items DROP INDEX IF EXISTS idx_php_price"], check=True)
+    plan = phpconn.call(url, key, "plan", {"sql": "ALTER TABLE items ADD INDEX idx_php_price (price)"})
+    assert plan["ok"] and not plan["result"].get("blocked"), plan
+    ch = phpconn.call(url, key, "change", {"sql": "ALTER TABLE items ADD INDEX idx_php_price (price)"}, job_id=950)
+    assert ch["ok"], ch
+    assert "idx_php_price" in sp.run(["mysql", "-N", "-e", "SHOW INDEX FROM shop_db.items"], capture_output=True, text=True).stdout
+    assert phpconn.call(url, key, "undo", {"change_job_id": 950}, job_id=951)["ok"]
+    assert "idx_php_price" not in sp.run(["mysql", "-N", "-e", "SHOW INDEX FROM shop_db.items"], capture_output=True, text=True).stdout

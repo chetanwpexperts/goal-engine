@@ -23,7 +23,7 @@ from app.models import Agent, Connector, ConnectorJob, Goal, dumps, loads, utcno
 
 
 EXPORT_DIR = Path(__file__).resolve().parents[2] / "data" / "exports"
-JOB_KINDS = ("schema", "query", "export", "explain", "health", "live", "plan", "change", "undo")
+JOB_KINDS = ("schema", "query", "export", "explain", "health", "live", "plan", "change", "undo", "checks", "optimize")
 PLAN_TTL = timedelta(minutes=10)      # Apply must follow a fresh preview
 UNDO_TTL = timedelta(days=7)
 MAX_OPEN_JOBS = 4            # per user at once: keeps our server and theirs light
@@ -173,6 +173,14 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
     payload = dict(payload or {})
     if kind in ("query", "export", "explain"):
         payload["sql"] = read_only_sql(payload.get("sql", ""))
+    if kind == "checks":
+        qs = payload.get("queries") or []
+        if not isinstance(qs, list) or not qs or len(qs) > 10:
+            raise DatabaseError("Between 1 and 10 checks")
+        payload["queries"] = [read_only_sql(q) for q in qs]
+    if kind == "optimize":
+        payload["sql"] = read_only_sql(payload.get("sql", ""))
+        payload["rewrites"] = [read_only_sql(q) for q in (payload.get("rewrites") or [])[:5]]
     if kind in ("plan", "change", "undo") and not connector.allow_changes:
         raise DatabaseError("Changes are switched off for this database")
     if kind == "plan":
@@ -360,6 +368,11 @@ def wants_database(goal: Goal | None, text: str) -> bool:
     """A database job the connector can do (not a pasted query to review, that's the SQL checker)."""
     if goal is None or SQL_TEXT.search(text or ""):
         return False
+    from app.dbknow import brain
+
+    rec = brain.recognize(text)
+    if rec["kind"] == "error" or (rec["kind"] == "issue" and rec["confidence"] >= 0.55):
+        return True                       # "too many connections", "Hindi text ???? ban jata hai", a pasted DB error
     if goal.intent == "slow_db_query":   # a slow query: the SQL checker, unless they ask about the whole database
         return bool(re.search(r"\b(health|size|tables|connections|kitna bada|poora database)\b", text or "", re.I))
     return goal.intent == "db_automation" or bool(DB_WORDS.search(text or ""))
@@ -452,8 +465,16 @@ def database_dict(db: Session, agent: Agent, hi: bool) -> dict:
         "name": MODE_TEXT[mode][0 if hi else 1].split(" (")[0], "status": agent.status, "access": "connector",
         "available": mode not in ("backup", "write"), "blocks": _blocks_for(mode, hi, connector),
         "connector": connector_dict(connector, db) if connector else None, "connectors": others,
-        "runs": [], "owner": _owner(db, agent.visitor_id), "needs_owner": mode == "report",
+        "runs": [], "owner": _owner(db, agent.visitor_id), "needs_owner": mode == "report", "brain": _brain_view(inputs.get("brain"), hi),
     }
+
+
+def _brain_view(rec, hi: bool):
+    if not rec or not rec.get("kind"):
+        return None
+    from app.dbknow import brain
+
+    return {**rec, "text": brain.describe(rec, hi)}
 
 
 def _owner(db: Session, visitor_id: str) -> dict:

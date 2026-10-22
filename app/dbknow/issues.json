@@ -1,49 +1,155 @@
 [
   {
     "id": "too-many-connections",
-    "engines": ["mysql", "mariadb", "postgres"],
+    "title_en": "Too many connections to the database",
+    "title_hi": "Database pe connections ki limit khatam",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
     "category": "connection",
-    "symptoms": ["Too many connections error", "website down: too many connections", "site bar bar database error de rahi hai", "FATAL: sorry, too many clients already", "connection limit khatam ho gaya"],
+    "symptoms": [
+      "Too many connections error",
+      "website down: too many connections",
+      "site bar bar database error de rahi hai",
+      "FATAL: sorry, too many clients already",
+      "connection limit khatam ho gaya"
+    ],
     "diagnose": [
-      {"engine": "mysql", "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected','Max_used_connections')", "look_for": "Threads_connected close to max_connections"},
-      {"engine": "mysql", "sql": "SHOW VARIABLES LIKE 'max_connections'", "look_for": "the limit"},
-      {"engine": "mysql", "sql": "SELECT USER, COUNT(*) AS n, SUM(COMMAND = 'Sleep') AS sleeping FROM information_schema.PROCESSLIST GROUP BY USER ORDER BY n DESC", "look_for": "one app user holding many sleeping connections"},
-      {"engine": "postgres", "sql": "SELECT usename, state, count(*) FROM pg_stat_activity GROUP BY 1, 2 ORDER BY 3 DESC", "look_for": "many 'idle' or 'idle in transaction' connections"},
-      {"engine": "postgres", "sql": "SHOW max_connections", "look_for": "the limit"}
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected','Max_used_connections')",
+        "look_for": "Threads_connected close to max_connections"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES LIKE 'max_connections'",
+        "look_for": "the limit"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT USER, COUNT(*) AS n, SUM(COMMAND = 'Sleep') AS sleeping FROM information_schema.PROCESSLIST GROUP BY USER ORDER BY n DESC",
+        "look_for": "one app user holding many sleeping connections"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT usename, state, count(*) FROM pg_stat_activity GROUP BY 1, 2 ORDER BY 3 DESC",
+        "look_for": "many 'idle' or 'idle in transaction' connections"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SHOW max_connections",
+        "look_for": "the limit"
+      }
     ],
     "causes": [
-      {"id": "leak", "title_en": "The app opens connections and doesn't close them (many sleeping/idle ones)", "title_hi": "App connection kholti hai par band nahi karti (bahut saare sleeping/idle)"},
-      {"id": "traffic", "title_en": "Real traffic is higher than the limit", "title_hi": "Asli traffic limit se zyada hai"},
-      {"id": "slow", "title_en": "Slow queries keep connections busy, so new requests pile up", "title_hi": "Slow queries connection pakde rehti hain, nayi requests line mein lag jaati hain"}
+      {
+        "id": "leak",
+        "title_en": "The app opens connections and doesn't close them (many sleeping/idle ones)",
+        "title_hi": "App connection kholti hai par band nahi karti (bahut saare sleeping/idle)"
+      },
+      {
+        "id": "traffic",
+        "title_en": "Real traffic is higher than the limit",
+        "title_hi": "Asli traffic limit se zyada hai"
+      },
+      {
+        "id": "slow",
+        "title_en": "Slow queries keep connections busy, so new requests pile up",
+        "title_hi": "Slow queries connection pakde rehti hain, nayi requests line mein lag jaati hain"
+      }
     ],
     "fixes": [
-      {"cause": "leak", "action": "config", "steps_en": "Lower wait_timeout (MySQL) / set idle_session_timeout (PostgreSQL 14+) so idle connections close; fix persistent connections in the app.", "steps_hi": "wait_timeout kam karo (MySQL) / idle_session_timeout set karo (PostgreSQL 14+) taaki idle connection band ho; app ke persistent connections theek karo."},
-      {"cause": "traffic", "action": "config", "steps_en": "Raise max_connections carefully (each connection uses memory), or add a pooler (ProxySQL / PgBouncer).", "steps_hi": "max_connections dhyan se badhao (har connection memory leta hai), ya pooler lagao (ProxySQL / PgBouncer)."},
-      {"cause": "slow", "action": "advice", "steps_en": "Open the Live tab, find the slow queries and run them through the query fixer.", "steps_hi": "Live tab kholo, slow queries dhoondo aur unhe query fixer se theek karo."}
+      {
+        "cause": "leak",
+        "action": "config",
+        "steps_en": "Lower wait_timeout (MySQL) / set idle_session_timeout (PostgreSQL 14+) so idle connections close; fix persistent connections in the app.",
+        "steps_hi": "wait_timeout kam karo (MySQL) / idle_session_timeout set karo (PostgreSQL 14+) taaki idle connection band ho; app ke persistent connections theek karo."
+      },
+      {
+        "cause": "traffic",
+        "action": "config",
+        "steps_en": "Raise max_connections carefully (each connection uses memory), or add a pooler (ProxySQL / PgBouncer).",
+        "steps_hi": "max_connections dhyan se badhao (har connection memory leta hai), ya pooler lagao (ProxySQL / PgBouncer)."
+      },
+      {
+        "cause": "slow",
+        "action": "advice",
+        "steps_en": "Open the Live tab, find the slow queries and run them through the query fixer.",
+        "steps_hi": "Live tab kholo, slow queries dhoondo aur unhe query fixer se theek karo."
+      }
     ],
-    "verify": {"en": "Threads_connected / active connections stay well under the limit for a day.", "hi": "Ek din tak connections limit se kaafi neeche rahein."},
+    "verify": {
+      "en": "Threads_connected / active connections stay well under the limit for a day.",
+      "hi": "Ek din tak connections limit se kaafi neeche rahein."
+    },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/too-many-connections.html",
-    "seen_at": ["https://stackoverflow.com/questions/730579/error-1040-too-many-connections"]
+    "seen_at": [
+      "https://stackoverflow.com/questions/730579/error-1040-too-many-connections"
+    ]
   },
   {
     "id": "question-marks-instead-of-text",
-    "engines": ["mysql", "mariadb"],
+    "title_en": "Text turns into ???? (wrong character set)",
+    "title_hi": "Text ???? ban jaata hai (galat character set)",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
     "category": "charset_encoding",
-    "symptoms": ["Hindi text shows ????", "emoji not saving", "Incorrect string value: '\\xF0\\x9F...'", "data mein ??? aa raha hai", "special characters galat dikh rahe hain"],
+    "symptoms": [
+      "Hindi text shows ????",
+      "emoji not saving",
+      "Incorrect string value: '\\xF0\\x9F...'",
+      "data mein ??? aa raha hai",
+      "special characters galat dikh rahe hain"
+    ],
     "diagnose": [
-      {"engine": "mysql", "sql": "SELECT TABLE_NAME, COLUMN_NAME, CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND CHARACTER_SET_NAME IS NOT NULL AND CHARACTER_SET_NAME <> 'utf8mb4'", "look_for": "text columns not in utf8mb4"},
-      {"engine": "mysql", "sql": "SHOW VARIABLES WHERE Variable_name IN ('character_set_server', 'character_set_database', 'character_set_connection')", "look_for": "latin1 or utf8 (3-byte) instead of utf8mb4"}
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME, COLUMN_NAME, CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND CHARACTER_SET_NAME IS NOT NULL AND CHARACTER_SET_NAME <> 'utf8mb4'",
+        "look_for": "text columns not in utf8mb4"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('character_set_server', 'character_set_database', 'character_set_connection')",
+        "look_for": "latin1 or utf8 (3-byte) instead of utf8mb4"
+      }
     ],
     "causes": [
-      {"id": "column", "title_en": "The columns use latin1 or 3-byte utf8, which can't hold emoji/many scripts", "title_hi": "Columns latin1 ya 3-byte utf8 mein hain, jo emoji/kai bhashayein nahi rakh sakte"},
-      {"id": "connection", "title_en": "The app connects with the wrong character set", "title_hi": "App galat character set se connect karti hai"}
+      {
+        "id": "column",
+        "title_en": "The columns use latin1 or 3-byte utf8, which can't hold emoji/many scripts",
+        "title_hi": "Columns latin1 ya 3-byte utf8 mein hain, jo emoji/kai bhashayein nahi rakh sakte"
+      },
+      {
+        "id": "connection",
+        "title_en": "The app connects with the wrong character set",
+        "title_hi": "App galat character set se connect karti hai"
+      }
     ],
     "fixes": [
-      {"cause": "column", "action": "approved_change", "steps_en": "Convert the affected tables to utf8mb4 (ALTER TABLE ... CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci) after a backup; check index length limits first.", "steps_hi": "Backup ke baad tables ko utf8mb4 mein badlo (ALTER TABLE ... CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci); pehle index length limit check karo."},
-      {"cause": "connection", "action": "code", "steps_en": "Set charset utf8mb4 in the app's DB config (Laravel 'charset' => 'utf8mb4', WordPress DB_CHARSET 'utf8mb4').", "steps_hi": "App ke DB config mein charset utf8mb4 karo (Laravel 'charset' => 'utf8mb4', WordPress DB_CHARSET 'utf8mb4')."}
+      {
+        "cause": "column",
+        "action": "approved_change",
+        "steps_en": "Convert the affected tables to utf8mb4 (ALTER TABLE ... CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci) after a backup; check index length limits first.",
+        "steps_hi": "Backup ke baad tables ko utf8mb4 mein badlo (ALTER TABLE ... CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci); pehle index length limit check karo."
+      },
+      {
+        "cause": "connection",
+        "action": "code",
+        "steps_en": "Set charset utf8mb4 in the app's DB config (Laravel 'charset' => 'utf8mb4', WordPress DB_CHARSET 'utf8mb4').",
+        "steps_hi": "App ke DB config mein charset utf8mb4 karo (Laravel 'charset' => 'utf8mb4', WordPress DB_CHARSET 'utf8mb4')."
+      }
     ],
-    "verify": {"en": "Save a test row with Hindi text and an emoji, read it back unchanged.", "hi": "Hindi aur emoji wali test row save karo, wapas same padhni chahiye."},
+    "verify": {
+      "en": "Save a test row with Hindi text and an emoji, read it back unchanged.",
+      "hi": "Hindi aur emoji wali test row save karo, wapas same padhni chahiye."
+    },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/charset-unicode-utf8mb4.html",
-    "seen_at": ["https://stackoverflow.com/questions/10957238/incorrect-string-value-when-trying-to-insert-utf-8-into-mysql-via-jdbc"]
+    "seen_at": [
+      "https://stackoverflow.com/questions/10957238/incorrect-string-value-when-trying-to-insert-utf-8-into-mysql-via-jdbc"
+    ]
   }
 ]

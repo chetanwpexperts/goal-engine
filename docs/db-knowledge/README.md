@@ -17,7 +17,7 @@ A scheduled session adds to it every night. These rules are for that session (an
 ## Goal
 One place where anyone can get ANY database problem solved without AI, for every database
 (MySQL, MariaDB, PostgreSQL, SQL Server, Oracle, SQLite, MongoDB, Redis and more).
-The most useful entry is an **issue playbook** (`issues.json`): how people describe it (English + Hinglish, at least 3 ways),
+The most useful entry is an **issue playbook** (`issues.json`): a short title (English + Hinglish), how people describe it (English + Hinglish, at least 3 ways),
 the read-only checks the agent runs by itself to find the cause, the possible causes, the fix for each cause,
 and how to prove it's fixed.
 

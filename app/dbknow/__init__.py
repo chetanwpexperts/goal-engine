@@ -29,7 +29,7 @@ REQUIRED = {
     "slow_rules": {"id", "engines", "detect", "title_en", "title_hi", "fix_en", "fix_hi", "source"},
     "structure": {"id", "kind", "rule", "explain_en", "explain_hi", "source"},
     # A playbook: how people describe it -> what the machine checks itself -> causes -> fixes -> how to prove it's fixed
-    "issues": {"id", "engines", "category", "symptoms", "diagnose", "causes", "fixes", "verify", "source"},
+    "issues": {"id", "title_en", "title_hi", "engines", "category", "symptoms", "diagnose", "causes", "fixes", "verify", "source"},
 }
 FIX_TYPES = {"advice", "closest_column", "closest_table", "qualify_column", "retry", "add_group_by", "cast", "limit"}
 

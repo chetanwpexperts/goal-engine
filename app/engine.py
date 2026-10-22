@@ -209,14 +209,19 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
         reply, options, relation = auto.plan_reply(spec, turn.hi), [], "agent_plan"
     elif goal is not None and relation not in ("howto", "safety", "chit_chat") and dbagent.wants_database(goal, text):
         # Database work: the agent works through a connector on the user's own server.
+        from app.dbknow import brain as dbbrain
+
         mode = dbagent.detect_mode(text)
+        rec = dbbrain.recognize(text)
         agent = dbagent.goal_agent(db, goal)
         if agent is None:
             agent = dbagent.create_agent(db, goal, mode)
-        elif mode != "explore":
-            inputs = loads(agent.inputs, {}) or {}
+        inputs = loads(agent.inputs, {}) or {}
+        if mode != "explore":
             inputs["mode"] = mode
-            agent.inputs = dumps(inputs)
+        if rec["kind"] in ("sql", "error") or (rec["kind"] in ("issue", "do") and rec["confidence"] >= 0.35):
+            inputs["brain"] = {**rec, "sql": text if rec["kind"] == "sql" else ""}
+        agent.inputs = dumps(inputs)
         goal.title = dbagent.MODE_TEXT[agent_mode(agent)][0 if turn.hi else 1].split(" (")[0]
         goal.missing_info = "[]"
         goal.pending = None
@@ -225,6 +230,12 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
         db.commit()
         has = bool(dbagent.visitor_connectors(db, visitor_id))
         reply, options, relation = dbagent.plan_reply(mode, turn.hi, has, dbagent.later_parts(text)), [], "agent_plan"
+        b = inputs.get("brain") or {}
+        seen = dbbrain.describe(b, turn.hi) if (b.get("kind") in ("issue", "error", "sql") or b.get("id") == "slow_query") else ""
+        if seen:
+            reply = (f"Samjha: {seen}. " if turn.hi else f"Understood: {seen}. ") + (
+                ("Database juda hua hai, card mein check shuru karo." if has else "Bas batao database kahan hai; judte hi main khud check karke wajah aur fix dhoondhunga.") if turn.hi
+                else ("Your database is connected; start the check on the card." if has else "Just tell me where your database is; once it's connected I'll check it myself and find the cause and the fix."))
     elif goal is not None and relation not in ("howto", "safety", "chit_chat"):
         agent, override, run_now = assign(db, goal, text, turn.hi, asking=bool(goal.pending))
         if run_now:

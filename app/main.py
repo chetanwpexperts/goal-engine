@@ -714,6 +714,61 @@ def link_php_file(connector_id: int, body: PhpLinkIn, db: Session = Depends(get_
     return {"connector": dbagent.connector_dict(connector, db)}
 
 
+class DiagnoseIn(BaseModel):
+    issue_id: str
+
+
+class OptimizeIn(BaseModel):
+    sql: str
+
+
+class RecognizeIn(BaseModel):
+    text: str
+    lang: str = "hi"
+
+
+@app.post("/api/dbbrain/recognize")
+def brain_recognize(body: RecognizeIn):
+    from app.dbknow import brain
+
+    rec = brain.recognize(body.text)
+    return {**rec, "text": brain.describe(rec, body.lang != "en")}
+
+
+@app.get("/api/dbbrain/playbook/{issue_id}")
+def brain_playbook(issue_id: str):
+    from app.dbknow import service
+
+    issue = service.playbook(issue_id) or service.error_entry(issue_id)
+    if issue is None:
+        raise HTTPException(404, "Not found")
+    return issue
+
+
+@app.post("/api/connectors/{connector_id}/diagnose")
+def brain_diagnose(connector_id: int, body: DiagnoseIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    """Run a playbook's own read-only checks on this database."""
+    from app.dbknow import service
+
+    try:
+        job, issue, checks = service.start_checks(db, _own_conn(db, connector_id, visitor), body.issue_id)
+    except dbagent.DatabaseError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return {"job": dbagent.job_dict(job), "playbook": issue, "checks": checks}
+
+
+@app.post("/api/connectors/{connector_id}/optimize")
+def brain_optimize(connector_id: int, body: OptimizeIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    """The solving loop: try the fixes on the real database and prove which one is the same answer and faster."""
+    from app.dbknow import service
+
+    try:
+        job, analysis = service.start_optimize(db, _own_conn(db, connector_id, visitor), body.sql)
+    except dbagent.DatabaseError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return {"job": dbagent.job_dict(job), "analysis": analysis}
+
+
 @app.get("/api/connector-info")
 def connector_info():
     return {"server_ip": dbagent_direct.server_ip()}

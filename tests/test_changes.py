@@ -276,3 +276,18 @@ def test_cascade_deletes_are_blocked():
         d.apply_change("DELETE FROM parents WHERE id = 1", 1)
     assert d.query("SELECT COUNT(*) FROM order_lines", 5)["rows"][0][0] == 2
     assert not d.plan_change("UPDATE items SET note = 'x' WHERE id = 1").get("blocked")
+
+
+def test_add_index_then_undo(db):
+    plan = db.plan_change("ALTER TABLE items ADD INDEX idx_items_price (price)")
+    assert plan["op"] == "add_index" and not plan.get("blocked"), plan
+    record, info = db.apply_change("CREATE INDEX idx_items_price ON items (price)", None)
+    assert any(i["name"] == "idx_items_price" for i in db.index_list("items"))
+    again = db.plan_change("CREATE INDEX idx_items_price2 ON items (price)")
+    assert "already exists" in again["blocked"]
+    db.undo_change(record)
+    assert not any(i["name"] == "idx_items_price" for i in db.index_list("items"))
+    with pytest.raises(ValueError):
+        gc.parse_change("CREATE UNIQUE INDEX u ON items (name)")
+    with pytest.raises(ValueError):
+        gc.parse_change("ALTER TABLE items ADD INDEX x (price), DROP COLUMN note")

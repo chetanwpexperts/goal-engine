@@ -72,9 +72,33 @@ def _mask(sql):
     return re.sub(r"/\*.*?\*/|--[^\n]*|#[^\n]*", lambda m: " " * len(m.group(0)), sql, flags=re.S)
 
 
-def parse_change(sql):
-    """One table, one simple statement: UPDATE ... WHERE, DELETE FROM ... WHERE, or INSERT INTO ... VALUES."""
+INDEX_FORMS = (
+    re.compile(r"^\s*alter\s+table\s+(?P<table>`?[A-Za-z_][\w$]*`?)\s+add\s+(?:index|key)\s+(?P<name>`?[A-Za-z_][\w$]{0,60}`?)\s*\((?P<cols>[^()]+)\)\s*$", re.I),
+    re.compile(r"^\s*create\s+index\s+(?:concurrently\s+)?(?P<name>\"?[A-Za-z_][\w$]{0,60}\"?)\s+on\s+(?P<table>[`\"]?[A-Za-z_][\w$]*[`\"]?)\s*\((?P<cols>[^()]+)\)\s*$", re.I),
+)
+IDENT_RE = re.compile(r"^[A-Za-z_][\w$]{0,63}$")
+
+
+def parse_index(sql):
+    """ALTER TABLE t ADD INDEX name (a, b)  or  CREATE INDEX name ON t (a, b): a plain index, nothing else."""
     sql = (sql or "").strip().rstrip(";").strip()
+    for form in INDEX_FORMS:
+        m = form.match(sql)
+        if m:
+            cols = [c.strip().strip('`"') for c in m.group("cols").split(",")]
+            table, name = m.group("table").strip('`"'), m.group("name").strip('`"')
+            if not cols or not all(IDENT_RE.match(c) for c in cols + [table, name]):
+                raise ValueError("Index columns must be plain column names")
+            return {"op": "add_index", "table": table, "name": name, "columns": cols, "sql": sql, "where": None}
+    return None
+
+
+def parse_change(sql):
+    """One table, one simple statement: UPDATE ... WHERE, DELETE FROM ... WHERE, INSERT INTO ... VALUES, or adding a plain index."""
+    sql = (sql or "").strip().rstrip(";").strip()
+    idx = parse_index(sql)
+    if idx:
+        return idx
     masked = _mask(sql)
     if not sql or ";" in masked:
         raise ValueError("One statement at a time, please")
@@ -290,8 +314,34 @@ class Driver:
         cur.execute(f"SELECT * FROM {self.q(table)} WHERE {cond}" + (self.lock_sql() if lock else ""), [v for k in keys for v in k])
         return [d[0] for d in cur.description], [list(r) for r in cur.fetchall()]
 
+    # --- plain indexes: built online, Undo drops them
+    def create_index(self, table, name, cols):
+        raise NotImplementedError
+
+    def drop_index(self, table, name):
+        raise NotImplementedError
+
+    def _plan_index(self, ch):
+        out = {"op": "add_index", "table": ch["table"], "name": ch["name"], "columns": ch["columns"], "count": None}
+        try:
+            self.rows(f"SELECT {', '.join(self.q(c) for c in ch['columns'])} FROM {self.q(ch['table'])} WHERE 1 = 0")
+        except Exception:  # noqa: BLE001
+            self.done()
+            out["blocked"] = "That table or column doesn't exist"
+            return out
+        existing = self.index_list(ch["table"])
+        if any(i["name"] == ch["name"] for i in existing):
+            out["blocked"] = f"An index named {ch['name']} already exists"
+        elif any(i["columns"][:len(ch["columns"])] == ch["columns"] for i in existing):
+            out["blocked"] = "An index starting with these columns already exists, so this one wouldn't help"
+        out["table_rows"] = int(self.rows(f"SELECT COUNT(*) FROM {self.q(ch['table'])}")[1][0][0])
+        out["existing"] = existing
+        return out
+
     def plan_change(self, sql):
         ch = parse_change(sql)
+        if ch["op"] == "add_index":
+            return self._plan_index(ch)
         pk, auto = self.primary_key(ch["table"])
         out = {"op": ch["op"], "table": ch["table"], "pk": pk}
         if not pk:
@@ -322,6 +372,15 @@ class Driver:
     def apply_change(self, sql, expected):
         """Run an approved change in one transaction, after saving the rows it touches. Returns the undo record."""
         ch = parse_change(sql)
+        if ch["op"] == "add_index":
+            plan = self._plan_index(ch)
+            if plan.get("blocked"):
+                raise ValueError(plan["blocked"] + ". Nothing was changed")
+            t = time.perf_counter()
+            self.create_index(ch["table"], ch["name"], ch["columns"])
+            record = {"op": "add_index", "table": ch["table"], "name": ch["name"], "columns": ch["columns"], "pk": [], "columns_all": [],
+                      "before": [], "after": []}
+            return record, {"op": "add_index", "table": ch["table"], "rows": 0, "seconds": round(time.perf_counter() - t, 1)}
         table, pk = ch["table"], None
         pk, auto = self.primary_key(table)
         if not pk:
@@ -374,6 +433,10 @@ class Driver:
         return last                 # MySQL reports the first id of a multi-row insert
 
     def undo_change(self, record, force=False):
+        if record["op"] == "add_index":
+            if any(i["name"] == record["name"] for i in self.index_list(record["table"])):
+                self.drop_index(record["table"], record["name"])
+            return {"op": "undo", "table": record["table"], "rows": 0, "forced": False}
         table, pk, cols = record["table"], record["pk"], record["columns"]
         idx = [cols.index(c) for c in pk]
         before = [[dec(v) for v in r] for r in record["before"]]
@@ -417,6 +480,79 @@ class Driver:
         finally:
             cur.close()
         return {"op": "undo", "table": table, "rows": len(before) if record["op"] != "insert" else len(after), "forced": bool(force and conflicts)}
+
+    # --- the solving loop: is the fix the same answer, and is it faster? (read-only)
+    def index_list(self, table):
+        return []
+
+    def plan_cost(self, sql):
+        """(metric, number) from EXPLAIN: rows examined (MySQL) or planner cost (PostgreSQL)."""
+        cols, rows = self.rows(self.explain_prefix + sql)
+        if "rows" in cols:
+            i = cols.index("rows")
+            return "rows", sum(int(r[i] or 0) for r in rows)
+        text = " ".join(str(r[0]) for r in rows[:1])
+        m = re.search(r"cost=[\d.]+\.\.([\d.]+)", text)
+        return ("cost", float(m.group(1))) if m else ("cost", None)
+
+    def measure(self, sql):
+        import hashlib
+        out = {}
+        try:
+            q = safe_sql(sql)
+            n = self.rows(f"SELECT COUNT(*) FROM ({q}) goal_t")[1][0][0]
+            best = None
+            for _ in range(2):
+                t = time.perf_counter()
+                cols, rows = self.rows(q, limit=2001)
+                ms = (time.perf_counter() - t) * 1000
+                best = ms if best is None else min(best, ms)
+            sample = sorted(repr([clean(v) for v in r]) for r in rows)
+            metric, value = self.plan_cost(q)
+            out = {"count": int(n), "ms": round(best, 1), "complete": int(n) <= 2000,
+                   "fingerprint": hashlib.sha256("\n".join(sample).encode()).hexdigest(), "metric": metric, "plan": value}
+        except Exception as exc:  # noqa: BLE001
+            self.done()
+            out = {"error": _why(exc)}
+        return out
+
+    def optimize(self, sql, rewrites, index_tables):
+        orig = self.measure(sql)
+        cands = []
+        for r in list(rewrites)[:5]:
+            m = self.measure(r)
+            if "error" in m or "error" in orig:
+                same = None
+            elif m["count"] != orig["count"]:
+                same = False
+            elif orig["complete"] and m["complete"]:
+                same = m["fingerprint"] == orig["fingerprint"]
+            else:
+                same = "count"                       # same number of rows; too many to compare one by one
+            cands.append({"sql": r, **m, "same": same})
+        tables = {}
+        for t in list(index_tables)[:5]:
+            try:
+                tables[t] = {"rows": int(self.rows(f"SELECT COUNT(*) FROM {self.q(t)}")[1][0][0]), "indexes": self.index_list(t)}
+            except Exception as exc:  # noqa: BLE001
+                self.done()
+                tables[t] = {"error": _why(exc)}
+        for m in [orig] + cands:
+            m.pop("fingerprint", None)
+        return {"original": orig, "candidates": cands, "tables": tables}
+
+    def checks(self, queries):
+        """Run a playbook's read-only checks. Each one on its own: one failing check doesn't stop the rest."""
+        out = []
+        for sql in list(queries)[:10]:
+            try:
+                cols, rows = self.rows(safe_sql(sql), limit=50)
+                hidden = secret_columns(cols)
+                out.append({"columns": cols, "rows": [mask_row([clean(v) for v in r], hidden) for r in rows]})
+            except Exception as exc:  # noqa: BLE001
+                self.done()
+                out.append({"error": _why(exc)})
+        return out
 
     def live(self):
         """What the database is doing right now. Query text has its values replaced by ?, so no data leaves."""
@@ -518,6 +654,28 @@ class MySQL(Driver):
                           "AND EVENT_OBJECT_TABLE = %s", (table,))
         return [r[0] for r in fk], [r[0] for r in tr]
 
+    def create_index(self, table, name, cols):
+        cur = self.cursor(read_only=False)
+        try:
+            cur.execute("SET SESSION TRANSACTION READ WRITE")
+            # online: the table stays readable and writable while the index is built
+            cur.execute(f"ALTER TABLE {self.q(table)} ADD INDEX {self.q(name)} ({', '.join(self.q(c) for c in cols)}), ALGORITHM=INPLACE, LOCK=NONE")
+        finally:
+            cur.close()
+
+    def drop_index(self, table, name):
+        cur = self.cursor(read_only=False)
+        try:
+            cur.execute("SET SESSION TRANSACTION READ WRITE")
+            cur.execute(f"ALTER TABLE {self.q(table)} DROP INDEX {self.q(name)}, ALGORITHM=INPLACE, LOCK=NONE")
+        finally:
+            cur.close()
+
+    def index_list(self, table):
+        _, rows = self.rows("SELECT INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) FROM information_schema.STATISTICS "
+                            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s GROUP BY INDEX_NAME", (table,))
+        return [{"name": r[0], "columns": str(r[1]).split(",")} for r in rows]
+
     def write_rights(self):
         _, grants = self.rows("SHOW GRANTS")
         return re.search(r"ALL PRIVILEGES|INSERT|UPDATE|DELETE|DROP", " ".join(str(g[0]).upper() for g in grants))
@@ -614,6 +772,31 @@ class Postgres(Driver):
                           "AND tgrelid = (quote_ident(current_schema()) || '.' || quote_ident(%s))::regclass", (table,))
         return [r[0] for r in fk], [r[0] for r in tr]
 
+    def _autocommit(self, sql):
+        self.conn.rollback()
+        old = self.conn.autocommit
+        self.conn.autocommit = True        # CONCURRENTLY can't run inside a transaction
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(sql)
+        finally:
+            self.conn.autocommit = old
+
+    def create_index(self, table, name, cols):
+        self._autocommit(f"CREATE INDEX CONCURRENTLY {self.q(name)} ON {self.q(table)} ({', '.join(self.q(c) for c in cols)})")
+
+    def drop_index(self, table, name):
+        self._autocommit(f"DROP INDEX CONCURRENTLY IF EXISTS {self.q(name)}")
+
+    def index_list(self, table):
+        _, rows = self.rows("SELECT i.relname, array_to_string(array_agg(a.attname ORDER BY k.ord), ',') FROM pg_index x "
+                            "JOIN pg_class i ON i.oid = x.indexrelid "
+                            "JOIN LATERAL unnest(x.indkey) WITH ORDINALITY k(attnum, ord) ON true "
+                            "JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum "
+                            "WHERE x.indrelid = (quote_ident(current_schema()) || '.' || quote_ident(%s))::regclass "
+                            "GROUP BY i.relname", (table,))
+        return [{"name": r[0], "columns": str(r[1]).split(",")} for r in rows]
+
     def _insert(self, cur, ch, pk, auto):
         cur.execute(ch["sql"] + " RETURNING " + ", ".join(self.q(c) for c in pk))
         return [list(r) for r in cur.fetchall()]
@@ -680,6 +863,21 @@ class SQLite(Driver):
 
     def first_insert_id(self, last, n):
         return last - n + 1         # SQLite reports the last id
+
+    def index_list(self, table):
+        out = []
+        for r in self.rows(f"PRAGMA index_list({self.q(table)})")[1]:
+            cols = [c[2] for c in self.rows(f"PRAGMA index_info({self.q(r[1])})")[1]]
+            out.append({"name": r[1], "columns": cols})
+        return out
+
+    def create_index(self, table, name, cols):
+        self.conn.execute(f"CREATE INDEX {self.q(name)} ON {self.q(table)} ({', '.join(self.q(c) for c in cols)})")
+        self.conn.commit()
+
+    def drop_index(self, table, name):
+        self.conn.execute(f"DROP INDEX IF EXISTS {self.q(name)}")
+        self.conn.commit()
 
     def tables(self):
         _, names = self.rows("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
@@ -787,6 +985,10 @@ def handle(db, job, export_path=None, writer=None):
         return db.export_file(payload.get("sql", ""), export_path)
     if kind == "plan":
         return db.plan_change(payload.get("sql", ""))
+    if kind == "checks":
+        return {"results": db.checks(payload.get("queries") or [])}
+    if kind == "optimize":
+        return db.optimize(payload.get("sql", ""), payload.get("rewrites") or [], payload.get("index_tables") or [])
     if kind in ("change", "undo"):
         if writer is None:
             raise ValueError("Changes are switched off for this database. Run the setup again and allow approved changes")

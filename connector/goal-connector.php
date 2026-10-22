@@ -407,7 +407,55 @@ function goal_mask_sql($sql) {
     return preg_replace_callback('/\/\*.*?\*\/|--[^\n]*|#[^\n]*/s', function ($m) { return str_repeat(' ', strlen($m[0])); }, $sql);
 }
 
+function goal_parse_index($sql) {
+    $sql = trim(rtrim(trim((string)$sql), ';'));
+    $forms = ['/^\s*alter\s+table\s+(?P<table>`?[A-Za-z_][\w$]*`?)\s+add\s+(?:index|key)\s+(?P<name>`?[A-Za-z_][\w$]{0,60}`?)\s*\((?P<cols>[^()]+)\)\s*$/i',
+              '/^\s*create\s+index\s+(?:concurrently\s+)?(?P<name>"?[A-Za-z_][\w$]{0,60}"?)\s+on\s+(?P<table>[`"]?[A-Za-z_][\w$]*[`"]?)\s*\((?P<cols>[^()]+)\)\s*$/i'];
+    foreach ($forms as $re) {
+        if (!preg_match($re, $sql, $g)) continue;
+        $cols = array_map(function ($c) { return trim(trim($c), '`"'); }, explode(',', $g['cols']));
+        $table = trim($g['table'], '`"'); $name = trim($g['name'], '`"');
+        foreach (array_merge($cols, [$table, $name]) as $x) if (!preg_match('/^[A-Za-z_][\w$]{0,63}$/', $x)) throw new Exception('Index columns must be plain column names');
+        return ['op' => 'add_index', 'table' => $table, 'name' => $name, 'columns' => $cols, 'sql' => $sql, 'where' => null];
+    }
+    return null;
+}
+
+function goal_index_list($pdo, $type, $table) {
+    if ($type === 'pgsql') {
+        $st = $pdo->prepare("SELECT i.relname, array_to_string(array_agg(a.attname ORDER BY k.ord), ',') FROM pg_index x JOIN pg_class i ON i.oid = x.indexrelid JOIN LATERAL unnest(x.indkey) WITH ORDINALITY k(attnum, ord) ON true JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum WHERE x.indrelid = (quote_ident(current_schema()) || '.' || quote_ident(?))::regclass GROUP BY i.relname");
+    } else {
+        $st = $pdo->prepare("SELECT INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? GROUP BY INDEX_NAME");
+    }
+    $st->execute([$table]);
+    return array_map(function ($r) { return ['name' => $r[0], 'columns' => explode(',', (string)$r[1])]; }, $st->fetchAll());
+}
+
+function goal_plan_index($pdo, $type, $ch) {
+    $out = ['op' => 'add_index', 'table' => $ch['table'], 'name' => $ch['name'], 'columns' => $ch['columns'], 'count' => null];
+    $t = goal_q($type, $ch['table']);
+    try { goal_rows($pdo, $type, 'SELECT ' . implode(', ', array_map(function ($c) use ($type) { return goal_q($type, $c); }, $ch['columns'])) . " FROM $t WHERE 1 = 0"); }
+    catch (Exception $e) { $out['blocked'] = "That table or column doesn't exist"; return $out; }
+    $existing = goal_index_list($pdo, $type, $ch['table']);
+    foreach ($existing as $i) {
+        if ($i['name'] === $ch['name']) { $out['blocked'] = 'An index named ' . $ch['name'] . ' already exists'; break; }
+        if (array_slice($i['columns'], 0, count($ch['columns'])) === $ch['columns']) { $out['blocked'] = "An index starting with these columns already exists, so this one wouldn't help"; break; }
+    }
+    list(, $n) = goal_rows($pdo, $type, "SELECT COUNT(*) FROM $t");
+    $out['table_rows'] = (int)$n[0][0];
+    $out['existing'] = $existing;
+    return $out;
+}
+
+function goal_index_ddl($pdo, $type, $sql) {
+    try { $pdo->exec('ROLLBACK'); } catch (Exception $e) {}
+    if ($type !== 'pgsql') $pdo->exec('SET SESSION TRANSACTION READ WRITE');
+    $pdo->exec($sql);
+}
+
 function goal_parse_change($sql) {
+    $idx = goal_parse_index($sql);
+    if ($idx) return $idx;
     $sql = trim(rtrim(trim((string)$sql), ';'));
     $m = goal_mask_sql($sql);
     if ($sql === '' || strpos($m, ';') !== false) throw new Exception('One statement at a time, please');
@@ -496,6 +544,7 @@ function goal_write_begin($pdo, $type) {
 
 function goal_plan($pdo, $type, $sql) {
     $ch = goal_parse_change($sql);
+    if ($ch['op'] === 'add_index') return goal_plan_index($pdo, $type, $ch);
     list($pk, $auto) = goal_pk($pdo, $type, $ch['table']);
     $out = ['op' => $ch['op'], 'table' => $ch['table'], 'pk' => $pk];
     if (!$pk) $out['blocked'] = 'This table has no primary key, so a change couldn\'t be undone safely';
@@ -519,6 +568,17 @@ function goal_plan($pdo, $type, $sql) {
 
 function goal_apply($pdo, $type, $sql, $expected) {
     $ch = goal_parse_change($sql);
+    if ($ch['op'] === 'add_index') {
+        $plan = goal_plan_index($pdo, $type, $ch);
+        if (!empty($plan['blocked'])) throw new Exception($plan['blocked'] . '. Nothing was changed');
+        $cols = implode(', ', array_map(function ($c) use ($type) { return goal_q($type, $c); }, $ch['columns']));
+        $t0 = microtime(true);
+        goal_index_ddl($pdo, $type, $type === 'pgsql'
+            ? 'CREATE INDEX CONCURRENTLY ' . goal_q($type, $ch['name']) . ' ON ' . goal_q($type, $ch['table']) . " ($cols)"
+            : 'ALTER TABLE ' . goal_q($type, $ch['table']) . ' ADD INDEX ' . goal_q($type, $ch['name']) . " ($cols), ALGORITHM=INPLACE, LOCK=NONE");
+        $rec = ['op' => 'add_index', 'table' => $ch['table'], 'name' => $ch['name'], 'columns' => $ch['columns'], 'pk' => [], 'before' => [], 'after' => []];
+        return [$rec, ['op' => 'add_index', 'table' => $ch['table'], 'rows' => 0, 'seconds' => round(microtime(true) - $t0, 1)]];
+    }
     $table = $ch['table'];
     list($pk, $auto) = goal_pk($pdo, $type, $table);
     if (!$pk) throw new Exception("This table has no primary key, so the change couldn't be undone safely. Nothing was changed");
@@ -562,6 +622,15 @@ function goal_apply($pdo, $type, $sql, $expected) {
 }
 
 function goal_undo($pdo, $type, $rec, $force) {
+    if ($rec['op'] === 'add_index') {
+        foreach (goal_index_list($pdo, $type, $rec['table']) as $i) {
+            if ($i['name'] === $rec['name']) {
+                goal_index_ddl($pdo, $type, $type === 'pgsql' ? 'DROP INDEX CONCURRENTLY IF EXISTS ' . goal_q($type, $rec['name'])
+                    : 'ALTER TABLE ' . goal_q($type, $rec['table']) . ' DROP INDEX ' . goal_q($type, $rec['name']) . ', ALGORITHM=INPLACE, LOCK=NONE');
+            }
+        }
+        return ['op' => 'undo', 'table' => $rec['table'], 'rows' => 0, 'forced' => false];
+    }
     $table = $rec['table']; $pk = $rec['pk']; $cols = $rec['columns'];
     $idx = array_map(function ($c) use ($cols) { return array_search($c, $cols); }, $pk);
     $keyof = function ($r) use ($idx) { return array_map(function ($i) use ($r) { return $r[$i]; }, $idx); };
@@ -610,6 +679,62 @@ function goal_undo_dir() {
 }
 
 function goal_undo_path($id) { return goal_undo_dir() . '/' . (int)$id . '.undo'; }
+
+// ---------------------------------------------------------------- playbook checks and the solving loop (read-only)
+function goal_checks($pdo, $type, $queries) {
+    $out = [];
+    foreach (array_slice((array)$queries, 0, 10) as $q) {
+        try { list($cols, $rows) = goal_rows($pdo, $type, goal_safe_sql($q), 50); $out[] = ['columns' => $cols, 'rows' => $rows]; }
+        catch (Exception $e) {
+            $m = $e->getMessage();
+            $out[] = ['error' => preg_match('/denied|permission|privilege|1142|1227/i', $m) ? "This database user isn't allowed to see it" : substr($m, 0, 120)];
+        }
+    }
+    return $out;
+}
+
+function goal_measure($pdo, $type, $sql) {
+    try {
+        $q = goal_safe_sql($sql);
+        list(, $n) = goal_rows($pdo, $type, "SELECT COUNT(*) FROM ($q) goal_t");
+        $best = null; $rows = [];
+        for ($i = 0; $i < 2; $i++) {
+            $t = microtime(true);
+            list(, $rows) = goal_rows($pdo, $type, $q, 2001);
+            $ms = (microtime(true) - $t) * 1000;
+            $best = $best === null ? $ms : min($best, $ms);
+        }
+        $sample = array_map(function ($r) { return json_encode($r); }, $rows);
+        sort($sample);
+        list($cols, $plan) = goal_rows($pdo, $type, 'EXPLAIN ' . $q);
+        $i = array_search('rows', $cols);
+        if ($i !== false) { $metric = 'rows'; $value = 0; foreach ($plan as $r) $value += (int)$r[$i]; }
+        else { $metric = 'cost'; $value = preg_match('/cost=[\d.]+\.\.([\d.]+)/', (string)$plan[0][0], $m) ? (float)$m[1] : null; }
+        return ['count' => (int)$n[0][0], 'ms' => round($best, 1), 'complete' => (int)$n[0][0] <= 2000,
+                'fingerprint' => hash('sha256', implode("\n", $sample)), 'metric' => $metric, 'plan' => $value];
+    } catch (Exception $e) { return ['error' => substr($e->getMessage(), 0, 160)]; }
+}
+
+function goal_optimize($pdo, $type, $sql, $rewrites, $tables) {
+    $orig = goal_measure($pdo, $type, $sql);
+    $cands = [];
+    foreach (array_slice((array)$rewrites, 0, 5) as $r) {
+        $m = goal_measure($pdo, $type, $r);
+        if (isset($m['error']) || isset($orig['error'])) $same = null;
+        elseif ($m['count'] !== $orig['count']) $same = false;
+        elseif ($orig['complete'] && $m['complete']) $same = $m['fingerprint'] === $orig['fingerprint'];
+        else $same = 'count';
+        unset($m['fingerprint']);
+        $cands[] = array_merge(['sql' => $r], $m, ['same' => $same]);
+    }
+    unset($orig['fingerprint']);
+    $info = [];
+    foreach (array_slice((array)$tables, 0, 5) as $t) {
+        try { list(, $n) = goal_rows($pdo, $type, 'SELECT COUNT(*) FROM ' . goal_q($type, $t)); $info[$t] = ['rows' => (int)$n[0][0], 'indexes' => goal_index_list($pdo, $type, $t)]; }
+        catch (Exception $e) { $info[$t] = ['error' => substr($e->getMessage(), 0, 120)]; }
+    }
+    return ['original' => $orig, 'candidates' => $cands, 'tables' => $info];
+}
 
 // ---------------------------------------------------------------- run the job
 $cfg = goal_find_settings($GOAL_DB);
@@ -669,6 +794,11 @@ try {
             goal_out(['ok' => true, 'result' => goal_health($pdo, $type)]);
         case 'live':
             goal_out(['ok' => true, 'result' => goal_live($pdo, $type)]);
+        case 'checks':
+            goal_out(['ok' => true, 'result' => ['results' => goal_checks($pdo, $type, isset($payload['queries']) ? $payload['queries'] : [])]]);
+        case 'optimize':
+            goal_out(['ok' => true, 'result' => goal_optimize($pdo, $type, isset($payload['sql']) ? $payload['sql'] : '',
+                isset($payload['rewrites']) ? $payload['rewrites'] : [], isset($payload['index_tables']) ? $payload['index_tables'] : [])]);
         default:
             goal_out(['ok' => false, 'error' => 'Unknown job']);
     }

@@ -104,3 +104,25 @@ def test_csv_fix(tmp_path):
     lines = open(out, encoding="utf-8-sig").read().splitlines()
     assert lines[1] == "01/10/2026,UPI payment,1250.5" and len(lines) == 2
     assert r["changes"]["remove_duplicates"] == 1
+
+
+def test_same_word_different_capitals_is_found_and_fixed(tmp_path):
+    from openpyxl import Workbook as WB
+
+    wb = WB()
+    ws = wb.active
+    ws.title = "Messy"
+    ws.append(["Name", "Department"])
+    for n, d in [("A", "Finance"), ("B", "finance"), ("C", "Finance"), ("D", "sales"), ("E", "Sales"), ("F", "Sales"), ("G", "IT")]:
+        ws.append([n, d])
+    src = str(tmp_path / "messy.xlsx")
+    wb.save(src)
+    r = office.scan(src)
+    assert r["summary"]["case_mixed"] == 2 and set(r["sheets"][0]["case_cells"]) == {"B3", "B5"}
+    out = str(tmp_path / "messy_fixed.xlsx")
+    res = office.fix(src, out, ["fix_case"])
+    assert res["changes"]["fix_case"] == 2
+    got = [c.value for c in load_workbook(out)["Messy"]["B"]][1:]
+    assert got == ["Finance", "Finance", "Finance", "Sales", "Sales", "Sales", "IT"]
+    first = list(load_workbook(out)["Changes by Goal Engine"].iter_rows(values_only=True))[1]
+    assert first[0].startswith("Capital/small letters")

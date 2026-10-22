@@ -124,6 +124,16 @@ def sheet_names(path: str) -> list[str]:
 
 
 # ------------------------------------------------------------------ small helpers
+CHANGES_SHEET = "Changes by Goal Engine"
+_ROWNO = re.compile(r"^\s*(record\s*id|s\.?\s*no\.?|sr\.?\s*no\.?|sl\.?\s*no\.?|serial(\s*no\.?)?|row(\s*no\.?)?|#|no\.?|id)\s*$", re.I)
+
+
+def row_key(header, row):
+    """What makes two rows 'the same': every value, ignoring spaces and capitals, and ignoring a plain row-number column
+    (Record ID 1 and Record ID 5 with the same person are still a duplicate)."""
+    skip = {i for i, h in enumerate(header or ()) if isinstance(h, str) and _ROWNO.match(h)}
+    return tuple(clean_spaces(v).lower() if isinstance(v, str) else v
+                 for i, v in enumerate(row) if i not in skip or not isinstance(v, (int, float)))
 def text_number(v):
     """'1,20,000' / '₹ 450' / ' 12.5 ' / '15%' -> number; None if it shouldn't be converted (IDs, phones, PINs)."""
     if not isinstance(v, str):
@@ -186,10 +196,14 @@ def scan(path: str) -> dict:
     report = {"kind": kind_of(path), "size": os.path.getsize(path), "sheets": []}
     shapes: dict = {}
     for name, rows in sheets(path, formulas=True):
+        if name == CHANGES_SHEET:
+            continue
         info = {"name": name, "rows": 0, "columns": 0, "header": [], "formulas": 0, "broken_refs": [],
                 "odd_formulas": [], "errors": {}, "text_numbers": 0, "text_number_cells": [], "spaces": 0,
-                "space_cells": [], "duplicate_rows": 0, "columns_info": []}
+                "space_cells": [], "duplicate_rows": 0, "columns_info": [], "case_mixed": 0, "case_cells": []}
         col_shapes = defaultdict(Counter)
+        col_words = defaultdict(lambda: defaultdict(Counter))   # column -> "finance" -> {"Finance": 3, "finance": 1}
+        col_word_cells = defaultdict(list)
         col_cells = defaultdict(list)
         col_types = defaultdict(Counter)
         seen_rows = set()
@@ -201,7 +215,7 @@ def scan(path: str) -> dict:
             if r_i == 1:
                 info["header"] = [str(v) if v is not None else "" for v in row]
             elif any(v not in (None, "") for v in row):
-                h = hash(tuple(clean_spaces(v).lower() if isinstance(v, str) else v for v in row))
+                h = hash(row_key(info["header"], row))
                 if h in seen_rows:
                     info["duplicate_rows"] += 1
                 else:
@@ -237,6 +251,11 @@ def scan(path: str) -> dict:
                         info["text_number_cells"].append(_addr(c_i, r_i))
                 else:
                     col_types[c_i]["text"] += 1
+                    w = clean_spaces(v)
+                    if len(w) <= 60 and len(col_words[c_i]) < 5000:
+                        col_words[c_i][w.lower()][w] += 1
+                        if len(col_word_cells[c_i]) < 50000:
+                            col_word_cells[c_i].append((r_i, w))
                 if has_bad_spaces(v):
                     info["spaces"] += 1
                     if len(info["space_cells"]) < MAX_LISTED:
@@ -250,6 +269,15 @@ def scan(path: str) -> dict:
                     if shape != main and len(info["odd_formulas"]) < MAX_LISTED:
                         info["odd_formulas"].append(_addr(c_i, r_i))
             shapes[(name, c_i)] = main if total and n / total >= 0.6 else None
+        # same word written with different capital letters in one column ("Finance" / "finance")
+        for c_i, groups in col_words.items():
+            main = {k: c.most_common(1)[0][0] for k, c in groups.items() if len(c) > 1}
+            for r_i, w in col_word_cells[c_i]:
+                m = main.get(w.lower())
+                if m is not None and w != m:
+                    info["case_mixed"] += 1
+                    if len(info["case_cells"]) < MAX_LISTED:
+                        info["case_cells"].append(_addr(c_i, r_i))
         for c_i in sorted(col_types):
             t = col_types[c_i]
             head = info["header"][c_i - 1] if c_i - 1 < len(info["header"]) else ""
@@ -259,6 +287,8 @@ def scan(path: str) -> dict:
     if report["kind"] == "xlsx":
         by_name = {s["name"]: s for s in report["sheets"]}
         for name, rows in sheets(path, formulas=False):
+            if name not in by_name:
+                continue
             errs = by_name[name]["errors"]
             for r_i, row in enumerate(rows, start=1):
                 for c_i, v in enumerate(row or (), start=1):
@@ -282,12 +312,40 @@ def _summary(report: dict) -> dict:
         s["text_numbers"] += sh["text_numbers"]
         s["spaces"] += sh["spaces"]
         s["duplicate_rows"] += sh["duplicate_rows"]
+        s["case_mixed"] += sh.get("case_mixed", 0)
     s["sheets"] = len(report["sheets"])
     return dict(s)
 
 
 # ------------------------------------------------------------------ fix (always a copy)
-FIX_OPS = {"trim_spaces", "text_to_number", "fix_broken_refs", "remove_duplicates"}
+FIX_OPS = {"trim_spaces", "text_to_number", "fix_broken_refs", "remove_duplicates", "fix_case"}
+LABELS = {"trim_spaces": "Extra space hataya (removed extra spaces)", "text_to_number": "Text ko number banaya (text turned into a number)",
+          "fix_broken_refs": "Toota formula theek kiya (broken formula rebuilt)", "remove_duplicates": "Duplicate row hatayi (repeated row removed)",
+          "fix_case": "Capital/small letters ek jaise kiye (same spelling everywhere)"}
+
+
+def case_maps(rows) -> dict:
+    """Per column: lower-case word -> the spelling used most often. Only words written more than one way."""
+    groups = defaultdict(lambda: defaultdict(Counter))
+    for r_i, row in enumerate(rows, start=1):
+        if r_i == 1:
+            continue
+        for c_i, v in enumerate(row or (), start=1):
+            if isinstance(v, str) and not v.startswith("=") and text_number(v) is None:
+                w = clean_spaces(v)
+                if 0 < len(w) <= 60 and len(groups[c_i]) < 5000:
+                    groups[c_i][w.lower()][w] += 1
+    return {c: {k: cnt.most_common(1)[0][0] for k, cnt in g.items() if len(cnt) > 1} for c, g in groups.items()}
+
+
+def _cased(v, maps, c_i, r_i, log, sheet, cell):
+    if r_i == 1 or not isinstance(v, str) or v.startswith("="):
+        return v
+    m = maps.get(c_i, {}).get(clean_spaces(v).lower())
+    if m is not None and clean_spaces(v) != m:
+        log.add("fix_case", sheet, cell, v, m)
+        return m
+    return v
 
 
 def fix(path: str, out: str, ops: list[str]) -> dict:
@@ -346,6 +404,9 @@ def _fix_full(path, out, ops):
                 if n >= 3 and n / sum(counter.values()) >= 0.6:
                     shapes[(ws.title, c)] = main
     for ws in wb.worksheets:
+        if ws.title == CHANGES_SHEET:
+            continue
+        maps = case_maps(ws.iter_rows(values_only=True)) if "fix_case" in ops else {}
         for row in ws.iter_rows():
             for cell in row:
                 v = cell.value
@@ -361,13 +422,17 @@ def _fix_full(path, out, ops):
                         log.counts["broken_refs_left"] += 1
                     continue
                 new = _new_value(v, ops, log, ws.title, cell.coordinate)
+                if maps:
+                    new = _cased(new, maps, cell.column, cell.row, log, ws.title, cell.coordinate)
                 if new is not v:
                     cell.value = new
                     if isinstance(new, float) and isinstance(v, str) and v.strip().endswith("%"):
                         cell.number_format = "0%"
         if "remove_duplicates" in ops:
             _dedupe_sheet(wb, ws, log)
-    _changes_sheet(wb.create_sheet("Changes by Goal Engine"), log)
+    if CHANGES_SHEET in wb.sheetnames:
+        del wb[CHANGES_SHEET]
+    _changes_sheet(wb.create_sheet(CHANGES_SHEET), log)
     wb.save(out)
     return {"changes": dict(log.counts), "formatting_kept": True}
 
@@ -381,8 +446,9 @@ def _dedupe_sheet(wb, ws, log):
         log.counts["duplicates_skipped_sheets"] += 1
         return
     seen, dupes = set(), []
+    header = [c.value for c in next(ws.iter_rows(max_row=1), [])]
     for row in ws.iter_rows(min_row=2):
-        vals = tuple(clean_spaces(c.value).lower() if isinstance(c.value, str) else c.value for c in row)
+        vals = row_key(header, [c.value for c in row])
         if all(v in (None, "") for v in vals):
             continue
         if vals in seen:
@@ -398,13 +464,24 @@ def _fix_stream(path, out, ops):
     """Big files: rewritten row by row (values and formulas kept, cell formatting not)."""
     wb_out = Workbook(write_only=True)
     log = _Log()
+    all_maps = {}
+    if "fix_case" in ops:
+        for name, rows in sheets(path, formulas=True):
+            all_maps[name] = case_maps(rows)
     for name, rows in sheets(path, formulas=True):
+        if name == CHANGES_SHEET:
+            continue
         ws = wb_out.create_sheet(name)
         seen = set()
+        maps = all_maps.get(name, {})
+        header = None
         for r_i, row in enumerate(rows, start=1):
-            row = [_new_value(v, ops, log, name, _addr(c_i, r_i)) for c_i, v in enumerate(row or (), start=1)]
+            row = [_cased(_new_value(v, ops, log, name, _addr(c_i, r_i)), maps, c_i, r_i, log, name, _addr(c_i, r_i))
+                   for c_i, v in enumerate(row or (), start=1)]
+            if header is None:
+                header = row
             if "remove_duplicates" in ops and r_i > 1 and not any(isinstance(v, str) and v.startswith("=") for v in row):
-                h = hash(tuple(v.lower() if isinstance(v, str) else v for v in row))
+                h = hash(row_key(header, row))
                 if any(v not in (None, "") for v in row) and h in seen:
                     log.add("remove_duplicates", name, f"row {r_i}", "", "")
                     continue
@@ -422,10 +499,15 @@ def _fix_csv(path, out, ops):
     seen = set()
     with open(out, "w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
+        maps = case_maps(_csv_rows(path)) if "fix_case" in ops else {}
+        header = None
         for r_i, row in enumerate(_csv_rows(path), start=1):
-            row = [_new_value(v, ops, log, "CSV", _addr(c_i, r_i)) for c_i, v in enumerate(row, start=1)]
+            row = [_cased(_new_value(v, ops, log, "CSV", _addr(c_i, r_i)), maps, c_i, r_i, log, "CSV", _addr(c_i, r_i))
+                   for c_i, v in enumerate(row, start=1)]
+            if header is None:
+                header = row
             if "remove_duplicates" in ops and r_i > 1:
-                h = hash(tuple(str(v).lower() for v in row))
+                h = hash(row_key(header, [text_number(v) if text_number(v) is not None else v for v in row]))
                 if h in seen:
                     log.add("remove_duplicates", "CSV", f"row {r_i}", "", "")
                     continue
@@ -435,9 +517,9 @@ def _fix_csv(path, out, ops):
 
 
 def _changes_sheet(ws, log):
-    ws.append(["What", "Sheet", "Cell", "Before", "After"])
-    for r in log.rows:
-        ws.append(list(r))
+    ws.append(["Kya kiya (what)", "Sheet", "Cell", "Pehle (before)", "Ab (after)"])
+    for op, *rest in log.rows:
+        ws.append([LABELS.get(op, op), *rest])
 
 
 # ------------------------------------------------------------------ compare two sheets / files

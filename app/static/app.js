@@ -1144,6 +1144,7 @@
       ["broken_refs", "fix_broken_refs", true, (n) => T(hi, `${n} formula toote hue hain (#REF!)`, `${n} broken formulas (#REF!)`)],
       ["text_numbers", "text_to_number", true, (n) => T(hi, `${n} number text ki tarah save hain (total galat aata hai)`, `${n} numbers saved as text (totals come out wrong)`)],
       ["spaces", "trim_spaces", true, (n) => T(hi, `${n} cells mein chhupe hue extra space`, `${n} cells with hidden extra spaces`)],
+      ["case_mixed", "fix_case", true, (n) => T(hi, `${n} cells mein ek hi shabd alag capital/small letters mein (finance / Finance)`, `${n} cells spell the same word with different capitals (finance / Finance)`)],
       ["duplicate_rows", "remove_duplicates", false, (n) => T(hi, `${n} rows do baar hain (duplicate)`, `${n} repeated rows (duplicates)`)],
       ["errors", null, false, (n) => T(hi, `${n} cells mein error dikh raha hai (#N/A, #DIV/0! …)`, `${n} cells show an error (#N/A, #DIV/0! …)`)],
       ["odd_formulas", null, false, (n) => T(hi, `${n} rows ka formula baaki column se alag hai (galti ho sakti hai)`, `${n} rows have a formula different from the rest of the column (possible mistake)`)],
@@ -1153,7 +1154,7 @@
       const list = [];
       for (const sh of rep.sheets) {
         const cells = key === "broken_refs" ? sh.broken_refs : key === "odd_formulas" ? sh.odd_formulas : key === "text_numbers" ? sh.text_number_cells
-          : key === "spaces" ? sh.space_cells : key === "errors" ? Object.values(sh.errors).flatMap((e) => e.cells) : [];
+          : key === "spaces" ? sh.space_cells : key === "case_mixed" ? sh.case_cells : key === "errors" ? Object.values(sh.errors).flatMap((e) => e.cells) : [];
         for (const c of (cells || []).slice(0, 8)) list.push(rep.sheets.length > 1 ? `${sh.name}!${c}` : c);
       }
       return list.join(", ");
@@ -1225,6 +1226,7 @@
           [c.text_to_number, T(hi, "text wale numbers asli number banaye", "text-numbers turned into numbers")],
           [c.trim_spaces, T(hi, "cells se extra space hataye", "cells cleaned of extra spaces")],
           [c.remove_duplicates, T(hi, "duplicate rows hatayi", "duplicate rows removed")],
+          [c.fix_case, T(hi, "cells mein capital/small letters ek jaise kiye", "cells made to use the same spelling")],
         ].filter(([n]) => n);
         parts.push(el("p", "cap", T(hi, "Ho gaya", "Done")));
         const ul = el("ul", "findings done");

@@ -176,3 +176,40 @@ def test_one_upload_many_tasks_from_chat_and_undo(client, ml_mode):
     r = say(client, "undo karo", goal_id)
     f = _wait(client, token)
     assert len(f["steps"]) == 1 and f["report"]["summary"]["text_numbers"] == 1
+
+
+def test_find_in_a_named_sheet_with_typos_then_yes(client, ml_mode):
+    """Chetan's own flow: open file, 'find dupicate entries from slaes sheet' -> exact answer, then 'yes' fixes it."""
+    from pathlib import Path
+
+    r = say(client, "I need to work on excel file")
+    assert "won't open" not in r["reply"] and "corrupt" not in r["reply"].lower()
+    goal_id = r["goal"]["id"]
+    agent = next(a for a in r["agents"] if a.get("office"))
+    data = (Path(__file__).parent / "data" / "practice.xlsx").read_bytes()
+    f = _upload(client, agent["id"], data, "Excel_Practice.xlsx")
+
+    r = say(client, "can you find dupicate entries from slaes sheet", goal_id)
+    reply = r["reply"]
+    assert "Sales Data" in reply and "Messy Data" in reply and ("yes" in reply or "haan" in reply), reply
+    card = next(a for a in r["agents"] if a.get("office"))
+    assert card["formula"] is None                                  # no formula homework while the file is open
+
+    r = say(client, "yes", goal_id)
+    assert "Fixing" in r["reply"] or "theek kar raha" in r["reply"], r["reply"]
+    f = _wait(client, f["id"])
+    assert f["result"]["changes"].get("remove_duplicates") == 2 and f["report"]["summary"]["duplicate_rows"] == 0
+
+
+def test_only_the_named_sheet_changes(client, ml_mode):
+    from pathlib import Path
+
+    r = say(client, "excel file check karni hai")
+    goal_id = r["goal"]["id"]
+    agent = next(a for a in r["agents"] if a.get("office"))
+    data = (Path(__file__).parent / "data" / "practice.xlsx").read_bytes()
+    f = _upload(client, agent["id"], data, "Excel_Practice.xlsx")
+    say(client, "messy sheet mein capital small letters theek karo", goal_id)
+    f = _wait(client, f["id"])
+    assert f["result"]["changes"].get("fix_case") == 4
+    say(client, "kya galat hai is file mein?", goal_id)

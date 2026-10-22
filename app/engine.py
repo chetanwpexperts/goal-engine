@@ -195,7 +195,11 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
     db.flush()
     reply, options, relation = turn.reply, turn.options, turn.relation
     spec = None
-    if goal is not None and relation not in ("howto", "safety", "chit_chat"):
+    file_open = False
+    if goal is not None:
+        _oa = officeagent.goal_agent(db, goal)
+        file_open = _oa is not None and officeagent.open_file(db, _oa) is not None
+    if goal is not None and relation not in ("howto", "safety", "chit_chat") and not file_open:
         spec = plan_automation(text)
     if spec is not None:
         # "Do this automatically" -> build the agent from blocks; the owner only checks the preview and taps Start.
@@ -211,7 +215,8 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
         goal.next_action = "Add the sheet, check the preview, then Start"
         db.commit()
         reply, options, relation = auto.plan_reply(spec, turn.hi), [], "agent_plan"
-    elif goal is not None and relation not in ("safety", "chit_chat") and officeagent.wants_office(goal, text, db):
+    elif goal is not None and relation not in ("safety", "chit_chat") and (
+            (file_open and not dbagent.DB_WORDS.search(text or "")) or officeagent.wants_office(goal, text, db)):
         # Excel / file work: the agent works on the file itself and gives back a fixed copy.
         from app.officeknow import brain as officebrain
 
@@ -219,7 +224,7 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
         agent = officeagent.goal_agent(db, goal) or officeagent.create_agent(db, goal)
         task_reply = officeagent.chat_task(db, agent, text, turn.hi)
         inputs = loads(agent.inputs, {}) or {}
-        if rec["confidence"] >= 0.35 and not task_reply:
+        if rec["confidence"] >= officeagent.SURE and not task_reply and officeagent.open_file(db, agent) is None:
             inputs["brain"] = rec
             goal.title = officebrain.describe(rec, turn.hi)
         elif not goal.title:
@@ -230,6 +235,9 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
         goal.next_action_type = "execute"
         goal.next_action = "Give the file to the agent"
         db.commit()
+        opened = officeagent.open_file(db, agent)
+        if not task_reply and opened is not None:
+            task_reply = officeagent.cant_yet(opened, turn.hi)
         reply, options, relation = (task_reply or officeagent.plan_reply(rec, turn.hi)), [], "agent_plan"
     elif goal is not None and relation not in ("howto", "safety", "chit_chat") and dbagent.wants_database(goal, text):
         # Database work: the agent works through a connector on the user's own server.

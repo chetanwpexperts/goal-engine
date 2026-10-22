@@ -43,7 +43,8 @@ def wants_office(goal: Goal | None, text: str, db: Session | None = None) -> boo
     if db is not None:                                # a file is already open in this conversation: follow-up tasks go to it
         agent = goal_agent(db, goal)
         if agent is not None and open_file(db, agent) is not None and (
-                UNDO_RE.search(text or "") or ALL_RE.search(text or "") or any(rx.search(text or "") for _, rx in CHAT_OPS)):
+                UNDO_RE.search(text or "") or ALL_RE.search(text or "") or ops_in(text) or REPORT_RE.search(text or "")
+                or (pending_offer(agent) and YES_RE.search(text or ""))):
             return True
     from app.agents.database import DB_WORDS
     from app.officeknow import brain
@@ -67,10 +68,13 @@ def create_agent(db: Session, goal: Goal) -> Agent:
     return agent
 
 
+SURE = 0.5
+
+
 def plan_reply(rec: dict, hi: bool) -> str:
     from app.officeknow import brain
 
-    seen = brain.describe(rec, hi) if rec.get("confidence", 0) >= 0.35 else ""
+    seen = brain.describe(rec, hi) if rec.get("confidence", 0) >= SURE else ""
     lead = (f"Samjha: {seen}. " if hi else f"Understood: {seen}. ") if seen else ""
     if rec.get("kind") == "formula" and seen:
         return lead + ("Formula card mein hai. File daaloge to main khud laga dunga." if hi
@@ -83,6 +87,9 @@ def office_dict(db: Session, agent: Agent, hi: bool) -> dict:
     inputs = loads(agent.inputs, {}) or {}
     files = list(db.scalars(select(OfficeFile).where(OfficeFile.agent_id == agent.id, OfficeFile.status != "removed")
                             .order_by(OfficeFile.id.desc()).limit(6)))
+    has_file = any(f.status in ("ready", "queued", "working") for f in files)
+    if has_file:
+        inputs = {k: v for k, v in inputs.items() if k != "brain"}     # the agent works on the file; no formula homework
     return {"id": agent.id, "lang": "hi" if hi else "en", "recipe": "office", "office": True, "status": agent.status,
             "name": "Excel / file ka kaam" if hi else "Excel and file work", "access": "upload", "available": True,
             "blocks": [], "runs": [], "brain": _brain_view(inputs.get("brain"), hi), "formula": _formula_view(inputs.get("brain"), hi),
@@ -178,11 +185,11 @@ def finish_upload(db: Session, f: OfficeFile) -> OfficeFile:
     return _start(db, f, "scan", {})
 
 
-def start_fix(db: Session, f: OfficeFile, ops: list[str]) -> OfficeFile:
+def start_fix(db: Session, f: OfficeFile, ops: list[str], sheets: list[str] | None = None) -> OfficeFile:
     ops = [o for o in ops if o in office.FIX_OPS]
     if f.status not in ("ready", "error") or not ops:
         raise OfficeAgentError("Pehle check poora hone do.")
-    return _start(db, f, "fix", {"ops": ops})
+    return _start(db, f, "fix", {"ops": ops, "sheets": sheets or []})
 
 
 def start_compare(db: Session, a: OfficeFile, b: OfficeFile, key: str = "") -> OfficeFile:
@@ -218,7 +225,7 @@ def _work(file_id: int, task: str, args: dict) -> None:
                 st = steps(f)
                 root, ext = os.path.splitext(st[0]["path"])
                 out = f"{root}.v{len(st)}{ext}"
-                res = office.fix(f.path, out, args["ops"])
+                res = office.fix(f.path, out, args["ops"], args.get("sheets") or None)
                 st.append({"path": out, "ops": args["ops"], "changes": res["changes"]})
                 f.versions, f.path = dumps(st), out
                 f.result = dumps({"task": "fix", **res})
@@ -337,16 +344,92 @@ def resume_interrupted(boot) -> int:
     return n
 
 
-# ------------------------------------------------------------------ "duplicate bhi hatao": tasks on the open file from the chat
-CHAT_OPS = [
-    ("trim_spaces", re.compile(r"\b(space|spaces|spes|khali jagah)\b", re.I)),
-    ("remove_duplicates", re.compile(r"\b(duplicate|duplicates|duplicat|dublicate|do baar|repeat|repeated)\b", re.I)),
-    ("fix_case", re.compile(r"\b(capital|small letter|case|uppercase|lowercase|spelling ek)\b", re.I)),
-    ("text_to_number", re.compile(r"\b(text.{0,12}number|number.{0,20}(text|theek|thik|fix)|total (galat|0|zero)|sum (galat|0|zero))\b", re.I)),
-    ("fix_broken_refs", re.compile(r"(#ref|toote? (hue )?formula|broken formula|formula (theek|thik|fix))", re.I)),
-]
+# ------------------------------------------------------------------ tasks on the open file, typed in the chat
+# Keywords are matched loosely, so typos still work ("dupicate", "slaes sheet").
+OP_WORDS = {
+    "trim_spaces": ["space", "spaces", "spacing", "jagah"],
+    "remove_duplicates": ["duplicate", "duplicates", "duplicated", "repeat", "repeated", "dobara", "dohra"],
+    "fix_case": ["capital", "capitals", "lowercase", "uppercase", "case", "spelling"],
+    "text_to_number": ["numbers", "number", "numeric"],
+    "fix_broken_refs": ["#ref", "ref", "broken"],
+}
+FIND_WORDS = {"find", "show", "check", "list", "dhoondo", "dhundo", "dhoond", "dhund", "dikhao", "dikha", "batao", "bata", "kitne",
+              "kitni", "kaun", "kaunse", "konse", "kahan", "where", "which", "how", "many", "any", "pata", "highlight", "search"}
+DO_WORDS = {"remove", "delete", "hatao", "hata", "hatado", "fix", "theek", "thik", "saaf", "clean", "correct", "sudharo",
+            "badlo", "merge", "drop", "nikaal", "nikal"}
+YES_RE = re.compile(r"^\s*(haan|ha|haa|han|yes|yep|ok|okay|theek hai|thik hai|kar do|karo|hata do|hatao|do it|go ahead|please)\b", re.I)
 UNDO_RE = re.compile(r"\b(undo|wapas|vapas|pehle jaisa|revert|purana wala)\b", re.I)
 ALL_RE = re.compile(r"\b(sab|saari|saare|everything|all)\b.{0,20}\b(theek|thik|fix|saaf|clean)", re.I)
+REPORT_RE = re.compile(r"\b(kya galat|kya problem|what.{0,10}wrong|check (karo|my|the|this)|problems?|errors?|galti|galtiyan|issues?)\b", re.I)
+_OP_NAMES = {"trim_spaces": ("extra space", "extra spaces"), "remove_duplicates": ("duplicate rows", "duplicate rows"),
+             "fix_case": ("capital/small letters", "capital letters"), "text_to_number": ("text wale numbers", "text-numbers"),
+             "fix_broken_refs": ("toote formula", "broken formulas")}
+
+
+def _words(text: str) -> list[str]:
+    from app.ml.normalize import tokens
+
+    return tokens(text or "")
+
+
+def _close(word: str, choices) -> bool:
+    import difflib
+
+    return len(word) >= 3 and bool(difflib.get_close_matches(word, list(choices), n=1, cutoff=0.8 if len(word) > 4 else 0.9))
+
+
+def ops_in(text: str) -> list[str]:
+    ws = _words(text)
+    found = [op for op, kws in OP_WORDS.items() if any(w in kws or _close(w, kws) for w in ws)]
+    if "text_to_number" in found and not re.search(r"\b(text|number|numbers|total|sum|jod)\b", text or "", re.I):
+        found.remove("text_to_number")
+    if "fix_broken_refs" in found and not re.search(r"(#?ref|formula|broken)", text or "", re.I):
+        found.remove("fix_broken_refs")
+    return found
+
+
+def sheets_in(text: str, report: dict) -> list[str]:
+    """'from the sales sheet' -> ['Sales Data'] (typos allowed)."""
+    ws = set(_words(text))
+    out = []
+    for sh in report.get("sheets", []):
+        name = sh["name"]
+        key = [w for w in re.findall(r"[a-z0-9]+", name.lower()) if w not in ("data", "sheet", "sheets", "the", "and", "of")]
+        if key and all(any(w == k or _close(w, [k]) for w in ws) for k in key):
+            out.append(name)
+    return out
+
+
+def wants_find(text: str) -> bool:
+    ws = _words(text)
+    finding = any(w in FIND_WORDS for w in ws) or "?" in (text or "") or bool(re.search(r"\bhai kya\b|\bhain kya\b", text or "", re.I))
+    doing = any(w in DO_WORDS or _close(w, DO_WORDS) for w in ws)
+    return finding and not doing
+
+
+def _findings(report: dict, op: str, sheets: list[str], hi: bool) -> tuple[str, int]:
+    """Plain words for what the scan found, for one kind of problem, in the asked sheets."""
+    lines, total = [], 0
+    for sh in report.get("sheets", []):
+        if sheets and sh["name"] not in sheets:
+            continue
+        if op == "remove_duplicates":
+            n, cells = sh.get("duplicate_rows", 0), [f"row {r} ({'row' if not hi else 'row'} {m} {'jaisi' if hi else 'again'})"
+                                                      for r, m in sh.get("duplicate_list", [])[:6]]
+        elif op == "trim_spaces":
+            n, cells = sh.get("spaces", 0), sh.get("space_cells", [])[:8]
+        elif op == "fix_case":
+            n, cells = sh.get("case_mixed", 0), sh.get("case_cells", [])[:8]
+        elif op == "text_to_number":
+            n, cells = sh.get("text_numbers", 0), sh.get("text_number_cells", [])[:8]
+        else:
+            n, cells = sh.get("broken_ref_count", 0), sh.get("broken_refs", [])[:8]
+        total += n
+        if n:
+            lines.append(f"{sh['name']}: {n} ({', '.join(cells)}{' …' if n > len(cells) else ''})")
+        elif sheets:
+            lines.append(f"{sh['name']}: " + ("koi nahi" if hi else "none"))
+    return "; ".join(lines), total
 
 
 def open_file(db: Session, agent: Agent) -> OfficeFile | None:
@@ -354,32 +437,97 @@ def open_file(db: Session, agent: Agent) -> OfficeFile | None:
                      .order_by(OfficeFile.updated_at.desc()))
 
 
+def pending_offer(agent: Agent) -> dict | None:
+    return (loads(agent.inputs, {}) or {}).get("offer")
+
+
+def _set_offer(agent: Agent, offer: dict | None) -> None:
+    inputs = loads(agent.inputs, {}) or {}
+    if offer:
+        inputs["offer"] = offer
+    else:
+        inputs.pop("offer", None)
+    agent.inputs = dumps(inputs)
+
+
 def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
-    """A task typed in the chat for the file that's already open. Returns the reply, or None if it isn't one."""
+    """Work on the file that's already open, from what the person typed. Returns the reply, or None if it isn't a file task."""
     f = open_file(db, agent)
     if f is None:
         return None
     if f.status != "ready":
         return "Pichla kaam abhi chal raha hai, khatam hote hi agla karta hoon. Card pe dikhega." if hi else "Still working on the last task; the card shows when it's done."
+    report = loads(f.report, {}) or {}
+    offer = pending_offer(agent)
+    if offer and YES_RE.search(text or "") and not ops_in(text):
+        _set_offer(agent, None)
+        f = start_fix(db, f, offer["ops"], offer.get("sheets"))
+        return _doing(f, offer["ops"], offer.get("sheets"), hi)
     if UNDO_RE.search(text or ""):
         try:
             start_undo(db, f)
         except OfficeAgentError as exc:
             return str(exc)
         return "Aakhri badlav wapas le raha hoon." if hi else "Undoing the last change."
-    ops = [op for op, rx in CHAT_OPS if rx.search(text or "")]
+    ops = ops_in(text)
+    sheets = sheets_in(text, report)
     if not ops and ALL_RE.search(text or ""):
-        s = (loads(f.report, {}) or {}).get("summary", {})
+        s = report.get("summary", {})
         ops = [op for key, op in (("spaces", "trim_spaces"), ("text_numbers", "text_to_number"), ("broken_refs", "fix_broken_refs"),
                                   ("case_mixed", "fix_case"), ("duplicate_rows", "remove_duplicates")) if s.get(key)]
         if not ops:
             return "Is file mein theek karne layak kuch nahi bacha." if hi else "Nothing left to fix in this file."
+        return _doing(start_fix(db, f, ops, sheets), ops, sheets, hi)
+    if not ops and REPORT_RE.search(text or ""):
+        ops = [op for op in _OP_NAMES]          # "kya galat hai?" -> everything the scan knows
+        return _answer(agent, report, ops, sheets, hi, f)
     if not ops:
         return None
-    start_fix(db, f, ops)
-    names = {"trim_spaces": ("extra space", "extra spaces"), "remove_duplicates": ("duplicate rows", "duplicate rows"),
-             "fix_case": ("capital/small letters", "capital letters"), "text_to_number": ("text wale numbers", "text-numbers"),
-             "fix_broken_refs": ("toote formula", "broken formulas")}
-    what = ", ".join(names[o][0 if hi else 1] for o in ops)
-    return (f"{f.name} mein {what} theek kar raha hoon. Pichle badlav bhi saath rahenge." if hi
-            else f"Fixing {what} in {f.name}. Earlier changes stay in.")
+    if wants_find(text):
+        return _answer(agent, report, ops, sheets, hi, f)
+    return _doing(start_fix(db, f, ops, sheets), ops, sheets, hi)
+
+
+def _answer(agent, report, ops, sheets, hi, f) -> str:
+    """Find, don't change: say exactly where, then offer to fix it."""
+    parts, fixable = [], []
+    for op in ops:
+        text, n = _findings(report, op, sheets, hi)
+        if n or sheets:
+            parts.append(f"{_OP_NAMES[op][0 if hi else 1].capitalize()}: {text or ('koi nahi' if hi else 'none')}")
+        if n:
+            fixable.append(op)
+    where = f" ({', '.join(sheets)})" if sheets else ""
+    if not fixable:
+        others = []
+        if sheets:                               # nothing in the asked sheet; maybe elsewhere
+            for op in ops:
+                t, n = _findings(report, op, [], hi)
+                if n:
+                    others.append(f"{_OP_NAMES[op][0 if hi else 1]}: {t}")
+        what = ", ".join(_OP_NAMES[o][0 if hi else 1] for o in ops) if len(ops) < 5 else ("koi galti" if hi else "problems")
+        place = ", ".join(sheets) if sheets else f.name
+        msg = (f"{place} mein ab koi {what} nahi hai." if hi else f"No {what} in {place}.")
+        if others:
+            msg += (" Baaki sheets mein: " if hi else " In other sheets: ") + "; ".join(others) + "."
+            _set_offer(agent, {"ops": [o for o in ops if _findings(report, o, [], hi)[1]], "sheets": []})
+            msg += " Theek kar doon? 'haan' likho." if hi else " Shall I fix those? Type 'yes'."
+        return msg
+    _set_offer(agent, {"ops": fixable, "sheets": sheets})
+    return ("Mila" if hi else "Found") + f"{where}. " + ". ".join(parts) + ". " + (
+        "Theek kar doon? 'haan' likho, ya card pe Theek karo dabao." if hi else "Shall I fix it? Type 'yes', or press Fix it on the card.")
+
+
+def _doing(f, ops, sheets, hi) -> str:
+    what = ", ".join(_OP_NAMES[o][0 if hi else 1] for o in ops)
+    where = f" ({', '.join(sheets)})" if sheets else ""
+    return (f"{f.name}{where} mein {what} theek kar raha hoon. Pichle badlav bhi saath rahenge." if hi
+            else f"Fixing {what} in {f.name}{where}. Earlier changes stay in.")
+
+
+def cant_yet(f: OfficeFile, hi: bool) -> str:
+    return (f"{f.name} khuli hai. Is pe main abhi ye kar sakta hoon: extra space, duplicate rows, capital/small letters, text wale numbers, "
+            "toote formula dhoondna aur theek karna, aur doosri file se compare. Aapka ye kaam main abhi seekh raha hoon; "
+            "tab tak inmein se koi kaam bolo." if hi else
+            f"{f.name} is open. Right now I can find and fix extra spaces, duplicate rows, mixed capitals, numbers saved as text, "
+            "broken formulas, and compare with another file. I'm still learning this one; meanwhile ask for any of those.")

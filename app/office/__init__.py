@@ -200,13 +200,13 @@ def scan(path: str) -> dict:
             continue
         info = {"name": name, "rows": 0, "columns": 0, "header": [], "formulas": 0, "broken_refs": [],
                 "odd_formulas": [], "errors": {}, "text_numbers": 0, "text_number_cells": [], "spaces": 0,
-                "space_cells": [], "duplicate_rows": 0, "columns_info": [], "case_mixed": 0, "case_cells": []}
+                "space_cells": [], "duplicate_rows": 0, "columns_info": [], "case_mixed": 0, "case_cells": [], "duplicate_list": []}
         col_shapes = defaultdict(Counter)
         col_words = defaultdict(lambda: defaultdict(Counter))   # column -> "finance" -> {"Finance": 3, "finance": 1}
         col_word_cells = defaultdict(list)
         col_cells = defaultdict(list)
         col_types = defaultdict(Counter)
-        seen_rows = set()
+        seen_rows = {}
         for r_i, row in enumerate(rows, start=1):
             if row is None:
                 continue
@@ -218,8 +218,10 @@ def scan(path: str) -> dict:
                 h = hash(row_key(info["header"], row))
                 if h in seen_rows:
                     info["duplicate_rows"] += 1
-                else:
-                    seen_rows.add(h)
+                    if len(info["duplicate_list"]) < MAX_LISTED:
+                        info["duplicate_list"].append([r_i, seen_rows[h]])     # this row repeats that one
+                elif len(seen_rows) < 3_000_000:
+                    seen_rows[h] = r_i
             for c_i, v in enumerate(row, start=1):
                 if v is None or v == "":
                     col_types[c_i]["empty"] += 1
@@ -348,7 +350,8 @@ def _cased(v, maps, c_i, r_i, log, sheet, cell):
     return v
 
 
-def fix(path: str, out: str, ops: list[str]) -> dict:
+def fix(path: str, out: str, ops: list[str], only_sheets=None) -> dict:
+    """only_sheets: change just these sheets ("Sales Data"); the others are copied as they are."""
     ops = [o for o in ops if o in FIX_OPS]
     if not ops:
         raise OfficeError("Nothing to fix.")
@@ -356,8 +359,8 @@ def fix(path: str, out: str, ops: list[str]) -> dict:
     if k == "csv":
         return _fix_csv(path, out, ops)
     if os.path.getsize(path) <= FULL_MODE_MAX:
-        return _fix_full(path, out, ops)
-    return _fix_stream(path, out, ops)
+        return _fix_full(path, out, ops, only_sheets)
+    return _fix_stream(path, out, ops, only_sheets)
 
 
 class _Log:
@@ -385,7 +388,7 @@ def _new_value(v, ops, log, sheet, cell):
     return v
 
 
-def _fix_full(path, out, ops):
+def _fix_full(path, out, ops, only_sheets=None):
     """Keeps all formatting: the workbook is opened normally and changed cell by cell."""
     keep_vba = path.lower().endswith(".xlsm")
     wb = load_workbook(path, keep_vba=keep_vba)
@@ -404,7 +407,7 @@ def _fix_full(path, out, ops):
                 if n >= 3 and n / sum(counter.values()) >= 0.6:
                     shapes[(ws.title, c)] = main
     for ws in wb.worksheets:
-        if ws.title == CHANGES_SHEET:
+        if ws.title == CHANGES_SHEET or (only_sheets and ws.title not in only_sheets):
             continue
         maps = case_maps(ws.iter_rows(values_only=True)) if "fix_case" in ops else {}
         for row in ws.iter_rows():
@@ -459,7 +462,7 @@ def _dedupe_sheet(wb, ws, log):
         ws.delete_rows(r)
 
 
-def _fix_stream(path, out, ops):
+def _fix_stream(path, out, ops, only_sheets=None):
     """Big files: rewritten row by row (values and formulas kept, cell formatting not)."""
     wb_out = Workbook(write_only=True)
     log = _Log()
@@ -471,6 +474,10 @@ def _fix_stream(path, out, ops):
         if name == CHANGES_SHEET:
             continue
         ws = wb_out.create_sheet(name)
+        if only_sheets and name not in only_sheets:
+            for row in rows:
+                ws.append(list(row or ()))
+            continue
         seen = set()
         maps = all_maps.get(name, {})
         header = None

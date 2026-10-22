@@ -54,3 +54,16 @@ def test_diagnose_and_optimize_through_the_api(client, ml_mode, monkeypatch):
     assert "analysis" in o and o["analysis"]["findings"]
     oj = client.get(f"/api/connector-jobs/{o['job']['id']}").json()
     assert oj["status"] == "done" and oj["result"]["original"]["count"] == 1000
+
+
+def test_brain_understands_new_phrasings_of_every_problem():
+    """Each playbook/question ships 2 sentences the brain never learned from. It must still recognise them."""
+    from app import dbknow
+    misses = []
+    for name, kind in (("issues", "issue"), ("questions", "question")):
+        for e in dbknow.load(name):
+            for t in e.get("test_phrases", []):
+                r = brain.recognize(t)
+                if (r["kind"], r["id"]) != (kind, e["id"]):
+                    misses.append(f"{e['id']}: '{t}' -> {r['kind']}:{r['id']} ({r['confidence']})")
+    assert not misses, "\n".join(misses)

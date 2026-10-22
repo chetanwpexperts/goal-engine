@@ -72,6 +72,13 @@ def validate() -> list[str]:
                         problems.append(f"{where}: bad regex in {key}: {exc}")
             if name == "errors" and e["fix"].get("type") not in FIX_TYPES:
                 problems.append(f"{where}: fix.type must be one of {sorted(FIX_TYPES)}")
+            if name in ("issues", "questions"):
+                tps = e.get("test_phrases", [])
+                if len(tps) < 2:
+                    problems.append(f"{where}: needs at least 2 test_phrases (new ways of saying it, not in symptoms/examples)")
+                learned = {x.strip().lower() for x in e.get("symptoms", []) + e.get("examples", [])}
+                if any(t.strip().lower() in learned for t in tps):
+                    problems.append(f"{where}: test_phrases must be different from the learned sentences")
             if name == "issues":
                 if e["category"] not in CATEGORIES:
                     problems.append(f"{where}: category must be one of {sorted(CATEGORIES)}")

@@ -34,7 +34,11 @@ and how to prove it's fixed.
 4. Read the official docs for it. Add entries to the right JSON file. **Every entry needs an `https://` `source` link** to the page it came from.
    - Plain-language text in both English (`*_en`) and simple Hinglish (`*_hi`), short, for a small-business owner.
    - Query templates must be read-only (`SELECT`/`WITH`), use `{placeholders}`, and be written for each engine they support.
-5. Add or extend tests in `tests/test_dbknow.py` when a new kind of entry needs it. Templates are executed against the real test databases.
+5. **Prove it works before keeping it:**
+   - Every playbook and question gets `test_phrases`: at least 2 NEW ways a person would say it (English/Hinglish/Hindi), NOT copies of the symptoms/examples.
+     `tests/test_dbbrain.py` checks the brain recognises them. If it doesn't, add richer `symptoms`/`examples` (more variety, real wording from Stack Overflow titles) until it does. Never weaken the test phrases to make it pass.
+   - Add the error codes a problem shows (`codes`: ["1040", "53300"]) so "error 1040 aa raha hai" is recognised directly.
+   - Every check and template is executed against the real test databases (tests/test_dbknow.py).
 6. Run the **whole** suite: `.venv/bin/python -m pytest -q`. Everything must pass. If something fails that you can't fix, revert your change.
 7. Tick the item in `BACKLOG.md`, add a dated entry to `LOG.md` (what was added, how many entries, anything Chetan should decide), commit, push `db-knowledge`.
 

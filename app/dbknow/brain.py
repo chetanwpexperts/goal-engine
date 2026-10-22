@@ -79,6 +79,11 @@ def recognize(text: str, engine: str = "") -> dict:
     for e in dbknow.load("errors"):              # an error message pasted as-is: exact match beats guessing
         if (not engine or engine in e["engines"]) and re.search(e["match"], text, re.I | re.S):
             return {"kind": "error", "id": e["id"], "confidence": 1.0, "alternatives": []}
+    codes = set(re.findall(r"\b(\d{4,5}|[0-9A-Z]{5})\b", text))
+    if codes:                                     # "error 1040 aa raha hai": the code says which problem it is
+        for issue in dbknow.load("issues"):
+            if codes & set(issue.get("codes", [])):
+                return {"kind": "issue", "id": issue["id"], "confidence": 1.0, "alternatives": []}
     with _lock:
         model = _train()
     probs = model.predict_proba([text])[0]

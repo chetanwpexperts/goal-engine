@@ -14,7 +14,10 @@
       "website down: too many connections",
       "site bar bar database error de rahi hai",
       "FATAL: sorry, too many clients already",
-      "connection limit khatam ho gaya"
+      "connection limit khatam ho gaya",
+      "connection limit reached error",
+      "mysql max connections khatam",
+      "database bolta hai aur connection nahi le sakta"
     ],
     "diagnose": [
       {
@@ -87,6 +90,15 @@
     "source": "https://dev.mysql.com/doc/refman/8.0/en/too-many-connections.html",
     "seen_at": [
       "https://stackoverflow.com/questions/730579/error-1040-too-many-connections"
+    ],
+    "test_phrases": [
+      "website khul nahi rahi, error mein connections likha hai",
+      "error 1040 aa raha hai mysql mein"
+    ],
+    "codes": [
+      "1040",
+      "1203",
+      "53300"
     ]
   },
   {
@@ -103,7 +115,11 @@
       "emoji not saving",
       "Incorrect string value: '\\xF0\\x9F...'",
       "data mein ??? aa raha hai",
-      "special characters galat dikh rahe hain"
+      "special characters galat dikh rahe hain",
+      "naam ajeeb characters mein dikhte hain",
+      "hindi naam kharab ho jaate hain save karne ke baad",
+      "garbled text in mysql",
+      "data mein Ã© jaise ajeeb characters"
     ],
     "diagnose": [
       {
@@ -150,6 +166,13 @@
     "source": "https://dev.mysql.com/doc/refman/8.0/en/charset-unicode-utf8mb4.html",
     "seen_at": [
       "https://stackoverflow.com/questions/10957238/incorrect-string-value-when-trying-to-insert-utf-8-into-mysql-via-jdbc"
+    ],
+    "test_phrases": [
+      "urdu aur hindi naam database mein ulte seedhe ho jaate hain",
+      "mysql emoji save nahi karta"
+    ],
+    "codes": [
+      "1366"
     ]
   }
 ]

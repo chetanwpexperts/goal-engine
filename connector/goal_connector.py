@@ -336,7 +336,17 @@ def setup(args):
         cfg["database"] = input("Database name: ").strip()
         cfg["user"] = input("Database user: ").strip()
         cfg["password"] = getpass.getpass("Password (hidden): ")
-    db = Database(cfg).connect()
+    try:
+        db = Database(cfg).connect()
+    except Exception as exc:  # noqa: BLE001 - show a short reason, not a traceback
+        msg = str(exc)
+        if "1045" in msg or "password authentication failed" in msg:
+            sys.exit("\nThe database said no to this user/password. Check them and run setup again.")
+        if "cryptography" in msg:
+            sys.exit("\nThis MySQL needs one more package:  pip3 install cryptography   then run setup again.")
+        if "1049" in msg or "does not exist" in msg:
+            sys.exit("\nNo database with that name. Check the name and run setup again.")
+        sys.exit(f"\nCouldn't connect: {msg[:200]}")
     print(f"\nConnection OK ({kind} {db.version()}).")
     if db.can_write():
         print("\nNote: this database user can change data. The connector never writes, but a read-only user is safer.")

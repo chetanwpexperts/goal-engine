@@ -4,7 +4,7 @@ Work top to bottom, one item per run (10-20 playbooks or 20-40 formulas). Tick `
 
 ## Department tasks people do in Excel (Chetan's list, 22 Oct) — for each: how people ask it (Eng/Hinglish/Hindi), the formula, the common mistakes
 - [x] Accounts: invoice aging (0-30/31-60/61-90/90+), AR collections list, AP three-way matching (PO vs receipt vs invoice), duplicate vendor payments, early-payment discount tracking
-- [ ] Accounts: bank reconciliation (ledger vs bank statement, timing differences, bank fees), credit card / POS settlement matching, intercompany matching
+- [x] Accounts: bank reconciliation (ledger vs bank statement, timing differences, bank fees), credit card / POS settlement matching, intercompany matching
 - [ ] Accounts: month-end close: accruals/deferrals, depreciation schedule (straight-line, WDV), trial balance check (debits = credits), transposed numbers, wrong account codes
 - [ ] Finance: budget vs actual variance, expense reports, cash flow forecast, GST/tax calculation
 - [ ] Sales & marketing: pipeline by stage, lead scoring, campaign ROI, commission calculation, dirty lead data (duplicates, missing phones, USA/U.S.A.)
@@ -46,3 +46,4 @@ Work top to bottom, one item per run (10-20 playbooks or 20-40 formulas). Tick `
 
 ## Auto fixes wanted (code to write in the file tools; add here when a fix had to be `steps`)
 - normalize_ids: rewrite invoice/bill/ID numbers to one style (INV-0012 vs 12 vs inv12) before matching (payment-not-matching-invoice)
+- match_bank_to_ledger: one-to-one match of bank lines to ledger lines by amount within a date tolerance, each ledger line used once (COUNTIFS can tick two bank lines off one repeated amount) (bank-reconciliation-difference, bank-vs-book-match)

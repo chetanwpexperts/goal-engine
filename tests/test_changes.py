@@ -265,3 +265,14 @@ def test_direct_connection_change_and_undo(client, ml_mode, monkeypatch):
     assert job(client, undo["id"])["status"] == "done" and snapshot(d) == before
     s.expire_all()
     assert s.get(ConnectorJob, change["id"]).undo_blob is None
+
+
+@pytest.mark.skipif(not _up(3306), reason="needs local MySQL with the parents/order_lines tables")
+def test_cascade_deletes_are_blocked():
+    d = gc.Database(DBS["mysql"][1]).connect()
+    plan = d.plan_change("DELETE FROM parents WHERE id = 1")
+    assert plan["blocked"] and "order_lines" in plan["blocked"]
+    with pytest.raises(ValueError, match="cascade"):
+        d.apply_change("DELETE FROM parents WHERE id = 1", 1)
+    assert d.query("SELECT COUNT(*) FROM order_lines", 5)["rows"][0][0] == 2
+    assert not d.plan_change("UPDATE items SET note = 'x' WHERE id = 1").get("blocked")

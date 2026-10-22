@@ -280,3 +280,14 @@ def test_php_changes_with_undo_on_postgres(wp_site, env):
         u = phpconn.call(url, key, "undo", {"change_job_id": 200 + n}, job_id=300 + n)
         assert u["ok"], u
         assert snap() == start, sql
+
+
+def test_php_blocks_cascade_deletes(wp_site, env):
+    key = "d" * 40
+    (wp_site / "cas.php").write_text(phpconn.TEMPLATE.read_text().replace("__CONNECTOR_ID__", "7").replace("__KEY__", key)
+                                     .replace("__ALLOW_CHANGES__", "true"))
+    url = f"{wp_site.base}/cas.php"
+    plan = phpconn.call(url, key, "plan", {"sql": "DELETE FROM parents WHERE id = 1"})
+    assert plan["ok"] and "order_lines" in plan["result"]["blocked"]
+    bad = phpconn.call(url, key, "change", {"sql": "DELETE FROM parents WHERE id = 1", "expected": 1}, job_id=900)
+    assert bad["ok"] is False and "cascade" in bad["error"]

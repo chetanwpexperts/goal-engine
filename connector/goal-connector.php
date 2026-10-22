@@ -472,6 +472,22 @@ function goal_by_pk($pdo, $type, $table, $pk, $keys, $lock = false) {
     return [$cols, array_map(function ($r) { return array_map('goal_enc', $r); }, $st->fetchAll())];
 }
 
+// rows in OTHER tables that a delete/update here would change (cascade), and triggers: Undo can't cover those
+function goal_side_effects($pdo, $type, $table) {
+    try {
+        if ($type === 'pgsql') {
+            $a = $pdo->prepare("SELECT DISTINCT c.conrelid::regclass::text FROM pg_constraint c WHERE c.contype = 'f' AND c.confrelid = (quote_ident(current_schema()) || '.' || quote_ident(?))::regclass AND (c.confdeltype IN ('c','n','d') OR c.confupdtype IN ('c','n','d'))");
+            $b = $pdo->prepare("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgrelid = (quote_ident(current_schema()) || '.' || quote_ident(?))::regclass");
+        } else {
+            $a = $pdo->prepare("SELECT DISTINCT TABLE_NAME FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND REFERENCED_TABLE_NAME = ? AND (DELETE_RULE IN ('CASCADE','SET NULL','SET DEFAULT') OR UPDATE_RULE IN ('CASCADE','SET NULL','SET DEFAULT'))");
+            $b = $pdo->prepare("SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE EVENT_OBJECT_SCHEMA = DATABASE() AND EVENT_OBJECT_TABLE = ?");
+        }
+        $a->execute([$table]); $b->execute([$table]);
+        $f = function ($r) { return $r[0]; };
+        return [array_map($f, $a->fetchAll()), array_map($f, $b->fetchAll())];
+    } catch (Exception $e) { return [[], []]; }
+}
+
 function goal_write_begin($pdo, $type) {
     try { $pdo->exec('ROLLBACK'); } catch (Exception $e) {}
     if ($type !== 'pgsql') $pdo->exec('SET SESSION TRANSACTION READ WRITE');
@@ -483,6 +499,9 @@ function goal_plan($pdo, $type, $sql) {
     list($pk, $auto) = goal_pk($pdo, $type, $ch['table']);
     $out = ['op' => $ch['op'], 'table' => $ch['table'], 'pk' => $pk];
     if (!$pk) $out['blocked'] = 'This table has no primary key, so a change couldn\'t be undone safely';
+    list($cascades, $triggers) = goal_side_effects($pdo, $type, $ch['table']);
+    if ($cascades && $ch['op'] !== 'insert') $out['blocked'] = 'Rows in ' . implode(', ', array_slice($cascades, 0, 5)) . ' are linked to this table and would be ' . ($ch['op'] === 'delete' ? 'deleted' : 'changed') . " too, which Undo can't bring back. Not allowed";
+    if ($triggers) $out['warning'] = 'This table has triggers (' . implode(', ', array_slice($triggers, 0, 5)) . "); anything they change elsewhere isn't covered by Undo";
     if ($ch['op'] === 'insert') {
         $out['count'] = null;
         if ($type !== 'pgsql' && !($auto && count($pk) === 1)) $out['blocked'] = 'INSERT can be undone only on tables with an auto-increment id';
@@ -503,6 +522,7 @@ function goal_apply($pdo, $type, $sql, $expected) {
     $table = $ch['table'];
     list($pk, $auto) = goal_pk($pdo, $type, $table);
     if (!$pk) throw new Exception("This table has no primary key, so the change couldn't be undone safely. Nothing was changed");
+    if ($ch['op'] !== 'insert') { list($cascades) = goal_side_effects($pdo, $type, $table); if ($cascades) throw new Exception("Other tables are linked with cascade to this one, so Undo couldn't bring everything back. Nothing was changed"); }
     $t = goal_q($type, $table);
     goal_write_begin($pdo, $type);
     try {

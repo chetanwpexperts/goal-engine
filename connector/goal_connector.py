@@ -276,6 +276,10 @@ class Driver:
     def start_write(self, cur):
         pass
 
+    def side_effects(self, table):
+        """([tables changed by ON DELETE/UPDATE CASCADE or SET NULL], [triggers on this table])"""
+        return [], []
+
     def lock_sql(self):
         return " FOR UPDATE"
 
@@ -292,6 +296,16 @@ class Driver:
         out = {"op": ch["op"], "table": ch["table"], "pk": pk}
         if not pk:
             out["blocked"] = "This table has no primary key, so a change couldn't be undone safely"
+        try:
+            cascades, triggers = self.side_effects(ch["table"])
+        except Exception:  # noqa: BLE001 - can't check: be safe
+            self.done()
+            cascades, triggers = [], []
+        if cascades and ch["op"] in ("delete", "update"):
+            out["blocked"] = ("Rows in " + ", ".join(cascades[:5]) + " are linked to this table and would be " +
+                              ("deleted" if ch["op"] == "delete" else "changed") + " too, which Undo can't bring back. Not allowed")
+        if triggers:
+            out["warning"] = "This table has triggers (" + ", ".join(triggers[:5]) + "); anything they change elsewhere isn't covered by Undo"
         if ch["op"] == "insert":
             out["count"] = None
             if self.kind != "postgres" and not (auto and len(pk) == 1):
@@ -312,6 +326,8 @@ class Driver:
         pk, auto = self.primary_key(table)
         if not pk:
             raise ValueError("This table has no primary key, so the change couldn't be undone safely. Nothing was changed")
+        if ch["op"] in ("delete", "update") and self.side_effects(table)[0]:
+            raise ValueError("Other tables are linked with cascade to this one, so Undo couldn't bring everything back. Nothing was changed")
         cur = self.cursor(read_only=False)
         try:
             self.start_write(cur)
@@ -494,6 +510,14 @@ class MySQL(Driver):
                             "ORDER BY k.ORDINAL_POSITION", (table,))
         return [r[0] for r in rows], any("auto_increment" in str(r[1]).lower() for r in rows)
 
+    def side_effects(self, table):
+        _, fk = self.rows("SELECT DISTINCT TABLE_NAME FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() "
+                          "AND REFERENCED_TABLE_NAME = %s AND (DELETE_RULE IN ('CASCADE', 'SET NULL', 'SET DEFAULT') "
+                          "OR UPDATE_RULE IN ('CASCADE', 'SET NULL', 'SET DEFAULT'))", (table,))
+        _, tr = self.rows("SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE EVENT_OBJECT_SCHEMA = DATABASE() "
+                          "AND EVENT_OBJECT_TABLE = %s", (table,))
+        return [r[0] for r in fk], [r[0] for r in tr]
+
     def write_rights(self):
         _, grants = self.rows("SHOW GRANTS")
         return re.search(r"ALL PRIVILEGES|INSERT|UPDATE|DELETE|DROP", " ".join(str(g[0]).upper() for g in grants))
@@ -581,6 +605,14 @@ class Postgres(Driver):
                             "WHERE i.indrelid = (quote_ident(current_schema()) || '.' || quote_ident(%s))::regclass AND i.indisprimary "
                             "ORDER BY array_position(i.indkey, a.attnum)", (table,))
         return [r[0] for r in rows], True
+
+    def side_effects(self, table):
+        _, fk = self.rows("SELECT DISTINCT c.conrelid::regclass::text FROM pg_constraint c WHERE c.contype = 'f' "
+                          "AND c.confrelid = (quote_ident(current_schema()) || '.' || quote_ident(%s))::regclass "
+                          "AND (c.confdeltype IN ('c', 'n', 'd') OR c.confupdtype IN ('c', 'n', 'd'))", (table,))
+        _, tr = self.rows("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal "
+                          "AND tgrelid = (quote_ident(current_schema()) || '.' || quote_ident(%s))::regclass", (table,))
+        return [r[0] for r in fk], [r[0] for r in tr]
 
     def _insert(self, cur, ch, pk, auto):
         cur.execute(ch["sql"] + " RETURNING " + ", ".join(self.q(c) for c in pk))

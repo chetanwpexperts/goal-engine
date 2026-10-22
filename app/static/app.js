@@ -841,6 +841,7 @@
           : T(hi, `${r.count} rows ${r.op === "delete" ? "delete hongi" : "badlengi"} · ${r.table}`, `${r.count} rows will be ${r.op === "delete" ? "deleted" : "changed"} · ${r.table}`);
         parts.push(el("p", "change-what", what));
         if (r.rows && r.rows.length) parts.push(el("p", "cap", T(hi, "Abhi ye rows aisi hain (pehli 20):", "These rows as they are now (first 20):")), grid({ columns: r.columns, rows: r.rows }));
+        if (r.warning) parts.push(el("p", "note warn", r.warning));
         if (r.blocked) { parts.push(el("p", "note err", r.blocked)); result.replaceChildren(...parts); return; }
         if (r.op !== "insert" && !r.count) { parts.push(el("p", "fine", T(hi, "Koi row match nahi hui, kuch nahi badlega.", "No rows match; nothing would change."))); result.replaceChildren(...parts); return; }
         const apply = el("button", "btn go", T(hi, "Apply karo", "Apply")); apply.type = "button";

@@ -355,3 +355,27 @@ body[data-state="active"] .status { display: none; }
 .status .dot.learn { background: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .status .dot.run { animation: none; } }
 @media (max-width: 640px) { .status { top: calc(42% + 70px); } .st-line { align-items: flex-start; } .st-line .dot { margin-top: 6px; } }
+
+/* database brain */
+.brain { margin: 14px 0 0 46px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); display: grid; gap: 10px; }
+.brain-ask { display: flex; gap: 8px; }
+.brain-ask input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #fff; font: inherit; font-size: 15px; outline: none; color: var(--ink); }
+.brain-ask input:focus { border-color: var(--ink); }
+.brain-body { display: grid; gap: 10px; }
+.brain-body:empty { display: none; }
+.brain-seen { margin: 0; font-weight: 600; }
+.brain-sql { width: 100%; min-height: 80px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: 14px/1.5 ui-monospace, Menlo, Consolas, monospace; background: #fff; resize: vertical; }
+.brain-out { display: grid; gap: 10px; }
+.brain-out:empty { display: none; }
+.brain-win { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--ok-soft); color: var(--ink); font-weight: 600; }
+.chk { display: grid; gap: 6px; }
+.chk-hint { margin: 0; font-size: 13px; color: var(--muted); }
+.causes { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.causes li { display: grid; gap: 6px; }
+.fix { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 14px; }
+.fix code { font: 13px ui-monospace, Menlo, Consolas, monospace; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 3px 8px; overflow-wrap: anywhere; }
+.tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--line); color: var(--ink); white-space: nowrap; }
+.tag.approved_change { background: var(--ok-soft); color: var(--ok); }
+.tag.config { background: var(--signal-soft); color: var(--signal-ink); }
+.why { margin: 0; padding-left: 18px; font-size: 14px; }
+@media (max-width: 640px) { .brain { margin-left: 0; } .brain-ask { flex-direction: column; } }

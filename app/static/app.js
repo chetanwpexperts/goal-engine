@@ -793,6 +793,176 @@
     return box;
   }
 
+  // Panels with work in progress survive the card being redrawn (e.g. when the table list arrives)
+  const kept = new Map();
+  function keep(key, make) {
+    if (!kept.has(key)) kept.set(key, make());
+    return kept.get(key);
+  }
+
+  // ---- the database brain: problem -> checks -> causes -> proven fix
+  async function waitJob(id) {
+    for (let i = 0; i < 120; i++) {
+      const j = await api(`/api/connector-jobs/${id}`);
+      if (j.status === "done") return j;
+      if (j.status === "failed" || j.status === "expired") throw new Error(j.error || "The check didn't finish");
+      await sleep(i < 5 ? 500 : 1200);
+    }
+    throw new Error("The database isn't answering. Try again in a moment.");
+  }
+
+  const ACTION = { approved_change: ["Agent kar sakta hai", "Agent can apply"], config: ["Setting badlo", "Setting change"],
+                   code: ["Code mein badlav", "Code change"], advice: ["Salah", "Advice"] };
+
+  function brainPanel(c, a, hi) {
+    const box = el("section", "brain");
+    const body2 = el("div", "brain-body");
+    const ask = el("form", "brain-ask");
+    const q = el("input"); q.placeholder = T(hi, "Database ki problem likho, error paste karo, ya slow query daalo", "Describe the problem, paste an error or a slow query");
+    const go = el("button", "btn solid", T(hi, "Dekho", "Check")); go.type = "submit";
+    ask.append(q, go);
+    ask.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!q.value.trim()) return;
+      try {
+        const r = await api("/api/dbbrain/recognize", { method: "POST", body: JSON.stringify({ text: q.value, lang: hi ? "hi" : "en" }) });
+        show({ ...r, sql: r.kind === "sql" ? q.value : "" });
+      } catch (ex) { body2.replaceChildren(el("p", "note err", ex.message)); }
+    });
+    box.append(ask, body2);
+
+    const show = (b) => {
+      body2.replaceChildren();
+      if (!b || !b.kind || (b.kind === "question")) {
+        if (b && b.kind === "question") body2.append(el("p", "fine", T(hi, "Data ke sawaal jald aa rahe hain. Abhi Tables ya SQL box use karo.", "Questions about your data are coming soon. Use Tables or the SQL box for now.")));
+        return;
+      }
+      if (b.text) body2.append(el("p", "brain-seen", (hi ? "Samjha: " : "Understood: ") + b.text));
+      if (b.kind === "issue") issueFlow(b.id);
+      else if (b.kind === "error") errorFlow(b.id);
+      else if (b.kind === "sql" || b.id === "slow_query") queryFlow(b.sql || "");
+      else if (b.id === "health") body2.append(el("p", "fine", T(hi, "Neeche Health check dabao.", "Use Health check below.")));
+    };
+
+    const issueFlow = (id) => {
+      const run = el("button", "btn go", T(hi, "Mere database pe check karo", "Check my database")); run.type = "button";
+      const out = el("div", "brain-out");
+      body2.append(run, out);
+      run.addEventListener("click", async () => {
+        run.disabled = true; out.replaceChildren(el("p", "waiting", T(hi, "Database check kar raha hoon…", "Checking your database…")));
+        try {
+          const d = await api(`/api/connectors/${c.id}/diagnose`, { method: "POST", body: JSON.stringify({ issue_id: id }) });
+          const j = await waitJob(d.job.id);
+          const parts = [el("p", "cap", T(hi, "Jo maine dekha", "What I found"))];
+          j.result.results.forEach((r, i) => {
+            const chk = el("div", "chk");
+            chk.append(el("p", "chk-hint", d.checks[i].look_for));
+            chk.append(r.error ? el("p", "fine", r.error) : grid(r));
+            parts.push(chk);
+          });
+          parts.push(el("p", "cap", T(hi, "Ho sakti wajah aur fix", "Likely causes and fixes")));
+          const ul = el("ul", "causes");
+          for (const cause of d.playbook.causes) {
+            const li = el("li");
+            li.append(el("b", null, hi ? cause.title_hi : cause.title_en));
+            for (const f of d.playbook.fixes.filter((x) => x.cause === cause.id)) {
+              const fx = el("div", "fix");
+              fx.append(el("span", `tag ${f.action}`, (ACTION[f.action] || ["", ""])[hi ? 0 : 1]), el("span", null, hi ? f.steps_hi : f.steps_en));
+              li.append(fx);
+            }
+            ul.append(li);
+          }
+          parts.push(ul, el("p", "fine", (hi ? "Theek hua ya nahi kaise pata chalega: " : "How to know it's fixed: ") + (hi ? d.playbook.verify.hi : d.playbook.verify.en)));
+          out.replaceChildren(...parts);
+        } catch (ex) { out.replaceChildren(el("p", "note err", ex.message)); }
+        run.disabled = false; run.textContent = T(hi, "Dobara check karo", "Check again");
+      });
+    };
+
+    const errorFlow = async (id) => {
+      try {
+        const e = await api(`/api/dbbrain/playbook/${id}`);
+        const fx = el("div", "fix");
+        fx.append(el("span", "tag advice", T(hi, "Fix", "Fix")), el("span", null, e.fix.note || ""));
+        body2.append(el("p", null, hi ? e.explain_hi : e.explain_en), fx);
+      } catch (_) { /* nothing more to show */ }
+    };
+
+    const queryFlow = (sql) => {
+      const ta = el("textarea", "brain-sql"); ta.value = sql; ta.placeholder = "SELECT … FROM … WHERE …";
+      const run = el("button", "btn go", T(hi, "Mere database pe test karo", "Test it on my database")); run.type = "button";
+      const out = el("div", "brain-out");
+      body2.append(ta, run, out);
+      const test = async (before) => {
+        out.replaceChildren(el("p", "waiting", T(hi, "Fixes try kar raha hoon aur naap raha hoon…", "Trying fixes and measuring…")));
+        const d = await api(`/api/connectors/${c.id}/optimize`, { method: "POST", body: JSON.stringify({ sql: ta.value }) });
+        const j = await waitJob(d.job.id);
+        const r = j.result, an = d.analysis;
+        const parts = [];
+        if (before) {
+          const n = (v) => (typeof v === "number" ? v.toLocaleString("en-IN") : v);
+          const unit = (v) => (r.original.metric === "rows" ? (v === 1 ? T(hi, "row padhi", "row read") : T(hi, "rows padhi", "rows read")) : "cost");
+          parts.push(el("p", "brain-win", T(hi, `Pehle: ${before.ms} ms, ${n(before.plan)} ${unit(before.plan)}  →  Ab: ${r.original.ms} ms, ${n(r.original.plan)} ${unit(r.original.plan)}`,
+                                                 `Before: ${before.ms} ms, ${n(before.plan)} ${unit(before.plan)}  →  Now: ${r.original.ms} ms, ${n(r.original.plan)} ${unit(r.original.plan)}`)));
+        }
+        const rows = [[T(hi, "Aapki query", "Your query"), "—", r.original.ms + " ms", r.original.plan ?? "—"]];
+        for (const cnd of r.candidates) {
+          const same = cnd.same === true ? T(hi, "✓ same result", "✓ same result") : cnd.same === "count" ? T(hi, "≈ same count", "≈ same count") : cnd.same === false ? T(hi, "✗ alag result", "✗ different result") : "—";
+          rows.push([T(hi, "Rewrite", "Rewrite"), same, cnd.ms + " ms", cnd.plan ?? "—"]);
+        }
+        parts.push(el("p", "cap", T(hi, "Aapke database pe naapa", "Measured on your database")),
+                   grid({ columns: ["", T(hi, "Result", "Result"), T(hi, "Time", "Time"), r.original.metric === "rows" ? T(hi, "Rows padhi", "Rows read") : "Cost"], rows }));
+        const best = r.candidates.find((x) => x.same === true || x.same === "count");
+        if (best && an.rewritten) parts.push(codeBox(T(hi, "Behtar query (same result)", "Better query (same result)"), an.rewritten, W(a.lang)));
+        const why = [...an.findings.map((f) => (hi ? f.title_hi : f.title_en)), ...an.extra.map((f) => (hi ? f.title_hi : f.title_en))];
+        if (why.length) { const ul = el("ul", "why"); for (const w2 of [...new Set(why)]) ul.append(el("li", null, w2)); parts.push(el("p", "cap", T(hi, "Slow kyun hai", "Why it's slow")), ul); }
+        for (const ix of an.indexes) {
+          const row = el("div", "fix");
+          const m = ix.match(/(?:alter\s+table\s+(\S+)\s+add\s+index\s+\S+|create\s+index\s+\S+\s+on\s+(\S+))\s*\(([^)]+)\)/i);
+          const tname = m ? (m[1] || m[2]).replace(/[`"]/g, "") : "";
+          const cols = m ? m[3].split(",").map((x) => x.trim().replace(/[`"]/g, "")) : [];
+          const t = r.tables[tname] || Object.values(r.tables)[0];
+          const covered = t && t.indexes && t.indexes.some((i) => cols.length && i.columns.slice(0, cols.length).join(",") === cols.join(","));
+          if (covered) {
+            row.append(el("span", "tag approved_change", "Index"), el("span", null, T(hi, `✓ ${tname} pe ye index pehle se laga hai`, `✓ This index is already on ${tname}`)));
+            parts.push(row);
+            continue;
+          }
+          row.append(el("span", "tag approved_change", "Index"), el("code", null, ix));
+          if (c.allow_changes) {
+            const fixb = el("button", "btn go", T(hi, "Fix karo", "Fix it")); fixb.type = "button";
+            fixb.addEventListener("click", async () => {
+              fixb.disabled = true; fixb.textContent = T(hi, "Index bana raha hoon…", "Building the index…");
+              try {
+                const p0 = await api(`/api/connectors/${c.id}/plan`, { method: "POST", body: JSON.stringify({ sql: ix }) });
+                const p = await waitJob(p0.id);
+                if (p.result.blocked) throw new Error(p.result.blocked);
+                const ch0 = await api(`/api/connectors/${c.id}/apply`, { method: "POST", body: JSON.stringify({ plan_id: p.id }) });
+                const ch = await waitJob(ch0.id);
+                await test(r.original);
+                out.prepend(undoButton(c, { id: ch.id, undo: { available: true } }, hi));
+              } catch (ex) { fixb.disabled = false; fixb.textContent = T(hi, "Fix karo", "Fix it"); addMachine(ex.message, [], true); }
+            });
+            row.append(fixb);
+          } else {
+            row.append(el("span", "fine", T(hi, "(Fix karne ke liye is database pe approved changes on karo)", "(turn on approved changes for this database to apply it)")));
+          }
+          if (t && t.rows !== undefined) row.append(el("span", "fine", T(hi, `${t.rows.toLocaleString("en-IN")} rows`, `${t.rows.toLocaleString("en-IN")} rows`)));
+          parts.push(row);
+        }
+        out.replaceChildren(...parts);
+      };
+      run.addEventListener("click", async () => {
+        run.disabled = true;
+        try { await test(null); } catch (ex) { out.replaceChildren(el("p", "note err", ex.message)); }
+        run.disabled = false;
+      });
+    };
+
+    show(a.brain);
+    return box;
+  }
+
   // ---- approved changes: preview -> apply -> undo
   function changesBox(c, a, hi) {
     const box = el("details", "db-sql changes");
@@ -921,6 +1091,7 @@
       tabs.append(b2);
     }
     card.append(tabs, pane, livePane, actPane);
+    if (c.online) pane.append(keep(`brain:${a.id}:${c.id}`, () => brainPanel(c, a, hi)));
     const tables = el("div", "db-tables");
     if (c.tables.length) {
       const filter = el("input"); filter.type = "search"; filter.placeholder = T(hi, `${c.tables.length} tables, naam se dhoondo`, `${c.tables.length} tables, search by name`);
@@ -993,7 +1164,7 @@
     if (a.mode !== "explore" && a.mode !== "export") acts.append(el("span"));
     pane.append(acts);
     if (a.mode === "health" || a.mode === "report") pane.append(sql);
-    pane.append(changesBox(c, a, hi));
+    pane.append(keep(`changes:${a.id}:${c.id}:${c.allow_changes ? 1 : 0}`, () => changesBox(c, a, hi)));
 
     if (a.mode === "report" && c.tables.length) {
       const rep = el("div", "slot");

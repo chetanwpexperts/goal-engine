@@ -123,9 +123,15 @@
     wordcount.classList.toggle("ok", n >= wordTarget);
   }
 
+  // Home: the input box sits inside the centred column; in a conversation it docks at the bottom.
+  const composerEl = document.getElementById("composer");
+  const slot = document.getElementById("composer-slot");
+  if (slot && body.dataset.state === "idle") slot.appendChild(composerEl);
+
   function setActive() {
     if (body.dataset.state === "active") return;
     body.dataset.state = "active";
+    document.body.insertBefore(composerEl, document.getElementById("options"));
     clearTimeout(typer);
     typeExamples();
   }
@@ -1675,6 +1681,7 @@
     const ctx = cv.getContext("2d");
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let W = 0, H = 0, pts = [], edges = [], adj = [], pulses = [], heat = 0, raf = 0, last = 0, t0 = performance.now();
+    const motes = Array.from({ length: 7 }, (_, i) => ({ a: i * 0.9 + Math.random(), s: 0.05 + Math.random() * 0.06, r: 0.38 + Math.random() * 0.1 }));
 
     // Side view of a brain (front to the right): the outline, the folds, the cerebellum and the stem.
     const OUTLINE = [[-0.92, -0.05], [-0.95, 0.15], [-0.86, 0.4], [-0.66, 0.6], [-0.38, 0.72], [-0.05, 0.77], [0.28, 0.71], [0.55, 0.56],
@@ -1773,7 +1780,7 @@
       const a = Math.sin(time * 0.00028) * 0.42;             // turns a little left and right, always recognisable
       const tilt = 0.06 + Math.sin(time * 0.00019) * 0.05;
       const ca = Math.cos(a), sa = Math.sin(a), ct = Math.cos(tilt), st = Math.sin(tilt);
-      const s = Math.min(W / 2.15, H / 1.95), cx = W / 2, cy = H / 2 + s * 0.08;
+      const s = Math.min(W / 2.6, H / 1.9), cx = W / 2, cy = H / 2 + s * 0.06;
       for (const p of pts) {
         const x1 = p.x * ca + p.z * sa, z1 = -p.x * sa + p.z * ca;
         const y1 = p.y * ct - z1 * st, z2 = p.y * st + z1 * ct;
@@ -1799,6 +1806,18 @@
       const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.min(W, H) * 0.55);
       g.addColorStop(0, `rgba(196, 206, 255, ${0.45 + heat * 0.25})`); g.addColorStop(1, "rgba(196, 206, 255, 0)");
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      // two thin orbit rings and a few drifting specks around it
+      const tt = (still ? 0 : now - t0) / 1000;
+      ctx.lineWidth = 1;
+      for (const [rx, ry, a] of [[0.47, 0.13, 0.16], [0.4, 0.1, 0.1]]) {
+        ctx.strokeStyle = `rgba(79, 99, 214, ${a})`;
+        ctx.beginPath(); ctx.ellipse(W / 2, H * 0.6, W * rx, H * ry * 1.6, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+      for (const m of motes) {
+        const x = W / 2 + Math.cos(m.a + tt * m.s) * W * m.r, y = H / 2 + Math.sin(m.a + tt * m.s * 0.8) * H * m.r * 0.9;
+        ctx.fillStyle = `rgba(46, 170, 196, ${0.35 + 0.3 * Math.sin(tt * 1.5 + m.a) ** 2})`;
+        ctx.beginPath(); ctx.arc(x, y, 1.6, 0, 7); ctx.fill();
+      }
       ctx.lineWidth = 1;
       for (const [i, j] of edges) {
         const p = pts[i], q = pts[j], d = (p.d + q.d) / 2;

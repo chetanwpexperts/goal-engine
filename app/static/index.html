@@ -57,30 +57,31 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
     </button>
   </form>
-  <canvas id="brain" class="brain-art" aria-hidden="true"></canvas>
-  <div class="hero" id="hero">
-    <h1>Problem batao.<br>Brain khud solve karega.</h1>
-    <p>Database, PHP aur Excel ki problem apni bhasha mein likho ya bolo. Agent khud check karta hai, theek karta hai, aur dikhata hai ki theek hua.</p>
-  </div>
-  <section class="brains" id="brains" aria-label="Brains">
-    <button type="button" class="brain-tile" data-example="Mera database bahut slow chal raha hai, check karke theek karo">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6"/></svg>
-      <b>Database</b>
-      <span>Slow query, errors, hacked data. Khud check, fix aur Undo.</span>
-    </button>
-    <button type="button" class="brain-tile" data-example="Meri WordPress site pe error aa raha hai, theek karo">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg>
-      <b>PHP · WordPress</b>
-      <span>Laravel, CodeIgniter bhi. White screen, plugin crash, hacked site.</span>
-    </button>
-    <button type="button" class="brain-tile" data-example="Meri Excel sheet mein #REF! aa raha hai, theek karo">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M3.5 15h17M9.5 4v16"/></svg>
-      <b>Excel · Word · Office</b>
-      <span>Formula errors, data match, lakhs of rows. Fixed copy milti hai.</span>
-    </button>
-  </section>
+  <main class="home" id="home">
+    <div id="status" class="status" aria-live="polite" hidden></div>
+    <div class="hero" id="hero">
+      <h1>Problem batao.<br>Brain khud solve karega.</h1>
+      <p>Database, PHP aur Excel ki problem apni bhasha mein likho ya bolo. Agent khud check karta hai, theek karta hai, aur dikhata hai ki theek hua.</p>
+    </div>
+    <canvas id="brain" class="brain-art" aria-hidden="true"></canvas>
+    <div id="composer-slot" class="composer-slot"></div>
+    <section class="brains" id="brains" aria-label="Agents">
+      <button type="button" class="brain-tile" data-example="Mera database bahut slow chal raha hai, check karke theek karo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6"/></svg>
+        <b>Database</b>
+      </button>
+      <button type="button" class="brain-tile" data-example="Meri WordPress site pe error aa raha hai, theek karo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4l-3 16"/></svg>
+        <b>PHP · WordPress</b>
+      </button>
+      <button type="button" class="brain-tile" data-example="Meri Excel sheet mein #REF! aa raha hai, theek karo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M3.5 15h17M9.5 4v16"/></svg>
+        <b>Excel · Office</b>
+      </button>
+    </section>
+    <p class="home-hint">Hindi, Hinglish ya English mein likho, ya mic dabake bolo.</p>
+  </main>
   <div id="options" class="options" hidden></div>
-  <div id="status" class="status" aria-live="polite" hidden></div>
   <p id="fineprint" class="fineprint">Please don't type passwords or card numbers here. <a href="/privacy">Privacy &amp; delete my data</a></p>
 
   <div id="drawer" class="drawer" hidden>

@@ -425,7 +425,7 @@ body[data-state="idle"] { background:
   -webkit-text-fill-color: transparent; }
 .hero p { margin: 18px auto 0; max-width: 56ch; font-size: clamp(15px, 1.3vw, 19px); line-height: 1.55; color: var(--muted); text-wrap: pretty; }
 
-.brain-stage { position: relative; width: min(680px, 96vw); display: flex; justify-content: center; margin: 6px 0 4px; }
+.brain-stage { position: relative; width: min(680px, 96vw); display: flex; justify-content: center; margin: 10px 0 28px; }
 .brain-art { display: block; width: min(560px, 92vw); height: clamp(170px, 30vh, 320px); pointer-events: none; }
 .orbit-tag { position: absolute; display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px 8px 11px; border-radius: 12px;
   font-size: 14px; font-weight: 600; color: var(--ink); background: rgba(248, 250, 253, .9); border: 1px solid #D9DEF2;

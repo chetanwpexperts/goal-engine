@@ -1886,7 +1886,7 @@
     }
 
     function build() {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
       W = cv.clientWidth; H = cv.clientHeight;
       if (!W || !H) return;
       cv.width = W * dpr; cv.height = H * dpr;
@@ -1910,7 +1910,7 @@
       const a = Math.sin(time * 0.00028) * 0.42;             // turns a little left and right, always recognisable
       const tilt = 0.06 + Math.sin(time * 0.00019) * 0.05;
       const ca = Math.cos(a), sa = Math.sin(a), ct = Math.cos(tilt), st = Math.sin(tilt);
-      const s = Math.min(W / 2.6, H / 1.9), cx = W / 2, cy = H / 2 + s * 0.06;
+      const s = Math.min(W / 2.7, H / 2.4), cx = W / 2, cy = H * 0.41;
       for (const p of pts) {
         const x1 = p.x * ca + p.z * sa, z1 = -p.x * sa + p.z * ca;
         const y1 = p.y * ct - z1 * st, z2 = p.y * st + z1 * ct;
@@ -1939,10 +1939,17 @@
       // two thin orbit rings and a few drifting specks around it
       const tt = (still ? 0 : now - t0) / 1000;
       ctx.lineWidth = 1;
-      for (const [rx, ry, a] of [[0.47, 0.13, 0.16], [0.4, 0.1, 0.1]]) {
-        ctx.strokeStyle = `rgba(79, 99, 214, ${a})`;
-        ctx.beginPath(); ctx.ellipse(W / 2, H * 0.6, W * rx, H * ry * 1.6, 0, 0, Math.PI * 2); ctx.stroke();
+      // a flat glowing base under the brain, like a platform it stands on
+      const by = H * 0.87;
+      const glow = ctx.createRadialGradient(W / 2, by, 0, W / 2, by, W * 0.3);
+      glow.addColorStop(0, `rgba(123, 79, 224, ${0.18 + heat * 0.12})`); glow.addColorStop(1, "rgba(123, 79, 224, 0)");
+      ctx.save(); ctx.translate(W / 2, by); ctx.scale(1, 0.18); ctx.translate(-W / 2, -by);
+      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(W / 2, by, W * 0.3, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      for (const [rx, a, w] of [[0.3, 0.35, 1.6], [0.22, 0.25, 1.2], [0.14, 0.2, 1]]) {
+        ctx.strokeStyle = `rgba(91, 79, 214, ${a})`; ctx.lineWidth = w;
+        ctx.beginPath(); ctx.ellipse(W / 2, by, W * rx, W * rx * 0.13, 0, 0, Math.PI * 2); ctx.stroke();
       }
+      ctx.lineWidth = 1;
       for (const m of motes) {
         const x = W / 2 + Math.cos(m.a + tt * m.s) * W * m.r, y = H / 2 + Math.sin(m.a + tt * m.s * 0.8) * H * m.r * 0.9;
         ctx.fillStyle = `rgba(46, 170, 196, ${0.35 + 0.3 * Math.sin(tt * 1.5 + m.a) ** 2})`;
@@ -1989,7 +1996,10 @@
     build();
     last = performance.now();
     if (still) draw(last); else start();
-    let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { build(); if (still) draw(performance.now()); else start(); }, 150); });
+    let rt;
+    const rebuild = () => { clearTimeout(rt); rt = setTimeout(() => { build(); if (still) draw(performance.now()); else start(); }, 60); };
+    window.addEventListener("resize", rebuild);
+    if (window.ResizeObserver) new ResizeObserver(() => { if (cv.clientWidth !== W || cv.clientHeight !== H) rebuild(); }).observe(cv);
     document.addEventListener("visibilitychange", start);
     return { excite() { heat = Math.min(1, heat + 0.1); start(); } };
   })();

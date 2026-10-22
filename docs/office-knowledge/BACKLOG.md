@@ -2,6 +2,16 @@
 
 Work top to bottom, one item per run (10-20 playbooks or 20-40 formulas). Tick `[x]` when done and note it in LOG.md.
 
+## Department tasks people do in Excel (Chetan's list, 22 Oct) — for each: how people ask it (Eng/Hinglish/Hindi), the formula, the common mistakes
+- [ ] Accounts: invoice aging (0-30/31-60/61-90/90+), AR collections list, AP three-way matching (PO vs receipt vs invoice), duplicate vendor payments, early-payment discount tracking
+- [ ] Accounts: bank reconciliation (ledger vs bank statement, timing differences, bank fees), credit card / POS settlement matching, intercompany matching
+- [ ] Accounts: month-end close: accruals/deferrals, depreciation schedule (straight-line, WDV), trial balance check (debits = credits), transposed numbers, wrong account codes
+- [ ] Finance: budget vs actual variance, expense reports, cash flow forecast, GST/tax calculation
+- [ ] Sales & marketing: pipeline by stage, lead scoring, campaign ROI, commission calculation, dirty lead data (duplicates, missing phones, USA/U.S.A.)
+- [ ] HR & operations: attendance and leave, shift roster clashes, project Gantt, inventory reorder alerts, accidental formula overwrites (sheet protection)
+- [ ] Data analysis: pivot summaries, KPI dashboards, trend lines, unrefreshed pivots, VLOOKUP breaking on inserted columns (XLOOKUP), cluttered charts
+- [ ] Working across sheets: consolidate (SUM across sheets, VSTACK), cross-sheet lookups (XLOOKUP/INDEX-MATCH), Power Query merges, group editing
+
 ## Excel (most asked first)
 - [ ] Formula errors: #REF! (done: 1), #N/A (done: 1), #VALUE!, #DIV/0!, #NAME?, #NUM!, #SPILL!, #CALC!, circular reference warning, formula shows as text, formula not updating (manual calculation)
 - [ ] Lookups and matching: VLOOKUP/XLOOKUP/INDEX-MATCH problems, two sheets not matching, matching on multiple columns, partial match, case and space issues, comparing two lists

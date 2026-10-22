@@ -104,13 +104,10 @@ def create_agent(db: Session, goal: Goal, spec: dict) -> Agent:
 
 
 def plan_reply(spec: dict, hi: bool) -> str:
-    lines = [(f"Main ye agent bana raha hoon: {spec['title']}" if hi else f"Here's the agent I'll set up: {spec['title']}")]
-    lines += [f"{i}. {s['text']}" for i, s in enumerate(describe(spec, hi), 1)]
-    needs = [FIELD_LABELS[f] for f in RULE_FIELDS.get(spec["rule"], []) + (["name", "email"] if spec["kind"] == "reminder" else [])]
-    cols = ", ".join(dict.fromkeys(needs))
-    lines.append(("Bas apni sheet ka link chahiye" + (f" (columns: {cols})" if cols else "") + ". Pehle preview dikhaunga, phir aap Start dabaoge."
-                  if hi else "I just need your sheet link" + (f" (columns: {cols})" if cols else "") + ". I'll show a preview first; then you tap Start."))
-    return "\n".join(lines)
+    """One short line: the blocks are drawn in the agent panel."""
+    when = schedule_text(spec["schedule"], hi)
+    return (f"Main ye agent bana raha hoon: {spec['title']}, {when}. Bas apni sheet ka link chahiye; pehle preview dikhaunga, phir aap Start dabaoge."
+            if hi else f"Here's the agent I'll set up: {spec['title']}, {when.lower()}. I just need your sheet link; I'll show a preview first, then you tap Start.")
 
 
 def automation_dict(db: Session, agent: Agent, hi: bool) -> dict:

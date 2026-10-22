@@ -2,105 +2,69 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Goal Engine · Tell me what you need</title>
-  <meta name="description" content="Describe a problem in your own words, in English, Hindi or Hinglish. Goal Engine turns it into a clear goal and the next step.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Goal Engine</title>
+  <meta name="description" content="Say what you need, in English, Hindi or Hinglish. Goal Engine understands it and builds an agent that does the work.">
+  <meta name="theme-color" content="#EEF1F6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/app.css">
 </head>
-<body>
-  <header class="top">
-    <div class="brand"><span class="mark" aria-hidden="true"></span>Goal Engine</div>
-    <p class="tagline">You describe the problem. It keeps the goal.</p>
-    <button id="my-agents" type="button" class="new-chat">My agents</button>
-    <button id="new-chat" type="button" class="new-chat">+ New chat</button>
+<body data-state="idle">
+  <header class="bar">
+    <a class="mark" href="/" aria-label="Goal Engine">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="16" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="24" cy="24" r="4"/><path d="M12 16h4l4-6M16 16l4 6"/></svg>
+    </a>
+    <nav class="tools">
+      <button id="open-goals" type="button" class="tool" aria-label="Your goals" title="Your goals">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h13"/></svg>
+      </button>
+      <button id="my-agents" type="button" class="tool" aria-label="Your agents" title="Your agents">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 12H12l3.5-4.5M12 12l3.5 4.5"/></svg>
+        <span id="agent-count" class="count" hidden></span>
+      </button>
+      <button id="new-chat" type="button" class="tool" aria-label="Start fresh" title="Start fresh">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </nav>
   </header>
 
-  <div id="agents-panel" class="agents-panel" hidden>
-    <h2>My agents</h2>
-    <div id="agents-list"></div>
-  </div>
-
-  <main class="layout">
-    <aside class="goals" aria-label="Your goals">
-      <h2>Your goals</h2>
-      <ul id="goal-list"></ul>
-      <p id="no-goals" class="muted">No goals yet. Tell me what's wrong, in any language.</p>
-    </aside>
-
-    <section class="chat" aria-label="Conversation">
-      <div id="messages" class="messages" aria-live="polite">
-        <div id="intro" class="intro">
-          <h1>Tell me what you need.</h1>
-          <p>Write it the way you'd say it, in English, Hindi or Hinglish. No technical words needed.</p>
-          <div class="examples">
-            <button type="button" class="example">Mera business acha nahi chal raha.</button>
-            <button type="button" class="example">Meri website hai but customer nahi aa rhe.</button>
-            <button type="button" class="example">Customer ko khud message jana chahiye.</button>
-            <button type="button" class="example">My car is not starting.</button>
-          </div>
-        </div>
-      </div>
-      <div id="options" class="options" hidden></div>
-      <form id="composer" class="composer">
-        <div class="field">
-          <textarea id="input" rows="2" maxlength="1500" placeholder="What's the problem? Type it or tap 🎤" aria-label="Your message"></textarea>
-          <div class="field-bar">
-            <span id="wordcount" class="wordcount" hidden></span>
-            <button id="mic-lang" type="button" class="mic-lang" title="Voice language" hidden>हिं</button>
-          </div>
-        </div>
-        <button id="mic" type="button" class="mic" aria-label="Speak instead of typing" title="Speak instead of typing" hidden>🎤</button>
-        <button id="send" type="submit">Send</button>
-      </form>
-      <p class="fineprint">Demo. Please don't share passwords or private details. <span id="remaining"></span></p>
-    </section>
-
-    <aside class="goalcard" aria-label="Current goal">
-      <div id="agents" class="agents"></div>
-      <div id="card-empty" class="card-empty">
-        <p class="eyebrow">Goal state</p>
-        <p class="muted">When you describe a problem, its goal appears here and stays updated as you talk.</p>
-      </div>
-      <article id="card" class="card" hidden>
-        <div class="card-head">
-          <p class="eyebrow">Goal #<span data-f="id"></span> · <span data-f="detected_language"></span></p>
-          <span id="relation" class="badge"></span>
-        </div>
-        <h2 data-f="title"></h2>
-
-        <dl class="fields">
-          <dt>You said</dt><dd class="quote" data-f="original_request"></dd>
-          <dt>What seems wrong</dt><dd data-f="interpreted_problem"></dd>
-          <dt>What you want</dt><dd data-f="desired_goal"></dd>
-        </dl>
-
-        <div class="block"><h3>Known facts</h3><ul data-list="known_facts"></ul></div>
-        <div class="block"><h3>Still needed</h3><ul data-list="missing_info"></ul></div>
-        <div class="block" data-hide-empty="constraints"><h3>Limits</h3><ul data-list="constraints"></ul></div>
-        <div class="block" data-hide-empty="sub_goals"><h3>Supporting tasks</h3><ul data-list="sub_goals"></ul></div>
-
-        <div class="next">
-          <span class="next-type" data-f="next_type"></span>
-          <p data-f="next_description"></p>
-        </div>
-
-        <div class="confidence">
-          <span>Confidence</span>
-          <div class="bar"><div id="conf-bar"></div></div>
-          <span data-f="confidence_pct"></span>
-        </div>
-
-        <div class="card-actions">
-          <button type="button" class="ghost" data-status="done">Mark solved</button>
-          <button type="button" class="ghost" data-status="dropped">Drop</button>
-          <button type="button" class="ghost" data-status="active" hidden>Reopen</button>
-        </div>
-      </article>
+  <main class="stage">
+    <section id="thread" class="thread" aria-live="polite"></section>
+    <aside id="machine" class="machine" aria-label="Agent">
+      <div id="agents"></div>
+      <div id="understood" class="understood" hidden></div>
     </aside>
   </main>
+
+  <form id="composer" class="composer">
+    <div class="field">
+      <textarea id="input" rows="1" maxlength="1500" aria-label="Say what you need"></textarea>
+      <div id="ghost" class="ghost" aria-hidden="true"></div>
+      <div class="field-meta">
+        <span id="wordcount" class="wordcount" hidden></span>
+        <button id="mic-lang" type="button" class="mic-lang" hidden></button>
+      </div>
+    </div>
+    <button id="mic" type="button" class="mic" aria-label="Speak instead of typing" title="Speak" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+    </button>
+    <button id="send" type="submit" class="send" aria-label="Send">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+    </button>
+  </form>
+  <div id="options" class="options" hidden></div>
+  <p id="fineprint" class="fineprint">Please don't type passwords or card numbers.</p>
+
+  <div id="drawer" class="drawer" hidden>
+    <div class="drawer-inner">
+      <button type="button" class="drawer-close" aria-label="Close" data-close>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <div id="drawer-body"></div>
+    </div>
+  </div>
 
   <script src="/static/app.js" defer></script>
 </body>

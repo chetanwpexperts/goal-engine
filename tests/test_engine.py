@@ -149,5 +149,5 @@ def test_confidence_clamped_and_questions_capped(client, use_provider):
 
 def test_page_and_health(client, use_provider):
     use_provider(FakeProvider(answers=[]))
-    assert "Tell me what you need" in client.get("/").text
+    assert "Say what you need" in client.get("/").text
     assert client.get("/api/health").json()["ok"] is True

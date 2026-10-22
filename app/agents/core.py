@@ -184,19 +184,15 @@ def goal_agents(db: Session, goal_id: int) -> list[Agent]:
 
 
 def plan_text(recipe: Recipe, hi: bool, missing: list[Input]) -> str:
-    lines = [("Main ye karunga:" if hi else "Here's what I'll do:")]
-    lines += [f"{i}. {b.hi if hi else b.en}" for i, b in enumerate(recipe.blocks, 1)]
-    if recipe.access == "none":
-        lines.append("🔒 " + ("Koi password ya access nahi chahiye." if hi else "No password or access needed."))
+    """One short line: the plan itself is drawn in the agent panel."""
+    head = (f"Main ye karunga: {recipe.name_hi}." if hi else f"Here's what I'll do: {recipe.name_en}.")
     if not recipe.available:
-        lines.append(("Ye agent abhi ban raha hai. Aapki zaroorat note kar li hai; tab tak neeche ke steps se shuru kar sakte ho."
-                      if hi else "This agent is being built. I've noted your need; meanwhile the steps below get you started."))
-    elif missing:
+        return head + (" Ye agent abhi ban raha hai; aapki zaroorat note kar li hai. Tab tak steps dekh sakte ho."
+                       if hi else " This agent is being built; your need is noted. Meanwhile you can see the steps.")
+    if missing:
         need = missing[0]
-        lines.append((f"Bas ek cheez chahiye: {need.label_hi}." if hi else f"I just need one thing: {need.label_en}."))
-    else:
-        lines.append(("Shuru karun? \"Start\" dabao ya \"haan\" likho." if hi else "Shall I start? Tap \"Start\" or type \"yes\"."))
-    return "\n".join(lines)
+        return head + (f" Bas ek cheez chahiye: {need.label_hi}." if hi else f" I just need one thing: {need.label_en}.")
+    return head + (" Shuru karun? Start dabao ya \"haan\" likho." if hi else " Shall I start? Tap Start or type \"yes\".")
 
 
 def inputs_from_text(recipe: Recipe, text: str, slots: dict) -> dict:

@@ -192,6 +192,12 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
                          and (loads(a.inputs, {}) or {}).get("spec", {}).get("template") == spec.get("template")), None)
         if existing is None:
             auto.create_agent(db, goal, spec)
+        # The agent now owns this goal: same name, and no leftover questions from the conversation engine.
+        goal.title = spec["title"]
+        goal.missing_info = "[]"
+        goal.pending = None
+        goal.next_action_type = "execute"
+        goal.next_action = "Add the sheet, check the preview, then Start"
         db.commit()
         reply, options, relation = auto.plan_reply(spec, turn.hi), [], "agent_plan"
     elif goal is not None and relation not in ("howto", "safety", "chit_chat"):
@@ -206,6 +212,8 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
         elif override:
             # The system does the work: show the plan instead of a to-do list for the user.
             reply = override
+            goal.missing_info = "[]"   # the agent asks for its own input in its panel
+            db.commit()
             options = [next(k for k, v in STEPS_LABELS.items() if v == turn.hi)]
     return _respond(db, visitor_id, text, goal, reply, relation, options=options, ask_words=turn.ask_words,
                     intent=turn.intent, confidence=turn.confidence, hi=turn.hi)

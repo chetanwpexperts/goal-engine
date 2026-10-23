@@ -3,11 +3,22 @@
 Work top to bottom, one item per run. Tick `[x]` when done (and note it in LOG.md).
 Stack Overflow / DBA Stack Exchange show which problems are most common for each item; official docs are the truth.
 
+## PRIORITY: the problems people ask about most (do these first, in this order)
+- [x] P1 Database / site slow: high CPU, too many slow queries, full table scans, missing indexes, temporary tables / filesort, buffer pool too small (MySQL, MariaDB, PostgreSQL)
+- [ ] P2 Locks and deadlocks: "Lock wait timeout exceeded", deadlock found, long-running transactions, a stuck query blocking others, metadata locks; PostgreSQL blocked queries, idle in transaction
+- [ ] P3 Disk full / table full / binlog or WAL filling the disk / tmp dir full
+- [ ] P4 MySQL / MariaDB / PostgreSQL won't start or keeps crashing (InnoDB recovery, corrupted tables, port in use, permissions on data dir, out of memory killer)
+- [ ] P5 Most common error messages in errors.json with exact `match` patterns (1062, 1451/1452, 1406, incorrect datetime/integer value, out of range, division by zero, 1064, packet too big, 23505, 23502, relation does not exist, permission denied, 40P01); aim for 30+
+- [ ] P6 More question templates in questions.json (sales this month, top customers, orders per day, unpaid invoices, new users per week, stock running low...), each tested on the test databases
+- [ ] P7 Table maintenance: OPTIMIZE/ANALYZE, VACUUM/autovacuum bloat, fragmentation, wrong statistics
+- [ ] P8 Backup and restore problems (mysqldump/pg_dump errors, restore fails, partial restore)
+- [ ] P9 Replication lag / broken replication
+
 ## Issue playbooks, MySQL/MariaDB + PostgreSQL first  (issues.json, 10-20 playbooks per item)
 - [x] Hacked database (defensive incident response, part 1 of 2): signs of a break-in (unknown admin users, new MySQL/PostgreSQL accounts or grants, unexpected triggers/events/stored procedures, spam links or scripts injected in posts/options, wp_users/wp_usermeta admin added, changed siteurl/home, ransom note table, data deleted), read-only checks for each, what to do right now (contain: rotate DB + app passwords, remove unknown users/grants, block remote access, take a copy for evidence), clean up, restore from backup, how to prove it's clean
 - [x] Hacked database part 2: how they got in and how to close it (SQL injection signs in logs, leaked .env / wp-config, weak or reused passwords, DB port open to the internet, outdated plugins), prevention checklist (least-privilege users, no remote root, TLS, backups tested, audit logging), ransomware / "pay bitcoin" tables on exposed MongoDB/Elasticsearch/MySQL
 - [x] Connection: refused, timeout, too many connections (done: 1), gone away / server closed the connection, SSL required, auth plugin, pg_hba, max_user_connections
-- [ ] Performance: site suddenly slow, one page slow, CPU 100%, high disk IO, slow after data grew, slow COUNT(*), slow LIKE search, slow ORDER BY + LIMIT, slow JOIN, temp tables on disk
+- [x] Performance: site suddenly slow, one page slow, CPU 100%, high disk IO, slow after data grew, slow COUNT(*), slow LIKE search, slow ORDER BY + LIMIT, slow JOIN, temp tables on disk
 - [ ] Locking: deadlocks, lock wait timeout, long-running transaction blocking, metadata lock on ALTER, idle in transaction
 - [ ] Charset/encoding: ???? (done: 1), mixed collations "Illegal mix of collations", emoji, CSV import garbled, sorting wrong for Hindi
 - [ ] Timezone: dates off by 5:30, NOW() vs UTC, DST, TIMESTAMP vs DATETIME

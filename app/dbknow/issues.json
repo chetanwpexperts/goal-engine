@@ -20,7 +20,10 @@
       "database bolta hai aur connection nahi le sakta",
       "डेटाबेस में कनेक्शन बहुत ज़्यादा हो गए",
       "बहुत सारे कनेक्शन खुले हैं, नया कनेक्शन नहीं बनता",
-      "कनेक्शन की लिमिट खत्म हो गई"
+      "कनेक्शन की लिमिट खत्म हो गई",
+      "website par bar bar too many connections likha aata hai",
+      "site pe too many connections wali error baar baar dikhti hai",
+      "my site keeps showing a too many connections message"
     ],
     "diagnose": [
       {
@@ -640,7 +643,10 @@
       "password reset ka mail mere paas nahi aata, kisi ne admin email change kar diya",
       "locked out of my own website admin",
       "my admin account was taken over",
-      "मेरा एडमिन पासवर्ड किसी ने बदल दिया लॉगिन नहीं होता"
+      "मेरा एडमिन पासवर्ड किसी ने बदल दिया लॉगिन नहीं होता",
+      "someone grabbed my site admin login and my password stopped working",
+      "kisi ne meri site ka admin le liya ab password kaam nahi karta",
+      "किसी ने साइट का एडमिन ले लिया, अब मेरा पासवर्ड काम नहीं करता"
     ],
     "diagnose": [
       {
@@ -3607,7 +3613,10 @@
       "इलास्टिकसर्च के सारे इंडेक्स गायब हो गए",
       "elasticsearch port 9200 open without password",
       "opensearch cluster wiped with ransom message",
-      "elastic hack ho gaya kya karein"
+      "elastic hack ho gaya kya karein",
+      "search server indexes vanished overnight and a ransom index appeared",
+      "search server ke index raat ko gayab ho gaye, paise maangne wala index aaya",
+      "सर्च सर्वर के इंडेक्स रात में गायब हो गए और फिरौती वाला इंडेक्स आया"
     ],
     "diagnose": [
       {
@@ -4704,7 +4713,9 @@
       "hosting says my database user opened too many connections",
       "my database username reached its own connection quota",
       "hosting plan ka database user limit cross kar gaya",
-      "होस्टिंग कहती है डेटाबेस यूज़र ने बहुत कनेक्शन खोले"
+      "होस्टिंग कहती है डेटाबेस यूज़र ने बहुत कनेक्शन खोले",
+      "web host says my db login opened too many connections at the same time",
+      "my hosting complains my database account uses too many connection slots"
     ],
     "diagnose": [
       {
@@ -4810,7 +4821,9 @@
       "errors ke baad mysql ne mera server block kar diya",
       "मायएसक्यूएल ने एरर के बाद वेब सर्वर का पता ब्लॉक किया",
       "mysql banned my server's ip",
-      "too many failed connects so mysql locked that host"
+      "too many failed connects so mysql locked that host",
+      "after failed attempts mysql shut out my web server's address",
+      "fail hone ke baad mysql ne web server ka address rok diya"
     ],
     "diagnose": [
       {
@@ -5491,6 +5504,1992 @@
       "my wordpress homepage only says it can't connect to the database",
       "meri wordpress website khulte hi bolti hai database se jud nahi pa rahi",
       "मेरी वर्डप्रेस वेबसाइट खुलते ही कहती है डेटाबेस से जुड़ नहीं पा रही"
+    ]
+  },
+  {
+    "id": "perf-cpu-100",
+    "title_en": "Database server CPU at 100%",
+    "title_hi": "Database server ka CPU 100% par",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "mysqld using 100% cpu",
+      "mysql process taking all the cpu on the server",
+      "postgres process high cpu usage",
+      "server cpu full because of mysql",
+      "database CPU spikes to 100 percent every few minutes",
+      "hosting ne bola mysql cpu zyada kha raha hai",
+      "server ka cpu 100% ho gaya mysql ki wajah se",
+      "top command mein mysqld sabse upar hai",
+      "cpu usage bahut high hai database ka",
+      "hosting provider ne account suspend kiya high cpu usage ki wajah se",
+      "सर्वर का सीपीयू पूरा भर गया है mysql की वजह से",
+      "डेटाबेस सीपीयू सौ प्रतिशत दिखा रहा है",
+      "RDS CPU utilization alarm keeps firing",
+      "load average very high and mysqld is the culprit",
+      "mysql is hogging the processor",
+      "database is eating all the processor power",
+      "processor usage full because of the database",
+      "my host complains the database uses too much processor",
+      "database poora processor kha raha hai",
+      "प्रोसेसर पूरा डेटाबेस खा रहा है",
+      "होस्टिंग वाले कहते हैं डेटाबेस ज़्यादा सीपीयू ले रहा है"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_running', 'Threads_connected', 'Questions', 'Com_select', 'Slow_queries', 'Uptime')",
+        "look_for": "Threads_running far above the number of CPU cores = queries queueing for CPU"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ID, USER, DB, COMMAND, TIME, STATE, LEFT(INFO, 200) AS query FROM information_schema.PROCESSLIST WHERE COMMAND <> 'Sleep' ORDER BY TIME DESC LIMIT 20",
+        "look_for": "queries running for many seconds, or many copies of the same query at once"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT LEFT(DIGEST_TEXT, 200) AS query, COUNT_STAR AS runs, ROUND(SUM_TIMER_WAIT / 1000000000000, 2) AS total_seconds, SUM_ROWS_EXAMINED AS rows_examined, SUM_ROWS_SENT AS rows_sent, SUM_NO_INDEX_USED AS runs_without_index FROM performance_schema.events_statements_summary_by_digest ORDER BY SUM_TIMER_WAIT DESC LIMIT 15",
+        "look_for": "the few query shapes that use most of the time; rows_examined far bigger than rows_sent = missing index (empty if performance_schema is off)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Select_scan', 'Select_full_join', 'Select_range_check', 'Handler_read_rnd_next', 'Handler_read_key', 'Slow_queries', 'Questions', 'Uptime')",
+        "look_for": "Handler_read_rnd_next much bigger than Handler_read_key, and a growing Select_full_join = tables read from start to end"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT state, count(*) AS sessions, max(now() - query_start) AS longest FROM pg_stat_activity WHERE pid <> pg_backend_pid() GROUP BY state ORDER BY sessions DESC",
+        "look_for": "many 'active' sessions at once = CPU is shared between too many queries"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT pid, state, now() - query_start AS running_for, wait_event_type, wait_event, left(query, 200) AS query FROM pg_stat_activity WHERE state <> 'idle' AND pid <> pg_backend_pid() ORDER BY query_start LIMIT 20",
+        "look_for": "queries running for a long time, or many copies of the same query"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, seq_scan, seq_tup_read, idx_scan, n_live_tup FROM pg_stat_user_tables ORDER BY seq_tup_read DESC LIMIT 20",
+        "look_for": "big tables (n_live_tup) with a high seq_tup_read and few idx_scan = read from start to end again and again"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT extname, extversion FROM pg_extension WHERE extname IN ('pg_stat_statements', 'pg_trgm', 'auto_explain')",
+        "look_for": "pg_stat_statements missing = no per-query time totals yet; pg_trgm missing = no fast LIKE '%text%' indexes"
+      }
+    ],
+    "causes": [
+      {
+        "id": "full_scans",
+        "title_en": "A few frequent queries read whole tables because an index is missing",
+        "title_hi": "Kuch baar-baar chalne wali queries poori table padhti hain kyunki index nahi hai"
+      },
+      {
+        "id": "traffic",
+        "title_en": "Too many queries at once (traffic spike, bots, a cron job, no page cache)",
+        "title_hi": "Ek saath bahut zyada queries (traffic badha, bots, cron job, page cache nahi)"
+      },
+      {
+        "id": "runaway",
+        "title_en": "One huge report/query or a stuck loop in the app running again and again",
+        "title_hi": "Ek bahut bhari report/query ya app ka loop jo baar-baar chal raha hai"
+      },
+      {
+        "id": "sorting",
+        "title_en": "Big sorts and temporary tables (ORDER BY / GROUP BY on many rows)",
+        "title_hi": "Bahut saari rows par ORDER BY / GROUP BY se bade sort aur temporary tables"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "full_scans",
+        "action": "approved_change",
+        "steps_en": "Take the top query from the checks, run EXPLAIN on it, and add the index it is missing (Goal Engine shows the CREATE INDEX for approval, with Undo).",
+        "steps_hi": "Checks ki sabse upar wali query par EXPLAIN chalao aur jo index missing hai woh lagao (Goal Engine CREATE INDEX approval ke liye dikhata hai, Undo ke saath)."
+      },
+      {
+        "cause": "traffic",
+        "action": "advice",
+        "steps_en": "Turn on page/object caching in the app (e.g. a caching plugin on WordPress), block bad bots, spread cron jobs out.",
+        "steps_hi": "App mein page/object caching chalu karo (WordPress par caching plugin), faltu bots block karo, cron jobs alag-alag time par chalao."
+      },
+      {
+        "cause": "runaway",
+        "action": "advice",
+        "steps_en": "Find the long query in the running list; ask its owner to stop it (KILL <id> in MySQL, pg_cancel_backend(pid) in PostgreSQL), then fix the code that sends it.",
+        "steps_hi": "Running list mein lambi query dhoondo; uske owner se band karwao (MySQL mein KILL <id>, PostgreSQL mein pg_cancel_backend(pid)), phir woh code theek karo jo use bhejta hai."
+      },
+      {
+        "cause": "sorting",
+        "action": "approved_change",
+        "steps_en": "Add an index that matches the WHERE + ORDER BY columns so the database reads rows already in order; see the temporary tables playbook.",
+        "steps_hi": "WHERE + ORDER BY columns wala index lagao taaki rows pehle se order mein milein; temporary tables playbook dekho."
+      }
+    ],
+    "verify": {
+      "en": "CPU drops back to normal and Threads_running / active sessions stay low at busy hours.",
+      "hi": "CPU normal par aa jata hai aur busy time par bhi Threads_running / active sessions kam rehte hain."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/performance-schema-statement-digests.html",
+    "seen_at": [
+      "https://www.percona.com/blog/reducing-high-cpu-on-mysql-a-case-study/",
+      "https://www.akamai.com/community/questions/8365/troubleshooting-100-cpu-utilization-by-mysqld-process",
+      "https://www.postgresql.org/docs/current/monitoring-stats.html"
+    ],
+    "test_phrases": [
+      "my web host says the database is eating all the processor",
+      "server ka processor poora database kha raha hai",
+      "होस्टिंग वाले कह रहे हैं डेटाबेस प्रोसेसर ज़्यादा खा रहा है"
+    ]
+  },
+  {
+    "id": "perf-site-suddenly-slow",
+    "title_en": "Site suddenly became slow (was fine before)",
+    "title_hi": "Site achanak slow ho gayi (pehle theek thi)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "website was fast yesterday and today it is crawling",
+      "site suddenly slow since this morning",
+      "everything was working fine then the site became very slow overnight",
+      "pages started timing out suddenly",
+      "kal tak site fast thi aaj achanak slow ho gayi",
+      "aaj subah se website bahut slow khul rahi hai",
+      "achanak se saare page der se load ho rahe hain",
+      "kuch change nahi kiya phir bhi site slow ho gayi",
+      "कल तक वेबसाइट तेज़ थी आज अचानक धीमी हो गई",
+      "आज सुबह से साइट बहुत देर से खुल रही है",
+      "after the plugin update the site became slow",
+      "site slowed down after we imported data",
+      "update ke baad site slow ho gayi hai",
+      "every page of the site became slow since last week",
+      "last week the website was quick, now all pages take ages",
+      "pichle hafte tak site fast thi ab har page der se khulta hai",
+      "har page atak atak ke khul raha hai achanak se",
+      "पिछले हफ्ते तक साइट तेज़ थी अब हर पेज अटकता है",
+      "पूरी साइट के सारे पेज अचानक धीमे हो गए"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT ID, USER, DB, COMMAND, TIME, STATE, LEFT(INFO, 200) AS query FROM information_schema.PROCESSLIST WHERE COMMAND <> 'Sleep' ORDER BY TIME DESC LIMIT 20",
+        "look_for": "queries running for many seconds, or many copies of the same query at once"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_running', 'Threads_connected', 'Questions', 'Com_select', 'Slow_queries', 'Uptime')",
+        "look_for": "Threads_running far above the number of CPU cores = queries queueing for CPU"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME, TABLE_ROWS, ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 1) AS size_mb, ROUND(INDEX_LENGTH / 1024 / 1024, 1) AS index_mb FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY DATA_LENGTH + INDEX_LENGTH DESC LIMIT 20",
+        "look_for": "which tables are big; a log/session table that grew huge is a common cause"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT start_time, query_time, rows_examined, rows_sent, LEFT(sql_text, 200) AS query FROM mysql.slow_log ORDER BY query_time DESC LIMIT 20",
+        "look_for": "the slowest recent queries (only filled when slow_query_log is ON and log_output includes TABLE)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT pid, state, now() - query_start AS running_for, wait_event_type, wait_event, left(query, 200) AS query FROM pg_stat_activity WHERE state <> 'idle' AND pid <> pg_backend_pid() ORDER BY query_start LIMIT 20",
+        "look_for": "queries running for a long time, or many copies of the same query"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT state, count(*) AS sessions, max(now() - query_start) AS longest FROM pg_stat_activity WHERE pid <> pg_backend_pid() GROUP BY state ORDER BY sessions DESC",
+        "look_for": "many 'active' sessions at once = CPU is shared between too many queries"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, n_live_tup, n_dead_tup, pg_size_pretty(pg_total_relation_size(relid)) AS total_size FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 20",
+        "look_for": "which tables are big, and many dead rows (n_dead_tup) = bloat"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, n_live_tup, n_mod_since_analyze, last_analyze, last_autoanalyze FROM pg_stat_user_tables ORDER BY n_mod_since_analyze DESC LIMIT 20",
+        "look_for": "many rows changed since the last analyze, or last_autoanalyze empty on a big table = the planner works from old numbers"
+      }
+    ],
+    "causes": [
+      {
+        "id": "new_query",
+        "title_en": "A new plugin/feature/deploy added a slow query",
+        "title_hi": "Naye plugin/feature/deploy ne ek slow query jod di"
+      },
+      {
+        "id": "table_grew",
+        "title_en": "A table (logs, sessions, carts, revisions) suddenly grew very big",
+        "title_hi": "Koi table (logs, sessions, carts, revisions) achanak bahut badi ho gayi"
+      },
+      {
+        "id": "blocked",
+        "title_en": "One long query or open transaction is blocking the others",
+        "title_hi": "Ek lambi query ya khula transaction baaki sab ko rok raha hai"
+      },
+      {
+        "id": "stale_stats",
+        "title_en": "Statistics went stale after a big import/delete and the planner picked a bad plan",
+        "title_hi": "Bade import/delete ke baad statistics purane ho gaye aur galat plan chuna gaya"
+      },
+      {
+        "id": "traffic",
+        "title_en": "More visitors or bots than usual",
+        "title_hi": "Aam se zyada visitors ya bots"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "new_query",
+        "action": "advice",
+        "steps_en": "Look at the slowest queries list; if it started with an update, roll back that plugin/deploy or add the index its query needs.",
+        "steps_hi": "Slow queries ki list dekho; agar update ke baad shuru hua to woh plugin/deploy wapas lo ya uski query ke liye index lagao."
+      },
+      {
+        "cause": "table_grew",
+        "action": "advice",
+        "steps_en": "Clean up or archive the old rows of the big table (after a backup), and set the app to keep it small (e.g. expire sessions, limit post revisions).",
+        "steps_hi": "Backup ke baad badi table ki purani rows saaf/archive karo, aur app ko set karo ki woh choti rahe (sessions expire, post revisions limit)."
+      },
+      {
+        "cause": "blocked",
+        "action": "advice",
+        "steps_en": "In the running list, find the oldest query/transaction and stop it (KILL <id> / pg_terminate_backend(pid)) after checking with its owner; see the locking playbooks.",
+        "steps_hi": "Running list mein sabse purani query/transaction dhoondo aur owner se pooch kar band karo (KILL <id> / pg_terminate_backend(pid)); locking playbooks dekho."
+      },
+      {
+        "cause": "stale_stats",
+        "action": "advice",
+        "steps_en": "Refresh statistics: ANALYZE TABLE <table> (MySQL) or ANALYZE <table> (PostgreSQL). See the 'query was fast, now slow' playbook.",
+        "steps_hi": "Statistics refresh karo: ANALYZE TABLE <table> (MySQL) ya ANALYZE <table> (PostgreSQL). 'Query pehle fast thi, ab slow' playbook dekho."
+      },
+      {
+        "cause": "traffic",
+        "action": "advice",
+        "steps_en": "Enable page caching / a CDN, block abusive bots, and check the CPU playbook.",
+        "steps_hi": "Page caching / CDN lagao, faltu bots block karo, aur CPU playbook dekho."
+      }
+    ],
+    "verify": {
+      "en": "Pages load as fast as before and no query stays in the running list for more than a second or two.",
+      "hi": "Page pehle jitne fast khulte hain aur koi query running list mein 1-2 second se zyada nahi rukti."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/monitoring-stats.html",
+      "https://www.percona.com/blog/reducing-high-cpu-on-mysql-a-case-study/"
+    ],
+    "test_phrases": [
+      "my shop website was quick last week and now every page takes ages",
+      "pichle hafte tak dukaan ki website tez thi ab har page atak atak ke khulta hai",
+      "पिछले हफ्ते तक दुकान की वेबसाइट तेज़ थी अब हर पेज अटक कर खुलता है"
+    ]
+  },
+  {
+    "id": "perf-one-page-slow",
+    "title_en": "Only one page or report is slow",
+    "title_hi": "Sirf ek page ya report slow hai",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "only the orders page in admin is slow",
+      "one report takes a minute to open, everything else is fast",
+      "search results page is very slow but other pages are fine",
+      "the dashboard page loads very slowly",
+      "baaki site theek hai bas ek page slow hai",
+      "sirf orders wala page khulne mein bahut time leta hai",
+      "admin mein reports page atak jata hai",
+      "ek hi report hai jo minute bhar leti hai",
+      "बाकी सब ठीक है बस एक पेज धीमा है",
+      "सिर्फ रिपोर्ट वाला पेज बहुत देर में खुलता है",
+      "customer list page takes forever",
+      "export page hangs for a long time",
+      "only one screen in the app is slow, the rest are quick",
+      "just the billing screen takes ages",
+      "bas ek screen dheere khulti hai baaki sab jaldi",
+      "sirf bill wali screen bahut der leti hai",
+      "बस एक स्क्रीन धीरे खुलती है बाकी सब ठीक",
+      "सिर्फ बिल वाली स्क्रीन बहुत देर लगाती है"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT LEFT(DIGEST_TEXT, 200) AS query, COUNT_STAR AS runs, ROUND(SUM_TIMER_WAIT / 1000000000000, 2) AS total_seconds, SUM_ROWS_EXAMINED AS rows_examined, SUM_ROWS_SENT AS rows_sent, SUM_NO_INDEX_USED AS runs_without_index FROM performance_schema.events_statements_summary_by_digest ORDER BY SUM_TIMER_WAIT DESC LIMIT 15",
+        "look_for": "the few query shapes that use most of the time; rows_examined far bigger than rows_sent = missing index (empty if performance_schema is off)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT start_time, query_time, rows_examined, rows_sent, LEFT(sql_text, 200) AS query FROM mysql.slow_log ORDER BY query_time DESC LIMIT 20",
+        "look_for": "the slowest recent queries (only filled when slow_query_log is ON and log_output includes TABLE)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('slow_query_log', 'long_query_time', 'log_output', 'log_queries_not_using_indexes', 'slow_query_log_file')",
+        "look_for": "slow_query_log OFF = nobody is recording slow queries yet"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ID, USER, DB, COMMAND, TIME, STATE, LEFT(INFO, 200) AS query FROM information_schema.PROCESSLIST WHERE COMMAND <> 'Sleep' ORDER BY TIME DESC LIMIT 20",
+        "look_for": "queries running for many seconds, or many copies of the same query at once"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('log_min_duration_statement', 'log_temp_files', 'track_io_timing', 'shared_preload_libraries')",
+        "look_for": "log_min_duration_statement = -1 means slow queries are not logged"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT extname, extversion FROM pg_extension WHERE extname IN ('pg_stat_statements', 'pg_trgm', 'auto_explain')",
+        "look_for": "pg_stat_statements missing = no per-query time totals yet; pg_trgm missing = no fast LIKE '%text%' indexes"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('pg_stat_statements.track', 'pg_stat_statements.max', 'compute_query_id')",
+        "look_for": "rows here only when pg_stat_statements is loaded; then SELECT query, calls, total_exec_time FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 10 shows the heaviest queries"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT pid, state, now() - query_start AS running_for, wait_event_type, wait_event, left(query, 200) AS query FROM pg_stat_activity WHERE state <> 'idle' AND pid <> pg_backend_pid() ORDER BY query_start LIMIT 20",
+        "look_for": "queries running for a long time, or many copies of the same query"
+      }
+    ],
+    "causes": [
+      {
+        "id": "missing_index",
+        "title_en": "The page's main query filters or sorts on a column with no index",
+        "title_hi": "Page ki main query aise column par filter/sort karti hai jiska index nahi hai"
+      },
+      {
+        "id": "n_plus_one",
+        "title_en": "The page runs one query per row (hundreds of small queries)",
+        "title_hi": "Page har row ke liye ek query chalata hai (sainkdon choti queries)"
+      },
+      {
+        "id": "too_much_data",
+        "title_en": "The page loads every row instead of one page of results",
+        "title_hi": "Page ek page ki jagah saari rows load karta hai"
+      },
+      {
+        "id": "heavy_report",
+        "title_en": "A heavy report (big GROUP BY over months of data) runs live every time",
+        "title_hi": "Bhari report (mahino ke data par GROUP BY) har baar live chalti hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "missing_index",
+        "action": "approved_change",
+        "steps_en": "Paste the page's query into Goal Engine ('optimize this query'); it runs EXPLAIN and proposes the index for approval.",
+        "steps_hi": "Page ki query Goal Engine mein daalo ('is query ko optimize karo'); woh EXPLAIN chala kar index approval ke liye dikhata hai."
+      },
+      {
+        "cause": "n_plus_one",
+        "action": "code",
+        "steps_en": "Load related rows in one query (JOIN or WHERE id IN (...)); in Laravel use with(), in Django select_related/prefetch_related.",
+        "steps_hi": "Related rows ek query mein lao (JOIN ya WHERE id IN (...)); Laravel mein with(), Django mein select_related/prefetch_related."
+      },
+      {
+        "cause": "too_much_data",
+        "action": "code",
+        "steps_en": "Add pagination (LIMIT) and select only the columns the page shows.",
+        "steps_hi": "Pagination (LIMIT) lagao aur sirf wahi columns lo jo page dikhata hai."
+      },
+      {
+        "cause": "heavy_report",
+        "action": "advice",
+        "steps_en": "Pre-compute the report daily into a summary table, or cache its result for some minutes.",
+        "steps_hi": "Report ko roz ek summary table mein pehle se nikal lo, ya result kuch minute cache karo."
+      }
+    ],
+    "verify": {
+      "en": "The page opens in about a second and its query no longer tops the slow list.",
+      "hi": "Page lagbhag ek second mein khulta hai aur uski query slow list mein upar nahi aati."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/slow-query-log.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/pgstatstatements.html",
+      "https://www.postgresql.org/docs/current/runtime-config-logging.html"
+    ],
+    "test_phrases": [
+      "just the invoices screen is painfully slow, the rest is quick",
+      "bas invoice wali screen dheere khulti hai baaki sab jaldi",
+      "बस इनवॉइस वाली स्क्रीन धीरे खुलती है बाकी सब जल्दी"
+    ]
+  },
+  {
+    "id": "perf-slow-after-data-grew",
+    "title_en": "Slow since the data grew (fine when it was small)",
+    "title_hi": "Data badhne ke baad slow (chhota tha tab theek tha)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "query was fast with 1000 rows but slow with 1 million rows",
+      "app gets slower as the table grows",
+      "performance degraded as the database got bigger",
+      "table has crores of rows and queries are slow now",
+      "data badhne ke saath app slow hoti ja rahi hai",
+      "jab data kam tha tab sab fast tha",
+      "lakhon records ho gaye ab queries slow hain",
+      "table mein crore rows ho gayi hain",
+      "जैसे जैसे डाटा बढ़ा सिस्टम धीमा होता गया",
+      "लाखों रिकॉर्ड होने के बाद सब धीमा है",
+      "worked fine in testing, slow in production with real data",
+      "testing mein fast tha live data pe slow hai",
+      "years of data piled up and now everything crawls",
+      "records have piled up over the years and the app is crawling",
+      "saalon ka data jama ho gaya ab sab bahut dheere chalta hai",
+      "records badhte badhte software rengne laga",
+      "सालों का डाटा जमा होने के बाद सब रेंगता है",
+      "रिकॉर्ड बढ़ते बढ़ते सॉफ्टवेयर बहुत धीमा हो गया"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME, TABLE_ROWS, ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 1) AS size_mb, ROUND(INDEX_LENGTH / 1024 / 1024, 1) AS index_mb FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY DATA_LENGTH + INDEX_LENGTH DESC LIMIT 20",
+        "look_for": "which tables are big; a log/session table that grew huge is a common cause"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT t.TABLE_NAME, t.TABLE_ROWS FROM information_schema.TABLES t WHERE t.TABLE_SCHEMA = DATABASE() AND t.TABLE_TYPE = 'BASE TABLE' AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS s WHERE s.TABLE_SCHEMA = t.TABLE_SCHEMA AND s.TABLE_NAME = t.TABLE_NAME AND s.INDEX_NAME <> 'PRIMARY') ORDER BY t.TABLE_ROWS DESC LIMIT 20",
+        "look_for": "big tables with no index except the primary key"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT c.TABLE_NAME, c.COLUMN_NAME FROM information_schema.COLUMNS c WHERE c.TABLE_SCHEMA = DATABASE() AND c.COLUMN_NAME LIKE '%\\_id' AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS s WHERE s.TABLE_SCHEMA = c.TABLE_SCHEMA AND s.TABLE_NAME = c.TABLE_NAME AND s.COLUMN_NAME = c.COLUMN_NAME AND s.SEQ_IN_INDEX = 1) ORDER BY c.TABLE_NAME LIMIT 50",
+        "look_for": "link columns (customer_id, order_id ...) that no index starts with: every join or filter on them reads the whole table"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_buffer_pool_read_requests', 'Innodb_buffer_pool_reads', 'Innodb_buffer_pool_pages_free', 'Innodb_buffer_pool_pages_total', 'Innodb_buffer_pool_wait_free')",
+        "look_for": "Innodb_buffer_pool_reads more than about 1% of read_requests, pages_free near 0 or wait_free above 0 = the memory cache is too small"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, n_live_tup, n_dead_tup, pg_size_pretty(pg_total_relation_size(relid)) AS total_size FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 20",
+        "look_for": "which tables are big, and many dead rows (n_dead_tup) = bloat"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, seq_scan, seq_tup_read, idx_scan, n_live_tup FROM pg_stat_user_tables ORDER BY seq_tup_read DESC LIMIT 20",
+        "look_for": "big tables (n_live_tup) with a high seq_tup_read and few idx_scan = read from start to end again and again"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT c.conrelid::regclass AS table_name, a.attname AS column_name FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1] WHERE c.contype = 'f' AND NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.conrelid AND i.indkey[0] = c.conkey[1]) LIMIT 50",
+        "look_for": "foreign-key columns that no index starts with (PostgreSQL does not index them automatically)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT datname, blks_hit, blks_read, round(blks_hit * 100.0 / nullif(blks_hit + blks_read, 0), 2) AS cache_hit_pct, temp_files, pg_size_pretty(temp_bytes) AS temp_size FROM pg_stat_database WHERE datname = current_database()",
+        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk"
+      }
+    ],
+    "causes": [
+      {
+        "id": "no_index",
+        "title_en": "Queries scan whole tables; that was cheap at 1,000 rows and is slow at millions",
+        "title_hi": "Queries poori table padhti hain; 1,000 rows par sasta tha, lakhon par slow"
+      },
+      {
+        "id": "memory",
+        "title_en": "The data no longer fits in the database's memory cache, so it reads from disk",
+        "title_hi": "Data ab database ki memory cache mein nahi aata, isliye disk se padhta hai"
+      },
+      {
+        "id": "old_data",
+        "title_en": "Old rows (logs, history) that nobody needs make every query read more",
+        "title_hi": "Purani rows (logs, history) jinki zarurat nahi, har query ko zyada padhwati hain"
+      },
+      {
+        "id": "offset",
+        "title_en": "Pagination with a big OFFSET reads and throws away all earlier rows",
+        "title_hi": "Bade OFFSET wali pagination pichli saari rows padh ke phenk deti hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "no_index",
+        "action": "approved_change",
+        "steps_en": "Add indexes on the columns used in WHERE, JOIN and ORDER BY of the slow queries (Goal Engine proposes them for approval).",
+        "steps_hi": "Slow queries ke WHERE, JOIN aur ORDER BY columns par index lagao (Goal Engine approval ke liye dikhata hai)."
+      },
+      {
+        "cause": "memory",
+        "action": "config",
+        "steps_en": "Give the database more memory cache (innodb_buffer_pool_size / shared_buffers); see the memory cache playbook.",
+        "steps_hi": "Database ko zyada memory cache do (innodb_buffer_pool_size / shared_buffers); memory cache playbook dekho."
+      },
+      {
+        "cause": "old_data",
+        "action": "advice",
+        "steps_en": "Archive or delete old rows after a backup; for very big time-based tables consider partitioning by month.",
+        "steps_hi": "Backup ke baad purani rows archive/delete karo; bahut badi date-wise tables ke liye month-wise partitioning socho."
+      },
+      {
+        "cause": "offset",
+        "action": "code",
+        "steps_en": "Use keyset pagination (WHERE id > last_seen_id ORDER BY id LIMIT 50) instead of a big OFFSET.",
+        "steps_hi": "Bade OFFSET ki jagah keyset pagination (WHERE id > last_seen_id ORDER BY id LIMIT 50) use karo."
+      }
+    ],
+    "verify": {
+      "en": "EXPLAIN of the slow queries shows an index being used and rows examined close to rows returned.",
+      "hi": "Slow queries ka EXPLAIN index use hota dikhata hai aur padhi gayi rows lautai gayi rows ke kareeb hain."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html",
+    "seen_at": [
+      "https://use-the-index-luke.com/",
+      "https://www.postgresql.org/docs/current/indexes.html"
+    ],
+    "test_phrases": [
+      "now that we have years of records everything crawls",
+      "saalon ka record jama ho gaya to sab rengne laga",
+      "सालों का रिकॉर्ड जमा हो गया तो सब रेंगने लगा"
+    ]
+  },
+  {
+    "id": "perf-missing-index-full-scan",
+    "title_en": "Full table scans: an index is missing",
+    "title_hi": "Full table scan: index missing hai",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "EXPLAIN shows type ALL",
+      "explain says full table scan",
+      "Seq Scan on a big table in the query plan",
+      "possible_keys NULL key NULL in explain",
+      "rows examined is millions but rows sent is 10",
+      "query is not using the index",
+      "which columns need an index",
+      "how do I know which index to add",
+      "kaunse column par index lagana chahiye",
+      "query index use nahi kar rahi",
+      "explain mein type ALL aa raha hai",
+      "poori table scan ho rahi hai",
+      "कौन से कॉलम पर इंडेक्स लगाना चाहिए",
+      "क्वेरी इंडेक्स का इस्तेमाल नहीं कर रही",
+      "log_queries_not_using_indexes shows many queries",
+      "missing index on foreign key column",
+      "to find one record it reads the whole table",
+      "it checks every row just to get one customer",
+      "ek record ke liye poori table padhta hai",
+      "har row check karta hai ek customer ke liye",
+      "एक रिकॉर्ड के लिए पूरी टेबल पढ़ता है",
+      "एक ग्राहक के लिए हर पंक्ति देखता है"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT OBJECT_NAME AS table_name, COUNT_READ AS rows_read_by_full_scan FROM performance_schema.table_io_waits_summary_by_index_usage WHERE OBJECT_SCHEMA = DATABASE() AND INDEX_NAME IS NULL AND COUNT_READ > 0 ORDER BY COUNT_READ DESC LIMIT 20",
+        "look_for": "tables read mostly without any index (empty if performance_schema is off)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT t.TABLE_NAME, t.TABLE_ROWS FROM information_schema.TABLES t WHERE t.TABLE_SCHEMA = DATABASE() AND t.TABLE_TYPE = 'BASE TABLE' AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS s WHERE s.TABLE_SCHEMA = t.TABLE_SCHEMA AND s.TABLE_NAME = t.TABLE_NAME AND s.INDEX_NAME <> 'PRIMARY') ORDER BY t.TABLE_ROWS DESC LIMIT 20",
+        "look_for": "big tables with no index except the primary key"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT c.TABLE_NAME, c.COLUMN_NAME FROM information_schema.COLUMNS c WHERE c.TABLE_SCHEMA = DATABASE() AND c.COLUMN_NAME LIKE '%\\_id' AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS s WHERE s.TABLE_SCHEMA = c.TABLE_SCHEMA AND s.TABLE_NAME = c.TABLE_NAME AND s.COLUMN_NAME = c.COLUMN_NAME AND s.SEQ_IN_INDEX = 1) ORDER BY c.TABLE_NAME LIMIT 50",
+        "look_for": "link columns (customer_id, order_id ...) that no index starts with: every join or filter on them reads the whole table"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Select_scan', 'Select_full_join', 'Select_range_check', 'Handler_read_rnd_next', 'Handler_read_key', 'Slow_queries', 'Questions', 'Uptime')",
+        "look_for": "Handler_read_rnd_next much bigger than Handler_read_key, and a growing Select_full_join = tables read from start to end"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, seq_scan, seq_tup_read, idx_scan, n_live_tup FROM pg_stat_user_tables ORDER BY seq_tup_read DESC LIMIT 20",
+        "look_for": "big tables (n_live_tup) with a high seq_tup_read and few idx_scan = read from start to end again and again"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT c.conrelid::regclass AS table_name, a.attname AS column_name FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1] WHERE c.contype = 'f' AND NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.conrelid AND i.indkey[0] = c.conkey[1]) LIMIT 50",
+        "look_for": "foreign-key columns that no index starts with (PostgreSQL does not index them automatically)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT tablename, indexname, indexdef FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY tablename, indexname",
+        "look_for": "whether an index covers the WHERE column(s) followed by the ORDER BY column"
+      }
+    ],
+    "causes": [
+      {
+        "id": "no_index",
+        "title_en": "No index starts with the column(s) in WHERE / JOIN",
+        "title_hi": "WHERE / JOIN ke column(s) se shuru hone wala koi index nahi"
+      },
+      {
+        "id": "function_on_column",
+        "title_en": "The column is wrapped in a function or calculation (YEAR(date), LOWER(email), price*2), so its index is skipped",
+        "title_hi": "Column function/calculation mein lapeta hai (YEAR(date), LOWER(email), price*2), isliye index chhoot jata hai"
+      },
+      {
+        "id": "type_mismatch",
+        "title_en": "The value's type differs from the column's (number vs text, different collation), so the index is skipped",
+        "title_hi": "Value ka type column se alag hai (number vs text, alag collation), isliye index chhoot jata hai"
+      },
+      {
+        "id": "wrong_order",
+        "title_en": "A multi-column index exists but its first column is not in the WHERE",
+        "title_hi": "Multi-column index hai par uska pehla column WHERE mein nahi hai"
+      },
+      {
+        "id": "leading_wildcard",
+        "title_en": "LIKE '%word' starts with a wildcard (see the LIKE search playbook)",
+        "title_hi": "LIKE '%word' wildcard se shuru hota hai (LIKE search playbook dekho)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "no_index",
+        "action": "approved_change",
+        "steps_en": "Create an index on the filtered/joined column(s): CREATE INDEX idx_<table>_<col> ON <table> (<col>). Goal Engine shows it for approval, with Undo (DROP INDEX).",
+        "steps_hi": "Filter/join wale column par index banao: CREATE INDEX idx_<table>_<col> ON <table> (<col>). Goal Engine approval ke liye dikhata hai, Undo (DROP INDEX) ke saath."
+      },
+      {
+        "cause": "function_on_column",
+        "action": "code",
+        "steps_en": "Rewrite as a range on the bare column: created >= '2026-01-01' AND created < '2027-01-01' instead of YEAR(created) = 2026; or use an expression/functional index.",
+        "steps_hi": "Bare column par range likho: YEAR(created) = 2026 ki jagah created >= '2026-01-01' AND created < '2027-01-01'; ya expression/functional index lagao."
+      },
+      {
+        "cause": "type_mismatch",
+        "action": "code",
+        "steps_en": "Compare with the same type: quote values for text columns, don't quote numbers; make link columns the same type and collation on both sides.",
+        "steps_hi": "Same type se compare karo: text column ke liye value quote karo, number ko nahi; link columns dono taraf same type aur collation rakho."
+      },
+      {
+        "cause": "wrong_order",
+        "action": "approved_change",
+        "steps_en": "Put the equality columns first, then the range/ORDER BY column: INDEX (status, created).",
+        "steps_hi": "Pehle barabari (=) wale columns, phir range/ORDER BY column: INDEX (status, created)."
+      },
+      {
+        "cause": "leading_wildcard",
+        "action": "advice",
+        "steps_en": "Use full-text search (MySQL FULLTEXT, PostgreSQL pg_trgm / tsvector).",
+        "steps_hi": "Full-text search use karo (MySQL FULLTEXT, PostgreSQL pg_trgm / tsvector)."
+      }
+    ],
+    "verify": {
+      "en": "EXPLAIN shows the index in 'key' (MySQL) or an Index Scan (PostgreSQL), and rows examined drops near rows returned.",
+      "hi": "EXPLAIN mein 'key' mein index (MySQL) ya Index Scan (PostgreSQL) dikhta hai, aur padhi gayi rows lautai rows ke kareeb aa jati hain."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/explain-output.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/using-explain.html",
+      "https://www.postgresql.org/docs/current/indexes-expressional.html",
+      "https://use-the-index-luke.com/"
+    ],
+    "test_phrases": [
+      "the database reads every single row to find one customer",
+      "ek customer dhoondhne ke liye poori table chhaan maarta hai",
+      "एक ग्राहक ढूंढने के लिए पूरी टेबल छान मारता है"
+    ]
+  },
+  {
+    "id": "perf-slow-count",
+    "title_en": "COUNT(*) is slow on a big table",
+    "title_hi": "Badi table par COUNT(*) slow hai",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "select count(*) takes 30 seconds",
+      "counting rows in a big table is slow",
+      "postgres count(*) very slow",
+      "innodb count star slow on large table",
+      "total number of records query is slow",
+      "count(*) query bahut der leti hai",
+      "total kitne records hain yeh nikalne mein minute lagta hai",
+      "row count nikalna slow hai",
+      "pagination ka total count slow hai",
+      "गिनती वाली क्वेरी बहुत धीमी है",
+      "कुल कितनी रो हैं यह निकालने में बहुत समय लगता है",
+      "how to get approximate row count fast",
+      "finding how many entries are in a table takes ages",
+      "counting the entries of a table is very slow",
+      "table ki entries ginne mein bahut der lagti hai",
+      "kitni entry hai bas yeh ginne mein ghanta lagta hai",
+      "टेबल की एंट्री गिनने में बहुत देर लगती है"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME, TABLE_ROWS AS estimated_rows FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_ROWS DESC LIMIT 20",
+        "look_for": "a quick row estimate that needs no full count (InnoDB numbers are approximate)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME, TABLE_ROWS, ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 1) AS size_mb, ROUND(INDEX_LENGTH / 1024 / 1024, 1) AS index_mb FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY DATA_LENGTH + INDEX_LENGTH DESC LIMIT 20",
+        "look_for": "which tables are big; a log/session table that grew huge is a common cause"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT c.relname, c.reltuples::bigint AS estimated_rows FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema') ORDER BY c.reltuples DESC LIMIT 20",
+        "look_for": "the planner's row estimate: instant, close enough for a dashboard number"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, n_live_tup, n_dead_tup, last_vacuum, last_autovacuum FROM pg_stat_user_tables ORDER BY n_dead_tup DESC LIMIT 20",
+        "look_for": "many dead rows or no recent vacuum = count(*) cannot use an index-only scan and reads more pages"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, n_live_tup, n_dead_tup, pg_size_pretty(pg_total_relation_size(relid)) AS total_size FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 20",
+        "look_for": "which tables are big, and many dead rows (n_dead_tup) = bloat"
+      }
+    ],
+    "causes": [
+      {
+        "id": "mvcc_full_count",
+        "title_en": "InnoDB and PostgreSQL keep no stored row count (each transaction can see a different number), so COUNT(*) reads a whole index or table",
+        "title_hi": "InnoDB aur PostgreSQL row count store nahi karte (har transaction alag number dekh sakta hai), isliye COUNT(*) poora index/table padhta hai"
+      },
+      {
+        "id": "count_with_filter",
+        "title_en": "COUNT(*) with a WHERE on a column without an index",
+        "title_hi": "Bina index wale column par WHERE ke saath COUNT(*)"
+      },
+      {
+        "id": "every_page",
+        "title_en": "The app counts all rows on every page load (pagination totals)",
+        "title_hi": "App har page load par saari rows ginta hai (pagination total)"
+      },
+      {
+        "id": "bloat",
+        "title_en": "PostgreSQL: dead rows / an old visibility map stop index-only scans",
+        "title_hi": "PostgreSQL: dead rows / purana visibility map index-only scan rokta hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "mvcc_full_count",
+        "action": "advice",
+        "steps_en": "Where an approximate number is fine, read the estimate (information_schema.TABLES.TABLE_ROWS, pg_class.reltuples); otherwise keep a counter table updated by the app.",
+        "steps_hi": "Jahan andaza kaafi hai wahan estimate padho (information_schema.TABLES.TABLE_ROWS, pg_class.reltuples); warna app se update hone wali counter table rakho."
+      },
+      {
+        "cause": "count_with_filter",
+        "action": "approved_change",
+        "steps_en": "Index the filter column(s) so the count reads only matching index entries.",
+        "steps_hi": "Filter column par index lagao taaki count sirf matching index entries padhe."
+      },
+      {
+        "cause": "every_page",
+        "action": "code",
+        "steps_en": "Show 'next page' without a grand total, or cache the total for a few minutes.",
+        "steps_hi": "Grand total ke bina 'next page' dikhao, ya total kuch minute cache karo."
+      },
+      {
+        "cause": "bloat",
+        "action": "advice",
+        "steps_en": "Make sure autovacuum keeps up (VACUUM the table) so PostgreSQL can answer from the index alone.",
+        "steps_hi": "Autovacuum time par chale (table par VACUUM) taaki PostgreSQL sirf index se jawab de sake."
+      }
+    ],
+    "verify": {
+      "en": "The count/estimate returns in well under a second.",
+      "hi": "Count/estimate ek second se kaafi kam mein aata hai."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-restrictions-limitations.html",
+    "seen_at": [
+      "https://wiki.postgresql.org/wiki/Count_estimate",
+      "https://www.cybertec-postgresql.com/en/postgresql-count-made-fast/",
+      "https://newrelic.com/blog/infrastructure-monitoring/fast-counting-in-postgresql-and-mysql"
+    ],
+    "test_phrases": [
+      "just finding how many entries a table has takes forever",
+      "table mein kitni entry hai bas itna janne mein hi ghanta lag jata hai",
+      "टेबल में कितनी एंट्री है बस इतना जानने में ही बहुत देर लगती है"
+    ]
+  },
+  {
+    "id": "perf-slow-like-search",
+    "title_en": "Search box / LIKE '%text%' is slow",
+    "title_hi": "Search box / LIKE '%text%' slow hai",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "LIKE '%keyword%' query is slow",
+      "search on product name is very slow",
+      "wildcard search not using index",
+      "ILIKE search slow in postgres",
+      "site search takes 10 seconds",
+      "searching customers by name is slow",
+      "search box mein kuch likhte hi site atak jati hai",
+      "product search bahut slow hai",
+      "naam se search karne mein bahut time lagta hai",
+      "like query slow hai index ke baad bhi",
+      "खोज वाला बॉक्स बहुत धीमा है",
+      "नाम से सर्च करने में बहुत समय लगता है",
+      "full text search vs like which is faster",
+      "looking up an item by part of its name is slow",
+      "typing half a product name in search hangs",
+      "aadha naam likh ke item dhoondo to atak jata hai",
+      "naam ka hissa daal ke search karo to der lagti hai",
+      "आधा नाम लिखकर आइटम खोजो तो अटक जाता है",
+      "नाम का हिस्सा डालकर सर्च करो तो देर लगती है"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME, INDEX_TYPE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND INDEX_TYPE = 'FULLTEXT'",
+        "look_for": "no FULLTEXT index on the text columns people search = every search reads every row"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT c.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, t.TABLE_ROWS FROM information_schema.COLUMNS c JOIN information_schema.TABLES t ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME WHERE c.TABLE_SCHEMA = DATABASE() AND c.DATA_TYPE IN ('varchar', 'text', 'mediumtext', 'longtext') ORDER BY t.TABLE_ROWS DESC LIMIT 30",
+        "look_for": "the text columns of the biggest tables: candidates for a FULLTEXT index"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME, TABLE_ROWS, ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 1) AS size_mb, ROUND(INDEX_LENGTH / 1024 / 1024, 1) AS index_mb FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY DATA_LENGTH + INDEX_LENGTH DESC LIMIT 20",
+        "look_for": "which tables are big; a log/session table that grew huge is a common cause"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT tablename, indexname, indexdef FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog', 'information_schema') AND (indexdef ILIKE '%gin_trgm_ops%' OR indexdef ILIKE '%gist_trgm_ops%' OR indexdef ILIKE '%to_tsvector%' OR indexdef ILIKE '%text_pattern_ops%')",
+        "look_for": "no trigram / full-text index = LIKE '%word%' and ILIKE read the whole table"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT extname, extversion FROM pg_extension WHERE extname IN ('pg_stat_statements', 'pg_trgm', 'auto_explain')",
+        "look_for": "pg_stat_statements missing = no per-query time totals yet; pg_trgm missing = no fast LIKE '%text%' indexes"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, n_live_tup, n_dead_tup, pg_size_pretty(pg_total_relation_size(relid)) AS total_size FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 20",
+        "look_for": "which tables are big, and many dead rows (n_dead_tup) = bloat"
+      }
+    ],
+    "causes": [
+      {
+        "id": "leading_wildcard",
+        "title_en": "A pattern that starts with % cannot use a normal B-tree index, so every row is read",
+        "title_hi": "% se shuru hone wala pattern normal B-tree index use nahi kar sakta, isliye har row padhi jati hai"
+      },
+      {
+        "id": "many_columns",
+        "title_en": "The search ORs several text columns (name OR description OR sku)",
+        "title_hi": "Search kai text columns ko OR karta hai (name OR description OR sku)"
+      },
+      {
+        "id": "lower_function",
+        "title_en": "LOWER(name) LIKE ... wraps the column so its index is skipped",
+        "title_hi": "LOWER(name) LIKE ... column ko lapet deta hai, index chhoot jata hai"
+      },
+      {
+        "id": "big_text",
+        "title_en": "Searching inside long text (post content, descriptions)",
+        "title_hi": "Lambe text (post content, description) ke andar search"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "leading_wildcard",
+        "action": "approved_change",
+        "steps_en": "MySQL: add a FULLTEXT index and use MATCH(col) AGAINST('word'). PostgreSQL: CREATE EXTENSION pg_trgm and a GIN index with gin_trgm_ops, which speeds up LIKE/ILIKE '%word%'.",
+        "steps_hi": "MySQL: FULLTEXT index lagao aur MATCH(col) AGAINST('word') use karo. PostgreSQL: CREATE EXTENSION pg_trgm aur gin_trgm_ops wala GIN index, jo LIKE/ILIKE '%word%' tez karta hai."
+      },
+      {
+        "cause": "many_columns",
+        "action": "approved_change",
+        "steps_en": "One FULLTEXT index over all searched columns (MySQL) or one tsvector/trigram index (PostgreSQL).",
+        "steps_hi": "Saare search columns par ek FULLTEXT index (MySQL) ya ek tsvector/trigram index (PostgreSQL)."
+      },
+      {
+        "cause": "lower_function",
+        "action": "code",
+        "steps_en": "Use a case-insensitive collation (MySQL default *_ci already ignores case) or ILIKE with a trigram index in PostgreSQL.",
+        "steps_hi": "Case-insensitive collation use karo (MySQL ka *_ci pehle se case ignore karta hai) ya PostgreSQL mein trigram index ke saath ILIKE."
+      },
+      {
+        "cause": "big_text",
+        "action": "advice",
+        "steps_en": "For big catalogs use a search engine (Elasticsearch/OpenSearch/Meilisearch) and keep the database for storage; if prefix search is enough, LIKE 'word%' can use a normal index.",
+        "steps_hi": "Bade catalog ke liye search engine (Elasticsearch/OpenSearch/Meilisearch) use karo; agar shuru se search kaafi hai to LIKE 'word%' normal index use kar sakta hai."
+      }
+    ],
+    "verify": {
+      "en": "EXPLAIN shows the FULLTEXT / trigram index being used and the search returns in under a second.",
+      "hi": "EXPLAIN mein FULLTEXT / trigram index use hota dikhta hai aur search ek second se kam mein aata hai."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/fulltext-search.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/pgtrgm.html",
+      "https://learn.microsoft.com/en-us/answers/a/488175",
+      "https://discuss.rubyonrails.org/t/faster-mysql-searches/24394"
+    ],
+    "test_phrases": [
+      "when my staff look up an item by part of its name it hangs",
+      "item ka aadha naam daal ke dhoondo to bahut der lagti hai",
+      "आइटम का आधा नाम डाल कर ढूंढो तो बहुत देर लगती है"
+    ]
+  },
+  {
+    "id": "perf-slow-order-by-limit",
+    "title_en": "ORDER BY + LIMIT / pagination is slow (later pages slower)",
+    "title_hi": "ORDER BY + LIMIT / pagination slow (aage ke page aur slow)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "ORDER BY created_at DESC LIMIT 10 is slow",
+      "pagination gets slower on later pages",
+      "LIMIT 100000, 20 is very slow",
+      "large OFFSET slow query",
+      "latest 10 records query takes seconds",
+      "page 500 of the list takes forever to load",
+      "pehle page fast hain par aakhri pages bahut slow",
+      "offset badhne par query slow ho jaati hai",
+      "latest 10 orders dikhane mein bhi time lagta hai",
+      "sort karne par list slow ho jati hai",
+      "आगे वाले पेज बहुत धीरे खुलते हैं",
+      "सबसे नए दस रिकॉर्ड लाने में भी देर लगती है",
+      "Using filesort with limit"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME, INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS index_columns FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() GROUP BY TABLE_NAME, INDEX_NAME ORDER BY TABLE_NAME, INDEX_NAME",
+        "look_for": "whether an index starts with the WHERE column(s) followed by the ORDER BY column"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Created_tmp_tables', 'Created_tmp_disk_tables', 'Created_tmp_files', 'Sort_merge_passes', 'Sort_scan', 'Sort_range')",
+        "look_for": "Created_tmp_disk_tables more than about 10-25% of Created_tmp_tables, or a growing Sort_merge_passes = sorting/grouping spills to disk"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT LEFT(DIGEST_TEXT, 200) AS query, COUNT_STAR AS runs, ROUND(SUM_TIMER_WAIT / 1000000000000, 2) AS total_seconds, SUM_ROWS_EXAMINED AS rows_examined, SUM_ROWS_SENT AS rows_sent, SUM_NO_INDEX_USED AS runs_without_index FROM performance_schema.events_statements_summary_by_digest ORDER BY SUM_TIMER_WAIT DESC LIMIT 15",
+        "look_for": "the few query shapes that use most of the time; rows_examined far bigger than rows_sent = missing index (empty if performance_schema is off)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT tablename, indexname, indexdef FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY tablename, indexname",
+        "look_for": "whether an index covers the WHERE column(s) followed by the ORDER BY column"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, seq_scan, seq_tup_read, idx_scan, n_live_tup FROM pg_stat_user_tables ORDER BY seq_tup_read DESC LIMIT 20",
+        "look_for": "big tables (n_live_tup) with a high seq_tup_read and few idx_scan = read from start to end again and again"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT datname, blks_hit, blks_read, round(blks_hit * 100.0 / nullif(blks_hit + blks_read, 0), 2) AS cache_hit_pct, temp_files, pg_size_pretty(temp_bytes) AS temp_size FROM pg_stat_database WHERE datname = current_database()",
+        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk"
+      }
+    ],
+    "causes": [
+      {
+        "id": "no_sort_index",
+        "title_en": "No index on the ORDER BY column (or on WHERE + ORDER BY together), so all matching rows are sorted before the LIMIT",
+        "title_hi": "ORDER BY column (ya WHERE + ORDER BY saath) par index nahi, isliye LIMIT se pehle saari rows sort hoti hain"
+      },
+      {
+        "id": "big_offset",
+        "title_en": "A big OFFSET makes the database read and discard all earlier rows",
+        "title_hi": "Bada OFFSET pichli saari rows padhwa ke phenkwata hai"
+      },
+      {
+        "id": "mixed_direction",
+        "title_en": "Sorting on several columns in mixed directions or on an expression the index cannot serve",
+        "title_hi": "Kai columns ko alag-alag direction mein ya expression par sort, jo index nahi sambhal sakta"
+      },
+      {
+        "id": "select_star",
+        "title_en": "SELECT * with big text columns makes every sorted row heavy",
+        "title_hi": "Bade text columns ke saath SELECT * har sorted row ko bhari bana deta hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "no_sort_index",
+        "action": "approved_change",
+        "steps_en": "Create an index with the WHERE equality columns first and the ORDER BY column last, e.g. INDEX (status, created_at).",
+        "steps_hi": "Index banao jisme pehle WHERE ke (=) columns aur aakhir mein ORDER BY column ho, jaise INDEX (status, created_at)."
+      },
+      {
+        "cause": "big_offset",
+        "action": "code",
+        "steps_en": "Use keyset ('seek') pagination: WHERE created_at < :last_seen ORDER BY created_at DESC LIMIT 20.",
+        "steps_hi": "Keyset ('seek') pagination use karo: WHERE created_at < :last_seen ORDER BY created_at DESC LIMIT 20."
+      },
+      {
+        "cause": "mixed_direction",
+        "action": "approved_change",
+        "steps_en": "Match the index to the sort (MySQL 8 and PostgreSQL support DESC index columns) or sort on a plain column.",
+        "steps_hi": "Index ko sort ke hisaab se banao (MySQL 8 aur PostgreSQL DESC index columns support karte hain) ya simple column par sort karo."
+      },
+      {
+        "cause": "select_star",
+        "action": "code",
+        "steps_en": "Select only the columns the list shows; fetch details by id afterwards.",
+        "steps_hi": "Sirf list wale columns select karo; details baad mein id se lao."
+      }
+    ],
+    "verify": {
+      "en": "EXPLAIN no longer shows 'Using filesort' (MySQL) / a Sort node over the whole table (PostgreSQL), and late pages load as fast as page 1.",
+      "hi": "EXPLAIN mein ab 'Using filesort' (MySQL) / poori table par Sort (PostgreSQL) nahi dikhta, aur aage ke page bhi page 1 jitne fast khulte hain."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/order-by-optimization.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/limit-optimization.html",
+      "https://www.postgresql.org/docs/current/indexes-ordering.html",
+      "https://use-the-index-luke.com/no-offset",
+      "https://eversql.com/?p=294"
+    ],
+    "test_phrases": [
+      "going to the last pages of my product list is super slow",
+      "product list ke peeche wale pages pe jao to bahut slow hai",
+      "प्रोडक्ट लिस्ट के पीछे वाले पन्नों पर जाओ तो बहुत धीमा है"
+    ]
+  },
+  {
+    "id": "perf-slow-join",
+    "title_en": "JOIN between tables is slow",
+    "title_hi": "Tables ka JOIN slow hai",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "join query very slow",
+      "joining two big tables takes minutes",
+      "query with multiple joins is slow",
+      "LEFT JOIN makes the query slow",
+      "Using join buffer (Block Nested Loop) in explain",
+      "hash join spills to disk",
+      "do table join karne par query slow ho jaati hai",
+      "join lagate hi query atak jaati hai",
+      "teen tables ko jodne wali query bahut time leti hai",
+      "दो टेबल जोड़ने पर क्वेरी धीमी हो जाती है",
+      "जॉइन वाली क्वेरी बहुत समय लेती है",
+      "orders and customers join slow",
+      "Select_full_join is increasing",
+      "getting customers together with their orders is slow",
+      "combining customers and orders in one query takes forever",
+      "customer aur order ek saath laane wali query slow hai",
+      "do table ek saath milake data nikalo to atak jata hai",
+      "ग्राहक और ऑर्डर एक साथ लाने वाली क्वेरी धीमी है",
+      "दो टेबल मिलाकर डाटा निकालो तो अटक जाता है"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT c.TABLE_NAME, c.COLUMN_NAME FROM information_schema.COLUMNS c WHERE c.TABLE_SCHEMA = DATABASE() AND c.COLUMN_NAME LIKE '%\\_id' AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS s WHERE s.TABLE_SCHEMA = c.TABLE_SCHEMA AND s.TABLE_NAME = c.TABLE_NAME AND s.COLUMN_NAME = c.COLUMN_NAME AND s.SEQ_IN_INDEX = 1) ORDER BY c.TABLE_NAME LIMIT 50",
+        "look_for": "link columns (customer_id, order_id ...) that no index starts with: every join or filter on them reads the whole table"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Select_full_join', 'Select_full_range_join', 'Select_range_check', 'Created_tmp_disk_tables', 'Handler_read_rnd_next')",
+        "look_for": "Select_full_join above 0 and growing = joins with no usable index on the joined table"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT a.TABLE_NAME, a.COLUMN_NAME, a.COLUMN_TYPE, a.CHARACTER_SET_NAME, a.COLLATION_NAME FROM information_schema.COLUMNS a WHERE a.TABLE_SCHEMA = DATABASE() AND (a.COLUMN_NAME = 'id' OR a.COLUMN_NAME LIKE '%\\_id') ORDER BY a.COLUMN_NAME, a.TABLE_NAME LIMIT 100",
+        "look_for": "a link column whose type or collation differs from the id it points to (INT vs VARCHAR, utf8 vs utf8mb4): the index cannot be used in the join"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT c.conrelid::regclass AS table_name, a.attname AS column_name FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1] WHERE c.contype = 'f' AND NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.conrelid AND i.indkey[0] = c.conkey[1]) LIMIT 50",
+        "look_for": "foreign-key columns that no index starts with (PostgreSQL does not index them automatically)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND (column_name = 'id' OR column_name LIKE '%\\_id') ORDER BY column_name, table_name LIMIT 100",
+        "look_for": "a link column of a different type than the id it points to (text vs integer, bigint vs integer)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('work_mem', 'hash_mem_multiplier', 'temp_file_limit', 'log_temp_files', 'temp_tablespaces')",
+        "look_for": "work_mem is per sort/hash step: too small = sorts written to temp files"
+      }
+    ],
+    "causes": [
+      {
+        "id": "no_index_join_col",
+        "title_en": "The joined column (customer_id, order_id ...) has no index on the inner table",
+        "title_hi": "Jode gaye column (customer_id, order_id ...) par inner table mein index nahi"
+      },
+      {
+        "id": "type_mismatch",
+        "title_en": "The two join columns have different types or character sets/collations, so the index cannot be used",
+        "title_hi": "Dono join columns ke type ya charset/collation alag hain, isliye index use nahi hota"
+      },
+      {
+        "id": "row_explosion",
+        "title_en": "A missing or wrong join condition multiplies rows (one-to-many twice, or a cartesian product)",
+        "title_hi": "Missing/galat join condition rows ko guna kar deti hai (do baar one-to-many, ya cartesian product)"
+      },
+      {
+        "id": "small_work_mem",
+        "title_en": "Big hash/sort steps don't fit in memory (join_buffer_size / work_mem)",
+        "title_hi": "Bade hash/sort steps memory (join_buffer_size / work_mem) mein nahi aate"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "no_index_join_col",
+        "action": "approved_change",
+        "steps_en": "Index the join column on the table being looked up: CREATE INDEX idx_orders_customer_id ON orders (customer_id).",
+        "steps_hi": "Jis table mein dhoonda ja raha hai uske join column par index: CREATE INDEX idx_orders_customer_id ON orders (customer_id)."
+      },
+      {
+        "cause": "type_mismatch",
+        "action": "approved_change",
+        "steps_en": "Make both columns the same type and collation (ALTER TABLE ... MODIFY, after a backup and in a quiet hour).",
+        "steps_hi": "Dono columns ka type aur collation same karo (backup ke baad, shaant samay mein ALTER TABLE ... MODIFY)."
+      },
+      {
+        "cause": "row_explosion",
+        "action": "code",
+        "steps_en": "Check every JOIN has its ON condition; aggregate the many-side in a subquery before joining.",
+        "steps_hi": "Har JOIN ki ON condition check karo; many-side ko join se pehle subquery mein aggregate karo."
+      },
+      {
+        "cause": "small_work_mem",
+        "action": "config",
+        "steps_en": "Fix indexes first; then raise work_mem (PostgreSQL) for that report's session only, or join_buffer_size modestly.",
+        "steps_hi": "Pehle index theek karo; phir sirf us report ke session ke liye work_mem (PostgreSQL) badhao, ya join_buffer_size thoda."
+      }
+    ],
+    "verify": {
+      "en": "EXPLAIN shows 'ref'/'eq_ref' with a key on every joined table (MySQL) or Index/Nested Loop joins with small row counts (PostgreSQL).",
+      "hi": "EXPLAIN mein har joined table par key ke saath 'ref'/'eq_ref' (MySQL) ya kam rows wale Index/Nested Loop join (PostgreSQL) dikhte hain."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/nested-loop-joins.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/using-explain.html",
+      "https://dev.mysql.com/doc/refman/8.0/en/hash-joins.html"
+    ],
+    "test_phrases": [
+      "putting customers and their orders together in one query is painfully slow",
+      "customer aur unke order ek saath nikalo to query rukti rehti hai",
+      "ग्राहक और उनके ऑर्डर एक साथ निकालो तो क्वेरी रुकी रहती है"
+    ]
+  },
+  {
+    "id": "perf-temp-tables-filesort",
+    "title_en": "Temporary tables on disk / filesort (GROUP BY, ORDER BY, DISTINCT)",
+    "title_hi": "Disk par temporary tables / filesort (GROUP BY, ORDER BY, DISTINCT)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "Using temporary; Using filesort in explain",
+      "Created_tmp_disk_tables is very high",
+      "group by query creates temp table on disk",
+      "temporary files growing in postgres log",
+      "tmp directory filling up during queries",
+      "Sort Method: external merge Disk in explain analyze",
+      "explain mein using temporary aur filesort aa raha hai",
+      "group by wali query slow hai",
+      "temp table disk pe ban rahi hai",
+      "distinct lagate hi query slow ho gayi",
+      "ग्रुप बाय वाली क्वेरी धीमी है",
+      "अस्थायी टेबल डिस्क पर बन रही है",
+      "too many temp files created",
+      "monthly totals report writes temporary files to disk",
+      "report creates scratch files on disk while grouping",
+      "mahine ka total wali report disk par temp files banati hai",
+      "report ke time disk par temporary files ban jaati hain",
+      "महीने के टोटल वाली रिपोर्ट डिस्क पर टेम्प फाइलें बनाती है",
+      "रिपोर्ट के समय डिस्क पर अस्थायी फाइलें बनती हैं"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Created_tmp_tables', 'Created_tmp_disk_tables', 'Created_tmp_files', 'Sort_merge_passes', 'Sort_scan', 'Sort_range')",
+        "look_for": "Created_tmp_disk_tables more than about 10-25% of Created_tmp_tables, or a growing Sort_merge_passes = sorting/grouping spills to disk"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('tmp_table_size', 'max_heap_table_size', 'sort_buffer_size', 'tmpdir', 'internal_tmp_mem_storage_engine', 'temptable_max_ram')",
+        "look_for": "the in-memory temporary table limit is the smaller of tmp_table_size and max_heap_table_size"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT LEFT(DIGEST_TEXT, 200) AS query, COUNT_STAR AS runs, SUM_CREATED_TMP_DISK_TABLES AS tmp_disk_tables, SUM_SORT_MERGE_PASSES AS sort_merge_passes FROM performance_schema.events_statements_summary_by_digest WHERE SUM_CREATED_TMP_DISK_TABLES > 0 OR SUM_SORT_MERGE_PASSES > 0 ORDER BY SUM_CREATED_TMP_DISK_TABLES DESC LIMIT 15",
+        "look_for": "which queries make temporary tables on disk"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT datname, blks_hit, blks_read, round(blks_hit * 100.0 / nullif(blks_hit + blks_read, 0), 2) AS cache_hit_pct, temp_files, pg_size_pretty(temp_bytes) AS temp_size FROM pg_stat_database WHERE datname = current_database()",
+        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('work_mem', 'hash_mem_multiplier', 'temp_file_limit', 'log_temp_files', 'temp_tablespaces')",
+        "look_for": "work_mem is per sort/hash step: too small = sorts written to temp files"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('log_min_duration_statement', 'log_temp_files', 'track_io_timing', 'shared_preload_libraries')",
+        "look_for": "log_min_duration_statement = -1 means slow queries are not logged"
+      }
+    ],
+    "causes": [
+      {
+        "id": "no_group_index",
+        "title_en": "GROUP BY / ORDER BY / DISTINCT columns have no index, so rows are collected and sorted in a temporary table",
+        "title_hi": "GROUP BY / ORDER BY / DISTINCT columns par index nahi, isliye rows temporary table mein jama karke sort hoti hain"
+      },
+      {
+        "id": "small_memory_limit",
+        "title_en": "The in-memory limit is small (tmp_table_size / max_heap_table_size, sort_buffer_size; work_mem in PostgreSQL), so the temp table goes to disk",
+        "title_hi": "Memory limit chhoti hai (tmp_table_size / max_heap_table_size, sort_buffer_size; PostgreSQL mein work_mem), isliye temp table disk par jati hai"
+      },
+      {
+        "id": "text_columns",
+        "title_en": "TEXT/BLOB columns in the result force on-disk temporary tables in older MySQL versions",
+        "title_hi": "Result mein TEXT/BLOB columns purane MySQL mein disk wali temp table banwate hain"
+      },
+      {
+        "id": "too_many_rows",
+        "title_en": "The query groups/sorts far more rows than needed (no WHERE on date, SELECT *)",
+        "title_hi": "Query zarurat se bahut zyada rows group/sort karti hai (date par WHERE nahi, SELECT *)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "no_group_index",
+        "action": "approved_change",
+        "steps_en": "Add an index matching the WHERE + GROUP BY / ORDER BY columns so rows come out already grouped/sorted.",
+        "steps_hi": "WHERE + GROUP BY / ORDER BY columns se match karta index lagao taaki rows pehle se grouped/sorted aayein."
+      },
+      {
+        "cause": "small_memory_limit",
+        "action": "config",
+        "steps_en": "Raise tmp_table_size and max_heap_table_size together (they work as a pair) or work_mem, moderately: they are per query/step, so very large values can run the server out of memory.",
+        "steps_hi": "tmp_table_size aur max_heap_table_size dono saath badhao (jodi mein kaam karte hain) ya work_mem, thoda-thoda: yeh har query/step ke liye hain, bahut bade values se server ki memory khatam ho sakti hai."
+      },
+      {
+        "cause": "text_columns",
+        "action": "code",
+        "steps_en": "Leave big TEXT columns out of grouped/sorted queries; fetch them afterwards by id.",
+        "steps_hi": "Group/sort wali queries mein bade TEXT columns mat lo; baad mein id se lao."
+      },
+      {
+        "cause": "too_many_rows",
+        "action": "code",
+        "steps_en": "Filter first (date range, status) and select only needed columns.",
+        "steps_hi": "Pehle filter karo (date range, status) aur sirf zaruri columns lo."
+      }
+    ],
+    "verify": {
+      "en": "Created_tmp_disk_tables / temp_files stop growing quickly and EXPLAIN no longer shows Using temporary / external merge for the query.",
+      "hi": "Created_tmp_disk_tables / temp_files tezi se badhna band ho jata hai aur EXPLAIN mein Using temporary / external merge nahi dikhta."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/internal-temporary-tables.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/runtime-config-resource.html",
+      "https://www.fromdual.com/blog/avoid-temporay-disk-tables-with-mysql/",
+      "https://www.netdata.cloud/guides/mysql/mysql-temp-tables-on-disk/"
+    ],
+    "test_phrases": [
+      "my monthly totals report keeps writing scratch files to disk",
+      "mahine ka total nikalne wali report disk par kachhe files banati rehti hai",
+      "महीने का टोटल निकालने वाली रिपोर्ट डिस्क पर कच्ची फाइलें बनाती रहती है"
+    ]
+  },
+  {
+    "id": "perf-memory-cache-too-small",
+    "title_en": "Database memory cache too small (buffer pool / shared_buffers)",
+    "title_hi": "Database ki memory cache chhoti hai (buffer pool / shared_buffers)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "innodb_buffer_pool_size is too small",
+      "buffer pool hit ratio is low",
+      "what should innodb_buffer_pool_size be",
+      "shared_buffers still 128MB default",
+      "postgres cache hit ratio below 99",
+      "server has 16GB RAM but mysql uses very little",
+      "innodb_buffer_pool_size kitna rakhna chahiye",
+      "server mein RAM bahut hai par database use nahi karta",
+      "buffer pool default 128MB pe hi hai",
+      "shared_buffers kitna set karun",
+      "सर्वर में रैम बहुत है पर डेटाबेस इस्तेमाल नहीं करता",
+      "बफर पूल कितना रखना चाहिए",
+      "Innodb_buffer_pool_reads keeps increasing",
+      "tune mysql memory settings",
+      "the database doesn't use the RAM my server has",
+      "server memory sits empty while the database is slow",
+      "server ki RAM khaali rehti hai database use nahi karta",
+      "RAM free padi hai par database usko leta nahi",
+      "सर्वर की रैम खाली रहती है डेटाबेस उसे नहीं लेता",
+      "रैम फ्री पड़ी है पर डेटाबेस इस्तेमाल नहीं करता"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_buffer_pool_read_requests', 'Innodb_buffer_pool_reads', 'Innodb_buffer_pool_pages_free', 'Innodb_buffer_pool_pages_total', 'Innodb_buffer_pool_wait_free')",
+        "look_for": "Innodb_buffer_pool_reads more than about 1% of read_requests, pages_free near 0 or wait_free above 0 = the memory cache is too small"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('innodb_buffer_pool_size', 'innodb_buffer_pool_instances', 'key_buffer_size', 'tmp_table_size', 'max_heap_table_size', 'max_connections')",
+        "look_for": "innodb_buffer_pool_size still at the 128 MB default on a server with GBs of RAM"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ENGINE, COUNT(*) AS tables, ROUND(SUM(DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024) AS total_mb FROM information_schema.TABLES WHERE TABLE_TYPE = 'BASE TABLE' GROUP BY ENGINE",
+        "look_for": "how much InnoDB data there is, to compare with innodb_buffer_pool_size; MyISAM tables use key_buffer_size instead"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT datname, blks_hit, blks_read, round(blks_hit * 100.0 / nullif(blks_hit + blks_read, 0), 2) AS cache_hit_pct, temp_files, pg_size_pretty(temp_bytes) AS temp_size FROM pg_stat_database WHERE datname = current_database()",
+        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('shared_buffers', 'effective_cache_size', 'work_mem', 'maintenance_work_mem', 'max_connections', 'random_page_cost')",
+        "look_for": "shared_buffers at the 128MB default on a big server; work_mem at 4MB with big sorts"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit FROM pg_statio_user_tables ORDER BY heap_blks_read + coalesce(idx_blks_read, 0) DESC LIMIT 20",
+        "look_for": "tables with many blocks read from disk (heap_blks_read) compared with blocks found in memory"
+      }
+    ],
+    "causes": [
+      {
+        "id": "default_size",
+        "title_en": "The memory cache is still the small default (128 MB) on a server with much more RAM",
+        "title_hi": "Memory cache ab bhi chhota default (128 MB) hai jabki server mein bahut zyada RAM hai"
+      },
+      {
+        "id": "data_bigger",
+        "title_en": "The often-used data grew bigger than the cache",
+        "title_hi": "Baar-baar use hone wala data cache se bada ho gaya"
+      },
+      {
+        "id": "full_scans",
+        "title_en": "Full table scans push useful pages out of the cache",
+        "title_hi": "Full table scans kaam ke pages ko cache se bahar dhakel dete hain"
+      },
+      {
+        "id": "shared_server",
+        "title_en": "The server is shared with the web app, so the database cannot be given most of the RAM",
+        "title_hi": "Server web app ke saath share hai, isliye database ko zyada RAM nahi de sakte"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "default_size",
+        "action": "config",
+        "steps_en": "On a server used only for the database, give InnoDB around 50-75% of RAM (innodb_buffer_pool_size; resizable online since MySQL 5.7). PostgreSQL: shared_buffers about 25% of RAM and effective_cache_size about 50-75%; needs a restart.",
+        "steps_hi": "Sirf database wale server par InnoDB ko RAM ka lagbhag 50-75% do (innodb_buffer_pool_size; MySQL 5.7 se online badal sakte hain). PostgreSQL: shared_buffers RAM ka ~25% aur effective_cache_size ~50-75%; restart chahiye."
+      },
+      {
+        "cause": "data_bigger",
+        "action": "advice",
+        "steps_en": "Archive old data, drop unused indexes, or move to a server with more RAM.",
+        "steps_hi": "Purana data archive karo, bekaar indexes hatao, ya zyada RAM wale server par jao."
+      },
+      {
+        "cause": "full_scans",
+        "action": "approved_change",
+        "steps_en": "Add the missing indexes so queries read only the pages they need (see the full table scan playbook).",
+        "steps_hi": "Missing indexes lagao taaki queries sirf zaruri pages padhein (full table scan playbook dekho)."
+      },
+      {
+        "cause": "shared_server",
+        "action": "config",
+        "steps_en": "Leave enough RAM for the web server/PHP; size the cache so the server never swaps.",
+        "steps_hi": "Web server/PHP ke liye kaafi RAM chhodo; cache itna rakho ki server kabhi swap na kare."
+      }
+    ],
+    "verify": {
+      "en": "Innodb_buffer_pool_reads stays under about 1% of read requests / cache_hit_pct above about 99%, and the server does not swap.",
+      "hi": "Innodb_buffer_pool_reads read requests ke ~1% se kam / cache_hit_pct ~99% se upar rehta hai, aur server swap nahi karta."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-buffer-pool-resize.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/runtime-config-resource.html",
+      "https://dev.mysql.com/doc/refman/8.0/en/innodb-buffer-pool.html",
+      "https://releem.com/blog/innodb-performance-tuning"
+    ],
+    "test_phrases": [
+      "the database barely uses the memory my server has",
+      "mere server ki RAM khaali padi rehti hai database use hi nahi karta",
+      "मेरे सर्वर की रैम खाली पड़ी रहती है डेटाबेस उसे लेता ही नहीं"
+    ]
+  },
+  {
+    "id": "perf-high-disk-io",
+    "title_en": "High disk I/O / disk busy because of the database",
+    "title_hi": "Database ki wajah se disk bahut busy (high I/O)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "mysql high disk io",
+      "iowait is high on the database server",
+      "disk usage 100% busy in iostat because of postgres",
+      "database is doing too many disk reads",
+      "IOPS limit reached on RDS",
+      "burst balance exhausted on database volume",
+      "disk ki io bahut zyada hai database ki wajah se",
+      "server ka iowait high hai",
+      "disk lagatar chalti rehti hai",
+      "डिस्क लगातार व्यस्त रहती है डेटाबेस की वजह से",
+      "डेटाबेस सर्वर पर आईओ वेट बहुत ज़्यादा है",
+      "too many writes to disk from mysql",
+      "checkpoints occurring too frequently",
+      "the hard drive is constantly working because of the database",
+      "disk activity light never stops on the database server",
+      "hard disk lagatar chalti rehti hai database ki wajah se",
+      "हार्ड डिस्क लगातार चलती रहती है डेटाबेस की वजह से"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_data_reads', 'Innodb_data_writes', 'Innodb_data_fsyncs', 'Innodb_os_log_written', 'Innodb_buffer_pool_reads', 'Innodb_rows_inserted', 'Innodb_rows_updated', 'Innodb_rows_deleted', 'Uptime')",
+        "look_for": "which side is heavy: many data reads = cache too small / full scans; many writes and fsyncs = heavy write load or very safe flush settings"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('innodb_flush_log_at_trx_commit', 'sync_binlog', 'innodb_io_capacity', 'innodb_log_file_size', 'innodb_redo_log_capacity', 'innodb_flush_method', 'log_bin', 'general_log')",
+        "look_for": "general_log ON writes every query to disk; innodb_log_file_size/redo capacity very small causes constant flushing"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_buffer_pool_read_requests', 'Innodb_buffer_pool_reads', 'Innodb_buffer_pool_pages_free', 'Innodb_buffer_pool_pages_total', 'Innodb_buffer_pool_wait_free')",
+        "look_for": "Innodb_buffer_pool_reads more than about 1% of read_requests, pages_free near 0 or wait_free above 0 = the memory cache is too small"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT OBJECT_NAME AS table_name, COUNT_READ AS rows_read_by_full_scan FROM performance_schema.table_io_waits_summary_by_index_usage WHERE OBJECT_SCHEMA = DATABASE() AND INDEX_NAME IS NULL AND COUNT_READ > 0 ORDER BY COUNT_READ DESC LIMIT 20",
+        "look_for": "tables read mostly without any index (empty if performance_schema is off)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit FROM pg_statio_user_tables ORDER BY heap_blks_read + coalesce(idx_blks_read, 0) DESC LIMIT 20",
+        "look_for": "tables with many blocks read from disk (heap_blks_read) compared with blocks found in memory"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT buffers_clean, maxwritten_clean, buffers_alloc, stats_reset FROM pg_stat_bgwriter",
+        "look_for": "a quickly growing buffers_alloc = constant reading of new pages from disk"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('checkpoint_timeout', 'max_wal_size', 'checkpoint_completion_target', 'synchronous_commit', 'wal_compression', 'log_statement')",
+        "look_for": "a small max_wal_size makes checkpoints (big disk writes) happen too often"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT datname, blks_hit, blks_read, round(blks_hit * 100.0 / nullif(blks_hit + blks_read, 0), 2) AS cache_hit_pct, temp_files, pg_size_pretty(temp_bytes) AS temp_size FROM pg_stat_database WHERE datname = current_database()",
+        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk"
+      }
+    ],
+    "causes": [
+      {
+        "id": "reads_cache",
+        "title_en": "Too many reads from disk: the cache is too small or queries scan whole tables",
+        "title_hi": "Disk se bahut reads: cache chhota hai ya queries poori table scan karti hain"
+      },
+      {
+        "id": "writes",
+        "title_en": "Heavy writes (bulk imports, logging tables, too many indexes on a busy table)",
+        "title_hi": "Bhari writes (bulk import, logging tables, busy table par bahut saare index)"
+      },
+      {
+        "id": "logs_on",
+        "title_en": "General query log or very chatty logging writes every query to disk",
+        "title_hi": "General query log ya bahut zyada logging har query disk par likhti hai"
+      },
+      {
+        "id": "checkpoints",
+        "title_en": "Small redo/WAL size makes the database flush to disk too often",
+        "title_hi": "Chhota redo/WAL size database ko baar-baar disk par flush karwata hai"
+      },
+      {
+        "id": "temp",
+        "title_en": "Sorts and temporary tables spill to disk",
+        "title_hi": "Sort aur temporary tables disk par jaate hain"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "reads_cache",
+        "action": "config",
+        "steps_en": "Raise the memory cache (see the memory cache playbook) and add missing indexes.",
+        "steps_hi": "Memory cache badhao (memory cache playbook dekho) aur missing indexes lagao."
+      },
+      {
+        "cause": "writes",
+        "action": "advice",
+        "steps_en": "Batch inserts in transactions, drop unused indexes, move log/analytics tables elsewhere or trim them.",
+        "steps_hi": "Inserts ko transactions mein batch karo, bekaar indexes hatao, log/analytics tables alag karo ya chhoti karo."
+      },
+      {
+        "cause": "logs_on",
+        "action": "config",
+        "steps_en": "Turn general_log OFF (keep only the slow log); in PostgreSQL avoid log_statement = 'all' on busy servers.",
+        "steps_hi": "general_log OFF karo (sirf slow log rakho); PostgreSQL mein busy server par log_statement = 'all' mat rakho."
+      },
+      {
+        "cause": "checkpoints",
+        "action": "config",
+        "steps_en": "Increase innodb_redo_log_capacity / innodb_log_file_size (MySQL) or max_wal_size (PostgreSQL) so checkpoints are spread out.",
+        "steps_hi": "innodb_redo_log_capacity / innodb_log_file_size (MySQL) ya max_wal_size (PostgreSQL) badhao taaki checkpoints door-door hon."
+      },
+      {
+        "cause": "temp",
+        "action": "advice",
+        "steps_en": "See the temporary tables playbook.",
+        "steps_hi": "Temporary tables playbook dekho."
+      }
+    ],
+    "verify": {
+      "en": "iowait / disk busy % drops at busy hours and Innodb_data_reads / heap_blks_read grow slowly.",
+      "hi": "Busy time par iowait / disk busy % kam ho jata hai aur Innodb_data_reads / heap_blks_read dheere badhte hain."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimizing-innodb-diskio.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/wal-configuration.html",
+      "https://www.postgresql.org/docs/current/monitoring-stats.html"
+    ],
+    "test_phrases": [
+      "the hard drive light never stops and the database is behind it",
+      "hard disk lagatar ghis rahi hai aur wajah database hai",
+      "हार्ड डिस्क लगातार घिस रही है और वजह डेटाबेस है"
+    ]
+  },
+  {
+    "id": "perf-find-slow-queries",
+    "title_en": "Find which queries are slow (turn on the slow query log)",
+    "title_hi": "Kaunsi queries slow hain pata karo (slow query log chalu karo)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "how to find slow queries in mysql",
+      "enable slow query log",
+      "which query is making my database slow",
+      "how to see the slowest queries in postgres",
+      "pg_stat_statements top queries",
+      "Slow_queries counter keeps going up",
+      "kaise pata karun kaunsi query slow hai",
+      "slow query log kaise on karte hain",
+      "sabse zyada time lene wali queries dikhao",
+      "database ko kaun si query slow kar rahi hai",
+      "कैसे पता करूं कौन सी क्वेरी धीमी है",
+      "सबसे ज़्यादा समय लेने वाली क्वेरी दिखाओ",
+      "too many slow queries in the log",
+      "log_min_duration_statement setup"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('slow_query_log', 'long_query_time', 'log_output', 'log_queries_not_using_indexes', 'slow_query_log_file')",
+        "look_for": "slow_query_log OFF = nobody is recording slow queries yet"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT start_time, query_time, rows_examined, rows_sent, LEFT(sql_text, 200) AS query FROM mysql.slow_log ORDER BY query_time DESC LIMIT 20",
+        "look_for": "the slowest recent queries (only filled when slow_query_log is ON and log_output includes TABLE)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT LEFT(DIGEST_TEXT, 200) AS query, COUNT_STAR AS runs, ROUND(SUM_TIMER_WAIT / 1000000000000, 2) AS total_seconds, SUM_ROWS_EXAMINED AS rows_examined, SUM_ROWS_SENT AS rows_sent, SUM_NO_INDEX_USED AS runs_without_index FROM performance_schema.events_statements_summary_by_digest ORDER BY SUM_TIMER_WAIT DESC LIMIT 15",
+        "look_for": "the few query shapes that use most of the time; rows_examined far bigger than rows_sent = missing index (empty if performance_schema is off)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_running', 'Threads_connected', 'Questions', 'Com_select', 'Slow_queries', 'Uptime')",
+        "look_for": "Threads_running far above the number of CPU cores = queries queueing for CPU"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('log_min_duration_statement', 'log_temp_files', 'track_io_timing', 'shared_preload_libraries')",
+        "look_for": "log_min_duration_statement = -1 means slow queries are not logged"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT extname, extversion FROM pg_extension WHERE extname IN ('pg_stat_statements', 'pg_trgm', 'auto_explain')",
+        "look_for": "pg_stat_statements missing = no per-query time totals yet; pg_trgm missing = no fast LIKE '%text%' indexes"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('pg_stat_statements.track', 'pg_stat_statements.max', 'compute_query_id')",
+        "look_for": "rows here only when pg_stat_statements is loaded; then SELECT query, calls, total_exec_time FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 10 shows the heaviest queries"
+      }
+    ],
+    "causes": [
+      {
+        "id": "not_logging",
+        "title_en": "Nobody is recording slow queries yet (slow_query_log OFF / log_min_duration_statement = -1)",
+        "title_hi": "Abhi koi slow queries record nahi kar raha (slow_query_log OFF / log_min_duration_statement = -1)"
+      },
+      {
+        "id": "many_slow",
+        "title_en": "Many queries are slow because of missing indexes",
+        "title_hi": "Bahut saari queries missing index ki wajah se slow hain"
+      },
+      {
+        "id": "one_heavy",
+        "title_en": "One query shape is run so often that it uses most of the time, even if each run is quick",
+        "title_hi": "Ek query itni baar chalti hai ki zyada time wahi khaati hai, chahe har baar jaldi ho"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "not_logging",
+        "action": "config",
+        "steps_en": "MySQL/MariaDB: SET GLOBAL slow_query_log = ON; SET GLOBAL long_query_time = 1 (seconds), add to my.cnf to keep it. PostgreSQL: log_min_duration_statement = 1000 (ms) and, for totals, add pg_stat_statements to shared_preload_libraries (restart) then CREATE EXTENSION pg_stat_statements.",
+        "steps_hi": "MySQL/MariaDB: SET GLOBAL slow_query_log = ON; SET GLOBAL long_query_time = 1 (second), hamesha ke liye my.cnf mein bhi likho. PostgreSQL: log_min_duration_statement = 1000 (ms) aur totals ke liye pg_stat_statements ko shared_preload_libraries mein daalo (restart) phir CREATE EXTENSION pg_stat_statements."
+      },
+      {
+        "cause": "many_slow",
+        "action": "approved_change",
+        "steps_en": "Start with the query with the highest total time; Goal Engine runs EXPLAIN on it and proposes indexes for approval.",
+        "steps_hi": "Sabse zyada total time wali query se shuru karo; Goal Engine us par EXPLAIN chala kar index approval ke liye dikhata hai."
+      },
+      {
+        "cause": "one_heavy",
+        "action": "code",
+        "steps_en": "Cache its result in the app, or remove repeated calls (N+1).",
+        "steps_hi": "App mein uska result cache karo, ya baar-baar ki calls (N+1) hatao."
+      }
+    ],
+    "verify": {
+      "en": "The slow log / pg_stat_statements shows the top queries and, after fixes, Slow_queries grows much more slowly.",
+      "hi": "Slow log / pg_stat_statements top queries dikhata hai aur fix ke baad Slow_queries bahut dheere badhta hai."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/slow-query-log.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/pgstatstatements.html",
+      "https://www.postgresql.org/docs/current/runtime-config-logging.html",
+      "https://mariadb.com/kb/en/slow-query-log-overview/"
+    ],
+    "test_phrases": [
+      "show me the list of queries hurting my database the most",
+      "mujhe woh queries dikhao jo database ko sabse zyada thaka rahi hain",
+      "मुझे वो क्वेरी दिखाओ जो डेटाबेस को सबसे ज़्यादा थका रही हैं"
+    ]
+  },
+  {
+    "id": "perf-query-was-fast-now-slow",
+    "title_en": "Same query was fast, now slow (bad plan / stale statistics)",
+    "title_hi": "Wahi query pehle fast thi, ab slow (galat plan / purane statistics)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "same query was fast yesterday now takes minutes",
+      "query plan changed suddenly",
+      "optimizer chooses wrong index",
+      "explain shows a different index than before",
+      "postgres planner estimates are way off",
+      "after bulk import queries became slow",
+      "wahi query kal fast thi aaj slow hai",
+      "query ka plan achanak badal gaya",
+      "database galat index chun raha hai",
+      "bahut data delete karne ke baad queries slow ho gayi",
+      "वही क्वेरी कल तेज़ थी आज धीमी है",
+      "डेटाबेस गलत इंडेक्स चुन रहा है",
+      "need to run analyze table",
+      "statistics out of date",
+      "without any code change a query became slow",
+      "my code is the same but one query got much slower",
+      "query used to be instant and now it is slow",
+      "code wahi hai par query ab dheemi ho gayi",
+      "kuch nahi badla phir bhi query turant se slow ho gayi",
+      "कोड वही है पर एक क्वेरी अब धीमी हो गई",
+      "कुछ नहीं बदला फिर भी क्वेरी तुरंत से धीमी हो गई"
+    ],
+    "codes": [],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME, CARDINALITY FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND SEQ_IN_INDEX = 1 ORDER BY CARDINALITY LIMIT 30",
+        "look_for": "CARDINALITY empty or 0 on an index of a big table = statistics are missing or stale"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('innodb_stats_persistent', 'innodb_stats_auto_recalc', 'innodb_stats_persistent_sample_pages', 'use_stat_tables', 'optimizer_switch')",
+        "look_for": "innodb_stats_auto_recalc OFF = numbers never refresh by themselves"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME, TABLE_ROWS, ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 1) AS size_mb, ROUND(INDEX_LENGTH / 1024 / 1024, 1) AS index_mb FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY DATA_LENGTH + INDEX_LENGTH DESC LIMIT 20",
+        "look_for": "which tables are big; a log/session table that grew huge is a common cause"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, n_live_tup, n_mod_since_analyze, last_analyze, last_autoanalyze FROM pg_stat_user_tables ORDER BY n_mod_since_analyze DESC LIMIT 20",
+        "look_for": "many rows changed since the last analyze, or last_autoanalyze empty on a big table = the planner works from old numbers"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT relname, n_live_tup, n_dead_tup, last_vacuum, last_autovacuum FROM pg_stat_user_tables ORDER BY n_dead_tup DESC LIMIT 20",
+        "look_for": "many dead rows or no recent vacuum = count(*) cannot use an index-only scan and reads more pages"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('shared_buffers', 'effective_cache_size', 'work_mem', 'maintenance_work_mem', 'max_connections', 'random_page_cost')",
+        "look_for": "shared_buffers at the 128MB default on a big server; work_mem at 4MB with big sorts"
+      }
+    ],
+    "causes": [
+      {
+        "id": "stale_stats",
+        "title_en": "Table statistics are old after big inserts/deletes, so the planner misjudges row counts",
+        "title_hi": "Bade insert/delete ke baad table statistics purane hain, planner rows ka galat andaza lagata hai"
+      },
+      {
+        "id": "skewed_data",
+        "title_en": "Some values are very common and others rare; one plan does not fit both",
+        "title_hi": "Kuch values bahut common aur kuch rare hain; ek plan dono par fit nahi hota"
+      },
+      {
+        "id": "autovacuum_behind",
+        "title_en": "PostgreSQL autovacuum/autoanalyze is not keeping up with a busy table",
+        "title_hi": "PostgreSQL autovacuum/autoanalyze busy table ke saath nahi chal pa raha"
+      },
+      {
+        "id": "upgrade",
+        "title_en": "A version upgrade or config change altered the optimizer's choices",
+        "title_hi": "Version upgrade ya config change ne optimizer ke faisle badal diye"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "stale_stats",
+        "action": "advice",
+        "steps_en": "Refresh statistics: ANALYZE TABLE <table> (MySQL/MariaDB) or ANALYZE <table> (PostgreSQL). It is quick and does not change data.",
+        "steps_hi": "Statistics refresh karo: ANALYZE TABLE <table> (MySQL/MariaDB) ya ANALYZE <table> (PostgreSQL). Jaldi hota hai aur data nahi badalta."
+      },
+      {
+        "cause": "skewed_data",
+        "action": "advice",
+        "steps_en": "Raise the sample size (innodb_stats_persistent_sample_pages; ALTER TABLE ... ALTER COLUMN ... SET STATISTICS in PostgreSQL) or add histograms (MySQL 8 ANALYZE TABLE ... UPDATE HISTOGRAM).",
+        "steps_hi": "Sample size badhao (innodb_stats_persistent_sample_pages; PostgreSQL mein ALTER COLUMN ... SET STATISTICS) ya histograms lagao (MySQL 8 ANALYZE TABLE ... UPDATE HISTOGRAM)."
+      },
+      {
+        "cause": "autovacuum_behind",
+        "action": "config",
+        "steps_en": "Make autovacuum more frequent for that table (lower autovacuum_analyze_scale_factor for it).",
+        "steps_hi": "Us table ke liye autovacuum zyada baar chalao (uske liye autovacuum_analyze_scale_factor kam karo)."
+      },
+      {
+        "cause": "upgrade",
+        "action": "advice",
+        "steps_en": "Compare EXPLAIN before/after; as a last resort pin the index with an index hint (MySQL FORCE INDEX), and report it so it can be fixed properly.",
+        "steps_hi": "Pehle/baad ka EXPLAIN milao; aakhri raasta: index hint (MySQL FORCE INDEX) se index fix karo, aur theek se fix karne ke liye note karo."
+      }
+    ],
+    "verify": {
+      "en": "EXPLAIN shows the good plan again (expected index, row estimates close to real) and the query is fast.",
+      "hi": "EXPLAIN mein phir se sahi plan (sahi index, rows ka andaza asli ke kareeb) aur query fast."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-persistent-stats.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/planner-stats.html",
+      "https://www.postgresql.org/docs/current/sql-analyze.html",
+      "https://dev.mysql.com/doc/refman/8.0/en/analyze-table.html"
+    ],
+    "test_phrases": [
+      "nothing changed in my code but one query went from instant to very slow",
+      "code mein kuch nahi badla par ek query turant se bahut dheemi ho gayi",
+      "कोड में कुछ नहीं बदला पर एक क्वेरी तुरंत से बहुत धीमी हो गई"
+    ]
+  },
+  {
+    "id": "perf-query-timeout",
+    "title_en": "Query stopped by a time limit (statement timeout / max execution time)",
+    "title_hi": "Query time limit se ruk gayi (statement timeout / max execution time)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "canceling statement due to statement timeout",
+      "Query execution was interrupted, maximum statement execution time exceeded",
+      "Query execution was interrupted (max_statement_time exceeded)",
+      "report fails with a timeout error",
+      "query gets killed after 30 seconds",
+      "504 gateway timeout when running a report",
+      "query 30 second baad cancel ho jaati hai",
+      "report chalate hi timeout error aata hai",
+      "statement timeout error aa raha hai",
+      "क्वेरी तीस सेकंड बाद रद्द हो जाती है",
+      "रिपोर्ट चलाते ही टाइमआउट की एरर आती है",
+      "max_execution_time exceeded error",
+      "the big report stops half way with a time limit message",
+      "report gets cut off because it ran out of time",
+      "badi report beech mein time khatam bol ke ruk jati hai",
+      "report adhi chal ke time limit ki wajah se band",
+      "बड़ी रिपोर्ट बीच में समय सीमा बोल कर रुक जाती है",
+      "रिपोर्ट आधी चलकर समय खत्म होने से बंद हो जाती है"
+    ],
+    "codes": [
+      "3024",
+      "1969",
+      "57014"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('max_execution_time', 'max_statement_time', 'wait_timeout', 'net_read_timeout', 'net_write_timeout', 'innodb_lock_wait_timeout')",
+        "look_for": "max_execution_time (MySQL, ms) or max_statement_time (MariaDB, seconds) above 0 = long SELECTs are stopped on purpose"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT start_time, query_time, rows_examined, rows_sent, LEFT(sql_text, 200) AS query FROM mysql.slow_log ORDER BY query_time DESC LIMIT 20",
+        "look_for": "the slowest recent queries (only filled when slow_query_log is ON and log_output includes TABLE)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ID, USER, DB, COMMAND, TIME, STATE, LEFT(INFO, 200) AS query FROM information_schema.PROCESSLIST WHERE COMMAND <> 'Sleep' ORDER BY TIME DESC LIMIT 20",
+        "look_for": "queries running for many seconds, or many copies of the same query at once"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting, unit, source FROM pg_settings WHERE name IN ('statement_timeout', 'lock_timeout', 'idle_in_transaction_session_timeout', 'transaction_timeout')",
+        "look_for": "statement_timeout above 0 stops long queries; source shows where it was set (database, user, config file)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT r.rolname, d.datname, s.setconfig FROM pg_db_role_setting s LEFT JOIN pg_roles r ON r.oid = s.setrole LEFT JOIN pg_database d ON d.oid = s.setdatabase",
+        "look_for": "statement_timeout set for one user or one database only"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT pid, state, now() - query_start AS running_for, wait_event_type, wait_event, left(query, 200) AS query FROM pg_stat_activity WHERE state <> 'idle' AND pid <> pg_backend_pid() ORDER BY query_start LIMIT 20",
+        "look_for": "queries running for a long time, or many copies of the same query"
+      }
+    ],
+    "causes": [
+      {
+        "id": "slow_query",
+        "title_en": "The query itself is too slow (missing index, too much data)",
+        "title_hi": "Query khud bahut slow hai (missing index, bahut data)"
+      },
+      {
+        "id": "limit_too_low",
+        "title_en": "A deliberate time limit is set low for this user/database/app",
+        "title_hi": "Is user/database/app ke liye jaan-boojh ke chhoti time limit lagi hai"
+      },
+      {
+        "id": "blocked",
+        "title_en": "The query waited on a lock held by another session until the time ran out",
+        "title_hi": "Query doosre session ke lock ka intezaar karte-karte time khatam ho gaya"
+      },
+      {
+        "id": "web_timeout",
+        "title_en": "The web server/proxy gives up first (PHP max_execution_time, nginx/gateway timeout)",
+        "title_hi": "Web server/proxy pehle haar maan leta hai (PHP max_execution_time, nginx/gateway timeout)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "slow_query",
+        "action": "approved_change",
+        "steps_en": "Make the query faster first: Goal Engine runs EXPLAIN and proposes the index for approval.",
+        "steps_hi": "Pehle query fast karo: Goal Engine EXPLAIN chala kar index approval ke liye dikhata hai."
+      },
+      {
+        "cause": "limit_too_low",
+        "action": "config",
+        "steps_en": "Raise the limit only for the report's session (SET statement_timeout = '5min' / SET SESSION max_execution_time = 300000 / SET STATEMENT max_statement_time=300 FOR ...), not globally.",
+        "steps_hi": "Limit sirf report ke session ke liye badhao (SET statement_timeout = '5min' / SET SESSION max_execution_time = 300000 / SET STATEMENT max_statement_time=300 FOR ...), poore server ke liye nahi."
+      },
+      {
+        "cause": "blocked",
+        "action": "advice",
+        "steps_en": "Check the running list for a long transaction holding the lock; see the locking playbooks.",
+        "steps_hi": "Running list mein lock pakde lambe transaction ko dekho; locking playbooks dekho."
+      },
+      {
+        "cause": "web_timeout",
+        "action": "advice",
+        "steps_en": "Run long reports in the background (a queue/cron) and email or download the result.",
+        "steps_hi": "Lambi reports background mein chalao (queue/cron) aur result email/download karo."
+      }
+    ],
+    "verify": {
+      "en": "The report finishes well inside the limit and no timeout errors appear in the app log.",
+      "hi": "Report limit ke andar aaram se khatam hoti hai aur app log mein timeout error nahi aata."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config-client.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html",
+      "https://mariadb.com/kb/en/aborting-statements/"
+    ],
+    "test_phrases": [
+      "my big sales report gets cut off half way with a time limit message",
+      "badi sales report beech mein hi time khatam bol ke ruk jaati hai",
+      "बड़ी सेल्स रिपोर्ट बीच में ही समय खत्म बोल कर रुक जाती है"
     ]
   }
 ]

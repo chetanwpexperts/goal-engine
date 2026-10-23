@@ -659,7 +659,7 @@ body[data-state="idle"] .fineprint { padding: 0 var(--gutter, 16px); box-sizing:
 @media (max-width: 640px) { .brain-stage { margin-top: 18px; } .hero h1 { font-size: clamp(32px, 9vw, 44px); } }
 
 /* the brain from the design: a lit image that breathes, brighter while the person types */
-.brain-photo { width: min(560px, 74vw); aspect-ratio: 900 / 616; position: relative; }
+.brain-photo { width: min(460px, 74vw); aspect-ratio: 900 / 616; position: relative; }
 .brain-photo img { width: 100%; height: 100%; display: block; object-fit: cover;
   -webkit-mask-image: radial-gradient(closest-side, #000 80%, transparent 100%); mask-image: radial-gradient(closest-side, #000 80%, transparent 100%);
   animation: brainfloat 7s ease-in-out infinite, brainglow 4s ease-in-out infinite; }

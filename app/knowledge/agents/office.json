@@ -5,7 +5,7 @@
   "office"
  ],
  "first": "upload",
- "about": "Excel, CSV and other office files",
+ "about": "Excel, CSV, Word and other office files",
  "words": {
   "strong": [
    "excel",
@@ -17,7 +17,13 @@
    "spreadsheets",
    "workbook",
    "csv",
-   "एक्सेल"
+   "एक्सेल",
+   "word file",
+   "word document",
+   "word doc",
+   "docx",
+   "ms word",
+   "microsoft word"
   ],
   "about": [
    "excel",
@@ -46,7 +52,11 @@
    "#N/A",
    "#VALUE!",
    "#DIV/0!",
-   "#NAME?"
+   "#NAME?",
+   "word document",
+   "word doc",
+   "doc file",
+   "ms word"
   ]
  },
  "expert_words": [

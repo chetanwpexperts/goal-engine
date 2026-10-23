@@ -832,6 +832,7 @@ def _plan_question(text, tables) -> dict:
     filters += cmp_f + date_f
     filters += _filled_filters(text, t, {i for i, _ in filters})
     group = _group_col(text, t, filters)
+    named_group = group
     month_text = text or ""
     for i, _ in num_cols:                                  # "Monthly Salary" is a column, not "month-wise"
         month_text = re.sub(re.escape(t.header[i]), " ", month_text, flags=re.I)
@@ -853,8 +854,9 @@ def _plan_question(text, tables) -> dict:
         group = txt_cols[0][0]
     if group is not None and not isinstance(group, tuple):
         vals = [v for v in t.col(group) if v not in (None, "")]
-        if vals and len({str(v).strip().lower() for v in vals}) > 0.95 * len(vals):
+        if vals and len({str(v).strip().lower() for v in vals}) > 0.95 * len(vals) and not (group == named_group and len(vals) <= 30):
             group = None                                   # "top 5 orders": each order is its own row, so rank rows
+                                                           # (a small table asked 'by region' keeps its one row per region)
     filters = [(i, v) for i, v in filters if i != group] + _number_filters(text, t, num_cols)
     seen_f, uniq = set(), []
     for f in filters:
@@ -1189,6 +1191,10 @@ def _crit(t: Table, filters):
 
 def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:
     """Do the plan on a copy of the file (new sheet / new column / colours). Returns {'say', 'formula', 'sheet'}."""
+    if plan.get("job", "").startswith("word_"):
+        from app.office import word
+
+        return word.run(plan, path, out, hi)
     tables = {t.name: t for t in load_tables(path)}
     info = None
     if plan.get("derive"):

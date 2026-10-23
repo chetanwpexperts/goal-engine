@@ -1180,7 +1180,8 @@
     // what really happened, in order; nothing shown as done unless it was
     const rail = el("ol", "ans-rail");
     const step = (text, state) => { const li = el("li", state); li.append(el("span", "dot"), el("span", null, text)); rail.append(li); };
-    step(T(hi, `File padhi: ${fmtN(now.sheets)} sheets, ${fmtN(now.rows)} rows`, `Read the file: ${fmtN(now.sheets)} sheets, ${fmtN(now.rows)} rows`), "done");
+    if (rep.kind === "docx") step(T(hi, `Document padha: ${fmtN(now.words)} shabd, ${fmtN(now.paragraphs)} paragraphs, ${fmtN(now.tables)} tables`, `Read the document: ${fmtN(now.words)} words, ${fmtN(now.paragraphs)} paragraphs, ${fmtN(now.tables)} tables`), "done");
+    else step(T(hi, `File padhi: ${fmtN(now.sheets)} sheets, ${fmtN(now.rows)} rows`, `Read the file: ${fmtN(now.sheets)} sheets, ${fmtN(now.rows)} rows`), "done");
     if (r.task === "ask") step(T(hi, "Sawaal ka jawab nikala", "Answered your question"), "done");
     else step(totalBefore ? T(hi, `${fmtN(totalBefore)} galtiyan mili`, `Found ${fmtN(totalBefore)} problems`) : T(hi, "Koi galti nahi mili", "No problems found"), "done");
     if (r.task !== "ask" && totalBefore) step(changed ? T(hi, `${fmtN(changed)} cells/rows theek kiye`, `Fixed ${fmtN(changed)} cells/rows`) : T(hi, "Abhi kuch nahi badla", "Nothing changed yet"), changed ? "done" : "wait");
@@ -1191,6 +1192,11 @@
     let title = T(hi, "File ki jaanch", "File check");
     let text = total ? T(hi, `${fmtN(total)} galtiyan hain. Neeche asli cells aur unka theek kiya hua roop dekho.`, `${fmtN(total)} problems. Below are the actual cells and what each fix will make of them.`)
       : T(hi, "Is file mein koi galti nahi hai.", "No problems in this file.");
+    if (rep.kind === "docx" && r.task !== "ask") {
+      title = T(hi, "Document padh liya", "Document read");
+      text = T(hi, `${fmtN(now.words)} shabd, lagbhag ${fmtN(now.pages)} pages, ${fmtN(now.headings)} headings, ${fmtN(now.tables)} tables. Kuch bhi poocho: summary, headings, koi shabd kahan aaya, kisi topic pe kya likha hai, tables ke total.`,
+        `${fmtN(now.words)} words, about ${fmtN(now.pages)} pages, ${fmtN(now.headings)} headings, ${fmtN(now.tables)} tables. Ask anything: a summary, the headings, where a word appears, what it says about a topic, totals from its tables.`);
+    }
     if (r.task === "ask") {
       title = r.value != null ? T(hi, "Jawab", "Answer") : (r.chart && r.chart.title) || T(hi, "Jawab", "Answer");
       title = title.charAt(0).toUpperCase() + title.slice(1);
@@ -1310,7 +1316,7 @@
     const box = el("section", "office");
     const out = el("div", "office-out");
     const pick = (label, multiple) => {
-      const inp = el("input"); inp.type = "file"; inp.accept = ".xlsx,.xlsm,.xls,.xlsb,.ods,.csv,.txt"; inp.hidden = true; inp.multiple = !!multiple;
+      const inp = el("input"); inp.type = "file"; inp.accept = ".xlsx,.xlsm,.xls,.xlsb,.ods,.csv,.txt,.docx,.doc"; inp.hidden = true; inp.multiple = !!multiple;
       const btn = el("button", "btn go", label); btn.type = "button";
       btn.addEventListener("click", () => inp.click());
       return [btn, inp];
@@ -1382,11 +1388,16 @@
       }
       box.classList.add("has-file");
       const rep = f.report, s = rep.summary, r = f.result || {};
-      const parts = [el("p", "cap", `${f.name} · ${s.sheets} ${T(hi, "sheet", s.sheets > 1 ? "sheets" : "sheet")} · ${fmt(s.rows)} ${T(hi, "rows", "rows")} · ${fmt(s.formulas)} ${T(hi, "formula", "formulas")}`)];
+      const parts = [el("p", "cap", rep.kind === "docx"
+        ? `${f.name} · ${fmt(s.words)} ${T(hi, "shabd", "words")} · ${fmt(s.paragraphs)} ${T(hi, "paragraph", "paragraphs")} · ${fmt(s.tables)} ${T(hi, "table", s.tables === 1 ? "table" : "tables")}`
+        : `${f.name} · ${s.sheets} ${T(hi, "sheet", s.sheets > 1 ? "sheets" : "sheet")} · ${fmt(s.rows)} ${T(hi, "rows", "rows")} · ${fmt(s.formulas)} ${T(hi, "formula", "formulas")}`)];
 
       if ((f.steps || []).length) {
         const ul = el("ul", "findings done");
-        for (const st of f.steps) for (const [op, n] of Object.entries(st.changes || {})) if (DONE[op] && n) ul.append(el("li", null, `${fmt(n)} ${DONE[op]}`));
+        for (const st of f.steps) {
+          if (st.say) { ul.append(el("li", null, st.say)); continue; }
+          for (const [op, n] of Object.entries(st.changes || {})) if (DONE[op] && n) ul.append(el("li", null, `${fmt(n)} ${DONE[op]}`));
+        }
         if (!ul.children.length) ul.append(el("li", null, T(hi, "Kuch badalne ki zaroorat nahi padi.", "Nothing needed changing.")));
         parts.push(el("p", "cap", T(hi, "Ab tak kiya", "Done so far")), ul);
         const c = r.task === "fix" ? (r.changes || {}) : {};

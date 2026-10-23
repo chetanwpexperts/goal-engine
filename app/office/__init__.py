@@ -68,7 +68,16 @@ def kind_of(path: str) -> str:
         return "convert" if ext in CONVERT else "xlsx"
     if ext in (".csv", ".txt"):
         return "csv"
-    raise OfficeError("Upload an Excel (.xlsx, .xls, .xlsm, .xlsb), OpenDocument (.ods) or CSV file.")
+    if ext == ".docx":
+        if head[:2] != b"PK":
+            if head[:4] == b"\xd0\xcf\x11\xe0":
+                raise OfficeError("This Word file has a password or is an old .doc saved with a .docx name. Open it in Word, remove any "
+                                  "password, Save As .docx, and upload it again.")
+            raise OfficeError("This isn't a real Word file (it may be another kind of file renamed to .docx).")
+        return "docx"
+    if ext == ".doc":
+        raise OfficeError("This is an old Word file (.doc). Open it in Word, choose Save As > Word Document (.docx), and upload that.")
+    raise OfficeError("Upload an Excel (.xlsx, .xls, .xlsm, .xlsb), OpenDocument (.ods), CSV or Word (.docx) file.")
 
 
 def convert_to_xlsx(path: str) -> tuple[str, dict]:
@@ -239,6 +248,10 @@ def formula_from_shape(shape: str, row: int, col: int) -> str:
 # ------------------------------------------------------------------ scan
 def scan(path: str) -> dict:
     """What's wrong with this file. Streams every sheet twice (formulas, then the values Excel saved)."""
+    if path.lower().endswith(".docx"):
+        from app.office import word
+
+        return word.scan(path)
     report = {"kind": kind_of(path), "size": os.path.getsize(path), "sheets": []}
     shapes: dict = {}
     for name, rows in sheets(path, formulas=True):

@@ -61,7 +61,7 @@ class _ServerLane:
 
 _big_lane = _ServerLane()                   # one big file at a time, so the VPS stays responsive
 FILE_WORDS = packs.words("office", "about")            # the field's words come from its knowledge pack
-ALLOWED = (".xlsx", ".xlsm", ".xls", ".xlsb", ".ods", ".csv", ".txt")
+ALLOWED = (".xlsx", ".xlsm", ".xls", ".xlsb", ".ods", ".csv", ".txt", ".docx", ".doc")
 STRONG_FILE = packs.words("office", "strong")
 # what a message describing a problem sounds like ('I need to work on my excel file' doesn't)
 SYMPTOM_WORDS = re.compile(r"\b(won'?t|wont|can'?t|cannot|not (open|opening|saving|loading|showing|calculating|updating)|nahi (khul|chal|ho|aa|dikh|ban)|"
@@ -166,7 +166,7 @@ def file_dict(f: OfficeFile) -> dict:
     st = steps(f)
     return {"id": f.token, "name": f.name, "size": f.size, "received": f.received, "status": f.status, "task": f.task,
             "report": loads(f.report, None), "result": loads(f.result, None), "error": f.error,
-            "steps": [{"ops": x["ops"], "changes": x["changes"]} for x in st[1:]], "before": st[0].get("summary"),
+            "steps": [{"ops": x["ops"], "changes": x["changes"], "say": x.get("say")} for x in st[1:]], "before": st[0].get("summary"),
             "download": len(st) > 1 and bool(f.path and os.path.exists(f.path)),
             "compare_download": bool(f.result_path and os.path.exists(f.result_path)), "result_name": f.result_name}
 
@@ -174,7 +174,7 @@ def file_dict(f: OfficeFile) -> dict:
 def start_upload(db: Session, visitor_id: str, agent_id: int | None, name: str, size: int) -> OfficeFile:
     name = os.path.basename(name or "file.xlsx")[:150]
     if not name.lower().endswith(ALLOWED):
-        raise OfficeAgentError("Upload an Excel (.xlsx, .xls, .xlsm, .xlsb), OpenDocument (.ods) or CSV file.")
+        raise OfficeAgentError("Upload an Excel (.xlsx, .xls, .xlsm, .xlsb), OpenDocument (.ods), CSV or Word (.docx) file.")
     if not 0 < size <= MAX_SIZE:
         raise OfficeAgentError("Files can be up to 1.5 GB.")
     DATA.mkdir(parents=True, exist_ok=True)
@@ -337,7 +337,10 @@ def _work(file_id: int, task: str, args: dict) -> None:
                 out = f"{root}.v{len(st)}{ext}"
                 res = asker.run(args["plan"], f.path, out, args.get("hi", True), n)
                 if os.path.exists(out):
-                    st.append({"path": out, "ops": ["answer"], "changes": {"answer": 1}})
+                    pl = args["plan"]
+                    edit = pl.get("op") if pl.get("job") == "edit" else pl.get("job") if str(pl.get("job", "")).startswith("word_") else None
+                    st.append({"path": out, "ops": [edit or "answer"], "changes": {edit or "answer": res.get("changes", 1) if edit else 1},
+                               **({"say": str(res.get("say", "")).split(". Download")[0].split(". Nayi copy")[0][:200]} if edit else {})})
                     f.versions, f.path = dumps(st), out
                 f.result = dumps({"task": "ask", **res})
             elif task == "undo":
@@ -600,6 +603,8 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
 
     if edits.is_order(text) and _edit_plan(f, text):
         return ask_task(db, agent, f, text, hi)           # "make names UPPER CASE", "remove blank rows": the edit, not a scan fix
+    if (f.path or "").lower().endswith(".docx"):
+        return ask_task(db, agent, f, text, hi)           # a Word document: its own questions and changes
     ops = ops_in(text)
     sheets = sheets_in(text, report)
     if FORMULA_RE.search(text or "") and ops:
@@ -830,8 +835,11 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
     m["tables"] = tables
     from app.office import understand as U
 
+    is_doc = (f.path or "").lower().endswith(".docx")
+    if is_doc:
+        from app.office import word
     try:
-        plan = asker.understand(text, tables)
+        plan = (word.plan(text, f.path) if is_doc else None) or asker.understand(text, tables)
     except U.Missing as miss:
         # not in this file and can't be worked out from it: say so plainly, with what it does have
         agent.inputs = dumps(inputs)
@@ -845,30 +853,44 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
             pass
         return miss.hi if hi else miss.en
     except asker.NeedMore as need:
-        inputs["pending_q"] = text
-        agent.inputs = dumps(inputs)
-        db.commit()
-        opts = list(need.options)
-        msg = need.hi if hi else need.en
-        try:
-            # it couldn't answer this directly: the sentence (scrubbed, nobody attached) goes to the learning list,
-            # so the agent learns to answer it straight away next time
-            from app import learning
+        plan = word.fallback(text, f.path) if is_doc else None
+        if plan is None:
+            inputs["pending_q"] = text
+            agent.inputs = dumps(inputs)
+            db.commit()
+            opts = list(need.options)
+            msg = need.hi if hi else need.en
+            if is_doc and (not tables or need.en.startswith("I didn't fully get")):
+                msg = ("Ye document mein nahi mila. Document pe ye pooch sakte ho: summary, headings, kisi shabd ko dhoondo, "
+                       "kisi topic ke baare mein kya likha hai, saari dates / amounts / emails, ya \"X ko Y se badlo\"." if hi else
+                       "I couldn't find that in the document. You can ask for a summary, the headings, where a word appears, what it says "
+                       "about a topic, every date / amount / email in it, or \"replace X with Y\".")
+                need.hi = "Ye poori tarah samajh nahi aaya"
+                opts = ["Summarise this document", "Show the headings", "List all dates"] if not hi else \
+                       ["Is document ka summary do", "Headings dikhao", "Saari dates batao"]
+            try:
+                # it couldn't answer this directly: the sentence (scrubbed, nobody attached) goes to the learning list,
+                # so the agent learns to answer it straight away next time
+                from app import learning
 
-            learning.ask_to_learn(db, "office", text, guess="needed: " + (need.en[:60] if need.en else ""))
-        except ValueError:
-            pass
-        if need.hi.startswith("Ye poori tarah samajh nahi aaya"):
-            # not understood: offer the closest things this file can answer, not a dead end
-            near = mo.closest_options(text, tables, hi)
-            if near:
-                msg = ("Ye poori tarah samajh nahi aaya. Is file pe inme se kuch chahiye?" if hi
-                       else "I didn't fully get that. Did you mean one of these?")
-                opts = near
-            opts = opts[:6] + ["Agent ko sikhao" if hi else "Teach the agent"]
-        mind.set_pattern("other", None)
-        mind.asked_back()
-        return msg, opts
+                learning.ask_to_learn(db, "office", text, guess="needed: " + (need.en[:60] if need.en else ""))
+            except ValueError:
+                pass
+            if need.hi.startswith("Ye poori tarah samajh nahi aaya") and not is_doc:
+                # not understood: offer the closest things this file can answer, not a dead end
+                near = mo.closest_options(text, tables, hi)
+                if near:
+                    msg = ("Ye poori tarah samajh nahi aaya. Is file pe inme se kuch chahiye?" if hi
+                           else "I didn't fully get that. Did you mean one of these?")
+                    opts = near
+            if need.hi.startswith("Ye poori tarah samajh nahi aaya"):
+                opts = opts[:6] + ["Agent ko sikhao" if hi else "Teach the agent"]
+            mind.set_pattern("other", None)
+            mind.asked_back()
+            return msg, opts
+    if is_doc and plan.get("job") == "list" and not plan.get("filters") and re.search(
+            r"\b(which|what|who|why|when|kaun|kaunsa|kya|kyun|kab)\b", text or "", re.I):
+        plan = word.fallback(text, f.path) or plan       # 'which region is weakest': what the text says, not every table row
     # the named sheet is the sheet (a check on the plan, whatever job it became)
     named = asker.named_sheet(text, tables)
     if named is not None and plan.get("table") not in (named.name, None) and plan.get("job") not in ("lookup", "combine", "reconcile"):
@@ -896,7 +918,7 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
         plan["readonly"] = True                            # "before making changes, tell me...": answer only
     show_fx = bool(sig.get("wants_formula") or (prof.get("formula") is True and not sig.get("no_formula")) or re.search(
         r"\b(in excel|excel mein|excel me)\b.{0,20}\b(kaise|how)\b|\bhow (do|can|to) i\b.{0,30}\b(calculate|count|sum|find)\b", text or "", re.I))
-    other = None if plan.get("derive") else mo.sheet_or_value(text, tables, plan, hi)
+    other = None if (plan.get("derive") or plan.get("job", "").startswith("word_")) else mo.sheet_or_value(text, tables, plan, hi)
     inputs["mind_plan"] = json.loads(json.dumps(plan, default=str))
     agent.inputs = dumps(inputs)
     mind.set_pattern(mo.label_of(plan), plan)

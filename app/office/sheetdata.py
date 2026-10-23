@@ -83,6 +83,10 @@ def forget(path: str) -> None:
 
 
 def _load_tables(path: str) -> list[Table]:
+    if path.lower().endswith(".docx"):
+        from app.office import word
+
+        return word.tables(path)              # a Word document's tables, asked like sheets
     if office.kind_of(path) == "csv":
         rows = list(office._csv_rows(path))
         header = [str(h).strip() for h in rows[0]] if rows else []

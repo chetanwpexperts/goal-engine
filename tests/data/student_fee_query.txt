@@ -1,0 +1,55 @@
+$sql = "
+            SELECT
+                s.student_id,
+                s.student_name,
+                s.father_name,
+                s.roll_no,
+                b.batch_name,
+                co.course_name,
+                co.course_code,
+                s.category,
+                s.admission_fee,
+            
+                c.name AS center_name,
+            
+                /* Course names (unchanged) */
+                MAX(CASE WHEN co.course_name LIKE '%01st%' THEN co.course_name END) AS course_1st_year,
+                MAX(CASE WHEN co.course_name LIKE '%02nd%' THEN co.course_name END) AS course_2nd_year,
+            
+                /* Existing year-wise board */
+                MAX(CASE WHEN co.course_name LIKE '%01st%' THEN fs.board_share END) AS board_1st_year,
+                MAX(CASE WHEN co.course_name LIKE '%02nd%' THEN fs.board_share END) AS board_2nd_year,
+            
+                /* Existing year-wise Exam */
+                MAX(CASE WHEN co.course_name LIKE '%01st%' THEN fs.exam_fee END) AS exam_fee_1st_year,
+                MAX(CASE WHEN co.course_name LIKE '%02nd%' THEN fs.exam_fee END) AS exam_fee_2nd_year,
+            
+                COALESCE(
+                    MAX(CASE WHEN co.course_name LIKE '%01st%' THEN fs.board_share END),
+                    MAX(CASE WHEN co.course_name LIKE '%02nd%' THEN fs.board_share END),
+                    MAX(fs.board_share)
+                ) AS board_share,
+            
+                COALESCE(
+                    MAX(CASE WHEN co.course_name LIKE '%01st%' THEN fs.exam_fee END),
+                    MAX(CASE WHEN co.course_name LIKE '%02nd%' THEN fs.exam_fee END),
+                    MAX(fs.exam_fee)
+                ) AS exam_fee
+            
+            FROM Students s
+            LEFT JOIN centers c 
+                ON c.id = s.center_id
+            LEFT JOIN courses co 
+                ON co.course_id = s.course_id
+            LEFT JOIN fee_structure fs
+                ON fs.course_id = co.course_id
+               AND fs.category_type = s.category
+               AND fs.scheme_id = s.scheme_id
+               AND fs.is_deleted = 0
+            LEFT JOIN Batches b
+                ON b.batch_id = s.batch_id
+            
+            WHERE s.status = 'ACTIVE'
+            GROUP BY s.student_id
+            ORDER BY s.student_name;
+        ";

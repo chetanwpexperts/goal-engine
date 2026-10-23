@@ -63,6 +63,10 @@ _big_lane = _ServerLane()                   # one big file at a time, so the VPS
 FILE_WORDS = packs.words("office", "about")            # the field's words come from its knowledge pack
 ALLOWED = (".xlsx", ".xlsm", ".csv", ".txt")
 STRONG_FILE = packs.words("office", "strong")
+# what a message describing a problem sounds like ('I need to work on my excel file' doesn't)
+SYMPTOM_WORDS = re.compile(r"\b(won'?t|wont|can'?t|cannot|not (open|opening|saving|loading|showing|calculating|updating)|nahi (khul|chal|ho|aa|dikh|ban)|"
+                           r"corrupt\w*|crash\w*|hang\w*|freez\w*|slow|stuck|missing|disappear\w*|lost|blank|#\w+[!?/]?\w*|"
+                           r"band ho|atak|gayab|khul nahi|open nahi|save nahi|nahi ho raha|nahi aa raha)\b|#", re.I)
 PROBLEM_WORDS = re.compile(r"\b(issues?|problems?|errors?|kharab|broken|galat|wrong|not working|nahi chal|help|fix|theek|check|messy|dikkat|gadbad)\b", re.I)
 
 
@@ -915,7 +919,10 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     agent = goal_agent(db, goal) or create_agent(db, goal)
     task_reply = chat_task(db, agent, text, turn.hi)
     inputs = loads(agent.inputs, {}) or {}
-    if rec["confidence"] >= SURE and not task_reply and open_file(db, agent) is None:
+    describes_problem = rec.get("kind") != "issue" or bool(PROBLEM_WORDS.search(text or "") or SYMPTOM_WORDS.search(text or ""))
+    if not describes_problem:
+        rec = {**rec, "confidence": 0.0}           # 'I need to work on my excel file': no problem named, so none guessed
+    if rec["confidence"] >= SURE and describes_problem and not task_reply and open_file(db, agent) is None:
         inputs["brain"] = rec
         goal.title = officebrain.describe(rec, turn.hi)
     elif not goal.title:

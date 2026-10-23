@@ -596,6 +596,10 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
         except OfficeAgentError as exc:
             return str(exc)
         return "Aakhri badlav wapas le raha hoon." if hi else "Undoing the last change."
+    from app.office import edits
+
+    if edits.is_order(text) and _edit_plan(f, text):
+        return ask_task(db, agent, f, text, hi)           # "make names UPPER CASE", "remove blank rows": the edit, not a scan fix
     ops = ops_in(text)
     sheets = sheets_in(text, report)
     if FORMULA_RE.search(text or "") and ops:
@@ -774,6 +778,16 @@ TEACH = ("Agent ko sikhao", "Teach the agent")
 LAST_FORMULA_RE = re.compile(r"^\s*(give me |show me |send me |what is |what's )?(the |its |iska |uska |is ka )?(excel )?"
                              r"(formula|formule|fourmula|farmula)( (for|of) (this|that|it|the (last )?answer))?( do| dena| batao| bhi do| kya hai| kya hoga)?\s*[?.!]*\s*$"
                              r"|^\s*(iska|uska|is ka) formula\b", re.I)
+
+
+def _edit_plan(f, text):
+    from app.office import edits
+    from app.office.sheetdata import load_tables
+
+    try:
+        return edits.plan_edit(text, load_tables(f.path))
+    except Exception:  # noqa: BLE001 - an unreadable sheet: the usual path explains it
+        return None
 
 
 def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):

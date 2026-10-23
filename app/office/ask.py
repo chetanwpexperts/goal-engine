@@ -501,6 +501,21 @@ def _understand_en(text: str, tables: list[Table]) -> dict:
 
     if not tables:
         raise NeedMore("Is file mein padhne layak koi sheet nahi mili.", "No readable sheet in this file.")
+    from app.office import edits
+
+    if edits.MACRO_RE.search(text or ""):
+        raise NeedMore("Macro / VBA likhna aur chalana ye agent nahi karta (file mein code chalana safe nahi). Jo kaam macro se karna tha, "
+                       "wo seedha bolo: jaise \"blank rows hatao\", \"region wise alag sheets bana do\", \"header bold karo\".",
+                       "This agent doesn't write or run macros / VBA (running code inside your file isn't safe). Tell me the job the macro "
+                       "was for and I'll do it directly, e.g. \"remove blank rows\", \"one sheet per region\", \"make the header bold\".")
+    order = edits.plan_edit(text, tables)                 # "make the header bold", "remove blank rows": do it on the file
+    if order:
+        return order
+    if edits.PIVOT_RE.search(text or ""):
+        plan = _understand_core_or_show(text, tables)
+        if plan.get("job") == "aggregate" and plan.get("group") is not None:
+            plan["pivot"] = True
+        return plan
     show = _plan_show(text, tables)
     if show:
         return show
@@ -536,6 +551,10 @@ def _understand_en(text: str, tables: list[Table]) -> dict:
             return plan
         raise U.missing_message(concept, tables)
     return _understand_core(text, tables)
+
+
+def _understand_core_or_show(text, tables):
+    return _plan_show(text, tables) or _understand_core(text, tables)
 
 
 def _swap_words(text: str, words, by: str) -> str:
@@ -922,8 +941,10 @@ def _plan_question(text, tables) -> dict:
             agg = "max"
         elif filters or re.search(r"\b(list|dikhao|show|kaun|kaunse|which|jinka|jinki|wale|wali)\b", text or "", re.I):
             return {"job": "list", "table": t.name, "filters": filters, "measure": measure, "topn": topn}
-        elif group is not None and measure is not None and num_cols and num_cols[0][1] >= 1:
-            agg = "sum"                                    # 'region wise sales amount': that column, added up
+        elif group is not None and measure is not None and num_cols and (num_cols[0][1] >= 1 or (
+                num_cols[0][1] >= 0.5 and re.search(r"amount|total|net|sales|revenue|value|salary|fee|bill|paid|balance|profit|cost|price|tax",
+                                                    t.header[measure], re.I))):
+            agg = "sum"                                    # 'region wise sales amount', 'salary by department': that money column, added up
         elif group is not None:
             agg = "count"                                  # 'doctor wise patients', 'month wise bookings': count per group
         else:
@@ -1186,13 +1207,31 @@ def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:
     wb = None if answer_only else (load_workbook(path, keep_vba=path.lower().endswith(".xlsm"))
                                    if path.lower().endswith((".xlsx", ".xlsm")) else None)
     plan = {**plan, "_path": path}
+    if job == "edit" and wb is None:
+        return {"say": ("Ye badlav .xlsx file mein hi ho sakta hai; file ko Excel mein .xlsx save karke dobara upload karo" if hi else
+                        "That change needs an .xlsx file; save it as .xlsx in Excel and upload it again"), "formula": "", "sheet": None}
     res = globals()[f"_run_{job}"](plan, tables, wb, hi, n)
     if info is not None:
         res = {**res, **_derived_note(info, hi, res)}
+    if plan.get("pivot"):
+        res = {**res, "say": res["say"] + (". (Excel ka asli PivotTable yahan nahi banta; ye wahi numbers wali summary table hai, jo data badalne pe "
+                                           "formulas se update hoti hai)" if hi else
+                                           ". (An Excel PivotTable itself can't be built here; this is a summary table with the same numbers, "
+                                           "and its formulas update when the data changes)")}
     if wb is not None:
         wb.calculation.fullCalcOnLoad = True
         wb.save(out)
     return res
+
+
+def _run_edit(p, tables, wb, hi, n):
+    from app.office import edits
+
+    res = edits.run_edit(p, tables, wb, hi, n)
+    if res["changes"]:
+        res["say"] += (". Nayi copy card pe Download karo; 'undo' likhoge to pehle jaisa ho jayega" if hi else
+                       ". Download the new copy from the card; type 'undo' to put it back")
+    return {"formula": "", **res, "sheet": None}
 
 
 def _sample(t: Table, rows, k=5):

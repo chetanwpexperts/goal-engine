@@ -774,7 +774,10 @@ def _plan_rows(text, tables):
 
 
 SHEETS_Q = re.compile(r"\b(how many|kitni|kitne|number of|count( of)?|total)\b.{0,15}\b(sheets|tabs|worksheets)\b|"
-                      r"\b(sheets|tabs)\b.{0,15}\b(kitni|kitne|how many|count)\b|शीट.{0,10}कितन|कितनी शीट", re.I)
+                      r"\b(sheets|tabs)\b.{0,15}\b(kitni|kitne|how many|count)\b|शीट.{0,10}कितन|कितनी शीट|"
+                      r"\b(sheets?|tabs?|worksheets?)\s*(names?|ke naam|ka naam|list)\b|\b(names?|list)\s+(of\s+)?(all\s+)?(the\s+)?(sheets|tabs|worksheets)\b|"
+                      r"\b(which|what|kaun ?si|kaunsi|konsi|kya kya)\s+(sheets|tabs)\b|\b(sheets|tabs)\s+(kaun ?si|kaunsi|konsi|kya kya)\b|"
+                      r"^\s*(sheets|tabs|all sheets|saari sheets)\s*\??\s*$|शीट.{0,6}नाम", re.I)
 
 
 def _plan_sheets(text, tables):

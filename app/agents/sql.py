@@ -35,6 +35,22 @@ class Table:
     order: list[str] = field(default_factory=list)
 
 
+def unwrap(query: str) -> str:
+    """A query pasted straight from code: $sql = "SELECT ...";  ->  SELECT ...  (and the indentation tidied)."""
+    q = (query or "").strip()
+    start = q
+    q = re.sub(r"^\s*(?:\$\w+|(?:var|let|const|string)\s+\w+|\w+)\s*[.+]?=\s*", "", q) if re.match(
+        r"^\s*(?:\$\w+|(?:var|let|const|string)\s+\w+|\w+)\s*[.+]?=\s*[\"'`]", q) else q
+    q = re.sub(r"^(?:<<<['\"]?\w+['\"]?|[\"'`]{1,3})\s*", "", q)
+    if q != start:                                   # it was wrapped in code: drop the closing quote too
+        q = re.sub(r"\s*[\"'`]{1,3}\s*\)?\s*;?\s*$", "", q)
+    lines = [ln.rstrip() for ln in q.splitlines()]
+    while lines and not lines[-1].strip():
+        lines.pop()
+    pad = min((len(ln) - len(ln.lstrip()) for ln in lines[1:] if ln.strip()), default=0)
+    return "\n".join([lines[0].strip()] + [ln[pad:] for ln in lines[1:]]).strip() if lines else ""
+
+
 def _strip_comments(sql: str) -> str:
     sql = re.sub(r"/\*.*?\*/", " ", sql, flags=re.S)
     return re.sub(r"(--|#)[^\n]*", " ", sql)
@@ -84,7 +100,7 @@ def _owner(col: str, tables: list[Table]) -> tuple[Table | None, str]:
 
 def analyze_sql(query: str, extra: str = "") -> dict:
     """query: the SQL. extra: optional EXPLAIN output and/or CREATE TABLE statements."""
-    original = (query or "").strip()
+    original = unwrap(query)
     if not original:
         return {"ok": False, "error": "No query given", "findings": []}
     if not re.match(r"^\s*(\(|with\b|select\b|update\b|delete\b)", _strip_comments(original), re.I):
@@ -196,6 +212,10 @@ def analyze_sql(query: str, extra: str = "") -> dict:
                 t, n = _owner(side, tables)
                 if t:
                     t.join.append(n)
+        for a in re.findall(r"([`\w]+\.[`\w]+)\s*=\s*(?:\d+|'[^']*'|\?)", m.group(1)):
+            t, n = _owner(a, tables)
+            if t:
+                t.join.append(n)                     # 'AND fs.is_deleted = 0' in the ON: part of how that table is looked up
     order_clause = _clause(sql, "order by", ("limit", "union"))
     for col in re.findall(r"([`\w.]+)(?:\s+(?:asc|desc))?", order_clause, re.I):
         if col.lower() in ("asc", "desc", "rand"):
@@ -238,7 +258,7 @@ def analyze_sql(query: str, extra: str = "") -> dict:
         if any(j.lower() in have for j in joins):
             joins = []                  # an index already starts with one of the join columns: MySQL can use it
         if joins:                       # one index for all the columns this table is joined on, not one each
-            cols = joins[:3]
+            cols = joins[:4]
             indexes.append(f"ALTER TABLE {t.name} ADD INDEX idx_{short}_{'_'.join(cols)[:40]} ({', '.join(cols)});")
     check_query = None
     if indexes and not seen_structure:
@@ -274,9 +294,39 @@ def analyze_sql(query: str, extra: str = "") -> dict:
 
     rewritten = rewrite(original)
     findings.sort(key=lambda f: f.severity, reverse=True)
+    notes = _notes(sql, tables, original)
     return {"ok": True, "findings": [f.as_dict() for f in findings], "indexes": indexes, "check_query": check_query,
-            "indexes_verified": bool(seen_structure), "assumed_primary": skipped,
+            "indexes_verified": bool(seen_structure), "assumed_primary": skipped, "notes": notes,
             "rewritten": rewritten if rewritten != original else None, "tables": [t.name for t in tables]}
+
+
+def _notes(sql: str, tables, original: str = "") -> list[dict]:
+    """What this query's own shape means for speed, beyond rules that rewrite it (plain words, both languages)."""
+    out = []
+    low = sql.lower()
+    group = _clause(sql, "group by", ("having", "order by", "limit", "union")).strip().rstrip(";")
+    order = _clause(sql, "order by", ("limit", "union")).strip().rstrip(";")
+    if group and order and re.sub(r"\s+", "", group.lower()) != re.sub(r"\s+|\b(asc|desc)\b", "", order.lower()):
+        out.append({"en": f"It groups by {group.strip()} but sorts by {order.strip()}: MySQL builds the groups first, then sorts "
+                          "them in a temporary table. That's normal for a report and fast when the WHERE keeps the rows few.",
+                    "hi": f"Ye {group.strip()} se group karti hai par {order.strip()} se sort: MySQL pehle group banata hai, "
+                          "phir temporary table mein sort. Report ke liye ye normal hai."})
+    if re.search(r"\blimit\b", low) is None and (group or len(tables) > 2):
+        out.append({"en": "There's no LIMIT, so it returns every matching row. If this is a list on a page, show it page by page "
+                          "(LIMIT 50 OFFSET ...) or filter it (by center, batch, date): that is usually the biggest speed-up.",
+                    "hi": "LIMIT nahi hai, isliye saari rows aati hain. Page pe list hai to page-wise dikhao (LIMIT 50 OFFSET ...) "
+                          "ya filter lagao (center, batch, date): aksar sabse bada fayda yahi hota hai."})
+    if re.search(r"\bcase\s+when\b[^;]*\blike\s+'%", (original or sql).lower()):
+        out.append({"en": "The LIKE '%...%' checks inside CASE run on rows already found; they don't search the table, so they "
+                          "don't need an index and aren't what makes it slow.",
+                    "hi": "CASE ke andar LIKE '%...%' sirf mil chuki rows pe chalta hai, table search nahi karta; ye slow hone ki "
+                          "wajah nahi hai."})
+    if re.search(r"\bleft\s+join\b[^;]*?\bon\b[^;]*?\band\s+[`\w]+\.[`\w]+\s*=\s*(\d+|'[^']*')", low):
+        out.append({"en": "The extra condition in the LEFT JOIN's ON (like is_deleted = 0) is in the right place: in WHERE it would "
+                          "drop the rows that have no match.",
+                    "hi": "LEFT JOIN ke ON mein extra condition (jaise is_deleted = 0) sahi jagah hai: WHERE mein daalne se bina "
+                          "match wali rows hat jaati."})
+    return out
 
 
 def _likely_primary(table: str, col: str) -> bool:

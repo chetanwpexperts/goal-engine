@@ -50,7 +50,7 @@ class Settings(BaseModel):
     # Safety limits so a public demo can never run up a bill or be abused.
     ai_daily_cap: int = _int("AI_DAILY_CAP", 400)              # all visitors together
     visitor_daily_cap: int = _int("VISITOR_DAILY_CAP", 25)     # one visitor
-    max_message_chars: int = _int("MAX_MESSAGE_CHARS", 1500)
+    max_message_chars: int = _int("MAX_MESSAGE_CHARS", 10000)
 
     cookie_secure: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 

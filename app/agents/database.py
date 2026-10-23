@@ -520,7 +520,12 @@ def clean_exports(max_age_hours: int = 24) -> None:
 
 def mind_state(db: Session, agent: Agent) -> dict:
     """What the shared mind may build next steps on."""
-    return {"connected": bool(visitor_connectors(db, agent.visitor_id))}
+    from app.agents.core import goal_agents
+    from app.models import AgentRun
+
+    checked = any(r.status == "done" for a in goal_agents(db, agent.goal_id) if a.recipe == "sql_review"
+                  for r in db.scalars(select(AgentRun).where(AgentRun.agent_id == a.id).limit(1)))
+    return {"connected": bool(visitor_connectors(db, agent.visitor_id)), "query_checked": checked}
 
 
 # ------------------------------------------------------------------ hooks the brain calls (named in the database pack)
@@ -580,47 +585,104 @@ def _sql_agent(db, goal):
 
 def holds_conversation(db, goal, text: str, any_text: bool = False):
     """A query was checked in this conversation and the person asks about it: answer about THAT query."""
-    if any_text or NEW_SQL_RE.search(text or "") or not SQL_FOLLOW_RE.search(text or ""):
+    if any_text or NEW_SQL_RE.search(text or "") or not (SQL_FOLLOW_RE.search(text or "") or DIFF_RE.search(text or "")):
         return None
     a, run = _sql_agent(db, goal)
     return a if run is not None and run.status == "done" else None
 
 
+DIFF_RE = re.compile(r"\b(what (did )?you change|what changed|what is the diff\w*|diff\w*|compare|original|kya badla|kya change|"
+                     r"farak|fark|antar|same (hi )?hai|any change)\b", re.I)
+WHY_RE = re.compile(r"\b(why|kyun|kyu|reason|wajah|explain|samjhao|kaise slow|what makes)\b", re.I)
+
+
 def continue_turn(db, goal, agent, text: str):
-    from app.agents.sql import rewrite
+    """Answers about the query that was checked: the optimised version, what changed, or why it's slow.
+    Worked out again from the query itself, so it's never a stale or repeated answer."""
+    from app.agents.sql import analyze_sql, rewrite, unwrap
     from app.ml.normalize import detect_language
-    from app.models import AgentRun
+    from app.models import Message
 
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
-    run = db.scalars(select(AgentRun).where(AgentRun.agent_id == agent.id).order_by(AgentRun.id.desc()).limit(1)).first()
-    res = loads(run.result, {}) or {}
-    query = (loads(agent.inputs, {}) or {}).get("query", "")
+    inputs = loads(agent.inputs, {}) or {}
+    query = unwrap(inputs.get("query", ""))
+    res = analyze_sql(query, inputs.get("explain", ""))
     better = res.get("rewritten") or rewrite(query)
-    changes = []
-    if re.search(r"\bselect\s+(\w+\.)?\*", better, re.I):
-        better = re.sub(r"\bselect\s+((?:\w+\.)?\*)", r"SELECT /* list only the columns you show, instead of \1 */ \1", better, count=1, flags=re.I)
-        changes.append("Pick only the columns the page shows instead of *: less data read, and an index can cover the query"
-                       if not hi else "* ki jagah sirf wahi columns lo jo page pe dikhte hain: kam data padha jayega")
-    for f in res.get("findings", []):
-        t = f["title_en"].lower()
-        if not t.startswith(("these columns need an index", "missing indexes")) and "select *" not in t:
-            changes.append(f["fix_hi"] if hi else f["fix_en"])
+    changed = _norm(better) != _norm(query)
+    last = db.scalars(select(Message).where(Message.goal_id == goal.id, Message.role == "assistant")
+                      .order_by(Message.id.desc()).limit(1)).first()
+    ask = "diff" if DIFF_RE.search(text or "") else "why" if WHY_RE.search(text or "") else "optimize"
+    reply = _sql_reply(ask, query, better, changed, res, hi)
+    if last is not None and _norm(last.text) == _norm(reply):
+        ask = {"optimize": "why", "why": "diff", "diff": "why"}[ask]     # never the same answer twice in a row
+        reply = _sql_reply(ask, query, better, changed, res, hi)
+    return reply, [], hi
+
+
+def _norm(q: str) -> str:
+    return re.sub(r"\s+", " ", (q or "")).strip().rstrip(";").lower()
+
+
+def _sql_reply(ask, query, better, changed, res, hi) -> str:
+    notes = [n["hi" if hi else "en"] for n in res.get("notes", [])]
+    fixes = [f for f in res.get("findings", [])
+             if not f["title_en"].lower().startswith(("these columns need an index", "missing indexes"))]
     idx = res.get("indexes") or []
-    lines = []
-    lines.append(("Aapki query ka behtar roop (result wahi rahega):" if hi else "Your query, optimised (same result):") + f"\n\n{better.strip()}")
-    if changes:
-        lines.append(("Kya badla aur kyun:\n" if hi else "What changes and why:\n") + "\n".join(f"- {c}" for c in changes[:5]))
+    parts = []
+    if ask == "diff":
+        if changed:
+            parts.append(("Ye badla (result wahi rahega):" if hi else "What I changed (the result stays the same):"))
+            parts += [f"- {f['title_hi' if hi else 'title_en']}: {f['fix_hi' if hi else 'fix_en']}" for f in fixes] or \
+                     [("- Query ka likhne ka tareeka, result wahi" if hi else "- How it's written, not what it returns")]
+            parts.append(("Pehle:" if hi else "Before:") + f"\n\n{query}\n\n" + ("Ab:" if hi else "After:") + f"\n\n{better}")
+        else:
+            parts.append("Maine aapki query ka text nahi badla: ye pehle se theek likhi hai, isme koi aisa pattern nahi jo index ko rokta ho. "
+                         "Farak sirf index ka hai (neeche), query wahi rahegi." if hi else
+                         "I didn't change your query's text: it's already written well, with nothing in it that stops an index "
+                         "being used. The only difference is the indexes below; your query stays exactly as it is.")
+        if idx:
+            parts.append(("Index:" if hi else "Indexes:") + "\n\n" + "\n".join(idx))
+        return "\n\n".join(parts)
+    if ask == "why":
+        parts.append("Ye query slow kyun ho sakti hai:" if hi else "Why this query can be slow:")
+        reasons = []
+        if idx:
+            reasons.append(("Jin columns pe ye filter aur join karti hai unpe index na ho to MySQL har table poori padhta hai: "
+                            + ", ".join(re.sub(r"^ALTER TABLE (\S+) ADD INDEX \S+ \((.+)\);$", r"\1 (\2)", x) for x in idx)) if hi else
+                           ("Without an index on the columns it filters and joins on, MySQL reads each table in full: "
+                            + ", ".join(re.sub(r"^ALTER TABLE (\S+) ADD INDEX \S+ \((.+)\);$", r"\1 (\2)", x) for x in idx)))
+        reasons += [f["title_hi" if hi else "title_en"] + ": " + f["fix_hi" if hi else "fix_en"] for f in fixes]
+        reasons += notes
+        parts += [f"- {r}" for r in reasons] or [("- Isme slow hone wala koi pattern nahi dikha; EXPLAIN output paste karo." if hi else
+                                                  "- Nothing in it looks slow by itself; paste the EXPLAIN output and I'll find the step.")]
+        if res.get("check_query"):
+            parts.append(("Pehle dekho kaunse index pehle se hain:" if hi else "First see which indexes you already have:")
+                         + f"\n\n{res['check_query']}")
+        return "\n\n".join(parts)
+    # optimize
+    if changed:
+        parts.append(("Aapki query ka behtar roop (result wahi rahega):" if hi else "Your query, optimised (same result):") + f"\n\n{better}")
+        if fixes:
+            parts.append(("Kya badla:\n" if hi else "What changed:\n") + "\n".join(f"- {f['fix_hi' if hi else 'fix_en']}" for f in fixes[:5]))
+    else:
+        parts.append("Aapki query pehle se theek likhi hai, iske text mein badalne layak kuch nahi; isliye wahi query rakho. "
+                     "Speed index aur in baaton se aayegi:" if hi else
+                     "Your query is already written well, so I'm not changing its text. The speed-up comes from the indexes "
+                     "and these points:")
+    if notes:
+        parts.append("\n".join(f"- {n}" for n in notes))
     if idx:
         if res.get("check_query"):
-            lines.append(("Sabse bada fayda index se hoga. Pehle ye chalao, dekho kaunse index pehle se hain:" if hi else
-                          "The biggest gain is indexes. First run this to see which ones you already have:") + f"\n\n{res['check_query']}")
-            lines.append(("Phir inme se sirf wo lagao jo upar nahi dikhe:" if hi else "Then add only the ones it doesn't show:") +
-                         "\n\n" + "\n".join(idx))
+            parts.append(("Pehle ye chalao, dekho kaunse index pehle se hain:" if hi else
+                          "First run this to see which indexes you already have:") + f"\n\n{res['check_query']}")
+            parts.append(("Phir inme se sirf wo lagao jo upar nahi dikhe:" if hi else "Then add only the ones it doesn't show:")
+                         + "\n\n" + "\n".join(idx))
         else:
-            lines.append(("Ye index lagao:" if hi else "Add these indexes:") + "\n\n" + "\n".join(idx))
+            parts.append(("Ye index lagao:" if hi else "Add these indexes:") + "\n\n" + "\n".join(idx))
     if res.get("assumed_primary"):
-        lines.append((f"{', '.join(res['assumed_primary'])} ko primary key maana (pehle se index hota hai)." if hi else
-                      f"I took {', '.join(res['assumed_primary'])} to be {'primary keys' if len(res['assumed_primary']) > 1 else 'the primary key'} (already indexed)."))
-    lines.append(("Index lagane ke baad EXPLAIN chala ke uska output paste karo, main confirm kar dunga ki index use ho raha hai." if hi else
-                  "After adding them, paste the EXPLAIN output of the query and I'll confirm the indexes are being used."))
-    return "\n\n".join(lines), [], hi
+        ap = res["assumed_primary"]
+        parts.append(f"{', '.join(ap)} ko primary key maana (inpe pehle se index hota hai)." if hi else
+                     f"I took {', '.join(ap)} to be {'primary keys' if len(ap) > 1 else 'the primary key'} (already indexed).")
+    parts.append(("Index lagane ke baad EXPLAIN chala ke output paste karo, main confirm kar dunga." if hi else
+                  "After adding them, paste the query's EXPLAIN output and I'll confirm the indexes are used."))
+    return "\n\n".join(parts)

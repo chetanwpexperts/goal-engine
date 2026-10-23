@@ -110,7 +110,7 @@ def test_no_keys_configured_is_503_not_crash(client, use_provider):
 def test_empty_and_too_long_messages_rejected(client, use_provider):
     use_provider(FakeProvider(answers=[]))
     assert client.post("/api/message", json={"text": "   "}).status_code == 400
-    assert client.post("/api/message", json={"text": "x" * 5000}).status_code == 400
+    assert client.post("/api/message", json={"text": "x" * 10001}).status_code == 400   # long pasted queries (up to 10,000) are fine
 
 
 def test_visitor_daily_cap(client, use_provider):

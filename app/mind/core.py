@@ -155,6 +155,11 @@ def _next(db: Session, brain: str, agent, chain: list[str], cur: dict, hi: bool,
     state_fn = packs.hook(brain, "state")
     state = state_fn(db, agent) if (state_fn is not None and agent is not None) else {}
     steps = pack.get("next", {})
+    for flag, labels in pack.get("when", {}).items():
+        if state.get(flag):
+            # the agent is at a known point (e.g. it just finished a piece of work): those are the next steps
+            just = {lab for lab, sc in packs.nearest(brain, text, k=1, min_score=0.45)}     # what they just asked
+            return [steps[x]["hi" if hi else "en"] for x in labels if x in steps and x not in just][:3]
     for need, only in pack.get("until", {}).items():
         if not state.get(need):
             # nothing else can happen until this is done: that is the one next step

@@ -122,6 +122,22 @@
    "needs": [
     "connected"
    ]
+  },
+  "sql_diff": {
+   "en": "What did you change in my query?",
+   "hi": "Meri query mein kya badla?"
+  },
+  "sql_why": {
+   "en": "Why is my query slow?",
+   "hi": "Meri query slow kyun hai?"
+  },
+  "sql_check_idx": {
+   "en": "Which indexes do I already have?",
+   "hi": "Mere paas kaunse index pehle se hain?"
+  },
+  "sql_another": {
+   "en": "Check another query",
+   "hi": "Ek aur query check karo"
   }
  },
  "until": {
@@ -211,6 +227,25 @@
    "insert",
    "data badlo",
    "change records"
+  ],
+  "sql_diff": [
+   "what did you change",
+   "what is the difference between my query and yours",
+   "kya badla query mein",
+   "original aur optimized mein farak",
+   "compare my query"
+  ],
+  "sql_why": [
+   "why is it slow",
+   "query slow kyun hai",
+   "explain why this query is slow",
+   "reason for slowness"
+  ],
+  "sql_optimize": [
+   "optimize this query",
+   "make my query faster",
+   "query fast kaise kare",
+   "isko optimize karo"
   ]
  },
  "hooks": {
@@ -231,5 +266,12 @@
   "db_explore": "explore",
   "db_export": "report",
   "db_report": "report"
+ },
+ "when": {
+  "query_checked": [
+   "sql_diff",
+   "sql_why",
+   "sql_another"
+  ]
  }
 }

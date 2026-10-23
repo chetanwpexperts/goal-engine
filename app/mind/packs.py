@@ -8,6 +8,7 @@ The brain has no field words of its own. It reads, from each pack:
   first         the pattern a conversation starts from
   next          next-step questions per pattern, with "needs" (states the agent must be in)
   until         {state: pattern}: while that state is missing, that pattern is the only next step
+  when          {state: [patterns]}: while that state is on, those are the next steps (checked before until)
   templates     (optional) question templates the agent's own suggester fills
   patterns      ways people ask each pattern, for recognising and for "the closest thing I can do"
   hooks         {"suggest": "module:function", "state": "module:function"} for the agent's own logic

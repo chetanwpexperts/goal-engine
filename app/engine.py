@@ -192,7 +192,7 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
             name, agent = held
             reply, options, hi = route.continue_turn(name, db, focus, agent, text)
             db.commit()
-            return _respond(db, visitor_id, text, focus, reply, "agent_plan", options=options, hi=hi)
+            return _respond(db, visitor_id, text, focus, reply, "agent_reply", options=options, hi=hi)
 
     # A data link for a waiting automation agent: save it and show the preview straight away.
     if focus is not None:

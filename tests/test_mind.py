@@ -329,3 +329,18 @@ def test_suggestions_add_up_totals_not_unit_prices():
     plan = ask.understand("how many records in the sales sheet", tables)
     sugg = mo.suggestions(predict.prior("office", "rows"), tables, plan, None, False)
     assert not any("Unit Price" in s for s in sugg), sugg
+
+
+def test_table_cache_stays_within_its_memory_budget(tmp_path, monkeypatch):
+    from app.office import sheetdata
+
+    monkeypatch.setattr(sheetdata, "CACHE_BUDGET", 3 * 1024 * 1024)
+    sheetdata._cache.clear()
+    paths = []
+    for k in range(4):
+        _book(tmp_path / f"c{k}.xlsx", k)
+        paths.append(str(tmp_path / f"c{k}.xlsx"))
+        sheetdata.load_tables(paths[-1])
+    assert sum(v[1] for v in sheetdata._cache.values()) <= sheetdata.CACHE_BUDGET
+    sheetdata.forget(paths[-1])
+    assert not any(k[0] == paths[-1] for k in sheetdata._cache)

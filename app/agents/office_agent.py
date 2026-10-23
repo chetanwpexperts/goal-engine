@@ -306,7 +306,11 @@ def start_undo(db: Session, f: OfficeFile) -> OfficeFile:
 
 
 def remove_file(f: OfficeFile) -> None:
+    from app.office.sheetdata import forget
+
     for p in {f.path, f.result_path, *(x["path"] for x in steps(f))}:
+        if p:
+            forget(p)
         _rm(p)
     f.path = f.result_path = None
     f.report = f.result = None

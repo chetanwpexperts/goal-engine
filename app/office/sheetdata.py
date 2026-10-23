@@ -44,12 +44,17 @@ class Table:
 
 
 _cache: dict = {}
-CACHE_MAX_BYTES = 25 * 1024 * 1024       # small/medium files stay read in memory between questions
-CACHE_FILES = 4
+CACHE_BUDGET = 120 * 1024 * 1024        # per server process: tables kept in memory between questions (~8x the file size)
+CELL_BYTES = 45                          # measured: a 2 MB, 50k-row sheet takes ~17 MB as Python objects
+
+
+def _size(tables) -> int:
+    return sum(len(t.rows) * max(1, len(t.header)) for t in tables) * CELL_BYTES
 
 
 def load_tables(path: str) -> list[Table]:
-    """The file's tables. Read once per version of the file: every next question on it reuses them."""
+    """The file's tables. Read once per version of the file: every next question on it reuses them, within a fixed
+    memory budget (big files are read again instead of kept, so the server never runs out of memory)."""
     import os
 
     try:
@@ -59,15 +64,22 @@ def load_tables(path: str) -> list[Table]:
     key = (path, st.st_mtime_ns, st.st_size)
     hit = _cache.get(key)
     if hit is not None:
-        return hit
+        return hit[0]
     tables = _load_tables(path)
-    if st.st_size <= CACHE_MAX_BYTES:
-        for k in [k for k in _cache if k[0] == path]:
-            _cache.pop(k, None)               # an older version of the same file
-        while len(_cache) >= CACHE_FILES:
-            _cache.pop(next(iter(_cache)))
-        _cache[key] = tables
+    need = _size(tables)
+    for k in [k for k in _cache if k[0] == path]:
+        _cache.pop(k, None)                   # an older version of the same file
+    if need <= CACHE_BUDGET // 2:
+        while _cache and sum(v[1] for v in _cache.values()) + need > CACHE_BUDGET:
+            _cache.pop(next(iter(_cache)))    # oldest first
+        _cache[key] = (tables, need)
     return tables
+
+
+def forget(path: str) -> None:
+    """The file was deleted: drop it from memory too."""
+    for k in [k for k in _cache if k[0] == path]:
+        _cache.pop(k, None)
 
 
 def _load_tables(path: str) -> list[Table]:

@@ -658,16 +658,7 @@ body[data-state="idle"] .fineprint { position: relative; left: auto; transform: 
 body[data-state="idle"] .fineprint { padding: 0 var(--gutter, 16px); box-sizing: border-box; }
 @media (max-width: 640px) { .brain-stage { margin-top: 18px; } .hero h1 { font-size: clamp(32px, 9vw, 44px); } }
 
-/* the brain from the design: a lit image that breathes, brighter while the person types */
-.brain-photo { width: min(460px, 74vw); aspect-ratio: 900 / 616; position: relative; }
-.brain-photo img { width: 100%; height: 100%; display: block; object-fit: cover;
-  -webkit-mask-image: radial-gradient(closest-side, #000 80%, transparent 100%); mask-image: radial-gradient(closest-side, #000 80%, transparent 100%);
-  animation: brainfloat 7s ease-in-out infinite, brainglow 4s ease-in-out infinite; }
-.brain-photo::after { content: ""; position: absolute; inset: 18% 20%; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(closest-side, rgba(150, 140, 255, .35), rgba(150, 140, 255, 0)); filter: blur(18px); z-index: -1; }
-body.thinking .brain-photo img { animation: brainfloat 7s ease-in-out infinite, brainglow 1.2s ease-in-out infinite; }
-@keyframes brainfloat { 50% { transform: translateY(-8px); } }
-@keyframes brainglow { 50% { filter: brightness(1.12) saturate(1.1); } }
-@media (prefers-reduced-motion: reduce) { .brain-photo img { animation: none; } }
+/* the brain, drawn in code (sharp at any size) */
+.brain-hd { display: block; width: min(620px, 80vw); height: clamp(260px, 42vh, 420px); pointer-events: none; }
 .brain-stage .brain-art { display: none; }
-@media (max-width: 640px) { .brain-photo { width: min(330px, 78vw); } }
+@media (max-width: 640px) { .brain-hd { width: 100%; height: clamp(200px, 30vh, 270px); } }

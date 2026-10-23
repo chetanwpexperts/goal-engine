@@ -61,7 +61,7 @@ class _ServerLane:
 
 _big_lane = _ServerLane()                   # one big file at a time, so the VPS stays responsive
 FILE_WORDS = packs.words("office", "about")            # the field's words come from its knowledge pack
-ALLOWED = (".xlsx", ".xlsm", ".csv", ".txt")
+ALLOWED = (".xlsx", ".xlsm", ".xls", ".xlsb", ".ods", ".csv", ".txt")
 STRONG_FILE = packs.words("office", "strong")
 # what a message describing a problem sounds like ('I need to work on my excel file' doesn't)
 SYMPTOM_WORDS = re.compile(r"\b(won'?t|wont|can'?t|cannot|not (open|opening|saving|loading|showing|calculating|updating)|nahi (khul|chal|ho|aa|dikh|ban)|"
@@ -174,15 +174,15 @@ def file_dict(f: OfficeFile) -> dict:
 def start_upload(db: Session, visitor_id: str, agent_id: int | None, name: str, size: int) -> OfficeFile:
     name = os.path.basename(name or "file.xlsx")[:150]
     if not name.lower().endswith(ALLOWED):
-        raise OfficeAgentError("Excel (.xlsx) ya CSV file daalo. Purani .xls ho to Excel mein Save As .xlsx karke daalo.")
+        raise OfficeAgentError("Upload an Excel (.xlsx, .xls, .xlsm, .xlsb), OpenDocument (.ods) or CSV file.")
     if not 0 < size <= MAX_SIZE:
-        raise OfficeAgentError("File 1.5 GB tak ki ho sakti hai.")
+        raise OfficeAgentError("Files can be up to 1.5 GB.")
     DATA.mkdir(parents=True, exist_ok=True)
     if shutil.disk_usage(DATA).free < size * 3 + 2 * 1024**3:
-        raise OfficeAgentError("Server abhi itni badi file nahi le sakta. Thodi der baad try karo.")
+        raise OfficeAgentError("The server can't take a file this big right now. Please try again in a little while.")
     open_now = db.scalars(select(OfficeFile).where(OfficeFile.visitor_id == visitor_id, OfficeFile.status.not_in(("removed",)))).all()
     if len(open_now) >= OPEN_FILES_PER_VISITOR:
-        raise OfficeAgentError("Ek saath 6 files tak. Purani files 1 ghante mein apne aap hat jaati hain.")
+        raise OfficeAgentError("Up to 6 files at a time. Older files are removed automatically an hour after you last used them.")
     token = secrets.token_urlsafe(24)
     f = OfficeFile(token=token, visitor_id=visitor_id, agent_id=agent_id, name=name, size=size,
                    path=str(DATA / f"{token}{os.path.splitext(name)[1].lower()}"))
@@ -201,11 +201,11 @@ def own_file(db: Session, token: str, visitor_id: str) -> OfficeFile:
 
 def add_chunk(db: Session, f: OfficeFile, offset: int, data: bytes) -> OfficeFile:
     if f.status != "uploading":
-        raise OfficeAgentError("Upload pehle hi poora ho chuka hai.")
+        raise OfficeAgentError("This upload has already finished.")
     if offset != f.received:
         return f                                     # the browser resumes from f.received
     if len(data) > CHUNK_MAX or f.received + len(data) > f.size:
-        raise OfficeAgentError("Galat hissa aaya. Dobara upload karo.")
+        raise OfficeAgentError("A piece of the file arrived wrong. Please upload it again.")
     with open(f.path, "r+b") as out:
         out.seek(offset)
         out.write(data)
@@ -216,11 +216,21 @@ def add_chunk(db: Session, f: OfficeFile, offset: int, data: bytes) -> OfficeFil
 
 def finish_upload(db: Session, f: OfficeFile) -> OfficeFile:
     if f.received != f.size:
-        raise OfficeAgentError("File poori nahi aayi. Upload dobara chalu karo, wahin se aage badhega.")
+        raise OfficeAgentError("The file didn't arrive completely. Start the upload again; it carries on from where it stopped.")
     try:
-        office.kind_of(f.path)
+        kind = office.kind_of(f.path)
+        if kind == "convert":
+            # old .xls / .ods / .xlsb: work on an .xlsx copy with the same sheets and values
+            new, notes = office.convert_to_xlsx(f.path)
+            _rm(f.path)
+            f.path = new
+            f.result = dumps({"task": "convert", **notes})
     except office.OfficeError as exc:
         f.status, f.error = "error", str(exc)
+        db.commit()
+        return f
+    except Exception:  # noqa: BLE001 - a broken file: say so plainly
+        f.status, f.error = "error", "This file couldn't be read. It may be damaged; try opening it in Excel and saving it again."
         db.commit()
         return f
     return _start(db, f, "scan", {})
@@ -237,6 +247,41 @@ def start_compare(db: Session, a: OfficeFile, b: OfficeFile, key: str = "") -> O
     if a.status not in ("ready", "error") or b.status not in ("ready", "error"):
         raise OfficeAgentError("Dono files ka upload aur check poora hone do.")
     return _start(db, a, "compare", {"other": b.id, "key": key})
+
+
+# ------------------------------------------------------------------ a Google Sheet by its link
+GSHEET_RE = re.compile(r"https?://docs\.google\.com/spreadsheets/d/([A-Za-z0-9_-]{20,})", re.I)
+GSHEET_MAX = 200 * 1024 * 1024
+
+
+def fetch_sheet(sheet_id: str) -> bytes:
+    """The Google Sheet as an .xlsx file. Works when it's shared as 'Anyone with the link'; Google sends a sign-in page
+    otherwise, which is said plainly."""
+    import urllib.request
+
+    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 GoalEngine"})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        data = resp.read(GSHEET_MAX + 1)
+    if len(data) > GSHEET_MAX:
+        raise OfficeAgentError("This Google Sheet is too big to fetch by link (over 200 MB). Download it as .xlsx and upload the file.")
+    if data[:2] != b"PK":
+        raise OfficeAgentError("I can't open this Google Sheet: it isn't shared. In the sheet, click Share, set General access to "
+                               "\"Anyone with the link\" (Viewer), and send the link again.")
+    return data
+
+
+def import_link(db: Session, agent: Agent, text: str) -> OfficeFile | None:
+    m = GSHEET_RE.search(text or "")
+    if not m:
+        return None
+    data = fetch_sheet(m.group(1))
+    f = start_upload(db, agent.visitor_id, agent.id, "Google Sheet.xlsx", len(data))
+    with open(f.path, "wb") as out:
+        out.write(data)
+    f.received, f.status = len(data), "uploaded"
+    db.commit()
+    return finish_upload(db, f)
 
 
 def _start(db: Session, f: OfficeFile, task: str, args: dict) -> OfficeFile:
@@ -906,6 +951,8 @@ def continue_turn(db: Session, goal: Goal, agent: Agent, text: str):
 
 
 def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) -> bool:
+    if GSHEET_RE.search(text or ""):
+        return True                                      # a Google Sheet link: the file to work on
     if relation in ("safety", "chit_chat"):
         return False
     return (held and not _outranked(text)) or wants_office(goal, text, db)
@@ -917,6 +964,21 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
 
     rec = officebrain.recognize(text)
     agent = goal_agent(db, goal) or create_agent(db, goal)
+    if GSHEET_RE.search(text or ""):
+        goal.title = goal.title or ("Google Sheet ka kaam" if turn.hi else "Google Sheet work")
+        goal.missing_info, goal.pending = "[]", None
+        try:
+            import_link(db, agent, text)
+        except OfficeAgentError as exc:
+            db.commit()
+            return str(exc), [], "agent_plan"
+        except Exception:  # noqa: BLE001 - network: say so
+            db.commit()
+            return ("I couldn't reach Google Sheets just now. Try the link again in a minute, or download it as .xlsx and upload it."
+                    ), [], "agent_plan"
+        db.commit()
+        return ("Google Sheet mil gayi. Padh raha hoon; card pe dikhega, phir kuch bhi poocho." if turn.hi else
+                "Got your Google Sheet. Reading it now; it shows on the card, then ask me anything about it."), [], "agent_plan"
     task_reply = chat_task(db, agent, text, turn.hi)
     inputs = loads(agent.inputs, {}) or {}
     describes_problem = rec.get("kind") != "issue" or bool(PROBLEM_WORDS.search(text or "") or SYMPTOM_WORDS.search(text or ""))

@@ -40,18 +40,64 @@ class OfficeError(Exception):
 
 
 # ------------------------------------------------------------------ reading
+CONVERT = (".xls", ".ods", ".xlsb")          # turned into .xlsx when they arrive
+
+
+def _head(path: str, n: int = 65536) -> bytes:
+    with open(path, "rb") as f:
+        return f.read(n)
+
+
+def is_protected(path: str) -> bool:
+    """A password-protected Excel file is an encrypted container, not a normal workbook."""
+    head = _head(path)
+    return head[:4] == b"\xd0\xcf\x11\xe0" and "EncryptionInfo".encode("utf-16-le") in head
+
+
 def kind_of(path: str) -> str:
     ext = os.path.splitext(path)[1].lower()
-    if ext in (".xlsx", ".xlsm"):
-        with open(path, "rb") as f:
-            if f.read(2) != b"PK":
-                raise OfficeError("This isn't a real .xlsx file (it may be a renamed CSV or old .xls).")
-        return "xlsx"
+    head = _head(path, 8)
+    if ext in (".xlsx", ".xlsm") or ext in CONVERT:
+        if is_protected(path):
+            raise OfficeError("This file has a password. Open it in Excel, remove the password (File > Info > Protect Workbook > "
+                              "Encrypt with Password, clear it), save, and upload it again.")
+        if ext in (".xlsx", ".xlsm") and head[:2] != b"PK":
+            if head[:4] == b"\xd0\xcf\x11\xe0":
+                return "convert"                  # an old .xls saved with a .xlsx name: convert it like one
+            raise OfficeError("This isn't a real Excel file (it may be a renamed CSV or another kind of file).")
+        return "convert" if ext in CONVERT else "xlsx"
     if ext in (".csv", ".txt"):
         return "csv"
-    if ext == ".xls":
-        raise OfficeError("Old .xls files: open it in Excel and Save As .xlsx, then upload again.")
-    raise OfficeError("Upload an Excel (.xlsx) or CSV file.")
+    raise OfficeError("Upload an Excel (.xlsx, .xls, .xlsm, .xlsb), OpenDocument (.ods) or CSV file.")
+
+
+def convert_to_xlsx(path: str) -> tuple[str, dict]:
+    """Old Excel (.xls), OpenDocument (.ods) and binary (.xlsb) -> a normal .xlsx with the same sheets and values.
+    Returns (new path, notes). Formulas come over as their results (those formats can't be rewritten safely)."""
+    from openpyxl import Workbook
+    from python_calamine import CalamineWorkbook
+
+    real = path
+    if os.path.splitext(path)[1].lower() in (".xlsx", ".xlsm") and _head(path, 4) == b"\xd0\xcf\x11\xe0":
+        real = os.path.splitext(path)[0] + ".as-xls.xls"     # an old .xls with a .xlsx name: read it as what it is
+        os.replace(path, real)
+    src = CalamineWorkbook.from_path(real)
+    out = os.path.splitext(path)[0] + ".converted.xlsx"
+    wb = Workbook(write_only=True)
+    sheets = 0
+    for name in src.sheet_names:
+        try:
+            rows = src.get_sheet_by_name(name).to_python(skip_empty_area=False)
+        except Exception:  # noqa: BLE001 - a chart sheet or an unreadable one: skip it, the rest still come over
+            continue
+        ws = wb.create_sheet(title=name[:31])
+        for r in rows:
+            ws.append([None if v == "" else v for v in r])
+        sheets += 1
+    wb.save(out)
+    if real != path and os.path.exists(real):
+        os.remove(real)
+    return out, {"converted_from": os.path.splitext(real)[1].lower(), "sheets": sheets}
 
 
 def _csv_rows(path: str):

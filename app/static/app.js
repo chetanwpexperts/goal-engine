@@ -1310,7 +1310,7 @@
     const box = el("section", "office");
     const out = el("div", "office-out");
     const pick = (label, multiple) => {
-      const inp = el("input"); inp.type = "file"; inp.accept = ".xlsx,.xlsm,.csv"; inp.hidden = true; inp.multiple = !!multiple;
+      const inp = el("input"); inp.type = "file"; inp.accept = ".xlsx,.xlsm,.xls,.xlsb,.ods,.csv,.txt"; inp.hidden = true; inp.multiple = !!multiple;
       const btn = el("button", "btn go", label); btn.type = "button";
       btn.addEventListener("click", () => inp.click());
       return [btn, inp];

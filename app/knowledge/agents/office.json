@@ -706,40 +706,51 @@
  "concepts": {
   "gender": {
    "words": [
-    "gender",
-    "sex",
-    "girls",
-    "girl",
-    "boys",
-    "boy",
-    "male",
-    "female",
-    "males",
-    "females",
-    "men",
-    "women",
-    "man",
-    "woman",
-    "ladies",
-    "lady",
-    "gents",
-    "ladki",
-    "ladkiyan",
-    "ladkiyaan",
-    "ladke",
-    "ladka",
-    "mahila",
-    "mahilaye",
-    "purush",
-    "aurat",
-    "aurtein",
     "aadmi",
-    "लड़की",
-    "लड़कियां",
-    "लड़के",
-    "लड़का",
+    "aurat",
+    "auraten",
+    "aurtein",
+    "aurton",
+    "boy",
+    "boys",
+    "female",
+    "females",
+    "gender",
+    "gents",
+    "gents log",
+    "girl",
+    "girls",
+    "ladake",
+    "ladakiyan",
+    "ladies",
+    "ladies log",
+    "ladka",
+    "ladke",
+    "ladki",
+    "ladkiyaan",
+    "ladkiyan",
+    "lady",
+    "mahila",
+    "mahilaayein",
+    "mahilaen",
+    "mahilaye",
+    "mahilayen",
+    "male",
+    "males",
+    "man",
+    "men",
+    "purush",
+    "purushon",
+    "sex",
+    "striyan",
+    "woman",
+    "women",
+    "पुरुष",
     "महिला",
-    "पुरुष"
+    "लड़का",
+    "लड़कियां",
+    "लड़की",
+    "लड़के"
    ],
    "headers": [
     "gender",
@@ -749,43 +760,53 @@
    ],
    "values": {
     "Female": [
-     "female",
+     "aurat",
+     "auraten",
+     "aurtein",
+     "aurton",
      "f",
+     "female",
+     "females",
      "girl",
      "girls",
+     "ladakiyan",
+     "ladies",
+     "ladki",
+     "ladkiyaan",
+     "ladkiyan",
+     "lady",
+     "mahila",
+     "mahilaayein",
+     "mahilaen",
+     "mahilaye",
+     "mahilayen",
+     "striyan",
+     "w",
      "woman",
      "women",
-     "ladies",
-     "lady",
-     "ladki",
-     "ladkiyan",
-     "ladkiyaan",
-     "mahila",
-     "mahilaye",
-     "aurat",
-     "aurtein",
-     "females",
-     "w",
-     "लड़की",
+     "महिला",
      "लड़कियां",
-     "महिला"
+     "लड़की"
     ],
     "Male": [
-     "male",
-     "m",
+     "aadmi",
      "boy",
      "boys",
-     "man",
-     "men",
      "gents",
+     "gents log",
+     "ladake",
      "ladka",
      "ladke",
-     "purush",
-     "aadmi",
+     "m",
+     "male",
      "males",
+     "man",
+     "men",
+     "purush",
+     "purushon",
+     "पुरुष",
      "लड़का",
-     "लड़के",
-     "पुरुष"
+     "लड़के"
     ]
    },
    "derive": "gender_from_names",
@@ -1213,5 +1234,183 @@
   "bhugatan": "payment",
   "bakaya": "pending",
   "nakad": "cash"
+ },
+ "column_synonyms": {
+  "doctor": [
+   "doctor",
+   "consultant",
+   "dr",
+   "physician",
+   "daktar"
+  ],
+  "category": [
+   "category",
+   "head",
+   "type",
+   "kind",
+   "group"
+  ],
+  "payment": [
+   "payment",
+   "paid",
+   "mode",
+   "pay"
+  ],
+  "route": [
+   "route",
+   "destination",
+   "from-to",
+   "to",
+   "city"
+  ],
+  "plan": [
+   "plan",
+   "package",
+   "membership",
+   "scheme",
+   "pack"
+  ],
+  "trainer": [
+   "trainer",
+   "coach",
+   "instructor"
+  ],
+  "designation": [
+   "designation",
+   "role",
+   "post",
+   "position",
+   "title",
+   "pad"
+  ],
+  "source": [
+   "source",
+   "channel",
+   "via",
+   "booked"
+  ],
+  "distance": [
+   "distance",
+   "km",
+   "kms",
+   "kilometer",
+   "kilometers",
+   "kilometre",
+   "kilometres"
+  ],
+  "guest": [
+   "guest",
+   "visitor",
+   "customer"
+  ],
+  "member": [
+   "member",
+   "members"
+  ],
+  "fee": [
+   "fee",
+   "fees",
+   "charges",
+   "paid",
+   "amount"
+  ],
+  "bill": [
+   "bill",
+   "amount",
+   "charges",
+   "fee"
+  ],
+  "freight": [
+   "freight",
+   "charges",
+   "bhada",
+   "bhaada"
+  ],
+  "room": [
+   "room",
+   "category",
+   "type"
+  ],
+  "class": [
+   "class",
+   "std",
+   "standard",
+   "grade",
+   "kaksha"
+  ],
+  "age": [
+   "age",
+   "yrs",
+   "years",
+   "umar",
+   "umr"
+  ],
+  "driver": [
+   "driver",
+   "chalak"
+  ],
+  "patient": [
+   "patient",
+   "patients",
+   "mareez",
+   "marij"
+  ],
+  "student": [
+   "student",
+   "students",
+   "bachche",
+   "bache",
+   "chhatra"
+  ],
+  "employee": [
+   "employee",
+   "employees",
+   "staff",
+   "emp"
+  ],
+  "status": [
+   "status",
+   "state",
+   "sthiti"
+  ],
+  "date": [
+   "date",
+   "dated",
+   "on",
+   "tarikh"
+  ],
+  "section": [
+   "section",
+   "sec",
+   "division",
+   "div"
+  ],
+  "city": [
+   "city",
+   "town",
+   "village",
+   "gaon",
+   "shehar",
+   "shahar",
+   "location",
+   "place",
+   "area",
+   "district"
+  ],
+  "amount": [
+   "amount",
+   "amt",
+   "amnt",
+   "rs",
+   "rupees",
+   "value",
+   "total"
+  ],
+  "spent": [
+   "spent",
+   "paid",
+   "kharch",
+   "kharcha"
+  ]
  }
 }

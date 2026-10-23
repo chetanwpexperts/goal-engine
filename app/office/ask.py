@@ -42,6 +42,19 @@ SYNONYMS = {
     "nights": {"nights", "night", "stay", "stays", "duration", "days stayed"},
     "rating": {"rating", "ratings", "rated", "stars", "star"},
 }
+def _pack_synonyms():
+    """More ways people name columns, from the Excel agent's pack (so they grow without code changes)."""
+    try:
+        from app.mind import packs
+
+        for k, ws in packs.get("office").get("column_synonyms", {}).items():
+            SYNONYMS.setdefault(k, set()).update(ws)
+            SYNONYMS[k].add(k)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+_pack_synonyms()
 STOP = {"the", "a", "an", "of", "in", "on", "for", "to", "me", "mein", "mai", "ka", "ki", "ke", "ko", "se", "hai", "hain", "kya", "kitna",
         "kitne", "kitni", "batao", "bata", "do", "de", "dena", "chahiye", "karo", "kar", "is", "are", "what", "show", "give", "please", "pls",
         "and", "or", "aur", "sheet", "sheets", "data", "file", "excel", "wise", "har", "per", "each", "by", "total", "sum", "count",
@@ -84,14 +97,18 @@ def _col_score(h: str, words: list[str]) -> float:
     hw = _header_words(h)
     if not hw:
         return 0.0
-    hit = 0.0
+    hit, syn_hit = 0.0, False
     for x in hw:
-        syn = next((s for s in SYNONYMS.values() if x in s), {x})
+        syns = [s for s in SYNONYMS.values() if x in s]
         if any(w == x or (len(w) >= 4 and _close(w, [x])) for w in words):
             hit += 1
-        elif any(w in syn for w in words):
+        elif any(w in s for s in syns for w in words):
             hit += 0.6                                    # "sales" ~ "amount": weaker than the real word
-    return hit / len(hw) + (0.01 * hit)
+            syn_hit = True
+    score = hit / len(hw) + (0.01 * hit)
+    if syn_hit and score < 0.52 and len(hw) <= 3:
+        score = 0.52                                      # 'doctor' for 'Consultant', 'category' for 'Expense Head'
+    return score
 
 
 def pick_sheet(text: str, tables: list[Table]) -> Table | None:
@@ -144,6 +161,11 @@ NO_CHANGE = re.compile(r"\bbefore (mak\w*|doing|any|you make)\b.{0,12}\bchang|\b
 
 def columns_in(text: str, t: Table, kinds=None) -> list[tuple[int, float]]:
     words = [w for w in tokens(text) if (w not in STOP or w in ("total", "sales", "net")) and w not in ROW_WORDS]
+    if "total" in words and len(words) > 1:
+        # 'total quantity': 'total' says add up, it isn't the column called Total, unless nothing else is named
+        rest = [w for w in words if w != "total"]
+        if any(h and _col_score(h, rest) >= 0.5 for i, h in enumerate(t.header) if not kinds or t.kind(i) in kinds):
+            words = rest
     out = []
     for i, h in enumerate(t.header):
         if not h or (kinds and t.kind(i) not in kinds):
@@ -175,7 +197,8 @@ def values_in(text: str, t: Table, skip_cols=()) -> list[tuple[int, str]]:
         for low, orig in vals.items():
             if len(low) < 3:
                 continue
-            if (" " in low and low in raw) or any(w == low or (len(w) >= 5 and _close(w, [low], 0.85)) for w in words):
+            if ((" " in low or "-" in low or "&" in low) and re.search(rf"(?<![\w]){re.escape(low)}(?![\w])", raw)) or \
+                    any(w == low or (len(w) >= 5 and _close(w, [low], 0.85)) for w in words):
                 found.append((i, orig))
         for low, orig in vals.items():                    # "IT", "HR": short values only when written in capitals
             if len(low) == 2 and re.search(rf"\b{re.escape(orig.upper())}\b", text or ""):
@@ -186,7 +209,9 @@ def values_in(text: str, t: Table, skip_cols=()) -> list[tuple[int, str]]:
         if i in skip_cols or not h or t.kind(i) != "text" or any(c == i for c, _ in found):
             continue
         vals = {str(v).strip() for v in t.col(i)[:5000] if v not in (None, "")}
-        if vals and {v.lower() for v in vals} <= YES | NO and _col_score(h, words) >= 0.5:
+        own = [w for w in words if w in set(_header_words(h)) and not any(
+            j != i and hh and _col_score(hh, [w]) >= 0.5 for j, hh in enumerate(t.header))]
+        if vals and {v.lower() for v in vals} <= YES | NO and own and _col_score(h, own) >= 0.5:
             neg = re.search(r"\b(not|nahi|nahin|bina|unapproved|unpaid|pending)\b", raw)
             pick = next((v for v in vals if v.lower() in (NO if neg else YES)), None)
             if pick:
@@ -373,7 +398,12 @@ def _short_values(text: str, t: Table, taken) -> list:
                 break
         if len(cells) > 60:
             continue
-        for w in _header_words(h):
+        names = set(_header_words(h))
+        for x in list(names):
+            for syn in SYNONYMS.values():
+                if x in syn:
+                    names |= {s for s in syn if " " not in s}
+        for w in names:
             if len(w) < 3:
                 continue
             m = re.search(rf"\b{re.escape(w)}\w*\s+([A-Za-z0-9]{{1,4}})\b", low, re.I)
@@ -475,7 +505,7 @@ def _understand_en(text: str, tables: list[Table]) -> dict:
     if show:
         return show
     named = named_sheet(text, tables) or pick_sheet(text, tables)
-    for concept, vals in U.mentioned(text).items():
+    for concept, vals in U.mentioned(text, tables).items():
         c = U._concepts()[concept]
         has_values = bool(c.get("values"))
         found = U.column_for(concept, [named] if named else tables) or (U.column_for(concept, tables) if named else None)
@@ -519,6 +549,9 @@ def _plan_show(text, tables):
     if not SHOW_RE.search(text or ""):
         return None
     t = named_sheet(text, tables) or pick_sheet(text, tables)
+    if t is None and len(tables) == 1 and re.search(r"\b(data|sheet|file|all|sab|poora|puri|everything)\b|" + re.escape(tables[0].name.lower()),
+                                                    (text or "").lower()):
+        t = tables[0]
     if t is None:
         return None
     rest = _without_sheet_name(text, t)
@@ -650,6 +683,43 @@ def _filled_filters(text: str, t: Table, taken) -> list:
     return out
 
 
+def _group_col(text: str, t: Table, filters):
+    """'doctor wise', 'by section', 'paid by ke hisaab se', 'room type wise': the column to group by, or None.
+    'with paid by Ramesh' is a value of a column, not grouping."""
+    from app.office import understand as U
+
+    gr = U.roles(t)
+    low = text or ""
+    taken_vals = {str(v).lower() for _, v in filters if isinstance(v, str)}
+    best = None
+    for m in GROUP_RE.finditer(low):
+        gword = next(g for g in m.groups() if g)
+        if gword.lower() in taken_vals:
+            continue
+        pos = low.lower().find(gword.lower(), m.start())
+        before = re.search(r"(\w+)\s*$", low[:pos])
+        tries = ([f"{before.group(1)} {gword}"] if before else []) + [gword]
+        for words in tries:
+            ws = [w for w in words.lower().split() if w not in ("by", "per", "each", "har", "ke", "wise", "of", "the")] or words.lower().split()
+            cands = [(sc, i) for i, h in enumerate(t.header) if h and (t.kind(i) == "text" or gr.get(i) == "category")
+                     and gr.get(i) not in ("name", "id") and (sc := _col_score(h, ws)) >= 0.5]
+            exact_elsewhere = any(set(ws) & set(_header_words(h)) for h in t.header if h)
+            if exact_elsewhere:
+                # a word that is literally another column's name ('net' -> Net Sales) isn't a synonym for this one
+                cands = [(sc, i) for sc, i in cands if set(ws) & set(_header_words(t.header[i]))]
+            if not cands:
+                continue
+            sc, i = max(cands)
+            after = low[m.end():m.end() + 40].strip().lower()
+            vals = {str(v).strip().lower() for v in t.col(i)[:3000] if v not in (None, "")}
+            if any(after.startswith(v) for v in vals if v):
+                break                                      # 'paid by Ramesh': that's a filter
+            if best is None or sc > best[0]:
+                best = (sc, i)
+            break
+    return best[1] if best else None
+
+
 def _plan_order(text, t: Table, filters):
     """'who joined most recently', 'latest 5 orders', 'oldest patient': rows ordered by a date (or by age for people)."""
     rec, old = RECENT_RE.search(text or ""), OLDEST_RE.search(text or "")
@@ -742,17 +812,7 @@ def _plan_question(text, tables) -> dict:
     filters += _short_values(text, t, {i for i, _ in filters})
     filters += cmp_f + date_f
     filters += _filled_filters(text, t, {i for i, _ in filters})
-    group = None
-    m = GROUP_RE.search(text or "")
-    if m:
-        gword = next(g for g in m.groups() if g)
-        from app.office import understand as U
-
-        gr = U.roles(t)
-        for i, h in enumerate(t.header):
-            if h and (t.kind(i) == "text" or gr.get(i) == "category") and _col_score(h, [gword.lower()]) >= 0.5:
-                group = i
-                break
+    group = _group_col(text, t, filters)
     month_text = text or ""
     for i, _ in num_cols:                                  # "Monthly Salary" is a column, not "month-wise"
         month_text = re.sub(re.escape(t.header[i]), " ", month_text, flags=re.I)
@@ -765,9 +825,12 @@ def _plan_question(text, tables) -> dict:
         msr = num_cols[0][0] if num_cols else None
         return {"job": "pivot", "table": t.name, "rows": group, "cols": other, "measure": msr,
                 "agg": "count" if msr is None else (_agg_of(text) if _agg_of(text) in ("sum", "avg", "count") else "sum"), "filters": filters}
+    for i, v in filters:                                  # 'Monthly ka total fee': Monthly is a plan here, not month-wise
+        if isinstance(v, str) and MONTH_RE.search(v):
+            month_text = re.sub(re.escape(v), " ", month_text, flags=re.I)
     if group is None and MONTH_RE.search(month_text) and date_cols:
         group = ("month", (columns_in(text, t, {"date"}) or [(date_cols[0], 1)])[0][0])
-    if group is None and agg and txt_cols and re.search(r"\b(wise|har|per|each|by|hisaab|according)\b", text or "", re.I):
+    if group is None and agg and txt_cols and re.search(r"\b(wise|har|per|each|hisaab|according)\b", text or "", re.I):
         group = txt_cols[0][0]
     if group is not None and not isinstance(group, tuple):
         vals = [v for v in t.col(group) if v not in (None, "")]
@@ -822,7 +885,11 @@ def _plan_question(text, tables) -> dict:
             derive, measure = d, len(t.header)             # 'total sales' with Qty and a unit price: Qty x price
     best = BEST_RE.search(text or "")
     if group is None and best and agg in (None, "max", "min"):
-        gcol = next((i for i, sc in columns_in(best.group(1), t, {"text"}) if sc >= 0.5), None)
+        from app.office import understand as U
+
+        _gr = U.roles(t)
+        gcol = next((i for i, sc in columns_in(best.group(1), t, {"text"}) if sc >= 0.5 and _gr.get(i) == "category"
+                     and not any(sc2 >= sc for _, sc2 in columns_in(best.group(1), t, {"number"}))), None)
         if gcol is not None:
             rated = re.search(r"\brated|rating|stars\b", text or "", re.I)
             rcol = next((i for i in _num_cols_of(t) if re.search(r"rating|stars|score", t.header[i], re.I)), None) if rated else None
@@ -855,8 +922,8 @@ def _plan_question(text, tables) -> dict:
             agg = "max"
         elif filters or re.search(r"\b(list|dikhao|show|kaun|kaunse|which|jinka|jinki|wale|wali)\b", text or "", re.I):
             return {"job": "list", "table": t.name, "filters": filters, "measure": measure, "topn": topn}
-        elif group is not None and measure is not None:
-            agg = "sum"
+        elif group is not None and measure is not None and num_cols and num_cols[0][1] >= 1:
+            agg = "sum"                                    # 'region wise sales amount': that column, added up
         elif group is not None:
             agg = "count"                                  # 'doctor wise patients', 'month wise bookings': count per group
         else:
@@ -1058,7 +1125,13 @@ def _fmt(n):
 
 
 def _label(t: Table):
-    """The column that names a row: a filled 'Name' column, else first + last name, else the first text column."""
+    """The column that names a row: a filled 'Name' column, else first + last name, else people's names by their
+    values ('Guest', 'Driver'), else the first text column."""
+    from app.office import understand as U
+
+    people = [i for i, role in U.roles(t).items() if role == "name" and not re.search(r"estimated|\(from ", t.header[i], re.I)]
+    if people and not any(re.search(r"name", t.header[i] or "", re.I) for i in people):
+        return people[0]
     names = [i for i, h in enumerate(t.header) if h and re.search(r"name", h, re.I) and t.kind(i) == "text"
              and not re.search(r"estimated|\(from ", h, re.I)]          # a worked-out column isn't a person's name
     first = next((i for i in names if re.search(r"first", t.header[i], re.I)), None)

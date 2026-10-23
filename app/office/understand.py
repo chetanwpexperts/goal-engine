@@ -96,8 +96,9 @@ def roles(t: Table) -> dict[int, str]:
             out[i] = "phone"
         elif sv and {v.lower() for v in sv} <= {"yes", "no", "y", "n", "true", "false", "haan", "nahi", "done", "pending"} and distinct <= 2:
             out[i] = "yesno"
-        elif any(w in hl for w in name_words) or re.search(r"\bname\b", hl):
-            out[i] = "name"
+        elif (any(w in hl for w in name_words) or re.search(r"\bname\b", hl) or _looks_like_people(sv, ratio)) and not (
+                n >= 8 and ratio < 0.3 and distinct <= 40):
+            out[i] = "name"                                 # (a 'Dr Name' / 'Party Name' with a few repeating values is a category)
         elif ID_RE.search(h) and ratio > 0.9:
             out[i] = "id"
         elif (_hdr_words(h) & cat_words) or (sv and 2 <= distinct <= min(40, max(2, int(0.5 * len(sv)))) and n >= 4):
@@ -106,6 +107,15 @@ def roles(t: Table) -> dict[int, str]:
             out[i] = "text"
     t._roles = out
     return out
+
+
+def _looks_like_people(sv, ratio) -> bool:
+    """A 'Guest' or 'Driver' column full of 'Aditi Sharma', 'Rohan Gill': people's names, whatever the heading says."""
+    if not sv or ratio < 0.25:
+        return False
+    female, male, either = _names()
+    known = sum(1 for v in sv[:500] if _first_word(v) in female or _first_word(v) in male or _first_word(v) in either)
+    return known >= 0.5 * min(len(sv), 500)
 
 
 def categories(t: Table) -> list[tuple[int, str]]:
@@ -289,13 +299,22 @@ def _concepts() -> dict:
     return concepts()
 
 
-def mentioned(text: str) -> dict[str, set[str]]:
-    """{concept: the values named, e.g. {'Female'} for 'how many girls'} for every everyday thing the question names."""
+def mentioned(text: str, tables=None) -> dict[str, set[str]]:
+    """{concept: the values named, e.g. {'Female'} for 'how many girls'} for every everyday thing the question names.
+    A word that is a value in the file ('Salary' as an expense head) is that value, not the concept."""
     out = {}
     low = text or ""
+    cells = set()
+    for t in tables or []:
+        for i, role in roles(t).items():
+            if role == "category":
+                cells |= {str(v).strip().lower() for v in t.col(i)[:3000] if isinstance(v, str)}
     for name, c in concepts().items():
         rx = _words_rx(c.get("words", []))
-        if not rx or not rx.search(low):
+        if not rx:
+            continue
+        hits = [m.group(0).lower() for m in rx.finditer(low)]
+        if not hits or all(h in cells for h in hits):
             continue
         vals = set()
         for canon, variants in (c.get("values") or {}).items():

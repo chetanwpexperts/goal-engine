@@ -74,7 +74,7 @@ def _load_tables(path: str) -> list[Table]:
     if office.kind_of(path) == "csv":
         rows = list(office._csv_rows(path))
         header = [str(h).strip() for h in rows[0]] if rows else []
-        data = [[office.text_number(v) if office.text_number(v) is not None else v for v in r] for r in rows[1:MAX_ROWS + 1]]
+        data = _without_totals([[_value(v) for v in r] for r in rows[1:MAX_ROWS + 1] if any(x not in (None, "") for x in r)])
         return [Table("CSV", header, data, 1, len(rows) - 1 > MAX_ROWS)]
     big = __import__("os").path.getsize(path) > office.FULL_MODE_MAX
     wb_v = load_workbook(path, read_only=True, data_only=True)
@@ -105,9 +105,60 @@ def _load_tables(path: str) -> list[Table]:
                     if v is None and isinstance(f, str) and f.startswith("="):
                         row[c_i] = ev.cell(name, r_i, c_i)
             if any(v not in (None, "") for v in row):
-                rows.append([office.text_number(v) if office.text_number(v) is not None else v for v in row])
+                rows.append([_value(v) for v in row])
+        rows = _without_totals(rows)
         tables.append(Table(name, header, rows[:MAX_ROWS], h + 1, len(rows) > MAX_ROWS))
     return tables
+
+
+# ------------------------------------------------------------------ real-world mess: dates as text, a Total row at the end
+_DATE_TEXT = [re.compile(r"^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$"), re.compile(r"^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$"),
+              re.compile(r"^(\d{1,2})[-\s/]([A-Za-z]{3,9})[-\s/,]*(\d{4})$")]
+_MONTHS = {m: i + 1 for i, m in enumerate(["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"])}
+TOTAL_WORDS = re.compile(r"^\s*(grand\s+)?(total|totals|sub\s*-?\s*total|sum|net total|kul|jod|योग|कुल)\s*:?\s*$", re.I)
+
+
+def date_text(v):
+    """'05-03-2026', '2026/03/05', '5 Mar 2026' -> a date (day first, as written in India); None if it isn't one."""
+    if not isinstance(v, str):
+        return None
+    s = v.strip()
+    try:
+        m = _DATE_TEXT[0].match(s)
+        if m:
+            d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if mo > 12 and d <= 12:
+                d, mo = mo, d                          # written month-first
+            return datetime(y, mo, d)
+        m = _DATE_TEXT[1].match(s)
+        if m:
+            return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        m = _DATE_TEXT[2].match(s)
+        if m and m.group(2)[:3].lower() in _MONTHS:
+            return datetime(int(m.group(3)), _MONTHS[m.group(2)[:3].lower()], int(m.group(1)))
+    except ValueError:
+        return None
+    return None
+
+
+def _value(v):
+    n = office.text_number(v)
+    if n is not None:
+        return n
+    d = date_text(v)
+    return d if d is not None else v
+
+
+def _without_totals(rows):
+    """Drop 'Total' / 'Grand Total' rows at the end: they're sums of the rows above, not data."""
+    while rows:
+        last = rows[-1]
+        texts = [v for v in last if isinstance(v, str) and v.strip()]
+        if texts and any(TOTAL_WORDS.match(t) for t in texts) and len(texts) <= 2:
+            rows = rows[:-1]
+            continue
+        break
+    return rows
 
 
 # ------------------------------------------------------------------ a small, safe formula evaluator

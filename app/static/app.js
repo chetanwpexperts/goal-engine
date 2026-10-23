@@ -1145,7 +1145,7 @@
 
   function barChart(rows, title, line, highlight) {
     const box = el("div", "ans-chart");
-    box.append(el("p", "ans-chart-title", title));
+    box.append(el("p", "ans-chart-title", title ? title.charAt(0).toUpperCase() + title.slice(1) : ""));
     const nums = rows.map((r) => Number(r[1]) || 0);
     const max = Math.max(1, ...nums.map(Math.abs));
     if (line && rows.length > 1) {
@@ -1191,11 +1191,16 @@
     let title = T(hi, "File ki jaanch", "File check");
     let text = total ? T(hi, `${fmtN(total)} galtiyan hain. Neeche asli cells aur unka theek kiya hua roop dekho.`, `${fmtN(total)} problems. Below are the actual cells and what each fix will make of them.`)
       : T(hi, "Is file mein koi galti nahi hai.", "No problems in this file.");
-    if (r.task === "ask") { title = r.value != null ? T(hi, "Jawab", "Answer") : (r.chart && r.chart.title) || T(hi, "Jawab", "Answer"); text = r.say; }
+    if (r.task === "ask") {
+      title = r.value != null ? T(hi, "Jawab", "Answer") : (r.chart && r.chart.title) || T(hi, "Jawab", "Answer");
+      title = title.charAt(0).toUpperCase() + title.slice(1);
+      text = r.say;
+    }
     else if (r.task === "fix") { title = T(hi, "Theek kar diya", "Fixed"); text = T(hi, `Pehle ${fmtN(totalBefore)} galtiyan thi, ab ${fmtN(total)}.`, `${fmtN(totalBefore)} problems before, ${fmtN(total)} now.`); }
     else if (r.task === "extract") { title = T(hi, "Duplicates ki list", "Duplicates listed"); text = T(hi, `${fmtN(r.count)} duplicate nayi sheet mein. Data nahi badla.`, `${fmtN(r.count)} duplicates listed in a new sheet. Your data wasn't changed.`); }
     else if (r.task === "compare") { title = T(hi, "Dono files ka milan", "Files compared"); text = T(hi, `${fmtN(r.only_in_a)} sirf pehli mein, ${fmtN(r.only_in_b)} sirf doosri mein, ${fmtN(r.changed_rows)} rows badli.`, `${fmtN(r.only_in_a)} only in the first, ${fmtN(r.only_in_b)} only in the second, ${fmtN(r.changed_rows)} rows changed.`); }
     const ot = el("div"); ot.append(el("h3", null, title), el("p", null, text));
+    if (r.task === "ask" && r.estimate) ot.append(el("span", "ans-estimate", T(hi, "Andaza: file mein ye column nahi tha", "Estimate: worked out, not in the file")));
     overview.append(ic, ot);
     if (r.formula && (r.task !== "ask" || r.show_formula)) overview.append(el("code", "ans-formula", r.formula));
 

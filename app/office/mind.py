@@ -42,24 +42,14 @@ AMOUNT_RE = re.compile(r"amount|total|net|sales|salary|price|value|fee|revenue|b
 
 
 def roles(t: Table) -> dict:
-    cats, nums, dates = [], [], []
-    n = len(t.rows)
-    for i, h in enumerate(t.header):
-        if not h:
-            continue
-        kind = t.kind(i)
-        if kind == "date":
-            dates.append(i)
-        elif kind == "number" and not ID_RE.search(h):
-            nums.append(i)
-        elif kind == "text":
-            vals = [str(v).strip() for v in t.col(i)[:5000] if v not in (None, "")]
-            d = len(set(v.lower() for v in vals))
-            if vals and 2 <= d <= min(25, max(2, int(0.6 * len(vals)))) and n >= 4:
-                cats.append((i, Counter(vals).most_common(1)[0][0]))
+    """Categories (real groupings, never names or IDs), number columns people add up, dates: from the file understanding."""
+    from app.office import understand as U
+
+    r = U.roles(t)
+    nums = [i for i, role in r.items() if role in ("amount", "quantity")]
     # what people add up: totals and amounts first; a unit price or rate summed down a column means little
-    nums.sort(key=lambda i: (0 if TOTAL_RE.search(t.header[i]) else 1 if MONEY_RE.search(t.header[i]) else 2 if AMOUNT_RE.search(t.header[i]) else 3, i))
-    return {"cats": cats, "nums": nums, "dates": dates}
+    nums.sort(key=lambda i: (0 if TOTAL_RE.search(t.header[i]) else 1 if MONEY_RE.search(t.header[i]) else 2 if r[i] == "amount" else 3, i))
+    return {"cats": U.categories(t), "nums": nums, "dates": [i for i, role in r.items() if role == "date"]}
 
 
 def _focus(tables: list[Table], plan: dict | None) -> Table | None:
@@ -116,8 +106,8 @@ def _check(kind: str, text: str, tables: list[Table], t: Table) -> bool:
 def _prefer_from(plan: dict | None, t: Table) -> dict:
     """Keep the person's own focus: the same column, the same value they just asked about."""
     out = {}
-    if not plan or plan.get("table") != t.name:
-        return out
+    if not plan or plan.get("table") != t.name or plan.get("derive"):
+        return out                                    # a worked-out column isn't in the file: suggest from the real ones
     if plan.get("measure") is not None and t.kind(plan["measure"]) == "number":
         out["m"] = plan["measure"]
     g = plan.get("group")

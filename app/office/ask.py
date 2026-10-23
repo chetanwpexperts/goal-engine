@@ -39,6 +39,8 @@ SYNONYMS = {
     "invoice": {"invoice", "bill"},
     "tax": {"tax", "gst"},
     "discount": {"discount", "chhoot", "off"},
+    "nights": {"nights", "night", "stay", "stays", "duration", "days stayed"},
+    "rating": {"rating", "ratings", "rated", "stars", "star"},
 }
 STOP = {"the", "a", "an", "of", "in", "on", "for", "to", "me", "mein", "mai", "ka", "ki", "ke", "ko", "se", "hai", "hain", "kya", "kitna",
         "kitne", "kitni", "batao", "bata", "do", "de", "dena", "chahiye", "karo", "kar", "is", "are", "what", "show", "give", "please", "pls",
@@ -212,6 +214,196 @@ def _number_filters(text, t, num_cols):
     return out
 
 
+
+# ------------------------------------------------------------------ the analyst's basics: conditions, dates, the main amount
+_NUM = r"\d[\d,]*(?:\.\d+)?"
+CMP_RE = re.compile(
+    r"(?P<op>more than|greater than|bigger than|higher than|above|over|exceeding|exceeds|at least|atleast|minimum of|older than|"
+    r"younger than|less than|lower than|fewer than|smaller than|below|under|at most|atmost|upto|up to|not more than|maximum of)\s*"
+    r"(?:rs\.?|₹|inr)?\s*(?P<n>" + _NUM + r")\s*(?P<unit>%|k\b|lakh|lac|years?|yrs?|saal|sal|days?|din)?"
+    r"|(?P<sym>>=|<=|>|<)\s*(?P<n2>" + _NUM + r")"
+    r"|(?P<n3>" + _NUM + r")\s*(?P<unit3>%|k\b|lakh|lac|years?|yrs?|saal|sal|days?|din)?\s*(?:se|say|sey)\s*(?P<op3>zyada|jyada|jada|upar|adhik|kam|neeche|niche|kum)",
+    re.I)
+_OPWORD = {"more than": "gt", "greater than": "gt", "bigger than": "gt", "higher than": "gt", "above": "gt", "over": "gt", "exceeding": "gt",
+           "exceeds": "gt", "older than": "gt", "at least": "ge", "atleast": "ge", "minimum of": "ge", "younger than": "lt", "less than": "lt",
+           "lower than": "lt", "fewer than": "lt", "smaller than": "lt", "below": "lt", "under": "lt", "at most": "le", "atmost": "le",
+           "upto": "le", "up to": "le", "not more than": "le", "maximum of": "le",
+           "zyada": "gt", "jyada": "gt", "jada": "gt", "upar": "gt", "adhik": "gt", "kam": "lt", "neeche": "lt", "niche": "lt", "kum": "lt",
+           ">": "gt", ">=": "ge", "<": "lt", "<=": "le"}
+YEAR_RE = re.compile(r"(?:\b(?:in|of|during|year|saal|for|mein|me|se)\s+)?\b((?:19|20)\d{2})\b(?!\s*(?:se|-|to))", re.I)
+MONTH_NAME_RE = re.compile(r"\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|(?:in|of|during)\s+may|may\s+(?:19|20)\d{2}|jun(?:e)?|jul(?:y)?|"
+                           r"aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b(?![- ]?wise)(?:\s+((?:19|20)\d{2}))?", re.I)
+RECENT_RE = re.compile(r"\b(most recent(?:ly)?|recently|latest|newest|last (?:joined|added|one|entry|order|booking|visit)|sabse (?:naya|nayi|naye|latest)|"
+                       r"youngest)\b", re.I)
+OLDEST_RE = re.compile(r"\b(oldest|earliest|first (?:joined|one|entry|order|booking)|sabse (?:purana|purani|purane)|senior ?most|longest serving|eldest)\b", re.I)
+MONEY_WORDS = re.compile(r"\b(sales|sale|revenue|turnover|income|earnings?|business|bikri|kamai|collection|takings|kitne ka|kitne ki)\b", re.I)
+BEST_RE = re.compile(r"\b(?:best|top|biggest|highest|most valuable|worst|lowest|weakest)\s+(?:rated\s+|selling\s+|performing\s+)?(?!\d)(\w+(?:\s+\w+)?)", re.I)
+
+
+def _scale(n: float, unit: str | None) -> float:
+    u = (unit or "").lower()
+    return n * 1000 if u == "k" else n * 100000 if u in ("lakh", "lac") else n
+
+
+def _num_cols_of(t: Table) -> list[int]:
+    from app.office import understand as U
+
+    r = U.roles(t)
+    return [i for i in range(len(t.header)) if t.header[i] and t.kind(i) == "number" and r.get(i, "amount") != "id"]
+
+
+def _nearest_col(text: str, pos: int, t: Table, cols: list[int]) -> int | None:
+    low = (text or "").lower()
+    best, dist = None, 10 ** 9
+    for i in cols:
+        for w in _header_words(t.header[i]):
+            if len(w) < 3:
+                continue
+            for m in re.finditer(rf"\b{re.escape(w)}\w*", low):
+                d = abs(m.start() - pos)
+                if d < dist:
+                    best, dist = i, d
+    return best if dist <= 45 else None
+
+
+def _by_magnitude(n: float, t: Table, cols: list[int]) -> int | None:
+    """'patients above 60': the number column whose usual values are like 60 (Age, not Bill Amount)."""
+    import math
+    import statistics
+
+    best, score = None, 9.0
+    for i in cols:
+        vals = [v for v in t.col(i)[:5000] if isinstance(v, (int, float)) and not isinstance(v, bool)]
+        if len(vals) < 3:
+            continue
+        lo, hi, med = min(vals), max(vals), statistics.median(vals)
+        if not (lo * 0.5 - 1 <= n <= hi * 1.5 + 1) or med <= 0 or n <= 0:
+            continue
+        d = abs(math.log10(n) - math.log10(med))
+        if d < score:
+            best, score = i, d
+    return best if score < 0.8 else None
+
+
+def _compare_filters(text: str, t: Table):
+    """'more than 5 years', 'above 60', '50k se zyada', '> 1000' -> (column, ('cmp', op, n)); and the text without them."""
+    out, spans = [], []
+    cols = _num_cols_of(t)
+    for m in CMP_RE.finditer(text or ""):
+        if m.group("n") is not None:
+            op, n, unit = _OPWORD[m.group("op").lower()], m.group("n"), m.group("unit")
+        elif m.group("n2") is not None:
+            op, n, unit = _OPWORD[m.group("sym")], m.group("n2"), None
+        else:
+            op, n, unit = _OPWORD[m.group("op3").lower()], m.group("n3"), m.group("unit3")
+        val = _scale(float(n.replace(",", "")), unit)
+        col = _nearest_col(text, m.start(), t, cols)
+        if col is None and (unit or "").lower().startswith(("year", "yr", "saal")):
+            col = next((i for i in reversed(cols) if re.search(r"age|years|experience|tenure|saal", t.header[i], re.I)), None)
+        if col is None and m.group("op") and m.group("op").lower() in ("older than", "younger than"):
+            col = next((i for i in reversed(cols) if re.search(r"\bage\b|umar", t.header[i], re.I)), None)
+        if col is None:
+            col = _by_magnitude(val, t, cols)
+        if col is None:
+            continue
+        if unit == "%" and val > 1 and all(abs(v) <= 1 for v in t.col(col)[:200] if isinstance(v, (int, float))):
+            val = val / 100
+        out.append((col, ("cmp", op, int(val) if float(val).is_integer() else val)))
+        spans.append(m.span())
+    for a, b in reversed(spans):
+        text = text[:a] + " " + text[b:]
+    return out, text
+
+
+def _date_cols(t: Table) -> list[int]:
+    return [i for i in range(len(t.header)) if t.header[i] and t.kind(i) == "date"]
+
+
+def _pick_date_col(text: str, t: Table, pos: int | None = None) -> int | None:
+    dc = _date_cols(t)
+    if not dc:
+        return None
+    if pos is not None:
+        near = _nearest_col(text, pos, t, dc)
+        if near is not None:
+            return near
+    low = (text or "").lower()
+    for i in dc:
+        if any(len(w) >= 4 and re.search(rf"\b{re.escape(w[:4])}", low) for w in _header_words(t.header[i])):
+            return i
+    return dc[0]
+
+
+def _date_filters(text: str, t: Table):
+    out, spans = [], []
+    if not _date_cols(t):
+        return out, text
+    for m in MONTH_NAME_RE.finditer(text or ""):
+        word = re.sub(r"^(in|of|during)\s+|\s+(19|20)\d{2}$", "", m.group(1).lower())
+        mon = next((k + 1 for k, name in enumerate(MONTHS) if name.startswith(word[:3])), None)
+        col = _pick_date_col(text, t, m.start())
+        yr = m.group(2) or (re.search(r"(?:19|20)\d{2}", m.group(1)) or [None])[0]
+        if mon and col is not None:
+            out.append((col, ("month", mon, int(yr) if yr else None)))
+            spans.append(m.span())
+    if not any(v[0] == "month" for _, v in out):
+        for m in YEAR_RE.finditer(text or ""):
+            col = _pick_date_col(text, t, m.start())
+            yr = int(m.group(1))
+            if col is not None and not any(isinstance(v, (int, float)) and v == yr for v in t.col(col)[:50]):
+                out.append((col, ("year", yr)))
+                spans.append(m.span())
+    for a, b in reversed(spans):
+        text = text[:a] + " " + text[b:]
+    return out, text
+
+
+def _short_values(text: str, t: Table, taken) -> list:
+    """'class 8', 'section A', 'room 2': a column's name followed by a short value of that column."""
+    out = []
+    low = text or ""
+    for i, h in enumerate(t.header):
+        if not h or i in taken or t.kind(i) == "date":
+            continue
+        cells = {}
+        for v in t.col(i)[:5000]:
+            if v not in (None, ""):
+                cells.setdefault(str(v).strip().lower(), v)
+            if len(cells) > 60:
+                break
+        if len(cells) > 60:
+            continue
+        for w in _header_words(h):
+            if len(w) < 3:
+                continue
+            m = re.search(rf"\b{re.escape(w)}\w*\s+([A-Za-z0-9]{{1,4}})\b", low, re.I)
+            if m and m.group(1).lower() in cells:
+                v = cells[m.group(1).lower()]
+                out.append((i, v if isinstance(v, (int, float)) else str(v).strip()))
+                break
+    return out
+
+
+def main_amount(t: Table):
+    """The column a person means by 'sales', 'total', 'top bills': (column, derive-or-None).
+    A unit price with a quantity next to it means quantity x price (worked out)."""
+    from app.office import understand as U
+
+    r = U.roles(t)
+    nums = [i for i in _num_cols_of(t) if r.get(i) in ("amount", None)]
+    if not nums:
+        return None, None
+    tot = [i for i in nums if re.search(r"amount|total|net|value|revenue|bill|fee|paid|salary|sales\b|sale\b|income", t.header[i], re.I)
+           and not re.search(r"price|rate|cost|%", t.header[i], re.I)]
+    if tot:
+        return max(tot, key=lambda i: (bool(re.search(r"net|total", t.header[i], re.I)), -i)), None
+    price = [i for i in nums if re.search(r"selling|sale|price|rate|mrp", t.header[i], re.I) and not re.search(r"cost|purchase|buy", t.header[i], re.I)]
+    qty = [i for i, role in r.items() if role == "quantity"]
+    if price and qty:
+        return price[0], {"how": "line_total", "table": t.name, "arg": price[0]}
+    return nums[0], None
+
+
 def _agg_of(text: str) -> str | None:
     low = " " + (text or "").lower() + " "
     ws = set(tokens(text))
@@ -254,7 +446,118 @@ JOBS = [
 ]
 
 
+SHOW_RE = re.compile(r"\b(give me|show me|show|open|display|send me|de do|dedo|dikhao|dikha do|dikhado|chahiye|bhejo|view|see)\b|दिखाओ|दो\b", re.I)
+
+
 def understand(text: str, tables: list[Table]) -> dict:
+    """What the question asks, read against what the file really has. Hindi script is read in Roman letters
+    (the way the file's headings are matched), with the Excel pack's word list for common Hindi words."""
+    if re.search(r"[\u0900-\u097f]", text or ""):
+        from app.mind import packs
+        from app.ml.normalize import transliterate
+
+        words = packs.get("office").get("romanised_words", {})
+        roman = " ".join(words.get(w, w) for w in re.findall(r"[\w%.]+", transliterate(text).lower()))
+        try:
+            return _understand_en(roman, tables)
+        except NeedMore:
+            return _understand_en(text, tables)
+    return _understand_en(text, tables)
+
+
+def _understand_en(text: str, tables: list[Table]) -> dict:
+    """What the question asks, read against what the file really has (app.office.understand)."""
+    from app.office import understand as U
+
+    if not tables:
+        raise NeedMore("Is file mein padhne layak koi sheet nahi mili.", "No readable sheet in this file.")
+    show = _plan_show(text, tables)
+    if show:
+        return show
+    named = named_sheet(text, tables) or pick_sheet(text, tables)
+    for concept, vals in U.mentioned(text).items():
+        c = U._concepts()[concept]
+        has_values = bool(c.get("values"))
+        found = U.column_for(concept, [named] if named else tables) or (U.column_for(concept, tables) if named else None)
+        if found and has_values:
+            return _concept_plan(text, tables, found[0], found[1], concept, vals)
+        if found:
+            continue                                   # e.g. 'salary' and the file has a salary column: the usual reading
+        # the question names a real column ('average science marks'): the concept word just describes it
+        plain = _swap_words(text, c.get("words", []), " ")
+        if not has_values and any(sc >= 1 for t in ([named] if named else tables) for i, sc in columns_in(plain, t, {"number"})
+                                  if not re.search(r"\b(id|no|code)\b", t.header[i], re.I)):
+            return _understand_core(plain, tables)
+        how = c.get("derive")
+        cands = [t for t in tables if how and U.can_derive(how, t)]
+        if cands:
+            t = named if named in cands else max(cands, key=lambda x: len(x.rows))
+            t2, info = U.derive(how, t)
+            tables2 = [t2 if x is t else x for x in tables]
+            if has_values:
+                plan = _concept_plan(text, tables2, t2, len(t.header), concept, vals)
+            else:
+                # 'kitna munafa hua' -> the worked-out column by its own name
+                said = re.sub(r"\bolder than\b", f"{info['header']} more than", text, flags=re.I)
+                said = re.sub(r"\byounger than\b", f"{info['header']} less than", said, flags=re.I)
+                said = _swap_words(said, c.get("words", []), info["header"])
+                plan = _understand_core(said, [t2])
+            plan["derive"] = {"how": how, "table": t.name}
+            return plan
+        raise U.missing_message(concept, tables)
+    return _understand_core(text, tables)
+
+
+def _swap_words(text: str, words, by: str) -> str:
+    for w in sorted(words, key=len, reverse=True):
+        text = re.sub(rf"(?<![\w]){re.escape(w)}(?![\w])", by, text or "", flags=re.I)
+    return text
+
+
+def _plan_show(text, tables):
+    """'give me employee data', 'Sales Data dikhao': that sheet itself."""
+    if not SHOW_RE.search(text or ""):
+        return None
+    t = named_sheet(text, tables) or pick_sheet(text, tables)
+    if t is None:
+        return None
+    rest = _without_sheet_name(text, t)
+    if _agg_of(rest) or ROWS_Q.search(rest) or GROUP_RE.search(rest) or values_in(rest, t) or TOPN_RE.search(rest) or \
+            any(sc >= 1 for _, sc in columns_in(rest, t)):
+        return None
+    return {"job": "show", "table": t.name}
+
+
+def _concept_plan(text, tables, t, col, concept, vals):
+    """'how many girls and how many boys' -> count by the gender column; 'average salary of women' -> filter on it."""
+    from app.office import understand as U
+
+    c = U._concepts()[concept]
+    stripped = text or ""
+    for w in sorted(c.get("words", []) + [v for vs in c.get("values", {}).values() for v in vs if len(v) > 1], key=len, reverse=True):
+        stripped = re.sub(rf"(?<![\w]){re.escape(w)}(?![\w])", " ", stripped, flags=re.I)
+    agg = _agg_of(stripped) or "count"
+    nums = columns_in(stripped, t, {"number"})
+    measure = nums[0][0] if nums and agg != "count" else None
+    if agg in ("sum", "avg", "max", "min") and measure is None:
+        agg = "count"
+    cmp_f, stripped = _compare_filters(stripped, t)
+    date_f, stripped = _date_filters(stripped, t)
+    filters = [(i, v) for i, v in values_in(stripped, t) if i != col]
+    filters += [f for f in _short_values(stripped, t, {i for i, _ in filters} | {col})] + cmp_f + date_f
+    group = None
+    if len(vals) == 1:
+        canon = next(iter(vals))
+        cells = U.cell_values(t, col, concept, canon) or [canon]
+        filters.append((col, cells[0]))
+    else:
+        group = col                                     # both named, or 'gender wise': count every value
+    if group is None and re.search(r"\b(list|show|names?|who|kaun|kaunse|dikhao|which)\b", stripped, re.I) and not _agg_of(stripped):
+        return {"job": "list", "table": t.name, "filters": filters, "measure": None, "topn": None}    # 'list of girls in class 8'
+    return {"job": "aggregate", "table": t.name, "agg": agg, "measure": measure, "group": group, "filters": filters, "topn": None}
+
+
+def _understand_core(text: str, tables: list[Table]) -> dict:
     if not tables:
         raise NeedMore("Is file mein padhne layak koi sheet nahi mili.", "No readable sheet in this file.")
     for job, rx in JOBS:
@@ -305,6 +608,14 @@ def _choose_table(text, tables, need_kinds=None) -> Table:
     data = [t for t in tables if len(t.rows) >= 3]
     if len(data) == 1:
         return data[0]
+    if RECENT_RE.search(text or "") or OLDEST_RE.search(text or "") or YEAR_RE.search(text or "") or MONTH_NAME_RE.search(text or ""):
+        # 'who joined most recently': the sheet whose date column is the one meant ('join' -> Joining Date)
+        low = (text or "").lower()
+        hits = [t for t in data if any(any(len(w) >= 4 and re.search(rf"\b{re.escape(w[:4])}", low) for w in _header_words(t.header[i]))
+                                       for i in _date_cols(t))]
+        pool = hits or [t for t in data if _date_cols(t)]
+        if len(pool) == 1 or (pool and len(hits) >= 1):
+            return max(pool, key=lambda t: len(t.rows))
     raise NeedMore("Kis sheet mein dekhun?", "Which sheet should I look in?", [t.name for t in data][:8])
 
 
@@ -314,6 +625,46 @@ def _without_sheet_name(text, t):
         if w not in ("data",):
             text = re.sub(rf"\b{re.escape(w)}\w*(\s+(data|sheet|tab))?\b", " ", text, flags=re.I)
     return re.sub(r"\b(sheet|tab|worksheet)s?\b", " ", text, flags=re.I)
+
+
+HAVE_RE = re.compile(r"\b(have|has|having|got|with|filled)\b|\b(hai|hain|bhara|bhari|diya|di hai)\s*[?.!]*\s*$", re.I)
+NOT_HAVE_RE = re.compile(r"\b(without|missing|nahi hai|nahi diya|nahi bhara|bina|blank|empty|khaali|khali)\b|\bno\s+\w+\s*$", re.I)
+
+
+def _filled_filters(text: str, t: Table, taken) -> list:
+    """'how many have a mobile number', 'kitne logon ka email hai' -> rows where it's filled in; 'without email' -> empty."""
+    from app.office import understand as U
+
+    out = []
+    if not HAVE_RE.search(text or "") and not NOT_HAVE_RE.search(text or ""):
+        return out
+    low = (text or "").lower()
+    for i, role in U.roles(t).items():
+        if i in taken or role not in ("phone", "email", "text", "name"):
+            continue
+        words = [w for w in _header_words(t.header[i]) if len(w) >= 4 and w not in ("name", "naam")]
+        if role in ("name", "text") and not re.search(r"\b(name|naam)\b", t.header[i], re.I):
+            continue
+        if words and any(re.search(rf"\b(have|has|having|got|with|without|no|ka|ki|ke)\s+(an?\s+|the\s+)?{re.escape(w)}", low) for w in words):
+            out.append((i, ("blank",) if NOT_HAVE_RE.search(text or "") else ("filled",)))
+    return out
+
+
+def _plan_order(text, t: Table, filters):
+    """'who joined most recently', 'latest 5 orders', 'oldest patient': rows ordered by a date (or by age for people)."""
+    rec, old = RECENT_RE.search(text or ""), OLDEST_RE.search(text or "")
+    if not (rec or old):
+        return None
+    topn = TOPN_RE.search(text or "")
+    n = int(next(g for g in topn.groups() if g)) if topn else (int(m.group(1)) if (m := re.search(r"\b(\d{1,3})\b", text or "")) else 1)
+    age = next((i for i in _num_cols_of(t) if re.search(r"\bage\b|umar", t.header[i], re.I)), None)
+    word = (rec or old).group(1).lower()
+    if age is not None and word in ("oldest", "eldest", "youngest"):
+        return {"job": "list", "table": t.name, "filters": filters, "measure": age, "topn": n, "order": "asc" if word == "youngest" else "desc"}
+    col = _pick_date_col(text, t, (rec or old).start())
+    if col is None:
+        return None
+    return {"job": "list", "table": t.name, "filters": filters, "measure": col, "topn": n, "order": "desc" if rec else "asc"}
 
 
 def _plan_rows(text, tables):
@@ -351,7 +702,12 @@ def _run_sheets(p, tables, wb, hi, n):
             "chart": {"title": "Har sheet mein records" if hi else "Records in each sheet", "rows": [[t.name, len(t.rows)] for t in ts]}}
 
 
+_ALL_TABLES = __import__("contextvars").ContextVar("all_tables", default=None)
+
+
 def _plan_question(text, tables) -> dict:
+    if len(tables) > 1 or _ALL_TABLES.get() is None:
+        _ALL_TABLES.set(tables)
     sheets_plan = _plan_sheets(text, tables)
     if sheets_plan:
         return sheets_plan
@@ -359,7 +715,9 @@ def _plan_question(text, tables) -> dict:
     if rows_plan:
         return rows_plan
     agg = _agg_of(text)
-    if agg is None and not pick_sheet(text, tables) and not any(columns_in(text, t) or values_in(text, t) for t in tables):
+    if agg is None and not pick_sheet(text, tables) and not MONEY_WORDS.search(text or "") and not MONTH_RE.search(text or "") \
+            and not RECENT_RE.search(text or "") and not OLDEST_RE.search(text or "") and not CMP_RE.search(text or "") \
+            and not any(columns_in(text, t) or values_in(text, t) for t in tables):
         # nothing in the question points at this file: say so plainly, don't ask which sheet
         names = ", ".join(t.name for t in tables if len(t.rows) >= 2)
         raise NeedMore(f"Ye poori tarah samajh nahi aaya. Is file mein ye sheets hain: {names}. Sheet ya column ke naam ke saath likho, jaise: "
@@ -369,16 +727,30 @@ def _plan_question(text, tables) -> dict:
     t = _choose_table(text, tables)
     if named_sheet(text, tables) is t:
         text = _without_sheet_name(text, t)
-    num_cols = columns_in(text, t, {"number"})
+    cmp_f, text = _compare_filters(text, t)                # 'above 60', '50k se zyada'
+    date_f, text = _date_filters(text, t)                  # 'in 2024', 'march mein'
+    special = _plan_order(text, t, cmp_f + date_f)
+    if special:
+        return special
+    from app.office import understand as U
+
+    _r = U.roles(t)
+    num_cols = [(i, sc) for i, sc in columns_in(text, t, {"number"}) if _r.get(i) not in ("id", "phone", "category")]
     txt_cols = columns_in(text, t, {"text"})
     date_cols = [i for i in range(len(t.header)) if t.kind(i) == "date"]
     filters = values_in(text, t)
+    filters += _short_values(text, t, {i for i, _ in filters})
+    filters += cmp_f + date_f
+    filters += _filled_filters(text, t, {i for i, _ in filters})
     group = None
     m = GROUP_RE.search(text or "")
     if m:
         gword = next(g for g in m.groups() if g)
+        from app.office import understand as U
+
+        gr = U.roles(t)
         for i, h in enumerate(t.header):
-            if h and t.kind(i) == "text" and _col_score(h, [gword.lower()]) >= 0.5:
+            if h and (t.kind(i) == "text" or gr.get(i) == "category") and _col_score(h, [gword.lower()]) >= 0.5:
                 group = i
                 break
     month_text = text or ""
@@ -402,6 +774,13 @@ def _plan_question(text, tables) -> dict:
         if vals and len({str(v).strip().lower() for v in vals}) > 0.95 * len(vals):
             group = None                                   # "top 5 orders": each order is its own row, so rank rows
     filters = [(i, v) for i, v in filters if i != group] + _number_filters(text, t, num_cols)
+    seen_f, uniq = set(), []
+    for f in filters:
+        key = (f[0], str(f[1]).lower())
+        if key not in seen_f:
+            seen_f.add(key)
+            uniq.append(f)
+    filters = uniq
     num_cols = [(i, sc) for i, sc in num_cols if i not in [f for f, _ in filters]]
     if group is not None and not isinstance(group, tuple) and re.search(r"\bby\s+\w+", text or "", re.I) and \
             any(i == group for i, _ in num_cols):
@@ -418,7 +797,8 @@ def _plan_question(text, tables) -> dict:
             strong = named + [i for i in strong if i not in named]
         msr = num_cols[0][0] if num_cols else None
         if msr is None and strong and wm:
-            sold = set(tokens(text)) & {"bika", "bike", "biki", "sold", "becha", "units", "pieces", "quantity", "qty"}
+            sold = set(tokens(text)) & {"bika", "bike", "biki", "sold", "becha", "units", "pieces", "quantity", "qty", "sells", "sell", "selling",
+                                        "bikta", "bikti", "bikte", "demand"}
             pat = r"qty|quantity|units" if sold else r"amount|total|net|sales|value"
             msr = next((i for i in range(len(t.header)) if t.kind(i) == "number" and re.search(pat, t.header[i], re.I)), None)
         if strong and wm and msr is not None:
@@ -427,6 +807,44 @@ def _plan_question(text, tables) -> dict:
     topn = TOPN_RE.search(text or "")
     topn = int(next(g for g in topn.groups() if g)) if topn else None
     measure = num_cols[0][0] if num_cols else None
+    derive = None
+    if agg == "count" and num_cols and num_cols[0][1] >= 1 and not re.search(r"\b(records?|rows?|entries|people|log|employees|students|patients|"
+                                                                               r"customers|orders|bills|bookings|invoices|times|baar)\b", text or "", re.I):
+        agg = "sum"                                        # 'how many nights in total', 'kitne rooms hain': add the column up
+    if measure is None and (MONEY_WORDS.search(text or "") or (agg in ("sum", "max", "min") or topn) and agg != "avg"):
+        if MONEY_WORDS.search(text or "") or agg in ("sum", "max", "min") or topn:
+            m_col, derive = main_amount(t)
+            if m_col is not None and (MONEY_WORDS.search(text or "") or agg in ("sum", "max", "min") or topn):
+                measure = m_col if not derive else len(t.header)
+    elif measure is not None and agg in ("sum", None) and re.search(r"price|rate|mrp", t.header[measure], re.I):
+        m_col, d = main_amount(t)
+        if d is not None and d["arg"] == measure:
+            derive, measure = d, len(t.header)             # 'total sales' with Qty and a unit price: Qty x price
+    best = BEST_RE.search(text or "")
+    if group is None and best and agg in (None, "max", "min"):
+        gcol = next((i for i, sc in columns_in(best.group(1), t, {"text"}) if sc >= 0.5), None)
+        if gcol is not None:
+            rated = re.search(r"\brated|rating|stars\b", text or "", re.I)
+            rcol = next((i for i in _num_cols_of(t) if re.search(r"rating|stars|score", t.header[i], re.I)), None) if rated else None
+            if rated and rcol is None and not getattr(t, "_tried_rated", False):
+                for other in _ALL_TABLES.get() or []:
+                    if other is not t and any(re.search(r"rating|stars|score", h or "", re.I) for h in other.header) and \
+                            any(sc >= 0.5 for _, sc in columns_in(best.group(1), other, {"text"})):
+                        other._tried_rated = True
+                        try:
+                            return _plan_question(text, [other])
+                        finally:
+                            other._tried_rated = False
+            msr = rcol if rcol is not None else measure
+            if msr is None:
+                msr, derive = main_amount(t)
+                msr = msr if not derive else len(t.header)
+            worst = re.search(r"\b(worst|lowest|weakest)\b", text or "", re.I)
+            plan = {"job": "aggregate", "table": t.name, "agg": "avg" if rcol is not None else ("sum" if msr is not None else "count"),
+                    "measure": msr, "group": gcol, "filters": filters, "topn": 3, "ranked": "min" if worst else "max"}
+            if derive and msr == len(t.header):
+                plan["derive"] = derive
+            return plan
     sold = set(tokens(text)) & {"bika", "bike", "biki", "sold", "becha", "units", "pieces", "nag"}
     if agg == "count" and sold:
         qty = next((i for i in range(len(t.header)) if t.kind(i) == "number" and re.search(r"qty|quantity|units", t.header[i], re.I)), None)
@@ -439,6 +857,8 @@ def _plan_question(text, tables) -> dict:
             return {"job": "list", "table": t.name, "filters": filters, "measure": measure, "topn": topn}
         elif group is not None and measure is not None:
             agg = "sum"
+        elif group is not None:
+            agg = "count"                                  # 'doctor wise patients', 'month wise bookings': count per group
         else:
             cols = ", ".join(h for h in t.header if h)
             raise NeedMore(f"Ye poori tarah samajh nahi aaya. {t.name} ke columns: {cols}. Inke naam ke saath likho, jaise: "
@@ -452,13 +872,19 @@ def _plan_question(text, tables) -> dict:
             measure = cands[0]
         elif len(amountish) == 1 or (amountish and agg == "sum"):
             measure = amountish[-1] if agg == "sum" else amountish[0]
+        if measure is None and agg != "avg":
+            m_col, derive = main_amount(t)
+            measure = None if m_col is None else (m_col if not derive else len(t.header))
         if measure is None:
             raise NeedMore(f"{t.name} mein kis column ka {_AGG_HI[agg]} chahiye?", f"Which column in {t.name} should I {_AGG_EN[agg]}?",
                            [t.header[i] for i in cands][:8])
-    return {"job": "aggregate", "table": t.name, "agg": agg, "measure": measure, "group": group, "filters": filters, "topn": topn}
+    plan = {"job": "aggregate", "table": t.name, "agg": agg, "measure": measure, "group": group, "filters": filters, "topn": topn}
+    if derive and measure == len(t.header):
+        plan["derive"] = derive
+    return plan
 
 
-_AGG_HI = {"sum": "total", "avg": "average", "max": "sabse zyada", "min": "sabse kam", "count": "ginti"}
+_AGG_HI = {"sum": "total", "avg": "average", "max": "sabse zyada", "min": "sabse kam", "count": "kitne"}
 _AGG_EN = {"sum": "total", "avg": "average", "max": "find the highest of", "min": "find the lowest of", "count": "count"}
 
 
@@ -572,30 +998,69 @@ def _num(v):
 def _match_filters(row, filters):
     def ok(i, v):
         x = row[i] if i < len(row) else None
+        if isinstance(v, (list, tuple)) and v and v[0] in ("filled", "blank"):
+            empty = x is None or (isinstance(x, str) and not x.strip())
+            return empty if v[0] == "blank" else not empty
+        if isinstance(v, (list, tuple)) and v and v[0] in ("cmp", "year", "month"):
+            if v[0] == "year":
+                return isinstance(x, (datetime, date)) and x.year == v[1]
+            if v[0] == "month":
+                return isinstance(x, (datetime, date)) and x.month == v[1] and (len(v) < 3 or v[2] is None or x.year == v[2])
+            op, n = v[1], v[2]
+            if not isinstance(x, (int, float)) or isinstance(x, bool):
+                return False
+            return {"gt": x > n, "ge": x >= n, "lt": x < n, "le": x <= n}[op]
         if isinstance(v, (int, float)):
             return isinstance(x, (int, float)) and abs(x - v) < 1e-9
-        return isinstance(x, str) and x.strip().lower() == v.lower()
+        return isinstance(x, str) and x.strip().lower() == str(v).lower()
     return all(ok(i, v) for i, v in filters)
+
+
+OPS = {"gt": ">", "ge": ">=", "lt": "<", "le": "<="}
+MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
+
+
+def _fdesc(t: Table, filters) -> str:
+    out = []
+    for i, v in filters:
+        h = t.header[i] if i < len(t.header) else "?"
+        if isinstance(v, (list, tuple)) and v and v[0] == "cmp":
+            out.append(f"{h} {OPS[v[1]]} {_fmt(v[2])}")
+        elif isinstance(v, (list, tuple)) and v and v[0] == "year":
+            out.append(f"{h} in {v[1]}")
+        elif isinstance(v, (list, tuple)) and v and v[0] in ("filled", "blank"):
+            out.append(f"{h} {'filled in' if v[0] == 'filled' else 'empty'}")
+        elif isinstance(v, (list, tuple)) and v and v[0] == "month":
+            out.append(f"{h} in {MONTHS[v[1] - 1].title()}" + (f" {v[2]}" if len(v) > 2 and v[2] else ""))
+        else:
+            out.append(f"{h} = {v}")
+    return ", ".join(out)
 
 
 def _fmt(n):
     if n is None:
         return "-"
+    frac, neg = "", False
     if isinstance(n, float) and not n.is_integer():
-        n = round(n, 2)
+        neg = n < 0
+        whole, _, dec = f"{abs(round(n, 2)):.2f}".partition(".")
+        dec = dec.rstrip("0")
+        frac = f".{dec}" if dec else ""
+        n = -int(whole) if neg else int(whole)
     if isinstance(n, float):
-        n = int(n)
+        n = int(round(n))
     s = str(abs(n))
     if isinstance(n, int) and len(s) > 3:                 # Indian grouping: 12,34,567
         head, tail = s[:-3], s[-3:]
         head = ",".join(re.findall(r"\d{1,2}(?=(?:\d{2})*$)", head))
         s = f"{head},{tail}"
-    return ("-" if n < 0 else "") + s
+    return ("-" if n < 0 or neg else "") + s + frac
 
 
 def _label(t: Table):
     """The column that names a row: a filled 'Name' column, else first + last name, else the first text column."""
-    names = [i for i, h in enumerate(t.header) if h and re.search(r"name", h, re.I) and t.kind(i) == "text"]
+    names = [i for i, h in enumerate(t.header) if h and re.search(r"name", h, re.I) and t.kind(i) == "text"
+             and not re.search(r"estimated|\(from ", h, re.I)]          # a worked-out column isn't a person's name
     first = next((i for i in names if re.search(r"first", t.header[i], re.I)), None)
     last = next((i for i in names if re.search(r"last|sur", t.header[i], re.I)), None)
     full = [i for i in names if i not in (first, last)]
@@ -613,15 +1078,35 @@ def _name(t, r, label) -> str:
 
 
 def _crit(t: Table, filters):
-    return "".join(f',{t.ref(i)},{v}' if isinstance(v, (int, float)) else f',{t.ref(i)},"{v}"' for i, v in filters)
+    out = []
+    for i, v in filters:
+        if isinstance(v, (list, tuple)) and v and v[0] == "cmp":
+            out.append(f',{t.ref(i)},"{OPS[v[1]]}{v[2]}"')
+        elif isinstance(v, (list, tuple)) and v and v[0] == "year":
+            out.append(f',{t.ref(i)},">="&DATE({v[1]},1,1),{t.ref(i)},"<="&DATE({v[1]},12,31)')
+        elif isinstance(v, (list, tuple)) and v and v[0] in ("filled", "blank"):
+            out.append(f',{t.ref(i)},"{"<>" if v[0] == "filled" else ""}"')
+        elif isinstance(v, (list, tuple)):
+            continue
+        else:
+            out.append(f',{t.ref(i)},{v}' if isinstance(v, (int, float)) else f',{t.ref(i)},"{v}"')
+    return "".join(out)
 
 
 def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:
     """Do the plan on a copy of the file (new sheet / new column / colours). Returns {'say', 'formula', 'sheet'}."""
     tables = {t.name: t for t in load_tables(path)}
+    info = None
+    if plan.get("derive"):
+        from app.office import understand as U
+
+        d = plan["derive"]
+        tables[d["table"]], info = U.derive(d["how"], tables[d["table"]], d.get("arg"))
+        plan = {**plan, "readonly": True}               # an estimate: shown, not written into their file
     job = plan["job"]
-    answer_only = job in ("rows", "sheets", "describe", "review") or (
-        job == "aggregate" and plan.get("group") is None and plan.get("agg") not in ("max", "min"))
+    answer_only = job in ("rows", "sheets", "describe", "review", "show") or (
+        job == "aggregate" and plan.get("group") is None and plan.get("agg") not in ("max", "min")) or (
+        job == "list" and plan.get("topn") and plan["topn"] <= 10)        # a few rows: the answer, not a new sheet
     if plan.get("readonly") and job in ("aggregate", "list", "describe", "rows", "pivot", "growth", "running", "missing", "variance", "aging", "review"):
         answer_only = True                                 # "before making changes, tell me...": answer only, the file stays as it is
     # a single number or a description adds nothing to the file: don't open, rewrite or save the workbook for it
@@ -629,6 +1114,8 @@ def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:
                                    if path.lower().endswith((".xlsx", ".xlsm")) else None)
     plan = {**plan, "_path": path}
     res = globals()[f"_run_{job}"](plan, tables, wb, hi, n)
+    if info is not None:
+        res = {**res, **_derived_note(info, hi, res)}
     if wb is not None:
         wb.calculation.fullCalcOnLoad = True
         wb.save(out)
@@ -668,6 +1155,30 @@ def _run_rows(p, tables, wb, hi, n):
             "chart": {"title": "Records in each sheet" if not hi else "Har sheet mein records", "rows": chart_rows}}
 
 
+def _derived_note(info: dict, hi: bool, res: dict) -> dict:
+    """Say it's derived, from what, and which rows couldn't be told."""
+    unclear = info.get("unclear") or []
+    if info["how"] == "gender_from_names":
+        head = (f"Is file mein gender ka column nahi hai, isliye ye '{info['from']}' ke naamon se andaza hai. " if hi else
+                f"This file has no gender column, so this is estimated from the names in '{info['from']}'. ")
+        tail = ""
+        if unclear:
+            shown = ", ".join(unclear[:8]) + (" …" if len(unclear) > 8 else "")
+            tail = (f" {len(unclear)} naamon se pata nahi chala ({shown}); unhe 'Unclear' mein rakha." if hi else
+                    f" {len(unclear)} names couldn't be told ({shown}); they're counted as 'Unclear'.")
+        return {"say": head + res["say"] + "." + tail, "estimate": True, "unclear": unclear[:50]}
+    head = (f"Ye '{info['from']}' se nikala: " if hi else f"Worked out from '{info['from']}': ")
+    return {"say": head + res["say"], "estimate": True}
+
+
+def _run_show(p, tables, wb, hi, n):
+    t = tables[p["table"]]
+    cols = ", ".join(h for h in t.header if h)
+    say = (f"{t.name}: {_fmt(len(t.rows))} records, columns: {cols}" if hi else f"{t.name}: {_fmt(len(t.rows))} records. Columns: {cols}")
+    return {"say": say, "formula": "", "sheet": None, "value": len(t.rows), "value_label": "records", "where": t.name,
+            "sample": _sample(t, t.rows, 20)}
+
+
 def _answer_sheet(wb, n, title):
     name = f"Answer {n} - {title}"[:31]
     name = re.sub(r"[\[\]:*?/\\]", "", name)
@@ -692,8 +1203,8 @@ def _run_aggregate(p, tables, wb, hi, n):
     t = tables[p["table"]]
     agg, m, g, filters, topn = p["agg"], p["measure"], p["group"], p["filters"], p["topn"]
     rows = [r for r in t.rows if _match_filters(r, filters)]
-    mname = t.header[m] if m is not None and agg != "count" else "rows"
-    fdesc = ", ".join(f"{t.header[i]} = {v}" for i, v in filters)
+    mname = t.header[m] if m is not None and agg != "count" else "records"
+    fdesc = _fdesc(t, filters)
 
     def calc(vals):
         nums = [x for x in (_num(v) for v in vals) if x is not None]
@@ -741,7 +1252,7 @@ def _run_aggregate(p, tables, wb, hi, n):
                 rows_c = sorted(((k, calc([x[m] for x in v] if m is not None else v)) for k, v in per.items()), key=lambda x: -(x[1] or 0))
                 chart = {"title": f"{'Records' if agg == 'count' else _AGG_EN[agg].split()[-1].title() + ' ' + mname} by {t.header[fi]}",
                          "rows": [[k, v or 0] for k, v in rows_c[:12]], "highlight": str(fv)}
-        what = f"{_AGG_HI[agg]} {mname}" if hi else f"{_AGG_EN[agg]} {mname}".replace("count rows", "records")
+        what = f"{_AGG_HI[agg]} {mname}" if hi else f"{_AGG_EN[agg]} {mname}".replace("count rows", "records").replace("total Total", "Total")
         say = f"{t.name}{' (' + fdesc + ')' if fdesc else ''}: {what} = {_fmt(val)}"
         if agg == "count":
             say = f"{t.name}{' (' + fdesc + ')' if fdesc else ''}: {_fmt(val)} records"
@@ -805,19 +1316,31 @@ def _run_list(p, tables, wb, hi, n):
     t = tables[p["table"]]
     rows = [r for r in t.rows if _match_filters(r, p["filters"])]
     if p.get("measure") is not None and p.get("topn"):
-        rows = sorted([r for r in rows if _num(r[p["measure"]]) is not None], key=lambda r: -r[p["measure"]])[: p["topn"]]
-    fdesc = ", ".join(f"{t.header[i]} = {v}" for i, v in p["filters"]) or ("sab" if hi else "all")
+        mi = p["measure"]
+        ok = [r for r in rows if mi < len(r) and (_num(r[mi]) is not None or isinstance(r[mi], (datetime, date)))]
+        rows = sorted(ok, key=lambda r: r[mi], reverse=p.get("order", "desc") == "desc")[: p["topn"]]
+    fdesc = _fdesc(t, p["filters"]) or ("sab" if hi else "all")
     span = f"{t.ref(0)[:t.ref(0).index('!') + 1]}A{t.header_row + 1}:{get_column_letter(len(t.header))}{t.header_row + len(t.rows)}"
     cond = "*".join(f'({t.ref(i)}="{v}")' for i, v in p["filters"]) or "TRUE"
     formula = f"=FILTER({span},{cond})"
     sname = None
     if wb is not None:
-        ws, sname = _answer_sheet(wb, n, "List " + (", ".join(str(v) for _, v in p["filters"]) or t.name))
+        ws, sname = _answer_sheet(wb, n, "List " + (_fdesc(t, p["filters"]) or t.name))
         _write_table(ws, t.header, rows, formula)
     label = _label(t)
-    names = ", ".join(_name(t, r, label) for r in rows[:10])
+    mi = p.get("measure")
+    if mi is not None and p.get("topn"):
+        # ordered: say the value it was ordered by ('Aman Verma (12-10-2025)')
+        names = ", ".join(f"{_name(t, r, label)} ({_cell(r[mi]) if not isinstance(r[mi], (int, float)) else _fmt(r[mi])})" for r in rows[:10])
+    else:
+        names = ", ".join(_name(t, r, label) for r in rows[:10])
     say = (f"{t.name} ({fdesc}): {len(rows)} rows. {names}{' …' if len(rows) > 10 else ''}" if hi else
            f"{t.name} ({fdesc}): {len(rows)} rows. {names}{' …' if len(rows) > 10 else ''}")
+    if mi is not None and p.get("order"):
+        by = t.header[mi]
+        first = "sabse naya" if hi and p["order"] == "desc" else "sabse purana" if hi else "latest" if p["order"] == "desc" else "earliest"
+        where = f" ({fdesc})" if p["filters"] else ""
+        say = f"{t.name}{where}, {first} by {by}: {names}"
     return {"say": say, "formula": formula, "sheet": sname, "value": len(rows), "value_label": "rows", "where": f"{t.name} ({fdesc})",
             "sample": _sample(t, rows)}
 
@@ -924,7 +1447,7 @@ def _run_highlight(p, tables, wb, hi, n):
     if "filters" in p:
         cond = "AND(" + ",".join(f'${get_column_letter(i + 1)}{first}="{v}"' for i, v in p["filters"]) + ")"
         hits = sum(1 for r in t.rows if _match_filters(r, p["filters"]))
-        what = ", ".join(f"{t.header[i]} = {v}" for i, v in p["filters"])
+        what = _fdesc(t, p["filters"])
     else:
         L = f"${get_column_letter(p['left'] + 1)}{first}"
         R = f"${get_column_letter(p['right_col'] + 1)}{first}" if "right_col" in p else _fmt(p["right_val"]).replace(",", "")

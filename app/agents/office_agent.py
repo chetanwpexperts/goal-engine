@@ -730,8 +730,22 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
         text = f"{pending} {text}"                        # the answer to "which sheet / which column?"
     tables = load_tables(f.path)
     m["tables"] = tables
+    from app.office import understand as U
+
     try:
         plan = asker.understand(text, tables)
+    except U.Missing as miss:
+        # not in this file and can't be worked out from it: say so plainly, with what it does have
+        agent.inputs = dumps(inputs)
+        db.commit()
+        mind.set_pattern("missing", None)
+        try:
+            from app import learning
+
+            learning.ask_to_learn(db, "office", text, guess="not in file: " + miss.concept)
+        except ValueError:
+            pass
+        return miss.hi if hi else miss.en
     except asker.NeedMore as need:
         inputs["pending_q"] = text
         agent.inputs = dumps(inputs)
@@ -765,7 +779,7 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
         except asker.NeedMore:
             pass
     # the same question again after an answer: don't repeat that answer; offer the other readings
-    if (sig.get("repeat") or sig.get("frustrated")) and last_plan and mo._same(plan, last_plan):
+    if (sig.get("repeat") or sig.get("frustrated")) and last_plan and mo._same(plan, last_plan) and not plan.get("derive"):
         alts = mo.other_readings(text, tables, plan, hi)
         try:                                       # the last answer missed: this sentence goes to the learning list
             from app import learning
@@ -784,7 +798,7 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
         plan["readonly"] = True                            # "before making changes, tell me...": answer only
     show_fx = bool(sig.get("wants_formula") or (prof.get("formula") is True and not sig.get("no_formula")) or re.search(
         r"\b(in excel|excel mein|excel me)\b.{0,20}\b(kaise|how)\b|\bhow (do|can|to) i\b.{0,30}\b(calculate|count|sum|find)\b", text or "", re.I))
-    other = mo.sheet_or_value(text, tables, plan, hi)
+    other = None if plan.get("derive") else mo.sheet_or_value(text, tables, plan, hi)
     inputs["mind_plan"] = json.loads(json.dumps(plan, default=str))
     agent.inputs = dumps(inputs)
     mind.set_pattern(mo.label_of(plan), plan)

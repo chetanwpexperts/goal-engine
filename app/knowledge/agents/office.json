@@ -702,5 +702,516 @@
   "combine": "combine",
   "reconcile": "reconcile",
   "sheets": "explore"
+ },
+ "concepts": {
+  "gender": {
+   "words": [
+    "gender",
+    "sex",
+    "girls",
+    "girl",
+    "boys",
+    "boy",
+    "male",
+    "female",
+    "males",
+    "females",
+    "men",
+    "women",
+    "man",
+    "woman",
+    "ladies",
+    "lady",
+    "gents",
+    "ladki",
+    "ladkiyan",
+    "ladkiyaan",
+    "ladke",
+    "ladka",
+    "mahila",
+    "mahilaye",
+    "purush",
+    "aurat",
+    "aurtein",
+    "aadmi",
+    "लड़की",
+    "लड़कियां",
+    "लड़के",
+    "लड़का",
+    "महिला",
+    "पुरुष"
+   ],
+   "headers": [
+    "gender",
+    "sex",
+    "ling",
+    "m/f"
+   ],
+   "values": {
+    "Female": [
+     "female",
+     "f",
+     "girl",
+     "girls",
+     "woman",
+     "women",
+     "ladies",
+     "lady",
+     "ladki",
+     "ladkiyan",
+     "ladkiyaan",
+     "mahila",
+     "mahilaye",
+     "aurat",
+     "aurtein",
+     "females",
+     "w",
+     "लड़की",
+     "लड़कियां",
+     "महिला"
+    ],
+    "Male": [
+     "male",
+     "m",
+     "boy",
+     "boys",
+     "man",
+     "men",
+     "gents",
+     "ladka",
+     "ladke",
+     "purush",
+     "aadmi",
+     "males",
+     "लड़का",
+     "लड़के",
+     "पुरुष"
+    ]
+   },
+   "derive": "gender_from_names",
+   "label": "gender"
+  },
+  "age": {
+   "words": [
+    "age",
+    "umar",
+    "umr",
+    "years old",
+    "aayu",
+    "आयु",
+    "उम्र",
+    "older than",
+    "younger than",
+    "aged",
+    "age group",
+    "seniors",
+    "senior citizens",
+    "kids",
+    "children",
+    "bachche ki umar"
+   ],
+   "headers": [
+    "age",
+    "umar",
+    "umr"
+   ],
+   "derive": "age_from_birth",
+   "label": "age"
+  },
+  "tenure": {
+   "words": [
+    "experience",
+    "tenure",
+    "years of service",
+    "kitne saal se",
+    "service years",
+    "how long",
+    "kab se kaam"
+   ],
+   "headers": [
+    "experience",
+    "tenure",
+    "service"
+   ],
+   "derive": "tenure_from_joining",
+   "label": "years since joining"
+  },
+  "email_domain": {
+   "words": [
+    "email domain",
+    "domain",
+    "company email",
+    "gmail",
+    "yahoo",
+    "outlook",
+    "hotmail",
+    "rediffmail"
+   ],
+   "headers": [
+    "domain"
+   ],
+   "values": {
+    "gmail": [
+     "gmail"
+    ],
+    "yahoo": [
+     "yahoo"
+    ],
+    "outlook": [
+     "outlook"
+    ],
+    "hotmail": [
+     "hotmail"
+    ],
+    "rediffmail": [
+     "rediffmail",
+     "rediff"
+    ]
+   },
+   "derive": "domain_from_email",
+   "label": "email domain"
+  },
+  "phone": {
+   "words": [
+    "phone",
+    "mobile",
+    "contact number",
+    "whatsapp",
+    "phone number",
+    "mobile number"
+   ],
+   "headers": [
+    "phone",
+    "mobile",
+    "contact",
+    "whatsapp"
+   ],
+   "label": "phone number"
+  },
+  "email": {
+   "words": [
+    "email",
+    "emails",
+    "mail id",
+    "e-mail"
+   ],
+   "headers": [
+    "email",
+    "mail",
+    "e-mail"
+   ],
+   "label": "email"
+  },
+  "address": {
+   "words": [
+    "address",
+    "pata"
+   ],
+   "headers": [
+    "address",
+    "addr",
+    "pata"
+   ],
+   "label": "address"
+  },
+  "salary": {
+   "words": [
+    "salary",
+    "salaries",
+    "tankhwah",
+    "tankha",
+    "ctc",
+    "wage",
+    "wages"
+   ],
+   "headers": [
+    "salary",
+    "ctc",
+    "wage",
+    "pay"
+   ],
+   "label": "salary"
+  },
+  "attendance": {
+   "words": [
+    "attendance",
+    "absent",
+    "haazri",
+    "hazri",
+    "chhutti",
+    "leaves",
+    "present days"
+   ],
+   "headers": [
+    "attendance",
+    "absent",
+    "present",
+    "leave",
+    "leaves"
+   ],
+   "label": "attendance"
+  },
+  "marks": {
+   "words": [
+    "marks",
+    "score",
+    "scores",
+    "grade",
+    "grades",
+    "result",
+    "percentage"
+   ],
+   "headers": [
+    "marks",
+    "score",
+    "grade",
+    "result",
+    "percent"
+   ],
+   "label": "marks",
+   "derive": "marks_total",
+   "parts": [
+    "maths",
+    "math",
+    "mathematics",
+    "science",
+    "english",
+    "hindi",
+    "punjabi",
+    "sanskrit",
+    "physics",
+    "chemistry",
+    "biology",
+    "social",
+    "sst",
+    "social science",
+    "history",
+    "geography",
+    "computer",
+    "economics",
+    "accounts",
+    "evs",
+    "gk",
+    "urdu"
+   ]
+  },
+  "profit": {
+   "words": [
+    "profit",
+    "profits",
+    "munafa",
+    "margin",
+    "kamai"
+   ],
+   "headers": [
+    "profit",
+    "margin"
+   ],
+   "derive": "profit_from_sales_cost",
+   "label": "profit"
+  },
+  "tax": {
+   "words": [
+    "tax",
+    "gst",
+    "vat"
+   ],
+   "headers": [
+    "tax",
+    "gst",
+    "vat"
+   ],
+   "label": "tax"
+  },
+  "discount": {
+   "words": [
+    "discount",
+    "discounts",
+    "chhoot"
+   ],
+   "headers": [
+    "discount"
+   ],
+   "label": "discount"
+  },
+  "stock": {
+   "words": [
+    "stock",
+    "inventory"
+   ],
+   "headers": [
+    "stock",
+    "inventory",
+    "on hand"
+   ],
+   "label": "stock"
+  },
+  "rating": {
+   "words": [
+    "rating",
+    "ratings",
+    "stars",
+    "feedback"
+   ],
+   "headers": [
+    "rating",
+    "stars",
+    "feedback",
+    "review"
+   ],
+   "label": "rating"
+  }
+ },
+ "data": {
+  "first_names": "app/knowledge/data/first_names.json"
+ },
+ "category_words": [
+  "department",
+  "dept",
+  "region",
+  "zone",
+  "area",
+  "city",
+  "location",
+  "branch",
+  "state",
+  "status",
+  "type",
+  "category",
+  "product",
+  "item",
+  "team",
+  "class",
+  "section",
+  "grade",
+  "gender",
+  "mode",
+  "vendor",
+  "supplier",
+  "customer",
+  "party",
+  "doctor",
+  "service",
+  "subject",
+  "stage",
+  "source",
+  "priority",
+  "rep",
+  "salesperson",
+  "channel",
+  "plan",
+  "shift",
+  "designation",
+  "role",
+  "level",
+  "group",
+  "segment",
+  "brand",
+  "warehouse",
+  "godown",
+  "store",
+  "month"
+ ],
+ "not_category_words": [
+  "name",
+  "email",
+  "mail",
+  "phone",
+  "mobile",
+  "address",
+  "remark",
+  "remarks",
+  "note",
+  "notes",
+  "description",
+  "comment",
+  "id",
+  "code",
+  "no",
+  "number"
+ ],
+ "name_words": [
+  "name",
+  "naam",
+  "first name",
+  "last name",
+  "full name",
+  "employee name",
+  "student name",
+  "customer name"
+ ],
+ "romanised_words": {
+  "doktar": "doctor",
+  "daktar": "doctor",
+  "marij": "patients",
+  "mariz": "patients",
+  "hisab": "hisaab",
+  "sal": "saal",
+  "umr": "age",
+  "umra": "age",
+  "bikri": "sales",
+  "kul": "total",
+  "jod": "total",
+  "ausat": "average",
+  "sabse": "sabse",
+  "jyada": "zyada",
+  "jiyada": "zyada",
+  "kam": "kam",
+  "shahar": "city",
+  "shehar": "city",
+  "vibhag": "department",
+  "tankhwah": "salary",
+  "vetan": "salary",
+  "grahak": "customer",
+  "saman": "item",
+  "maal": "item",
+  "kimat": "price",
+  "daam": "price",
+  "mahina": "month",
+  "mahine": "month",
+  "tarikh": "date",
+  "naam": "name",
+  "chhatra": "students",
+  "vidyarthi": "students",
+  "kaksha": "class",
+  "ank": "marks",
+  "bhugtan": "payment",
+  "baki": "pending",
+  "baaki": "pending",
+  "kamare": "rooms",
+  "kamra": "room",
+  "mehman": "guest",
+  "bukig": "booking",
+  "buking": "booking",
+  "bil": "bill",
+  "bill": "bill",
+  "kitni": "kitni",
+  "kitne": "kitne",
+  "ladakiyan": "ladkiyan",
+  "ladake": "ladke",
+  "ladaki": "ladki",
+  "men": "mein",
+  "chhatr": "students",
+  "tanakhvah": "salary",
+  "sabase": "sabse",
+  "vale": "wale",
+  "vali": "wali",
+  "kitane": "kitne",
+  "kitani": "kitni",
+  "rupaye": "",
+  "rupaya": "",
+  "rupe": "",
+  "log": "log",
+  "logon": "logon",
+  "kakshaa": "class",
+  "vishay": "subject",
+  "shikshak": "teacher",
+  "dukan": "shop",
+  "kamara": "room",
+  "yatri": "guest",
+  "dava": "medicine",
+  "bhugatan": "payment",
+  "bakaya": "pending",
+  "nakad": "cash"
  }
 }

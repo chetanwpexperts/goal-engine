@@ -185,8 +185,8 @@ def _next_step(goal: Goal, hi: bool) -> Turn:
         text = ("Ye steps maine upar bata diye hai. Kis step ko detail mein samjhaun?" if hi
                 else "I've shared these steps above. Which one should I explain in detail?")
         if not choices:
-            text = ("Ye steps upar hai. Kuch naya batana ho (jaise kaam, shehar, ya kya try kiya) to likho ya 🎤 bolo."
-                    if hi else "The steps are above. Tell me anything new (your work, city, what you tried) to refine them.")
+            text = ("Ye upar bata diya hai. Ab kya alag hai, ya kya try kiya aur kya hua, wo likho ya 🎤 bolo, main usi hisaab se aage badhunga."
+                    if hi else "I've covered this above. Tell me what's different now, or what you tried and what happened, and I'll take it from there.")
         goal.next_action_type = "execute"
         goal.next_action = next_line
         return Turn(text, "", goal, options=choices)

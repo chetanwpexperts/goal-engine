@@ -184,10 +184,42 @@
       });
       box.append(ul);
     }
-    box.append(el("p", "say", text));
+    box.append(richSay(text));
     thread.append(box);
     box.scrollIntoView({ block: "end", behavior: reduceMotion ? "auto" : "smooth" });
     return box;
+  }
+
+  // A reply in readable parts: paragraphs, bullet lists, and code (queries, formulas) in a box with Copy.
+  const CODE_START = /^\s*(select|with|update|delete|insert|alter|create|drop|show|explain|set|begin|commit|grant|=[A-Z]|\$|<\?php|function |def |SELECT)/i;
+  function richSay(text) {
+    const wrap = el("div", "say");
+    const blocks = String(text || "").split(/\n\s*\n/);
+    let code = [];
+    const flush = () => {
+      if (!code.length) return;
+      wrap.append(codeBox("", code.join("\n\n"), W(lastLang === "en" ? "en" : "hi")));
+      code = [];
+    };
+    for (const b of blocks) {
+      const lines = b.split("\n");
+      if (CODE_START.test(lines[0]) && (lines.length > 1 || /[;()=]/.test(b))) { code.push(b.replace(/\s+$/, "")); continue; }
+      flush();
+      if (lines.every((l) => /^\s*[-•]\s+/.test(l) || !l.trim())) {
+        const ul = el("ul", "say-list");
+        for (const l of lines) if (l.trim()) ul.append(el("li", null, l.replace(/^\s*[-•]\s+/, "")));
+        wrap.append(ul);
+      } else if (lines.length > 1 && lines.slice(1).every((l) => /^\s*[-•]\s+/.test(l))) {
+        wrap.append(el("p", null, lines[0]));
+        const ul = el("ul", "say-list");
+        for (const l of lines.slice(1)) ul.append(el("li", null, l.replace(/^\s*[-•]\s+/, "")));
+        wrap.append(ul);
+      } else {
+        wrap.append(el("p", null, b));
+      }
+    }
+    flush();
+    return wrap;
   }
 
   function thinking() {

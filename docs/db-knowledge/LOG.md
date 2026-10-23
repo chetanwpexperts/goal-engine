@@ -2,6 +2,27 @@
 
 Newest first. One entry per nightly run.
 
+## 2026-10-23 (nightly: connection problems)
+- Feed: not read this run (the fetch needed a permission nobody was there to give), so no feed request ids covered.
+- Backlog: "Connection" done. 17 new playbooks in `issues.json` (category `connection`): connection refused, connection timed out,
+  MySQL local socket (2002), MySQL server has gone away / lost connection (2006, 2013, 4031), PostgreSQL server closed the connection
+  (57P01, 08006, 25P03, 57P05), PostgreSQL starting up / recovery mode (57P03), SSL/TLS required or certificate errors (3159, 2026),
+  MySQL 8 auth plugin caching_sha2_password / mysql_native_password removed in 8.4/9.0 (2059, 1251, 2061, 1524), pg_hba.conf / peer / ident
+  rejected (28000), per-user connection limit (1226, 1203), MySQL host blocked (1129), host not allowed (1130), unknown database (1049, 3D000),
+  database host name not found (2005), app in Docker can't reach the database, app connection pool exhausted (Prisma P2024), WordPress
+  "Error establishing a database connection".
+- Moved code 1203 from `too-many-connections` to `max-user-connections` (1203 is the per-user limit error, not the server-wide one).
+- All checks are read-only and ran on the MariaDB + PostgreSQL test DBs. 51 new test phrases (English, Hinglish, Hindi script);
+  all 160 test phrases in the brain are recognised. Added a few Hindi symptoms to `too-many-connections` and plain-language symptoms to
+  `hacked-postgres-cryptominer` / `hacked-no-encryption-tls` because the new playbooks pulled their phrases away.
+- Sources: MySQL manual (can-not-connect-to-server, gone-away, problems-with-mysql-sock, blocked-host, caching-sha2, user-resources,
+  encrypted connections, problems-connecting), PostgreSQL docs (auth-pg-hba-conf, server-start, runtime-config-client/connection, libpq-ssl,
+  libpq-connect), Docker Compose networking, WordPress "Common WordPress Errors". Ideas from forums/hubs in `seen_at`.
+  Stack Overflow pages didn't show up in this run's web search, so `seen_at` cites forums (Docker forums, PostgreSQL lists, SitePoint, Percona, Netdata) instead.
+- For Chetan: (1) Full suite: same 6 failed + 35 errors as before this change, all from `tests/data` missing on a fresh clone (ignored by `data/` in `.gitignore`).
+  (2) `scripts/setup_test_dbs.sh` failed on a fresh container until `apt-get update` ran first; maybe add `apt-get update -qq` to the script.
+  (3) Code 28P01 (wrong password) and 1045 (access denied) left for the Security/permissions item.
+
 ## 2026-10-22 (nightly: hacked database, part 2)
 - Feed: not read this run (the fetch needed a permission nobody was there to give), so no feed request ids covered.
 - Backlog: "Hacked database part 2" done. 17 new defensive playbooks in `issues.json`:

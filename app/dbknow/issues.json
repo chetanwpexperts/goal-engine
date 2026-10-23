@@ -17,7 +17,10 @@
       "connection limit khatam ho gaya",
       "connection limit reached error",
       "mysql max connections khatam",
-      "database bolta hai aur connection nahi le sakta"
+      "database bolta hai aur connection nahi le sakta",
+      "डेटाबेस में कनेक्शन बहुत ज़्यादा हो गए",
+      "बहुत सारे कनेक्शन खुले हैं, नया कनेक्शन नहीं बनता",
+      "कनेक्शन की लिमिट खत्म हो गई"
     ],
     "diagnose": [
       {
@@ -97,7 +100,6 @@
     ],
     "codes": [
       "1040",
-      "1203",
       "53300"
     ]
   },
@@ -1518,7 +1520,10 @@
       "server ka cpu 100% hai aur postgres ke naam se miner chal raha hai",
       "kdevtmpfsi kinsing process on database server",
       "postgres password was weak and now server is slow and hot",
-      "पोस्टग्रेस सर्वर पर कोई माइनर चल रहा है सीपीयू पूरा भरा है"
+      "पोस्टग्रेस सर्वर पर कोई माइनर चल रहा है सीपीयू पूरा भरा है",
+      "postgres server cpu full even when no one is using it",
+      "raat ko bhi postgres machine ka cpu full rehta hai",
+      "postgres machine heating, cpu always maxed out"
     ],
     "diagnose": [
       {
@@ -3041,7 +3046,12 @@
       "क्या डेटाबेस का कनेक्शन एन्क्रिप्टेड है",
       "डेटाबेस के लिए SSL कैसे चालू करें",
       "tls for database traffic between servers",
-      "compliance audit asks for encryption in transit for the db"
+      "compliance audit asks for encryption in transit for the db",
+      "is my database traffic encrypted or plain text",
+      "database ka data bina encryption ke ja raha hai kya",
+      "could anyone on the network see the data between app and database",
+      "app aur database ke beech ka data koi network pe padh sakta hai kya",
+      "is the link between my app and db readable by others"
     ],
     "diagnose": [
       {
@@ -3728,6 +3738,1759 @@
       "our cache server got emptied and the machine is now using full cpu",
       "hamare cache server ka sab khali ho gaya aur machine full cpu pe chal rahi hai",
       "हमारा कैश सर्वर खाली हो गया और मशीन पूरा सीपीयू खा रही है"
+    ]
+  },
+  {
+    "id": "conn-refused",
+    "title_en": "Connection refused: the database server is not running or not listening there",
+    "title_hi": "Connection refused: database server band hai ya us jagah sun hi nahi raha",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "Can't connect to MySQL server on host (111 Connection refused)",
+      "ECONNREFUSED 127.0.0.1:3306",
+      "connect ECONNREFUSED 5432",
+      "could not connect to server: Connection refused. Is the server running on host and accepting TCP/IP connections",
+      "connection refused jab app database se judti hai",
+      "database server chalu hi nahi ho raha lagta hai",
+      "mysql service band ho gayi hai kya, connect nahi ho raha",
+      "postgres not accepting connections on port 5432",
+      "database refused the connection",
+      "server ne connection mana kar diya",
+      "डेटाबेस सर्वर कनेक्शन मना कर रहा है",
+      "डेटाबेस सर्विस बंद पड़ी है, जुड़ नहीं पा रहा",
+      "after reboot the database won't accept connections",
+      "restart ke baad database connect nahi hota",
+      "the database won't talk to my application",
+      "app ko database jawab hi nahi deta, refuse kar deta hai",
+      "डेटाबेस मेरी ऐप से बात ही नहीं करता",
+      "database rejects my app straight away"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('port', 'socket', 'bind_address', 'skip_networking', 'hostname')",
+        "look_for": "skip_networking ON or bind_address 127.0.0.1 means no other machine can connect; the port the app must use"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'unix_socket_directories', 'max_connections')",
+        "look_for": "listen_addresses 'localhost' accepts only local connections; the port the app must use"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Uptime', 'Aborted_connects', 'Aborted_clients', 'Connection_errors_max_connections', 'Connection_errors_internal', 'Connection_errors_peer_address')",
+        "look_for": "a small Uptime (seconds) means the server restarted recently (crash / out of memory); rising Aborted_* counters"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT pg_postmaster_start_time() AS started_at, now() - pg_postmaster_start_time() AS running_for",
+        "look_for": "a recent start time means the server restarted (crash, out of memory, update)"
+      }
+    ],
+    "causes": [
+      {
+        "id": "not_running",
+        "title_en": "The database service is stopped or crashed (often after a reboot or running out of memory/disk)",
+        "title_hi": "Database service band hai ya crash ho gayi (aksar reboot ya memory/disk khatam hone ke baad)"
+      },
+      {
+        "id": "wrong_port_host",
+        "title_en": "The app points to the wrong host or port",
+        "title_hi": "App galat host ya port par connect kar rahi hai"
+      },
+      {
+        "id": "local_only",
+        "title_en": "The server listens only on localhost (bind_address / listen_addresses / skip_networking)",
+        "title_hi": "Server sirf localhost par sunta hai (bind_address / listen_addresses / skip_networking)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "not_running",
+        "action": "advice",
+        "steps_en": "Start the service (systemctl start mysql|mariadb|postgresql), enable it at boot, then read the server error log for why it stopped (out of memory, disk full, bad config).",
+        "steps_hi": "Service start karo (systemctl start mysql|mariadb|postgresql), boot par enable karo, phir server error log padho ki kyun band hua (memory, disk full, galat config)."
+      },
+      {
+        "cause": "wrong_port_host",
+        "action": "config",
+        "steps_en": "Put the exact host and port the server reports into the app's config (.env / wp-config.php); 'localhost' and '127.0.0.1' are not always the same (socket vs TCP).",
+        "steps_hi": "Server jo host aur port batata hai wahi app ke config (.env / wp-config.php) mein daalo; 'localhost' aur '127.0.0.1' hamesha same nahi (socket vs TCP)."
+      },
+      {
+        "cause": "local_only",
+        "action": "config",
+        "steps_en": "If the app runs on another machine, set bind_address / listen_addresses to the server's private IP (not the whole internet), allow that one app IP in the firewall, restart in a quiet hour.",
+        "steps_hi": "Agar app doosri machine par hai to bind_address / listen_addresses ko server ka private IP karo (poora internet nahi), firewall mein sirf app ka IP allow karo, shant time par restart karo."
+      }
+    ],
+    "verify": {
+      "en": "The app connects without 'refused' errors, and the service starts again by itself after a reboot.",
+      "hi": "App bina 'refused' error ke connect hoti hai, aur reboot ke baad service khud start hoti hai."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/can-not-connect-to-server.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/server-start.html",
+      "https://sentry.io/answers/connection-refused/",
+      "https://www.postgrespro.com/list/thread-id/1159982"
+    ],
+    "test_phrases": [
+      "my app says the database is refusing to talk to it",
+      "app bol rahi hai database ne connection reject kar diya",
+      "ऐप कह रहा है डेटाबेस ने कनेक्शन लेने से इनकार कर दिया"
+    ],
+    "codes": [
+      "2003",
+      "10061"
+    ]
+  },
+  {
+    "id": "conn-timeout",
+    "title_en": "Connection timed out: the database server can't be reached over the network",
+    "title_hi": "Connection timeout: network par database server tak pahunch nahi pa rahe",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "Can't connect to MySQL server (110 Connection timed out)",
+      "connection timed out connecting to database",
+      "timeout expired while connecting to postgres",
+      "connect ETIMEDOUT to the db server",
+      "database se connect karte waqt bahut der tak ruk ke timeout aata hai",
+      "remote database pe connect nahi ho raha, hang ho jata hai",
+      "aws rds connection timeout from my laptop",
+      "cloud database se connect karte hi atak jata hai",
+      "can connect from the server but not from my computer, it just waits",
+      "डेटाबेस से जुड़ते समय टाइमआउट आ जाता है",
+      "दूर वाले डेटाबेस सर्वर से कनेक्ट नहीं होता, बस घूमता रहता है",
+      "security group mein port khola nahi shayad",
+      "firewall database port block kar raha hai"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('port', 'socket', 'bind_address', 'skip_networking', 'hostname')",
+        "look_for": "skip_networking ON or bind_address 127.0.0.1 means no other machine can connect; the port the app must use"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'unix_socket_directories', 'max_connections')",
+        "look_for": "listen_addresses 'localhost' accepts only local connections; the port the app must use"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('connect_timeout', 'skip_name_resolve')",
+        "look_for": "a very small connect_timeout on a slow link; skip_name_resolve OFF makes every login wait for a DNS lookup"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('authentication_timeout', 'tcp_keepalives_idle')",
+        "look_for": "authentication_timeout too short for slow links"
+      }
+    ],
+    "causes": [
+      {
+        "id": "firewall",
+        "title_en": "A firewall / cloud security group drops the database port from your IP",
+        "title_hi": "Firewall / cloud security group aapke IP se database port ko block karta hai"
+      },
+      {
+        "id": "wrong_address",
+        "title_en": "Wrong or private address (private IP from outside the network, old IP after a server move)",
+        "title_hi": "Galat ya private address (network ke bahar se private IP, server shift hone ke baad purana IP)"
+      },
+      {
+        "id": "overloaded",
+        "title_en": "Server too busy to answer (CPU 100%, out of memory, slow DNS lookup on login)",
+        "title_hi": "Server itna busy hai ki jawab nahi de pata (CPU 100%, memory khatam, login par slow DNS lookup)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "firewall",
+        "action": "config",
+        "steps_en": "Allow the database port only from your app server / office IP in the firewall or cloud security group; or use an SSH tunnel instead of opening the port.",
+        "steps_hi": "Firewall ya cloud security group mein database port sirf app server / office IP ke liye kholo; ya port kholne ki jagah SSH tunnel use karo."
+      },
+      {
+        "cause": "wrong_address",
+        "action": "config",
+        "steps_en": "Use the public endpoint (or VPN) from outside, the private IP from inside; update the app config after any server move.",
+        "steps_hi": "Bahar se public endpoint (ya VPN), andar se private IP use karo; server shift ke baad app config update karo."
+      },
+      {
+        "cause": "overloaded",
+        "action": "advice",
+        "steps_en": "Check the server's CPU/RAM and the Live tab; on MySQL consider skip_name_resolve (then accounts must use IPs, not host names).",
+        "steps_hi": "Server ka CPU/RAM aur Live tab dekho; MySQL par skip_name_resolve socho (tab accounts mein host name ki jagah IP chahiye)."
+      }
+    ],
+    "verify": {
+      "en": "Connecting from the app's machine takes under a second, every time.",
+      "hi": "App ki machine se connect hamesha ek second se kam mein hota hai."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/can-not-connect-to-server.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/runtime-config-connection.html",
+      "https://discuss.rubyonrails.org/t/pg-connection-time-out-error/66770"
+    ],
+    "test_phrases": [
+      "the database just keeps loading and never connects from home",
+      "ghar se database connect karo to bas ghoomta rehta hai phir time out",
+      "घर से डेटाबेस कनेक्ट करो तो बस लोड होता रहता है और फिर समय खत्म"
+    ],
+    "codes": [
+      "10060"
+    ]
+  },
+  {
+    "id": "mysql-local-socket",
+    "title_en": "Can't connect to local MySQL server through socket",
+    "title_hi": "Local MySQL server se socket ke through connect nahi ho raha",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "ERROR 2002 Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock'",
+      "mysqld.sock not found",
+      "mysql.sock (2) No such file or directory",
+      "php mysqli No such file or directory when using localhost",
+      "socket file missing mysql",
+      "mysql command line socket error aa raha hai",
+      "local mysql socket wali error",
+      "localhost se mysql nahi chal raha par 127.0.0.1 se chal raha hai",
+      "मायएसक्यूएल सॉकेट फाइल नहीं मिल रही",
+      "लोकल मायएसक्यूएल से सॉकेट वाली एरर आ रही है",
+      "mysql socket error after installing on ubuntu",
+      "the mysql sock file is missing on my machine",
+      "mysql sock file gayab hai server pe",
+      "मायएसक्यूएल की sock फाइल गायब है",
+      "mysql says no such file for its socket"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('socket', 'port', 'skip_networking')",
+        "look_for": "the real socket path the server created; the client/PHP must use the same path (or connect with 127.0.0.1 over TCP)"
+      }
+    ],
+    "causes": [
+      {
+        "id": "not_running",
+        "title_en": "MySQL/MariaDB is not running, so the socket file does not exist",
+        "title_hi": "MySQL/MariaDB chal hi nahi raha, isliye socket file bani hi nahi"
+      },
+      {
+        "id": "path_mismatch",
+        "title_en": "Client and server use different socket paths (php.ini mysqli.default_socket, my.cnf [client])",
+        "title_hi": "Client aur server alag socket path use kar rahe hain (php.ini mysqli.default_socket, my.cnf [client])"
+      },
+      {
+        "id": "dir_perms",
+        "title_en": "The socket directory (/var/run/mysqld) is missing or has wrong permissions",
+        "title_hi": "Socket folder (/var/run/mysqld) hai hi nahi ya permission galat hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "not_running",
+        "action": "advice",
+        "steps_en": "Start the service and read the error log for why it stopped.",
+        "steps_hi": "Service start karo aur error log padho ki kyun band hua."
+      },
+      {
+        "cause": "path_mismatch",
+        "action": "config",
+        "steps_en": "Set the same socket path in my.cnf [client] / php.ini as the server's socket variable, or use host 127.0.0.1 so the client uses TCP instead.",
+        "steps_hi": "my.cnf [client] / php.ini mein wahi socket path do jo server ka socket variable hai, ya host 127.0.0.1 do taaki TCP use ho."
+      },
+      {
+        "cause": "dir_perms",
+        "action": "advice",
+        "steps_en": "Recreate the directory owned by the mysql user (e.g. mkdir -p /var/run/mysqld && chown mysql:mysql) and restart.",
+        "steps_hi": "Folder dobara banao mysql user ke naam (jaise mkdir -p /var/run/mysqld && chown mysql:mysql) aur restart karo."
+      }
+    ],
+    "verify": {
+      "en": "mysql -u user -p and the app both connect with host 'localhost'.",
+      "hi": "mysql -u user -p aur app dono 'localhost' se connect hote hain."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/problems-with-mysql-sock.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/can-not-connect-to-server.html",
+      "https://learn.microsoft.com/en-us/answers/questions/1078183/error-2002-(hy000)-cant-connect-to-local-mysql-ser",
+      "https://www.sitepoint.com/community/t/cant-connect-to-local-mysql-server-through-socket-tmp-mysqld-sock-2/94588"
+    ],
+    "test_phrases": [
+      "mysql on my own server says the sock file is not there",
+      "apne hi server pe mysql bolta hai sock file nahi mili",
+      "अपने ही सर्वर पर मायएसक्यूएल कहता है sock फाइल गायब है"
+    ],
+    "codes": [
+      "2002"
+    ]
+  },
+  {
+    "id": "mysql-server-gone-away",
+    "title_en": "MySQL server has gone away / Lost connection during query",
+    "title_hi": "MySQL server has gone away / query ke beech connection toot gaya",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "MySQL server has gone away",
+      "Lost connection to MySQL server during query",
+      "Lost connection to MySQL server at 'reading initial communication packet'",
+      "import of a big sql file stops with server has gone away",
+      "Packet for query is too large max_allowed_packet",
+      "after some time idle the app loses the mysql connection",
+      "cron job ke beech mysql connection chala jata hai",
+      "badi sql file import karte waqt gone away aata hai",
+      "raat bhar idle rehne ke baad pehli request fail hoti hai",
+      "The client was disconnected by the server because of inactivity",
+      "मायएसक्यूएल सर्वर गायब हो गया एरर",
+      "क्वेरी चलते चलते कनेक्शन टूट जाता है",
+      "bada data insert karte hi connection toot jata hai"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('wait_timeout', 'interactive_timeout', 'max_allowed_packet', 'net_read_timeout', 'net_write_timeout', 'connect_timeout')",
+        "look_for": "wait_timeout shorter than how long the app keeps an idle connection; max_allowed_packet smaller than your biggest row / INSERT"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Uptime', 'Aborted_connects', 'Aborted_clients', 'Connection_errors_max_connections', 'Connection_errors_internal', 'Connection_errors_peer_address')",
+        "look_for": "a small Uptime (seconds) means the server restarted recently (crash / out of memory); rising Aborted_* counters"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT ID, USER, HOST, COMMAND, TIME, STATE FROM information_schema.PROCESSLIST WHERE COMMAND = 'Sleep' ORDER BY TIME DESC LIMIT 20",
+        "look_for": "connections sleeping for a long time: the app holds them open and the server will close them at wait_timeout"
+      }
+    ],
+    "causes": [
+      {
+        "id": "idle_timeout",
+        "title_en": "The connection sat idle longer than wait_timeout and the server closed it",
+        "title_hi": "Connection wait_timeout se zyada der idle raha aur server ne band kar diya"
+      },
+      {
+        "id": "packet",
+        "title_en": "A query or row is bigger than max_allowed_packet (big imports, images in BLOBs)",
+        "title_hi": "Query ya row max_allowed_packet se badi hai (bade import, BLOB mein images)"
+      },
+      {
+        "id": "crash",
+        "title_en": "The server restarted or crashed in the middle (out of memory, killed), see a small Uptime",
+        "title_hi": "Server beech mein restart/crash hua (memory khatam, kill hua), Uptime chhota dikhega"
+      },
+      {
+        "id": "long_query",
+        "title_en": "A long query hit net_read/write_timeout or was killed (KILL, max_execution_time, proxy timeout)",
+        "title_hi": "Lambi query net_read/write_timeout se takrayi ya kill hui (KILL, max_execution_time, proxy timeout)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "idle_timeout",
+        "action": "code",
+        "steps_en": "Make the app reconnect / ping before use (pool 'test on borrow', Laravel/Django reconnect), close connections when done; raise wait_timeout only moderately.",
+        "steps_hi": "App ko use se pehle ping/reconnect karne do (pool 'test on borrow', Laravel/Django reconnect), kaam ke baad connection band karo; wait_timeout thoda hi badhao."
+      },
+      {
+        "cause": "packet",
+        "action": "config",
+        "steps_en": "Raise max_allowed_packet on the server and the client (e.g. 64M) for the import, or split the import into smaller INSERTs.",
+        "steps_hi": "Server aur client dono par max_allowed_packet badhao (jaise 64M), ya import ko chhote INSERTs mein todo."
+      },
+      {
+        "cause": "crash",
+        "action": "advice",
+        "steps_en": "Read the server error log around the time; if it was killed for memory, lower buffer sizes/max_connections or add RAM.",
+        "steps_hi": "Us time ka server error log padho; agar memory ki wajah se kill hua to buffer sizes/max_connections kam karo ya RAM badhao."
+      },
+      {
+        "cause": "long_query",
+        "action": "advice",
+        "steps_en": "Find the slow query (Live tab / slow log) and speed it up; raise net_read_timeout/net_write_timeout only for known big jobs.",
+        "steps_hi": "Slow query dhoondo (Live tab / slow log) aur tez karo; net_read_timeout/net_write_timeout sirf pata bade jobs ke liye badhao."
+      }
+    ],
+    "verify": {
+      "en": "The job / import that failed runs to the end, and Uptime keeps growing (no restarts).",
+      "hi": "Jo job / import fail hota tha woh poora chalta hai, aur Uptime badhta rehta hai (koi restart nahi)."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/gone-away.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/mysql-errors/8.0/en/client-error-reference.html",
+      "https://www.netdata.cloud/guides/mysql/mysql-server-has-gone-away/",
+      "https://www.sitepoint.com/community/t/mysql-server-has-gone-away/91877"
+    ],
+    "test_phrases": [
+      "my import dies halfway saying the server went away",
+      "import aadha hote hi bolta hai server chala gaya",
+      "इम्पोर्ट आधे में रुक जाता है और कहता है सर्वर चला गया"
+    ],
+    "codes": [
+      "2006",
+      "2013",
+      "4031"
+    ]
+  },
+  {
+    "id": "pg-server-closed-connection",
+    "title_en": "PostgreSQL: server closed the connection unexpectedly / terminating connection",
+    "title_hi": "PostgreSQL: server ne achanak connection band kar diya",
+    "engines": [
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "server closed the connection unexpectedly. This probably means the server terminated abnormally",
+      "FATAL: terminating connection due to administrator command",
+      "terminating connection due to idle-in-transaction timeout",
+      "terminating connection due to idle-session timeout",
+      "SSL SYSCALL error: EOF detected",
+      "connection to server was lost",
+      "psycopg2 OperationalError server closed the connection",
+      "postgres connection drop ho jata hai thodi der baad",
+      "load balancer ke peeche postgres connection idle hone par kat jata hai",
+      "postgres ne achanak connection kaat diya",
+      "पोस्टग्रेस ने अचानक कनेक्शन बंद कर दिया",
+      "थोड़ी देर खाली रहने पर पोस्टग्रेस कनेक्शन कट जाता है",
+      "the database connection resets after a few minutes of no activity",
+      "postgres drops my app's connection randomly",
+      "postgres beech beech mein connection kaat deta hai",
+      "पोस्टग्रेस बीच बीच में ऐप का कनेक्शन तोड़ देता है",
+      "postgres hangs up the line in the middle of work",
+      "postgres keeps cutting off my app for no reason",
+      "postgres keeps disconnecting my app suddenly",
+      "my app gets kicked off postgres without warning"
+    ],
+    "diagnose": [
+      {
+        "engine": "postgres",
+        "sql": "SELECT pg_postmaster_start_time() AS started_at, now() - pg_postmaster_start_time() AS running_for",
+        "look_for": "a recent start time means the server restarted (crash, out of memory, update)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('idle_session_timeout', 'idle_in_transaction_session_timeout', 'statement_timeout', 'tcp_keepalives_idle', 'tcp_keepalives_interval', 'tcp_keepalives_count', 'authentication_timeout')",
+        "look_for": "non-zero idle timeouts that close connections the app still thinks are open; keepalives 0 = OS default"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT datname, sessions, sessions_abandoned, sessions_fatal, sessions_killed FROM pg_stat_database WHERE datname = current_database()",
+        "look_for": "sessions_killed (an admin or timeout ended them), sessions_abandoned (the network dropped them), sessions_fatal (errors) growing; PostgreSQL 14+"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT pid, usename, client_addr, state, now() - state_change AS idle_for FROM pg_stat_activity WHERE state LIKE 'idle%' ORDER BY state_change LIMIT 20",
+        "look_for": "connections idle for a long time: a firewall/NAT/load balancer may silently drop them"
+      }
+    ],
+    "causes": [
+      {
+        "id": "crash",
+        "title_en": "A server process crashed and PostgreSQL restarted all connections (out of memory killer, bug, disk full)",
+        "title_hi": "Ek server process crash hua aur PostgreSQL ne saare connection restart kiye (OOM killer, bug, disk full)"
+      },
+      {
+        "id": "timeouts",
+        "title_en": "idle_session_timeout / idle_in_transaction_session_timeout / statement_timeout ended the session",
+        "title_hi": "idle_session_timeout / idle_in_transaction_session_timeout / statement_timeout ne session band kiya"
+      },
+      {
+        "id": "network_idle",
+        "title_en": "A firewall, NAT, proxy or cloud load balancer drops idle TCP connections",
+        "title_hi": "Firewall, NAT, proxy ya cloud load balancer idle TCP connection gira deta hai"
+      },
+      {
+        "id": "terminated",
+        "title_en": "Someone or a tool ran pg_terminate_backend / a restart or failover happened",
+        "title_hi": "Kisi ne ya kisi tool ne pg_terminate_backend chalaya / restart ya failover hua"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "crash",
+        "action": "advice",
+        "steps_en": "Read the PostgreSQL log at that time ('server process was terminated by signal 9' = out of memory); lower work_mem/max_connections or add RAM.",
+        "steps_hi": "Us time ka PostgreSQL log padho ('terminated by signal 9' = memory khatam); work_mem/max_connections kam karo ya RAM badhao."
+      },
+      {
+        "cause": "timeouts",
+        "action": "code",
+        "steps_en": "Commit transactions quickly, don't leave sessions 'idle in transaction'; let the pool validate connections before use; set timeouts per role if needed.",
+        "steps_hi": "Transactions jaldi commit karo, sessions ko 'idle in transaction' mat chhodo; pool ko use se pehle connection check karne do; zarurat ho to timeouts role ke hisaab se set karo."
+      },
+      {
+        "cause": "network_idle",
+        "action": "config",
+        "steps_en": "Turn on TCP keepalives (tcp_keepalives_idle on the server or keepalives_idle in the client) shorter than the proxy's idle limit; set the pool's max idle/lifetime below it.",
+        "steps_hi": "TCP keepalives on karo (server par tcp_keepalives_idle ya client mein keepalives_idle) proxy ki idle limit se chhota; pool ka max idle/lifetime usse kam rakho."
+      },
+      {
+        "cause": "terminated",
+        "action": "advice",
+        "steps_en": "Check the log for 'terminating connection due to administrator command' and who ran it (cron jobs, monitoring, failover).",
+        "steps_hi": "Log mein 'terminating connection due to administrator command' dekho aur kisne chalaya (cron, monitoring, failover)."
+      }
+    ],
+    "verify": {
+      "en": "No 'closed unexpectedly' errors for a day, and the start time / sessions_killed stay unchanged.",
+      "hi": "Ek din tak 'closed unexpectedly' error nahi, aur start time / sessions_killed same rehte hain."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config-client.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/runtime-config-connection.html",
+      "https://www.postgresql.org/docs/current/errcodes-appendix.html",
+      "https://www.postgresql.org/docs/current/monitoring-stats.html",
+      "https://www.postgresql.org/message-id/ffbe633b-cf55-9afb-db39-3f47822443c8%40aklaver.com",
+      "https://postgrespro.com/list/thread-id/1128705"
+    ],
+    "test_phrases": [
+      "postgres keeps hanging up on my app out of nowhere",
+      "postgres bina wajah meri app ka connection kaat deta hai",
+      "पोस्टग्रेस बिना वजह मेरी ऐप का कनेक्शन काट देता है"
+    ],
+    "codes": [
+      "57P01",
+      "08006",
+      "25P03",
+      "57P05"
+    ]
+  },
+  {
+    "id": "pg-starting-up-or-recovery",
+    "title_en": "PostgreSQL says the database system is starting up / in recovery mode / shutting down",
+    "title_hi": "PostgreSQL bolta hai database start ho raha hai / recovery mode mein hai / band ho raha hai",
+    "engines": [
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "FATAL: the database system is starting up",
+      "FATAL: the database system is in recovery mode",
+      "FATAL: the database system is shutting down",
+      "the database system is not yet accepting connections",
+      "postgres stuck in recovery mode",
+      "database recovery mode mein atka hua hai",
+      "postgres start ho raha hai bolta rehta hai",
+      "after a crash postgres says recovery",
+      "डेटाबेस रिकवरी मोड में अटका हुआ है",
+      "पोस्टग्रेस कहता है अभी शुरू हो रहा है",
+      "consistent recovery state has not been yet reached",
+      "postgres won't let me log in, says it's still starting",
+      "postgres says it is booting and refuses logins",
+      "postgres is still coming up after restart, can't log in",
+      "postgres abhi start ho raha hai bol ke login nahi karne deta"
+    ],
+    "diagnose": [
+      {
+        "engine": "postgres",
+        "sql": "SELECT pg_is_in_recovery() AS is_standby",
+        "look_for": "true on a standby/replica (normal) or while a crash recovery is still replaying"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT pg_postmaster_start_time() AS started_at, now() - pg_postmaster_start_time() AS running_for",
+        "look_for": "a recent start time means the server restarted (crash, out of memory, update)"
+      }
+    ],
+    "causes": [
+      {
+        "id": "crash_recovery",
+        "title_en": "PostgreSQL crashed and is replaying its WAL before accepting connections (can take minutes on big/busy servers)",
+        "title_hi": "PostgreSQL crash hua aur connection lene se pehle WAL replay kar raha hai (bade server par minute lag sakte hain)"
+      },
+      {
+        "id": "standby",
+        "title_en": "You connected to a standby that is still catching up or has hot_standby off",
+        "title_hi": "Aap standby se jude ho jo abhi catch up kar raha hai ya hot_standby off hai"
+      },
+      {
+        "id": "restart_loop",
+        "title_en": "It keeps crashing and restarting (out of memory, disk full, corrupted file)",
+        "title_hi": "Baar baar crash aur restart ho raha hai (memory khatam, disk full, kharab file)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "crash_recovery",
+        "action": "advice",
+        "steps_en": "Wait and watch the log: 'database system is ready to accept connections' means done. Don't delete WAL (pg_wal) files to speed it up.",
+        "steps_hi": "Rukiye aur log dekhiye: 'database system is ready to accept connections' aaya to ho gaya. Jaldi ke liye WAL (pg_wal) files kabhi mat mitao."
+      },
+      {
+        "cause": "standby",
+        "action": "config",
+        "steps_en": "Point writes to the primary; on the standby keep hot_standby = on so reads work once it is consistent.",
+        "steps_hi": "Writes primary par bhejo; standby par hot_standby = on rakho taaki consistent hone ke baad reads chalein."
+      },
+      {
+        "cause": "restart_loop",
+        "action": "advice",
+        "steps_en": "Read the log for the first error before the restart (out of memory, 'No space left on device', 'invalid page'); fix that cause first.",
+        "steps_hi": "Restart se pehle wali pehli error log mein dekho (memory, 'No space left on device', 'invalid page'); pehle wahi theek karo."
+      }
+    ],
+    "verify": {
+      "en": "Connections work and the start time stops changing.",
+      "hi": "Connection chalte hain aur start time badalna band ho jata hai."
+    },
+    "source": "https://www.postgresql.org/docs/current/server-start.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/hot-standby.html",
+      "https://www.postgresql.org/docs/current/wal-internals.html",
+      "https://postgrespro.com/list/thread-id/1399911",
+      "https://www.slingacademy.com/article/fixing-postgresql-error-fatal-the-database-system-is-starting-up/"
+    ],
+    "test_phrases": [
+      "postgres wont let me in, keeps saying it is still booting up",
+      "postgres andar nahi aane deta, bolta hai abhi recover kar raha hoon",
+      "पोस्टग्रेस अंदर नहीं आने देता, कहता है अभी रिकवर कर रहा हूं"
+    ],
+    "codes": [
+      "57P03"
+    ]
+  },
+  {
+    "id": "ssl-required",
+    "title_en": "Connection rejected because SSL/TLS is required (or the SSL handshake fails)",
+    "title_hi": "SSL/TLS zaroori hai isliye connection reject (ya SSL handshake fail)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "Connections using insecure transport are prohibited while --require_secure_transport=ON",
+      "no pg_hba.conf entry for host, SSL off",
+      "SSL connection is required. Please specify SSL options and retry",
+      "server does not support SSL, but SSL was required",
+      "SSL connection error: unable to get local issuer certificate",
+      "self signed certificate in certificate chain database",
+      "sslmode require kaise lagaye azure postgres",
+      "rds ssl certificate error aa raha hai",
+      "database bol raha hai secure connection chahiye",
+      "ssl ke bina database connect nahi hone de raha",
+      "डेटाबेस कहता है एसएसएल ज़रूरी है",
+      "सर्टिफिकेट वाली एरर की वजह से डेटाबेस नहीं जुड़ रहा",
+      "cloud mysql ko ssl certificate chahiye",
+      "host requires an encrypted database connection so my website fails to connect",
+      "hosting provider ka database sirf secure connection leta hai, website connect nahi hoti",
+      "होस्टिंग प्रोवाइडर का डेटाबेस सिर्फ सुरक्षित कनेक्शन लेता है, वेबसाइट नहीं जुड़ती",
+      "managed database insists on ssl and my site fails",
+      "cloud database ko encrypted link chahiye, app connect fail"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('have_ssl', 'have_openssl', 'require_secure_transport', 'tls_version', 'ssl_cert', 'ssl_ca')",
+        "look_for": "require_secure_transport ON means every TCP client must use TLS; have_ssl DISABLED means the server can't do TLS at all"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW SESSION STATUS WHERE Variable_name IN ('Ssl_cipher', 'Ssl_version')",
+        "look_for": "empty values = this connection is not encrypted"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('ssl', 'ssl_min_protocol_version', 'password_encryption')",
+        "look_for": "ssl off means sslmode=require clients can't connect"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT a.usename, a.client_addr, s.ssl, s.version, s.cipher FROM pg_stat_ssl s JOIN pg_stat_activity a USING (pid) WHERE a.client_addr IS NOT NULL",
+        "look_for": "which connected clients use TLS (ssl = true) and which don't"
+      }
+    ],
+    "causes": [
+      {
+        "id": "server_requires",
+        "title_en": "The server (or cloud provider) requires TLS and the app connects without it",
+        "title_hi": "Server (ya cloud provider) TLS maangta hai aur app bina TLS ke connect karti hai"
+      },
+      {
+        "id": "ca_missing",
+        "title_en": "The app doesn't trust the server's certificate (provider CA bundle not installed, self-signed cert)",
+        "title_hi": "App server ka certificate trust nahi karti (provider ka CA bundle install nahi, self-signed cert)"
+      },
+      {
+        "id": "server_no_ssl",
+        "title_en": "The app asks for SSL but the server has no TLS set up",
+        "title_hi": "App SSL maangti hai par server par TLS set hi nahi"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "server_requires",
+        "action": "config",
+        "steps_en": "Turn TLS on in the app's connection: sslmode=require (PostgreSQL), ssl-mode=REQUIRED / PDO MYSQL_ATTR_SSL_CA / WordPress MYSQL_CLIENT_FLAGS (MySQL). Don't switch the server's requirement off.",
+        "steps_hi": "App ke connection mein TLS on karo: sslmode=require (PostgreSQL), ssl-mode=REQUIRED / PDO MYSQL_ATTR_SSL_CA / WordPress MYSQL_CLIENT_FLAGS (MySQL). Server ki requirement band mat karo."
+      },
+      {
+        "cause": "ca_missing",
+        "action": "config",
+        "steps_en": "Download the provider's CA certificate (RDS, Azure, Google Cloud docs) and point the client to it (sslrootcert / ssl-ca) with verify-full / VERIFY_IDENTITY.",
+        "steps_hi": "Provider ka CA certificate download karo (RDS, Azure, Google Cloud docs) aur client ko uska path do (sslrootcert / ssl-ca), verify-full / VERIFY_IDENTITY ke saath."
+      },
+      {
+        "cause": "server_no_ssl",
+        "action": "config",
+        "steps_en": "Add a certificate and key on the server (ssl = on with ssl_cert_file/ssl_key_file; MySQL ssl_cert/ssl_key) and restart in a quiet hour.",
+        "steps_hi": "Server par certificate aur key lagao (ssl = on, ssl_cert_file/ssl_key_file; MySQL ssl_cert/ssl_key) aur shant time par restart karo."
+      }
+    ],
+    "verify": {
+      "en": "The app connects and the check shows Ssl_cipher / ssl = true for its connection.",
+      "hi": "App connect hoti hai aur check mein uske connection ka Ssl_cipher / ssl = true dikhta hai."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/using-encrypted-connections.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/libpq-ssl.html",
+      "https://www.postgresql.org/docs/current/ssl-tcp.html",
+      "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/mysql-ssl-connections.require-ssl.html",
+      "https://community.qlik.com/t5/Qlik-Replicate/Can-Qlik-replicate-work-with-encrypted-turn-on-for-MySQL-as/td-p/2458040"
+    ],
+    "test_phrases": [
+      "hosting company database wants an encrypted link and my site can't connect",
+      "hosting wala database encrypted connection maang raha hai aur site connect nahi ho rahi",
+      "होस्टिंग वाला डेटाबेस एन्क्रिप्टेड कनेक्शन मांग रहा है और साइट नहीं जुड़ रही"
+    ],
+    "codes": [
+      "3159",
+      "2026"
+    ]
+  },
+  {
+    "id": "mysql-auth-plugin",
+    "title_en": "MySQL 8 login fails: caching_sha2_password / mysql_native_password plugin errors",
+    "title_hi": "MySQL 8 login fail: caching_sha2_password / mysql_native_password plugin wali error",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "Authentication plugin 'caching_sha2_password' cannot be loaded",
+      "Client does not support authentication protocol requested by server; consider upgrading MySQL client",
+      "Authentication plugin 'caching_sha2_password' reported error: Authentication requires secure connection",
+      "Plugin 'mysql_native_password' is not loaded",
+      "The server requested authentication method unknown to the client",
+      "ER_NOT_SUPPORTED_AUTH_MODE node mysql",
+      "upgrade to mysql 8.4 old users cannot log in",
+      "mysql 8 ke baad purana php app login nahi kar pa raha",
+      "auth plugin wali error aa rahi hai mysql 8 mein",
+      "dbeaver public key retrieval is not allowed",
+      "मायएसक्यूएल 8 में ऑथेंटिकेशन प्लगइन की एरर",
+      "पुराना ऐप नए मायएसक्यूएल में लॉगिन नहीं कर पा रहा",
+      "mariadb client cannot connect to mysql 8 server",
+      "old software stopped signing in after the mysql upgrade",
+      "mysql upgrade ke baad purana software login nahi karta",
+      "मायएसक्यूएल अपग्रेड के बाद पुराना सॉफ्टवेयर लॉगिन नहीं करता",
+      "new mysql version won't accept my old app's login"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('default_authentication_plugin', 'authentication_policy', 'version', 'version_comment')",
+        "look_for": "MySQL 8.0 defaults new users to caching_sha2_password; 8.4 disables mysql_native_password unless enabled; MariaDB uses mysql_native_password/ed25519"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT PLUGIN_NAME, PLUGIN_STATUS FROM information_schema.PLUGINS WHERE PLUGIN_TYPE = 'AUTHENTICATION' ORDER BY PLUGIN_NAME",
+        "look_for": "which login methods this server can use"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT USER() AS you_connected_as, CURRENT_USER() AS account_matched",
+        "look_for": "the account the server matched for this login"
+      }
+    ],
+    "causes": [
+      {
+        "id": "old_client",
+        "title_en": "The app's driver is too old for caching_sha2_password (old PHP mysqlnd, old Node mysql, old connectors)",
+        "title_hi": "App ka driver caching_sha2_password ke liye bahut purana hai (purana PHP mysqlnd, Node mysql, connectors)"
+      },
+      {
+        "id": "needs_tls_or_key",
+        "title_en": "caching_sha2_password needs TLS or the server's RSA public key on the first login (allowPublicKeyRetrieval / get-server-public-key)",
+        "title_hi": "caching_sha2_password ko pehle login par TLS ya server ki RSA public key chahiye (allowPublicKeyRetrieval / get-server-public-key)"
+      },
+      {
+        "id": "native_removed",
+        "title_en": "The account uses mysql_native_password, which MySQL 8.4 disables by default and 9.0 removed",
+        "title_hi": "Account mysql_native_password use karta hai, jo MySQL 8.4 mein default band hai aur 9.0 mein hata diya gaya"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "old_client",
+        "action": "code",
+        "steps_en": "Upgrade the driver (PHP 7.4+ mysqlnd, mysql2 for Node, Connector/J 8+, latest PyMySQL/mysqlclient). This is the lasting fix.",
+        "steps_hi": "Driver upgrade karo (PHP 7.4+ mysqlnd, Node ke liye mysql2, Connector/J 8+, latest PyMySQL/mysqlclient). Yahi pakka fix hai."
+      },
+      {
+        "cause": "needs_tls_or_key",
+        "action": "config",
+        "steps_en": "Connect over TLS, or allow the client to fetch the server public key (allowPublicKeyRetrieval=true / --get-server-public-key) on trusted networks only.",
+        "steps_hi": "TLS se connect karo, ya sirf bharosemand network par client ko server public key lene do (allowPublicKeyRetrieval=true / --get-server-public-key)."
+      },
+      {
+        "cause": "native_removed",
+        "action": "approved_change",
+        "steps_en": "Move the account to caching_sha2_password (ALTER USER ... IDENTIFIED WITH caching_sha2_password BY '...') and update the app's driver; enable mysql_native_password on 8.4 only as a short bridge.",
+        "steps_hi": "Account ko caching_sha2_password par le jao (ALTER USER ... IDENTIFIED WITH caching_sha2_password BY '...') aur app ka driver update karo; 8.4 par mysql_native_password sirf thode time ke liye on karo."
+      }
+    ],
+    "verify": {
+      "en": "The app logs in with its normal user; no plugin errors in its log.",
+      "hi": "App apne normal user se login karti hai; log mein plugin error nahi."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/caching-sha2-pluggable-authentication.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/upgrading-from-previous-series.html",
+      "https://dev.mysql.com/doc/refman/8.4/en/native-pluggable-authentication.html",
+      "https://www.percona.com/blog/upgrade-your-libraries-authentication-plugin-caching_sha2_password-cannot-be-loaded/",
+      "https://tableplus.com/blog/2018/07/failed-to-load-caching-sha2-password-authentication-plugin-solved.html",
+      "https://discourse.metabase.com/t/unable-to-load-authentication-plugin-caching-sha2-password/4839"
+    ],
+    "test_phrases": [
+      "after the hosting moved us to the new mysql my old software can't sign in anymore",
+      "hosting ne naya mysql diya, ab purana software sign in nahi kar pata, plugin ka error",
+      "होस्टिंग ने नया मायएसक्यूएल दिया, अब पुराना सॉफ्टवेयर साइन इन नहीं कर पाता"
+    ],
+    "codes": [
+      "2059",
+      "1251",
+      "2061",
+      "1524"
+    ]
+  },
+  {
+    "id": "pg-hba-rejected",
+    "title_en": "PostgreSQL rejects the login: no pg_hba.conf entry / Peer or Ident authentication failed",
+    "title_hi": "PostgreSQL login reject: pg_hba.conf mein entry nahi / Peer ya Ident authentication failed",
+    "engines": [
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "FATAL: no pg_hba.conf entry for host",
+      "FATAL: Peer authentication failed for user postgres",
+      "FATAL: Ident authentication failed for user",
+      "pg_hba.conf rejects connection for host",
+      "psql -U myuser peer authentication failed",
+      "remote se postgres connect karo to pg_hba wali error aati hai",
+      "pg_hba.conf mein kya likhna hai remote access ke liye",
+      "postgres user se login nahi ho raha peer authentication",
+      "पोस्टग्रेस में pg_hba वाली एरर आ रही है",
+      "दूसरे कंप्यूटर से पोस्टग्रेस में लॉगिन नहीं होता",
+      "allow my app server ip in postgres access rules",
+      "postgres doesn't allow my computer's address",
+      "postgres mere ip address ko allow nahi karta",
+      "पोस्टग्रेस मेरे आईपी पते को अनुमति नहीं देता",
+      "my pc's ip is not permitted in postgres config",
+      "postgres access rules block my machine"
+    ],
+    "diagnose": [
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'password_encryption', 'ssl')",
+        "look_for": "listen_addresses must include the network the client comes from; password_encryption (scram-sha-256) must match the method in pg_hba.conf"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT a.usename, a.datname, a.client_addr, s.ssl FROM pg_stat_activity a LEFT JOIN pg_stat_ssl s USING (pid) WHERE a.backend_type = 'client backend'",
+        "look_for": "which user/database/address/SSL combinations already work: the failing one needs a matching line"
+      }
+    ],
+    "causes": [
+      {
+        "id": "no_line",
+        "title_en": "No pg_hba.conf line matches this user + database + client address (+ SSL)",
+        "title_hi": "pg_hba.conf mein is user + database + client address (+ SSL) ki koi line nahi"
+      },
+      {
+        "id": "peer",
+        "title_en": "Local login uses 'peer'/'ident', which needs the Linux user name to equal the database user",
+        "title_hi": "Local login 'peer'/'ident' use karta hai, jisme Linux user ka naam database user jaisa hona chahiye"
+      },
+      {
+        "id": "not_reloaded",
+        "title_en": "pg_hba.conf was edited but not reloaded, or the wrong file was edited",
+        "title_hi": "pg_hba.conf badli par reload nahi ki, ya galat file badli"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "no_line",
+        "action": "config",
+        "steps_en": "Add one narrow line for the app: host <db> <user> <app_ip>/32 scram-sha-256 (hostssl if SSL is required). Never 0.0.0.0/0 with trust.",
+        "steps_hi": "App ke liye ek tight line jodo: host <db> <user> <app_ip>/32 scram-sha-256 (SSL zaroori ho to hostssl). Kabhi 0.0.0.0/0 ke saath trust mat likho."
+      },
+      {
+        "cause": "peer",
+        "action": "config",
+        "steps_en": "Connect with -h 127.0.0.1 to use password login, or run as the matching OS user (sudo -u postgres psql), or change that local line to scram-sha-256.",
+        "steps_hi": "Password login ke liye -h 127.0.0.1 se connect karo, ya same naam wale OS user se chalao (sudo -u postgres psql), ya us local line ko scram-sha-256 karo."
+      },
+      {
+        "cause": "not_reloaded",
+        "action": "advice",
+        "steps_en": "Run SHOW hba_file as a superuser to find the real file, then SELECT pg_reload_conf() (or systemctl reload postgresql); lines are read top to bottom, first match wins.",
+        "steps_hi": "Superuser se SHOW hba_file chala kar asli file dhoondo, phir SELECT pg_reload_conf() (ya systemctl reload postgresql); lines upar se neeche padhi jaati hain, pehli match jeetti hai."
+      }
+    ],
+    "verify": {
+      "en": "The app connects from its own address, and the check shows its user/address in the list.",
+      "hi": "App apne address se connect hoti hai, aur check mein uska user/address dikhta hai."
+    },
+    "source": "https://www.postgresql.org/docs/current/auth-pg-hba-conf.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/client-authentication-problems.html",
+      "https://www.postgresql.org/docs/current/auth-peer.html",
+      "https://postgrespro.com/list/thread-id/1311051",
+      "https://support.tibco.com/s/article/000046217"
+    ],
+    "test_phrases": [
+      "postgres says my computer's address is not on its allowed list",
+      "postgres bolta hai mere computer ka address allowed list mein nahi hai",
+      "पोस्टग्रेस कहता है मेरे कंप्यूटर का पता अनुमति वाली सूची में नहीं है"
+    ],
+    "codes": [
+      "28000"
+    ]
+  },
+  {
+    "id": "max-user-connections",
+    "title_en": "One user hit its own connection limit (max_user_connections / CONNECTION LIMIT)",
+    "title_hi": "Ek user ki apni connection limit poori ho gayi (max_user_connections / CONNECTION LIMIT)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "User has exceeded the 'max_user_connections' resource",
+      "already has more than 'max_user_connections' active connections",
+      "FATAL: too many connections for role",
+      "FATAL: too many connections for database",
+      "shared hosting max_user_connections error",
+      "hosting ne per user 25 connections ki limit lagayi hai",
+      "ek database user ki connection limit khatam",
+      "cpanel mysql user limit exceeded",
+      "एक यूज़र की कनेक्शन लिमिट पूरी हो गई",
+      "होस्टिंग में यूज़र के कनेक्शन की सीमा खत्म",
+      "max_user_connections badhana hai",
+      "hosting says my database user opened too many connections",
+      "my database username reached its own connection quota",
+      "hosting plan ka database user limit cross kar gaya",
+      "होस्टिंग कहती है डेटाबेस यूज़र ने बहुत कनेक्शन खोले"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('max_user_connections', 'max_connections')",
+        "look_for": "a non-zero max_user_connections caps every account (shared hosting often sets 10-30); per-account limits live in the account itself"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT USER, HOST, COUNT(*) AS connections, SUM(COMMAND = 'Sleep') AS sleeping FROM information_schema.PROCESSLIST GROUP BY USER, HOST ORDER BY connections DESC",
+        "look_for": "how many connections this user holds and how many just sleep (needs PROCESS to see other users)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT r.rolname, count(a.pid) AS connections, r.rolconnlimit FROM pg_roles r LEFT JOIN pg_stat_activity a ON a.usename = r.rolname WHERE r.rolconnlimit <> -1 GROUP BY r.rolname, r.rolconnlimit",
+        "look_for": "roles with a CONNECTION LIMIT and how close they are"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT datname, datconnlimit, datallowconn FROM pg_database WHERE NOT datistemplate ORDER BY datname",
+        "look_for": "databases with their own CONNECTION LIMIT"
+      }
+    ],
+    "causes": [
+      {
+        "id": "leak",
+        "title_en": "The app keeps connections open and idle (persistent connections, no pool, crons overlapping)",
+        "title_hi": "App connection khule aur idle rakhti hai (persistent connections, pool nahi, cron overlap)"
+      },
+      {
+        "id": "limit_low",
+        "title_en": "The per-user limit (set by you or the host) is lower than the real need",
+        "title_hi": "Per-user limit (aapki ya host ki lagayi) asli zaroorat se kam hai"
+      },
+      {
+        "id": "bots",
+        "title_en": "Bot / crawler traffic opens many PHP workers at once, each with its own connection",
+        "title_hi": "Bot / crawler traffic ek saath kai PHP workers kholta hai, har ek ka apna connection"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "leak",
+        "action": "code",
+        "steps_en": "Turn off persistent connections (mysqli p:, PDO::ATTR_PERSISTENT), close connections after each request, use one small pool; stop overlapping crons.",
+        "steps_hi": "Persistent connections band karo (mysqli p:, PDO::ATTR_PERSISTENT), har request ke baad connection band karo, ek chhota pool use karo; overlap hone wale cron roko."
+      },
+      {
+        "cause": "limit_low",
+        "action": "config",
+        "steps_en": "Raise it on purpose: ALTER USER ... WITH MAX_USER_CONNECTIONS n (MySQL) / ALTER ROLE ... CONNECTION LIMIT n (PostgreSQL); on shared hosting ask the host or move to a bigger plan.",
+        "steps_hi": "Soch kar badhao: ALTER USER ... WITH MAX_USER_CONNECTIONS n (MySQL) / ALTER ROLE ... CONNECTION LIMIT n (PostgreSQL); shared hosting par host se kaho ya bada plan lo."
+      },
+      {
+        "cause": "bots",
+        "action": "advice",
+        "steps_en": "Add page caching and block abusive bots so fewer requests reach the database.",
+        "steps_hi": "Page caching lagao aur faltu bots block karo taaki kam requests database tak pahunchein."
+      }
+    ],
+    "verify": {
+      "en": "The user's connection count stays under its limit through the busiest hour.",
+      "hi": "Sabse busy ghante mein bhi user ke connections limit se neeche rehte hain."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/user-resources.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/sql-createrole.html",
+      "https://www.postgresql.org/docs/current/sql-alterrole.html",
+      "https://www.pythonanywhere.com/forums/topic/27490/",
+      "https://support.atlassian.com/jira/kb/user-has-exceeded-the-max_user_connections-resource-error-in-mysql-due-to-limited-connection-pool/",
+      "https://fivetran.com/docs/connectors/databases/postgresql/troubleshooting/too-many-connections-for-role"
+    ],
+    "test_phrases": [
+      "my web host says my database login is using too many slots at once",
+      "hosting bol rahi hai mera database user ek saath zyada connection le raha hai",
+      "होस्टिंग कह रही है मेरा डेटाबेस यूज़र एक साथ ज़्यादा कनेक्शन ले रहा है"
+    ],
+    "codes": [
+      "1226",
+      "1203"
+    ]
+  },
+  {
+    "id": "mysql-host-blocked",
+    "title_en": "MySQL: Host is blocked because of many connection errors",
+    "title_hi": "MySQL: bahut connection errors ki wajah se host block ho gaya",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "Host is blocked because of many connection errors; unblock with mysqladmin flush-hosts",
+      "mysql host blocked flush hosts",
+      "max_connect_errors reached",
+      "app server suddenly blocked by mysql",
+      "mysql ne mere server ka IP block kar diya",
+      "host blocked wali error, flush hosts karna padta hai baar baar",
+      "load balancer health check se mysql host block ho gaya",
+      "मायएसक्यूएल ने मेरे सर्वर को ब्लॉक कर दिया",
+      "होस्ट ब्लॉक वाली एरर बार बार आती है",
+      "mysql blocked my web server after errors",
+      "errors ke baad mysql ne mera server block kar diya",
+      "मायएसक्यूएल ने एरर के बाद वेब सर्वर का पता ब्लॉक किया",
+      "mysql banned my server's ip",
+      "too many failed connects so mysql locked that host"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('max_connect_errors', 'host_cache_size', 'skip_name_resolve')",
+        "look_for": "a low max_connect_errors (old default 10, now 100)"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT IP, HOST, SUM_CONNECT_ERRORS, COUNT_HOST_BLOCKED_ERRORS, COUNT_HANDSHAKE_ERRORS, COUNT_AUTHENTICATION_ERRORS, LAST_ERROR_SEEN FROM performance_schema.host_cache ORDER BY SUM_CONNECT_ERRORS DESC",
+        "look_for": "which IP is blocked and what kind of errors it made (handshake = half-open connections, e.g. health checks or port scans)"
+      }
+    ],
+    "causes": [
+      {
+        "id": "health_checks",
+        "title_en": "A load balancer / monitor opens TCP connections to 3306 and drops them without logging in",
+        "title_hi": "Load balancer / monitor 3306 par TCP connection khol kar bina login chhod deta hai"
+      },
+      {
+        "id": "network_flaky",
+        "title_en": "Network drops or timeouts during the handshake from that host",
+        "title_hi": "Us host se handshake ke dauraan network drop ya timeout"
+      },
+      {
+        "id": "scans",
+        "title_en": "Port scanners or bots hitting an exposed port",
+        "title_hi": "Khule port par port scanners ya bots"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "health_checks",
+        "action": "config",
+        "steps_en": "Make the health check log in properly (or check a different port); raise max_connect_errors moderately.",
+        "steps_hi": "Health check ko theek se login karne do (ya doosra port check karo); max_connect_errors thoda badhao."
+      },
+      {
+        "cause": "network_flaky",
+        "action": "approved_change",
+        "steps_en": "Unblock now with FLUSH HOSTS (MySQL 8: TRUNCATE TABLE performance_schema.host_cache), then fix the network/timeouts.",
+        "steps_hi": "Abhi FLUSH HOSTS se unblock karo (MySQL 8: TRUNCATE TABLE performance_schema.host_cache), phir network/timeouts theek karo."
+      },
+      {
+        "cause": "scans",
+        "action": "config",
+        "steps_en": "Close the port to the internet (firewall: app server only), see the 'database open to the internet' playbook.",
+        "steps_hi": "Port ko internet ke liye band karo (firewall: sirf app server), 'database internet par khula' playbook dekho."
+      }
+    ],
+    "verify": {
+      "en": "The host's SUM_CONNECT_ERRORS stays at 0 and no new blocks for a day.",
+      "hi": "Host ka SUM_CONNECT_ERRORS 0 rehta hai aur ek din tak naya block nahi."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/blocked-host.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.4/en/host-cache.html",
+      "https://forum.xojo.com/t/blocked-because-of-many-connection-errors/69088",
+      "https://community.powerbi.com/t5/Desktop/Problem-Connecting-MySQL-Host-blocked/td-p/1311574"
+    ],
+    "test_phrases": [
+      "mysql locked out my web server's address after some failed tries",
+      "kuch fail tries ke baad mysql ne web server ka address band kar diya",
+      "कुछ असफल कोशिशों के बाद मायएसक्यूएल ने वेब सर्वर का पता बंद कर दिया"
+    ],
+    "codes": [
+      "1129"
+    ]
+  },
+  {
+    "id": "mysql-host-not-allowed",
+    "title_en": "MySQL: Host is not allowed to connect to this server (account exists only for localhost)",
+    "title_hi": "MySQL: is host ko server se connect karne ki ijazat nahi (account sirf localhost ke liye hai)",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "Host '192.168.1.5' is not allowed to connect to this MySQL server",
+      "is not allowed to connect to this MariaDB server",
+      "remote mysql access not allowed for user",
+      "mysql workbench se remote connect karne par not allowed",
+      "user sirf localhost ke liye bana hai, bahar se connect nahi hota",
+      "how to allow remote connection to mysql user",
+      "मायएसक्यूएल कहता है इस होस्ट को अनुमति नहीं है",
+      "बाहर के कंप्यूटर से मायएसक्यूएल में आने की इजाज़त नहीं",
+      "docker app ko mysql allow nahi kar raha host not allowed",
+      "mysql won't let another computer connect",
+      "mysql doosre computer ko connect nahi karne deta",
+      "दूसरे कंप्यूटर को मायएसक्यूएल जुड़ने नहीं देता",
+      "this machine has no permission to reach mysql"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT USER() AS you_connected_as, CURRENT_USER() AS account_matched",
+        "look_for": "from a working login: user@host you came from vs the account it matched; accounts are user + host pairs"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE FROM information_schema.USER_PRIVILEGES GROUP BY GRANTEE ORDER BY GRANTEE",
+        "look_for": "which user@host accounts exist (all of them only for an admin): the app's IP/host is missing"
+      }
+    ],
+    "causes": [
+      {
+        "id": "localhost_only",
+        "title_en": "The account was created only for 'localhost', so other machines (or Docker containers) don't match",
+        "title_hi": "Account sirf 'localhost' ke liye bana, isliye doosri machines (ya Docker containers) match nahi hoti"
+      },
+      {
+        "id": "ip_changed",
+        "title_en": "The app's IP changed (new server, container, NAT) and no account matches the new address",
+        "title_hi": "App ka IP badal gaya (naya server, container, NAT) aur naye address ka account nahi"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "localhost_only",
+        "action": "approved_change",
+        "steps_en": "Create the account for the app's exact IP or subnet (CREATE USER 'app'@'10.0.0.5' ... ; GRANT only what it needs), never 'root'@'%'.",
+        "steps_hi": "App ke exact IP ya subnet ke liye account banao (CREATE USER 'app'@'10.0.0.5' ... ; sirf zaroori GRANT), kabhi 'root'@'%' nahi."
+      },
+      {
+        "cause": "ip_changed",
+        "action": "approved_change",
+        "steps_en": "Add the new address as its own account (or a private subnet like 'app'@'10.0.0.%'), then remove the old one.",
+        "steps_hi": "Naya address alag account ke roop mein jodo (ya private subnet 'app'@'10.0.0.%'), phir purana hatao."
+      }
+    ],
+    "verify": {
+      "en": "The app connects from its machine, and CURRENT_USER() shows the narrow account (not '%').",
+      "hi": "App apni machine se connect hoti hai aur CURRENT_USER() tight account dikhata hai ('%' nahi)."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/problems-connecting.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/account-names.html",
+      "https://dev.mysql.com/doc/refman/8.0/en/creating-accounts.html",
+      "https://bannisterlake.atlassian.net/wiki/spaces/SUPPR/pages/1576665120/Trouble+Connecting+to+MySQL+Database"
+    ],
+    "test_phrases": [
+      "mysql won't let my other pc in, says that machine has no permission",
+      "doosre pc se mysql kehta hai is machine ko permission nahi",
+      "दूसरे पीसी से मायएसक्यूएल कहता है इस मशीन को इजाज़त नहीं"
+    ],
+    "codes": [
+      "1130"
+    ]
+  },
+  {
+    "id": "unknown-database-name",
+    "title_en": "Connected, but the database name doesn't exist (Unknown database / database does not exist)",
+    "title_hi": "Connect hua par database ka naam exist nahi karta (Unknown database / database does not exist)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "Unknown database 'shop'",
+      "FATAL: database \"myapp\" does not exist",
+      "database does not exist postgres but I created it",
+      "wrong DB_NAME in wp-config",
+      "database ka naam galat hai shayad, unknown database aa raha hai",
+      "migration se pehle database bana hi nahi",
+      "postgres bolta hai database exist nahi karta",
+      "डेटाबेस का नाम नहीं मिल रहा एरर",
+      "पोस्टग्रेस कहता है यह डेटाबेस मौजूद नहीं है",
+      "case of the database name is different on linux",
+      "the database name in my settings doesn't exist",
+      "settings wala database naam mil nahi raha",
+      "सेटिंग वाला डेटाबेस नाम नहीं मिलता",
+      "it can't find the database I configured"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA ORDER BY SCHEMA_NAME",
+        "look_for": "the exact names this user can see (case matters on Linux)"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT datname, datconnlimit, datallowconn FROM pg_database WHERE NOT datistemplate ORDER BY datname",
+        "look_for": "the exact names; a quoted \"MyApp\" is case-sensitive"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT DATABASE() AS current_database, @@hostname AS server_host, @@port AS server_port",
+        "look_for": "the server name/port the app really reached; compare with the app's settings"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT current_database(), current_user, inet_server_addr(), inet_server_port()",
+        "look_for": "the address/port the server answers on; compare with the app's settings"
+      }
+    ],
+    "causes": [
+      {
+        "id": "typo_case",
+        "title_en": "Name typo or different upper/lower case (\"MyApp\" vs myapp)",
+        "title_hi": "Naam mein typo ya upper/lower case alag (\"MyApp\" vs myapp)"
+      },
+      {
+        "id": "not_created",
+        "title_en": "The database was never created on this server (new server, fresh container, restore not done)",
+        "title_hi": "Is server par database bana hi nahi (naya server, fresh container, restore nahi hua)"
+      },
+      {
+        "id": "wrong_server",
+        "title_en": "The app reaches a different server/port than the one that has the data",
+        "title_hi": "App us server/port ke bajaye kisi aur tak pahunch rahi hai jahan data hai"
+      },
+      {
+        "id": "no_rights",
+        "title_en": "MySQL hides databases the user has no rights on",
+        "title_hi": "MySQL un databases ko chhupa deta hai jin par user ke rights nahi"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "typo_case",
+        "action": "config",
+        "steps_en": "Copy the exact name from the check into the app's config (DB_NAME / DB_DATABASE / DATABASE_URL).",
+        "steps_hi": "Check se exact naam copy karke app config (DB_NAME / DB_DATABASE / DATABASE_URL) mein daalo."
+      },
+      {
+        "cause": "not_created",
+        "action": "advice",
+        "steps_en": "Create the database (CREATE DATABASE) or restore the backup on this server before running migrations.",
+        "steps_hi": "Migrations chalane se pehle is server par database banao (CREATE DATABASE) ya backup restore karo."
+      },
+      {
+        "cause": "wrong_server",
+        "action": "config",
+        "steps_en": "Compare the host/port in the check with the app config; fix the host (localhost vs container name vs cloud endpoint).",
+        "steps_hi": "Check ka host/port app config se milao; host theek karo (localhost vs container name vs cloud endpoint)."
+      },
+      {
+        "cause": "no_rights",
+        "action": "approved_change",
+        "steps_en": "GRANT the app user rights on that one database.",
+        "steps_hi": "App user ko sirf us database par GRANT do."
+      }
+    ],
+    "verify": {
+      "en": "The app connects and the name appears in the check list.",
+      "hi": "App connect hoti hai aur naam check ki list mein dikhta hai."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/problems-connecting.html",
+    "seen_at": [
+      "https://www.postgresql.org/docs/current/manage-ag-overview.html",
+      "https://www.postgresql.org/docs/current/errcodes-appendix.html",
+      "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+    ],
+    "test_phrases": [
+      "it says the database I gave in settings is not there",
+      "settings mein jo database naam diya woh mil hi nahi raha bolta hai",
+      "सेटिंग में जो डेटाबेस दिया वो मिल ही नहीं रहा बोलता है"
+    ],
+    "codes": [
+      "1049",
+      "3D000"
+    ]
+  },
+  {
+    "id": "db-host-not-found",
+    "title_en": "Database host name can't be found (DNS): Unknown MySQL server host / could not translate host name",
+    "title_hi": "Database host ka naam nahi mila (DNS): Unknown MySQL server host / could not translate host name",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "Unknown MySQL server host 'db'",
+      "could not translate host name \"db\" to address: Name or service not known",
+      "getaddrinfo ENOTFOUND database host",
+      "php_network_getaddresses: getaddrinfo failed: Name or service not known",
+      "temporary failure in name resolution database",
+      "database host ka naam resolve nahi ho raha",
+      "rds endpoint galat hai shayad host nahi milta",
+      "डेटाबेस होस्ट का नाम नहीं मिल रहा",
+      "डेटाबेस सर्वर का पता गलत है शायद",
+      "db hostname not resolving after server migration",
+      "app can't find the database server name",
+      "database server ka hostname nahi mil raha",
+      "ऐप को डेटाबेस सर्वर का होस्टनेम नहीं मिलता",
+      "server name of the database not found"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT DATABASE() AS current_database, @@hostname AS server_host, @@port AS server_port",
+        "look_for": "the server name/port the app really reached; compare with the app's settings"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT current_database(), current_user, inet_server_addr(), inet_server_port()",
+        "look_for": "the address/port the server answers on; compare with the app's settings"
+      }
+    ],
+    "causes": [
+      {
+        "id": "typo",
+        "title_en": "Typo or old host name in the app config (endpoint changed after a move/restore)",
+        "title_hi": "App config mein typo ya purana host naam (move/restore ke baad endpoint badla)"
+      },
+      {
+        "id": "container_name",
+        "title_en": "A Docker service name used outside Docker (or a different compose network)",
+        "title_hi": "Docker service ka naam Docker ke bahar use kiya (ya alag compose network)"
+      },
+      {
+        "id": "dns_down",
+        "title_en": "The machine's DNS is broken or the private DNS zone isn't reachable",
+        "title_hi": "Machine ka DNS kharab hai ya private DNS zone tak pahunch nahi"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "typo",
+        "action": "config",
+        "steps_en": "Copy the host exactly from the provider console (or use the IP) into the app config.",
+        "steps_hi": "Provider console se host exact copy karo (ya IP do) aur app config mein daalo."
+      },
+      {
+        "cause": "container_name",
+        "action": "config",
+        "steps_en": "Use the service name only inside the same compose network; from the host machine use localhost + the published port.",
+        "steps_hi": "Service ka naam sirf usi compose network ke andar; host machine se localhost + published port use karo."
+      },
+      {
+        "cause": "dns_down",
+        "action": "advice",
+        "steps_en": "Test with nslookup/dig on the app's machine; fix /etc/resolv.conf or VPC DNS.",
+        "steps_hi": "App ki machine par nslookup/dig se test karo; /etc/resolv.conf ya VPC DNS theek karo."
+      }
+    ],
+    "verify": {
+      "en": "nslookup of the host returns an address and the app connects.",
+      "hi": "Host ka nslookup address deta hai aur app connect hoti hai."
+    },
+    "source": "https://www.postgresql.org/docs/current/libpq-connect.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/mysql-errors/8.0/en/client-error-reference.html",
+      "https://docs.docker.com/compose/how-tos/networking/"
+    ],
+    "test_phrases": [
+      "my app can't even find the database server's name",
+      "app ko database server ka naam hi nahi mil raha",
+      "ऐप को डेटाबेस सर्वर का नाम ही नहीं मिल रहा"
+    ],
+    "codes": [
+      "2005"
+    ]
+  },
+  {
+    "id": "docker-localhost-connection",
+    "title_en": "App in Docker can't reach the database (localhost inside a container is the container itself)",
+    "title_hi": "Docker mein app database tak nahi pahunchti (container ke andar localhost khud container hai)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "docker compose app cannot connect to mysql container",
+      "connection refused to postgres from another container on localhost:5432",
+      "app in docker can't reach database on host machine",
+      "host.docker.internal mysql connection",
+      "docker mein laravel ko DB_HOST kya dena hai",
+      "container se database connect nahi hota par bahar se hota hai",
+      "db container start hone se pehle app start ho jati hai",
+      "डॉकर में ऐप डेटाबेस से नहीं जुड़ रहा",
+      "कंटेनर से डेटाबेस कनेक्ट नहीं होता",
+      "docker compose up ke baad database connection error",
+      "inside docker my app can't see the database but outside it can",
+      "docker ke andar database nahi milta par bahar chal jata hai",
+      "डॉकर के अंदर डेटाबेस नहीं मिलता पर बाहर चल जाता है",
+      "works on my laptop but not in the container"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SELECT DATABASE() AS current_database, @@hostname AS server_host, @@port AS server_port",
+        "look_for": "the server name/port the app really reached; compare with the app's settings"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT current_database(), current_user, inet_server_addr(), inet_server_port()",
+        "look_for": "the address/port the server answers on; compare with the app's settings"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW VARIABLES WHERE Variable_name IN ('port', 'socket', 'bind_address', 'skip_networking', 'hostname')",
+        "look_for": "skip_networking ON or bind_address 127.0.0.1 means no other machine can connect; the port the app must use"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'unix_socket_directories', 'max_connections')",
+        "look_for": "listen_addresses 'localhost' accepts only local connections; the port the app must use"
+      }
+    ],
+    "causes": [
+      {
+        "id": "localhost",
+        "title_en": "The app uses localhost/127.0.0.1, which inside a container means the container itself",
+        "title_hi": "App localhost/127.0.0.1 use karti hai, jo container ke andar khud container hai"
+      },
+      {
+        "id": "startup_order",
+        "title_en": "The app starts before the database is ready (depends_on doesn't wait for readiness)",
+        "title_hi": "App database ready hone se pehle start hoti hai (depends_on readiness ka wait nahi karta)"
+      },
+      {
+        "id": "host_db_local_only",
+        "title_en": "The database is on the host machine but listens only on 127.0.0.1",
+        "title_hi": "Database host machine par hai par sirf 127.0.0.1 par sunta hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "localhost",
+        "action": "config",
+        "steps_en": "Use the compose service name as the host (DB_HOST=db) and the container port (3306/5432), not the published one.",
+        "steps_hi": "Host mein compose service ka naam do (DB_HOST=db) aur container port (3306/5432), published port nahi."
+      },
+      {
+        "cause": "startup_order",
+        "action": "config",
+        "steps_en": "Add a healthcheck to the database service and depends_on: condition: service_healthy, plus retry-on-connect in the app.",
+        "steps_hi": "Database service mein healthcheck aur depends_on: condition: service_healthy lagao, saath mein app mein connect retry."
+      },
+      {
+        "cause": "host_db_local_only",
+        "action": "config",
+        "steps_en": "Use host.docker.internal (add host-gateway on Linux) and let the database listen on the Docker bridge address only; allow just that subnet.",
+        "steps_hi": "host.docker.internal use karo (Linux par host-gateway jodo) aur database ko sirf Docker bridge address par sunne do; sirf woh subnet allow karo."
+      }
+    ],
+    "verify": {
+      "en": "docker compose up starts cleanly and the app's first request reaches the database.",
+      "hi": "docker compose up saaf start hota hai aur app ki pehli request database tak pahunchti hai."
+    },
+    "source": "https://docs.docker.com/compose/how-tos/networking/",
+    "seen_at": [
+      "https://docs.docker.com/compose/how-tos/startup-order/",
+      "https://dev.mysql.com/doc/refman/8.0/en/can-not-connect-to-server.html",
+      "https://forums.docker.com/t/docker-compose-postgres-database-connection-error-econnrefused-127-0-0-1-5432/145090",
+      "https://forums.docker.com/t/installing-docker-container-for-java-spring-postgres-application-connection-to-localhost-5432-refused/140916"
+    ],
+    "test_phrases": [
+      "inside the container my program can't see the database but on my laptop it works",
+      "container ke andar program ko database nahi dikhta par laptop pe chal jata hai",
+      "कंटेनर के अंदर प्रोग्राम को डेटाबेस नहीं दिखता पर लैपटॉप पर चलता है"
+    ]
+  },
+  {
+    "id": "app-pool-exhausted",
+    "title_en": "The app's connection pool runs out (timed out waiting for a free connection)",
+    "title_hi": "App ka connection pool khatam (free connection ke intezaar mein timeout)",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "HikariPool Connection is not available, request timed out after 30000ms",
+      "QueuePool limit of size 5 overflow 10 reached, connection timed out",
+      "Timed out fetching a new connection from the connection pool prisma",
+      "Unable to acquire JDBC Connection",
+      "knex Timeout acquiring a connection. The pool is probably full",
+      "connection pool full ho gaya app mein",
+      "pool se connection nahi mil raha, requests atak rahi hain",
+      "traffic aate hi app connection ka wait karti rehti hai",
+      "ऐप का कनेक्शन पूल भर गया",
+      "पूल से कनेक्शन नहीं मिल रहा, रिक्वेस्ट अटक रही हैं",
+      "database pool size kitna rakhein",
+      "when lots of users come the app waits for a free database connection",
+      "zyada users aate hi app database connection ka intezaar karti hai",
+      "ज़्यादा यूज़र आते ही ऐप डेटाबेस कनेक्शन का इंतज़ार करती है",
+      "all pool connections busy, requests waiting",
+      "app runs out of free db connections under load",
+      "when many visitors come together the site waits for a database connection slot",
+      "busy time pe app ko free db connection nahi milta",
+      "site hangs at peak waiting on the database pool"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected', 'Threads_running', 'Max_used_connections', 'Connections')",
+        "look_for": "few Threads_running but the app still waits = connections are held, not used"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT USER, HOST, COUNT(*) AS connections, SUM(COMMAND = 'Sleep') AS sleeping FROM information_schema.PROCESSLIST GROUP BY USER, HOST ORDER BY connections DESC",
+        "look_for": "the app's connections: many sleeping = leaked/held connections"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT usename, datname, count(*) AS connections FROM pg_stat_activity WHERE backend_type = 'client backend' GROUP BY usename, datname ORDER BY connections DESC",
+        "look_for": "how many connections the app really holds"
+      },
+      {
+        "engine": "postgres",
+        "sql": "SELECT pid, usename, client_addr, state, now() - state_change AS idle_for FROM pg_stat_activity WHERE state LIKE 'idle%' ORDER BY state_change LIMIT 20",
+        "look_for": "'idle in transaction' for long = the app took a connection and never finished"
+      }
+    ],
+    "causes": [
+      {
+        "id": "leak",
+        "title_en": "Code takes a connection and never returns it (missing close / finally, open transaction)",
+        "title_hi": "Code connection leta hai aur wapas nahi karta (close / finally nahi, transaction khula)"
+      },
+      {
+        "id": "slow_queries",
+        "title_en": "Slow queries hold every pooled connection so new requests wait",
+        "title_hi": "Slow queries saare pool connections pakad leti hain, nayi requests wait karti hain"
+      },
+      {
+        "id": "pool_small",
+        "title_en": "The pool is smaller than real concurrency (or many app instances × pool > max_connections)",
+        "title_hi": "Pool asli concurrency se chhota hai (ya kai app instances × pool > max_connections)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "leak",
+        "action": "code",
+        "steps_en": "Always return connections (try/finally, with-blocks, framework-managed sessions); turn on the pool's leak detection to find the line.",
+        "steps_hi": "Connection hamesha wapas karo (try/finally, with-blocks, framework sessions); line dhoondne ke liye pool ka leak detection on karo."
+      },
+      {
+        "cause": "slow_queries",
+        "action": "advice",
+        "steps_en": "Find and speed up the slow queries first (Live tab, slow log); add statement timeouts so one bad query can't hold the pool.",
+        "steps_hi": "Pehle slow queries dhoondo aur tez karo (Live tab, slow log); statement timeout lagao taaki ek kharab query pool na pakde."
+      },
+      {
+        "cause": "pool_small",
+        "action": "config",
+        "steps_en": "Size it on purpose: instances × pool size must stay under max_connections; a few connections per CPU core is usually enough; add PgBouncer/ProxySQL for many instances.",
+        "steps_hi": "Soch kar size do: instances × pool size max_connections se kam rahe; har CPU core par kuch connections kaafi hote hain; bahut instances ho to PgBouncer/ProxySQL lagao."
+      }
+    ],
+    "verify": {
+      "en": "At peak traffic the pool's wait time stays near zero and no timeout errors appear.",
+      "hi": "Peak traffic par pool ka wait time zero ke paas rehta hai aur timeout error nahi aate."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config-connection.html",
+    "seen_at": [
+      "https://dev.mysql.com/doc/refman/8.0/en/connection-management.html",
+      "https://dev.to/anasanjaria/how-slow-queries-lead-to-hikaricp-connection-timeouts-4hni",
+      "https://medium.com/@nagarjun_nagesh/common-connection-pool-errors-with-hikaricp-in-spring-boot-6d15ecc0ccab"
+    ],
+    "test_phrases": [
+      "when many people use the site at once it waits forever for a free database slot",
+      "jab bahut log ek saath aate hain to app free database connection ke liye rukti rehti hai",
+      "जब बहुत लोग एक साथ आते हैं तो ऐप खाली डेटाबेस कनेक्शन के लिए रुकी रहती है"
+    ],
+    "codes": [
+      "P2024"
+    ]
+  },
+  {
+    "id": "wordpress-error-establishing-db",
+    "title_en": "WordPress: Error establishing a database connection",
+    "title_hi": "WordPress: Error establishing a database connection",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "Error establishing a database connection",
+      "wordpress site shows error establishing database connection",
+      "wp-admin error establishing a database connection",
+      "wordpress site achanak database error dikha rahi hai",
+      "website pe error establishing a database connection aa raha hai",
+      "One or more database tables are unavailable. The database may need to be repaired",
+      "wp-config.php DB_HOST DB_USER galat",
+      "hosting change ke baad wordpress database se connect nahi ho raha",
+      "वर्डप्रेस साइट पर डेटाबेस कनेक्शन की एरर",
+      "वेबसाइट खोलते ही डेटाबेस से जुड़ने में त्रुटि दिखती है",
+      "my wordpress blog went blank with a database connection message",
+      "my wordpress site only shows a database connection error",
+      "wordpress home page pe sirf database connection error dikhta hai",
+      "वर्डप्रेस होम पेज पर सिर्फ डेटाबेस कनेक्शन एरर दिखता है",
+      "wordpress can't connect to database"
+    ],
+    "diagnose": [
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Uptime', 'Aborted_connects', 'Aborted_clients', 'Connection_errors_max_connections', 'Connection_errors_internal', 'Connection_errors_peer_address')",
+        "look_for": "a small Uptime (seconds) means the server restarted recently (crash / out of memory); rising Aborted_* counters"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected', 'Threads_running', 'Max_used_connections', 'Connections')",
+        "look_for": "Max_used_connections at the limit = the site ran out of connections under traffic"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA ORDER BY SCHEMA_NAME",
+        "look_for": "the exact database name to put in DB_NAME"
+      },
+      {
+        "engine": "mysql",
+        "sql": "SELECT option_name, option_value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'db_version')",
+        "look_for": "the site's settings are readable (tables are fine); unexpected URLs = see the hacked playbooks"
+      }
+    ],
+    "causes": [
+      {
+        "id": "credentials",
+        "title_en": "Wrong DB_NAME / DB_USER / DB_PASSWORD / DB_HOST in wp-config.php (after a move, a password change or a host change)",
+        "title_hi": "wp-config.php mein galat DB_NAME / DB_USER / DB_PASSWORD / DB_HOST (move, password change ya host change ke baad)"
+      },
+      {
+        "id": "server_down",
+        "title_en": "MySQL/MariaDB is down or restarted (out of memory on a small server, disk full)",
+        "title_hi": "MySQL/MariaDB band hai ya restart hua (chhote server par memory khatam, disk full)"
+      },
+      {
+        "id": "overloaded",
+        "title_en": "Too much traffic / bots used up all connections",
+        "title_hi": "Zyada traffic / bots ne saare connections le liye"
+      },
+      {
+        "id": "tables_damaged",
+        "title_en": "Tables are damaged ('One or more database tables are unavailable')",
+        "title_hi": "Tables kharab hain ('One or more database tables are unavailable')"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "credentials",
+        "action": "config",
+        "steps_en": "Compare wp-config.php with the host's database panel; reset the database user's password there and put the same one in DB_PASSWORD. DB_HOST is often 'localhost' but some hosts give a name.",
+        "steps_hi": "wp-config.php ko host ke database panel se milao; wahan database user ka password reset karo aur wahi DB_PASSWORD mein daalo. DB_HOST aksar 'localhost' hota hai par kuch host naam dete hain."
+      },
+      {
+        "cause": "server_down",
+        "action": "advice",
+        "steps_en": "Start the database service / ask the host; if it was killed for memory, lower its memory settings or upgrade the plan.",
+        "steps_hi": "Database service start karo / host se kaho; memory ki wajah se band hua to memory settings kam karo ya plan badhao."
+      },
+      {
+        "cause": "overloaded",
+        "action": "advice",
+        "steps_en": "Add page caching, block bad bots, then see the 'Too many connections' playbook.",
+        "steps_hi": "Page caching lagao, faltu bots block karo, phir 'Too many connections' playbook dekho."
+      },
+      {
+        "cause": "tables_damaged",
+        "action": "advice",
+        "steps_en": "Take a backup first, then use WordPress repair (define('WP_ALLOW_REPAIR', true); open /wp-admin/maint/repair.php) and remove the line afterwards.",
+        "steps_hi": "Pehle backup lo, phir WordPress repair chalao (define('WP_ALLOW_REPAIR', true); /wp-admin/maint/repair.php kholo) aur baad mein line hata do."
+      }
+    ],
+    "verify": {
+      "en": "The home page and /wp-admin load, and Uptime keeps growing.",
+      "hi": "Home page aur /wp-admin khulte hain, aur Uptime badhta rehta hai."
+    },
+    "source": "https://wordpress.org/documentation/article/common-wordpress-errors/",
+    "seen_at": [
+      "https://developer.wordpress.org/advanced-administration/wordpress/wp-config/",
+      "https://www.wpbeginner.com/beginners-guide/how-to-fix-the-error-establishing-a-database-connection-in-wordpress/",
+      "https://geekflare.com/fix-wordpress-error-establishing-a-database-connection"
+    ],
+    "test_phrases": [
+      "my wordpress homepage only says it can't connect to the database",
+      "meri wordpress website khulte hi bolti hai database se jud nahi pa rahi",
+      "मेरी वर्डप्रेस वेबसाइट खुलते ही कहती है डेटाबेस से जुड़ नहीं पा रही"
     ]
   }
 ]

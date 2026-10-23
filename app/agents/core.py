@@ -146,6 +146,27 @@ RUNS_PER_VISITOR_PER_DAY = 30
 _running = threading.Lock()
 
 
+def pasted_query(text: str) -> bool:
+    """The whole message is one SQL query (maybe straight from code), or a short line and then one."""
+    return query_in(text) is not None
+
+
+def query_in(text: str) -> str | None:
+    """The SQL query pasted in this message (maybe straight from code), after at most a short lead-in line like
+    'here is my query:'; None when the message is a sentence that only mentions SQL."""
+    from app.agents.sql import _strip_comments, unwrap
+
+    lines = (text or "").strip().splitlines()
+    for k in range(min(len(lines), 4)):
+        lead, rest = " ".join(lines[:k]), "\n".join(lines[k:])
+        if len(lead.split()) > 15:
+            break
+        q = _strip_comments(unwrap(rest)).strip()
+        if re.match(r"^\(?\s*(select|with|update|delete)\b", q, re.I) and SQL_RE.search(q):
+            return rest.strip()
+    return None
+
+
 def recipe_for(goal: Goal | None) -> Recipe | None:
     if goal is None:
         return None
@@ -226,8 +247,8 @@ def inputs_from_text(recipe: Recipe, text: str, slots: dict) -> dict:
                 found[inp.key] = m.group(1)
         elif inp.kind == "sql":
             m = SQL_RE.search(text)
-            if m:
-                found[inp.key] = text[m.start():].strip()[:20000]
+            if m:                                  # pasted from code: keep the code around it, the checker unwraps it
+                found[inp.key] = (query_in(text) or text[m.start():]).strip()[:20000]
     return found
 
 
@@ -237,6 +258,8 @@ def assign(db: Session, goal: Goal | None, text: str, hi: bool, asking: bool) ->
     Returns (agent, reply_override, run_now). The reply override replaces generic advice with the plan.
     """
     recipe = recipe_for(goal)
+    if goal is not None and (recipe is None or not any(i.kind == "sql" for i in recipe.inputs)) and pasted_query(text):
+        goal.intent, recipe = "slow_db_query", RECIPES["sql_review"]   # the message IS a query: whatever the chat was about, check it
     if recipe is None or goal is None:
         return None, None, False
     if any(a.recipe == "automation" for a in goal_agents(db, goal.id)):
@@ -258,6 +281,8 @@ def assign(db: Session, goal: Goal | None, text: str, hi: bool, asking: bool) ->
         db.add(agent)
         db.flush()
         missing = [i for i in recipe.inputs if i.required and not found.get(i.key)]
+        if recipe.available and not missing and any(i.kind == "sql" and found.get(i.key) for i in recipe.inputs):
+            return agent, None, True   # a pasted query is the whole input (only its text is read): check it now, don't ask "start?"
         return agent, plan_text(recipe, hi, missing), False
 
     inputs = loads(agent.inputs, {}) or {}

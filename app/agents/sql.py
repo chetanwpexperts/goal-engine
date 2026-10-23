@@ -4,6 +4,7 @@ Works on the query text alone (no database access needed). If the person also pa
 EXPLAIN output or CREATE TABLE statements, the checks get sharper.
 """
 
+import datetime as _dt
 import re
 from dataclasses import dataclass, field
 
@@ -35,16 +36,71 @@ class Table:
     order: list[str] = field(default_factory=list)
 
 
+_ASSIGN = r"(?:\$\w+|(?:(?:var|let|const|final|val|string|String|str)\s+)*[A-Za-z_][\w.]*)(?:\[[^\]]*\])?\s*[.+]?=\s*"   # $sql = / const q =
+_CALL = r"[A-Za-z_$][\w.$]*(?:->\w+)*\s*\(\s*(?:\$?\w+\s*,\s*)?"                                             # cursor.execute( / $db->query($c,
+_CODE_START = re.compile(rf"^\s*(?:{_ASSIGN}(?:{_CALL})?|{_CALL})(?=<<<|[rRfFbBuU]{{0,2}}[\"'`])")
+
+
+def _unclosed_quote(q: str) -> int | None:
+    """Where a quote opens that never closes (strings and comments read the way SQL reads them), or None."""
+    i, n, state, start = 0, len(q), None, None
+    while i < n:
+        c = q[i]
+        if state:
+            if c == "\\":
+                i += 2
+                continue
+            if c == state:
+                if q[i + 1:i + 2] == state:          # 'it''s'
+                    i += 2
+                    continue
+                state = None
+        elif c in "'\"`":
+            state, start = c, i
+        elif q.startswith("--", i) or c == "#":
+            j = q.find("\n", i)
+            i = n if j < 0 else j
+            continue
+        elif q.startswith("/*", i):
+            j = q.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+            continue
+        i += 1
+    if state is None:
+        return None
+    while start > 0 and q[start - 1] == state:          # the rest of a closing \"\"\"
+        start -= 1
+    return start
+
+
 def unwrap(query: str) -> str:
-    """A query pasted straight from code: $sql = "SELECT ...";  ->  SELECT ...  (and the indentation tidied)."""
+    """A query pasted straight from code: $sql = "SELECT ...";  ->  SELECT ...  (and the indentation tidied).
+    Also PHP heredoc (<<<SQL ... SQL;), JS template strings, Python strings and calls like cursor.execute(\"\"\"...\"\"\")."""
     q = (query or "").strip()
-    start = q
-    q = re.sub(r"^\s*(?:\$\w+|(?:var|let|const|string)\s+\w+|\w+)\s*[.+]?=\s*", "", q) if re.match(
-        r"^\s*(?:\$\w+|(?:var|let|const|string)\s+\w+|\w+)\s*[.+]?=\s*[\"'`]", q) else q
-    q = re.sub(r"^(?:<<<['\"]?\w+['\"]?|[\"'`]{1,3})\s*", "", q)
-    if q != start:                                   # it was wrapped in code: drop the closing quote too
-        q = re.sub(r"\s*[\"'`]{1,3}\s*\)?\s*;?\s*$", "", q)
+    m = _CODE_START.match(q)
+    rest = q[m.end():] if m else q
+    rest = re.sub(r"^[rRfFbBuU]{1,2}(?=[\"'`])", "", rest) if m else rest
+    body = None
+    h = re.match(r"<<<\s*['\"]?(\w+)['\"]?[ \t]*\r?\n", rest)
+    if h:                                            # heredoc: up to the line that closes it
+        end = re.search(rf"\r?\n[ \t]*{h.group(1)}\b[^\n]*$", rest[h.end():])
+        body = rest[h.end():][:end.start()] if end else rest[h.end():]
+    else:
+        for tok in ('"""', "'''", '"', "'", "`"):
+            if rest.startswith(tok) and (m or tok in ('"""', "'''", "`") or rest.rstrip().rstrip(";").rstrip().endswith(tok)):
+                last = rest.rfind(tok)
+                if last >= len(tok):
+                    body = rest[len(tok):last]
+                break
+    if body is not None:
+        q = body
+    else:                                            # the code before it was cut off: drop a closing quote left alone
+        cut = _unclosed_quote(q)
+        if cut is not None and re.fullmatch(r"[\"'`]*\s*(?:,[^\"'`]*)?\)?\s*;?\s*", q[cut:]):
+            q = q[:cut]
     lines = [ln.rstrip() for ln in q.splitlines()]
+    while lines and not lines[0].strip():
+        lines.pop(0)
     while lines and not lines[-1].strip():
         lines.pop()
     pad = min((len(ln) - len(ln.lstrip()) for ln in lines[1:] if ln.strip()), default=0)
@@ -57,7 +113,8 @@ def _strip_comments(sql: str) -> str:
 
 
 def _mask_strings(sql: str) -> str:
-    return re.sub(r"'(?:[^'\\]|\\.)*'", "'?'", sql)
+    """Every string becomes '?' ('%?' when it starts with %, so a leading-wildcard LIKE is still visible)."""
+    return re.sub(r"'(?:[^'\\]|\\.)*'", lambda m: "'%?'" if m.group(0).startswith("'%") else "'?'", sql)
 
 
 def _clause(sql: str, start: str, stops: tuple[str, ...]) -> str:
@@ -113,7 +170,7 @@ def analyze_sql(query: str, extra: str = "") -> dict:
     def add(sev, ten, thi, ev, fen, fhi):
         findings.append(SqlFinding(sev, ten, thi, ev, fen, fhi))
 
-    if re.search(r"\bselect\s+(distinct\s+)?(\w+\.)?\*", low):
+    if re.search(r"\bselect\s+(distinct\s+)?([`\"]?\w+[`\"]?\.)?\*", low):
         add(2, "SELECT * reads every column", "SELECT * har column padhta hai", "SELECT *",
             "Select only the columns you show or use; it reads less data and can use covering indexes.",
             "Sirf wahi columns lo jo chahiye; data kam padha jaata hai aur covering index kaam aata hai.")
@@ -131,18 +188,34 @@ def analyze_sql(query: str, extra: str = "") -> dict:
             "WHERE condition lagao aur pehle SELECT se test karo.")
 
     func = re.findall(r"\b(date|year|month|lower|upper|trim|substring|cast|concat|ifnull|coalesce)\s*\(\s*([`\w.]+)", where, re.I)
-    if func:
-        f, c = func[0]
-        add(3, f"{f.upper()}() on a column in WHERE blocks the index", f"WHERE mein column pe {f.upper()}() index ko rok deta hai",
-            f"{f.upper()}({c}) in WHERE",
-            "Compare the raw column with a range instead (see the rewritten query).",
-            "Column ko seedha range se compare karo (rewritten query dekho).")
-    if re.search(r"\blike\s+'\?'", where) and re.search(r"like\s+'%", _strip_comments(original), re.I):
+    rewritten = rewrite(original)
+    reported = set()
+    for f, c in func:
+        f = f.upper()
+        if f in reported:
+            continue
+        reported.add(f)
+        if f in ("DATE", "YEAR", "MONTH") and rewritten != original and re.search(rf"\b{f}\s*\(", rewritten, re.I) is None:
+            fen, fhi = ("Compare the raw column with a range instead (see the rewritten query).",
+                        "Column ko seedha range se compare karo (rewritten query dekho).")
+        elif f in ("DATE", "YEAR", "MONTH"):
+            fen, fhi = (f"Compare the raw column with a date range instead, e.g. {c} >= '2026-01-01' AND {c} < '2026-02-01'.",
+                        f"Column ko seedha date range se compare karo, jaise {c} >= '2026-01-01' AND {c} < '2026-02-01'.")
+        elif f in ("LOWER", "UPPER"):
+            fen, fhi = ("Compare the column as it is: MySQL's usual (_ci) collation already ignores case. In PostgreSQL use ILIKE, "
+                        "or an index on the same expression.",
+                        "Column ko seedha compare karo: MySQL ka aam (_ci) collation case pehle se ignore karta hai. PostgreSQL mein "
+                        "ILIKE, ya usi expression pe index.")
+        else:
+            fen, fhi = ("Store the cleaned value in its own column (or index the same expression) and compare that column directly.",
+                        "Saaf value alag column mein rakho (ya usi expression pe index) aur us column ko seedha compare karo.")
+        add(3, f"{f}() on a column in WHERE blocks the index", f"WHERE mein column pe {f}() index ko rok deta hai",
+            f"{f}({c}) in WHERE", fen, fhi)
+    if re.search(r"\blike\s+'%\?'", where, re.I):
         add(2, "LIKE '%...' can't use an index", "LIKE '%...' index use nahi kar sakta", "leading % in LIKE",
             "Use prefix search (LIKE 'abc%') or a FULLTEXT index for word search.",
             "Prefix search (LIKE 'abc%') ya word search ke liye FULLTEXT index.")
-    bare = re.sub(r"\b\w+\s*\([^()]*\)", "f()", where)  # drop function calls like DATE(x)
-    if re.search(r"\band\b", bare, re.I) and re.search(r"\bor\b", bare, re.I) and "(" not in bare.replace("f()", ""):
+    if _mixed_and_or(where):
         add(3, "AND and OR mixed without brackets: probably wrong results", "AND aur OR bina bracket ke: shayad galat result",
             "a AND b OR c", "AND runs before OR. Add brackets to say what you mean, e.g. a AND (b OR c).",
             "AND pehle chalta hai, OR baad mein. Bracket lagao, jaise a AND (b OR c).")
@@ -202,8 +275,8 @@ def analyze_sql(query: str, extra: str = "") -> dict:
                 other.join.append(oname)
         elif op in ("=", "in"):
             table.eq.append(name)
-        elif op == "like" and "%'" not in rhs[:3]:
-            table.rng.append(name)
+        elif op == "like" and rhs.startswith("'%"):
+            continue                              # LIKE '%x' can't use an index on this column
         else:
             table.rng.append(name)
     for m in re.finditer(r"\bon\s+(.+?)(?=\b(?:left|right|inner|join|where|group|order|limit)\b|$)", sql, re.I | re.S):
@@ -217,8 +290,9 @@ def analyze_sql(query: str, extra: str = "") -> dict:
             if t:
                 t.join.append(n)                     # 'AND fs.is_deleted = 0' in the ON: part of how that table is looked up
     order_clause = _clause(sql, "order by", ("limit", "union"))
+    aliases = {a.strip("`").lower() for a in re.findall(r"\bas\s+([`\w]+)", _clause(sql, "select", ("from",)), re.I)}
     for col in re.findall(r"([`\w.]+)(?:\s+(?:asc|desc))?", order_clause, re.I):
-        if col.lower() in ("asc", "desc", "rand"):
+        if col.lower() in ("asc", "desc", "rand") or col.strip("`").lower() in aliases or re.match(r"^\d+$", col):
             continue
         t, n = _owner(col, tables)
         if t:
@@ -229,11 +303,17 @@ def analyze_sql(query: str, extra: str = "") -> dict:
         if t:
             t.rng.append(n)
     existing, seen_structure = _existing_indexes(extra)
+    known = _structure_columns(extra)
 
-    def clean(cols: list[str]) -> list[str]:
+    def clean(cols: list[str], table: str = "") -> list[str]:
+        real = known.get(table.lower()) if table else None
         out: list[str] = []
         for c in cols:
-            c = c.strip("`")
+            c = c.strip('`"')
+            if real is not None:
+                if c.lower() not in real:
+                    continue                          # not a column of this table (the structure says so)
+                c = real[c.lower()]
             if c and c.lower() not in KEYWORDS and c not in out and c != "?":
                 out.append(c)
         return out
@@ -244,14 +324,17 @@ def analyze_sql(query: str, extra: str = "") -> dict:
         short = t.name.split(".")[-1]
         have = existing.get(short.lower(), set()) | existing.get("*", set())
         # filter index: equality columns first, then ONE range column (or the ORDER BY columns)
-        filt = clean(t.eq + (t.rng[:1] if t.rng else t.order))[:4]
-        if filt and filt[0].lower() not in have and not _likely_primary(short, filt[0]):
-            indexes.append(f"ALTER TABLE {t.name} ADD INDEX idx_{short}_{'_'.join(filt)[:40]} ({', '.join(filt)});")
+        rng = clean(t.rng, short)
+        filt = clean(t.eq + (rng[:1] if rng else t.order), short)[:4]
+        if filt and filt[0].lower() not in have and not (_likely_primary(short, filt[0]) and short.lower() not in known):
+            indexes.append(f"ALTER TABLE {t.name} ADD INDEX {_index_name(short, filt)} ({', '.join(filt)});")
         if t.name in has_filter and len(tables) > 1:
             continue                    # MySQL reads this table through its filter index; its join columns point outward
         joins = []
-        for jc in clean(t.join):
-            if _likely_primary(short, jc):
+        for jc in clean(t.join, short):
+            if jc.lower() in have and short.lower() in known:
+                continue                      # the structure shows it's already indexed
+            if _likely_primary(short, jc) and short.lower() not in known:
                 skipped.append(f"{short}.{jc}")
             elif jc not in filt[:1]:
                 joins.append(jc)
@@ -259,7 +342,7 @@ def analyze_sql(query: str, extra: str = "") -> dict:
             joins = []                  # an index already starts with one of the join columns: MySQL can use it
         if joins:                       # one index for all the columns this table is joined on, not one each
             cols = joins[:4]
-            indexes.append(f"ALTER TABLE {t.name} ADD INDEX idx_{short}_{'_'.join(cols)[:40]} ({', '.join(cols)});")
+            indexes.append(f"ALTER TABLE {t.name} ADD INDEX {_index_name(short, cols)} ({', '.join(cols)});")
     check_query = None
     if indexes and not seen_structure:
         names = ", ".join(f"'{t.name.split('.')[-1]}'" for t in tables)
@@ -292,7 +375,6 @@ def analyze_sql(query: str, extra: str = "") -> dict:
             add(2, "Temporary table for GROUP BY/DISTINCT", "GROUP BY/DISTINCT ke liye temporary table", "Using temporary",
                 "Index the GROUP BY columns, or pre-aggregate.", "GROUP BY columns pe index, ya pehle se aggregate.")
 
-    rewritten = rewrite(original)
     findings.sort(key=lambda f: f.severity, reverse=True)
     notes = _notes(sql, tables, original)
     return {"ok": True, "findings": [f.as_dict() for f in findings], "indexes": indexes, "check_query": check_query,
@@ -329,6 +411,11 @@ def _notes(sql: str, tables, original: str = "") -> list[dict]:
     return out
 
 
+def _index_name(table: str, cols: list[str]) -> str:
+    """idx_<table>_<columns>, never longer than MySQL (64) and PostgreSQL (63) allow."""
+    return f"idx_{table}_{'_'.join(cols)[:40]}"[:60].rstrip("_")
+
+
 def _likely_primary(table: str, col: str) -> bool:
     """'id', or courses.course_id / batches.batch_id: almost always the table's own primary key (already indexed)."""
     c, t = col.lower().strip("`"), table.lower().strip("`")
@@ -336,20 +423,38 @@ def _likely_primary(table: str, col: str) -> bool:
     return c == "id" or any(c in (f"{f}_id", f"{f}id") for f in forms)
 
 
+_TNAME = r"[`\"]?(?:\w+[`\"]?\.[`\"]?)?(\w+)[`\"]?"
+_NOT_COLUMN = {"primary", "key", "index", "unique", "constraint", "foreign", "check", "fulltext", "spatial", "exclude", "like"}
+
+
+def _looks_postgres(text: str) -> bool:
+    return not re.search(r"\bengine\s*=", text, re.I) and bool(
+        re.search(r"\bpublic\.|using\s+btree|character varying|without time zone|\bserial\b|::|\bbigserial\b", text, re.I))
+
+
 def _existing_indexes(extra: str) -> tuple[dict, bool]:
-    """Indexes already there, from a pasted SHOW CREATE TABLE / SHOW INDEX: {table: {first columns}}, and whether any
-    structure was pasted at all (without it, nothing about existing indexes is known)."""
+    """Indexes already there, from a pasted SHOW CREATE TABLE / SHOW INDEX / pg_dump --schema-only: {table: {first columns}},
+    and whether any structure was pasted at all (without it, nothing about existing indexes is known)."""
     out: dict = {}
     text = extra or ""
     seen = False
-    for m in re.finditer(r"create\s+table\s+(?:if\s+not\s+exists\s+)?[`\"]?(?:\w+[`\"]?\.[`\"]?)?(\w+)[`\"]?\s*\((.*?)\)\s*(?:engine|;|$)",
-                         text, re.I | re.S):
+    pg = _looks_postgres(text)
+    keys = r"primary\s+key|unique\s+key|unique\s+index|unique|key|index" + ("" if pg else r"|foreign\s+key")  # InnoDB indexes a FK
+    for m in re.finditer(rf"create\s+table\s+(?:if\s+not\s+exists\s+)?{_TNAME}\s*\((.*?)\)\s*(?:engine|;|$)", text, re.I | re.S):
         seen = True
         cols = out.setdefault(m.group(1).lower(), set())
-        for k in re.finditer(r"(?:primary\s+key|unique\s+key|unique|key|index|foreign\s+key)\s*[`\w]*\s*\(\s*`?(\w+)", m.group(2), re.I):
-            cols.add(k.group(1).lower())              # an InnoDB foreign key is indexed too
-        for k in re.finditer(r"^\s*`?(\w+)`?\s+\w+[^,\n]*\bprimary\s+key\b", m.group(2), re.I | re.M):
+        for k in re.finditer(rf"(?:{keys})\s*[`\"\w]*\s*\(\s*[`\"]?(\w+)", m.group(2), re.I):
             cols.add(k.group(1).lower())
+        for k in re.finditer(r"^\s*[`\"]?(\w+)[`\"]?\s+\w+[^,\n]*\b(?:primary\s+key|unique)\b", m.group(2), re.I | re.M):
+            cols.add(k.group(1).lower())
+    for m in re.finditer(rf"alter\s+table\s+(?:only\s+)?(?:if\s+exists\s+)?{_TNAME}\s+add\s+(?:constraint\s+[`\"\w]+\s+)?"
+                         rf"(?:{keys})\s*[`\"\w]*\s*\(\s*[`\"]?(\w+)", text, re.I):
+        seen = True                                    # ALTER TABLE ... ADD CONSTRAINT x PRIMARY KEY (id) / ADD INDEX ...
+        out.setdefault(m.group(1).lower(), set()).add(m.group(2).lower())
+    for m in re.finditer(rf"create\s+(?:unique\s+)?index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?[`\"\w]*\s*on\s+(?:only\s+)?{_TNAME}"
+                         r"\s*(?:using\s+\w+\s*)?\(\s*[`\"]?(\w+)[`\"]?\s*[,)]", text, re.I):
+        seen = True                                    # CREATE INDEX x ON public.t USING btree (col)
+        out.setdefault(m.group(1).lower(), set()).add(m.group(2).lower())
     for m in re.finditer(r"^\|?\s*(\w+)\s*\|\s*[01]\s*\|\s*(\w+)\s*\|\s*1\s*\|\s*(\w+)\s*\|", text, re.M):
         seen = True                                    # SHOW INDEX rows: Table | Non_unique | Key_name | Seq 1 | Column
         out.setdefault(m.group(1).lower(), set()).add(m.group(3).lower())
@@ -360,10 +465,87 @@ def _existing_indexes(extra: str) -> tuple[dict, bool]:
     return out, seen
 
 
-def rewrite(sql: str) -> str:
-    """Safe, mechanical rewrites only (same results, index-friendly)."""
-    out = re.sub(r"\bdate\s*\(\s*([`\w.]+)\s*\)\s*=\s*'(\d{4}-\d{2}-\d{2})'",
-                 lambda m: f"{m.group(1)} >= '{m.group(2)}' AND {m.group(1)} < '{m.group(2)}' + INTERVAL 1 DAY", sql, flags=re.I)
-    out = re.sub(r"\byear\s*\(\s*([`\w.]+)\s*\)\s*=\s*(\d{4})",
-                 lambda m: f"{m.group(1)} >= '{m.group(2)}-01-01' AND {m.group(1)} < '{int(m.group(2)) + 1}-01-01'", out, flags=re.I)
+def _structure_columns(extra: str) -> dict:
+    """{table: {column in lower case: column as the table spells it}} from pasted CREATE TABLE statements."""
+    out: dict = {}
+    for m in re.finditer(rf"create\s+table\s+(?:if\s+not\s+exists\s+)?{_TNAME}\s*\((.*?)\)\s*(?:engine|;|$)", extra or "", re.I | re.S):
+        cols = out.setdefault(m.group(1).lower(), {})
+        for k in re.finditer(r"(?:^|,)\s*(`[^`]+`|\"[^\"]+\"|[A-Za-z_]\w*)\s+[A-Za-z]", m.group(2), re.M):
+            name = k.group(1)
+            bare = name.strip('`"')
+            if name[0] not in '`"' and bare.lower() in _NOT_COLUMN:
+                continue
+            real = bare if name[0] in '`"' or not _looks_postgres(extra) else bare.lower()   # PostgreSQL folds unquoted names
+            cols[bare.lower()] = real
     return out
+
+
+_DAY = r"'(\d{4}-\d{2}-\d{2})'"
+_DATE_CMP = re.compile(rf"(\bnot\s+)?\bdate\s*\(\s*([`\"\w.]+)\s*\)\s*(?:(between)\s+{_DAY}\s+and\s+{_DAY}|(>=|<=|<>|!=|=|>|<)\s*{_DAY})",
+                       re.I)
+_YEAR_CMP = re.compile(r"(\bnot\s+)?\byear\s*\(\s*([`\"\w.]+)\s*\)\s*(?:(between)\s+(\d{4})\s+and\s+(\d{4})|(>=|<=|<>|!=|=|>|<)\s*(\d{4}))\b",
+                       re.I)
+_ENDS_CONDITION = re.compile(r"^\s*(?:$|\)|;|\b(?:and|or|order|group|limit|having|union|offset|then|when|else|end)\b)", re.I)
+
+
+def _range(col: str, lo: str | None, hi: str | None) -> str:
+    """col >= lo AND col < hi (hi is the first day NOT included)."""
+    parts = ([f"{col} >= '{lo}'"] if lo else []) + ([f"{col} < '{hi}'"] if hi else [])
+    return " AND ".join(parts)
+
+
+def _ranged(m, text: str, lo_hi) -> str:
+    try:
+        cond = lo_hi(m)
+    except ValueError:                                # not a real date: leave it as written
+        return m.group(0)
+    if cond is None:
+        return m.group(0)
+    two = " AND " in cond
+    if m.group(1):                                   # NOT DATE(x) = ...: keep it one condition
+        return f"{m.group(1)}({cond})"
+    if two and not _ENDS_CONDITION.match(text[m.end():]):
+        return f"({cond})"
+    return cond
+
+
+def _date_bounds(m):
+    col, between, d1, d2, op, d = m.group(2), m.group(3), m.group(4), m.group(5), m.group(6), m.group(7)
+    day = lambda x, k=0: (_dt.date.fromisoformat(x) + _dt.timedelta(days=k)).isoformat()  # noqa: E731
+    if between:
+        return _range(col, day(d1), day(d2, 1))
+    return {"=": lambda: _range(col, day(d), day(d, 1)), ">=": lambda: _range(col, day(d), None), ">": lambda: _range(col, day(d, 1), None),
+            "<": lambda: _range(col, None, day(d)), "<=": lambda: _range(col, None, day(d, 1))}.get(op, lambda: None)()
+
+
+def _year_bounds(m):
+    col, between, y1, y2, op, y = m.group(2), m.group(3), m.group(4), m.group(5), m.group(6), m.group(7)
+    jan = lambda x, k=0: f"{int(x) + k:04d}-01-01"  # noqa: E731
+    if between:
+        return _range(col, jan(y1), jan(y2, 1))
+    return {"=": lambda: _range(col, jan(y), jan(y, 1)), ">=": lambda: _range(col, jan(y), None), ">": lambda: _range(col, jan(y, 1), None),
+            "<": lambda: _range(col, None, jan(y)), "<=": lambda: _range(col, None, jan(y, 1))}.get(op, lambda: None)()
+
+
+def rewrite(sql: str) -> str:
+    """Safe, mechanical rewrites only (same results, index-friendly): DATE(col) / YEAR(col) compared with a constant
+    becomes a range on the plain column, with the end date worked out here, so it runs the same on MySQL and PostgreSQL."""
+    out = _DATE_CMP.sub(lambda m: _ranged(m, m.string, _date_bounds), sql)
+    return _YEAR_CMP.sub(lambda m: _ranged(m, m.string, _year_bounds), out)
+
+
+def _mixed_and_or(where: str) -> bool:
+    """AND and OR side by side at the same bracket level (BETWEEN x AND y is not a logical AND)."""
+    w = re.sub(r"\bbetween\b(.+?)\band\b", lambda m: "between" + m.group(1) + "_band_", where, flags=re.I | re.S)
+    both = lambda g: bool(re.search(r"\band\b", g, re.I) and re.search(r"\bor\b", g, re.I))  # noqa: E731
+    stack: list[list[str]] = [[]]
+    for ch in w:
+        if ch == "(":
+            stack.append([])
+        elif ch == ")" and len(stack) > 1:
+            if both("".join(stack.pop())):
+                return True
+            stack[-1].append(" x ")
+        else:
+            stack[-1].append(ch)
+    return any(both("".join(g)) for g in stack)

@@ -3051,7 +3051,12 @@
       "database ka data bina encryption ke ja raha hai kya",
       "could anyone on the network see the data between app and database",
       "app aur database ke beech ka data koi network pe padh sakta hai kya",
-      "is the link between my app and db readable by others"
+      "is the link between my app and db readable by others",
+      "database ko encrypt karna hai",
+      "db ka connection encrypted kaise karein",
+      "database pe ssl lagana hai",
+      "encryption on karna hai database connection pe",
+      "how do I encrypt my database connection"
     ],
     "diagnose": [
       {
@@ -5194,7 +5199,11 @@
       "inside docker my app can't see the database but outside it can",
       "docker ke andar database nahi milta par bahar chal jata hai",
       "डॉकर के अंदर डेटाबेस नहीं मिलता पर बाहर चल जाता है",
-      "works on my laptop but not in the container"
+      "works on my laptop but not in the container",
+      "connection refused to the database on the host machine from the app container",
+      "app can't reach the database running on the host machine",
+      "localhost pe database chal raha hai par container se connection refused aata hai",
+      "host machine wala database container ke andar se nahi milta"
     ],
     "diagnose": [
       {

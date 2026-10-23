@@ -49,3 +49,43 @@ and how to prove it's fixed.
 
 ## File formats
 See `app/dbknow/__init__.py` (`REQUIRED`, `FIX_TYPES`) and the existing entries. `dbknow.validate()` must return `[]`.
+
+## The test generator (proves the database agent on data it has never seen)
+`tests/fuzz/db.py` is to the database agent what `tests/fuzz/sheets.py` is to the Excel agent. Each seed makes a random
+schema from a field (school, shop orders, HR, clinic, hotel, inventory, fees, attendance, loans), with primary keys
+(`id` or `<table>_id`), foreign keys, some existing indexes, snake/camel-case names and random data (NULLs, dates, text,
+numbers). It creates the tables (`fz<seed>_*`) on the local test databases (MySQL/MariaDB `shop_db`, PostgreSQL `shop_pg`,
+from `scripts/setup_test_dbs.sh`), runs the checks and drops them. An engine whose server is down is skipped.
+All data is generated: never real users' databases, real names or secrets.
+
+Three families, with the truth worked out by the generator (from the schema, the data and the engines), never by the agent:
+- **queries**: random SELECT / UPDATE / DELETE (filters, functions on columns, LIKE, AND/OR, joins, GROUP BY, ORDER BY,
+  LIMIT/OFFSET, IN/EXISTS subqueries, comments, odd spacing, wrapped in PHP / heredoc / JS / Python / Java code).
+  `analyze_sql` must not crash, `unwrap` must give the bare query, a rewrite must return exactly the same rows on every
+  engine where the original runs, every suggested index must name real columns, never a primary key or an already indexed
+  leading column, and must really run through the connector (create, then Undo), wording must match what the agent can
+  know (structure pasted or not), and findings must match what was put in the query.
+- **followups**: a chat through the API (slow database, the query, then optimise / what changed / why slow / which
+  indexes / explain, in English, Hinglish and Hindi): the right kind of answer, never the same reply twice, no generic
+  fallback, no code wrapper left, next suggestions about the query.
+- **phrasings**: new ways of describing every playbook in `issues.json`: the right playbook, or "not sure".
+  Confidently wrong is a failure.
+
+```
+python -m tests.fuzz.db --start 1 --seeds 150 --json out.json     # pass rate per family, coverage, every failure
+python -m tests.fuzz.db --seed 7 --show                           # one seed, every item printed
+```
+
+`tests/test_fuzz_db.py` runs a small fixed set of seeds in the normal suite (under a minute) plus every failure the
+generator ever found, as a permanent case.
+
+### In the nightly run
+1. After setup, run the generator on **new seeds every night**:
+   `.venv/bin/python -m tests.fuzz.db --start $(( $(date +%Y%m%d) % 100000 * 10 )) --seeds 150 --json fuzz-db.json`
+2. **Fix its failures before taking a backlog item.** Group them, fix the biggest group first: knowledge in
+   `app/dbknow/*.json` first (richer symptoms/examples), code in `app/agents/sql.py`, `app/agents/database.py` or
+   `app/dbknow/` only when data can't fix it. Re-run the same seeds until the pass rate stops improving.
+3. Add each fixed failure to `tests/test_fuzz_db.py` as a permanent case.
+4. Never make a check in the generator more lenient to get a pass, and never weaken `test_phrases`.
+   If a failure can't be fixed safely, write it in `LOG.md` for Chetan (seed, family, what fails).
+5. Note the pass rate per family in `LOG.md`.

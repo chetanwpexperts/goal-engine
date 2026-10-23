@@ -533,6 +533,12 @@ def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) ->
     return relation not in ("howto", "safety", "chit_chat") and wants_database(goal, text)
 
 
+def _sure(rec: dict) -> bool:
+    """Sure of the problem: very likely, or a clear winner over the next guess (more problems known = lower top scores)."""
+    nxt = (rec.get("alternatives") or [{}])[0].get("confidence", 0)
+    return rec["confidence"] >= 0.6 or (rec["confidence"] >= 0.35 and rec["confidence"] >= 4 * nxt)
+
+
 def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     """Database work: the agent works through a connector on the user's own server."""
     from app.dbknow import brain as dbbrain
@@ -546,7 +552,7 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     if mode != "explore":
         inputs["mode"] = mode
     if rec["kind"] in ("sql", "error") or (rec["kind"] == "do" and rec["confidence"] >= 0.35) or (
-            rec["kind"] == "issue" and rec["confidence"] >= 0.6):     # name a specific problem only when sure
+            rec["kind"] == "issue" and _sure(rec)):                   # name a specific problem only when sure
         inputs["brain"] = {**rec, "sql": text if rec["kind"] == "sql" else ""}
     agent.inputs = dumps(inputs)
     goal.title = MODE_TEXT[inputs.get("mode", "explore")][0 if turn.hi else 1].split(" (")[0]

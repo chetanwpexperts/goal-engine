@@ -101,3 +101,20 @@ def test_english_by_default(client, ml_mode):
 def test_fix_everything_in_any_order(client, open_file, text):
     r = say(client, text, open_file)
     assert "Fixing" in r["reply"] or "theek kar raha" in r["reply"] or "Nothing left" in r["reply"] or "kuch nahi bacha" in r["reply"], (text, r["reply"])
+
+
+@pytest.mark.parametrize("text", ["my excel sheet have issues", "excel me problem hai", "my spreadsheet is broken", "meri sheet kharab hai",
+                                  "I need help with a csv file", "एक्सेल फाइल में दिक्कत है"])
+def test_any_excel_problem_opens_the_excel_agent(client, ml_mode, text):
+    r = say(client, text)
+    assert any(a.get("office") for a in r["agents"]), (text, r["reply"])
+    assert "no agent" not in r["reply"].lower() and "abhi agent nahi" not in r["reply"].lower()
+
+
+@pytest.mark.parametrize("text,agent", [("my database has issues", "database"), ("mysql not working properly", "database"),
+                                        ("my website has issues", "website_check"), ("website kharab hai", "website_check"),
+                                        ("my wordpress site has problems", "website_check")])
+def test_vague_problems_open_the_right_agent(client, ml_mode, text, agent):
+    r = say(client, text)
+    assert agent in [a.get("recipe") for a in r["agents"]], (text, r["reply"])
+    assert "????" not in r["reply"], "never names a specific cause it can't know yet"

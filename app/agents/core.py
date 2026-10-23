@@ -242,8 +242,11 @@ def assign(db: Session, goal: Goal | None, text: str, hi: bool, asking: bool) ->
         if asking and goal.pending in INPUT_SLOTS.get(recipe.key, ()):
             goal.pending = None        # the agent asks for its own input (e.g. the website address)
             asking = False
-        if asking and not found:
+        direct = goal.intent == "website_problem" and recipe.key in INPUT_SLOTS
+        if asking and not found and not direct:
             return None, None, False   # the conversation is still asking its one question; propose after
+        if direct:
+            goal.pending = None        # "my website has issues": the agent only needs the address; ask for that, not an essay
         agent = Agent(visitor_id=goal.visitor_id, goal_id=goal.id, recipe=recipe.key, inputs=dumps(found),
                       status="proposed" if recipe.available else "planned")
         db.add(agent)

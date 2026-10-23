@@ -1,6 +1,9 @@
 """More ways people describe each problem. Kept separate so it's easy to keep adding."""
 
 EXTRA: dict[str, list[str]] = {
+    'website_problem': ['my website has issues', 'website kharab hai', 'website kharab ho gayi', 'site mein problem hai', 'my site is broken',
+                        'website not working properly', 'website mein dikkat hai', 'site down hai kya', 'website khul nahi rahi',
+                        'my website has errors', 'website pe error aa raha hai', 'website theek karo', 'site sahi nahi chal rahi'],
     'pricing': ['mehenga bolke log chale jaate hai', 'service charge kitna lu', 'what price should i set', 'quotation mein kitna likhu', 'per piece kitna rate rakhe'],
     'competition': ['naye competitor ne customer chheen liye', 'everyone sells the same thing cheaper', 'bade brand se kaise lade', 'log online se sasta mangwa lete hai'],
     'cash_flow': ['udhaar mein maal dena padta hai paisa phans jaata hai', 'no money left after paying bills', 'business mein paisa kam pad jaata hai'],

@@ -292,7 +292,8 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
         inputs = loads(agent.inputs, {}) or {}
         if mode != "explore":
             inputs["mode"] = mode
-        if rec["kind"] in ("sql", "error") or (rec["kind"] in ("issue", "do") and rec["confidence"] >= 0.35):
+        if rec["kind"] in ("sql", "error") or (rec["kind"] == "do" and rec["confidence"] >= 0.35) or (
+                rec["kind"] == "issue" and rec["confidence"] >= 0.6):     # name a specific problem only when sure
             inputs["brain"] = {**rec, "sql": text if rec["kind"] == "sql" else ""}
         agent.inputs = dumps(inputs)
         goal.title = dbagent.MODE_TEXT[agent_mode(agent)][0 if turn.hi else 1].split(" (")[0]

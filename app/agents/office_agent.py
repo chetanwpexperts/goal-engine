@@ -30,6 +30,8 @@ _big_lane = threading.Semaphore(1)          # one big file at a time, so the VPS
 FILE_WORDS = re.compile(r"\b(excel|xlsx|xls|csv|spreadsheet|sheet|sheets|workbook|vlookup|xlookup|pivot|formula|formule|"
                         r"word file|docx|powerpoint|pptx|outlook|onedrive|eksel|shit|phormula)\b|#(REF!|N/A|VALUE!|DIV/0!|NAME\?)", re.I)
 ALLOWED = (".xlsx", ".xlsm", ".csv", ".txt")
+STRONG_FILE = re.compile(r"\b(excel|eksel|xlsx|xls|xlsm|spreadsheets?|workbook|csv)\b|एक्सेल", re.I)
+PROBLEM_WORDS = re.compile(r"\b(issues?|problems?|errors?|kharab|broken|galat|wrong|not working|nahi chal|help|fix|theek|check|messy|dikkat|gadbad)\b", re.I)
 
 
 class OfficeAgentError(Exception):
@@ -54,6 +56,10 @@ def wants_office(goal: Goal | None, text: str, db: Session | None = None) -> boo
     rec = brain.recognize(text)
     if rec["confidence"] >= 0.99:
         return True                                   # an Excel error value like #REF!
+    if STRONG_FILE.search(text or ""):
+        return True                                   # "my excel sheet has issues": it names Excel, that's enough
+    if FILE_WORDS.search(text or "") and PROBLEM_WORDS.search(text or ""):
+        return True                                   # "meri sheet kharab hai"
     return bool(FILE_WORDS.search(text or "")) and rec["confidence"] >= 0.2
 
 

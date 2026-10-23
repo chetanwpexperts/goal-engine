@@ -28,7 +28,38 @@ FILE_TTL = timedelta(hours=1)          # after the last thing done with the file
 FILE_MAX_AGE = timedelta(hours=8)      # whatever happens
 BIG = 50 * 1024 * 1024
 OPEN_FILES_PER_VISITOR = 6
-_big_lane = threading.Semaphore(1)          # one big file at a time, so the VPS stays responsive
+class _ServerLane:
+    """One big file at a time on the WHOLE server (all app processes), so a few huge uploads can't use up the RAM
+    the server shares with other sites: a thread lock inside this process + a file lock across processes."""
+
+    def __init__(self):
+        self._threads = threading.Lock()
+        self._fh = None
+
+    def acquire(self):
+        import fcntl
+
+        self._threads.acquire()
+        try:
+            DATA.mkdir(parents=True, exist_ok=True)
+            self._fh = open(DATA / ".big-file.lock", "a")
+            fcntl.flock(self._fh, fcntl.LOCK_EX)        # waits while another process works on a big file
+        except Exception:  # noqa: BLE001 - no lock file: still one at a time within this process
+            self._fh = None
+
+    def release(self):
+        import fcntl
+
+        try:
+            if self._fh is not None:
+                fcntl.flock(self._fh, fcntl.LOCK_UN)
+                self._fh.close()
+        finally:
+            self._fh = None
+            self._threads.release()
+
+
+_big_lane = _ServerLane()                   # one big file at a time, so the VPS stays responsive
 FILE_WORDS = packs.words("office", "about")            # the field's words come from its knowledge pack
 ALLOWED = (".xlsx", ".xlsm", ".csv", ".txt")
 STRONG_FILE = packs.words("office", "strong")

@@ -126,3 +126,34 @@ def test_same_word_different_capitals_is_found_and_fixed(tmp_path):
     assert got == ["Finance", "Finance", "Finance", "Sales", "Sales", "Sales", "IT"]
     first = list(load_workbook(out)["Changes by Goal Engine"].iter_rows(values_only=True))[1]
     assert first[0].startswith("Capital/small letters")
+
+
+def _hold_lane(q):
+    from app.agents.office_agent import _big_lane
+
+    _big_lane.acquire()
+    q.put("held")
+    import time
+
+    time.sleep(1.0)
+    _big_lane.release()
+
+
+def test_one_big_file_at_a_time_across_processes():
+    """Two app processes never work on two big files at once (shared server RAM)."""
+    import multiprocessing as mp
+    import time
+
+    from app.agents.office_agent import _big_lane
+
+    ctx = mp.get_context("spawn")
+    q = ctx.Queue()
+    p = ctx.Process(target=_hold_lane, args=(q,))
+    p.start()
+    assert q.get(timeout=30) == "held"
+    t0 = time.monotonic()
+    _big_lane.acquire()                 # waits for the other process to finish
+    waited = time.monotonic() - t0
+    _big_lane.release()
+    p.join(10)
+    assert waited >= 0.5, waited

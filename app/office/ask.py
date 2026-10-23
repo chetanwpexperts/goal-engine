@@ -948,7 +948,7 @@ def _plan_question(text, tables) -> dict:
         elif filters or re.search(r"\b(list|dikhao|show|kaun|kaunse|which|jinka|jinki|wale|wali)\b", text or "", re.I):
             return {"job": "list", "table": t.name, "filters": filters, "measure": measure, "topn": topn}
         elif group is not None and measure is not None and num_cols and (num_cols[0][1] >= 1 or (
-                num_cols[0][1] >= 0.5 and re.search(r"amount|total|net|sales|revenue|value|salary|fee|bill|paid|balance|profit|cost|price|tax",
+                num_cols[0][1] >= 0.5 and re.search(r"amount|total|net|sales|revenue|value|salary|fee|bill|paid|balance|profit|cost|price|tax|amt|\brs\b|rupee|expense|kharch|rent",
                                                     t.header[measure], re.I))):
             agg = "sum"                                    # 'region wise sales amount', 'salary by department': that money column, added up
         elif group is not None:

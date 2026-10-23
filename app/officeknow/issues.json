@@ -462,7 +462,12 @@
       "same entries do baar aa gayi bank statement import mein",
       "bank ki dates ulti ho gayi import karne par",
       "reco mein kuch entries match hi nahi hoti",
-      "बैंक स्टेटमेंट और लेजर मेल नहीं खा रहे"
+      "बैंक स्टेटमेंट और लेजर मेल नहीं खा रहे",
+      "bank rec is out at month end",
+      "can't find why the bank reconciliation is off",
+      "month end bank reconciliation out, reason not found",
+      "bank rec mismatch at close no idea why",
+      "महीने के अंत में बैंक मिलान गड़बड़, कारण नहीं मिल रहा"
     ],
     "causes": [
       {
@@ -718,6 +723,266 @@
     "seen_at": [
       "https://www.reddit.com/r/excel/",
       "https://www.mrexcel.com/board/"
+    ]
+  },
+  {
+    "id": "trial-balance-not-tallying",
+    "apps": [
+      "excel",
+      "google_sheets"
+    ],
+    "category": "formula_error",
+    "title_en": "Trial balance doesn't tally (debits and credits differ)",
+    "title_hi": "Trial balance tally nahi ho raha (debit credit alag)",
+    "symptoms": [
+      "trial balance not tallying",
+      "TB not matching debit credit",
+      "tb mein difference aa raha hai",
+      "debit total and credit total are different",
+      "trial balance difference in suspense",
+      "तलपट नहीं मिल रहा",
+      "ट्रायल बैलेंस में डेबिट क्रेडिट का अंतर",
+      "dr cr total match nahi ho rahe",
+      "sum of debit column wrong some cells not added",
+      "trial balance out by a small amount",
+      "tb tally nahi hua month end par",
+      "मासिक समापन पर तलपट गड़बड़",
+      "credit side is more than debit side in TB",
+      "journal import trial balance unequal",
+      "debits and credits off at month close",
+      "where is the gap between debits and credits coming from",
+      "debits and credits are off by some amount",
+      "month close debit credit gap",
+      "closing time pe debit credit mein gap",
+      "महीने के अंत में डेबिट क्रेडिट में अंतर कहाँ से"
+    ],
+    "causes": [
+      {
+        "id": "text_numbers",
+        "title_en": "Some amounts are text, so SUM skips them",
+        "title_hi": "Kuch amounts text hain, SUM unhe chhod deta hai"
+      },
+      {
+        "id": "one_sided",
+        "title_en": "An entry posted on one side only, or on the wrong side",
+        "title_hi": "Entry sirf ek side ya galat side post hui"
+      },
+      {
+        "id": "rounding",
+        "title_en": "Rounding: amounts with hidden decimals",
+        "title_hi": "Rounding: chhupe hue decimals"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "text_numbers",
+        "action": "auto",
+        "auto": "text_to_number",
+        "steps_en": "I turn the text amounts into real numbers so both totals include every line, then check the TB again.",
+        "steps_hi": "Main text amounts ko asli numbers bana deta hoon taaki dono total mein har line jude, phir TB dobara check."
+      },
+      {
+        "cause": "one_sided",
+        "action": "auto",
+        "auto": "replace_formula",
+        "steps_en": "I add a debit-minus-credit check per voucher and a half-the-difference finder, so the unbalanced voucher or wrong-side amount shows up.",
+        "steps_hi": "Main har voucher ka debit-minus-credit check aur difference-ka-aadha finder lagata hoon, taaki galat voucher ya galat side wali amount dikh jaye."
+      },
+      {
+        "cause": "rounding",
+        "action": "advice",
+        "steps_en": "Round each line to 2 decimals (ROUND) before totalling; a difference of a few paise is rounding, not a missing entry.",
+        "steps_hi": "Total se pehle har line ko 2 decimal tak ROUND karo; kuch paise ka fark rounding hai, missing entry nahi."
+      }
+    ],
+    "verify": {
+      "en": "Total debits = total credits and every voucher shows 0 difference.",
+      "hi": "Total debit = total credit aur har voucher ka difference 0."
+    },
+    "test_phrases": [
+      "my debits and credits are off by 4,500 at month close, where's the gap coming from",
+      "month close par TB 4500 se nahi mil raha, fark kahan se aa raha",
+      "महीने के अंत में तलपट 4500 से नहीं मिल रहा, अंतर कहाँ से है"
+    ],
+    "codes": [],
+    "source": "https://learn.microsoft.com/en-us/dynamics365/business-central/reports/report-6",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "depreciation-schedule-wrong",
+    "apps": [
+      "excel",
+      "google_sheets"
+    ],
+    "category": "formula_error",
+    "title_en": "Depreciation schedule gives wrong figures",
+    "title_hi": "Depreciation schedule galat figures de raha hai",
+    "symptoms": [
+      "depreciation schedule wrong",
+      "DB function giving different value from wdv rate",
+      "depreciation going below zero",
+      "book value becomes negative after some years",
+      "depreciation calculation galat aa raha",
+      "मूल्यह्रास गलत आ रहा है",
+      "डेप्रिसिएशन शेड्यूल की गणना गलत",
+      "first year depreciation should be for 6 months only",
+      "SLN gives #DIV/0!",
+      "fixed asset register depreciation mismatch with auditor",
+      "wdv ka figure CA se match nahi kar raha",
+      "बुक वैल्यू माइनस में चली गई",
+      "depreciation keeps charging after asset fully depreciated"
+    ],
+    "causes": [
+      {
+        "id": "method",
+        "title_en": "Wrong method: DB's own rate used instead of the given WDV rate",
+        "title_hi": "Galat method: diye gaye WDV rate ki jagah DB ka apna rate"
+      },
+      {
+        "id": "no_cap",
+        "title_en": "No stop at salvage value, so book value goes negative",
+        "title_hi": "Salvage par rok nahi, book value minus mein"
+      },
+      {
+        "id": "full_year",
+        "title_en": "Full year charged for an asset bought mid-year",
+        "title_hi": "Beech saal khareede asset par poore saal ka charge"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "method",
+        "action": "auto",
+        "auto": "replace_formula",
+        "steps_en": "I replace the DB formulas with cost x (1-rate)^(year-1) x rate, using your rate.",
+        "steps_hi": "Main DB formulas ki jagah aapke rate se cost x (1-rate)^(year-1) x rate laga deta hoon."
+      },
+      {
+        "cause": "no_cap",
+        "action": "auto",
+        "auto": "replace_formula",
+        "steps_en": "I wrap the yearly charge in MIN(charge, book value - salvage) so it stops at the salvage value.",
+        "steps_hi": "Main saal ke charge ko MIN(charge, book value - salvage) mein daal deta hoon taaki salvage par ruk jaye."
+      },
+      {
+        "cause": "full_year",
+        "action": "auto",
+        "auto": "replace_formula",
+        "steps_en": "I multiply the first-year charge by YEARFRAC(purchase date, year end, 1).",
+        "steps_hi": "Main pehle saal ke charge ko YEARFRAC(purchase date, year end, 1) se guna kar deta hoon."
+      }
+    ],
+    "verify": {
+      "en": "Year-by-year charges add up to cost - salvage and book value never goes below salvage.",
+      "hi": "Saal-dar-saal charges ka jod = cost - salvage aur book value salvage se neeche nahi."
+    },
+    "test_phrases": [
+      "my asset's book value turned negative in year 7 of the schedule",
+      "depreciation schedule mein 7th saal mein book value minus ho gayi",
+      "मूल्यह्रास सूची में सातवें साल बुक वैल्यू माइनस हो गई"
+    ],
+    "codes": [
+      "#DIV/0!"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/sln-function-cdb666e5-c1c6-40a7-806a-e695edc2f1c8",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "wrong-account-codes",
+    "apps": [
+      "excel",
+      "google_sheets",
+      "csv"
+    ],
+    "category": "lookup_matching",
+    "title_en": "Journal has wrong or unrecognised account codes",
+    "title_hi": "Journal mein galat ya anjaan account codes",
+    "symptoms": [
+      "account codes not matching chart of accounts",
+      "gl code lookup returns #N/A",
+      "import rejected invalid account",
+      "galat ledger code pe entry chali gayi",
+      "account code 4001 and 4001.0 not same",
+      "खाता कोड मेल नहीं खा रहे",
+      "जर्नल में गलत लेजर कोड",
+      "codes with leading zeros lost 00123 became 123",
+      "account code text vs number mismatch",
+      "entries posted to wrong gl",
+      "coa mein code dikh raha phir bhi match nahi",
+      "कोड के आगे के शून्य गायब हो गए",
+      "GL numbers not found though present in master",
+      "ledger codes show not found but exist in the account list",
+      "GL number master mein hai par not found dikhata hai",
+      "account master mein code hai phir bhi nahi milta",
+      "जीएल नंबर मास्टर में है फिर भी नहीं मिलता",
+      "लेजर कोड सूची में हैं पर नहीं मिल रहे",
+      "half of the account numbers fail lookup against the master"
+    ],
+    "causes": [
+      {
+        "id": "text_vs_number",
+        "title_en": "Codes are text on one side and numbers on the other",
+        "title_hi": "Ek taraf code text, doosri taraf number"
+      },
+      {
+        "id": "spaces",
+        "title_en": "Hidden spaces around the codes",
+        "title_hi": "Codes ke aage-peeche chhupe space"
+      },
+      {
+        "id": "really_wrong",
+        "title_en": "The code really isn't in the chart (typo or old code)",
+        "title_hi": "Code sach mein chart mein nahi (typo ya purana)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "text_vs_number",
+        "action": "auto",
+        "auto": "text_to_number",
+        "steps_en": "I make the codes the same type in the journal and the chart so they match.",
+        "steps_hi": "Main journal aur chart mein codes ek hi type ke bana deta hoon taaki match ho."
+      },
+      {
+        "cause": "spaces",
+        "action": "auto",
+        "auto": "trim_spaces",
+        "steps_en": "I remove the hidden spaces from every code.",
+        "steps_hi": "Main har code se chhupe space hata deta hoon."
+      },
+      {
+        "cause": "really_wrong",
+        "action": "auto",
+        "auto": "compare_sheets",
+        "steps_en": "Upload the journal and the chart of accounts; I list every code that isn't in the chart so you can correct it.",
+        "steps_hi": "Journal aur chart of accounts upload karo; main har woh code dikhata hoon jo chart mein nahi, aap sahi kar lo."
+      }
+    ],
+    "verify": {
+      "en": "Every journal code finds its account name in the chart.",
+      "hi": "Journal ke har code ko chart mein account ka naam milta hai."
+    },
+    "test_phrases": [
+      "half my GL numbers say not found even though they're in the account master",
+      "aadhe GL number master mein hote hue bhi not found aa rahe hain",
+      "आधे जीएल नंबर मास्टर में होते हुए भी नहीं मिल रहे"
+    ],
+    "codes": [
+      "#N/A"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/match-function-e8dffd45-c762-47d6-bf89-533f4a37673a",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
     ]
   }
 ]

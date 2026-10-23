@@ -208,8 +208,7 @@ def analyze_sql(query: str, extra: str = "") -> dict:
         t, n = _owner(c, tables)
         if t:
             t.rng.append(n)
-    existing = {m.group(1).lower() for m in re.finditer(r"(?:key|index)\s+[`\w]*\s*\(\s*`?(\w+)", extra or "", re.I)}
-    existing.add("id")  # primary keys are already indexed
+    existing, seen_structure = _existing_indexes(extra)
 
     def clean(cols: list[str]) -> list[str]:
         out: list[str] = []
@@ -219,21 +218,46 @@ def analyze_sql(query: str, extra: str = "") -> dict:
                 out.append(c)
         return out
 
-    indexes = []
+    indexes, skipped = [], []
+    has_filter = {t.name for t in tables if clean(t.eq + t.rng + t.order)}
     for t in tables:
         short = t.name.split(".")[-1]
+        have = existing.get(short.lower(), set()) | existing.get("*", set())
         # filter index: equality columns first, then ONE range column (or the ORDER BY columns)
         filt = clean(t.eq + (t.rng[:1] if t.rng else t.order))[:4]
-        if filt and filt[0].lower() not in existing:
+        if filt and filt[0].lower() not in have and not _likely_primary(short, filt[0]):
             indexes.append(f"ALTER TABLE {t.name} ADD INDEX idx_{short}_{'_'.join(filt)[:40]} ({', '.join(filt)});")
+        if t.name in has_filter and len(tables) > 1:
+            continue                    # MySQL reads this table through its filter index; its join columns point outward
+        joins = []
         for jc in clean(t.join):
-            if jc.lower() not in existing and jc not in filt[:1]:
-                indexes.append(f"ALTER TABLE {t.name} ADD INDEX idx_{short}_{jc[:40]} ({jc});")
-    if indexes:
-        add(2, "Missing indexes on the columns this query filters and joins on",
-            "Jin columns pe query filter aur join karti hai unpe index chahiye",
-            "columns used in WHERE / JOIN / ORDER BY", "Add the suggested indexes (check SHOW INDEX FROM table first).",
-            "Suggested indexes lagao (pehle SHOW INDEX FROM table se check karo).")
+            if _likely_primary(short, jc):
+                skipped.append(f"{short}.{jc}")
+            elif jc not in filt[:1]:
+                joins.append(jc)
+        if any(j.lower() in have for j in joins):
+            joins = []                  # an index already starts with one of the join columns: MySQL can use it
+        if joins:                       # one index for all the columns this table is joined on, not one each
+            cols = joins[:3]
+            indexes.append(f"ALTER TABLE {t.name} ADD INDEX idx_{short}_{'_'.join(cols)[:40]} ({', '.join(cols)});")
+    check_query = None
+    if indexes and not seen_structure:
+        names = ", ".join(f"'{t.name.split('.')[-1]}'" for t in tables)
+        check_query = ("SELECT TABLE_NAME, INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS columns\n"
+                       "FROM information_schema.STATISTICS\n"
+                       f"WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ({names})\n"
+                       "GROUP BY TABLE_NAME, INDEX_NAME;")
+        add(2, "These columns need an index if they don't have one yet (I can't see your current indexes from the query alone)",
+            "In columns pe index chahiye agar pehle se nahi hai (sirf query se aapke maujooda index nahi dikhte)",
+            "columns used in WHERE / JOIN / ORDER BY",
+            "Run the check query first, or paste the SHOW CREATE TABLE output of these tables in the second box: "
+            "then only the really missing indexes are listed.",
+            "Pehle check query chalao, ya in tables ka SHOW CREATE TABLE output doosre box mein paste karo: "
+            "phir sirf sach mein missing index hi dikhenge.")
+    elif indexes:
+        add(2, "Missing indexes on the columns this query filters and joins on (checked against your table structure)",
+            "Jin columns pe query filter aur join karti hai unpe index nahi hai (aapke table structure se check kiya)",
+            "columns used in WHERE / JOIN / ORDER BY", "Add the indexes below.", "Neeche wale index lagao.")
 
     # ---- EXPLAIN output, if pasted
     if extra:
@@ -250,8 +274,40 @@ def analyze_sql(query: str, extra: str = "") -> dict:
 
     rewritten = rewrite(original)
     findings.sort(key=lambda f: f.severity, reverse=True)
-    return {"ok": True, "findings": [f.as_dict() for f in findings], "indexes": indexes,
+    return {"ok": True, "findings": [f.as_dict() for f in findings], "indexes": indexes, "check_query": check_query,
+            "indexes_verified": bool(seen_structure), "assumed_primary": skipped,
             "rewritten": rewritten if rewritten != original else None, "tables": [t.name for t in tables]}
+
+
+def _likely_primary(table: str, col: str) -> bool:
+    """'id', or courses.course_id / batches.batch_id: almost always the table's own primary key (already indexed)."""
+    c, t = col.lower().strip("`"), table.lower().strip("`")
+    forms = {t, t[:-3] + "y" if t.endswith("ies") else t, t[:-1] if t.endswith("s") else t, t[:-2] if t.endswith("es") else t}
+    return c == "id" or any(c in (f"{f}_id", f"{f}id") for f in forms)
+
+
+def _existing_indexes(extra: str) -> tuple[dict, bool]:
+    """Indexes already there, from a pasted SHOW CREATE TABLE / SHOW INDEX: {table: {first columns}}, and whether any
+    structure was pasted at all (without it, nothing about existing indexes is known)."""
+    out: dict = {}
+    text = extra or ""
+    seen = False
+    for m in re.finditer(r"create\s+table\s+(?:if\s+not\s+exists\s+)?[`\"]?(?:\w+[`\"]?\.[`\"]?)?(\w+)[`\"]?\s*\((.*?)\)\s*(?:engine|;|$)",
+                         text, re.I | re.S):
+        seen = True
+        cols = out.setdefault(m.group(1).lower(), set())
+        for k in re.finditer(r"(?:primary\s+key|unique\s+key|unique|key|index|foreign\s+key)\s*[`\w]*\s*\(\s*`?(\w+)", m.group(2), re.I):
+            cols.add(k.group(1).lower())              # an InnoDB foreign key is indexed too
+        for k in re.finditer(r"^\s*`?(\w+)`?\s+\w+[^,\n]*\bprimary\s+key\b", m.group(2), re.I | re.M):
+            cols.add(k.group(1).lower())
+    for m in re.finditer(r"^\|?\s*(\w+)\s*\|\s*[01]\s*\|\s*(\w+)\s*\|\s*1\s*\|\s*(\w+)\s*\|", text, re.M):
+        seen = True                                    # SHOW INDEX rows: Table | Non_unique | Key_name | Seq 1 | Column
+        out.setdefault(m.group(1).lower(), set()).add(m.group(3).lower())
+    if not seen:
+        for k in re.finditer(r"(?:key|index)\s+[`\w]*\s*\(\s*`?(\w+)", text, re.I):
+            out.setdefault("*", set()).add(k.group(1).lower())
+            seen = True
+    return out, seen
 
 
 def rewrite(sql: str) -> str:

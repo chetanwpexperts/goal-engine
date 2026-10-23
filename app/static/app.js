@@ -49,6 +49,7 @@
           verified: "Verified", next: "Agla run", noAccess: "Koi password ya access nahi chahiye", connector: "Aapke server pe read-only connector chahiye",
           soon: "Ye agent abhi ban raha hai. Aapki zaroorat note kar li hai.", copy: "Copy", copied: "Copied",
           rewritten: "Rewritten query", indexes: "Index commands", mapping: "Columns samjhe",
+          check: "Pehle ye chalao: kaunse index pehle se hain", maybe: "Index commands (sirf wo lagao jo check query mein nahi dikhe)",
           state: { proposed: "Taiyar", planned: "Jald aa raha", running: "Chal raha", done: "Ho gaya", failed: "Ruk gaya", active: "Chal raha hai", paused: "Ruka hua" } },
     en: { preview: "Preview", start: "Start", pause: "Pause", again: "Run again", checking: "Working…",
           paste: "Or paste the rows (CSV)", template: "The message", none: "Nobody would get a message today.",
@@ -57,6 +58,7 @@
           verified: "Verified", next: "Next run", noAccess: "No password or access needed", connector: "Needs a read-only connector on your server",
           soon: "This agent is being built. Your need is noted.", copy: "Copy", copied: "Copied",
           rewritten: "Rewritten query", indexes: "Index commands", mapping: "Columns understood",
+          check: "Run this first: which indexes you already have", maybe: "Index commands (add only the ones the check doesn't show)",
           state: { proposed: "Ready", planned: "Coming soon", running: "Running", done: "Done", failed: "Stopped", active: "Running", paused: "Paused" } },
   };
   const W = (lang) => RUN_WORDS[lang === "en" ? "en" : "hi"];
@@ -274,7 +276,8 @@
       wrap.append(ul);
     }
     if (r.rewritten) wrap.append(codeBox(w.rewritten, r.rewritten, w));
-    if (r.indexes && r.indexes.length) wrap.append(codeBox(w.indexes, r.indexes.join("\n"), w));
+    if (r.check_query) wrap.append(codeBox(w.check, r.check_query, w));
+    if (r.indexes && r.indexes.length) wrap.append(codeBox(r.indexes_verified === false ? w.maybe : w.indexes, r.indexes.join("\n"), w));
     if (r.note) wrap.append(el("p", "note", r.note));
     return wrap;
   }

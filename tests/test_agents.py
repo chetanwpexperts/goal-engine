@@ -143,3 +143,19 @@ def test_database_request_gets_working_agent_and_honest_later_levels(client, ml_
     assert "agle level" in res["reply"] and "Backup" in res["reply"]
 
 
+
+
+def test_sql_checker_does_not_claim_missing_indexes_it_cannot_see():
+    q = ("SELECT s.*, c.course_name, f.amount, b.batch_name FROM Students s JOIN courses c ON c.course_id = s.course_id "
+         "JOIN fee_structure f ON f.course_id = s.course_id AND f.category_type = s.category AND f.scheme_id = s.scheme_id "
+         "JOIN Batches b ON b.batch_id = s.batch_id WHERE s.status = 'active' ORDER BY s.student_name")
+    r = analyze_sql(q)
+    assert not r["indexes_verified"] and "information_schema.STATISTICS" in r["check_query"]
+    assert any("can't see your current indexes" in f["title_en"] for f in r["findings"])
+    assert r["indexes"] == ["ALTER TABLE Students ADD INDEX idx_Students_status_student_name (status, student_name);",
+                            "ALTER TABLE fee_structure ADD INDEX idx_fee_structure_course_id_category_type_scheme_id "
+                            "(course_id, category_type, scheme_id);"]           # not 11: own primary keys and outward joins skipped
+    assert set(r["assumed_primary"]) == {"courses.course_id", "Batches.batch_id"}
+    r = analyze_sql(q, "CREATE TABLE `fee_structure` (`id` int, `course_id` int, PRIMARY KEY (`id`), "
+                       "KEY `c` (`course_id`,`category_type`)) ENGINE=InnoDB;")
+    assert r["indexes_verified"] and r["check_query"] is None and len(r["indexes"]) == 1

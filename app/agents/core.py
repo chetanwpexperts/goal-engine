@@ -70,8 +70,14 @@ def _sql_summary(result: dict, hi: bool) -> str:
         return (f"Query check nahi ho payi: {result.get('error')}" if hi else f"Couldn't check the query: {result.get('error')}")
     n, idx = len(result["findings"]), len(result.get("indexes", []))
     extra = (" Rewritten query bhi taiyar hai." if hi else " A rewritten query is ready too.") if result.get("rewritten") else ""
-    return (f"Query check ki: {n} problem mili, {idx} index suggest kiye.{extra}" if hi
-            else f"Checked the query: {n} problem{'s' if n != 1 else ''} found, {idx} index{'es' if idx != 1 else ''} suggested.{extra}")
+    if idx and not result.get("indexes_verified"):
+        extra += (" Aapke maujooda index mujhe nahi dikhte, isliye pehle card wali check query chalao (ya SHOW CREATE TABLE paste karo)."
+                  if hi else " I can't see your current indexes from the query alone, so run the check query in the card first "
+                             "(or paste SHOW CREATE TABLE) and I'll list only the missing ones.")
+    what = ("index lag sakte hain" if hi else "possible indexes") if idx and not result.get("indexes_verified") else (
+        "index suggest kiye" if hi else f"index{'es' if idx != 1 else ''} suggested")
+    return (f"Query check ki: {n} problem mili, {idx} {what}.{extra}" if hi
+            else f"Checked the query: {n} problem{'s' if n != 1 else ''} found, {idx} {what}.{extra}")
 
 
 def _run_website(inputs: dict) -> dict:

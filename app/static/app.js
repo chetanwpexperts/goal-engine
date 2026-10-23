@@ -136,6 +136,21 @@
     typeExamples();
   }
 
+  // the likely next questions, written with the person's own sheet and column names; one tap asks it
+  function nextChips(items, hi) {
+    const wrap = el("div", "next-asks");
+    wrap.append(el("span", "next-label", hi ? "Aage pooch sakte ho" : "You might ask next"));
+    const row = el("div", "next-row");
+    for (const q of items) {
+      const b = el("button", "next-chip", q);
+      b.type = "button";
+      b.addEventListener("click", () => { wrap.remove(); sendMessage(q); });
+      row.append(b);
+    }
+    wrap.append(row);
+    return wrap;
+  }
+
   function showOptions(options) {
     optionsEl.replaceChildren();
     optionsEl.hidden = !(options && options.length);
@@ -1822,6 +1837,7 @@
       }
       const box = addMachine(data.reply, traceFor(data));
       if (data.offer_expert && data.goal) box.append(expertOffer(data.goal, text, data.goal.detected_language !== "English"));
+      if (data.next && data.next.length) box.append(nextChips(data.next, lastLang !== "en"));
       showOptions(data.options || []);
       wordTarget = data.ask_words || 0;
       updateWordcount();

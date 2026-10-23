@@ -115,6 +115,9 @@ def delete_visitor(db: Session, visitor_id: str) -> dict:
         office_agent.remove_file(f)
         db.delete(f)
         counts["office_files"] = counts.get("office_files", 0) + 1
+    from app.mind import profile as mind_profile
+
+    counts["working_style"] = mind_profile.delete_visitor(db, visitor_id)
     db.execute(delete(UsageCounter).where(UsageCounter.scope == f"visitor:{visitor_id}"))
     db.commit()
     return counts
@@ -202,6 +205,11 @@ def maintain(db: Session, now=None) -> dict:
     from app.agents import office_agent
 
     done["office_files"] = office_agent.maintain(db, now)
+    # 2d. the mind: working-style notes expire; question-path counts fade so recent habits weigh more
+    from app.mind import predict as mind_predict, profile as mind_profile
+
+    done["mind_styles"] = mind_profile.maintain(db, now)
+    done["mind_paths_dropped"] = mind_predict.decay(db, now)
 
     # 3. "already emailed" log
     done["sent_log"] = db.execute(delete(SentEmail).where(SentEmail.sent_at < now - SENT_LOG_TTL)).rowcount

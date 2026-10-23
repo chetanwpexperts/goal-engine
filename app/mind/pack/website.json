@@ -1,0 +1,51 @@
+{
+ "patterns": {
+  "web_problem": [
+   "my website has issues",
+   "website kharab hai",
+   "site not working",
+   "website down",
+   "website mein dikkat",
+   "site broken"
+  ],
+  "web_check": [
+   "check my website",
+   "website check karo",
+   "is my site ok",
+   "site test karo",
+   "scan my website",
+   "audit my site"
+  ],
+  "web_slow": [
+   "website is slow",
+   "site slow hai",
+   "speed up website",
+   "load time",
+   "page takes long",
+   "dheemi site"
+  ],
+  "web_watch": [
+   "check daily",
+   "roz check karo",
+   "monitor my site",
+   "alert me if down",
+   "keep watching",
+   "har din dekho"
+  ],
+  "web_another": [
+   "check another website",
+   "doosri website",
+   "one more site",
+   "aur ek site",
+   "another url"
+  ],
+  "web_fix": [
+   "fix my website",
+   "website theek karo",
+   "repair site",
+   "solve the error",
+   "white screen fix",
+   "plugin conflict"
+  ]
+ }
+}

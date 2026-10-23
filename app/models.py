@@ -306,3 +306,41 @@ class OfficeFile(Base):
     error: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class PatternStep(Base):
+    """How often one kind of question follows another (anonymous: labels only, never text, files or who asked).
+    prev2/prev1 = the two question patterns before; '*' = not used (shorter history)."""
+
+    __tablename__ = "pattern_steps"
+    __table_args__ = (UniqueConstraint("brain", "prev2", "prev1", "nxt"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    brain: Mapped[str] = mapped_column(String(20), index=True)
+    prev2: Mapped[str] = mapped_column(String(40))
+    prev1: Mapped[str] = mapped_column(String(40))
+    nxt: Mapped[str] = mapped_column(String(40))
+    weight: Mapped[float] = mapped_column(Float, default=0.0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class MindSession(Base):
+    """What the agent has worked out about the person in one conversation: their goal, level, urgency, control,
+    the patterns asked so far. No file contents."""
+
+    __tablename__ = "mind_sessions"
+
+    goal_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    visitor_id: Mapped[str] = mapped_column(String(64), index=True)
+    data: Mapped[str] = mapped_column(Text, default="{}")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class VisitorStyle(Base):
+    """How a returning person likes to work (language, level, formulas or not, ask first or just do it). No contents."""
+
+    __tablename__ = "visitor_styles"
+
+    visitor_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    data: Mapped[str] = mapped_column(Text, default="{}")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

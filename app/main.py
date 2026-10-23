@@ -448,7 +448,10 @@ def learning_feed(key: str = "", db: Session = Depends(get_db)):
     want = os.getenv("LEARN_KEY", "")
     if len(want) < 16 or not hmac.compare_digest(key, want):
         raise HTTPException(404, "Not Found")
-    return {"requests": learning.feed(db)}
+    from app.mind import predict
+
+    # plus the question paths real people take (labels only), so the nightly run can tune the starting chains
+    return {"requests": learning.feed(db), "paths": {b: predict.top_paths(db, b) for b in ("office", "database", "website")}}
 
 
 class MessageIn(BaseModel):

@@ -6,6 +6,7 @@ app/office (doing it).
 """
 
 import os
+import json
 import re
 import secrets
 import shutil
@@ -498,11 +499,15 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
         return "Pichla kaam abhi chal raha hai, khatam hote hi agla karta hoon. Card pe dikhega." if hi else "Still working on the last task; the card shows when it's done."
     report = loads(f.report, {}) or {}
     offer = pending_offer(agent)
+    from app import mind
+
     if offer and YES_RE.search(text or "") and not ops_in(text):
+        mind.set_pattern("fix")
         _set_offer(agent, None)
         f = start_fix(db, f, offer["ops"], offer.get("sheets"))
         return _doing(f, offer["ops"], offer.get("sheets"), hi)
     if UNDO_RE.search(text or ""):
+        mind.set_pattern("undo")
         try:
             start_undo(db, f)
         except OfficeAgentError as exc:
@@ -512,19 +517,23 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
     sheets = sheets_in(text, report)
     if FORMULA_RE.search(text or "") and ops:
         # "duplicate ka formula do": they want the formula for THEIR file, not a change
+        mind.set_pattern("formula")
         return formula_reply(agent, f, report, ops or ["remove_duplicates"], sheets, hi)
     if not ops and ALL_RE.search(text or ""):
         s = report.get("summary", {})
         ops = [op for key, op in (("spaces", "trim_spaces"), ("text_numbers", "text_to_number"), ("broken_refs", "fix_broken_refs"),
                                   ("case_mixed", "fix_case"), ("duplicate_rows", "remove_duplicates")) if s.get(key)]
+        mind.set_pattern("fix")
         if not ops:
             return "Is file mein theek karne layak kuch nahi bacha." if hi else "Nothing left to fix in this file."
         return _doing(start_fix(db, f, ops, sheets), ops, sheets, hi)
     if not ops and REPORT_RE.search(text or ""):
         ops = [op for op in _OP_NAMES]          # "kya galat hai?" -> everything the scan knows
+        mind.set_pattern("review")
         return _answer(agent, report, ops, sheets, hi, f)
     if not ops:
         return ask_task(db, agent, f, text, hi)
+    mind.set_pattern("fix" if wants_do(text) else "dups" if ops == ["remove_duplicates"] else "review")
     if ops == ["remove_duplicates"] and not wants_do(text):
         # "duplicates dhund ke do", "alag sheet mein daalo": list them in a new sheet, delete nothing
         _set_offer(agent, {"ops": ["remove_duplicates"], "sheets": sheets})
@@ -679,15 +688,29 @@ def formula_reply(agent: Agent, f: OfficeFile, report: dict, ops: list[str], she
 TEACH = ("Agent ko sikhao", "Teach the agent")
 
 
+LAST_FORMULA_RE = re.compile(r"^\s*(give me |show me |send me |what is |what's )?(the |its |iska |uska |is ka )?(excel )?"
+                             r"(formula|formule|fourmula|farmula)( (for|of) (this|that|it|the (last )?answer))?( do| dena| batao| bhi do| kya hai| kya hoga)?\s*[?.!]*\s*$"
+                             r"|^\s*(iska|uska|is ka) formula\b", re.I)
+
+
 def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
     """Totals, counts, X-wise, lists, lookups, aging, combining, highlighting... on the person's own sheets.
-    Returns the reply, or (question, options) when one detail is missing. Never a random answer."""
+    Returns the reply, or (question, options) when one detail is missing. Never a random answer.
+
+    Before answering it checks the plan against the question and the person: the sheet they named, whether they
+    want changes or only the answer, formulas only when they want them, and a different reading when the same
+    question comes back because the last answer missed."""
+    from app import mind
+    from app.mind import office as mo
     from app.office import ask as asker
     from app.office.sheetdata import load_tables
 
+    m = mind.now()
+    sig, prof = m.get("signals", {}), m.get("profile", {})
     _set_offer(agent, None)
     inputs = loads(agent.inputs, {}) or {}
     pending = inputs.pop("pending_q", None)
+    last_plan = inputs.get("mind_plan")
     if (text or "").strip() in TEACH and pending:
         from app import learning
 
@@ -696,22 +719,60 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
         db.commit()
         return ("Note kar liya. Ye kaam agent ki learning list mein chala gaya; seekhte hi ye bhi karega. Tab tak koi aur kaam bolo."
                 if hi else "Noted. It's on the agent's learning list; once learned it'll do this too. Meanwhile, ask for something else.")
+    # "give me the formula" right after an answer: the formula of that answer
+    last = loads(f.result, {}) or {}
+    if LAST_FORMULA_RE.search(text or "") and last.get("task") == "ask" and last.get("formula"):
+        f.result = dumps({**last, "show_formula": True})
+        agent.inputs = dumps(inputs)
+        db.commit()
+        mind.set_pattern("formula", last_plan)
+        return (f"Pichle jawab ka formula: {last['formula']}" if hi else f"The formula for the last answer: {last['formula']}")
     if pending and len((text or "").split()) <= 5:
         text = f"{pending} {text}"                        # the answer to "which sheet / which column?"
+    tables = load_tables(f.path)
+    m["tables"] = tables
     try:
-        plan = asker.understand(text, load_tables(f.path))
+        plan = asker.understand(text, tables)
     except asker.NeedMore as need:
         inputs["pending_q"] = text
         agent.inputs = dumps(inputs)
         db.commit()
         opts = list(need.options)
+        msg = need.hi if hi else need.en
         if need.hi.startswith("Ye poori tarah samajh nahi aaya"):
+            # not understood: offer the closest things this file can answer, not a dead end
+            near = mo.closest_options(text, tables, hi)
+            if near:
+                msg = ("Ye poori tarah samajh nahi aaya. Is file pe inme se kuch chahiye?" if hi
+                       else "I didn't fully get that. Did you mean one of these?")
+                opts = near
             opts = opts[:6] + ["Agent ko sikhao" if hi else "Teach the agent"]
-        return (need.hi if hi else need.en), opts
-    agent.inputs = dumps(inputs)
-    if asker.NO_CHANGE.search(text or ""):
+        mind.set_pattern("other", None)
+        return msg, opts
+    # the named sheet is the sheet (a check on the plan, whatever job it became)
+    named = asker.named_sheet(text, tables)
+    if named is not None and plan.get("table") not in (named.name, None) and plan.get("job") not in ("lookup", "combine", "reconcile"):
+        try:
+            plan = asker.understand(text, [named])
+        except asker.NeedMore:
+            pass
+    # the same question again after an answer: don't repeat that answer; offer the other readings
+    if (sig.get("repeat") or sig.get("frustrated")) and last_plan and mo._same(plan, last_plan):
+        alts = mo.other_readings(text, tables, plan, hi)
+        if alts:
+            agent.inputs = dumps(inputs)
+            db.commit()
+            mind.set_pattern(mo.label_of(plan), plan)
+            return (("Pichli baar maine ise aise samjha tha, shayad galat. Inme se kaunsa chahiye?" if hi
+                     else "Last time I read this one way and it may have been wrong. Which of these did you mean?"), alts)
+    if asker.NO_CHANGE.search(text or "") or prof.get("control") == "ask_first":
         plan["readonly"] = True                            # "before making changes, tell me...": answer only
-    show_fx = bool(FORMULA_RE.search(text or "") or re.search(r"\b(in excel|excel mein|excel me)\b.{0,20}\b(kaise|how)\b|\bhow (do|can|to) i\b.{0,30}\b(calculate|count|sum|find)\b", text or "", re.I))
+    show_fx = bool(sig.get("wants_formula") or (prof.get("formula") is True and not sig.get("no_formula")) or re.search(
+        r"\b(in excel|excel mein|excel me)\b.{0,20}\b(kaise|how)\b|\bhow (do|can|to) i\b.{0,30}\b(calculate|count|sum|find)\b", text or "", re.I))
+    other = mo.sheet_or_value(text, tables, plan, hi)
+    inputs["mind_plan"] = json.loads(json.dumps(plan, default=str))
+    agent.inputs = dumps(inputs)
+    mind.set_pattern(mo.label_of(plan), plan)
     args = {"plan": plan, "hi": hi}
     if f.size <= BIG:
         f.status, f.task, f.args = "queued", "ask", dumps(args)
@@ -732,7 +793,12 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
                 db.commit()
             if plan.get("readonly") and not r.get("sheet"):
                 tail = " Nothing in your file was changed." if not hi else " File mein kuch nahi badla."
-            return f"{r['say']}.{fx}{tail}".replace("..", ".")
+            reply = f"{r['say']}.{fx}{tail}".replace("..", ".")
+            if other:
+                # answered the likelier reading; the other one is one tap away
+                reply += (" Agar aapka matlab kuch aur tha, neeche chuno." if hi else " If you meant something else, pick it below.")
+                return reply, [other]
+            return reply
         return f.error or ("Ye kaam poora nahi ho saka." if hi else "Couldn't finish that.")
     _start(db, f, "ask", args)
     return "Badi file hai, kaam chal raha hai; card pe jawab aayega." if hi else "Big file, working on it; the answer will show on the card."

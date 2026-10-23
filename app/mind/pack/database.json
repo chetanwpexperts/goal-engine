@@ -1,0 +1,88 @@
+{
+ "patterns": {
+  "db_connect": [
+   "connect my database",
+   "database jodo",
+   "how to connect",
+   "connection setup",
+   "add my mysql",
+   "link database",
+   "database kaise jode"
+  ],
+  "db_health": [
+   "check database health",
+   "database check karo",
+   "is my database ok",
+   "database ki sehat",
+   "health report",
+   "database status",
+   "size of tables"
+  ],
+  "db_slow": [
+   "database is slow",
+   "slow queries",
+   "query slow hai",
+   "site slow due to database",
+   "performance issue",
+   "database dheema",
+   "takes too long"
+  ],
+  "db_error": [
+   "database error",
+   "error aa raha",
+   "connection refused",
+   "too many connections",
+   "access denied",
+   "table crashed",
+   "deadlock found"
+  ],
+  "db_explore": [
+   "show tables",
+   "tables dikhao",
+   "what data is there",
+   "see my data",
+   "browse database",
+   "kaunsi tables hain",
+   "data dekhna hai"
+  ],
+  "db_export": [
+   "export to excel",
+   "excel mein nikalo",
+   "download csv",
+   "data nikaal do",
+   "table export",
+   "sheet mein daalo"
+  ],
+  "db_report": [
+   "daily report",
+   "roz report bhejo",
+   "email me report",
+   "weekly report",
+   "schedule report",
+   "har subah report"
+  ],
+  "db_fix": [
+   "fix it",
+   "theek karo",
+   "add index",
+   "optimize",
+   "speed up",
+   "repair table",
+   "fix the query"
+  ],
+  "db_backup": [
+   "backup",
+   "backup lo",
+   "restore",
+   "database copy",
+   "backup schedule"
+  ],
+  "db_write": [
+   "update data",
+   "delete rows",
+   "insert",
+   "data badlo",
+   "change records"
+  ]
+ }
+}

@@ -1,5 +1,6 @@
 """Receive -> understand -> structure. Every message updates goal state, not just the chat."""
 
+import logging
 import re
 from typing import Any
 
@@ -22,6 +23,8 @@ from app.ml.brain import SKIP_RE, steps_text
 from app.ml.registry import domain_of
 from app.ml.normalize import normalize
 from app.models import Agent, Goal, Message, dumps, loads
+
+logger = logging.getLogger(__name__)
 
 
 MAX_CONTEXT_GOALS = 6
@@ -100,9 +103,29 @@ def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: 
                    intent=intent or None, confidence=confidence or None))
     db.add(Message(visitor_id=visitor_id, goal_id=gid, role="assistant", text=reply, relation=relation, provider="ml"))
     db.commit()
+    nxt: list[str] = []
+    try:                                   # the mind: learn this step, work out the likely next questions
+        from app import mind
+
+        thought = mind.after(db, visitor_id, goal, text, reply, goal_agents(db, goal.id) if goal else [], hi)
+        nxt = [x for x in thought["next"] if x not in (options or [])]
+        if thought["reply"] != reply:
+            reply = thought["reply"]
+            last = db.scalars(select(Message).where(Message.visitor_id == visitor_id, Message.role == "assistant")
+                              .order_by(Message.id.desc()).limit(1)).first()
+            if last is not None:
+                last.text = reply
+                db.commit()
+    except Exception:  # noqa: BLE001 - the mind never breaks a reply
+        logger.exception("mind")
+    finally:
+        from app.mind import core as _mc
+
+        _mc._current.set(None)
     agents = [agent_dict(a, db, hi) for a in goal_agents(db, goal.id)] if goal else []
     return {
         "reply": reply,
+        "next": nxt,
         "relation": relation,
         "goal": goal.as_dict() if goal else None,
         "goals": [g.summary() for g in all_goals(db, visitor_id)],
@@ -135,6 +158,12 @@ SMALL_TALK_RE = re.compile(r"^\s*(hi|hello|hey|thanks?|thank you|thx|ok|okay|bye
 
 def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | None) -> dict[str, Any]:
     focus = focus_goal(db, visitor_id, goal_id)
+    try:                                   # the mind reads the person before any agent answers
+        from app import mind
+
+        mind.before(db, visitor_id, focus.id if focus is not None else None, text)
+    except Exception:  # noqa: BLE001
+        logger.exception("mind")
     hi_focus = (focus.detected_language in ("Hinglish", "Hindi")) if focus is not None else False
 
     # Tap: "show me the steps instead"

@@ -239,7 +239,8 @@ class Skip(Exception):
 JOBS = [
     ("review", re.compile(r"\b(review|audit|jaanch|janch)\b|\b(check|dekho|dekh lo)\b.{0,15}\b(file|sheet|workbook|poori|puri)\b|\b(file|sheet)\b.{0,10}\b(check|review)\b", re.I)),
     ("reconcile", re.compile(r"\b(reconcil\w*|bank statement|milan|ledger\b.{0,25}\bbank|bank\b.{0,25}\bledger|books?\b.{0,15}\bbank)\b", re.I)),
-    ("growth", re.compile(r"\b(growth|badhat|badhotri|month on month|mom|pichle mahine se|increase|decrease|ghata|badha|change)\b", re.I)),
+    ("growth", re.compile(r"\b(growth|badhat|badhotri|month on month|mom|pichle mahine se|increase|decrease|ghata|badha)\b|"
+                          r"(?<!before )(?<!before you )(?<!don't )(?<!dont )(?<!any )(?<!without )\bchange\b(?!s? (anything|nothing|mat))", re.I)),
     ("running", re.compile(r"\b(running total|cumulative|ab tak ka total|progressive total)\b", re.I)),
     ("missing", re.compile(r"\b(khaali|khali|blank|empty|missing|nahi bhara|bhara nahi|null)\b", re.I)),
     ("sort", re.compile(r"\b(sort|arrange|kram|ascending|descending|chhote se bade|bade se chhote|a to z|z to a|order mein laga)\b", re.I)),
@@ -599,7 +600,7 @@ def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:
     tables = {t.name: t for t in load_tables(path)}
     wb = load_workbook(path, keep_vba=path.lower().endswith(".xlsm")) if path.lower().endswith((".xlsx", ".xlsm")) else None
     job = plan["job"]
-    if plan.get("readonly") and job in ("aggregate", "list", "describe", "rows", "pivot"):
+    if plan.get("readonly") and job in ("aggregate", "list", "describe", "rows", "pivot", "growth", "running", "missing", "variance", "aging", "review"):
         wb = None                                          # "before making changes, tell me...": answer only, the file stays as it is
     plan = {**plan, "_path": path}
     res = globals()[f"_run_{job}"](plan, tables, wb, hi, n)
@@ -786,7 +787,7 @@ def _run_list(p, tables, wb, hi, n):
     formula = f"=FILTER({span},{cond})"
     sname = None
     if wb is not None:
-        ws, sname = _answer_sheet(wb, n, f"List {fdesc}")
+        ws, sname = _answer_sheet(wb, n, "List " + (", ".join(str(v) for _, v in p["filters"]) or t.name))
         _write_table(ws, t.header, rows, formula)
     label = _label(t)
     names = ", ".join(_name(t, r, label) for r in rows[:10])

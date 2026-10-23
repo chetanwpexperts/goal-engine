@@ -154,3 +154,15 @@ def test_a_question_does_not_change_the_file_and_the_card_shows_the_answer(clien
 def test_formula_only_when_asked(client, open_file):
     r = say(client, "region wise total sales ka formula bhi do", open_file)
     assert "SUMIFS(" in r["reply"]
+
+
+def test_sheet_list_offers_each_sheet(client, ml_mode):
+    r = say(client, "I need to work on my excel file")
+    agent = next(a for a in r["agents"] if a.get("office"))
+    _upload(client, agent["id"], PRACTICE.read_bytes(), "Excel_Practice.xlsx")
+    gid = r["goal"]["id"]
+    r = say(client, "how many sheets we have?", gid)
+    assert "Show Sales Data" in r["options"] and "Show Messy Data" in r["options"], r["options"]
+    r = say(client, "Show Sales Data", gid)
+    f = next(a for a in r["agents"] if a.get("office"))["files"][0]
+    assert "Sales Data" in r["reply"] and f["result"]["sample"]["sheet"] == "Sales Data", r["reply"]

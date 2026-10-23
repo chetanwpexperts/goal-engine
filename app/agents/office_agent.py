@@ -943,6 +943,10 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
             if plan.get("readonly") and not r.get("sheet"):
                 tail = " Nothing in your file was changed." if not hi else " File mein kuch nahi badla."
             reply = f"{r['say']}.{fx}{tail}".replace("..", ".")
+            links = r.get("sheet_links") or []
+            if len(links) > 1:
+                # several sheets named: each one is a tap away
+                return reply, [(f"{n} dikhao" if hi else f"Show {n}") for n in links[:8]]
             if other:
                 # answered the likelier reading; the other one is one tap away
                 reply += (" Agar aapka matlab kuch aur tha, neeche chuno." if hi else " If you meant something else, pick it below.")

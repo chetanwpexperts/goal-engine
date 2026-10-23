@@ -791,6 +791,7 @@ def _run_sheets(p, tables, wb, hi, n):
     names = ", ".join(f"{t.name} ({_fmt(len(t.rows))})" for t in ts)
     say = (f"Is file mein {len(ts)} sheets hain: {names}" if hi else f"This file has {len(ts)} sheets: {names}")
     return {"say": say, "formula": "", "sheet": None, "value": len(ts), "value_label": "sheets", "where": "this file",
+            "sheet_links": [t.name for t in ts if t.rows],
             "chart": {"title": "Har sheet mein records" if hi else "Records in each sheet", "rows": [[t.name, len(t.rows)] for t in ts]}}
 
 
@@ -1273,6 +1274,7 @@ def _run_rows(p, tables, wb, hi, n):
     total = sum(len(t.rows) for t in allt)
     say = (f"Poori file mein {_fmt(total)} records: " if hi else f"{_fmt(total)} records in the file: ") + "; ".join(f"{t.name}: {_fmt(len(t.rows))}" for t in allt)
     return {"say": say, "formula": "", "sheet": None, "value": total, "value_label": "records", "where": "all sheets",
+            "sheet_links": [t.name for t in allt],
             "chart": {"title": "Records in each sheet" if not hi else "Har sheet mein records", "rows": chart_rows}}
 
 

@@ -73,6 +73,7 @@
 
   // ---------------------------------------------------------------- composer
   const EXAMPLES = [
+    "Describe your PHP, SQL, Excel or other problem…",
     "My Excel sheet shows #REF! errors, fix them",
     "My database is slow, check it",
     "Remind customers with pending payments every Monday",
@@ -1906,7 +1907,7 @@
     if (!cv || !cv.getContext) return { excite() {} };
     const ctx = cv.getContext("2d");
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let W = 0, H = 0, pts = [], edges = [], adj = [], pulses = [], heat = 0, raf = 0, last = 0, t0 = performance.now();
+    let W = 0, H = 0, pts = [], edges = [], adj = [], pulses = [], heat = 0, raf = 0, last = 0, t0 = performance.now(), sil = [], cereb = [], stem = [];
     const motes = Array.from({ length: 7 }, (_, i) => ({ a: i * 0.9 + Math.random(), s: 0.05 + Math.random() * 0.06, r: 0.38 + Math.random() * 0.1 }));
 
     // Side view of a brain (front to the right): the outline, the folds, the cerebellum and the stem.
@@ -1987,7 +1988,7 @@
       if (!W || !H) return;
       cv.width = W * dpr; cv.height = H * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      pts = shape(W < 360 ? 380 : 760);
+      pts = shape(W < 360 ? 700 : 1500);
       edges = []; adj = pts.map(() => []);
       pts.forEach((p, i) => {
         const near = [];
@@ -1997,17 +1998,20 @@
           if (near.length < 3) { near.push([j, d]); near.sort((a, b) => a[1] - b[1]); }
           else if (d < near[2][1]) { near[2] = [j, d]; near.sort((a, b) => a[1] - b[1]); }
         }
-        for (const [j, d] of near) if (d < 0.045 && i < j) { edges.push([i, j]); adj[i].push(j); adj[j].push(i); }
+        for (const [j, d] of near) if (d < 0.03 && i < j) { edges.push([i, j]); adj[i].push(j); adj[j].push(i); }
       });
       pts.forEach((p) => { p.glow = 0; });
+      sil = OUTLINE.map(([x, y]) => ({ x, y, z: 0 }));
+      cereb = Array.from({ length: 24 }, (_, i) => { const a = (i / 24) * Math.PI * 2; return { x: -0.5 + 0.27 * Math.cos(a), y: -0.47 + 0.15 * Math.sin(a), z: -0.05 }; });
+      stem = [[-0.1, -0.47], [-0.04, -0.5], [-0.12, -0.9], [-0.19, -0.88], [-0.2, -0.6]].map(([x, y]) => ({ x, y, z: -0.02 }));
     }
 
     function project(time) {
       const a = Math.sin(time * 0.00028) * 0.42;             // turns a little left and right, always recognisable
       const tilt = 0.06 + Math.sin(time * 0.00019) * 0.05;
       const ca = Math.cos(a), sa = Math.sin(a), ct = Math.cos(tilt), st = Math.sin(tilt);
-      const s = Math.min(W / 2.7, H / 2.4), cx = W / 2, cy = H * 0.41;
-      for (const p of pts) {
+      const s = Math.min(W / 2.35, H / 2.05), cx = W / 2, cy = H * 0.42;
+      for (const p of [...pts, ...sil, ...cereb, ...stem]) {
         const x1 = p.x * ca + p.z * sa, z1 = -p.x * sa + p.z * ca;
         const y1 = p.y * ct - z1 * st, z2 = p.y * st + z1 * ct;
         const f = 3.2 / (3.2 - z2);
@@ -2028,23 +2032,37 @@
       if (!W) build();
       ctx.clearRect(0, 0, W, H);
       project(still ? 0 : now - t0);
-      // soft light halo, so the brain reads as lit from inside
-      const g = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.min(W, H) * 0.55);
-      g.addColorStop(0, `rgba(196, 206, 255, ${0.45 + heat * 0.25})`); g.addColorStop(1, "rgba(196, 206, 255, 0)");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-      // two thin orbit rings and a few drifting specks around it
       const tt = (still ? 0 : now - t0) / 1000;
-      ctx.lineWidth = 1;
-      // a flat glowing base under the brain, like a platform it stands on
-      const by = H * 0.87;
-      const glow = ctx.createRadialGradient(W / 2, by, 0, W / 2, by, W * 0.3);
-      glow.addColorStop(0, `rgba(123, 79, 224, ${0.18 + heat * 0.12})`); glow.addColorStop(1, "rgba(123, 79, 224, 0)");
-      ctx.save(); ctx.translate(W / 2, by); ctx.scale(1, 0.18); ctx.translate(-W / 2, -by);
-      ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(W / 2, by, W * 0.3, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-      for (const [rx, a, w] of [[0.3, 0.35, 1.6], [0.22, 0.25, 1.2], [0.14, 0.2, 1]]) {
-        ctx.strokeStyle = `rgba(91, 79, 214, ${a})`; ctx.lineWidth = w;
-        ctx.beginPath(); ctx.ellipse(W / 2, by, W * rx, W * rx * 0.13, 0, 0, Math.PI * 2); ctx.stroke();
-      }
+      const cx0 = W / 2, cy0 = H * 0.43, R = Math.min(W / 2.5, H / 2.1);
+      // the light it gives off: a wide soft halo, a warm core, a violet rim
+      const g = ctx.createRadialGradient(cx0, cy0, 0, cx0, cy0, R * 1.5);
+      g.addColorStop(0, `rgba(255, 255, 255, ${0.9})`); g.addColorStop(0.25, `rgba(214, 220, 255, ${0.7 + heat * 0.2})`);
+      g.addColorStop(0.6, "rgba(196, 190, 255, .25)"); g.addColorStop(1, "rgba(196, 206, 255, 0)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      const core = ctx.createRadialGradient(cx0, cy0, 0, cx0, cy0, R * 0.9);
+      core.addColorStop(0, `rgba(120, 130, 255, ${0.35 + heat * 0.1})`); core.addColorStop(1, "rgba(120, 90, 230, 0)");
+      ctx.save(); ctx.translate(cx0, cy0); ctx.scale(1, 0.72); ctx.translate(-cx0, -cy0);
+      ctx.fillStyle = core; ctx.beginPath(); ctx.arc(cx0, cy0, R * 0.9, 0, 7); ctx.fill(); ctx.restore();
+      // two tilted orbits around it; the back half is drawn now, the front half after the brain
+      const orbits = [[1.25, 0.26, -0.18, "242, 163, 58"], [1.12, 0.3, 0.22, "110, 120, 255"]];
+      const ring = (front) => {
+        for (const [rx, ry, rot, col] of orbits) {
+          ctx.save(); ctx.translate(cx0, cy0 + R * 0.12); ctx.rotate(rot);
+          const grd = ctx.createLinearGradient(-R * rx, 0, R * rx, 0);
+          grd.addColorStop(0, `rgba(${col}, 0)`); grd.addColorStop(0.5, `rgba(${col}, ${front ? 0.85 : 0.35})`); grd.addColorStop(1, `rgba(${col}, 0)`);
+          ctx.strokeStyle = grd; ctx.lineWidth = front ? 2 : 1.2;
+          ctx.beginPath(); ctx.ellipse(0, 0, R * rx, R * ry, 0, front ? 0 : Math.PI, front ? Math.PI : Math.PI * 2); ctx.stroke();
+          const a = (tt * 0.5 + rot * 3) % (Math.PI * 2), on = Math.sin(a) > 0;
+          if (on === front) {
+            const px = Math.cos(a) * R * rx, py = Math.sin(a) * R * ry;
+            const dot = ctx.createRadialGradient(px, py, 0, px, py, 9);
+            dot.addColorStop(0, `rgba(${col}, 1)`); dot.addColorStop(1, `rgba(${col}, 0)`);
+            ctx.fillStyle = dot; ctx.beginPath(); ctx.arc(px, py, 9, 0, 7); ctx.fill();
+          }
+          ctx.restore();
+        }
+      };
+      ring(false);
       ctx.lineWidth = 1;
       for (const m of motes) {
         const x = W / 2 + Math.cos(m.a + tt * m.s) * W * m.r, y = H / 2 + Math.sin(m.a + tt * m.s * 0.8) * H * m.r * 0.9;
@@ -2052,20 +2070,49 @@
         ctx.beginPath(); ctx.arc(x, y, 1.6, 0, 7); ctx.fill();
       }
       ctx.lineWidth = 1;
+      // the brain's body: a filled, lit shape (deep blue at the back, violet at the front), then the neurons on it
+      const body2 = (poly, a) => {
+        if (!poly.length) return;
+        const xs = poly.map((p) => p.sx), lo = Math.min(...xs), hi = Math.max(...xs);
+        const fill = ctx.createLinearGradient(lo, 0, hi, 0);
+        fill.addColorStop(0, `rgba(48, 70, 230, ${a})`); fill.addColorStop(0.55, `rgba(92, 70, 235, ${a})`); fill.addColorStop(1, `rgba(150, 80, 240, ${a})`);
+        ctx.save(); ctx.shadowColor = "rgba(110, 100, 255, .65)"; ctx.shadowBlur = 38;
+        ctx.fillStyle = fill; ctx.beginPath(); ctx.moveTo(poly[0].sx, poly[0].sy);
+        for (const p of poly.slice(1)) ctx.lineTo(p.sx, p.sy);
+        ctx.closePath(); ctx.fill(); ctx.restore();
+      };
+      body2(stem, 0.32);
+      body2(cereb, 0.78);
+      body2(sil, 0.82);
+      const shine = ctx.createRadialGradient(cx0 + R * 0.1, cy0 - R * 0.2, 0, cx0 + R * 0.1, cy0 - R * 0.2, R * 0.75);
+      shine.addColorStop(0, "rgba(190, 200, 255, .45)"); shine.addColorStop(1, "rgba(190, 200, 255, 0)");
+      ctx.fillStyle = shine; ctx.beginPath(); ctx.moveTo(sil[0].sx, sil[0].sy); for (const p of sil.slice(1)) ctx.lineTo(p.sx, p.sy); ctx.closePath(); ctx.fill();
+      const hue = (p) => { const t = Math.max(0, Math.min(1, (p.x + 1) / 2)); return [Math.round(150 + 70 * t), Math.round(190 - 40 * t), 255]; };
       for (const [i, j] of edges) {
-        const p = pts[i], q = pts[j], d = (p.d + q.d) / 2;
-        ctx.strokeStyle = `rgba(79, 99, 214, ${0.05 + 0.2 * d})`;
+        const p = pts[i], q = pts[j], d = (p.d + q.d) / 2, [r, gg, b] = hue(p);
+        ctx.strokeStyle = `rgba(${r}, ${gg}, ${b}, ${0.1 + 0.3 * d})`;
         ctx.beginPath(); ctx.moveTo(p.sx, p.sy); ctx.lineTo(q.sx, q.sy); ctx.stroke();
       }
+      ctx.save();
       for (const p of pts) {
         p.glow = Math.max(0, p.glow - dt * 1.4);
-        const r = (W < 360 ? 0.5 : 0.7) + (W < 360 ? 1 : 1.5) * p.d + p.glow * (W < 360 ? 2 : 3.2);
-        ctx.fillStyle = p.glow > 0.03 ? `rgba(242, 163, 58, ${0.4 + 0.6 * p.glow})` : `rgba(${p.k === 3 ? "52, 66, 160" : p.k ? "108, 92, 231" : "79, 99, 214"}, ${(p.k === 3 ? 0.3 : 0.14) + 0.55 * p.d})`;
+        const r = (W < 360 ? 0.6 : 0.9) + (W < 360 ? 1.1 : 1.7) * p.d + p.glow * (W < 360 ? 2.4 : 3.6);
+        const [cr, cg, cb] = hue(p);
+        ctx.fillStyle = p.glow > 0.03 ? `rgba(255, 170, 60, ${0.6 + 0.4 * p.glow})`
+          : p.k === 3 ? `rgba(235, 240, 255, ${0.45 + 0.5 * p.d})`
+          : `rgba(${cr}, ${cg}, ${cb}, ${0.18 + 0.5 * p.d})`;
         ctx.beginPath(); ctx.arc(p.sx, p.sy, r, 0, 7); ctx.fill();
+        if (p.glow > 0.3) {
+          const h = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, 10 * p.glow);
+          h.addColorStop(0, `rgba(255, 190, 90, ${0.55 * p.glow})`); h.addColorStop(1, "rgba(255, 190, 90, 0)");
+          ctx.fillStyle = h; ctx.beginPath(); ctx.arc(p.sx, p.sy, 10 * p.glow, 0, 7); ctx.fill();
+        }
       }
+      ctx.restore();
+      ring(true);
       if (!still) {
         heat = Math.max(0, heat - dt * 0.5);
-        const rate = 6 + heat * 40;
+        const rate = 12 + heat * 40;
         for (let k = 0; k < 3; k++) if (Math.random() < dt * rate / 3) fire();
         const next = [];
         for (const pu of pulses) {

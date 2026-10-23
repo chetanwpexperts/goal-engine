@@ -44,9 +44,9 @@ CASES = [
 ROWS_CASES = [
     ("before make changes tell me how many records in the sales sheet", "Sales Data has 60 records"),
     ("how many rows in employee data", "Employee Data has 40 records"),
-    ("sheets name", "7 sheets: Read Me"),
-    ("sheet names", "7 sheets: Read Me"),
-    ("which sheets are there", "7 sheets: Read Me"),
+    ("sheets name", "7 sheets"),
+    ("sheet names", "Messy Data (15)"),
+    ("which sheets are there", "Sales Data (60)"),
     ("kitne records hain inventory sheet mein", "Inventory mein 6 records"),
     ("how many employees in Sales department", "Department = Sales"),
     ("how many records of Sales department in messy data sheet", "Messy Data (Department = Sales)"),

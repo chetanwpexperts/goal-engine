@@ -286,3 +286,46 @@ def test_after_a_long_pause_the_chain_starts_fresh(client, open_file):  # noqa: 
         hist = loads(db.get(MindSession, open_file).data, {})["history"]
     assert core.BREAK in hist
     assert core._chain(hist, "office")[-1] == "rows" and len(core._chain(hist, "office")) <= 2
+
+
+def test_how_many_sheets_gets_the_number(client, open_file):  # noqa: F811
+    r = say(client, "now tell me how many sheets in this", open_file)
+    assert "7 sheets" in r["reply"] and "Sales Data" in r["reply"], r["reply"]
+    assert r["options"] == []
+
+
+def test_what_it_could_not_answer_directly_goes_to_learning(client, open_file):  # noqa: F811
+    from sqlalchemy.orm import Session
+
+    from app.db import get_engine
+    from app.models import LearnRequest
+
+    r = say(client, "blorp the quarterly zingers", open_file)
+    assert r["options"] and r["next"] == [], "a question back, no suggestions next to it"
+    with Session(get_engine()) as db:
+        rows = db.query(LearnRequest).all()
+        assert any("zingers" in x.text and x.brain == "office" for x in rows)
+
+
+def test_a_single_answer_reads_the_file_once_and_writes_nothing(client, open_file):  # noqa: F811
+    from app.office import sheetdata
+
+    r1 = say(client, "total sales kitni hai", open_file)
+    hits = []
+    orig = sheetdata._load_tables
+    sheetdata._load_tables = lambda p: hits.append(p) or orig(p)
+    try:
+        r2 = say(client, "average salary kitni hai", open_file)
+    finally:
+        sheetdata._load_tables = orig
+    assert hits == [], "the tables were already in memory"
+    f = _wait(client, next(a for a in r2["agents"] if a.get("office"))["files"][0]["id"])
+    assert f["steps"] == [], "a single number doesn't make a new version of the file"
+    assert r1["reply"] and r2["reply"]
+
+
+def test_suggestions_add_up_totals_not_unit_prices():
+    tables = load_tables(str(PRACTICE))
+    plan = ask.understand("how many records in the sales sheet", tables)
+    sugg = mo.suggestions(predict.prior("office", "rows"), tables, plan, None, False)
+    assert not any("Unit Price" in s for s in sugg), sugg

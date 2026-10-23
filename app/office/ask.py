@@ -333,7 +333,28 @@ def _plan_rows(text, tables):
     return {"job": "rows", "table": None}             # no sheet named: every sheet's count
 
 
+SHEETS_Q = re.compile(r"\b(how many|kitni|kitne|number of|count( of)?|total)\b.{0,15}\b(sheets|tabs|worksheets)\b|"
+                      r"\b(sheets|tabs)\b.{0,15}\b(kitni|kitne|how many|count)\b|शीट.{0,10}कितन|कितनी शीट", re.I)
+
+
+def _plan_sheets(text, tables):
+    if not SHEETS_Q.search(text or ""):
+        return None
+    return {"job": "sheets"}
+
+
+def _run_sheets(p, tables, wb, hi, n):
+    ts = list(tables.values())
+    names = ", ".join(f"{t.name} ({_fmt(len(t.rows))})" for t in ts)
+    say = (f"Is file mein {len(ts)} sheets hain: {names}" if hi else f"This file has {len(ts)} sheets: {names}")
+    return {"say": say, "formula": "", "sheet": None, "value": len(ts), "value_label": "sheets", "where": "this file",
+            "chart": {"title": "Har sheet mein records" if hi else "Records in each sheet", "rows": [[t.name, len(t.rows)] for t in ts]}}
+
+
 def _plan_question(text, tables) -> dict:
+    sheets_plan = _plan_sheets(text, tables)
+    if sheets_plan:
+        return sheets_plan
     rows_plan = _plan_rows(text, tables)
     if rows_plan:
         return rows_plan
@@ -598,10 +619,14 @@ def _crit(t: Table, filters):
 def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:
     """Do the plan on a copy of the file (new sheet / new column / colours). Returns {'say', 'formula', 'sheet'}."""
     tables = {t.name: t for t in load_tables(path)}
-    wb = load_workbook(path, keep_vba=path.lower().endswith(".xlsm")) if path.lower().endswith((".xlsx", ".xlsm")) else None
     job = plan["job"]
+    answer_only = job in ("rows", "sheets", "describe", "review") or (
+        job == "aggregate" and plan.get("group") is None and plan.get("agg") not in ("max", "min"))
     if plan.get("readonly") and job in ("aggregate", "list", "describe", "rows", "pivot", "growth", "running", "missing", "variance", "aging", "review"):
-        wb = None                                          # "before making changes, tell me...": answer only, the file stays as it is
+        answer_only = True                                 # "before making changes, tell me...": answer only, the file stays as it is
+    # a single number or a description adds nothing to the file: don't open, rewrite or save the workbook for it
+    wb = None if answer_only else (load_workbook(path, keep_vba=path.lower().endswith(".xlsm"))
+                                   if path.lower().endswith((".xlsx", ".xlsm")) else None)
     plan = {**plan, "_path": path}
     res = globals()[f"_run_{job}"](plan, tables, wb, hi, n)
     if wb is not None:
@@ -718,7 +743,7 @@ def _run_aggregate(p, tables, wb, hi, n):
                          "rows": [[k, v or 0] for k, v in rows_c[:12]], "highlight": str(fv)}
         what = f"{_AGG_HI[agg]} {mname}" if hi else f"{_AGG_EN[agg]} {mname}".replace("count rows", "records")
         say = f"{t.name}{' (' + fdesc + ')' if fdesc else ''}: {what} = {_fmt(val)}"
-        if agg == "count" and not hi:
+        if agg == "count":
             say = f"{t.name}{' (' + fdesc + ')' if fdesc else ''}: {_fmt(val)} records"
         if t.truncated:
             say += " (sirf pehli 5 lakh rows)" if hi else " (first 5 lakh rows only)"

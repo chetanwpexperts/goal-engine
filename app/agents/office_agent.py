@@ -738,6 +738,14 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
         db.commit()
         opts = list(need.options)
         msg = need.hi if hi else need.en
+        try:
+            # it couldn't answer this directly: the sentence (scrubbed, nobody attached) goes to the learning list,
+            # so the agent learns to answer it straight away next time
+            from app import learning
+
+            learning.ask_to_learn(db, "office", text, guess="needed: " + (need.en[:60] if need.en else ""))
+        except ValueError:
+            pass
         if need.hi.startswith("Ye poori tarah samajh nahi aaya"):
             # not understood: offer the closest things this file can answer, not a dead end
             near = mo.closest_options(text, tables, hi)
@@ -747,6 +755,7 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
                 opts = near
             opts = opts[:6] + ["Agent ko sikhao" if hi else "Teach the agent"]
         mind.set_pattern("other", None)
+        mind.asked_back()
         return msg, opts
     # the named sheet is the sheet (a check on the plan, whatever job it became)
     named = asker.named_sheet(text, tables)
@@ -758,10 +767,17 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
     # the same question again after an answer: don't repeat that answer; offer the other readings
     if (sig.get("repeat") or sig.get("frustrated")) and last_plan and mo._same(plan, last_plan):
         alts = mo.other_readings(text, tables, plan, hi)
+        try:                                       # the last answer missed: this sentence goes to the learning list
+            from app import learning
+
+            learning.ask_to_learn(db, "office", text, guess="missed: " + mo.label_of(plan))
+        except ValueError:
+            pass
         if alts:
             agent.inputs = dumps(inputs)
             db.commit()
             mind.set_pattern(mo.label_of(plan), plan)
+            mind.asked_back()
             return (("Pichli baar maine ise aise samjha tha, shayad galat. Inme se kaunsa chahiye?" if hi
                      else "Last time I read this one way and it may have been wrong. Which of these did you mean?"), alts)
     if asker.NO_CHANGE.search(text or "") or prof.get("control") == "ask_first":

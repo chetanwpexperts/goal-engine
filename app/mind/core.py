@@ -35,6 +35,13 @@ def set_pattern(label: str, plan: dict | None = None, brain: str | None = None) 
             cur["brain"] = brain
 
 
+def asked_back() -> None:
+    """An agent asked the person something (which one? which meaning?): the answer comes first, no suggestions."""
+    cur = _current.get()
+    if cur is not None:
+        cur["asked_back"] = True
+
+
 def _previous_texts(db: Session, visitor_id: str, goal_id: int | None, limit: int = 3) -> list[str]:
     if goal_id is None:
         return []
@@ -122,7 +129,7 @@ def after(db: Session, visitor_id: str, goal, text: str, reply: str, agents: lis
                         if hi else "That's the same answer as before, so I may have misread you. Say it another way, or pick below.\n\n") + reply
 
     # likely next questions: not when they're in a hurry or annoyed (then: just do exactly what was asked)
-    if brain and not sig.get("urgent") and not sig.get("frustrated") and not sig.get("repeat"):
+    if brain and not cur.get("asked_back") and not sig.get("urgent") and not sig.get("frustrated") and not sig.get("repeat"):
         try:
             out["next"] = _next(db, brain, agent, chain, cur, hi, text, visitor_id)
         except Exception:  # noqa: BLE001

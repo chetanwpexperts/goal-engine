@@ -43,7 +43,34 @@ class Table:
         return f"{q}${c}${first}:${c}${last}" if absolute else f"{q}{c}{first}:{c}{last}"
 
 
+_cache: dict = {}
+CACHE_MAX_BYTES = 25 * 1024 * 1024       # small/medium files stay read in memory between questions
+CACHE_FILES = 4
+
+
 def load_tables(path: str) -> list[Table]:
+    """The file's tables. Read once per version of the file: every next question on it reuses them."""
+    import os
+
+    try:
+        st = os.stat(path)
+    except OSError:
+        return _load_tables(path)
+    key = (path, st.st_mtime_ns, st.st_size)
+    hit = _cache.get(key)
+    if hit is not None:
+        return hit
+    tables = _load_tables(path)
+    if st.st_size <= CACHE_MAX_BYTES:
+        for k in [k for k in _cache if k[0] == path]:
+            _cache.pop(k, None)               # an older version of the same file
+        while len(_cache) >= CACHE_FILES:
+            _cache.pop(next(iter(_cache)))
+        _cache[key] = tables
+    return tables
+
+
+def _load_tables(path: str) -> list[Table]:
     if office.kind_of(path) == "csv":
         rows = list(office._csv_rows(path))
         header = [str(h).strip() for h in rows[0]] if rows else []

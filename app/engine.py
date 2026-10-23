@@ -106,6 +106,7 @@ def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: 
         from app import mind
 
         thought = mind.after(db, visitor_id, goal, text, reply, goal_agents(db, goal.id) if goal else [], hi)
+        # when the agent just asked the person something, the answer comes first: no suggestions next to it
         nxt = [x for x in thought["next"] if x not in (options or [])]
         if thought["reply"] != reply:
             reply = thought["reply"]

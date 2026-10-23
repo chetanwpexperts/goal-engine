@@ -36,6 +36,7 @@ def label_of(plan: dict | None) -> str:
 
 # ---------------------------------------------------------------- what each column is, in any file
 ID_RE = re.compile(r"\b(id|no|number|code|phone|mobile|pin|zip|year|sr|s\.?no|roll)\b", re.I)
+TOTAL_RE = re.compile(r"amount|total|net|sales|revenue|value|salary|fee|bill|paid|balance|profit|tax", re.I)
 MONEY_RE = re.compile(r"amount|total|net|sales|salary|price|value|fee|revenue|bill|cost|tax|paid|balance|profit", re.I)
 AMOUNT_RE = re.compile(r"amount|total|net|sales|salary|price|value|fee|revenue|bill|cost|tax|paid|balance|profit|qty|quantity|units|marks|score", re.I)
 
@@ -56,7 +57,8 @@ def roles(t: Table) -> dict:
             d = len(set(v.lower() for v in vals))
             if vals and 2 <= d <= min(25, max(2, int(0.6 * len(vals)))) and n >= 4:
                 cats.append((i, Counter(vals).most_common(1)[0][0]))
-    nums.sort(key=lambda i: (0 if MONEY_RE.search(t.header[i]) else 1 if AMOUNT_RE.search(t.header[i]) else 2, i))
+    # what people add up: totals and amounts first; a unit price or rate summed down a column means little
+    nums.sort(key=lambda i: (0 if TOTAL_RE.search(t.header[i]) else 1 if MONEY_RE.search(t.header[i]) else 2 if AMOUNT_RE.search(t.header[i]) else 3, i))
     return {"cats": cats, "nums": nums, "dates": dates}
 
 

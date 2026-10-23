@@ -139,7 +139,7 @@
   // the likely next questions, written with the person's own sheet and column names; one tap asks it
   function nextChips(items, hi) {
     const wrap = el("div", "next-asks");
-    wrap.append(el("span", "next-label", hi ? "Aage pooch sakte ho" : "You might ask next"));
+    wrap.append(el("span", "next-label", hi ? "Ye bhi pooch sakte ho" : "Related questions"));
     const row = el("div", "next-row");
     for (const q of items) {
       const b = el("button", "next-chip", q);

@@ -257,6 +257,13 @@
    "month": 0.1,
    "top": 0.1,
    "count_g": 0.1
+  },
+  "sheets": {
+   "rows": 0.3,
+   "describe": 0.2,
+   "sum_g": 0.2,
+   "review": 0.15,
+   "count_g": 0.15
   }
  },
  "templates": {
@@ -656,6 +663,17 @@
    "tax amount",
    "into",
    "guna karo"
+  ],
+  "sheets": [
+   "how many sheets",
+   "kitni sheets hain",
+   "how many tabs",
+   "sheets count",
+   "number of sheets",
+   "kitne tab hain",
+   "कितनी शीट हैं",
+   "list the sheets",
+   "sheets ke naam"
   ]
  },
  "hooks": {
@@ -682,6 +700,7 @@
   "rank": "analyse",
   "lookup": "combine",
   "combine": "combine",
-  "reconcile": "reconcile"
+  "reconcile": "reconcile",
+  "sheets": "explore"
  }
 }

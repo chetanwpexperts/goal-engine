@@ -167,6 +167,10 @@ async def coming_soon(request: Request, call_next):
         response = FileResponse(STATIC / "coming-soon.html", status_code=200)
     if not _site_open():
         response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+        if not path.startswith(("/static/", "/api/", "/connector/")):
+            # the same address shows the coming-soon page or the app depending on the preview cookie: never cache it
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Vary"] = "Cookie"
     return response
 
 

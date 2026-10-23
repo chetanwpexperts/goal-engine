@@ -709,6 +709,9 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
             opts = opts[:6] + ["Agent ko sikhao" if hi else "Teach the agent"]
         return (need.hi if hi else need.en), opts
     agent.inputs = dumps(inputs)
+    if asker.NO_CHANGE.search(text or ""):
+        plan["readonly"] = True                            # "before making changes, tell me...": answer only
+    show_fx = bool(FORMULA_RE.search(text or "") or re.search(r"\b(in excel|excel mein|excel me)\b.{0,20}\b(kaise|how)\b|\bhow (do|can|to) i\b.{0,30}\b(calculate|count|sum|find)\b", text or "", re.I))
     args = {"plan": plan, "hi": hi}
     if f.size <= BIG:
         f.status, f.task, f.args = "queued", "ask", dumps(args)
@@ -722,7 +725,13 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
                 tail = (f" Nayi sheet \"{r['sheet']}\" file mein jod di; card pe Download karo." if hi and r["sheet"].startswith("Answer") else
                         f" Ye \"{r['sheet']}\" sheet mein hai; card pe Download karo." if hi else
                         f" Added to the file as \"{r['sheet']}\"; download it from the card.")
-            fx = (f" Formula: {r['formula']}" if r.get("formula") else "")
+            # the answer itself; the formula only when they asked for one (it's always in Details on the card)
+            fx = (f" Formula: {r['formula']}" if r.get("formula") and show_fx else "")
+            if show_fx != bool(r.get("show_formula")):
+                f.result = dumps({**r, "show_formula": show_fx})
+                db.commit()
+            if plan.get("readonly") and not r.get("sheet"):
+                tail = " Nothing in your file was changed." if not hi else " File mein kuch nahi badla."
             return f"{r['say']}.{fx}{tail}".replace("..", ".")
         return f.error or ("Ye kaam poora nahi ho saka." if hi else "Couldn't finish that.")
     _start(db, f, "ask", args)

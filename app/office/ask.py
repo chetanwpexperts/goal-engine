@@ -103,8 +103,45 @@ def pick_sheet(text: str, tables: list[Table]) -> Table | None:
     return best
 
 
+def named_sheet(text: str, tables: list[Table]) -> Table | None:
+    """'the sales sheet', 'sheet Inventory', 'Sales Data mein', 'employee tab': the person named the sheet; use it."""
+    low = (text or "").lower()
+    hits = []
+    for t in tables:
+        if pick_sheet(text, [t]) is None:
+            continue
+        key = [w for w in re.findall(r"[a-z0-9]+", t.name.lower()) if w not in ("data", "sheet", "sheets")]
+        k = r"\s+".join(re.escape(w) + r"\w*" for w in key)
+        m = re.search(rf"\b{k}\s+(data\s+)?(sheet|tab|worksheet)s?\b|\b(sheet|tab)\s+(named\s+|called\s+)?{k}", low)
+        if m:
+            hits.append((0, -len(key), t))
+        elif t.name.lower() in low and len(t.name.split()) >= 2:
+            hits.append((1, -len(key), t))
+    return min(hits, key=lambda x: x[:2])[2] if hits else None
+
+
+def _value_not_sheet(text, t, tables):
+    """'employees in Sales department': 'Sales' is a Department value in the Employee sheet, not the Sales sheet."""
+    low = (text or "").lower()
+    for o in tables:
+        if o is t:
+            continue
+        for i, v in values_in(text, o):
+            words = [w for w in _header_words(o.header[i]) if len(w) >= 4]
+            if v.lower() in t.name.lower() and any(re.search(rf"\b{re.escape(v.lower())}\s+{re.escape(w)}", low) for w in words):
+                return o
+    return None
+
+
+ROW_WORDS = {"record", "records", "row", "rows", "entries", "entry", "lines"}
+ROWS_Q = re.compile(r"\b(how many|how much|kitne|kitni|kitna|number of|count|total)\b.{0,30}\b(records?|rows?|entries|entry|lines)\b|"
+                    r"\b(records?|rows?|entries)\b.{0,20}\b(kitne|kitni|count|hain|hai)\b|(रिकॉर्ड|रो|एंट्री).{0,15}कितन", re.I)
+NO_CHANGE = re.compile(r"\bbefore (mak\w*|doing|any|you make)\b.{0,12}\bchang|\b(don'?t|do not|dont)\s+(change|touch|modify|edit)|\bwithout chang|"
+                       r"\bno changes?\b|\b(sirf|bas|just|only)\s+(batao|bata do|tell|show|dikhao)|\b(change|badlav|badal)\w*\s+mat\b|मत बदल", re.I)
+
+
 def columns_in(text: str, t: Table, kinds=None) -> list[tuple[int, float]]:
-    words = [w for w in tokens(text) if w not in STOP or w in ("total", "sales", "net")]
+    words = [w for w in tokens(text) if (w not in STOP or w in ("total", "sales", "net")) and w not in ROW_WORDS]
     out = []
     for i, h in enumerate(t.header):
         if not h or (kinds and t.kind(i) not in kinds):
@@ -223,6 +260,8 @@ def understand(text: str, tables: list[Table]) -> dict:
         if rx.search(text or ""):
             if job == "describe" and _agg_of(text) and not re.search(r"\b(columns?|structure|samjhao|explain|overview)\b", text, re.I):
                 continue
+            if job == "describe" and ROWS_Q.search(text or "") and not re.search(r"\b(columns?|structure|samjhao|explain|overview)\b", text, re.I):
+                continue                                   # "how many rows in X": the count, not a description
             try:
                 return globals()[f"_plan_{job}"](text, tables)
             except Skip:
@@ -237,7 +276,12 @@ SHEET_HINTS = {"sales": {"bika", "bike", "biki", "bikti", "sold", "bikri", "bech
 
 
 def _choose_table(text, tables, need_kinds=None) -> Table:
+    named = named_sheet(text, tables)
+    if named:
+        return named
     t = pick_sheet(text, tables)
+    if t and _value_not_sheet(text, t, tables):
+        t = _value_not_sheet(text, t, tables)
     if t:
         if not any(sc >= 1 for _, sc in columns_in(text, t, {"number"})):
             # "kis customer ka taxable value": 'customer' names the Customers sheet, but the value lives in Invoices
@@ -263,7 +307,35 @@ def _choose_table(text, tables, need_kinds=None) -> Table:
     raise NeedMore("Kis sheet mein dekhun?", "Which sheet should I look in?", [t.name for t in data][:8])
 
 
+def _without_sheet_name(text, t):
+    """Words that name the sheet aren't values to filter on: 'the sales sheet' is not Department = Sales."""
+    for w in re.findall(r"[a-z0-9]+", t.name.lower()):
+        if w not in ("data",):
+            text = re.sub(rf"\b{re.escape(w)}\w*(\s+(data|sheet|tab))?\b", " ", text, flags=re.I)
+    return re.sub(r"\b(sheet|tab|worksheet)s?\b", " ", text, flags=re.I)
+
+
+def _plan_rows(text, tables):
+    """'how many records in the sales sheet' -> the number of filled rows of that sheet (header and blank rows not counted)."""
+    if not ROWS_Q.search(text or ""):
+        return None
+    t = named_sheet(text, tables) or pick_sheet(text, tables)
+    if t is not None and not named_sheet(text, tables) and _value_not_sheet(text, t, tables):
+        return None                                    # "records of Sales department": a filtered count
+    if t is not None:
+        rest = _without_sheet_name(text, t)
+        if values_in(rest, t) or GROUP_RE.search(rest) or _number_filters(rest, t, columns_in(rest, t, {"number"})):
+            return None                                # "how many rows of East region": a filtered count, not the sheet size
+        return {"job": "rows", "table": t.name}
+    if any(values_in(text, o) for o in tables) or GROUP_RE.search(text or ""):
+        return None
+    return {"job": "rows", "table": None}             # no sheet named: every sheet's count
+
+
 def _plan_question(text, tables) -> dict:
+    rows_plan = _plan_rows(text, tables)
+    if rows_plan:
+        return rows_plan
     agg = _agg_of(text)
     if agg is None and not pick_sheet(text, tables) and not any(columns_in(text, t) or values_in(text, t) for t in tables):
         # nothing in the question points at this file: say so plainly, don't ask which sheet
@@ -273,6 +345,8 @@ def _plan_question(text, tables) -> dict:
                        f"I didn't fully get that. This file has: {names}. Ask using a sheet or column name, e.g. \"total sales by region\", "
                        "\"show pending rows\", \"5% of amount\".", [])
     t = _choose_table(text, tables)
+    if named_sheet(text, tables) is t:
+        text = _without_sheet_name(text, t)
     num_cols = columns_in(text, t, {"number"})
     txt_cols = columns_in(text, t, {"text"})
     date_cols = [i for i in range(len(t.header)) if t.kind(i) == "date"]
@@ -525,12 +599,47 @@ def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:
     tables = {t.name: t for t in load_tables(path)}
     wb = load_workbook(path, keep_vba=path.lower().endswith(".xlsm")) if path.lower().endswith((".xlsx", ".xlsm")) else None
     job = plan["job"]
+    if plan.get("readonly") and job in ("aggregate", "list", "describe", "rows", "pivot"):
+        wb = None                                          # "before making changes, tell me...": answer only, the file stays as it is
     plan = {**plan, "_path": path}
     res = globals()[f"_run_{job}"](plan, tables, wb, hi, n)
     if wb is not None:
         wb.calculation.fullCalcOnLoad = True
         wb.save(out)
     return res
+
+
+def _sample(t: Table, rows, k=5):
+    """The real rows behind an answer, so the person can see what was counted."""
+    keep = [i for i, h in enumerate(t.header) if h][:8]
+    return {"sheet": t.name, "header": [t.header[i] for i in keep],
+            "rows": [[_cell(r[i]) if i < len(r) else "" for i in keep] for r in rows[:k]], "total": len(rows)}
+
+
+def _cell(v):
+    if isinstance(v, datetime):
+        return v.strftime("%d-%m-%Y")
+    if isinstance(v, date):
+        return v.strftime("%d-%m-%Y")
+    return "" if v is None else v
+
+
+def _run_rows(p, tables, wb, hi, n):
+    allt = [t for t in tables.values() if t.rows]
+    chart_rows = [[t.name, len(t.rows)] for t in allt]
+    if p.get("table"):
+        t = tables[p["table"]]
+        say = (f"{t.name} mein {_fmt(len(t.rows))} records hain (heading aur khaali rows nahi gine)" if hi else
+               f"{t.name} has {_fmt(len(t.rows))} records (the heading row and blank rows aren't counted)")
+        if t.truncated:
+            say += " (sirf pehli 5 lakh rows padhi)" if hi else " (read the first 5 lakh rows only)"
+        return {"say": say, "formula": f"=COUNTA({t.ref(0)})", "sheet": None, "value": len(t.rows), "value_label": "records",
+                "where": t.name, "chart": {"title": "Records in each sheet" if not hi else "Har sheet mein records", "rows": chart_rows,
+                                            "highlight": t.name}, "sample": _sample(t, t.rows)}
+    total = sum(len(t.rows) for t in allt)
+    say = (f"Poori file mein {_fmt(total)} records: " if hi else f"{_fmt(total)} records in the file: ") + "; ".join(f"{t.name}: {_fmt(len(t.rows))}" for t in allt)
+    return {"say": say, "formula": "", "sheet": None, "value": total, "value_label": "records", "where": "all sheets",
+            "chart": {"title": "Records in each sheet" if not hi else "Har sheet mein records", "rows": chart_rows}}
 
 
 def _answer_sheet(wb, n, title):
@@ -592,14 +701,28 @@ def _run_aggregate(p, tables, wb, hi, n):
         formula = f"={fn}({target}{crit})" if filters or agg != "count" else f"=COUNTA({t.ref(0)})"
         if agg == "count" and filters:
             formula = f"=COUNTIFS({crit[1:]})"
-        if wb is not None:
-            ws, sname = _answer_sheet(wb, n, f"{_AGG_EN[agg].split()[-1].title()} {mname}")
-            _write_table(ws, ["Kya (what)", "Jawab (answer)"], [[f"{_AGG_EN[agg]} {mname}{' (' + fdesc + ')' if fdesc else ''}", val]], formula)
-        what = f"{_AGG_HI[agg]} {mname}" if hi else f"{_AGG_EN[agg]} {mname}".replace("count rows", "number of rows")
+        chart = None
+        if filters:
+            # the same number for every value of the filtered column, so the answer is seen next to the rest
+            fi, fv = filters[0]
+            others = filters[1:]
+            per = defaultdict(list)
+            for r in t.rows:
+                k = r[fi] if fi < len(r) else None
+                if k not in (None, "") and _match_filters(r, others):
+                    per[str(k).strip()].append(r)
+            if 1 < len(per) <= 40:
+                rows_c = sorted(((k, calc([x[m] for x in v] if m is not None else v)) for k, v in per.items()), key=lambda x: -(x[1] or 0))
+                chart = {"title": f"{'Records' if agg == 'count' else _AGG_EN[agg].split()[-1].title() + ' ' + mname} by {t.header[fi]}",
+                         "rows": [[k, v or 0] for k, v in rows_c[:12]], "highlight": str(fv)}
+        what = f"{_AGG_HI[agg]} {mname}" if hi else f"{_AGG_EN[agg]} {mname}".replace("count rows", "records")
         say = f"{t.name}{' (' + fdesc + ')' if fdesc else ''}: {what} = {_fmt(val)}"
+        if agg == "count" and not hi:
+            say = f"{t.name}{' (' + fdesc + ')' if fdesc else ''}: {_fmt(val)} records"
         if t.truncated:
             say += " (sirf pehli 5 lakh rows)" if hi else " (first 5 lakh rows only)"
-        return {"say": say, "formula": formula, "sheet": sname if wb is not None else None}
+        return {"say": say, "formula": formula, "sheet": None, "value": val, "value_label": what, "where": t.name + (f" ({fdesc})" if fdesc else ""),
+                "chart": chart, "sample": _sample(t, rows)}
 
     # X-wise / month-wise
     buckets = defaultdict(list)
@@ -669,7 +792,8 @@ def _run_list(p, tables, wb, hi, n):
     names = ", ".join(_name(t, r, label) for r in rows[:10])
     say = (f"{t.name} ({fdesc}): {len(rows)} rows. {names}{' …' if len(rows) > 10 else ''}" if hi else
            f"{t.name} ({fdesc}): {len(rows)} rows. {names}{' …' if len(rows) > 10 else ''}")
-    return {"say": say, "formula": formula, "sheet": sname}
+    return {"say": say, "formula": formula, "sheet": sname, "value": len(rows), "value_label": "rows", "where": f"{t.name} ({fdesc})",
+            "sample": _sample(t, rows)}
 
 
 def _run_describe(p, tables, wb, hi, n):

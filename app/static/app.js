@@ -1128,7 +1128,7 @@
   const svgIcon = (d) => { const s = document.createElementNS("http://www.w3.org/2000/svg", "svg"); s.setAttribute("viewBox", "0 0 24 24"); s.innerHTML = d; return s; };
   const ICON_BRAIN = '<path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 1V5a3 3 0 0 0-3-1zM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 1"/>';
 
-  function barChart(rows, title, line) {
+  function barChart(rows, title, line, highlight) {
     const box = el("div", "ans-chart");
     box.append(el("p", "ans-chart-title", title));
     const nums = rows.map((r) => Number(r[1]) || 0);
@@ -1144,8 +1144,8 @@
       box.append(svg, labels);
       return box;
     }
-    for (const [label, v] of rows.slice(0, 10)) {
-      const row = el("div", "ans-bar");
+    for (const [label, v] of rows.slice(0, 12)) {
+      const row = el("div", highlight != null && String(label).toLowerCase() === String(highlight).toLowerCase() ? "ans-bar hl" : "ans-bar");
       const fill = el("span", "fill"); fill.style.width = `${Math.max(2, (Math.abs(Number(v) || 0) / max) * 100)}%`;
       const track = el("span", "track"); track.append(fill);
       row.append(el("span", "lbl", String(label)), track, el("span", "val", Number(v || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })));
@@ -1176,13 +1176,13 @@
     let title = T(hi, "File ki jaanch", "File check");
     let text = total ? T(hi, `${fmtN(total)} galtiyan hain. Neeche asli cells aur unka theek kiya hua roop dekho.`, `${fmtN(total)} problems. Below are the actual cells and what each fix will make of them.`)
       : T(hi, "Is file mein koi galti nahi hai.", "No problems in this file.");
-    if (r.task === "ask") { title = (r.chart && r.chart.title) || T(hi, "Jawab", "Answer"); text = r.say; }
+    if (r.task === "ask") { title = r.value != null ? T(hi, "Jawab", "Answer") : (r.chart && r.chart.title) || T(hi, "Jawab", "Answer"); text = r.say; }
     else if (r.task === "fix") { title = T(hi, "Theek kar diya", "Fixed"); text = T(hi, `Pehle ${fmtN(totalBefore)} galtiyan thi, ab ${fmtN(total)}.`, `${fmtN(totalBefore)} problems before, ${fmtN(total)} now.`); }
     else if (r.task === "extract") { title = T(hi, "Duplicates ki list", "Duplicates listed"); text = T(hi, `${fmtN(r.count)} duplicate nayi sheet mein. Data nahi badla.`, `${fmtN(r.count)} duplicates listed in a new sheet. Your data wasn't changed.`); }
     else if (r.task === "compare") { title = T(hi, "Dono files ka milan", "Files compared"); text = T(hi, `${fmtN(r.only_in_a)} sirf pehli mein, ${fmtN(r.only_in_b)} sirf doosri mein, ${fmtN(r.changed_rows)} rows badli.`, `${fmtN(r.only_in_a)} only in the first, ${fmtN(r.only_in_b)} only in the second, ${fmtN(r.changed_rows)} rows changed.`); }
     const ot = el("div"); ot.append(el("h3", null, title), el("p", null, text));
     overview.append(ic, ot);
-    if (r.formula) overview.append(el("code", "ans-formula", r.formula));
+    if (r.formula && (r.task !== "ask" || r.show_formula)) overview.append(el("code", "ans-formula", r.formula));
 
     const visual = el("div", "ans-visual");
     const exampleLine = (where, from, to) => {
@@ -1192,8 +1192,30 @@
       return li;
     };
 
-    if (r.task === "ask" && r.chart && r.chart.rows && r.chart.rows.length) {
-      visual.append(barChart(r.chart.rows, r.chart.title, r.chart.line));
+    if (r.task === "ask") {
+      // the answer as a number, where it came from, how it compares, and the real rows behind it
+      if (r.value != null) {
+        const tile = el("div", "ans-number");
+        const num = typeof r.value === "number" ? r.value.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : String(r.value);
+        tile.append(el("b", null, num), el("span", null, `${r.value_label || ""}${r.where ? ` · ${r.where}` : ""}`));
+        visual.append(tile);
+      }
+      if (r.chart && r.chart.rows && r.chart.rows.length > 1) visual.append(barChart(r.chart.rows, r.chart.title, r.chart.line, r.chart.highlight));
+      if (r.sample && r.sample.rows && r.sample.rows.length) {
+        const box = el("div", "ans-sample");
+        box.append(el("p", "ans-chart-title", r.sample.total > r.sample.rows.length
+          ? T(hi, `Gine gaye rows (pehle ${r.sample.rows.length}, kul ${fmtN(r.sample.total)})`, `Rows behind this answer (first ${r.sample.rows.length} of ${fmtN(r.sample.total)})`)
+          : T(hi, "Gine gaye rows", "Rows behind this answer")));
+        const wrap = el("div", "ans-table-wrap");
+        const table = el("table", "ans-table");
+        const hr = el("tr"); for (const h of r.sample.header) hr.append(el("th", null, String(h)));
+        const thead = el("thead"); thead.append(hr); table.append(thead);
+        const tb = el("tbody");
+        for (const row of r.sample.rows) { const tr = el("tr"); for (const c of row) tr.append(el("td", null, typeof c === "number" ? c.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : String(c ?? ""))); tb.append(tr); }
+        table.append(tb); wrap.append(table); box.append(wrap);
+        visual.append(box);
+      }
+      if (!visual.childNodes.length) { const c = el("div", "ans-card"); c.append(el("p", null, r.say || "")); visual.append(c); }
     } else if (r.task === "fix" && r.examples && Object.keys(r.examples).length) {
       // what actually changed in the file, with the real values
       for (const [op, rows] of Object.entries(r.examples)) {
@@ -1364,6 +1386,7 @@
       if (r.task === "ask") {
         parts.push(el("p", "cap", T(hi, "Jawab", "Answer")), el("p", "answer", r.say));
         if (r.formula) {
+          parts.push(el("p", "cap", T(hi, "Khud Excel mein karna ho to", "To do it yourself in Excel")));
           const fx = el("div", "formula");
           const code = el("code", null, r.formula);
           const copy = el("button", "btn", T(hi, "Formula copy karo", "Copy formula")); copy.type = "button";

@@ -498,7 +498,7 @@ body.typing .brains { visibility: hidden; }
 .ans-tabs { display: flex; gap: 6px; margin: 16px 0 12px; }
 .ans-tab { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 10px; padding: 7px 14px; font: inherit; font-size: 14px; cursor: pointer; }
 .ans-tab[aria-selected="true"] { background: linear-gradient(90deg, #4D5BE6, #7B4FE0); color: #fff; border-color: transparent; }
-.ans-visual { display: grid; gap: 16px; }
+.ans-visual { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .ans-flow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; }
 .ans-flow .col { display: grid; gap: 8px; }
 .ans-flow .node { width: auto; height: auto; place-items: start; display: grid; gap: 2px; padding: 9px 12px; border-radius: 12px; border: 1px solid; font-size: 13px; position: relative; }
@@ -547,3 +547,17 @@ body.typing .brains { visibility: hidden; }
 .ans-card .to { color: #135F55; background: #E3F5F1; border-radius: 6px; padding: 0 6px; white-space: pre; font-family: ui-monospace, monospace; font-size: 12.5px; }
 .ans-card .arrow { color: var(--muted); }
 .ans-visual > .btn.solid { justify-self: start; }
+
+/* ask answers: the number, the comparison, the real rows */
+.ans-number { margin-bottom: 0 !important; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 18px 20px; border-radius: 16px;
+  background: var(--card, #fff); border: 1px solid rgba(30, 36, 64, .08); margin-bottom: 14px; }
+.ans-number b { font-size: 44px; line-height: 1; font-weight: 800; color: #1E2440; font-variant-numeric: tabular-nums; }
+.ans-number span { color: #5A6079; font-size: 15px; }
+.ans-bar.hl .lbl { font-weight: 700; color: #1E2440; }
+.ans-bar.hl .fill { background: #F2A33A; }
+.ans-sample { margin-top: 16px; }
+.ans-table-wrap { overflow-x: auto; border: 1px solid rgba(30, 36, 64, .08); border-radius: 12px; background: #fff; }
+.ans-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.ans-table th, .ans-table td { padding: 8px 10px; text-align: left; white-space: nowrap; border-bottom: 1px solid rgba(30, 36, 64, .06); }
+.ans-table th { font-weight: 600; color: #5A6079; background: #F6F7FB; }
+.ans-table tr:last-child td { border-bottom: 0; }

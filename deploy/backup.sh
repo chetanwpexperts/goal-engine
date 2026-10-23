@@ -11,19 +11,28 @@ KEEP_DAYS="${BACKUP_KEEP_DAYS:-7}"
 mkdir -p "$DEST"
 chmod 700 "$DEST"
 
-# the database login from .env, without printing it
-get() { grep -E "^$1=" .env | tail -1 | cut -d= -f2- | sed -e 's/^["'\'']//' -e 's/["'\'']$//'; }
-DB_HOST="$(get DB_HOST)"; DB_HOST="${DB_HOST:-127.0.0.1}"
-DB_PORT="$(get DB_PORT)"; DB_PORT="${DB_PORT:-3306}"
-DB_NAME="$(get DB_NAME)"; DB_NAME="${DB_NAME:-goal_engine}"
-DB_USER="$(get DB_USER)"; DB_USER="${DB_USER:-goal_engine}"
-DB_PASSWORD="$(get DB_PASSWORD)"
-
-# the password goes in a private temporary file, so it never shows in the process list
+# the database login exactly as the app reads it (DATABASE_URL or the DB_* parts in .env), written straight into a
+# private temporary file: never printed, never on a command line, never in the process list
 CNF="$(mktemp)"
 trap 'rm -f "$CNF"' EXIT
 chmod 600 "$CNF"
-printf '[client]\nuser=%s\npassword=%s\nhost=%s\nport=%s\n' "$DB_USER" "$DB_PASSWORD" "$DB_HOST" "$DB_PORT" > "$CNF"
+DB_NAME="$(.venv/bin/python - "$CNF" <<'PY'
+import sys
+from sqlalchemy.engine import make_url
+from app.config import get_settings
+
+u = make_url(str(get_settings().sqlalchemy_url()) if not hasattr(get_settings().sqlalchemy_url(), "render_as_string")
+             else get_settings().sqlalchemy_url().render_as_string(hide_password=False))
+q = lambda v: '"' + str(v).replace("\\", "\\\\").replace('"', '\\"') + '"'   # quoted: '#' or spaces in a password are kept
+with open(sys.argv[1], "w") as f:
+    f.write("[client]\n")
+    f.write(f"user={q(u.username or '')}\n")
+    f.write(f"password={q(u.password or '')}\n")
+    f.write(f"host={u.host or '127.0.0.1'}\n")
+    f.write(f"port={u.port or 3306}\n")
+print(u.database or "goal_engine")
+PY
+)"
 
 OUT="$DEST/${DB_NAME}-$(date +%F_%H%M).sql.gz"
 umask 077

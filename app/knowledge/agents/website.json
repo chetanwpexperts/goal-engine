@@ -1,0 +1,168 @@
+{
+ "name": "website",
+ "priority": 3,
+ "recipes": [
+  "website_check",
+  "website_watch"
+ ],
+ "first": "web_problem",
+ "about": "websites",
+ "words": {
+  "about": [
+   "website",
+   "site",
+   "web site",
+   "url",
+   "domain"
+  ]
+ },
+ "expert_words": [
+  "wp-config",
+  "htaccess",
+  ".htaccess",
+  "php-fpm",
+  "opcache",
+  "composer",
+  "artisan",
+  "eloquent",
+  "wp_query",
+  "cron job",
+  "nginx",
+  "apache",
+  "dns",
+  "cname",
+  "ssl certificate",
+  "core web vitals",
+  "lcp",
+  "cls"
+ ],
+ "chains": {
+  "web_problem": {
+   "web_check": 0.6,
+   "web_slow": 0.2,
+   "web_watch": 0.2
+  },
+  "web_check": {
+   "web_watch": 0.4,
+   "web_slow": 0.25,
+   "web_another": 0.2,
+   "web_fix": 0.15
+  },
+  "web_slow": {
+   "web_fix": 0.5,
+   "web_watch": 0.3,
+   "web_another": 0.2
+  },
+  "web_fix": {
+   "web_check": 0.5,
+   "web_watch": 0.3,
+   "web_another": 0.2
+  },
+  "web_watch": {
+   "web_another": 0.5,
+   "web_check": 0.3,
+   "web_slow": 0.2
+  },
+  "web_another": {
+   "web_watch": 0.5,
+   "web_slow": 0.3,
+   "web_check": 0.2
+  },
+  "other": {
+   "web_check": 0.5,
+   "web_watch": 0.3,
+   "web_slow": 0.2
+  }
+ },
+ "next": {
+  "web_watch": {
+   "en": "Yes, check it daily",
+   "hi": "Haan, roz check karo",
+   "needs": [
+    "checked"
+   ]
+  },
+  "web_another": {
+   "en": "Check another website",
+   "hi": "Koi aur website check karo",
+   "needs": [
+    "checked"
+   ]
+  },
+  "web_check": {
+   "en": "Check {url} again",
+   "hi": "{url} dobara check karo",
+   "needs": [
+    "checked",
+    "url"
+   ]
+  },
+  "web_fix": {
+   "en": "Check {url} again",
+   "hi": "{url} dobara check karo",
+   "needs": [
+    "checked",
+    "url"
+   ]
+  }
+ },
+ "patterns": {
+  "web_problem": [
+   "my website has issues",
+   "website kharab hai",
+   "site not working",
+   "website down",
+   "website mein dikkat",
+   "site broken"
+  ],
+  "web_check": [
+   "check my website",
+   "website check karo",
+   "is my site ok",
+   "site test karo",
+   "scan my website",
+   "audit my site"
+  ],
+  "web_slow": [
+   "website is slow",
+   "site slow hai",
+   "speed up website",
+   "load time",
+   "page takes long",
+   "dheemi site"
+  ],
+  "web_watch": [
+   "check daily",
+   "roz check karo",
+   "monitor my site",
+   "alert me if down",
+   "keep watching",
+   "har din dekho"
+  ],
+  "web_another": [
+   "check another website",
+   "doosri website",
+   "one more site",
+   "aur ek site",
+   "another url"
+  ],
+  "web_fix": [
+   "fix my website",
+   "website theek karo",
+   "repair site",
+   "solve the error",
+   "white screen fix",
+   "plugin conflict"
+  ]
+ },
+ "hooks": {
+  "state": "app.agents.website:mind_state",
+  "holds": "app.agents.website:holds_conversation",
+  "continue": "app.agents.website:continue_turn"
+ },
+ "goals": {
+  "web_check": "check",
+  "web_problem": "fix",
+  "web_watch": "monitor"
+ }
+}

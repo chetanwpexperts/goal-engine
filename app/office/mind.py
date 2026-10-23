@@ -1,17 +1,14 @@
-"""The mind's Excel part: what pattern a question was, what the person will likely ask next (written with the real
+"""The Excel agent's side of the mind: what pattern a question was, what the person will likely ask next (written with the real
 sheet and column names of THEIR file, and checked that the agent can really do it), other readings when an answer
 missed, and the nearest known question when something isn't understood."""
 
 import json
 import re
 from collections import Counter
-from functools import lru_cache
-from pathlib import Path
 
+from app.mind import packs
 from app.office import ask as asker
 from app.office.sheetdata import Table
-
-PACK = Path(__file__).resolve().parent / "pack"
 
 
 # ---------------------------------------------------------------- the pattern of a question
@@ -73,44 +70,8 @@ def _focus(tables: list[Table], plan: dict | None) -> Table | None:
 
 
 # ---------------------------------------------------------------- writing a pattern as a question the agent understands
-EN = {
-    "rows": "how many records in the {S} sheet",
-    "count": "how many records in the {S} sheet",
-    "count_g": "how many records by {g} in the {S} sheet",
-    "count_f": "how many records with {g} {v} in the {S} sheet",
-    "sum": "total {m} in the {S} sheet",
-    "sum_f": "total {m} for {v} in the {S} sheet",
-    "sum_g": "total {m} by {g} in the {S} sheet",
-    "avg": "average {m} in the {S} sheet",
-    "month": "month wise total {m} in the {S} sheet",
-    "top": "top 5 by {m} in the {S} sheet",
-    "rank": "which {g} has the highest total {m} in the {S} sheet",
-    "list_f": "show {v} rows in the {S} sheet",
-    "pivot": "total {m} by {g} and {g2} in the {S} sheet",
-    "missing": "find blank cells in the {S} sheet",
-    "dups": "find duplicates in the {S} sheet",
-    "fix": "fix all problems",
-    "formula": "give me the formula for this",
-}
-HI = {
-    "rows": "{S} sheet mein kitne records hain",
-    "count": "{S} sheet mein kitne records hain",
-    "count_g": "{S} sheet mein {g} wise kitne records hain",
-    "count_f": "{S} sheet mein {v} wale kitne records hain",
-    "sum": "{S} sheet mein total {m} kitna hai",
-    "sum_f": "{S} sheet mein {v} ka total {m}",
-    "sum_g": "{S} sheet mein {g} wise total {m}",
-    "avg": "{S} sheet mein average {m} kitna hai",
-    "month": "{S} sheet mein month wise total {m}",
-    "top": "{S} sheet mein {m} ke top 5",
-    "rank": "{S} sheet mein kis {g} ka total {m} sabse zyada hai",
-    "list_f": "{S} sheet mein {v} wale dikhao",
-    "pivot": "{S} sheet mein {g} aur {g2} wise total {m}",
-    "missing": "{S} sheet mein khaali cells dhundo",
-    "dups": "{S} sheet mein duplicate dhundo",
-    "fix": "sab theek karo",
-    "formula": "iska formula do",
-}
+EN = packs.get("office").get("templates", {}).get("en", {})
+HI = packs.get("office").get("templates", {}).get("hi", {})
 CHAT_KINDS = {"dups", "fix", "formula"}       # handled by the agent's own commands, not the question engine
 
 
@@ -200,30 +161,8 @@ def suggestions(scores: dict[str, float], tables: list[Table], plan: dict | None
 
 
 # ---------------------------------------------------------------- the nearest known question, when nothing fits
-@lru_cache(maxsize=1)
-def _pack():
-    from sklearn.feature_extraction.text import TfidfVectorizer
-
-    data = json.loads((PACK / "office.json").read_text(encoding="utf-8"))
-    labels, phrases = [], []
-    for label, items in data["patterns"].items():
-        for p in items:
-            labels.append(label)
-            phrases.append(p.lower())
-    vec = TfidfVectorizer(analyzer="char_wb", ngram_range=(2, 4), sublinear_tf=True)
-    mat = vec.fit_transform(phrases)
-    return vec, mat, labels
-
-
 def nearest(text: str, k: int = 3, min_score: float = 0.22) -> list[tuple[str, float]]:
-    vec, mat, labels = _pack()
-    sims = (mat @ vec.transform([(text or "").lower()]).T).toarray().ravel()
-    best: dict[str, float] = {}
-    for i in sims.argsort()[::-1][:60]:
-        if sims[i] < min_score:
-            break
-        best.setdefault(labels[i], float(sims[i]))
-    return sorted(best.items(), key=lambda x: -x[1])[:k]
+    return packs.nearest("office", text, k, min_score)
 
 
 def closest_options(text: str, tables: list[Table], hi: bool, limit: int = 3) -> list[str]:
@@ -312,3 +251,33 @@ def sheet_or_value(text: str, tables: list[Table], plan: dict, hi: bool) -> str 
             if sheet is not None:
                 return plan_text({"job": "rows", "table": sheet.name}, tables, hi)
     return None
+
+
+# ---------------------------------------------------------------- the hook the shared mind calls
+SUGGEST_MAX_BYTES = 10 * 1024 * 1024       # bigger files: no reading the whole file again just to suggest
+
+
+def suggest(db, agent, scores: dict, cur: dict, hi: bool, text: str) -> list[str]:
+    from app.agents import office_agent
+    from app.models import loads
+    from app.office.sheetdata import load_tables
+
+    f = office_agent.open_file(db, agent) if agent is not None else None
+    if f is None or f.status != "ready" or f.size > SUGGEST_MAX_BYTES:
+        return []
+    prof = cur.get("profile", {})
+    scores = dict(scores)
+    if prof.get("level") == "expert" and cur.get("plan"):
+        scores["formula"] = max(scores.get("formula", 0), 0.2)    # people who name functions like formulas
+    if prof.get("formula") is False:
+        scores.pop("formula", None)
+    tables = cur.get("tables") or load_tables(f.path)
+    plan = cur.get("plan") or (loads(agent.inputs, {}) or {}).get("mind_plan")
+    return suggestions(scores, tables, plan, loads(f.report, {}) or {}, hi, asked=text)
+
+
+def ready(db, agent) -> bool:
+    from app.agents import office_agent
+
+    f = office_agent.open_file(db, agent) if agent is not None else None
+    return f is not None and f.status == "ready"

@@ -1,4 +1,304 @@
 {
+ "name": "office",
+ "priority": 1,
+ "recipes": [
+  "office"
+ ],
+ "first": "upload",
+ "about": "Excel, CSV and other office files",
+ "words": {
+  "strong": [
+   "excel",
+   "eksel",
+   "xlsx",
+   "xls",
+   "xlsm",
+   "spreadsheet",
+   "spreadsheets",
+   "workbook",
+   "csv",
+   "एक्सेल"
+  ],
+  "about": [
+   "excel",
+   "xlsx",
+   "xls",
+   "csv",
+   "spreadsheet",
+   "sheet",
+   "sheets",
+   "workbook",
+   "vlookup",
+   "xlookup",
+   "pivot",
+   "formula",
+   "formule",
+   "word file",
+   "docx",
+   "powerpoint",
+   "pptx",
+   "outlook",
+   "onedrive",
+   "eksel",
+   "shit",
+   "phormula",
+   "#REF!",
+   "#N/A",
+   "#VALUE!",
+   "#DIV/0!",
+   "#NAME?"
+  ]
+ },
+ "expert_words": [
+  "vlookup",
+  "xlookup",
+  "index match",
+  "index/match",
+  "sumif",
+  "sumifs",
+  "countif",
+  "countifs",
+  "averageifs",
+  "pivot table",
+  "pivottable",
+  "power query",
+  "vba",
+  "macro",
+  "array formula",
+  "named range",
+  "absolute reference",
+  "conditional formatting",
+  "dax"
+ ],
+ "chains": {
+  "upload": {
+   "review": 0.22,
+   "rows": 0.14,
+   "sum_g": 0.14,
+   "dups": 0.12,
+   "fix": 0.1,
+   "describe": 0.08,
+   "count_g": 0.1,
+   "month": 0.1
+  },
+  "rows": {
+   "count_g": 0.24,
+   "sum_g": 0.16,
+   "list_f": 0.14,
+   "dups": 0.12,
+   "sum": 0.12,
+   "review": 0.12,
+   "top": 0.1
+  },
+  "count": {
+   "count_g": 0.3,
+   "list_f": 0.2,
+   "sum": 0.15,
+   "rows": 0.1,
+   "top": 0.1,
+   "review": 0.15
+  },
+  "count_f": {
+   "count_g": 0.3,
+   "list_f": 0.3,
+   "sum_f": 0.2,
+   "highlight": 0.1,
+   "formula": 0.1
+  },
+  "count_g": {
+   "list_f": 0.24,
+   "rank": 0.2,
+   "sum_g": 0.2,
+   "pivot": 0.1,
+   "month": 0.1,
+   "formula": 0.08,
+   "highlight": 0.08
+  },
+  "sum": {
+   "sum_g": 0.34,
+   "month": 0.2,
+   "top": 0.15,
+   "avg": 0.1,
+   "formula": 0.1,
+   "count": 0.11
+  },
+  "sum_f": {
+   "sum_g": 0.3,
+   "list_f": 0.25,
+   "month": 0.15,
+   "top": 0.1,
+   "formula": 0.1,
+   "count_f": 0.1
+  },
+  "sum_g": {
+   "rank": 0.24,
+   "month": 0.2,
+   "list_f": 0.16,
+   "pivot": 0.14,
+   "top": 0.1,
+   "formula": 0.1,
+   "growth": 0.06
+  },
+  "avg": {
+   "sum_g": 0.3,
+   "top": 0.2,
+   "rank": 0.2,
+   "list_f": 0.15,
+   "formula": 0.15
+  },
+  "month": {
+   "growth": 0.3,
+   "sum_g": 0.2,
+   "rank": 0.15,
+   "top": 0.15,
+   "formula": 0.1,
+   "list_f": 0.1
+  },
+  "top": {
+   "list_f": 0.2,
+   "sum_g": 0.2,
+   "rank": 0.2,
+   "highlight": 0.2,
+   "formula": 0.1,
+   "month": 0.1
+  },
+  "rank": {
+   "list_f": 0.3,
+   "top": 0.2,
+   "month": 0.15,
+   "sum_g": 0.15,
+   "highlight": 0.1,
+   "formula": 0.1
+  },
+  "list_f": {
+   "count_g": 0.2,
+   "sum_f": 0.25,
+   "highlight": 0.25,
+   "dups": 0.1,
+   "sort": 0.1,
+   "formula": 0.1
+  },
+  "review": {
+   "fix": 0.45,
+   "dups": 0.2,
+   "list_f": 0.1,
+   "rows": 0.1,
+   "sum_g": 0.15
+  },
+  "dups": {
+   "fix": 0.5,
+   "review": 0.2,
+   "rows": 0.15,
+   "count": 0.15
+  },
+  "fix": {
+   "review": 0.3,
+   "rows": 0.15,
+   "sum_g": 0.2,
+   "dups": 0.1,
+   "month": 0.1,
+   "count_g": 0.15
+  },
+  "lookup": {
+   "review": 0.2,
+   "missing": 0.2,
+   "sum_g": 0.3,
+   "list_f": 0.3
+  },
+  "combine": {
+   "sum_g": 0.3,
+   "dups": 0.3,
+   "rows": 0.2,
+   "count_g": 0.2
+  },
+  "highlight": {
+   "list_f": 0.3,
+   "count": 0.3,
+   "sort": 0.2,
+   "sum_f": 0.2
+  },
+  "describe": {
+   "rows": 0.2,
+   "sum_g": 0.2,
+   "review": 0.2,
+   "dups": 0.15,
+   "count_g": 0.15,
+   "month": 0.1
+  },
+  "aging": {
+   "list_f": 0.3,
+   "sum_g": 0.3,
+   "highlight": 0.2,
+   "count_g": 0.2
+  },
+  "pivot": {
+   "rank": 0.3,
+   "list_f": 0.2,
+   "month": 0.2,
+   "sum_g": 0.3
+  },
+  "growth": {
+   "rank": 0.3,
+   "month": 0.3,
+   "list_f": 0.2,
+   "sum_g": 0.2
+  },
+  "formula": {
+   "sum_g": 0.3,
+   "list_f": 0.2,
+   "month": 0.2,
+   "rank": 0.3
+  },
+  "other": {
+   "review": 0.2,
+   "sum_g": 0.2,
+   "rows": 0.15,
+   "dups": 0.15,
+   "month": 0.1,
+   "top": 0.1,
+   "count_g": 0.1
+  }
+ },
+ "templates": {
+  "en": {
+   "rows": "how many records in the {S} sheet",
+   "count": "how many records in the {S} sheet",
+   "count_g": "how many records by {g} in the {S} sheet",
+   "count_f": "how many records with {g} {v} in the {S} sheet",
+   "sum": "total {m} in the {S} sheet",
+   "sum_f": "total {m} for {v} in the {S} sheet",
+   "sum_g": "total {m} by {g} in the {S} sheet",
+   "avg": "average {m} in the {S} sheet",
+   "month": "month wise total {m} in the {S} sheet",
+   "top": "top 5 by {m} in the {S} sheet",
+   "rank": "which {g} has the highest total {m} in the {S} sheet",
+   "list_f": "show {v} rows in the {S} sheet",
+   "pivot": "total {m} by {g} and {g2} in the {S} sheet",
+   "missing": "find blank cells in the {S} sheet",
+   "dups": "find duplicates in the {S} sheet",
+   "fix": "fix all problems",
+   "formula": "give me the formula for this"
+  },
+  "hi": {
+   "rows": "{S} sheet mein kitne records hain",
+   "count": "{S} sheet mein kitne records hain",
+   "count_g": "{S} sheet mein {g} wise kitne records hain",
+   "count_f": "{S} sheet mein {v} wale kitne records hain",
+   "sum": "{S} sheet mein total {m} kitna hai",
+   "sum_f": "{S} sheet mein {v} ka total {m}",
+   "sum_g": "{S} sheet mein {g} wise total {m}",
+   "avg": "{S} sheet mein average {m} kitna hai",
+   "month": "{S} sheet mein month wise total {m}",
+   "top": "{S} sheet mein {m} ke top 5",
+   "rank": "{S} sheet mein kis {g} ka total {m} sabse zyada hai",
+   "list_f": "{S} sheet mein {v} wale dikhao",
+   "pivot": "{S} sheet mein {g} aur {g2} wise total {m}",
+   "missing": "{S} sheet mein khaali cells dhundo",
+   "dups": "{S} sheet mein duplicate dhundo",
+   "fix": "sab theek karo",
+   "formula": "iska formula do"
+  }
+ },
  "patterns": {
   "rows": [
    "how many records",
@@ -357,5 +657,31 @@
    "into",
    "guna karo"
   ]
+ },
+ "hooks": {
+  "suggest": "app.office.mind:suggest",
+  "ready": "app.office.mind:ready",
+  "holds": "app.agents.office_agent:holds_conversation",
+  "continue": "app.agents.office_agent:continue_turn",
+  "wants": "app.agents.office_agent:wants_turn",
+  "take": "app.agents.office_agent:take_turn",
+  "labels": "app.officeknow.brain:labels"
+ },
+ "goals": {
+  "review": "check",
+  "dups": "clean",
+  "fix": "clean",
+  "describe": "explore",
+  "rows": "check",
+  "upload": "explore",
+  "sum_g": "report",
+  "count_g": "report",
+  "month": "report",
+  "pivot": "report",
+  "top": "analyse",
+  "rank": "analyse",
+  "lookup": "combine",
+  "combine": "combine",
+  "reconcile": "reconcile"
  }
 }

@@ -118,6 +118,9 @@ def delete_visitor(db: Session, visitor_id: str) -> dict:
     from app.mind import profile as mind_profile
 
     counts["working_style"] = mind_profile.delete_visitor(db, visitor_id)
+    from app.mind import predict as mind_predict
+
+    counts["question_habits"] = mind_predict.delete_visitor(db, visitor_id)
     db.execute(delete(UsageCounter).where(UsageCounter.scope == f"visitor:{visitor_id}"))
     db.commit()
     return counts

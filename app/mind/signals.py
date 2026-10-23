@@ -4,12 +4,9 @@ Rules only, in English / Hinglish / Hindi. No AI."""
 import difflib
 import re
 
+from app.mind import packs
 from app.ml.normalize import tokens
 
-EXPERT = re.compile(r"\b(vlookup|xlookup|index\s*/?\s*match|sumifs?|countifs?|averageifs|pivot ?table|power query|vba|macro|array formula|"
-                    r"named range|absolute reference|conditional formatting|dax|"
-                    r"explain plan|execution plan|innodb|b-?tree|composite index|deadlock|replication|binlog|query planner|vacuum|"
-                    r"wp-config|htaccess|php-?fpm|opcache|composer|artisan|eloquent|hooks?|wp_query|cron job|nginx|apache)\b", re.I)
 BEGINNER = re.compile(r"\b(samajh nahi|samaj nahi|kuch samajh|don'?t understand|no idea|not technical|non[- ]technical|beginner|"
                       r"pata nahi|nahi pata|kaise karte|how do i even|i am new|naya hoon|nayi hoon)\b|समझ नहीं", re.I)
 URGENT = re.compile(r"\b(urgent|urgently|asap|jaldi|turant|abhi ke abhi|immediately|quickly|right now|deadline|client is waiting)\b"
@@ -40,7 +37,7 @@ def read(text: str, previous: list[str] | None = None) -> dict:
     t = text or ""
     words = len(t.split())
     s = {
-        "expert": bool(EXPERT.search(t)),
+        "expert": bool(packs.expert_rx() and packs.expert_rx().search(t)),     # practitioners' words, from the agents' packs
         "beginner": bool(BEGINNER.search(t)),
         "urgent": bool(URGENT.search(t)),
         "frustrated": bool(FRUSTRATED.search(t)),

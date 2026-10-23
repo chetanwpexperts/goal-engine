@@ -98,3 +98,21 @@ Tests: `.venv/bin/pip install pytest httpx && .venv/bin/python -m pytest -q`
 
 See `deploy/`: Supervisor program on port 8098, nginx site for `solve.chetanbuilds.com`,
 and `deploy/update.sh` to pull and restart.
+
+## Adding a new agent (no change to the brain)
+
+The brain (`app/mind/`, `app/engine.py`, `app/learning.py`) knows people and question patterns, never a technology;
+a test (`tests/test_brain_neutral.py`) fails if a technology name appears there. Everything about a field lives in
+its pack, `app/knowledge/agents/<name>.json`:
+
+- `recipes`, `priority`: which agents belong to it, and the order packs are asked
+- `words`: the field's words (`about`, `strong`), used for routing; `outranks`: packs whose open conversation it may take over
+- `expert_words`: words only practitioners use
+- `chains`, `first`: starting next-question chains, before real sessions exist
+- `next`, `until`: next-step questions with the states they need (e.g. `connected`)
+- `patterns`: ways people ask each kind of question (English / Hinglish / Hindi)
+- `goals`: what each kind of question says the person is trying to finish
+- `hooks`: `module:function` for the agent's own code: `wants`, `take` (handle a message), `holds`, `continue`
+  (keep a conversation, e.g. an open file), `state`, `ready`, `suggest` (next questions), `labels` (for learning)
+
+Add the pack and the agent's worker code; routing, the mind, next-question prediction and learning pick it up.

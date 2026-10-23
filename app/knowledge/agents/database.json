@@ -1,0 +1,233 @@
+{
+ "name": "database",
+ "priority": 2,
+ "recipes": [
+  "database",
+  "sql_review"
+ ],
+ "first": "db_start",
+ "about": "databases",
+ "words": {
+  "about": [
+   "database",
+   "databse",
+   "db",
+   "mysql",
+   "mariadb",
+   "postgres",
+   "postgresql",
+   "phpmyadmin"
+  ]
+ },
+ "expert_words": [
+  "explain plan",
+  "execution plan",
+  "innodb",
+  "b-tree",
+  "btree",
+  "composite index",
+  "deadlock",
+  "replication",
+  "binlog",
+  "query planner",
+  "vacuum",
+  "slow query log"
+ ],
+ "chains": {
+  "db_start": {
+   "db_connect": 0.5,
+   "db_health": 0.2,
+   "db_explore": 0.15,
+   "db_slow": 0.15
+  },
+  "db_connect": {
+   "db_health": 0.35,
+   "db_explore": 0.3,
+   "db_slow": 0.2,
+   "db_export": 0.15
+  },
+  "db_health": {
+   "db_slow": 0.35,
+   "db_fix": 0.3,
+   "db_report": 0.2,
+   "db_explore": 0.15
+  },
+  "db_slow": {
+   "db_fix": 0.45,
+   "db_health": 0.2,
+   "db_report": 0.2,
+   "db_explore": 0.15
+  },
+  "db_error": {
+   "db_fix": 0.5,
+   "db_health": 0.25,
+   "db_connect": 0.25
+  },
+  "db_explore": {
+   "db_export": 0.35,
+   "db_health": 0.25,
+   "db_report": 0.2,
+   "db_slow": 0.2
+  },
+  "db_export": {
+   "db_report": 0.4,
+   "db_explore": 0.3,
+   "db_health": 0.3
+  },
+  "db_report": {
+   "db_health": 0.4,
+   "db_explore": 0.3,
+   "db_export": 0.3
+  },
+  "db_fix": {
+   "db_health": 0.4,
+   "db_report": 0.3,
+   "db_slow": 0.3
+  },
+  "other": {
+   "db_connect": 0.4,
+   "db_health": 0.3,
+   "db_explore": 0.3
+  }
+ },
+ "next": {
+  "db_connect": {
+   "en": "How do I connect my database?",
+   "hi": "Database kaise jodun?"
+  },
+  "db_health": {
+   "en": "Check my database health",
+   "hi": "Mere database ki health check karo",
+   "needs": [
+    "connected"
+   ]
+  },
+  "db_explore": {
+   "en": "Show me the tables in my database",
+   "hi": "Database ki tables dikhao",
+   "needs": [
+    "connected"
+   ]
+  },
+  "db_export": {
+   "en": "Export a database table to Excel",
+   "hi": "Database se data Excel mein export karo",
+   "needs": [
+    "connected"
+   ]
+  },
+  "db_report": {
+   "en": "Email me a daily database report",
+   "hi": "Roz subah database report email karo",
+   "needs": [
+    "connected"
+   ]
+  }
+ },
+ "until": {
+  "connected": "db_connect"
+ },
+ "patterns": {
+  "db_connect": [
+   "connect my database",
+   "database jodo",
+   "how to connect",
+   "connection setup",
+   "add my mysql",
+   "link database",
+   "database kaise jode"
+  ],
+  "db_health": [
+   "check database health",
+   "database check karo",
+   "is my database ok",
+   "database ki sehat",
+   "health report",
+   "database status",
+   "size of tables"
+  ],
+  "db_slow": [
+   "database is slow",
+   "slow queries",
+   "query slow hai",
+   "site slow due to database",
+   "performance issue",
+   "database dheema",
+   "takes too long"
+  ],
+  "db_error": [
+   "database error",
+   "error aa raha",
+   "connection refused",
+   "too many connections",
+   "access denied",
+   "table crashed",
+   "deadlock found"
+  ],
+  "db_explore": [
+   "show tables",
+   "tables dikhao",
+   "what data is there",
+   "see my data",
+   "browse database",
+   "kaunsi tables hain",
+   "data dekhna hai"
+  ],
+  "db_export": [
+   "export to excel",
+   "excel mein nikalo",
+   "download csv",
+   "data nikaal do",
+   "table export",
+   "sheet mein daalo"
+  ],
+  "db_report": [
+   "daily report",
+   "roz report bhejo",
+   "email me report",
+   "weekly report",
+   "schedule report",
+   "har subah report"
+  ],
+  "db_fix": [
+   "fix it",
+   "theek karo",
+   "add index",
+   "optimize",
+   "speed up",
+   "repair table",
+   "fix the query"
+  ],
+  "db_backup": [
+   "backup",
+   "backup lo",
+   "restore",
+   "database copy",
+   "backup schedule"
+  ],
+  "db_write": [
+   "update data",
+   "delete rows",
+   "insert",
+   "data badlo",
+   "change records"
+  ]
+ },
+ "hooks": {
+  "state": "app.agents.database:mind_state",
+  "wants": "app.agents.database:wants_turn",
+  "take": "app.agents.database:take_turn",
+  "labels": "app.dbknow.brain:labels"
+ },
+ "outranks": [
+  "office"
+ ],
+ "goals": {
+  "db_health": "fix",
+  "db_slow": "fix",
+  "db_error": "fix",
+  "db_explore": "explore",
+  "db_export": "report",
+  "db_report": "report"
+ }
+}

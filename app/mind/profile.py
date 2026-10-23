@@ -15,16 +15,6 @@ STYLE_TTL = timedelta(days=180)
 SESSION_TTL = timedelta(days=30)
 HISTORY = 12
 
-# what the questions so far say the person is trying to finish
-GOAL_OF = {
-    "review": "check", "dups": "clean", "fix": "clean", "describe": "explore", "rows": "check", "upload": "explore",
-    "sum_g": "report", "count_g": "report", "month": "report", "pivot": "report", "top": "analyse", "rank": "analyse",
-    "lookup": "combine", "combine": "combine", "reconcile": "reconcile", "compare": "reconcile",
-    "db_health": "fix", "db_slow": "fix", "db_error": "fix", "db_explore": "explore", "db_export": "report", "db_report": "report",
-    "web_check": "check", "web_problem": "fix", "web_watch": "monitor",
-}
-
-
 def _default() -> dict:
     return {"level": "unknown", "control": "normal", "formula": None, "lang": "en", "history": [], "frustrated": 0,
             "urgent": False, "goal": None, "turns": 0}
@@ -66,13 +56,13 @@ def update(p: dict, signals: dict, lang: str | None = None) -> dict:
     return p
 
 
-def add_pattern(p: dict, label: str | None) -> None:
+def add_pattern(p: dict, label: str | None, goal: str | None = None) -> None:
+    """goal: what this kind of question says the person is trying to finish (from the agent's pack)."""
     if not label:
         return
     hist = p.setdefault("history", [])
     hist.append(label)
     del hist[:-HISTORY]
-    goal = GOAL_OF.get(label)
     if goal:
         p["goal"] = goal
 

@@ -204,3 +204,40 @@ def _report(url: str, findings: list[Finding], page: Page | None, note: str = ""
         "note": note,
         "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
+
+
+
+def mind_state(db, agent) -> dict:
+    """What the shared mind may build next steps on: was a check done, which address."""
+    from sqlalchemy import select
+
+    from app.models import AgentRun, loads
+
+    run = db.scalars(select(AgentRun).where(AgentRun.agent_id == agent.id).order_by(AgentRun.id.desc()).limit(1)).first()
+    inputs = loads(agent.inputs, {}) or {}
+    url = inputs.get("website_url") or inputs.get("url") or ""
+    return {"checked": bool(run is not None and run.status == "done"), "url": url}
+
+
+
+# ------------------------------------------------------------------ hooks the brain calls (named in the website pack)
+ANOTHER_SITE_RE = re.compile(r"\b(koi|ek|aur|or|another|dusri|doosri|dusra|doosra|new|nayi|naya|one more|ek aur)\b.{0,25}\b(website|site|web ?site|url|domain)\b"
+                             r"|\b(website|site)\b.{0,25}\b(aur|or|another|dusri|doosri|bhi)\b", re.I)
+
+
+def holds_conversation(db, goal, text: str, any_text: bool = False):
+    """'koi aur website check kar sakte ho?': same agent, new address. Ask for it; don't start a different topic."""
+    if any_text or not ANOTHER_SITE_RE.search(text or ""):
+        return None
+    from app.agents.core import goal_agents
+
+    return next((a for a in goal_agents(db, goal.id) if a.recipe in ("website_check", "website_watch")), None)
+
+
+def continue_turn(db, goal, agent, text: str):
+    from app.ml.normalize import detect_language
+
+    hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 8)
+    reply = ("Haan. Doosri website ka address bhejo (jaise example.com), main turant check karta hoon." if hi
+             else "Yes. Send the other website's address (like example.com) and I'll check it right away.")
+    return reply, [], hi

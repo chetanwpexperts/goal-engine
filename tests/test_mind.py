@@ -6,7 +6,7 @@ import random
 import pytest
 from openpyxl import Workbook
 
-from app.mind import office as mo
+from app.office import mind as mo
 from app.mind import predict, signals
 from app.office import ask
 from app.office.sheetdata import load_tables
@@ -236,3 +236,53 @@ def test_hinglish_conversations_follow_the_chips(client, open_file, first):  # n
         q = r["next"][-1]
         r = say(client, q, open_file)
         assert "samajh nahi aaya" not in r["reply"] and "didn't fully get" not in r["reply"], (q, r["reply"])
+
+
+def test_a_returning_persons_own_habits_come_first(db_session):
+    for _ in range(4):
+        predict.record(db_session, "office", ["upload", "sum_g"], "highlight", visitor="v-alice")
+    s_alice = predict.scores(db_session, "office", ["upload", "sum_g"], visitor="v-alice")
+    s_bob = predict.scores(db_session, "office", ["upload", "sum_g"], visitor="v-bob")
+    assert max(s_alice, key=s_alice.get) == "highlight"
+    assert s_bob["highlight"] < s_alice["highlight"]
+    from app.models import PersonalStep
+
+    assert all(r.who.startswith("h:") and "alice" not in r.who for r in db_session.query(PersonalStep)), "only a one-way fingerprint"
+    predict.delete_visitor(db_session, "v-alice")
+    assert db_session.query(PersonalStep).count() == 0
+
+
+def test_one_off_paths_are_dropped_as_noise(db_session):
+    from datetime import timedelta
+
+    from app.models import PatternStep, utcnow
+
+    predict.record(db_session, "office", ["rows"], "aging")
+    for r in db_session.query(PatternStep):
+        r.updated_at = utcnow() - timedelta(days=20)
+    db_session.flush()
+    predict.decay(db_session)
+    assert db_session.query(PatternStep).filter(PatternStep.nxt == "aging").count() == 0
+
+
+def test_after_a_long_pause_the_chain_starts_fresh(client, open_file):  # noqa: F811
+    from datetime import timedelta
+
+    from sqlalchemy.orm import Session
+
+    from app.db import get_engine
+    from app.mind import core
+    from app.models import MindSession, dumps, loads, utcnow
+
+    say(client, "total sales by region", open_file)
+    with Session(get_engine()) as db:
+        row = db.get(MindSession, open_file)
+        data = loads(row.data, {})
+        data["last_at"] = (utcnow() - timedelta(hours=2)).isoformat()
+        row.data = dumps(data)
+        db.commit()
+    say(client, "how many records in the sales sheet", open_file)
+    with Session(get_engine()) as db:
+        hist = loads(db.get(MindSession, open_file).data, {})["history"]
+    assert core.BREAK in hist
+    assert core._chain(hist, "office")[-1] == "rows" and len(core._chain(hist, "office")) <= 2

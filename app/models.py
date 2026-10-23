@@ -344,3 +344,19 @@ class VisitorStyle(Base):
     visitor_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     data: Mapped[str] = mapped_column(Text, default="{}")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class PersonalStep(Base):
+    """One person's own question habits (who = a one-way fingerprint of their browser id; labels only, never text).
+    Deleted with 'Delete all my data' and after 180 days without use."""
+
+    __tablename__ = "personal_steps"
+    __table_args__ = (UniqueConstraint("who", "brain", "prev1", "nxt"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    who: Mapped[str] = mapped_column(String(64), index=True)
+    brain: Mapped[str] = mapped_column(String(20))
+    prev1: Mapped[str] = mapped_column(String(40))
+    nxt: Mapped[str] = mapped_column(String(40))
+    weight: Mapped[float] = mapped_column(Float, default=0.0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

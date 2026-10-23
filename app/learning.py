@@ -1,6 +1,6 @@
 """How every brain upgrades itself from real users, without AI and without keeping anyone's details.
 
-Two loops, the same for every brain (database, php, office, general):
+Two loops, the same for every brain (each agent pack, plus the general one):
 
 1. "I meant this one": when a brain isn't sure it shows its best guesses. The person picks the right one.
    When 3 different people pick the same meaning for the same sentence, that sentence becomes a training
@@ -24,7 +24,23 @@ from sqlalchemy.orm import Session
 from app.models import LearnedPhrase, LearnRequest, LearnVote, utcnow
 from app.ml.normalize import normalize
 
-BRAINS = ("database", "php", "office", "general")
+def _brains() -> tuple[str, ...]:
+    from app.mind import packs
+
+    return tuple(packs.all_packs()) + ("general",)
+
+
+class _Brains(tuple):
+    """Every agent pack's brain plus 'general'; a new pack joins learning by itself."""
+
+    def __contains__(self, item):
+        return item in _brains()
+
+    def __iter__(self):
+        return iter(_brains())
+
+
+BRAINS = _Brains()
 VOTES_TO_LEARN = 3          # different people agreeing
 AGREEMENT = 0.75            # share of the votes for that sentence
 VOTES_PER_DAY = 30          # per person
@@ -57,19 +73,14 @@ def _fp(brain: str, text: str) -> str:
 
 # ------------------------------------------------------------------ what each brain can mean
 def labels(brain: str) -> set[str]:
-    if brain == "database":
-        from app.dbknow import brain as dbbrain
-
-        return set(dbbrain._examples()[1])
     if brain == "general":
         from app.ml.intent import training_examples
 
         return set(training_examples(include_learned=False)[1])
-    try:
-        from app import brains
-    except ImportError:          # php / office brains not installed yet
-        return set()
-    return brains.labels(brain)
+    from app.mind import packs
+
+    fn = packs.hook(brain, "labels")          # the agent's pack names where its meanings come from
+    return set(fn()) if fn is not None else set()
 
 
 # ------------------------------------------------------------------ loop 1: "I meant this one"

@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Agent, Connector, ConnectorJob, Goal, dumps, loads, utcnow
+from app.mind import packs
 
 
 EXPORT_DIR = Path(__file__).resolve().parents[2] / "data" / "exports"
@@ -360,7 +361,7 @@ def visitor_connectors(db: Session, visitor_id: str) -> list[Connector]:
 
 
 # ---------------------------------------------------------------- the database agent (one per goal)
-DB_WORDS = re.compile(r"\b(database|databse|db|mysql|mariadb|postgres\w*|phpmyadmin)\b", re.I)
+DB_WORDS = packs.words("database", "about")            # the field's words come from its knowledge pack
 SQL_TEXT = re.compile(r"\bselect\b[\s\S]+?\bfrom\b", re.I)
 
 
@@ -514,3 +515,47 @@ def clean_exports(max_age_hours: int = 24) -> None:
                 f.unlink()
         except OSError:
             pass
+
+
+
+def mind_state(db: Session, agent: Agent) -> dict:
+    """What the shared mind may build next steps on."""
+    return {"connected": bool(visitor_connectors(db, agent.visitor_id))}
+
+
+# ------------------------------------------------------------------ hooks the brain calls (named in the database pack)
+def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) -> bool:
+    return relation not in ("howto", "safety", "chit_chat") and wants_database(goal, text)
+
+
+def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
+    """Database work: the agent works through a connector on the user's own server."""
+    from app.dbknow import brain as dbbrain
+
+    mode = detect_mode(text)
+    rec = dbbrain.recognize(text)
+    agent = goal_agent(db, goal)
+    if agent is None:
+        agent = create_agent(db, goal, mode)
+    inputs = loads(agent.inputs, {}) or {}
+    if mode != "explore":
+        inputs["mode"] = mode
+    if rec["kind"] in ("sql", "error") or (rec["kind"] == "do" and rec["confidence"] >= 0.35) or (
+            rec["kind"] == "issue" and rec["confidence"] >= 0.6):     # name a specific problem only when sure
+        inputs["brain"] = {**rec, "sql": text if rec["kind"] == "sql" else ""}
+    agent.inputs = dumps(inputs)
+    goal.title = MODE_TEXT[inputs.get("mode", "explore")][0 if turn.hi else 1].split(" (")[0]
+    goal.missing_info = "[]"
+    goal.pending = None
+    goal.next_action_type = "execute"
+    goal.next_action = "Connect the database, then pick a table"
+    db.commit()
+    has = bool(visitor_connectors(db, visitor_id))
+    reply = plan_reply(mode, turn.hi, has, later_parts(text))
+    b = inputs.get("brain") or {}
+    seen = dbbrain.describe(b, turn.hi) if (b.get("kind") in ("issue", "error", "sql") or b.get("id") == "slow_query") else ""
+    if seen:
+        reply = (f"Samjha: {seen}. " if turn.hi else f"Understood: {seen}. ") + (
+            ("Database juda hua hai, card mein check shuru karo." if has else "Bas batao database kahan hai; judte hi main khud check karke wajah aur fix dhoondhunga.") if turn.hi
+            else ("Your database is connected; start the check on the card." if has else "Just tell me where your database is; once it's connected I'll check it myself and find the cause and the fix."))
+    return reply, [], "agent_plan"

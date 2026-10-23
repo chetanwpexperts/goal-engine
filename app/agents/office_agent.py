@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import office
+from app.mind import packs
 from app.models import Agent, Goal, OfficeFile, dumps, loads, utcnow
 
 DATA = Path(__file__).resolve().parents[2] / "data" / "office"
@@ -28,10 +29,9 @@ FILE_MAX_AGE = timedelta(hours=8)      # whatever happens
 BIG = 50 * 1024 * 1024
 OPEN_FILES_PER_VISITOR = 6
 _big_lane = threading.Semaphore(1)          # one big file at a time, so the VPS stays responsive
-FILE_WORDS = re.compile(r"\b(excel|xlsx|xls|csv|spreadsheet|sheet|sheets|workbook|vlookup|xlookup|pivot|formula|formule|"
-                        r"word file|docx|powerpoint|pptx|outlook|onedrive|eksel|shit|phormula)\b|#(REF!|N/A|VALUE!|DIV/0!|NAME\?)", re.I)
+FILE_WORDS = packs.words("office", "about")            # the field's words come from its knowledge pack
 ALLOWED = (".xlsx", ".xlsm", ".csv", ".txt")
-STRONG_FILE = re.compile(r"\b(excel|eksel|xlsx|xls|xlsm|spreadsheets?|workbook|csv)\b|एक्सेल", re.I)
+STRONG_FILE = packs.words("office", "strong")
 PROBLEM_WORDS = re.compile(r"\b(issues?|problems?|errors?|kharab|broken|galat|wrong|not working|nahi chal|help|fix|theek|check|messy|dikkat|gadbad)\b", re.I)
 
 
@@ -49,11 +49,10 @@ def wants_office(goal: Goal | None, text: str, db: Session | None = None) -> boo
                 UNDO_RE.search(text or "") or ALL_RE.search(text or "") or ops_in(text) or REPORT_RE.search(text or "")
                 or (pending_offer(agent) and YES_RE.search(text or ""))):
             return True
-    from app.agents.database import DB_WORDS
     from app.officeknow import brain
 
-    if DB_WORDS.search(text or ""):
-        return False                                  # "database se excel chahiye" is the database agent's export
+    if any(packs.mentions(name, text) for name, p in packs.all_packs().items() if "office" in p.get("outranks", [])):
+        return False                                  # "database se excel chahiye": that agent's words win (its pack says so)
     rec = brain.recognize(text)
     if rec["confidence"] >= 0.99:
         return True                                   # an Excel error value like #REF!
@@ -701,7 +700,7 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
     want changes or only the answer, formulas only when they want them, and a different reading when the same
     question comes back because the last answer missed."""
     from app import mind
-    from app.mind import office as mo
+    from app.office import mind as mo
     from app.office import ask as asker
     from app.office.sheetdata import load_tables
 
@@ -802,3 +801,70 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
         return f.error or ("Ye kaam poora nahi ho saka." if hi else "Couldn't finish that.")
     _start(db, f, "ask", args)
     return "Badi file hai, kaam chal raha hai; card pe jawab aayega." if hi else "Big file, working on it; the answer will show on the card."
+
+
+# ------------------------------------------------------------------ hooks the brain calls (named in the office pack)
+def _outranked(text: str) -> bool:
+    """Words of a field whose pack outranks this one (e.g. 'export my database to excel' while a sheet is open)."""
+    return any(packs.mentions(name, text) for name, p in packs.all_packs().items() if "office" in p.get("outranks", []))
+
+
+def holds_conversation(db: Session, goal: Goal, text: str, any_text: bool = False) -> Agent | None:
+    """A file is open in this conversation: what the person types is about that file."""
+    agent = goal_agent(db, goal)
+    if agent is None or open_file(db, agent) is None:
+        return None
+    if not any_text and _outranked(text):
+        return None
+    return agent
+
+
+def continue_turn(db: Session, goal: Goal, agent: Agent, text: str):
+    from app.ml.normalize import HINGLISH_MARKERS, detect_language, tokens
+
+    lang = detect_language(text)
+    if lang == "English" and goal.detected_language in ("Hinglish", "Hindi") and (
+            len(text.split()) < 4 or any(w in HINGLISH_MARKERS for w in tokens(text))):
+        lang = goal.detected_language
+    hi = lang in ("Hinglish", "Hindi")
+    reply = chat_task(db, agent, text, hi)
+    options = []
+    if isinstance(reply, tuple):
+        reply, options = reply
+    if not reply:
+        reply = cant_yet(open_file(db, agent), hi)
+    return reply, options, hi
+
+
+def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) -> bool:
+    if relation in ("safety", "chit_chat"):
+        return False
+    return (held and not _outranked(text)) or wants_office(goal, text, db)
+
+
+def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
+    """Excel / file work: the agent works on the file itself and gives back a fixed copy."""
+    from app.officeknow import brain as officebrain
+
+    rec = officebrain.recognize(text)
+    agent = goal_agent(db, goal) or create_agent(db, goal)
+    task_reply = chat_task(db, agent, text, turn.hi)
+    inputs = loads(agent.inputs, {}) or {}
+    if rec["confidence"] >= SURE and not task_reply and open_file(db, agent) is None:
+        inputs["brain"] = rec
+        goal.title = officebrain.describe(rec, turn.hi)
+    elif not goal.title:
+        goal.title = "Excel / file ka kaam" if turn.hi else "Excel and file work"
+    agent.inputs = dumps(inputs)
+    goal.missing_info = "[]"
+    goal.pending = None
+    goal.next_action_type = "execute"
+    goal.next_action = "Give the file to the agent"
+    db.commit()
+    opened = open_file(db, agent)
+    if not task_reply and opened is not None:
+        task_reply = cant_yet(opened, turn.hi)
+    options = []
+    if isinstance(task_reply, tuple):
+        task_reply, options = task_reply
+    return (task_reply or plan_reply(rec, turn.hi)), options, "agent_plan"

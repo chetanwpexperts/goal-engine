@@ -130,3 +130,8 @@ def describe(rec: dict, hi: bool) -> str:
     if kind == "question":
         return "Database se sawaal" if hi else "A question about your data"
     return ""
+
+
+def labels() -> set[str]:
+    """Everything this brain can mean (for the learning loop)."""
+    return set(_examples()[1])

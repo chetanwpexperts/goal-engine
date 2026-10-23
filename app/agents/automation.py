@@ -24,6 +24,9 @@ from app.agents.spec import describe, next_run, schedule_text, validate
 from app import privacy
 from app.models import Agent, AgentRun, Goal, Message, OwnerContact, SentEmail, dumps, loads, utcnow
 
+SOURCE_LINK_RE = re.compile(r"https?://(?:docs\.google\.com/spreadsheets/[^\s]+|[^\s]+\.csv\b[^\s]*)", re.I)   # where its data lives
+NEXT_ACTION = "Add the sheet, check the preview, then Start"
+
 
 MAX_PER_RUN = 50
 MAX_PER_DAY = 100

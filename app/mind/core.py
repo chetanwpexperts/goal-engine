@@ -1,23 +1,24 @@
-"""One mind for all three agents.
+"""One mind for every agent. It knows people and question patterns, not any technology: each agent's field knowledge
+comes from its pack (app/knowledge/agents/*.json, see packs.py).
 
-before(): read the person in this message (level, urgency, frustration, control, formulas or not), on top of what the
-conversation and their earlier visits already showed. The agents read it while they work (now()).
-after():  note the question's pattern, learn the step (anonymous), and work out the likely next questions.
+before(): read the person in this message (level, urgency, annoyance, control, formulas or not), on top of what the
+conversation and their earlier visits already showed. Agents read it while they work (now()).
+after():  note the question's pattern, learn the step (anonymous for everyone; fingerprinted for the person's own
+habits), and work out the likely next questions.
 """
 
 import contextvars
-import json
-from functools import lru_cache
-from pathlib import Path
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.mind import predict, profile, signals
-from app.models import Message, loads
+from app.mind import packs, predict, profile, signals
+from app.models import Message, utcnow
 
 _current: contextvars.ContextVar[dict | None] = contextvars.ContextVar("mind", default=None)
-PACK = Path(__file__).resolve().parent / "pack"
+PAUSE = timedelta(minutes=30)       # a longer gap in the same conversation starts a fresh chain of questions
+BREAK = "|"
 
 
 def now() -> dict:
@@ -25,11 +26,13 @@ def now() -> dict:
     return _current.get() or {}
 
 
-def set_pattern(label: str, plan: dict | None = None, brain: str = "office") -> None:
+def set_pattern(label: str, plan: dict | None = None, brain: str | None = None) -> None:
     """An agent says what kind of question this was (and the plan it made)."""
     cur = _current.get()
     if cur is not None:
-        cur["label"], cur["plan"], cur["brain"] = label, plan, brain
+        cur["label"], cur["plan"] = label, plan
+        if brain:
+            cur["brain"] = brain
 
 
 def _previous_texts(db: Session, visitor_id: str, goal_id: int | None, limit: int = 3) -> list[str]:
@@ -53,65 +56,40 @@ def before(db: Session, visitor_id: str, goal_id: int | None, text: str) -> dict
     sig = signals.read(text, prev)
     p = profile.load(db, goal_id, visitor_id)
     profile.update(p, sig)
+    last_at = p.get("last_at")
+    if last_at and p.get("history") and p["history"][-1] != BREAK:
+        try:
+            if utcnow() - datetime.fromisoformat(last_at) > PAUSE:
+                p["history"].append(BREAK)            # back after a long pause: don't link this to what came before
+        except ValueError:
+            pass
     cur = {"signals": sig, "profile": p, "goal_id": goal_id, "label": None, "plan": None, "brain": None,
-           "last_reply": _previous_reply(db, visitor_id, goal_id)}
+           "last_reply": _previous_reply(db, visitor_id, goal_id), "visitor_id": visitor_id}
     _current.set(cur)
     return cur
 
 
-# ---------------------------------------------------------------- database and website: patterns from the words
-@lru_cache(maxsize=4)
-def _pack(brain: str):
-    from sklearn.feature_extraction.text import TfidfVectorizer
-
-    data = json.loads((PACK / f"{brain}.json").read_text(encoding="utf-8"))
-    labels, phrases = [], []
-    for label, items in data["patterns"].items():
-        labels += [label] * len(items)
-        phrases += [p.lower() for p in items]
-    vec = TfidfVectorizer(analyzer="char_wb", ngram_range=(2, 4), sublinear_tf=True)
-    return vec, vec.fit_transform(phrases), labels
+def _chain(history: list[str], brain: str) -> list[str]:
+    """This agent's patterns since the last pause."""
+    out = []
+    for h in history:
+        if h == BREAK:
+            out = []
+        elif h.startswith(brain + ":"):
+            out.append(h.split(":", 1)[1])
+    return out
 
 
-def label_from_words(brain: str, text: str, min_score: float = 0.25) -> str:
-    vec, mat, labels = _pack(brain)
-    sims = (mat @ vec.transform([(text or "").lower()]).T).toarray().ravel()
-    i = int(sims.argmax())
-    return labels[i] if sims[i] >= min_score else "other"
-
-
-DB_NEXT = {
-    "db_connect": ("How do I connect my database?", "Database kaise jodun?"),
-    "db_health": ("Check my database health", "Mere database ki health check karo"),
-    "db_explore": ("Show me the tables in my database", "Database ki tables dikhao"),
-    "db_export": ("Export a database table to Excel", "Database se data Excel mein export karo"),
-    "db_report": ("Email me a daily database report", "Roz subah database report email karo"),
-}
-
-
-def _web_next(label: str, agent_inputs: dict, hi: bool) -> str | None:
-    url = agent_inputs.get("website_url") or agent_inputs.get("url")
-    if label == "web_watch":
-        return "Haan, roz check karo" if hi else "Yes, check it daily"
-    if label == "web_another":
-        return "Koi aur website check karo" if hi else "Check another website"
-    if label in ("web_check", "web_fix") and url:
-        return f"{url} dobara check karo" if hi else f"Check {url} again"
-    return None
-
-
-# ---------------------------------------------------------------- after the agent answered
 def _brain_of(agents) -> tuple[str | None, object | None]:
+    found = []
     for a in agents:
-        if a.recipe == "office":
-            return "office", a
-    for a in agents:
-        if a.recipe in ("database", "sql_review"):
-            return "database", a
-    for a in agents:
-        if a.recipe in ("website_check", "website_watch"):
-            return "website", a
-    return None, None
+        name = packs.brain_for_recipe(a.recipe)
+        if name:
+            found.append((packs.get(name).get("priority", 99), a.id or 0, name, a))
+    if not found:
+        return None, None
+    _, _, name, agent = min(found, key=lambda x: (x[0], -x[1]))
+    return name, agent
 
 
 def after(db: Session, visitor_id: str, goal, text: str, reply: str, agents: list, hi: bool) -> dict:
@@ -122,24 +100,21 @@ def after(db: Session, visitor_id: str, goal, text: str, reply: str, agents: lis
     p["lang"] = "hi" if hi else "en"
     out = {"next": [], "reply": reply}
     brain, agent = _brain_of(agents)
+    pack = packs.get(brain) if brain else {}
     label = cur.get("label")
-    if brain and not label:
-        if brain == "office":
-            label = None                                # the Excel agent names its own patterns; small talk has none
-        elif brain == "database":
-            label = label_from_words("database", text)
-        elif brain == "website":
-            label = label_from_words("website", text)
-    history = list(p.get("history") or [])
-    if brain == "office" and label and not any(h.startswith("office:") for h in history):
-        history.append("office:upload")                 # the file itself was the first step
-        profile.add_pattern(p, "office:upload")
+    if brain and not label and not pack.get("hooks", {}).get("suggest"):
+        label = packs.label_from_words(brain, text)    # agents that don't name their own patterns: from the pack's phrasings
+    chain = _chain(p.get("history") or [], brain) if brain else []
     if brain and label and label != "other":
+        if not chain and pack.get("first") and label != pack["first"]:
+            profile.add_pattern(p, f"{brain}:{pack['first']}")     # where this agent's work starts (e.g. the file arrived)
+            chain = [pack["first"]]
         try:
-            predict.record(db, brain, [h.split(":", 1)[1] for h in history if h.startswith(brain + ":")], label)
+            predict.record(db, brain, chain, label, visitor=visitor_id)
         except Exception:  # noqa: BLE001 - learning never breaks a reply
             pass
-        profile.add_pattern(p, f"{brain}:{label}")
+        profile.add_pattern(p, f"{brain}:{label}", pack.get("goals", {}).get(label))
+        chain.append(label)
 
     # the same answer to the same question again: say so instead of repeating it silently
     if (sig.get("repeat") or sig.get("frustrated")) and cur.get("last_reply") and reply.strip() == cur["last_reply"].strip():
@@ -148,82 +123,49 @@ def after(db: Session, visitor_id: str, goal, text: str, reply: str, agents: lis
 
     # likely next questions: not when they're in a hurry or annoyed (then: just do exactly what was asked)
     if brain and not sig.get("urgent") and not sig.get("frustrated") and not sig.get("repeat"):
-        own = [h.split(":", 1)[1] for h in (p.get("history") or []) if h.startswith(brain + ":")]
         try:
-            out["next"] = _next(db, brain, agent, own, cur, hi, text)
+            out["next"] = _next(db, brain, agent, chain, cur, hi, text, visitor_id)
         except Exception:  # noqa: BLE001
             out["next"] = []
+    p["last_at"] = utcnow().isoformat()
     if goal is not None and goal.id is not None:
         profile.save(db, goal.id, visitor_id, p)
     db.commit()
     return out
 
 
-def _next(db: Session, brain: str, agent, own: list[str], cur: dict, hi: bool, text: str) -> list[str]:
-    if not own:
-        if brain == "office" and agent is not None:
-            from app.agents import office_agent
-
-            f = office_agent.open_file(db, agent)
-            if f is None or f.status != "ready":
-                return []
-            own = ["upload"]
-        elif brain == "database":
-            own = ["db_start"]
-        else:
-            own = ["web_problem"]
-    scores = predict.scores(db, brain, own)
-    if brain == "office":
-        if cur["profile"].get("level") == "expert" and cur.get("plan"):
-            scores["formula"] = max(scores.get("formula", 0), 0.2)
-        if cur["profile"].get("formula") is False:
-            scores.pop("formula", None)
-        return _office_next(db, agent, scores, cur, hi, text)
-    if brain == "database":
-        from app.agents import database as dbagent
-
-        has = bool(dbagent.visitor_connectors(db, agent.visitor_id)) if agent is not None else False
-        if not has:
-            # nothing else can happen until the database is connected: that is the one next step
-            return [] if own[-1] == "db_connect" else [DB_NEXT["db_connect"][1 if hi else 0]]
-        out = []
-        for label, pr in sorted(scores.items(), key=lambda x: -x[1]):
-            if label in DB_NEXT and pr >= 0.1 and not (label == "db_connect" and has) and label != own[-1]:
-                out.append(DB_NEXT[label][1 if hi else 0])
-            if len(out) >= 3:
-                break
-        return out
-    inputs = (loads(agent.inputs, {}) or {}) if agent is not None else {}
-    from app.models import AgentRun
-
-    run = db.scalars(select(AgentRun).where(AgentRun.agent_id == agent.id).order_by(AgentRun.id.desc()).limit(1)).first() \
-        if agent is not None else None
-    if run is None or run.status != "done":
-        return []                                   # the next step is the address / the check itself
+def _next(db: Session, brain: str, agent, chain: list[str], cur: dict, hi: bool, text: str, visitor_id: str) -> list[str]:
+    pack = packs.get(brain)
+    if not chain:
+        ready = packs.hook(brain, "ready")
+        if ready is not None and not ready(db, agent):
+            return []
+        chain = [pack.get("first", "other")]
+    scores = predict.scores(db, brain, chain, visitor=visitor_id)
+    suggest = packs.hook(brain, "suggest")
+    if suggest is not None:
+        return suggest(db, agent, scores, cur, hi, text)      # the agent writes them with the person's own names
+    state_fn = packs.hook(brain, "state")
+    state = state_fn(db, agent) if (state_fn is not None and agent is not None) else {}
+    steps = pack.get("next", {})
+    for need, only in pack.get("until", {}).items():
+        if not state.get(need):
+            # nothing else can happen until this is done: that is the one next step
+            return [] if chain[-1] == only or only not in steps else [steps[only]["hi" if hi else "en"]]
     out = []
+    values = {k: v for k, v in state.items() if isinstance(v, str)}
     for label, pr in sorted(scores.items(), key=lambda x: -x[1]):
-        s = _web_next(label, inputs, hi) if pr >= 0.1 else None
-        if s and s not in out:
+        step = steps.get(label)
+        if not step or pr < 0.1:
+            continue
+        if not all(state.get(n) for n in step.get("needs", [])):
+            continue
+        try:
+            s = step["hi" if hi else "en"].format(**values)
+        except KeyError:
+            continue
+        if s not in out:
             out.append(s)
         if len(out) >= 3:
             break
     return out
-
-
-SUGGEST_MAX_BYTES = 10 * 1024 * 1024       # bigger files: no reading the whole file again just to suggest
-
-
-def _office_next(db: Session, agent, scores: dict, cur: dict, hi: bool, text: str) -> list[str]:
-    from app.agents import office_agent
-    from app.mind import office as mo
-    from app.office.sheetdata import load_tables
-
-    f = office_agent.open_file(db, agent)
-    if f is None or f.status != "ready":
-        return []
-    report = loads(f.report, {}) or {}
-    if f.size > SUGGEST_MAX_BYTES:
-        return []
-    tables = cur.get("tables") or load_tables(f.path)
-    plan = cur.get("plan") or (loads(agent.inputs, {}) or {}).get("mind_plan")
-    return mo.suggestions(scores, tables, plan, report, hi, asked=text)

@@ -36,7 +36,9 @@ PY
 
 OUT="$DEST/${DB_NAME}-$(date +%F_%H%M).sql.gz"
 umask 077
-mysqldump --defaults-extra-file="$CNF" --single-transaction --quick --routines --triggers --no-tablespaces "$DB_NAME" | gzip -6 > "$OUT.part"
+echo "Backing up database '$DB_NAME' as MySQL user '$(sed -n 's/^user="\(.*\)"$/\1/p' "$CNF")' on $(sed -n 's/^host=//p' "$CNF")"
+# --defaults-file: ONLY this login, not ~/.my.cnf or /etc/mysql settings (they could name another user)
+mysqldump --defaults-file="$CNF" --single-transaction --quick --routines --triggers --no-tablespaces "$DB_NAME" | gzip -6 > "$OUT.part"
 mv "$OUT.part" "$OUT"
 
 # a backup that's too small is a failed backup: say so loudly

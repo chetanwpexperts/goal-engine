@@ -217,7 +217,9 @@
   "state": "app.agents.database:mind_state",
   "wants": "app.agents.database:wants_turn",
   "take": "app.agents.database:take_turn",
-  "labels": "app.dbknow.brain:labels"
+  "labels": "app.dbknow.brain:labels",
+  "holds": "app.agents.database:holds_conversation",
+  "continue": "app.agents.database:continue_turn"
  },
  "outranks": [
   "office"

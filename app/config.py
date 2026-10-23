@@ -22,6 +22,11 @@ def _int(name: str, default: int) -> int:
 class Settings(BaseModel):
     app_name: str = os.getenv("APP_NAME", "Goal Engine")
 
+    @property
+    def expose_internals(self) -> bool:
+        """How the brain read a message (intent, confidence, interpretation) stays on the server; tests switch this on."""
+        return os.getenv("EXPOSE_INTERNALS", "") == "1"
+
     # Database: DATABASE_URL wins (used by tests); otherwise MySQL from the parts.
     database_url: str = os.getenv("DATABASE_URL", "")
     db_host: str = os.getenv("DB_HOST", "127.0.0.1")

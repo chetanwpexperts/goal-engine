@@ -62,7 +62,24 @@ async def lifespan(application: FastAPI):
     stop.set()
 
 
-app = FastAPI(title="Goal Engine", docs_url=None, redoc_url=None, lifespan=lifespan)
+app = FastAPI(title="Goal Engine", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+_MIN_JS: dict = {}
+
+
+@app.get("/static/app.js", include_in_schema=False)
+def app_js():
+    """The page's script, minified: no comments or notes about how things work reach the browser."""
+    from fastapi.responses import Response
+
+    path = STATIC / "app.js"
+    key = path.stat().st_mtime
+    if _MIN_JS.get("key") != key:
+        import rjsmin
+
+        _MIN_JS.update(key=key, body=rjsmin.jsmin(path.read_text(encoding="utf-8"), keep_bang_comments=False))
+    return Response(_MIN_JS["body"], media_type="application/javascript", headers={"Cache-Control": "no-cache"})
+
+
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
@@ -506,8 +523,28 @@ def health() -> dict:
     router: AIRouter = app.state.router
     from app.ml.slots import SPECS
 
+    if not get_settings().expose_internals:
+        return {"ok": True}                                  # how the engine works isn't anyone's business
     return {"ok": True, "engine": get_settings().engine_mode, "problem_types": len(SPECS) - 1,
             "ai_providers": [p.name for p in router.providers]}
+
+
+GOAL_INTERNAL = ("intent", "confidence", "interpreted_problem", "desired_goal", "sub_goals", "constraints", "next_action",
+                 "original_request", "updates")
+
+
+def public(data: dict) -> dict:
+    """What the browser gets: the replies, cards and goal titles, never how the brain read the message."""
+    if get_settings().expose_internals or not isinstance(data, dict):
+        return data
+    out = {k: v for k, v in data.items() if k not in ("provider", "intent", "confidence")}
+    for key in ("goal", "current"):
+        if isinstance(out.get(key), dict):
+            out[key] = {k: v for k, v in out[key].items() if k not in GOAL_INTERNAL}
+    if isinstance(out.get("agents"), list):
+        out["agents"] = [{**a, "brain": {k: v for k, v in a["brain"].items() if k not in ("confidence", "ranking", "scores", "score")}}
+                         if isinstance(a, dict) and isinstance(a.get("brain"), dict) else a for a in out["agents"]]
+    return out
 
 
 @app.get("/api/state")
@@ -515,13 +552,13 @@ def state(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)) -> 
     goals = all_goals(db, visitor)
     settings = get_settings()
     used = usage_today(db, visitor)
-    return {
+    return public({
         "goals": [g.summary() for g in goals],
         "current": goals[0].as_dict() if goals else None,
         "agents": [agent_dict(a, db, _goal_hi(goals[0])) for a in goal_agents(db, goals[0].id)] if goals else [],
         "messages": _messages(db, visitor, limit=40),
         "remaining_today": max(0, settings.visitor_daily_cap - used["visitor"]),
-    }
+    })
 
 
 @app.post("/api/message")
@@ -539,7 +576,7 @@ def post_message(body: MessageIn, db: Session = Depends(get_db), visitor: str = 
                             status_code=503)
     used = usage_today(db, visitor)
     result["remaining_today"] = max(0, get_settings().visitor_daily_cap - used["visitor"])
-    return result
+    return public(result)
 
 
 class StartIn(BaseModel):
@@ -575,10 +612,10 @@ def start_agent(agent_id: int, body: StartIn, db: Session = Depends(get_db), vis
     reply, options = _after_run(agent, run, hi)
     db.add(Message(visitor_id=visitor, goal_id=agent.goal_id, role="assistant", text=reply, relation="agent_run", provider="agent"))
     db.commit()
-    return {"reply": reply, "options": options, "relation": "agent_run",
-            "goal": goal.as_dict() if goal else None,
-            "goals": [g.summary() for g in all_goals(db, visitor)],
-            "agents": [agent_dict(a, db, hi) for a in goal_agents(db, agent.goal_id)]}
+    return public({"reply": reply, "options": options, "relation": "agent_run",
+                   "goal": goal.as_dict() if goal else None,
+                   "goals": [g.summary() for g in all_goals(db, visitor)],
+                   "agents": [agent_dict(a, db, hi) for a in goal_agents(db, agent.goal_id)]})
 
 
 class OwnerIn(BaseModel):
@@ -590,9 +627,9 @@ class OwnerIn(BaseModel):
 def _agent_payload(db: Session, agent: Agent, visitor: str, reply: str = "") -> dict:
     goal = db.get(Goal, agent.goal_id)
     hi = _goal_hi(goal)
-    return {"reply": reply, "relation": "agent_run", "goal": goal.as_dict() if goal else None,
-            "goals": [g.summary() for g in all_goals(db, visitor)],
-            "agents": [agent_dict(a, db, hi) for a in goal_agents(db, agent.goal_id)]}
+    return public({"reply": reply, "relation": "agent_run", "goal": goal.as_dict() if goal else None,
+                   "goals": [g.summary() for g in all_goals(db, visitor)],
+                   "agents": [agent_dict(a, db, hi) for a in goal_agents(db, agent.goal_id)]})
 
 
 def mailer() -> SmtpMailer:
@@ -1150,8 +1187,8 @@ def new_chat(request: Request) -> JSONResponse:
 @app.get("/api/goals/{goal_id}")
 def get_goal(goal_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)) -> dict:
     goal = own_goal(db, goal_id, visitor)
-    return {"goal": goal.as_dict(), "messages": _messages(db, visitor, goal_id=goal.id),
-            "agents": [agent_dict(a, db, _goal_hi(goal)) for a in goal_agents(db, goal.id)]}
+    return public({"goal": goal.as_dict(), "messages": _messages(db, visitor, goal_id=goal.id),
+                   "agents": [agent_dict(a, db, _goal_hi(goal)) for a in goal_agents(db, goal.id)]})
 
 
 @app.post("/api/goals/{goal_id}/status")
@@ -1160,7 +1197,7 @@ def set_status(goal_id: int, body: StatusIn, db: Session = Depends(get_db),
     goal = own_goal(db, goal_id, visitor)
     goal.status = body.status
     db.commit()
-    return {"goal": goal.as_dict(), "goals": [g.summary() for g in all_goals(db, visitor)]}
+    return public({"goal": goal.as_dict(), "goals": [g.summary() for g in all_goals(db, visitor)]})
 
 
 def _messages(db: Session, visitor: str, goal_id: int | None = None, limit: int = 100) -> list[dict]:

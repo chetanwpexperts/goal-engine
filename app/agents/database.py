@@ -559,3 +559,68 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
             ("Database juda hua hai, card mein check shuru karo." if has else "Bas batao database kahan hai; judte hi main khud check karke wajah aur fix dhoondhunga.") if turn.hi
             else ("Your database is connected; start the check on the card." if has else "Just tell me where your database is; once it's connected I'll check it myself and find the cause and the fix."))
     return reply, [], "agent_plan"
+
+
+# ------------------------------------------------------------------ after a query check: "optimize it", "why slow", "kya karu"
+SQL_FOLLOW_RE = re.compile(r"\b(optimi[sz]\w*|faster|speed( it)? up|improve|better|rewrite|re-write|fix (it|this|the query)|tune|slow|fast|"
+                           r"index(es)?|why|explain|kaise|kya karu|kya karna|theek karo|tez|jaldi|behtar|sudharo|samjhao)\b", re.I)
+NEW_SQL_RE = re.compile(r"\b(select|update|delete|insert)\b[\s\S]+\b(from|into|set)\b", re.I)
+
+
+def _sql_agent(db, goal):
+    from app.agents.core import goal_agents
+    from app.models import AgentRun
+
+    a = next((x for x in goal_agents(db, goal.id) if x.recipe == "sql_review"), None)
+    if a is None:
+        return None, None
+    run = db.scalars(select(AgentRun).where(AgentRun.agent_id == a.id).order_by(AgentRun.id.desc()).limit(1)).first()
+    return a, run
+
+
+def holds_conversation(db, goal, text: str, any_text: bool = False):
+    """A query was checked in this conversation and the person asks about it: answer about THAT query."""
+    if any_text or NEW_SQL_RE.search(text or "") or not SQL_FOLLOW_RE.search(text or ""):
+        return None
+    a, run = _sql_agent(db, goal)
+    return a if run is not None and run.status == "done" else None
+
+
+def continue_turn(db, goal, agent, text: str):
+    from app.agents.sql import rewrite
+    from app.ml.normalize import detect_language
+    from app.models import AgentRun
+
+    hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
+    run = db.scalars(select(AgentRun).where(AgentRun.agent_id == agent.id).order_by(AgentRun.id.desc()).limit(1)).first()
+    res = loads(run.result, {}) or {}
+    query = (loads(agent.inputs, {}) or {}).get("query", "")
+    better = res.get("rewritten") or rewrite(query)
+    changes = []
+    if re.search(r"\bselect\s+(\w+\.)?\*", better, re.I):
+        better = re.sub(r"\bselect\s+((?:\w+\.)?\*)", r"SELECT /* list only the columns you show, instead of \1 */ \1", better, count=1, flags=re.I)
+        changes.append("Pick only the columns the page shows instead of *: less data read, and an index can cover the query"
+                       if not hi else "* ki jagah sirf wahi columns lo jo page pe dikhte hain: kam data padha jayega")
+    for f in res.get("findings", []):
+        t = f["title_en"].lower()
+        if not t.startswith(("these columns need an index", "missing indexes")) and "select *" not in t:
+            changes.append(f["fix_hi"] if hi else f["fix_en"])
+    idx = res.get("indexes") or []
+    lines = []
+    lines.append(("Aapki query ka behtar roop (result wahi rahega):" if hi else "Your query, optimised (same result):") + f"\n\n{better.strip()}")
+    if changes:
+        lines.append(("Kya badla aur kyun:\n" if hi else "What changes and why:\n") + "\n".join(f"- {c}" for c in changes[:5]))
+    if idx:
+        if res.get("check_query"):
+            lines.append(("Sabse bada fayda index se hoga. Pehle ye chalao, dekho kaunse index pehle se hain:" if hi else
+                          "The biggest gain is indexes. First run this to see which ones you already have:") + f"\n\n{res['check_query']}")
+            lines.append(("Phir inme se sirf wo lagao jo upar nahi dikhe:" if hi else "Then add only the ones it doesn't show:") +
+                         "\n\n" + "\n".join(idx))
+        else:
+            lines.append(("Ye index lagao:" if hi else "Add these indexes:") + "\n\n" + "\n".join(idx))
+    if res.get("assumed_primary"):
+        lines.append((f"{', '.join(res['assumed_primary'])} ko primary key maana (pehle se index hota hai)." if hi else
+                      f"I took {', '.join(res['assumed_primary'])} to be {'primary keys' if len(res['assumed_primary']) > 1 else 'the primary key'} (already indexed)."))
+    lines.append(("Index lagane ke baad EXPLAIN chala ke uska output paste karo, main confirm kar dunga ki index use ho raha hai." if hi else
+                  "After adding them, paste the EXPLAIN output of the query and I'll confirm the indexes are being used."))
+    return "\n\n".join(lines), [], hi

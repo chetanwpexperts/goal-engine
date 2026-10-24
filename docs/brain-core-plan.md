@@ -42,3 +42,23 @@ and edges, not as whole playbooks.
 2. Build the core for the database brain (map, converter, reasoning, investigation planning, outcome
    learning, generator family for unseen combinations).
 3. Reuse the same core for the Microsoft brain, then PHP.
+
+## Learning from any platform: how knowledge is trusted (applies to EVERY brain and every source)
+Sources: official docs (MySQL, MariaDB, PostgreSQL, Microsoft Support/Learn, PHP, Laravel, WordPress
+developer docs); Stack Overflow / DBA SE / Super User; Microsoft Community / Q&A; Reddit (r/excel, r/SQL,
+r/PostgreSQL, r/PHP, r/laravel, r/Wordpress); MrExcel / Chandoo; WordPress.org support forums; Laracasts;
+GitHub issues of the software itself; engineering blogs and post-mortems; our own users' outcomes.
+
+No source is trusted on its own. Every fact passes all six filters before the brain may use it:
+1. Signals are only a hint: accepted/votes/date/version. Old answers for old versions get low trust.
+2. Official docs are the judge: a fact that contradicts the official documentation is dropped.
+3. Lab test: anything testable is reproduced on the real test databases / generated files and must work.
+4. Agreement: a fact needs support from more than one independent source.
+5. Safety: anything that risks data loss or security is rejected, or kept only with backup + warning.
+6. Real outcomes: trust rises when fixes work for users and falls when they fail.
+
+Wrong-but-popular answers are kept as "common mistakes" (what people try first and why it fails), so the
+brain recognises them and goes to the real cause. Every fact carries: source(s), version range, lab-tested
+yes/no, trust score. The brain answers with certainty only from proven facts plus evidence from the
+user's own data; otherwise it says what it found and the next step.
+Ideas and facts only: never copy text or code from forums (licences); write our own.

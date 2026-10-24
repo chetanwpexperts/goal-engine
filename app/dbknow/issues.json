@@ -29,39 +29,73 @@
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected','Max_used_connections')",
-        "look_for": "Threads_connected close to max_connections"
+        "look_for": "Threads_connected close to max_connections",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES LIKE 'max_connections'",
-        "look_for": "the limit"
+        "look_for": "the limit",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT USER, COUNT(*) AS n, SUM(COMMAND = 'Sleep') AS sleeping FROM information_schema.PROCESSLIST GROUP BY USER ORDER BY n DESC",
-        "look_for": "one app user holding many sleeping connections"
+        "look_for": "one app user holding many sleeping connections",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT usename, state, count(*) FROM pg_stat_activity GROUP BY 1, 2 ORDER BY 3 DESC",
-        "look_for": "many 'idle' or 'idle in transaction' connections"
+        "look_for": "many 'idle' or 'idle in transaction' connections",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SHOW max_connections",
-        "look_for": "the limit"
+        "look_for": "the limit",
+        "id": "check_5"
       }
     ],
     "causes": [
       {
         "id": "leak",
         "title_en": "The app opens connections and doesn't close them (many sleeping/idle ones)",
-        "title_hi": "App connection kholti hai par band nahi karti (bahut saare sleeping/idle)"
+        "title_hi": "App connection kholti hai par band nahi karti (bahut saare sleeping/idle)",
+        "signals": [
+          {
+            "check": "check_3",
+            "column": "sleeping",
+            "aggregate": "max",
+            "op": ">",
+            "value": 50,
+            "evidence": "{value} connections for one account are sleeping; this is over the safe evidence threshold of {threshold}"
+          }
+        ],
+        "minimum_signals": 1
       },
       {
         "id": "traffic",
         "title_en": "Real traffic is higher than the limit",
-        "title_hi": "Asli traffic limit se zyada hai"
+        "title_hi": "Asli traffic limit se zyada hai",
+        "signals": [
+          {
+            "check": "check_1",
+            "where": {
+              "Variable_name": "Threads_connected"
+            },
+            "column": "Value",
+            "op": ">=",
+            "value": 85,
+            "value_from": {
+              "check": "check_2",
+              "column": "Value"
+            },
+            "ratio": true,
+            "evidence": "{value}% of the configured connection limit is in use (threshold {threshold}%)"
+          }
+        ],
+        "minimum_signals": 1
       },
       {
         "id": "slow",
@@ -130,12 +164,14 @@
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_NAME, COLUMN_NAME, CHARACTER_SET_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND CHARACTER_SET_NAME IS NOT NULL AND CHARACTER_SET_NAME <> 'utf8mb4'",
-        "look_for": "text columns not in utf8mb4"
+        "look_for": "text columns not in utf8mb4",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('character_set_server', 'character_set_database', 'character_set_connection')",
-        "look_for": "latin1 or utf8 (3-byte) instead of utf8mb4"
+        "look_for": "latin1 or utf8 (3-byte) instead of utf8mb4",
+        "id": "check_2"
       }
     ],
     "causes": [
@@ -225,82 +261,98 @@
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE",
-        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users"
+        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT USER, HOST, DB, COMMAND, TIME FROM information_schema.PROCESSLIST ORDER BY TIME DESC",
-        "look_for": "sessions from an IP/host that isn't your app server or your office"
+        "look_for": "sessions from an IP/host that isn't your app server or your office",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
-        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
-        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)",
+        "id": "check_4"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, DEFINER, SECURITY_TYPE, CREATED, LAST_ALTERED FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA NOT IN ('sys', 'mysql') ORDER BY CREATED DESC",
-        "look_for": "procedures/functions with names you don't recognise, recently created, or with an unknown DEFINER"
+        "look_for": "procedures/functions with names you don't recognise, recently created, or with an unknown DEFINER",
+        "id": "check_5"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_SCHEMA, TABLE_NAME, CREATE_TIME, TABLE_ROWS FROM information_schema.TABLES WHERE LOWER(TABLE_NAME) LIKE '%recover%' OR LOWER(TABLE_NAME) LIKE '%readme%' OR LOWER(TABLE_NAME) LIKE '%read_me%' OR LOWER(TABLE_NAME) LIKE '%warning%' OR LOWER(TABLE_NAME) LIKE '%bitcoin%' OR LOWER(TABLE_NAME) LIKE '%ransom%' OR LOWER(TABLE_NAME) LIKE '%hacked%' OR LOWER(TABLE_SCHEMA) LIKE '%recover%' OR LOWER(TABLE_SCHEMA) LIKE '%readme%' OR LOWER(TABLE_SCHEMA) LIKE '%read_me%'",
-        "look_for": "a table/database like RECOVER_YOUR_DATA, README, PLEASE_READ_ME or WARNING: that is the ransom note"
+        "look_for": "a table/database like RECOVER_YOUR_DATA, README, PLEASE_READ_ME or WARNING: that is the ransom note",
+        "id": "check_6"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_ROWS, CREATE_TIME, UPDATE_TIME FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys') ORDER BY CREATE_TIME DESC LIMIT 30",
-        "look_for": "tables created recently that nobody made, or important tables now with 0 rows"
+        "look_for": "tables created recently that nobody made, or important tables now with 0 rows",
+        "id": "check_7"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'port', 'require_secure_transport', 'local_infile', 'secure_file_priv')",
-        "look_for": "bind_address 0.0.0.0 or * (open to every network), local_infile ON, secure_file_priv empty"
+        "look_for": "bind_address 0.0.0.0 or * (open to every network), local_infile ON, secure_file_priv empty",
+        "id": "check_8"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
-        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls",
+        "id": "check_9"
       },
       {
         "engine": "postgres",
         "sql": "SELECT g.rolname AS powerful_role, r.rolname AS member FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid WHERE g.rolname IN ('pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files', 'pg_signal_backend', 'pg_read_all_data', 'pg_write_all_data')",
-        "look_for": "an app or unknown role allowed to run server programs or read/write server files"
+        "look_for": "an app or unknown role allowed to run server programs or read/write server files",
+        "id": "check_10"
       },
       {
         "engine": "postgres",
         "sql": "SELECT usename, client_addr, application_name, backend_start, state FROM pg_stat_activity WHERE backend_type = 'client backend' ORDER BY backend_start",
-        "look_for": "connections from addresses that aren't your app or office, or a strange application_name"
+        "look_for": "connections from addresses that aren't your app or office, or a strange application_name",
+        "id": "check_11"
       },
       {
         "engine": "postgres",
         "sql": "SELECT evtname, evtevent, evtowner::regrole AS owner, evtfoid::regproc AS runs_function, evtenabled FROM pg_event_trigger",
-        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)"
+        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)",
+        "id": "check_12"
       },
       {
         "engine": "postgres",
         "sql": "SELECT t.tgrelid::regclass AS on_table, t.tgname, t.tgfoid::regproc AS runs_function, t.tgenabled FROM pg_trigger t WHERE NOT t.tgisinternal ORDER BY 1",
-        "look_for": "a trigger you don't know, especially one running a function you didn't write"
+        "look_for": "a trigger you don't know, especially one running a function you didn't write",
+        "id": "check_13"
       },
       {
         "engine": "postgres",
         "sql": "SELECT table_schema, table_name FROM information_schema.tables WHERE lower(table_name) LIKE '%recover%' OR lower(table_name) LIKE '%readme%' OR lower(table_name) LIKE '%read_me%' OR lower(table_name) LIKE '%warning%' OR lower(table_name) LIKE '%bitcoin%' OR lower(table_name) LIKE '%ransom%' OR lower(table_name) LIKE '%hacked%'",
-        "look_for": "a ransom-note table (README, RECOVER_YOUR_DATA, WARNING...) in this database"
+        "look_for": "a ransom-note table (README, RECOVER_YOUR_DATA, WARNING...) in this database",
+        "id": "check_14"
       },
       {
         "engine": "postgres",
         "sql": "SELECT datname, pg_database_size(datname) AS bytes FROM pg_database WHERE NOT datistemplate ORDER BY datname",
-        "look_for": "a new database like readme_to_recover, or your database suddenly tiny"
+        "look_for": "a new database like readme_to_recover, or your database suddenly tiny",
+        "id": "check_15"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'ssl', 'password_encryption', 'log_connections', 'log_statement')",
-        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off"
+        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off",
+        "id": "check_16"
       }
     ],
     "causes": [
@@ -410,42 +462,50 @@
       {
         "engine": "mysql",
         "sql": "SELECT USER, HOST, DB, COMMAND, TIME FROM information_schema.PROCESSLIST ORDER BY TIME DESC",
-        "look_for": "sessions from an IP/host that isn't your app server or your office"
+        "look_for": "sessions from an IP/host that isn't your app server or your office",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE",
-        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users"
+        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'port', 'require_secure_transport', 'local_infile', 'secure_file_priv')",
-        "look_for": "bind_address 0.0.0.0 or * (open to every network), local_infile ON, secure_file_priv empty"
+        "look_for": "bind_address 0.0.0.0 or * (open to every network), local_infile ON, secure_file_priv empty",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'general_log', 'log_error', 'expire_logs_days', 'binlog_expire_logs_seconds')",
-        "look_for": "log_bin ON means the changes (and the attack) are recorded and can be replayed up to a point in time"
+        "look_for": "log_bin ON means the changes (and the attack) are recorded and can be replayed up to a point in time",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT usename, client_addr, application_name, backend_start, state FROM pg_stat_activity WHERE backend_type = 'client backend' ORDER BY backend_start",
-        "look_for": "connections from addresses that aren't your app or office, or a strange application_name"
+        "look_for": "connections from addresses that aren't your app or office, or a strange application_name",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
-        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'ssl', 'password_encryption', 'log_connections', 'log_statement')",
-        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off"
+        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off",
+        "id": "check_7"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('wal_level', 'archive_mode', 'archive_command', 'archive_library')",
-        "look_for": "archive_mode on with a working archive: point-in-time recovery to just before the attack is possible"
+        "look_for": "archive_mode on with a working archive: point-in-time recovery to just before the attack is possible",
+        "id": "check_8"
       }
     ],
     "causes": [
@@ -532,32 +592,38 @@
       {
         "engine": "mysql",
         "sql": "SELECT u.ID, u.user_login, u.display_name, u.user_registered FROM wp_users u JOIN wp_usermeta m ON m.user_id = u.ID WHERE m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%' ORDER BY u.user_registered DESC",
-        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)"
+        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT m.user_id, m.meta_key, m.meta_value, u.user_login FROM wp_usermeta m LEFT JOIN wp_users u ON u.ID = m.user_id WHERE (m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%') OR (m.meta_key LIKE '%user_level' AND m.meta_value = '10')",
-        "look_for": "admin rights given to a user id that has no row in wp_users (user_login empty) or to a user you don't recognise"
+        "look_for": "admin rights given to a user id that has no row in wp_users (user_login empty) or to a user you don't recognise",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ID, user_login, display_name, user_registered FROM wp_users ORDER BY ID DESC LIMIT 20",
-        "look_for": "the newest user ids: a high id with an old registration date was added later and back-dated"
+        "look_for": "the newest user ids: a high id with an old registration date was added later and back-dated",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'admin_email', 'users_can_register', 'default_role', 'template', 'stylesheet')",
-        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator"
+        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator",
+        "id": "check_4"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
-        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table",
+        "id": "check_5"
       },
       {
         "engine": "mysql",
         "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
-        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)",
+        "id": "check_6"
       }
     ],
     "causes": [
@@ -652,22 +718,26 @@
       {
         "engine": "mysql",
         "sql": "SELECT u.ID, u.user_login, u.display_name, u.user_registered FROM wp_users u JOIN wp_usermeta m ON m.user_id = u.ID WHERE m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%' ORDER BY u.user_registered DESC",
-        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)"
+        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ID, user_login, user_registered FROM wp_users WHERE user_activation_key <> ''",
-        "look_for": "password-reset keys you didn't ask for"
+        "look_for": "password-reset keys you didn't ask for",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'admin_email', 'users_can_register', 'default_role', 'template', 'stylesheet')",
-        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator"
+        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ID, user_login, display_name, user_registered FROM wp_users ORDER BY ID DESC LIMIT 20",
-        "look_for": "the newest user ids: a high id with an old registration date was added later and back-dated"
+        "look_for": "the newest user ids: a high id with an old registration date was added later and back-dated",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -742,37 +812,44 @@
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE",
-        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users"
+        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, TABLE_SCHEMA, PRIVILEGE_TYPE FROM information_schema.SCHEMA_PRIVILEGES ORDER BY GRANTEE, TABLE_SCHEMA",
-        "look_for": "unknown accounts with rights on your database"
+        "look_for": "unknown accounts with rights on your database",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT USER, HOST, DB, COMMAND, TIME FROM information_schema.PROCESSLIST ORDER BY TIME DESC",
-        "look_for": "sessions from an IP/host that isn't your app server or your office"
+        "look_for": "sessions from an IP/host that isn't your app server or your office",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
-        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT g.rolname AS powerful_role, r.rolname AS member FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid WHERE g.rolname IN ('pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files', 'pg_signal_backend', 'pg_read_all_data', 'pg_write_all_data')",
-        "look_for": "an app or unknown role allowed to run server programs or read/write server files"
+        "look_for": "an app or unknown role allowed to run server programs or read/write server files",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT grantee, table_schema, privilege_type, count(*) AS tables FROM information_schema.role_table_grants WHERE table_schema NOT IN ('pg_catalog', 'information_schema') GROUP BY 1, 2, 3 ORDER BY 1",
-        "look_for": "unknown roles (or PUBLIC) with write rights on your tables"
+        "look_for": "unknown roles (or PUBLIC) with write rights on your tables",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT usename, client_addr, application_name, backend_start, state FROM pg_stat_activity WHERE backend_type = 'client backend' ORDER BY backend_start",
-        "look_for": "connections from addresses that aren't your app or office, or a strange application_name"
+        "look_for": "connections from addresses that aren't your app or office, or a strange application_name",
+        "id": "check_7"
       }
     ],
     "causes": [
@@ -784,7 +861,37 @@
       {
         "id": "escalated",
         "title_en": "An existing app account was given admin powers (SUPER/FILE/GRANT, superuser, server-program roles)",
-        "title_hi": "Pehle wale app account ko admin powers de di gayi (SUPER/FILE/GRANT, superuser, server-program roles)"
+        "title_hi": "Pehle wale app account ko admin powers de di gayi (SUPER/FILE/GRANT, superuser, server-program roles)",
+        "signals": [
+          {
+            "check": "check_1",
+            "where": {
+              "PRIVILEGE_TYPE": "SUPER"
+            },
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "At least one account has the global SUPER privilege"
+          },
+          {
+            "check": "check_4",
+            "where": {
+              "rolsuper": "True"
+            },
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "At least one non-system login role is a superuser"
+          },
+          {
+            "check": "check_5",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} memberships grant powerful server or all-data access"
+          }
+        ],
+        "minimum_signals": 1
       },
       {
         "id": "forgotten",
@@ -860,27 +967,32 @@
       {
         "engine": "mysql",
         "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
-        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT u.ID, u.user_login, u.display_name, u.user_registered FROM wp_users u JOIN wp_usermeta m ON m.user_id = u.ID WHERE m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%' ORDER BY u.user_registered DESC",
-        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)"
+        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)",
+        "id": "check_2"
       },
       {
         "engine": "postgres",
         "sql": "SELECT t.tgrelid::regclass AS on_table, t.tgname, t.tgfoid::regproc AS runs_function, t.tgenabled FROM pg_trigger t WHERE NOT t.tgisinternal ORDER BY 1",
-        "look_for": "a trigger you don't know, especially one running a function you didn't write"
+        "look_for": "a trigger you don't know, especially one running a function you didn't write",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT evtname, evtevent, evtowner::regrole AS owner, evtfoid::regproc AS runs_function, evtenabled FROM pg_event_trigger",
-        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)"
+        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT n.nspname AS schema, p.proname AS function, r.rolname AS owner, l.lanname AS language, p.prosecdef AS security_definer FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_roles r ON r.oid = p.proowner JOIN pg_language l ON l.oid = p.prolang WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') ORDER BY n.nspname, p.proname",
-        "look_for": "functions with odd names, written in C or an untrusted language (plpython3u, plperlu), or SECURITY DEFINER owned by a superuser"
+        "look_for": "functions with odd names, written in C or an untrusted language (plpython3u, plperlu), or SECURITY DEFINER owned by a superuser",
+        "id": "check_5"
       }
     ],
     "causes": [
@@ -967,32 +1079,38 @@
       {
         "engine": "mysql",
         "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
-        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES LIKE 'event_scheduler'",
-        "look_for": "ON means scheduled events really run"
+        "look_for": "ON means scheduled events really run",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, DEFINER, SECURITY_TYPE, CREATED, LAST_ALTERED FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA NOT IN ('sys', 'mysql') ORDER BY CREATED DESC",
-        "look_for": "procedures/functions with names you don't recognise, recently created, or with an unknown DEFINER"
+        "look_for": "procedures/functions with names you don't recognise, recently created, or with an unknown DEFINER",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT n.nspname AS schema, p.proname AS function, r.rolname AS owner, l.lanname AS language, p.prosecdef AS security_definer FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_roles r ON r.oid = p.proowner JOIN pg_language l ON l.oid = p.prolang WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') ORDER BY n.nspname, p.proname",
-        "look_for": "functions with odd names, written in C or an untrusted language (plpython3u, plperlu), or SECURITY DEFINER owned by a superuser"
+        "look_for": "functions with odd names, written in C or an untrusted language (plpython3u, plperlu), or SECURITY DEFINER owned by a superuser",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT 'extension' AS kind, extname AS name FROM pg_extension UNION ALL SELECT 'language', lanname FROM pg_language WHERE NOT lanpltrusted AND lanname NOT IN ('c', 'internal')",
-        "look_for": "extensions or untrusted languages nobody installed on purpose (pg_cron jobs and untrusted languages can run things on a schedule or on the server)"
+        "look_for": "extensions or untrusted languages nobody installed on purpose (pg_cron jobs and untrusted languages can run things on a schedule or on the server)",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT evtname, evtevent, evtowner::regrole AS owner, evtfoid::regproc AS runs_function, evtenabled FROM pg_event_trigger",
-        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)"
+        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)",
+        "id": "check_6"
       }
     ],
     "causes": [
@@ -1077,32 +1195,38 @@
       {
         "engine": "mysql",
         "sql": "SELECT ID, post_type, post_status, post_title, post_modified FROM wp_posts WHERE post_content LIKE '%<script%' OR post_content LIKE '%<iframe%' OR post_content LIKE '%display:none%' OR post_content LIKE '%eval(%' OR post_content LIKE '%fromCharCode%' ORDER BY post_modified DESC LIMIT 50",
-        "look_for": "posts/pages carrying hidden links or scripts; many posts changed at the same minute is a mass injection"
+        "look_for": "posts/pages carrying hidden links or scripts; many posts changed at the same minute is a mass injection",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT DATE(post_modified) AS day, COUNT(*) AS changed FROM wp_posts GROUP BY DATE(post_modified) ORDER BY day DESC LIMIT 14",
-        "look_for": "a day where hundreds of posts changed at once, or thousands of new pages you didn't write"
+        "look_for": "a day where hundreds of posts changed at once, or thousands of new pages you didn't write",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT post_type, post_status, COUNT(*) AS n, MIN(post_date) AS first_seen, MAX(post_date) AS last_seen FROM wp_posts GROUP BY post_type, post_status ORDER BY n DESC",
-        "look_for": "a huge count of published pages/posts (spam pages in Japanese, pharma, casino) that your team didn't create"
+        "look_for": "a huge count of published pages/posts (spam pages in Japanese, pharma, casino) that your team didn't create",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LENGTH(option_value) AS size, autoload FROM wp_options WHERE option_value LIKE '%<script%' OR option_value LIKE '%<iframe%' OR option_value LIKE '%eval(%' OR option_value LIKE '%base64_decode%' OR option_value LIKE '%fromCharCode%' OR option_value LIKE '%atob(%' ORDER BY size DESC LIMIT 50",
-        "look_for": "settings (widgets, theme options, header/footer code) holding scripts or encoded code you didn't add"
+        "look_for": "settings (widgets, theme options, header/footer code) holding scripts or encoded code you didn't add",
+        "id": "check_4"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
-        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table",
+        "id": "check_5"
       },
       {
         "engine": "mysql",
         "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
-        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)",
+        "id": "check_6"
       }
     ],
     "causes": [
@@ -1182,22 +1306,26 @@
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'admin_email', 'users_can_register', 'default_role', 'template', 'stylesheet')",
-        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator"
+        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LENGTH(option_value) AS size, autoload FROM wp_options WHERE option_value LIKE '%<script%' OR option_value LIKE '%<iframe%' OR option_value LIKE '%eval(%' OR option_value LIKE '%base64_decode%' OR option_value LIKE '%fromCharCode%' OR option_value LIKE '%atob(%' ORDER BY size DESC LIMIT 50",
-        "look_for": "settings (widgets, theme options, header/footer code) holding scripts or encoded code you didn't add"
+        "look_for": "settings (widgets, theme options, header/footer code) holding scripts or encoded code you didn't add",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ID, post_type, post_status, post_title, post_modified FROM wp_posts WHERE post_content LIKE '%<script%' OR post_content LIKE '%<iframe%' OR post_content LIKE '%display:none%' OR post_content LIKE '%eval(%' OR post_content LIKE '%fromCharCode%' ORDER BY post_modified DESC LIMIT 50",
-        "look_for": "posts/pages carrying hidden links or scripts; many posts changed at the same minute is a mass injection"
+        "look_for": "posts/pages carrying hidden links or scripts; many posts changed at the same minute is a mass injection",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
-        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -1284,57 +1412,68 @@
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_SCHEMA, TABLE_NAME, CREATE_TIME, TABLE_ROWS FROM information_schema.TABLES WHERE LOWER(TABLE_NAME) LIKE '%recover%' OR LOWER(TABLE_NAME) LIKE '%readme%' OR LOWER(TABLE_NAME) LIKE '%read_me%' OR LOWER(TABLE_NAME) LIKE '%warning%' OR LOWER(TABLE_NAME) LIKE '%bitcoin%' OR LOWER(TABLE_NAME) LIKE '%ransom%' OR LOWER(TABLE_NAME) LIKE '%hacked%' OR LOWER(TABLE_SCHEMA) LIKE '%recover%' OR LOWER(TABLE_SCHEMA) LIKE '%readme%' OR LOWER(TABLE_SCHEMA) LIKE '%read_me%'",
-        "look_for": "a table/database like RECOVER_YOUR_DATA, README, PLEASE_READ_ME or WARNING: that is the ransom note"
+        "look_for": "a table/database like RECOVER_YOUR_DATA, README, PLEASE_READ_ME or WARNING: that is the ransom note",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT s.SCHEMA_NAME, COUNT(t.TABLE_NAME) AS tables FROM information_schema.SCHEMATA s LEFT JOIN information_schema.TABLES t ON t.TABLE_SCHEMA = s.SCHEMA_NAME GROUP BY s.SCHEMA_NAME ORDER BY tables",
-        "look_for": "your databases now empty (0 tables) or a new database you never created"
+        "look_for": "your databases now empty (0 tables) or a new database you never created",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_ROWS, CREATE_TIME, UPDATE_TIME FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys') ORDER BY CREATE_TIME DESC LIMIT 30",
-        "look_for": "tables created recently that nobody made, or important tables now with 0 rows"
+        "look_for": "tables created recently that nobody made, or important tables now with 0 rows",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE",
-        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users"
+        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users",
+        "id": "check_4"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'port', 'require_secure_transport', 'local_infile', 'secure_file_priv')",
-        "look_for": "bind_address 0.0.0.0 or * (open to every network), local_infile ON, secure_file_priv empty"
+        "look_for": "bind_address 0.0.0.0 or * (open to every network), local_infile ON, secure_file_priv empty",
+        "id": "check_5"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'general_log', 'log_error', 'expire_logs_days', 'binlog_expire_logs_seconds')",
-        "look_for": "log_bin ON means the changes (and the attack) are recorded and can be replayed up to a point in time"
+        "look_for": "log_bin ON means the changes (and the attack) are recorded and can be replayed up to a point in time",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT table_schema, table_name FROM information_schema.tables WHERE lower(table_name) LIKE '%recover%' OR lower(table_name) LIKE '%readme%' OR lower(table_name) LIKE '%read_me%' OR lower(table_name) LIKE '%warning%' OR lower(table_name) LIKE '%bitcoin%' OR lower(table_name) LIKE '%ransom%' OR lower(table_name) LIKE '%hacked%'",
-        "look_for": "a ransom-note table (README, RECOVER_YOUR_DATA, WARNING...) in this database"
+        "look_for": "a ransom-note table (README, RECOVER_YOUR_DATA, WARNING...) in this database",
+        "id": "check_7"
       },
       {
         "engine": "postgres",
         "sql": "SELECT datname, pg_database_size(datname) AS bytes FROM pg_database WHERE NOT datistemplate ORDER BY datname",
-        "look_for": "a new database like readme_to_recover, or your database suddenly tiny"
+        "look_for": "a new database like readme_to_recover, or your database suddenly tiny",
+        "id": "check_8"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
-        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls",
+        "id": "check_9"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'ssl', 'password_encryption', 'log_connections', 'log_statement')",
-        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off"
+        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off",
+        "id": "check_10"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('wal_level', 'archive_mode', 'archive_command', 'archive_library')",
-        "look_for": "archive_mode on with a working archive: point-in-time recovery to just before the attack is possible"
+        "look_for": "archive_mode on with a working archive: point-in-time recovery to just before the attack is possible",
+        "id": "check_11"
       }
     ],
     "causes": [
@@ -1413,47 +1552,56 @@
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_ROWS, CREATE_TIME, UPDATE_TIME FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys') ORDER BY CREATE_TIME DESC LIMIT 30",
-        "look_for": "tables created recently that nobody made, or important tables now with 0 rows"
+        "look_for": "tables created recently that nobody made, or important tables now with 0 rows",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'general_log', 'log_error', 'expire_logs_days', 'binlog_expire_logs_seconds')",
-        "look_for": "log_bin ON means the changes (and the attack) are recorded and can be replayed up to a point in time"
+        "look_for": "log_bin ON means the changes (and the attack) are recorded and can be replayed up to a point in time",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
-        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
-        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)",
+        "id": "check_4"
       },
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE",
-        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users"
+        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, n_live_tup, n_tup_ins, n_tup_upd, n_tup_del, last_autovacuum, last_autoanalyze FROM pg_stat_user_tables ORDER BY n_tup_del DESC LIMIT 30",
-        "look_for": "tables with very many deletes/updates since the last stats reset, or live rows suddenly near 0"
+        "look_for": "tables with very many deletes/updates since the last stats reset, or live rows suddenly near 0",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('wal_level', 'archive_mode', 'archive_command', 'archive_library')",
-        "look_for": "archive_mode on with a working archive: point-in-time recovery to just before the attack is possible"
+        "look_for": "archive_mode on with a working archive: point-in-time recovery to just before the attack is possible",
+        "id": "check_7"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
-        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls",
+        "id": "check_8"
       },
       {
         "engine": "postgres",
         "sql": "SELECT t.tgrelid::regclass AS on_table, t.tgname, t.tgfoid::regproc AS runs_function, t.tgenabled FROM pg_trigger t WHERE NOT t.tgisinternal ORDER BY 1",
-        "look_for": "a trigger you don't know, especially one running a function you didn't write"
+        "look_for": "a trigger you don't know, especially one running a function you didn't write",
+        "id": "check_9"
       }
     ],
     "causes": [
@@ -1535,37 +1683,44 @@
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
-        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls",
+        "id": "check_1"
       },
       {
         "engine": "postgres",
         "sql": "SELECT g.rolname AS powerful_role, r.rolname AS member FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid WHERE g.rolname IN ('pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files', 'pg_signal_backend', 'pg_read_all_data', 'pg_write_all_data')",
-        "look_for": "an app or unknown role allowed to run server programs or read/write server files"
+        "look_for": "an app or unknown role allowed to run server programs or read/write server files",
+        "id": "check_2"
       },
       {
         "engine": "postgres",
         "sql": "SELECT usename, client_addr, state, now() - query_start AS running_for, left(query, 120) AS query FROM pg_stat_activity WHERE backend_type = 'client backend' AND state <> 'idle' ORDER BY query_start",
-        "look_for": "a long-running statement from an unknown user or address (miners and data thieves run for hours)"
+        "look_for": "a long-running statement from an unknown user or address (miners and data thieves run for hours)",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT usename, client_addr, application_name, backend_start, state FROM pg_stat_activity WHERE backend_type = 'client backend' ORDER BY backend_start",
-        "look_for": "connections from addresses that aren't your app or office, or a strange application_name"
+        "look_for": "connections from addresses that aren't your app or office, or a strange application_name",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT n.nspname AS schema, p.proname AS function, r.rolname AS owner, l.lanname AS language, p.prosecdef AS security_definer FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_roles r ON r.oid = p.proowner JOIN pg_language l ON l.oid = p.prolang WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') ORDER BY n.nspname, p.proname",
-        "look_for": "functions with odd names, written in C or an untrusted language (plpython3u, plperlu), or SECURITY DEFINER owned by a superuser"
+        "look_for": "functions with odd names, written in C or an untrusted language (plpython3u, plperlu), or SECURITY DEFINER owned by a superuser",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT 'extension' AS kind, extname AS name FROM pg_extension UNION ALL SELECT 'language', lanname FROM pg_language WHERE NOT lanpltrusted AND lanname NOT IN ('c', 'internal')",
-        "look_for": "extensions or untrusted languages nobody installed on purpose (pg_cron jobs and untrusted languages can run things on a schedule or on the server)"
+        "look_for": "extensions or untrusted languages nobody installed on purpose (pg_cron jobs and untrusted languages can run things on a schedule or on the server)",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'ssl', 'password_encryption', 'log_connections', 'log_statement')",
-        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off"
+        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off",
+        "id": "check_7"
       }
     ],
     "causes": [
@@ -1642,42 +1797,50 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'general_log', 'log_error', 'expire_logs_days', 'binlog_expire_logs_seconds')",
-        "look_for": "log_bin ON means the changes (and the attack) are recorded and can be replayed up to a point in time"
+        "look_for": "log_bin ON means the changes (and the attack) are recorded and can be replayed up to a point in time",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_ROWS, CREATE_TIME, UPDATE_TIME FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys') ORDER BY CREATE_TIME DESC LIMIT 30",
-        "look_for": "tables created recently that nobody made, or important tables now with 0 rows"
+        "look_for": "tables created recently that nobody made, or important tables now with 0 rows",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
-        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
-        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('wal_level', 'archive_mode', 'archive_command', 'archive_library')",
-        "look_for": "archive_mode on with a working archive: point-in-time recovery to just before the attack is possible"
+        "look_for": "archive_mode on with a working archive: point-in-time recovery to just before the attack is possible",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT datname, pg_database_size(datname) AS bytes FROM pg_database WHERE NOT datistemplate ORDER BY datname",
-        "look_for": "a new database like readme_to_recover, or your database suddenly tiny"
+        "look_for": "a new database like readme_to_recover, or your database suddenly tiny",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT t.tgrelid::regclass AS on_table, t.tgname, t.tgfoid::regproc AS runs_function, t.tgenabled FROM pg_trigger t WHERE NOT t.tgisinternal ORDER BY 1",
-        "look_for": "a trigger you don't know, especially one running a function you didn't write"
+        "look_for": "a trigger you don't know, especially one running a function you didn't write",
+        "id": "check_7"
       },
       {
         "engine": "postgres",
         "sql": "SELECT evtname, evtevent, evtowner::regrole AS owner, evtfoid::regproc AS runs_function, evtenabled FROM pg_event_trigger",
-        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)"
+        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)",
+        "id": "check_8"
       }
     ],
     "causes": [
@@ -1759,82 +1922,98 @@
       {
         "engine": "mysql",
         "sql": "SELECT u.ID, u.user_login, u.display_name, u.user_registered FROM wp_users u JOIN wp_usermeta m ON m.user_id = u.ID WHERE m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%' ORDER BY u.user_registered DESC",
-        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)"
+        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT m.user_id, m.meta_key, m.meta_value, u.user_login FROM wp_usermeta m LEFT JOIN wp_users u ON u.ID = m.user_id WHERE (m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%') OR (m.meta_key LIKE '%user_level' AND m.meta_value = '10')",
-        "look_for": "admin rights given to a user id that has no row in wp_users (user_login empty) or to a user you don't recognise"
+        "look_for": "admin rights given to a user id that has no row in wp_users (user_login empty) or to a user you don't recognise",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'admin_email', 'users_can_register', 'default_role', 'template', 'stylesheet')",
-        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator"
+        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LENGTH(option_value) AS size, autoload FROM wp_options WHERE option_value LIKE '%<script%' OR option_value LIKE '%<iframe%' OR option_value LIKE '%eval(%' OR option_value LIKE '%base64_decode%' OR option_value LIKE '%fromCharCode%' OR option_value LIKE '%atob(%' ORDER BY size DESC LIMIT 50",
-        "look_for": "settings (widgets, theme options, header/footer code) holding scripts or encoded code you didn't add"
+        "look_for": "settings (widgets, theme options, header/footer code) holding scripts or encoded code you didn't add",
+        "id": "check_4"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ID, post_type, post_status, post_title, post_modified FROM wp_posts WHERE post_content LIKE '%<script%' OR post_content LIKE '%<iframe%' OR post_content LIKE '%display:none%' OR post_content LIKE '%eval(%' OR post_content LIKE '%fromCharCode%' ORDER BY post_modified DESC LIMIT 50",
-        "look_for": "posts/pages carrying hidden links or scripts; many posts changed at the same minute is a mass injection"
+        "look_for": "posts/pages carrying hidden links or scripts; many posts changed at the same minute is a mass injection",
+        "id": "check_5"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
-        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table",
+        "id": "check_6"
       },
       {
         "engine": "mysql",
         "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
-        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)",
+        "id": "check_7"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ROUTINE_SCHEMA, ROUTINE_NAME, ROUTINE_TYPE, DEFINER, SECURITY_TYPE, CREATED, LAST_ALTERED FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA NOT IN ('sys', 'mysql') ORDER BY CREATED DESC",
-        "look_for": "procedures/functions with names you don't recognise, recently created, or with an unknown DEFINER"
+        "look_for": "procedures/functions with names you don't recognise, recently created, or with an unknown DEFINER",
+        "id": "check_8"
       },
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE",
-        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users"
+        "look_for": "accounts you don't know, '%' hosts (any computer), and SUPER / FILE / GRANT OPTION / CREATE USER given to app users",
+        "id": "check_9"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'port', 'require_secure_transport', 'local_infile', 'secure_file_priv')",
-        "look_for": "bind_address 0.0.0.0 or * (open to every network), local_infile ON, secure_file_priv empty"
+        "look_for": "bind_address 0.0.0.0 or * (open to every network), local_infile ON, secure_file_priv empty",
+        "id": "check_10"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin, rolreplication, rolbypassrls, rolvaliduntil FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
-        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls"
+        "look_for": "a login role you don't know, or extra roles with superuser / createrole / bypassrls",
+        "id": "check_11"
       },
       {
         "engine": "postgres",
         "sql": "SELECT g.rolname AS powerful_role, r.rolname AS member FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid WHERE g.rolname IN ('pg_execute_server_program', 'pg_read_server_files', 'pg_write_server_files', 'pg_signal_backend', 'pg_read_all_data', 'pg_write_all_data')",
-        "look_for": "an app or unknown role allowed to run server programs or read/write server files"
+        "look_for": "an app or unknown role allowed to run server programs or read/write server files",
+        "id": "check_12"
       },
       {
         "engine": "postgres",
         "sql": "SELECT t.tgrelid::regclass AS on_table, t.tgname, t.tgfoid::regproc AS runs_function, t.tgenabled FROM pg_trigger t WHERE NOT t.tgisinternal ORDER BY 1",
-        "look_for": "a trigger you don't know, especially one running a function you didn't write"
+        "look_for": "a trigger you don't know, especially one running a function you didn't write",
+        "id": "check_13"
       },
       {
         "engine": "postgres",
         "sql": "SELECT evtname, evtevent, evtowner::regrole AS owner, evtfoid::regproc AS runs_function, evtenabled FROM pg_event_trigger",
-        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)"
+        "look_for": "any event trigger you didn't create (they fire on CREATE/DROP/ALTER in the whole database)",
+        "id": "check_14"
       },
       {
         "engine": "postgres",
         "sql": "SELECT n.nspname AS schema, p.proname AS function, r.rolname AS owner, l.lanname AS language, p.prosecdef AS security_definer FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_roles r ON r.oid = p.proowner JOIN pg_language l ON l.oid = p.prolang WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') ORDER BY n.nspname, p.proname",
-        "look_for": "functions with odd names, written in C or an untrusted language (plpython3u, plperlu), or SECURITY DEFINER owned by a superuser"
+        "look_for": "functions with odd names, written in C or an untrusted language (plpython3u, plperlu), or SECURITY DEFINER owned by a superuser",
+        "id": "check_15"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'ssl', 'password_encryption', 'log_connections', 'log_statement')",
-        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off"
+        "look_for": "listen_addresses '*' (open to every network), md5 passwords, connection logging off",
+        "id": "check_16"
       }
     ],
     "causes": [
@@ -1921,17 +2100,20 @@
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'admin_email', 'users_can_register', 'default_role', 'template', 'stylesheet')",
-        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator"
+        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT u.ID, u.user_login, u.display_name, u.user_registered FROM wp_users u JOIN wp_usermeta m ON m.user_id = u.ID WHERE m.meta_key LIKE '%capabilities' AND m.meta_value LIKE '%administrator%' ORDER BY u.user_registered DESC",
-        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)"
+        "look_for": "an administrator you don't know, or one 'registered' on an odd date (attackers often fake an old date)",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ID, user_login, display_name, user_registered FROM wp_users ORDER BY ID DESC LIMIT 20",
-        "look_for": "the newest user ids: a high id with an old registration date was added later and back-dated"
+        "look_for": "the newest user ids: a high id with an old registration date was added later and back-dated",
+        "id": "check_3"
       }
     ],
     "causes": [
@@ -1993,22 +2175,26 @@
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LENGTH(option_value) AS size, autoload FROM wp_options WHERE option_value LIKE '%<script%' OR option_value LIKE '%<iframe%' OR option_value LIKE '%eval(%' OR option_value LIKE '%base64_decode%' OR option_value LIKE '%fromCharCode%' OR option_value LIKE '%atob(%' ORDER BY size DESC LIMIT 50",
-        "look_for": "settings (widgets, theme options, header/footer code) holding scripts or encoded code you didn't add"
+        "look_for": "settings (widgets, theme options, header/footer code) holding scripts or encoded code you didn't add",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'admin_email', 'users_can_register', 'default_role', 'template', 'stylesheet')",
-        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator"
+        "look_for": "siteurl/home pointing to a strange domain, admin_email you don't own, users_can_register = 1 together with default_role = administrator",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TRIGGER_SCHEMA, TRIGGER_NAME, EVENT_MANIPULATION, EVENT_OBJECT_TABLE, ACTION_TIMING, CREATED, DEFINER, LEFT(ACTION_STATEMENT, 300) AS body FROM information_schema.TRIGGERS ORDER BY CREATED DESC",
-        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table"
+        "look_for": "a trigger nobody on your team made, especially on comments/users/usermeta/posts/orders, or one that writes into a users table",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT EVENT_SCHEMA, EVENT_NAME, DEFINER, STATUS, EVENT_TYPE, INTERVAL_VALUE, INTERVAL_FIELD, CREATED, LAST_EXECUTED, LEFT(EVENT_DEFINITION, 300) AS body FROM information_schema.EVENTS ORDER BY CREATED DESC",
-        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)"
+        "look_for": "scheduled events you didn't create (they can re-add a user, re-insert spam or delete data every few minutes)",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -2091,27 +2277,32 @@
       {
         "engine": "mysql",
         "sql": "SELECT USER, HOST, CURRENT_CONNECTIONS, TOTAL_CONNECTIONS FROM performance_schema.accounts WHERE USER IS NOT NULL ORDER BY TOTAL_CONNECTIONS DESC",
-        "look_for": "an account that logged in from a host/IP that is not your web server: the password was used from outside (leaked or guessed)"
+        "look_for": "an account that logged in from a host/IP that is not your web server: the password was used from outside (leaked or guessed)",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'port', 'require_secure_transport', 'general_log', 'log_error')",
-        "look_for": "bind_address 0.0.0.0 or * means the database listens on every network; no general log means there is no record of what was run"
+        "look_for": "bind_address 0.0.0.0 or * means the database listens on every network; no general log means there is no record of what was run",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT SCHEMA_NAME, LEFT(DIGEST_TEXT, 200) AS query_shape, COUNT_STAR, SUM_ERRORS, FIRST_SEEN, LAST_SEEN FROM performance_schema.events_statements_summary_by_digest WHERE SUM_ERRORS > 0 ORDER BY SUM_ERRORS DESC LIMIT 20",
-        "look_for": "many failing query shapes from the website's database, or shapes that read information_schema: a sign someone was probing the site through a form or URL"
+        "look_for": "many failing query shapes from the website's database, or shapes that read information_schema: a sign someone was probing the site through a form or URL",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT usename, client_addr, application_name, backend_start FROM pg_stat_activity WHERE backend_type = 'client backend' ORDER BY backend_start",
-        "look_for": "connections from an IP that is not your app server"
+        "look_for": "connections from an IP that is not your app server",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'ssl', 'password_encryption', 'log_connections', 'log_statement')",
-        "look_for": "listen_addresses '*' with weak passwords is the most common way in; log_connections off means logins are not recorded"
+        "look_for": "listen_addresses '*' with weak passwords is the most common way in; log_connections off means logins are not recorded",
+        "id": "check_5"
       }
     ],
     "causes": [
@@ -2226,27 +2417,32 @@
       {
         "engine": "mysql",
         "sql": "SELECT SCHEMA_NAME, LEFT(DIGEST_TEXT, 200) AS query_shape, COUNT_STAR, SUM_ERRORS, FIRST_SEEN, LAST_SEEN FROM performance_schema.events_statements_summary_by_digest WHERE SUM_ERRORS > 0 ORDER BY SUM_ERRORS DESC LIMIT 20",
-        "look_for": "a burst of failing query shapes from the app's database around the time of the attack (probing makes many syntax errors)"
+        "look_for": "a burst of failing query shapes from the app's database around the time of the attack (probing makes many syntax errors)",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT SCHEMA_NAME, LEFT(DIGEST_TEXT, 200) AS query_shape, COUNT_STAR, FIRST_SEEN, LAST_SEEN FROM performance_schema.events_statements_summary_by_digest WHERE DIGEST_TEXT LIKE '%information_schema%' OR DIGEST_TEXT LIKE '%UNION%' ORDER BY LAST_SEEN DESC LIMIT 20",
-        "look_for": "your app normally never reads information_schema; such shapes from the app's database are a strong sign of injection"
+        "look_for": "your app normally never reads information_schema; such shapes from the app's database are a strong sign of injection",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('general_log', 'log_output', 'slow_query_log', 'log_error', 'performance_schema')",
-        "look_for": "whether any log exists to look back in; performance_schema OFF means the digest checks above will be empty"
+        "look_for": "whether any log exists to look back in; performance_schema OFF means the digest checks above will be empty",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT datname, xact_commit, xact_rollback, conflicts, deadlocks, stats_reset FROM pg_stat_database WHERE datname = current_database()",
-        "look_for": "a high rollback count compared to commits can mean many failing (injected) statements"
+        "look_for": "a high rollback count compared to commits can mean many failing (injected) statements",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('log_min_error_statement', 'log_statement', 'log_destination', 'logging_collector')",
-        "look_for": "whether failed statements are written to the server log, so you can search it"
+        "look_for": "whether failed statements are written to the server log, so you can search it",
+        "id": "check_5"
       }
     ],
     "causes": [
@@ -2336,27 +2532,32 @@
       {
         "engine": "mysql",
         "sql": "SELECT USER, HOST, CURRENT_CONNECTIONS, TOTAL_CONNECTIONS FROM performance_schema.accounts WHERE USER IS NOT NULL ORDER BY USER, HOST",
-        "look_for": "the app's account seen from a host that is not your web server means the leaked password is being used"
+        "look_for": "the app's account seen from a host that is not your web server means the leaked password is being used",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT USER, HOST, DB, COMMAND, TIME FROM information_schema.PROCESSLIST ORDER BY HOST",
-        "look_for": "live connections from unexpected IPs"
+        "look_for": "live connections from unexpected IPs",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, TABLE_SCHEMA, PRIVILEGE_TYPE FROM information_schema.SCHEMA_PRIVILEGES ORDER BY GRANTEE, TABLE_SCHEMA",
-        "look_for": "what the leaked account can reach: if it covers every database, all of them are at risk"
+        "look_for": "what the leaked account can reach: if it covers every database, all of them are at risk",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT usename, client_addr, application_name, backend_start, state FROM pg_stat_activity WHERE backend_type = 'client backend' ORDER BY client_addr",
-        "look_for": "the app's role connected from an address that is not the app server"
+        "look_for": "the app's role connected from an address that is not the app server",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolcanlogin FROM pg_roles WHERE rolname = current_user",
-        "look_for": "how powerful the leaked role is (superuser = the whole server is exposed)"
+        "look_for": "how powerful the leaked role is (superuser = the whole server is exposed)",
+        "id": "check_5"
       }
     ],
     "causes": [
@@ -2459,27 +2660,32 @@
       {
         "engine": "mysql",
         "sql": "SELECT IP, HOST, SUM_CONNECT_ERRORS, COUNT_AUTHENTICATION_ERRORS, FIRST_SEEN, LAST_SEEN FROM performance_schema.host_cache ORDER BY COUNT_AUTHENTICATION_ERRORS DESC LIMIT 20",
-        "look_for": "IPs with many authentication errors that are not yours"
+        "look_for": "IPs with many authentication errors that are not yours",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Aborted_connects', 'Access_denied_errors', 'Connection_errors_internal', 'Connection_errors_max_connections')",
-        "look_for": "Aborted_connects / Access_denied_errors climbing fast between two checks = ongoing guessing"
+        "look_for": "Aborted_connects / Access_denied_errors climbing fast between two checks = ongoing guessing",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'max_connect_errors', 'log_warnings', 'log_error_verbosity')",
-        "look_for": "listening on all addresses makes guessing possible; low log verbosity hides the failed logins"
+        "look_for": "listening on all addresses makes guessing possible; low log verbosity hides the failed logins",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'log_connections', 'password_encryption', 'authentication_timeout')",
-        "look_for": "listen_addresses '*' and log_connections off: guesses can happen and you can't see them"
+        "look_for": "listen_addresses '*' and log_connections off: guesses can happen and you can't see them",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcanlogin, rolvaliduntil FROM pg_roles WHERE rolcanlogin ORDER BY rolsuper DESC, rolname",
-        "look_for": "accounts that can log in: the 'postgres' superuser with a password reachable from the internet is the usual target"
+        "look_for": "accounts that can log in: the 'postgres' superuser with a password reachable from the internet is the usual target",
+        "id": "check_5"
       }
     ],
     "causes": [
@@ -2559,27 +2765,32 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name LIKE 'validate_password%' OR Variable_name LIKE 'simple_password_check%' OR Variable_name LIKE 'cracklib_password_check%'",
-        "look_for": "empty result = no password-strength check is active on this server"
+        "look_for": "empty result = no password-strength check is active on this server",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT PLUGIN_NAME, PLUGIN_STATUS, PLUGIN_TYPE FROM information_schema.PLUGINS WHERE PLUGIN_TYPE = 'PASSWORD VALIDATION' OR PLUGIN_NAME LIKE '%password%'",
-        "look_for": "which password plugins are loaded (mysql_native_password is old and weak; caching_sha2_password / ed25519 are stronger)"
+        "look_for": "which password plugins are loaded (mysql_native_password is old and weak; caching_sha2_password / ed25519 are stronger)",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE PRIVILEGE_TYPE IN ('SUPER', 'CREATE USER', 'FILE', 'SHUTDOWN') ORDER BY GRANTEE",
-        "look_for": "every admin-level account must have a strong unique password (an admin user sees all accounts here)"
+        "look_for": "every admin-level account must have a strong unique password (an admin user sees all accounts here)",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('password_encryption', 'listen_addresses')",
-        "look_for": "password_encryption md5 is the old method; scram-sha-256 is the safe one"
+        "look_for": "password_encryption md5 is the old method; scram-sha-256 is the safe one",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcanlogin, rolvaliduntil FROM pg_roles WHERE rolcanlogin AND rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC",
-        "look_for": "login roles to rotate; superusers first"
+        "look_for": "login roles to rotate; superusers first",
+        "id": "check_5"
       }
     ],
     "causes": [
@@ -2668,27 +2879,32 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'port', 'require_secure_transport')",
-        "look_for": "bind_address 0.0.0.0, :: or * with no firewall means the whole internet can try to log in"
+        "look_for": "bind_address 0.0.0.0, :: or * with no firewall means the whole internet can try to log in",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE GRANTEE LIKE '%@''\\%''' ORDER BY GRANTEE",
-        "look_for": "accounts allowed from any host ('%'): together with an open port these are reachable by anyone"
+        "look_for": "accounts allowed from any host ('%'): together with an open port these are reachable by anyone",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT HOST, COUNT(*) AS connections FROM information_schema.PROCESSLIST GROUP BY HOST ORDER BY connections DESC",
-        "look_for": "client hosts that are not localhost/your app server"
+        "look_for": "client hosts that are not localhost/your app server",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'ssl')",
-        "look_for": "listen_addresses '*' listens on every network card"
+        "look_for": "listen_addresses '*' listens on every network card",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT client_addr, count(*) FROM pg_stat_activity WHERE client_addr IS NOT NULL GROUP BY client_addr ORDER BY 2 DESC",
-        "look_for": "public IP addresses that are not yours"
+        "look_for": "public IP addresses that are not yours",
+        "id": "check_5"
       }
     ],
     "causes": [
@@ -2778,22 +2994,26 @@
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES WHERE GRANTEE LIKE '''root''@%' AND GRANTEE NOT LIKE '%@''localhost''' AND GRANTEE NOT LIKE '%@''127.0.0.1''' AND GRANTEE NOT LIKE '%@''::1''' ORDER BY GRANTEE",
-        "look_for": "any row = root can log in from a non-local host (an admin user sees all accounts here)"
+        "look_for": "any row = root can log in from a non-local host (an admin user sees all accounts here)",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT CURRENT_USER() AS connected_as",
-        "look_for": "if the app connects as root, every bug in the app becomes a full server takeover"
+        "look_for": "if the app connects as root, every bug in the app becomes a full server takeover",
+        "id": "check_2"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcanlogin FROM pg_roles WHERE rolsuper AND rolcanlogin ORDER BY rolname",
-        "look_for": "superusers that can log in; only 'postgres' (local only) should be here"
+        "look_for": "superusers that can log in; only 'postgres' (local only) should be here",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT current_user, (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS is_superuser",
-        "look_for": "the app must not connect as a superuser"
+        "look_for": "the app must not connect as a superuser",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -2871,34 +3091,62 @@
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.USER_PRIVILEGES ORDER BY GRANTEE, PRIVILEGE_TYPE",
-        "look_for": "global rights (ON *.*) for the app user, especially SUPER, FILE, PROCESS, CREATE USER, GRANT OPTION, SHUTDOWN"
+        "look_for": "global rights (ON *.*) for the app user, especially SUPER, FILE, PROCESS, CREATE USER, GRANT OPTION, SHUTDOWN",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, TABLE_SCHEMA, PRIVILEGE_TYPE, IS_GRANTABLE FROM information_schema.SCHEMA_PRIVILEGES ORDER BY GRANTEE, TABLE_SCHEMA",
-        "look_for": "the app user should appear only on its own database; DROP, GRANT OPTION, ALTER ROUTINE, EVENT, TRIGGER are rarely needed at run time"
+        "look_for": "the app user should appear only on its own database; DROP, GRANT OPTION, ALTER ROUTINE, EVENT, TRIGGER are rarely needed at run time",
+        "id": "check_2"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls FROM pg_roles WHERE rolname = current_user",
-        "look_for": "the app role should have all of these false"
+        "look_for": "the app role should have all of these false",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT d.datname, pg_get_userbyid(d.datdba) AS owner FROM pg_database d WHERE NOT d.datistemplate ORDER BY 1",
-        "look_for": "if the app role owns the database it can change or drop anything; a separate owner role is safer"
+        "look_for": "if the app role owns the database it can change or drop anything; a separate owner role is safer",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT r.rolname AS member, g.rolname AS member_of FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid ORDER BY 1, 2",
-        "look_for": "membership in powerful roles (pg_read_server_files, pg_write_server_files, pg_execute_server_program, pg_read_all_data)"
+        "look_for": "membership in powerful roles (pg_read_server_files, pg_write_server_files, pg_execute_server_program, pg_read_all_data)",
+        "id": "check_5"
       }
     ],
     "causes": [
       {
         "id": "global_all",
         "title_en": "App user created with ALL PRIVILEGES on *.* (or as superuser) during setup",
-        "title_hi": "Setup ke time app user ko *.* par ALL PRIVILEGES (ya superuser) de diya"
+        "title_hi": "Setup ke time app user ko *.* par ALL PRIVILEGES (ya superuser) de diya",
+        "signals": [
+          {
+            "check": "check_1",
+            "where": {
+              "PRIVILEGE_TYPE": "SUPER"
+            },
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "The connected account has a global SUPER privilege"
+          },
+          {
+            "check": "check_3",
+            "where": {
+              "rolsuper": "True"
+            },
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "The connected PostgreSQL role is a superuser"
+          }
+        ],
+        "minimum_signals": 1
       },
       {
         "id": "shared_user",
@@ -2970,22 +3218,26 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('secure_file_priv', 'local_infile')",
-        "look_for": "secure_file_priv empty = the server may read/write files anywhere it has OS access; NULL or a fixed folder is safe; local_infile ON lets clients load local files"
+        "look_for": "secure_file_priv empty = the server may read/write files anywhere it has OS access; NULL or a fixed folder is safe; local_infile ON lets clients load local files",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE PRIVILEGE_TYPE = 'FILE' ORDER BY GRANTEE",
-        "look_for": "only an admin should have FILE; an app user with FILE can drop files into the web folder"
+        "look_for": "only an admin should have FILE; an app user with FILE can drop files into the web folder",
+        "id": "check_2"
       },
       {
         "engine": "postgres",
         "sql": "SELECT r.rolname AS member, g.rolname AS powerful_role FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.member JOIN pg_roles g ON g.oid = m.roleid WHERE g.rolname IN ('pg_read_server_files', 'pg_write_server_files', 'pg_execute_server_program')",
-        "look_for": "members of these roles can read/write server files or run programs, like a superuser"
+        "look_for": "members of these roles can read/write server files or run programs, like a superuser",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname FROM pg_roles WHERE rolsuper AND rolcanlogin",
-        "look_for": "superusers can run server programs through COPY ... PROGRAM; keep them few and local"
+        "look_for": "superusers can run server programs through COPY ... PROGRAM; keep them few and local",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -3068,22 +3320,26 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('have_ssl', 'have_openssl', 'require_secure_transport', 'tls_version', 'ssl_cert')",
-        "look_for": "have_ssl DISABLED / no certificate = connections cannot be encrypted; require_secure_transport OFF = plain connections are allowed"
+        "look_for": "have_ssl DISABLED / no certificate = connections cannot be encrypted; require_secure_transport OFF = plain connections are allowed",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW SESSION STATUS WHERE Variable_name IN ('Ssl_cipher', 'Ssl_version')",
-        "look_for": "an empty Ssl_cipher means this very connection is not encrypted"
+        "look_for": "an empty Ssl_cipher means this very connection is not encrypted",
+        "id": "check_2"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('ssl', 'ssl_min_protocol_version', 'listen_addresses')",
-        "look_for": "ssl off means every remote login and query travels in plain text"
+        "look_for": "ssl off means every remote login and query travels in plain text",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT s.pid, a.usename, a.client_addr, s.ssl, s.version FROM pg_stat_ssl s JOIN pg_stat_activity a ON a.pid = s.pid WHERE a.client_addr IS NOT NULL",
-        "look_for": "remote connections with ssl = false"
+        "look_for": "remote connections with ssl = false",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -3162,22 +3418,26 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('general_log', 'general_log_file', 'log_output', 'log_error', 'server_audit_logging', 'audit_log_file')",
-        "look_for": "general_log OFF and no audit plugin = no record of logins or statements"
+        "look_for": "general_log OFF and no audit plugin = no record of logins or statements",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT PLUGIN_NAME, PLUGIN_STATUS FROM information_schema.PLUGINS WHERE PLUGIN_NAME LIKE '%audit%'",
-        "look_for": "MariaDB server_audit or MySQL Enterprise audit_log loaded?"
+        "look_for": "MariaDB server_audit or MySQL Enterprise audit_log loaded?",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'binlog_expire_logs_seconds', 'expire_logs_days')",
-        "look_for": "the binary log records every data change: needed to find and undo what an attacker changed"
+        "look_for": "the binary log records every data change: needed to find and undo what an attacker changed",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('log_connections', 'log_disconnections', 'log_statement', 'log_line_prefix', 'logging_collector', 'shared_preload_libraries')",
-        "look_for": "log_connections off and log_statement none = nothing to look back at; 'pgaudit' in shared_preload_libraries means auditing is available"
+        "look_for": "log_connections off and log_statement none = nothing to look back at; 'pgaudit' in shared_preload_libraries means auditing is available",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -3253,17 +3513,20 @@
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LEFT(option_value, 1000) AS value FROM wp_options WHERE option_name IN ('active_plugins', 'template', 'stylesheet', 'db_version', 'siteurl')",
-        "look_for": "active_plugins lists every running plugin; compare each with wordpress.org for updates and known holes; db_version tells the WordPress version range"
+        "look_for": "active_plugins lists every running plugin; compare each with wordpress.org for updates and known holes; db_version tells the WordPress version range",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LENGTH(option_value) AS size FROM wp_options WHERE option_name LIKE '%\\_site\\_transient\\_update%' OR option_name LIKE '%update\\_core%'",
-        "look_for": "update-check data; missing or very old means WordPress hasn't checked for updates in a long time"
+        "look_for": "update-check data; missing or very old means WordPress hasn't checked for updates in a long time",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT option_name, LEFT(option_value, 200) AS value FROM wp_options WHERE option_name IN ('recently_activated', 'uninstall_plugins') OR option_name LIKE '%\\_plugin\\_%version%' ORDER BY option_name LIMIT 50",
-        "look_for": "plugins switched recently, and versions stored by plugins themselves"
+        "look_for": "plugins switched recently, and versions stored by plugins themselves",
+        "id": "check_3"
       }
     ],
     "causes": [
@@ -3336,27 +3599,32 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('log_bin', 'binlog_format', 'binlog_expire_logs_seconds', 'expire_logs_days')",
-        "look_for": "with log_bin ON you can replay changes after the last backup (point-in-time recovery); OFF means you lose everything since the last dump"
+        "look_for": "with log_bin ON you can replay changes after the last backup (point-in-time recovery); OFF means you lose everything since the last dump",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_SCHEMA, ROUND(SUM(DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 1) AS size_mb, COUNT(*) AS tables_count FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('mysql', 'information_schema', 'performance_schema', 'sys') GROUP BY TABLE_SCHEMA",
-        "look_for": "the size and table count a good backup must roughly match; a much smaller backup file is a warning"
+        "look_for": "the size and table count a good backup must roughly match; a much smaller backup file is a warning",
+        "id": "check_2"
       },
       {
         "engine": "postgres",
         "sql": "SELECT archived_count, last_archived_wal, last_archived_time, failed_count, last_failed_time FROM pg_stat_archiver",
-        "look_for": "failed_count growing or last_archived_time old = continuous backup is broken"
+        "look_for": "failed_count growing or last_archived_time old = continuous backup is broken",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('wal_level', 'archive_mode', 'archive_timeout')",
-        "look_for": "archive_mode off = only nightly dumps; no point-in-time recovery"
+        "look_for": "archive_mode off = only nightly dumps; no point-in-time recovery",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT pg_size_pretty(pg_database_size(current_database())) AS db_size, (SELECT count(*) FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema')) AS tables_count",
-        "look_for": "what a full restore should bring back"
+        "look_for": "what a full restore should bring back",
+        "id": "check_5"
       }
     ],
     "causes": [
@@ -3448,27 +3716,32 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('bind_address', 'skip_networking', 'require_secure_transport', 'have_ssl', 'secure_file_priv', 'local_infile', 'log_bin', 'general_log', 'version')",
-        "look_for": "network: local/private only; TLS required; secure_file_priv limited; local_infile OFF; binary log ON; a supported version"
+        "look_for": "network: local/private only; TLS required; secure_file_priv limited; local_infile OFF; binary log ON; a supported version",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE, PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE PRIVILEGE_TYPE IN ('SUPER', 'FILE', 'CREATE USER', 'PROCESS', 'SHUTDOWN', 'RELOAD') ORDER BY GRANTEE",
-        "look_for": "admin-level rights only on a few local admin accounts, never on app users or '%' hosts"
+        "look_for": "admin-level rights only on a few local admin accounts, never on app users or '%' hosts",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name LIKE 'validate_password%' OR Variable_name LIKE 'simple_password_check%'",
-        "look_for": "a password-strength check should be active"
+        "look_for": "a password-strength check should be active",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'ssl', 'password_encryption', 'log_connections', 'log_statement', 'archive_mode', 'server_version')",
-        "look_for": "listen_addresses not '*' (or firewalled), ssl on, scram-sha-256, connections logged, archiving on, a supported version"
+        "look_for": "listen_addresses not '*' (or firewalled), ssl on, scram-sha-256, connections logged, archiving on, a supported version",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT rolname, rolsuper, rolcreaterole, rolcreatedb, rolbypassrls, rolcanlogin FROM pg_roles WHERE rolname NOT LIKE 'pg\\_%' ORDER BY rolsuper DESC, rolname",
-        "look_for": "only one local superuser; app roles without special attributes"
+        "look_for": "only one local superuser; app roles without special attributes",
+        "id": "check_5"
       }
     ],
     "causes": [
@@ -3788,22 +4061,26 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('port', 'socket', 'bind_address', 'skip_networking', 'hostname')",
-        "look_for": "skip_networking ON or bind_address 127.0.0.1 means no other machine can connect; the port the app must use"
+        "look_for": "skip_networking ON or bind_address 127.0.0.1 means no other machine can connect; the port the app must use",
+        "id": "check_1"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'unix_socket_directories', 'max_connections')",
-        "look_for": "listen_addresses 'localhost' accepts only local connections; the port the app must use"
+        "look_for": "listen_addresses 'localhost' accepts only local connections; the port the app must use",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Uptime', 'Aborted_connects', 'Aborted_clients', 'Connection_errors_max_connections', 'Connection_errors_internal', 'Connection_errors_peer_address')",
-        "look_for": "a small Uptime (seconds) means the server restarted recently (crash / out of memory); rising Aborted_* counters"
+        "look_for": "a small Uptime (seconds) means the server restarted recently (crash / out of memory); rising Aborted_* counters",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT pg_postmaster_start_time() AS started_at, now() - pg_postmaster_start_time() AS running_for",
-        "look_for": "a recent start time means the server restarted (crash, out of memory, update)"
+        "look_for": "a recent start time means the server restarted (crash, out of memory, update)",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -3892,22 +4169,26 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('port', 'socket', 'bind_address', 'skip_networking', 'hostname')",
-        "look_for": "skip_networking ON or bind_address 127.0.0.1 means no other machine can connect; the port the app must use"
+        "look_for": "skip_networking ON or bind_address 127.0.0.1 means no other machine can connect; the port the app must use",
+        "id": "check_1"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'unix_socket_directories', 'max_connections')",
-        "look_for": "listen_addresses 'localhost' accepts only local connections; the port the app must use"
+        "look_for": "listen_addresses 'localhost' accepts only local connections; the port the app must use",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('connect_timeout', 'skip_name_resolve')",
-        "look_for": "a very small connect_timeout on a slow link; skip_name_resolve OFF makes every login wait for a DNS lookup"
+        "look_for": "a very small connect_timeout on a slow link; skip_name_resolve OFF makes every login wait for a DNS lookup",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('authentication_timeout', 'tcp_keepalives_idle')",
-        "look_for": "authentication_timeout too short for slow links"
+        "look_for": "authentication_timeout too short for slow links",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -3995,7 +4276,8 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('socket', 'port', 'skip_networking')",
-        "look_for": "the real socket path the server created; the client/PHP must use the same path (or connect with 127.0.0.1 over TCP)"
+        "look_for": "the real socket path the server created; the client/PHP must use the same path (or connect with 127.0.0.1 over TCP)",
+        "id": "check_1"
       }
     ],
     "causes": [
@@ -4082,17 +4364,20 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('wait_timeout', 'interactive_timeout', 'max_allowed_packet', 'net_read_timeout', 'net_write_timeout', 'connect_timeout')",
-        "look_for": "wait_timeout shorter than how long the app keeps an idle connection; max_allowed_packet smaller than your biggest row / INSERT"
+        "look_for": "wait_timeout shorter than how long the app keeps an idle connection; max_allowed_packet smaller than your biggest row / INSERT",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Uptime', 'Aborted_connects', 'Aborted_clients', 'Connection_errors_max_connections', 'Connection_errors_internal', 'Connection_errors_peer_address')",
-        "look_for": "a small Uptime (seconds) means the server restarted recently (crash / out of memory); rising Aborted_* counters"
+        "look_for": "a small Uptime (seconds) means the server restarted recently (crash / out of memory); rising Aborted_* counters",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ID, USER, HOST, COMMAND, TIME, STATE FROM information_schema.PROCESSLIST WHERE COMMAND = 'Sleep' ORDER BY TIME DESC LIMIT 20",
-        "look_for": "connections sleeping for a long time: the app holds them open and the server will close them at wait_timeout"
+        "look_for": "connections sleeping for a long time: the app holds them open and the server will close them at wait_timeout",
+        "id": "check_3"
       }
     ],
     "causes": [
@@ -4198,22 +4483,26 @@
       {
         "engine": "postgres",
         "sql": "SELECT pg_postmaster_start_time() AS started_at, now() - pg_postmaster_start_time() AS running_for",
-        "look_for": "a recent start time means the server restarted (crash, out of memory, update)"
+        "look_for": "a recent start time means the server restarted (crash, out of memory, update)",
+        "id": "check_1"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('idle_session_timeout', 'idle_in_transaction_session_timeout', 'statement_timeout', 'tcp_keepalives_idle', 'tcp_keepalives_interval', 'tcp_keepalives_count', 'authentication_timeout')",
-        "look_for": "non-zero idle timeouts that close connections the app still thinks are open; keepalives 0 = OS default"
+        "look_for": "non-zero idle timeouts that close connections the app still thinks are open; keepalives 0 = OS default",
+        "id": "check_2"
       },
       {
         "engine": "postgres",
         "sql": "SELECT datname, sessions, sessions_abandoned, sessions_fatal, sessions_killed FROM pg_stat_database WHERE datname = current_database()",
-        "look_for": "sessions_killed (an admin or timeout ended them), sessions_abandoned (the network dropped them), sessions_fatal (errors) growing; PostgreSQL 14+"
+        "look_for": "sessions_killed (an admin or timeout ended them), sessions_abandoned (the network dropped them), sessions_fatal (errors) growing; PostgreSQL 14+",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT pid, usename, client_addr, state, now() - state_change AS idle_for FROM pg_stat_activity WHERE state LIKE 'idle%' ORDER BY state_change LIMIT 20",
-        "look_for": "connections idle for a long time: a firewall/NAT/load balancer may silently drop them"
+        "look_for": "connections idle for a long time: a firewall/NAT/load balancer may silently drop them",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -4317,12 +4606,14 @@
       {
         "engine": "postgres",
         "sql": "SELECT pg_is_in_recovery() AS is_standby",
-        "look_for": "true on a standby/replica (normal) or while a crash recovery is still replaying"
+        "look_for": "true on a standby/replica (normal) or while a crash recovery is still replaying",
+        "id": "check_1"
       },
       {
         "engine": "postgres",
         "sql": "SELECT pg_postmaster_start_time() AS started_at, now() - pg_postmaster_start_time() AS running_for",
-        "look_for": "a recent start time means the server restarted (crash, out of memory, update)"
+        "look_for": "a recent start time means the server restarted (crash, out of memory, update)",
+        "id": "check_2"
       }
     ],
     "causes": [
@@ -4416,22 +4707,26 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('have_ssl', 'have_openssl', 'require_secure_transport', 'tls_version', 'ssl_cert', 'ssl_ca')",
-        "look_for": "require_secure_transport ON means every TCP client must use TLS; have_ssl DISABLED means the server can't do TLS at all"
+        "look_for": "require_secure_transport ON means every TCP client must use TLS; have_ssl DISABLED means the server can't do TLS at all",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW SESSION STATUS WHERE Variable_name IN ('Ssl_cipher', 'Ssl_version')",
-        "look_for": "empty values = this connection is not encrypted"
+        "look_for": "empty values = this connection is not encrypted",
+        "id": "check_2"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('ssl', 'ssl_min_protocol_version', 'password_encryption')",
-        "look_for": "ssl off means sslmode=require clients can't connect"
+        "look_for": "ssl off means sslmode=require clients can't connect",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT a.usename, a.client_addr, s.ssl, s.version, s.cipher FROM pg_stat_ssl s JOIN pg_stat_activity a USING (pid) WHERE a.client_addr IS NOT NULL",
-        "look_for": "which connected clients use TLS (ssl = true) and which don't"
+        "look_for": "which connected clients use TLS (ssl = true) and which don't",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -4524,17 +4819,20 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('default_authentication_plugin', 'authentication_policy', 'version', 'version_comment')",
-        "look_for": "MySQL 8.0 defaults new users to caching_sha2_password; 8.4 disables mysql_native_password unless enabled; MariaDB uses mysql_native_password/ed25519"
+        "look_for": "MySQL 8.0 defaults new users to caching_sha2_password; 8.4 disables mysql_native_password unless enabled; MariaDB uses mysql_native_password/ed25519",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT PLUGIN_NAME, PLUGIN_STATUS FROM information_schema.PLUGINS WHERE PLUGIN_TYPE = 'AUTHENTICATION' ORDER BY PLUGIN_NAME",
-        "look_for": "which login methods this server can use"
+        "look_for": "which login methods this server can use",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT USER() AS you_connected_as, CURRENT_USER() AS account_matched",
-        "look_for": "the account the server matched for this login"
+        "look_for": "the account the server matched for this login",
+        "id": "check_3"
       }
     ],
     "causes": [
@@ -4628,12 +4926,14 @@
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'password_encryption', 'ssl')",
-        "look_for": "listen_addresses must include the network the client comes from; password_encryption (scram-sha-256) must match the method in pg_hba.conf"
+        "look_for": "listen_addresses must include the network the client comes from; password_encryption (scram-sha-256) must match the method in pg_hba.conf",
+        "id": "check_1"
       },
       {
         "engine": "postgres",
         "sql": "SELECT a.usename, a.datname, a.client_addr, s.ssl FROM pg_stat_activity a LEFT JOIN pg_stat_ssl s USING (pid) WHERE a.backend_type = 'client backend'",
-        "look_for": "which user/database/address/SSL combinations already work: the failing one needs a matching line"
+        "look_for": "which user/database/address/SSL combinations already work: the failing one needs a matching line",
+        "id": "check_2"
       }
     ],
     "causes": [
@@ -4726,22 +5026,26 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('max_user_connections', 'max_connections')",
-        "look_for": "a non-zero max_user_connections caps every account (shared hosting often sets 10-30); per-account limits live in the account itself"
+        "look_for": "a non-zero max_user_connections caps every account (shared hosting often sets 10-30); per-account limits live in the account itself",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT USER, HOST, COUNT(*) AS connections, SUM(COMMAND = 'Sleep') AS sleeping FROM information_schema.PROCESSLIST GROUP BY USER, HOST ORDER BY connections DESC",
-        "look_for": "how many connections this user holds and how many just sleep (needs PROCESS to see other users)"
+        "look_for": "how many connections this user holds and how many just sleep (needs PROCESS to see other users)",
+        "id": "check_2"
       },
       {
         "engine": "postgres",
         "sql": "SELECT r.rolname, count(a.pid) AS connections, r.rolconnlimit FROM pg_roles r LEFT JOIN pg_stat_activity a ON a.usename = r.rolname WHERE r.rolconnlimit <> -1 GROUP BY r.rolname, r.rolconnlimit",
-        "look_for": "roles with a CONNECTION LIMIT and how close they are"
+        "look_for": "roles with a CONNECTION LIMIT and how close they are",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT datname, datconnlimit, datallowconn FROM pg_database WHERE NOT datistemplate ORDER BY datname",
-        "look_for": "databases with their own CONNECTION LIMIT"
+        "look_for": "databases with their own CONNECTION LIMIT",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -4834,12 +5138,14 @@
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('max_connect_errors', 'host_cache_size', 'skip_name_resolve')",
-        "look_for": "a low max_connect_errors (old default 10, now 100)"
+        "look_for": "a low max_connect_errors (old default 10, now 100)",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT IP, HOST, SUM_CONNECT_ERRORS, COUNT_HOST_BLOCKED_ERRORS, COUNT_HANDSHAKE_ERRORS, COUNT_AUTHENTICATION_ERRORS, LAST_ERROR_SEEN FROM performance_schema.host_cache ORDER BY SUM_CONNECT_ERRORS DESC",
-        "look_for": "which IP is blocked and what kind of errors it made (handshake = half-open connections, e.g. health checks or port scans)"
+        "look_for": "which IP is blocked and what kind of errors it made (handshake = half-open connections, e.g. health checks or port scans)",
+        "id": "check_2"
       }
     ],
     "causes": [
@@ -4926,12 +5232,14 @@
       {
         "engine": "mysql",
         "sql": "SELECT USER() AS you_connected_as, CURRENT_USER() AS account_matched",
-        "look_for": "from a working login: user@host you came from vs the account it matched; accounts are user + host pairs"
+        "look_for": "from a working login: user@host you came from vs the account it matched; accounts are user + host pairs",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT GRANTEE FROM information_schema.USER_PRIVILEGES GROUP BY GRANTEE ORDER BY GRANTEE",
-        "look_for": "which user@host accounts exist (all of them only for an admin): the app's IP/host is missing"
+        "look_for": "which user@host accounts exist (all of them only for an admin): the app's IP/host is missing",
+        "id": "check_2"
       }
     ],
     "causes": [
@@ -5009,22 +5317,26 @@
       {
         "engine": "mysql",
         "sql": "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA ORDER BY SCHEMA_NAME",
-        "look_for": "the exact names this user can see (case matters on Linux)"
+        "look_for": "the exact names this user can see (case matters on Linux)",
+        "id": "check_1"
       },
       {
         "engine": "postgres",
         "sql": "SELECT datname, datconnlimit, datallowconn FROM pg_database WHERE NOT datistemplate ORDER BY datname",
-        "look_for": "the exact names; a quoted \"MyApp\" is case-sensitive"
+        "look_for": "the exact names; a quoted \"MyApp\" is case-sensitive",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT DATABASE() AS current_database, @@hostname AS server_host, @@port AS server_port",
-        "look_for": "the server name/port the app really reached; compare with the app's settings"
+        "look_for": "the server name/port the app really reached; compare with the app's settings",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT current_database(), current_user, inet_server_addr(), inet_server_port()",
-        "look_for": "the address/port the server answers on; compare with the app's settings"
+        "look_for": "the address/port the server answers on; compare with the app's settings",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -5125,12 +5437,14 @@
       {
         "engine": "mysql",
         "sql": "SELECT DATABASE() AS current_database, @@hostname AS server_host, @@port AS server_port",
-        "look_for": "the server name/port the app really reached; compare with the app's settings"
+        "look_for": "the server name/port the app really reached; compare with the app's settings",
+        "id": "check_1"
       },
       {
         "engine": "postgres",
         "sql": "SELECT current_database(), current_user, inet_server_addr(), inet_server_port()",
-        "look_for": "the address/port the server answers on; compare with the app's settings"
+        "look_for": "the address/port the server answers on; compare with the app's settings",
+        "id": "check_2"
       }
     ],
     "causes": [
@@ -5222,22 +5536,26 @@
       {
         "engine": "mysql",
         "sql": "SELECT DATABASE() AS current_database, @@hostname AS server_host, @@port AS server_port",
-        "look_for": "the server name/port the app really reached; compare with the app's settings"
+        "look_for": "the server name/port the app really reached; compare with the app's settings",
+        "id": "check_1"
       },
       {
         "engine": "postgres",
         "sql": "SELECT current_database(), current_user, inet_server_addr(), inet_server_port()",
-        "look_for": "the address/port the server answers on; compare with the app's settings"
+        "look_for": "the address/port the server answers on; compare with the app's settings",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SHOW VARIABLES WHERE Variable_name IN ('port', 'socket', 'bind_address', 'skip_networking', 'hostname')",
-        "look_for": "skip_networking ON or bind_address 127.0.0.1 means no other machine can connect; the port the app must use"
+        "look_for": "skip_networking ON or bind_address 127.0.0.1 means no other machine can connect; the port the app must use",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('listen_addresses', 'port', 'unix_socket_directories', 'max_connections')",
-        "look_for": "listen_addresses 'localhost' accepts only local connections; the port the app must use"
+        "look_for": "listen_addresses 'localhost' accepts only local connections; the port the app must use",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -5329,22 +5647,26 @@
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected', 'Threads_running', 'Max_used_connections', 'Connections')",
-        "look_for": "few Threads_running but the app still waits = connections are held, not used"
+        "look_for": "few Threads_running but the app still waits = connections are held, not used",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT USER, HOST, COUNT(*) AS connections, SUM(COMMAND = 'Sleep') AS sleeping FROM information_schema.PROCESSLIST GROUP BY USER, HOST ORDER BY connections DESC",
-        "look_for": "the app's connections: many sleeping = leaked/held connections"
+        "look_for": "the app's connections: many sleeping = leaked/held connections",
+        "id": "check_2"
       },
       {
         "engine": "postgres",
         "sql": "SELECT usename, datname, count(*) AS connections FROM pg_stat_activity WHERE backend_type = 'client backend' GROUP BY usename, datname ORDER BY connections DESC",
-        "look_for": "how many connections the app really holds"
+        "look_for": "how many connections the app really holds",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT pid, usename, client_addr, state, now() - state_change AS idle_for FROM pg_stat_activity WHERE state LIKE 'idle%' ORDER BY state_change LIMIT 20",
-        "look_for": "'idle in transaction' for long = the app took a connection and never finished"
+        "look_for": "'idle in transaction' for long = the app took a connection and never finished",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -5433,22 +5755,26 @@
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Uptime', 'Aborted_connects', 'Aborted_clients', 'Connection_errors_max_connections', 'Connection_errors_internal', 'Connection_errors_peer_address')",
-        "look_for": "a small Uptime (seconds) means the server restarted recently (crash / out of memory); rising Aborted_* counters"
+        "look_for": "a small Uptime (seconds) means the server restarted recently (crash / out of memory); rising Aborted_* counters",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected', 'Threads_running', 'Max_used_connections', 'Connections')",
-        "look_for": "Max_used_connections at the limit = the site ran out of connections under traffic"
+        "look_for": "Max_used_connections at the limit = the site ran out of connections under traffic",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA ORDER BY SCHEMA_NAME",
-        "look_for": "the exact database name to put in DB_NAME"
+        "look_for": "the exact database name to put in DB_NAME",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT option_name, option_value FROM wp_options WHERE option_name IN ('siteurl', 'home', 'db_version')",
-        "look_for": "the site's settings are readable (tables are fine); unexpected URLs = see the hacked playbooks"
+        "look_for": "the site's settings are readable (tables are fine); unexpected URLs = see the hacked playbooks",
+        "id": "check_4"
       }
     ],
     "causes": [
@@ -5553,42 +5879,50 @@
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_running', 'Threads_connected', 'Questions', 'Com_select', 'Slow_queries', 'Uptime')",
-        "look_for": "Threads_running far above the number of CPU cores = queries queueing for CPU"
+        "look_for": "Threads_running far above the number of CPU cores = queries queueing for CPU",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ID, USER, DB, COMMAND, TIME, STATE, LEFT(INFO, 200) AS query FROM information_schema.PROCESSLIST WHERE COMMAND <> 'Sleep' ORDER BY TIME DESC LIMIT 20",
-        "look_for": "queries running for many seconds, or many copies of the same query at once"
+        "look_for": "queries running for many seconds, or many copies of the same query at once",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT LEFT(DIGEST_TEXT, 200) AS query, COUNT_STAR AS runs, ROUND(SUM_TIMER_WAIT / 1000000000000, 2) AS total_seconds, SUM_ROWS_EXAMINED AS rows_examined, SUM_ROWS_SENT AS rows_sent, SUM_NO_INDEX_USED AS runs_without_index FROM performance_schema.events_statements_summary_by_digest ORDER BY SUM_TIMER_WAIT DESC LIMIT 15",
-        "look_for": "the few query shapes that use most of the time; rows_examined far bigger than rows_sent = missing index (empty if performance_schema is off)"
+        "look_for": "the few query shapes that use most of the time; rows_examined far bigger than rows_sent = missing index (empty if performance_schema is off)",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Select_scan', 'Select_full_join', 'Select_range_check', 'Handler_read_rnd_next', 'Handler_read_key', 'Slow_queries', 'Questions', 'Uptime')",
-        "look_for": "Handler_read_rnd_next much bigger than Handler_read_key, and a growing Select_full_join = tables read from start to end"
+        "look_for": "Handler_read_rnd_next much bigger than Handler_read_key, and a growing Select_full_join = tables read from start to end",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT state, count(*) AS sessions, max(now() - query_start) AS longest FROM pg_stat_activity WHERE pid <> pg_backend_pid() GROUP BY state ORDER BY sessions DESC",
-        "look_for": "many 'active' sessions at once = CPU is shared between too many queries"
+        "look_for": "many 'active' sessions at once = CPU is shared between too many queries",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT pid, state, now() - query_start AS running_for, wait_event_type, wait_event, left(query, 200) AS query FROM pg_stat_activity WHERE state <> 'idle' AND pid <> pg_backend_pid() ORDER BY query_start LIMIT 20",
-        "look_for": "queries running for a long time, or many copies of the same query"
+        "look_for": "queries running for a long time, or many copies of the same query",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, seq_scan, seq_tup_read, idx_scan, n_live_tup FROM pg_stat_user_tables ORDER BY seq_tup_read DESC LIMIT 20",
-        "look_for": "big tables (n_live_tup) with a high seq_tup_read and few idx_scan = read from start to end again and again"
+        "look_for": "big tables (n_live_tup) with a high seq_tup_read and few idx_scan = read from start to end again and again",
+        "id": "check_7"
       },
       {
         "engine": "postgres",
         "sql": "SELECT extname, extversion FROM pg_extension WHERE extname IN ('pg_stat_statements', 'pg_trgm', 'auto_explain')",
-        "look_for": "pg_stat_statements missing = no per-query time totals yet; pg_trgm missing = no fast LIKE '%text%' indexes"
+        "look_for": "pg_stat_statements missing = no per-query time totals yet; pg_trgm missing = no fast LIKE '%text%' indexes",
+        "id": "check_8"
       }
     ],
     "causes": [
@@ -5691,42 +6025,50 @@
       {
         "engine": "mysql",
         "sql": "SELECT ID, USER, DB, COMMAND, TIME, STATE, LEFT(INFO, 200) AS query FROM information_schema.PROCESSLIST WHERE COMMAND <> 'Sleep' ORDER BY TIME DESC LIMIT 20",
-        "look_for": "queries running for many seconds, or many copies of the same query at once"
+        "look_for": "queries running for many seconds, or many copies of the same query at once",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_running', 'Threads_connected', 'Questions', 'Com_select', 'Slow_queries', 'Uptime')",
-        "look_for": "Threads_running far above the number of CPU cores = queries queueing for CPU"
+        "look_for": "Threads_running far above the number of CPU cores = queries queueing for CPU",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_NAME, TABLE_ROWS, ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 1) AS size_mb, ROUND(INDEX_LENGTH / 1024 / 1024, 1) AS index_mb FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY DATA_LENGTH + INDEX_LENGTH DESC LIMIT 20",
-        "look_for": "which tables are big; a log/session table that grew huge is a common cause"
+        "look_for": "which tables are big; a log/session table that grew huge is a common cause",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT start_time, query_time, rows_examined, rows_sent, LEFT(sql_text, 200) AS query FROM mysql.slow_log ORDER BY query_time DESC LIMIT 20",
-        "look_for": "the slowest recent queries (only filled when slow_query_log is ON and log_output includes TABLE)"
+        "look_for": "the slowest recent queries (only filled when slow_query_log is ON and log_output includes TABLE)",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT pid, state, now() - query_start AS running_for, wait_event_type, wait_event, left(query, 200) AS query FROM pg_stat_activity WHERE state <> 'idle' AND pid <> pg_backend_pid() ORDER BY query_start LIMIT 20",
-        "look_for": "queries running for a long time, or many copies of the same query"
+        "look_for": "queries running for a long time, or many copies of the same query",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT state, count(*) AS sessions, max(now() - query_start) AS longest FROM pg_stat_activity WHERE pid <> pg_backend_pid() GROUP BY state ORDER BY sessions DESC",
-        "look_for": "many 'active' sessions at once = CPU is shared between too many queries"
+        "look_for": "many 'active' sessions at once = CPU is shared between too many queries",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, n_live_tup, n_dead_tup, pg_size_pretty(pg_total_relation_size(relid)) AS total_size FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 20",
-        "look_for": "which tables are big, and many dead rows (n_dead_tup) = bloat"
+        "look_for": "which tables are big, and many dead rows (n_dead_tup) = bloat",
+        "id": "check_7"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, n_live_tup, n_mod_since_analyze, last_analyze, last_autoanalyze FROM pg_stat_user_tables ORDER BY n_mod_since_analyze DESC LIMIT 20",
-        "look_for": "many rows changed since the last analyze, or last_autoanalyze empty on a big table = the planner works from old numbers"
+        "look_for": "many rows changed since the last analyze, or last_autoanalyze empty on a big table = the planner works from old numbers",
+        "id": "check_8"
       }
     ],
     "causes": [
@@ -5838,42 +6180,50 @@
       {
         "engine": "mysql",
         "sql": "SELECT LEFT(DIGEST_TEXT, 200) AS query, COUNT_STAR AS runs, ROUND(SUM_TIMER_WAIT / 1000000000000, 2) AS total_seconds, SUM_ROWS_EXAMINED AS rows_examined, SUM_ROWS_SENT AS rows_sent, SUM_NO_INDEX_USED AS runs_without_index FROM performance_schema.events_statements_summary_by_digest ORDER BY SUM_TIMER_WAIT DESC LIMIT 15",
-        "look_for": "the few query shapes that use most of the time; rows_examined far bigger than rows_sent = missing index (empty if performance_schema is off)"
+        "look_for": "the few query shapes that use most of the time; rows_examined far bigger than rows_sent = missing index (empty if performance_schema is off)",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT start_time, query_time, rows_examined, rows_sent, LEFT(sql_text, 200) AS query FROM mysql.slow_log ORDER BY query_time DESC LIMIT 20",
-        "look_for": "the slowest recent queries (only filled when slow_query_log is ON and log_output includes TABLE)"
+        "look_for": "the slowest recent queries (only filled when slow_query_log is ON and log_output includes TABLE)",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('slow_query_log', 'long_query_time', 'log_output', 'log_queries_not_using_indexes', 'slow_query_log_file')",
-        "look_for": "slow_query_log OFF = nobody is recording slow queries yet"
+        "look_for": "slow_query_log OFF = nobody is recording slow queries yet",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ID, USER, DB, COMMAND, TIME, STATE, LEFT(INFO, 200) AS query FROM information_schema.PROCESSLIST WHERE COMMAND <> 'Sleep' ORDER BY TIME DESC LIMIT 20",
-        "look_for": "queries running for many seconds, or many copies of the same query at once"
+        "look_for": "queries running for many seconds, or many copies of the same query at once",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('log_min_duration_statement', 'log_temp_files', 'track_io_timing', 'shared_preload_libraries')",
-        "look_for": "log_min_duration_statement = -1 means slow queries are not logged"
+        "look_for": "log_min_duration_statement = -1 means slow queries are not logged",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT extname, extversion FROM pg_extension WHERE extname IN ('pg_stat_statements', 'pg_trgm', 'auto_explain')",
-        "look_for": "pg_stat_statements missing = no per-query time totals yet; pg_trgm missing = no fast LIKE '%text%' indexes"
+        "look_for": "pg_stat_statements missing = no per-query time totals yet; pg_trgm missing = no fast LIKE '%text%' indexes",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('pg_stat_statements.track', 'pg_stat_statements.max', 'compute_query_id')",
-        "look_for": "rows here only when pg_stat_statements is loaded; then SELECT query, calls, total_exec_time FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 10 shows the heaviest queries"
+        "look_for": "rows here only when pg_stat_statements is loaded; then SELECT query, calls, total_exec_time FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 10 shows the heaviest queries",
+        "id": "check_7"
       },
       {
         "engine": "postgres",
         "sql": "SELECT pid, state, now() - query_start AS running_for, wait_event_type, wait_event, left(query, 200) AS query FROM pg_stat_activity WHERE state <> 'idle' AND pid <> pg_backend_pid() ORDER BY query_start LIMIT 20",
-        "look_for": "queries running for a long time, or many copies of the same query"
+        "look_for": "queries running for a long time, or many copies of the same query",
+        "id": "check_8"
       }
     ],
     "causes": [
@@ -5974,42 +6324,50 @@
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_NAME, TABLE_ROWS, ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 1) AS size_mb, ROUND(INDEX_LENGTH / 1024 / 1024, 1) AS index_mb FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY DATA_LENGTH + INDEX_LENGTH DESC LIMIT 20",
-        "look_for": "which tables are big; a log/session table that grew huge is a common cause"
+        "look_for": "which tables are big; a log/session table that grew huge is a common cause",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT t.TABLE_NAME, t.TABLE_ROWS FROM information_schema.TABLES t WHERE t.TABLE_SCHEMA = DATABASE() AND t.TABLE_TYPE = 'BASE TABLE' AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS s WHERE s.TABLE_SCHEMA = t.TABLE_SCHEMA AND s.TABLE_NAME = t.TABLE_NAME AND s.INDEX_NAME <> 'PRIMARY') ORDER BY t.TABLE_ROWS DESC LIMIT 20",
-        "look_for": "big tables with no index except the primary key"
+        "look_for": "big tables with no index except the primary key",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT c.TABLE_NAME, c.COLUMN_NAME FROM information_schema.COLUMNS c WHERE c.TABLE_SCHEMA = DATABASE() AND c.COLUMN_NAME LIKE '%\\_id' AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS s WHERE s.TABLE_SCHEMA = c.TABLE_SCHEMA AND s.TABLE_NAME = c.TABLE_NAME AND s.COLUMN_NAME = c.COLUMN_NAME AND s.SEQ_IN_INDEX = 1) ORDER BY c.TABLE_NAME LIMIT 50",
-        "look_for": "link columns (customer_id, order_id ...) that no index starts with: every join or filter on them reads the whole table"
+        "look_for": "link columns (customer_id, order_id ...) that no index starts with: every join or filter on them reads the whole table",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_buffer_pool_read_requests', 'Innodb_buffer_pool_reads', 'Innodb_buffer_pool_pages_free', 'Innodb_buffer_pool_pages_total', 'Innodb_buffer_pool_wait_free')",
-        "look_for": "Innodb_buffer_pool_reads more than about 1% of read_requests, pages_free near 0 or wait_free above 0 = the memory cache is too small"
+        "look_for": "Innodb_buffer_pool_reads more than about 1% of read_requests, pages_free near 0 or wait_free above 0 = the memory cache is too small",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, n_live_tup, n_dead_tup, pg_size_pretty(pg_total_relation_size(relid)) AS total_size FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 20",
-        "look_for": "which tables are big, and many dead rows (n_dead_tup) = bloat"
+        "look_for": "which tables are big, and many dead rows (n_dead_tup) = bloat",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, seq_scan, seq_tup_read, idx_scan, n_live_tup FROM pg_stat_user_tables ORDER BY seq_tup_read DESC LIMIT 20",
-        "look_for": "big tables (n_live_tup) with a high seq_tup_read and few idx_scan = read from start to end again and again"
+        "look_for": "big tables (n_live_tup) with a high seq_tup_read and few idx_scan = read from start to end again and again",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT c.conrelid::regclass AS table_name, a.attname AS column_name FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1] WHERE c.contype = 'f' AND NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.conrelid AND i.indkey[0] = c.conkey[1]) LIMIT 50",
-        "look_for": "foreign-key columns that no index starts with (PostgreSQL does not index them automatically)"
+        "look_for": "foreign-key columns that no index starts with (PostgreSQL does not index them automatically)",
+        "id": "check_7"
       },
       {
         "engine": "postgres",
         "sql": "SELECT datname, blks_hit, blks_read, round(blks_hit * 100.0 / nullif(blks_hit + blks_read, 0), 2) AS cache_hit_pct, temp_files, pg_size_pretty(temp_bytes) AS temp_size FROM pg_stat_database WHERE datname = current_database()",
-        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk"
+        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk",
+        "id": "check_8"
       }
     ],
     "causes": [
@@ -6114,44 +6472,90 @@
       {
         "engine": "mysql",
         "sql": "SELECT OBJECT_NAME AS table_name, COUNT_READ AS rows_read_by_full_scan FROM performance_schema.table_io_waits_summary_by_index_usage WHERE OBJECT_SCHEMA = DATABASE() AND INDEX_NAME IS NULL AND COUNT_READ > 0 ORDER BY COUNT_READ DESC LIMIT 20",
-        "look_for": "tables read mostly without any index (empty if performance_schema is off)"
+        "look_for": "tables read mostly without any index (empty if performance_schema is off)",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT t.TABLE_NAME, t.TABLE_ROWS FROM information_schema.TABLES t WHERE t.TABLE_SCHEMA = DATABASE() AND t.TABLE_TYPE = 'BASE TABLE' AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS s WHERE s.TABLE_SCHEMA = t.TABLE_SCHEMA AND s.TABLE_NAME = t.TABLE_NAME AND s.INDEX_NAME <> 'PRIMARY') ORDER BY t.TABLE_ROWS DESC LIMIT 20",
-        "look_for": "big tables with no index except the primary key"
+        "look_for": "big tables with no index except the primary key",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT c.TABLE_NAME, c.COLUMN_NAME FROM information_schema.COLUMNS c WHERE c.TABLE_SCHEMA = DATABASE() AND c.COLUMN_NAME LIKE '%\\_id' AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS s WHERE s.TABLE_SCHEMA = c.TABLE_SCHEMA AND s.TABLE_NAME = c.TABLE_NAME AND s.COLUMN_NAME = c.COLUMN_NAME AND s.SEQ_IN_INDEX = 1) ORDER BY c.TABLE_NAME LIMIT 50",
-        "look_for": "link columns (customer_id, order_id ...) that no index starts with: every join or filter on them reads the whole table"
+        "look_for": "link columns (customer_id, order_id ...) that no index starts with: every join or filter on them reads the whole table",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Select_scan', 'Select_full_join', 'Select_range_check', 'Handler_read_rnd_next', 'Handler_read_key', 'Slow_queries', 'Questions', 'Uptime')",
-        "look_for": "Handler_read_rnd_next much bigger than Handler_read_key, and a growing Select_full_join = tables read from start to end"
+        "look_for": "Handler_read_rnd_next much bigger than Handler_read_key, and a growing Select_full_join = tables read from start to end",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, seq_scan, seq_tup_read, idx_scan, n_live_tup FROM pg_stat_user_tables ORDER BY seq_tup_read DESC LIMIT 20",
-        "look_for": "big tables (n_live_tup) with a high seq_tup_read and few idx_scan = read from start to end again and again"
+        "look_for": "big tables (n_live_tup) with a high seq_tup_read and few idx_scan = read from start to end again and again",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT c.conrelid::regclass AS table_name, a.attname AS column_name FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1] WHERE c.contype = 'f' AND NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.conrelid AND i.indkey[0] = c.conkey[1]) LIMIT 50",
-        "look_for": "foreign-key columns that no index starts with (PostgreSQL does not index them automatically)"
+        "look_for": "foreign-key columns that no index starts with (PostgreSQL does not index them automatically)",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT tablename, indexname, indexdef FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY tablename, indexname",
-        "look_for": "whether an index covers the WHERE column(s) followed by the ORDER BY column"
+        "look_for": "whether an index covers the WHERE column(s) followed by the ORDER BY column",
+        "id": "check_7"
       }
     ],
     "causes": [
       {
         "id": "no_index",
         "title_en": "No index starts with the column(s) in WHERE / JOIN",
-        "title_hi": "WHERE / JOIN ke column(s) se shuru hone wala koi index nahi"
+        "title_hi": "WHERE / JOIN ke column(s) se shuru hone wala koi index nahi",
+        "signals": [
+          {
+            "check": "check_1",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} tables show reads without an index"
+          },
+          {
+            "check": "check_2",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} tables have no secondary index"
+          },
+          {
+            "check": "check_3",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} link columns have no leading index"
+          },
+          {
+            "check": "check_5",
+            "column": "seq_tup_read",
+            "aggregate": "max",
+            "op": ">",
+            "value": 10000,
+            "evidence": "A table has {value} rows read by sequential scans"
+          },
+          {
+            "check": "check_6",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} foreign-key columns have no leading index"
+          }
+        ],
+        "minimum_signals": 1
       },
       {
         "id": "function_on_column",
@@ -6256,27 +6660,32 @@
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_NAME, TABLE_ROWS AS estimated_rows FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_ROWS DESC LIMIT 20",
-        "look_for": "a quick row estimate that needs no full count (InnoDB numbers are approximate)"
+        "look_for": "a quick row estimate that needs no full count (InnoDB numbers are approximate)",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_NAME, TABLE_ROWS, ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 1) AS size_mb, ROUND(INDEX_LENGTH / 1024 / 1024, 1) AS index_mb FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY DATA_LENGTH + INDEX_LENGTH DESC LIMIT 20",
-        "look_for": "which tables are big; a log/session table that grew huge is a common cause"
+        "look_for": "which tables are big; a log/session table that grew huge is a common cause",
+        "id": "check_2"
       },
       {
         "engine": "postgres",
         "sql": "SELECT c.relname, c.reltuples::bigint AS estimated_rows FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema') ORDER BY c.reltuples DESC LIMIT 20",
-        "look_for": "the planner's row estimate: instant, close enough for a dashboard number"
+        "look_for": "the planner's row estimate: instant, close enough for a dashboard number",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, n_live_tup, n_dead_tup, last_vacuum, last_autovacuum FROM pg_stat_user_tables ORDER BY n_dead_tup DESC LIMIT 20",
-        "look_for": "many dead rows or no recent vacuum = count(*) cannot use an index-only scan and reads more pages"
+        "look_for": "many dead rows or no recent vacuum = count(*) cannot use an index-only scan and reads more pages",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, n_live_tup, n_dead_tup, pg_size_pretty(pg_total_relation_size(relid)) AS total_size FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 20",
-        "look_for": "which tables are big, and many dead rows (n_dead_tup) = bloat"
+        "look_for": "which tables are big, and many dead rows (n_dead_tup) = bloat",
+        "id": "check_5"
       }
     ],
     "causes": [
@@ -6379,32 +6788,38 @@
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME, INDEX_TYPE FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND INDEX_TYPE = 'FULLTEXT'",
-        "look_for": "no FULLTEXT index on the text columns people search = every search reads every row"
+        "look_for": "no FULLTEXT index on the text columns people search = every search reads every row",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT c.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, t.TABLE_ROWS FROM information_schema.COLUMNS c JOIN information_schema.TABLES t ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME WHERE c.TABLE_SCHEMA = DATABASE() AND c.DATA_TYPE IN ('varchar', 'text', 'mediumtext', 'longtext') ORDER BY t.TABLE_ROWS DESC LIMIT 30",
-        "look_for": "the text columns of the biggest tables: candidates for a FULLTEXT index"
+        "look_for": "the text columns of the biggest tables: candidates for a FULLTEXT index",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_NAME, TABLE_ROWS, ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 1) AS size_mb, ROUND(INDEX_LENGTH / 1024 / 1024, 1) AS index_mb FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY DATA_LENGTH + INDEX_LENGTH DESC LIMIT 20",
-        "look_for": "which tables are big; a log/session table that grew huge is a common cause"
+        "look_for": "which tables are big; a log/session table that grew huge is a common cause",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT tablename, indexname, indexdef FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog', 'information_schema') AND (indexdef ILIKE '%gin_trgm_ops%' OR indexdef ILIKE '%gist_trgm_ops%' OR indexdef ILIKE '%to_tsvector%' OR indexdef ILIKE '%text_pattern_ops%')",
-        "look_for": "no trigram / full-text index = LIKE '%word%' and ILIKE read the whole table"
+        "look_for": "no trigram / full-text index = LIKE '%word%' and ILIKE read the whole table",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT extname, extversion FROM pg_extension WHERE extname IN ('pg_stat_statements', 'pg_trgm', 'auto_explain')",
-        "look_for": "pg_stat_statements missing = no per-query time totals yet; pg_trgm missing = no fast LIKE '%text%' indexes"
+        "look_for": "pg_stat_statements missing = no per-query time totals yet; pg_trgm missing = no fast LIKE '%text%' indexes",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, n_live_tup, n_dead_tup, pg_size_pretty(pg_total_relation_size(relid)) AS total_size FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 20",
-        "look_for": "which tables are big, and many dead rows (n_dead_tup) = bloat"
+        "look_for": "which tables are big, and many dead rows (n_dead_tup) = bloat",
+        "id": "check_6"
       }
     ],
     "causes": [
@@ -6501,32 +6916,38 @@
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_NAME, INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS index_columns FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() GROUP BY TABLE_NAME, INDEX_NAME ORDER BY TABLE_NAME, INDEX_NAME",
-        "look_for": "whether an index starts with the WHERE column(s) followed by the ORDER BY column"
+        "look_for": "whether an index starts with the WHERE column(s) followed by the ORDER BY column",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Created_tmp_tables', 'Created_tmp_disk_tables', 'Created_tmp_files', 'Sort_merge_passes', 'Sort_scan', 'Sort_range')",
-        "look_for": "Created_tmp_disk_tables more than about 10-25% of Created_tmp_tables, or a growing Sort_merge_passes = sorting/grouping spills to disk"
+        "look_for": "Created_tmp_disk_tables more than about 10-25% of Created_tmp_tables, or a growing Sort_merge_passes = sorting/grouping spills to disk",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT LEFT(DIGEST_TEXT, 200) AS query, COUNT_STAR AS runs, ROUND(SUM_TIMER_WAIT / 1000000000000, 2) AS total_seconds, SUM_ROWS_EXAMINED AS rows_examined, SUM_ROWS_SENT AS rows_sent, SUM_NO_INDEX_USED AS runs_without_index FROM performance_schema.events_statements_summary_by_digest ORDER BY SUM_TIMER_WAIT DESC LIMIT 15",
-        "look_for": "the few query shapes that use most of the time; rows_examined far bigger than rows_sent = missing index (empty if performance_schema is off)"
+        "look_for": "the few query shapes that use most of the time; rows_examined far bigger than rows_sent = missing index (empty if performance_schema is off)",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT tablename, indexname, indexdef FROM pg_indexes WHERE schemaname NOT IN ('pg_catalog', 'information_schema') ORDER BY tablename, indexname",
-        "look_for": "whether an index covers the WHERE column(s) followed by the ORDER BY column"
+        "look_for": "whether an index covers the WHERE column(s) followed by the ORDER BY column",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, seq_scan, seq_tup_read, idx_scan, n_live_tup FROM pg_stat_user_tables ORDER BY seq_tup_read DESC LIMIT 20",
-        "look_for": "big tables (n_live_tup) with a high seq_tup_read and few idx_scan = read from start to end again and again"
+        "look_for": "big tables (n_live_tup) with a high seq_tup_read and few idx_scan = read from start to end again and again",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT datname, blks_hit, blks_read, round(blks_hit * 100.0 / nullif(blks_hit + blks_read, 0), 2) AS cache_hit_pct, temp_files, pg_size_pretty(temp_bytes) AS temp_size FROM pg_stat_database WHERE datname = current_database()",
-        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk"
+        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk",
+        "id": "check_6"
       }
     ],
     "causes": [
@@ -6630,32 +7051,38 @@
       {
         "engine": "mysql",
         "sql": "SELECT c.TABLE_NAME, c.COLUMN_NAME FROM information_schema.COLUMNS c WHERE c.TABLE_SCHEMA = DATABASE() AND c.COLUMN_NAME LIKE '%\\_id' AND NOT EXISTS (SELECT 1 FROM information_schema.STATISTICS s WHERE s.TABLE_SCHEMA = c.TABLE_SCHEMA AND s.TABLE_NAME = c.TABLE_NAME AND s.COLUMN_NAME = c.COLUMN_NAME AND s.SEQ_IN_INDEX = 1) ORDER BY c.TABLE_NAME LIMIT 50",
-        "look_for": "link columns (customer_id, order_id ...) that no index starts with: every join or filter on them reads the whole table"
+        "look_for": "link columns (customer_id, order_id ...) that no index starts with: every join or filter on them reads the whole table",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Select_full_join', 'Select_full_range_join', 'Select_range_check', 'Created_tmp_disk_tables', 'Handler_read_rnd_next')",
-        "look_for": "Select_full_join above 0 and growing = joins with no usable index on the joined table"
+        "look_for": "Select_full_join above 0 and growing = joins with no usable index on the joined table",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT a.TABLE_NAME, a.COLUMN_NAME, a.COLUMN_TYPE, a.CHARACTER_SET_NAME, a.COLLATION_NAME FROM information_schema.COLUMNS a WHERE a.TABLE_SCHEMA = DATABASE() AND (a.COLUMN_NAME = 'id' OR a.COLUMN_NAME LIKE '%\\_id') ORDER BY a.COLUMN_NAME, a.TABLE_NAME LIMIT 100",
-        "look_for": "a link column whose type or collation differs from the id it points to (INT vs VARCHAR, utf8 vs utf8mb4): the index cannot be used in the join"
+        "look_for": "a link column whose type or collation differs from the id it points to (INT vs VARCHAR, utf8 vs utf8mb4): the index cannot be used in the join",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT c.conrelid::regclass AS table_name, a.attname AS column_name FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1] WHERE c.contype = 'f' AND NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.conrelid AND i.indkey[0] = c.conkey[1]) LIMIT 50",
-        "look_for": "foreign-key columns that no index starts with (PostgreSQL does not index them automatically)"
+        "look_for": "foreign-key columns that no index starts with (PostgreSQL does not index them automatically)",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT table_name, column_name, data_type FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog', 'information_schema') AND (column_name = 'id' OR column_name LIKE '%\\_id') ORDER BY column_name, table_name LIMIT 100",
-        "look_for": "a link column of a different type than the id it points to (text vs integer, bigint vs integer)"
+        "look_for": "a link column of a different type than the id it points to (text vs integer, bigint vs integer)",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('work_mem', 'hash_mem_multiplier', 'temp_file_limit', 'log_temp_files', 'temp_tablespaces')",
-        "look_for": "work_mem is per sort/hash step: too small = sorts written to temp files"
+        "look_for": "work_mem is per sort/hash step: too small = sorts written to temp files",
+        "id": "check_6"
       }
     ],
     "causes": [
@@ -6757,32 +7184,38 @@
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Created_tmp_tables', 'Created_tmp_disk_tables', 'Created_tmp_files', 'Sort_merge_passes', 'Sort_scan', 'Sort_range')",
-        "look_for": "Created_tmp_disk_tables more than about 10-25% of Created_tmp_tables, or a growing Sort_merge_passes = sorting/grouping spills to disk"
+        "look_for": "Created_tmp_disk_tables more than about 10-25% of Created_tmp_tables, or a growing Sort_merge_passes = sorting/grouping spills to disk",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('tmp_table_size', 'max_heap_table_size', 'sort_buffer_size', 'tmpdir', 'internal_tmp_mem_storage_engine', 'temptable_max_ram')",
-        "look_for": "the in-memory temporary table limit is the smaller of tmp_table_size and max_heap_table_size"
+        "look_for": "the in-memory temporary table limit is the smaller of tmp_table_size and max_heap_table_size",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT LEFT(DIGEST_TEXT, 200) AS query, COUNT_STAR AS runs, SUM_CREATED_TMP_DISK_TABLES AS tmp_disk_tables, SUM_SORT_MERGE_PASSES AS sort_merge_passes FROM performance_schema.events_statements_summary_by_digest WHERE SUM_CREATED_TMP_DISK_TABLES > 0 OR SUM_SORT_MERGE_PASSES > 0 ORDER BY SUM_CREATED_TMP_DISK_TABLES DESC LIMIT 15",
-        "look_for": "which queries make temporary tables on disk"
+        "look_for": "which queries make temporary tables on disk",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT datname, blks_hit, blks_read, round(blks_hit * 100.0 / nullif(blks_hit + blks_read, 0), 2) AS cache_hit_pct, temp_files, pg_size_pretty(temp_bytes) AS temp_size FROM pg_stat_database WHERE datname = current_database()",
-        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk"
+        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('work_mem', 'hash_mem_multiplier', 'temp_file_limit', 'log_temp_files', 'temp_tablespaces')",
-        "look_for": "work_mem is per sort/hash step: too small = sorts written to temp files"
+        "look_for": "work_mem is per sort/hash step: too small = sorts written to temp files",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('log_min_duration_statement', 'log_temp_files', 'track_io_timing', 'shared_preload_libraries')",
-        "look_for": "log_min_duration_statement = -1 means slow queries are not logged"
+        "look_for": "log_min_duration_statement = -1 means slow queries are not logged",
+        "id": "check_6"
       }
     ],
     "causes": [
@@ -6886,32 +7319,38 @@
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_buffer_pool_read_requests', 'Innodb_buffer_pool_reads', 'Innodb_buffer_pool_pages_free', 'Innodb_buffer_pool_pages_total', 'Innodb_buffer_pool_wait_free')",
-        "look_for": "Innodb_buffer_pool_reads more than about 1% of read_requests, pages_free near 0 or wait_free above 0 = the memory cache is too small"
+        "look_for": "Innodb_buffer_pool_reads more than about 1% of read_requests, pages_free near 0 or wait_free above 0 = the memory cache is too small",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('innodb_buffer_pool_size', 'innodb_buffer_pool_instances', 'key_buffer_size', 'tmp_table_size', 'max_heap_table_size', 'max_connections')",
-        "look_for": "innodb_buffer_pool_size still at the 128 MB default on a server with GBs of RAM"
+        "look_for": "innodb_buffer_pool_size still at the 128 MB default on a server with GBs of RAM",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ENGINE, COUNT(*) AS tables, ROUND(SUM(DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024) AS total_mb FROM information_schema.TABLES WHERE TABLE_TYPE = 'BASE TABLE' GROUP BY ENGINE",
-        "look_for": "how much InnoDB data there is, to compare with innodb_buffer_pool_size; MyISAM tables use key_buffer_size instead"
+        "look_for": "how much InnoDB data there is, to compare with innodb_buffer_pool_size; MyISAM tables use key_buffer_size instead",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT datname, blks_hit, blks_read, round(blks_hit * 100.0 / nullif(blks_hit + blks_read, 0), 2) AS cache_hit_pct, temp_files, pg_size_pretty(temp_bytes) AS temp_size FROM pg_stat_database WHERE datname = current_database()",
-        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk"
+        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('shared_buffers', 'effective_cache_size', 'work_mem', 'maintenance_work_mem', 'max_connections', 'random_page_cost')",
-        "look_for": "shared_buffers at the 128MB default on a big server; work_mem at 4MB with big sorts"
+        "look_for": "shared_buffers at the 128MB default on a big server; work_mem at 4MB with big sorts",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit FROM pg_statio_user_tables ORDER BY heap_blks_read + coalesce(idx_blks_read, 0) DESC LIMIT 20",
-        "look_for": "tables with many blocks read from disk (heap_blks_read) compared with blocks found in memory"
+        "look_for": "tables with many blocks read from disk (heap_blks_read) compared with blocks found in memory",
+        "id": "check_6"
       }
     ],
     "causes": [
@@ -7012,42 +7451,50 @@
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_data_reads', 'Innodb_data_writes', 'Innodb_data_fsyncs', 'Innodb_os_log_written', 'Innodb_buffer_pool_reads', 'Innodb_rows_inserted', 'Innodb_rows_updated', 'Innodb_rows_deleted', 'Uptime')",
-        "look_for": "which side is heavy: many data reads = cache too small / full scans; many writes and fsyncs = heavy write load or very safe flush settings"
+        "look_for": "which side is heavy: many data reads = cache too small / full scans; many writes and fsyncs = heavy write load or very safe flush settings",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('innodb_flush_log_at_trx_commit', 'sync_binlog', 'innodb_io_capacity', 'innodb_log_file_size', 'innodb_redo_log_capacity', 'innodb_flush_method', 'log_bin', 'general_log')",
-        "look_for": "general_log ON writes every query to disk; innodb_log_file_size/redo capacity very small causes constant flushing"
+        "look_for": "general_log ON writes every query to disk; innodb_log_file_size/redo capacity very small causes constant flushing",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Innodb_buffer_pool_read_requests', 'Innodb_buffer_pool_reads', 'Innodb_buffer_pool_pages_free', 'Innodb_buffer_pool_pages_total', 'Innodb_buffer_pool_wait_free')",
-        "look_for": "Innodb_buffer_pool_reads more than about 1% of read_requests, pages_free near 0 or wait_free above 0 = the memory cache is too small"
+        "look_for": "Innodb_buffer_pool_reads more than about 1% of read_requests, pages_free near 0 or wait_free above 0 = the memory cache is too small",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SELECT OBJECT_NAME AS table_name, COUNT_READ AS rows_read_by_full_scan FROM performance_schema.table_io_waits_summary_by_index_usage WHERE OBJECT_SCHEMA = DATABASE() AND INDEX_NAME IS NULL AND COUNT_READ > 0 ORDER BY COUNT_READ DESC LIMIT 20",
-        "look_for": "tables read mostly without any index (empty if performance_schema is off)"
+        "look_for": "tables read mostly without any index (empty if performance_schema is off)",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit FROM pg_statio_user_tables ORDER BY heap_blks_read + coalesce(idx_blks_read, 0) DESC LIMIT 20",
-        "look_for": "tables with many blocks read from disk (heap_blks_read) compared with blocks found in memory"
+        "look_for": "tables with many blocks read from disk (heap_blks_read) compared with blocks found in memory",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT buffers_clean, maxwritten_clean, buffers_alloc, stats_reset FROM pg_stat_bgwriter",
-        "look_for": "a quickly growing buffers_alloc = constant reading of new pages from disk"
+        "look_for": "a quickly growing buffers_alloc = constant reading of new pages from disk",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('checkpoint_timeout', 'max_wal_size', 'checkpoint_completion_target', 'synchronous_commit', 'wal_compression', 'log_statement')",
-        "look_for": "a small max_wal_size makes checkpoints (big disk writes) happen too often"
+        "look_for": "a small max_wal_size makes checkpoints (big disk writes) happen too often",
+        "id": "check_7"
       },
       {
         "engine": "postgres",
         "sql": "SELECT datname, blks_hit, blks_read, round(blks_hit * 100.0 / nullif(blks_hit + blks_read, 0), 2) AS cache_hit_pct, temp_files, pg_size_pretty(temp_bytes) AS temp_size FROM pg_stat_database WHERE datname = current_database()",
-        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk"
+        "look_for": "cache_hit_pct below about 99% on a busy site = memory too small for the data; many temp_files = sorts spilling to disk",
+        "id": "check_8"
       }
     ],
     "causes": [
@@ -7155,37 +7602,44 @@
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('slow_query_log', 'long_query_time', 'log_output', 'log_queries_not_using_indexes', 'slow_query_log_file')",
-        "look_for": "slow_query_log OFF = nobody is recording slow queries yet"
+        "look_for": "slow_query_log OFF = nobody is recording slow queries yet",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT start_time, query_time, rows_examined, rows_sent, LEFT(sql_text, 200) AS query FROM mysql.slow_log ORDER BY query_time DESC LIMIT 20",
-        "look_for": "the slowest recent queries (only filled when slow_query_log is ON and log_output includes TABLE)"
+        "look_for": "the slowest recent queries (only filled when slow_query_log is ON and log_output includes TABLE)",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT LEFT(DIGEST_TEXT, 200) AS query, COUNT_STAR AS runs, ROUND(SUM_TIMER_WAIT / 1000000000000, 2) AS total_seconds, SUM_ROWS_EXAMINED AS rows_examined, SUM_ROWS_SENT AS rows_sent, SUM_NO_INDEX_USED AS runs_without_index FROM performance_schema.events_statements_summary_by_digest ORDER BY SUM_TIMER_WAIT DESC LIMIT 15",
-        "look_for": "the few query shapes that use most of the time; rows_examined far bigger than rows_sent = missing index (empty if performance_schema is off)"
+        "look_for": "the few query shapes that use most of the time; rows_examined far bigger than rows_sent = missing index (empty if performance_schema is off)",
+        "id": "check_3"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_running', 'Threads_connected', 'Questions', 'Com_select', 'Slow_queries', 'Uptime')",
-        "look_for": "Threads_running far above the number of CPU cores = queries queueing for CPU"
+        "look_for": "Threads_running far above the number of CPU cores = queries queueing for CPU",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('log_min_duration_statement', 'log_temp_files', 'track_io_timing', 'shared_preload_libraries')",
-        "look_for": "log_min_duration_statement = -1 means slow queries are not logged"
+        "look_for": "log_min_duration_statement = -1 means slow queries are not logged",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT extname, extversion FROM pg_extension WHERE extname IN ('pg_stat_statements', 'pg_trgm', 'auto_explain')",
-        "look_for": "pg_stat_statements missing = no per-query time totals yet; pg_trgm missing = no fast LIKE '%text%' indexes"
+        "look_for": "pg_stat_statements missing = no per-query time totals yet; pg_trgm missing = no fast LIKE '%text%' indexes",
+        "id": "check_6"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting FROM pg_settings WHERE name IN ('pg_stat_statements.track', 'pg_stat_statements.max', 'compute_query_id')",
-        "look_for": "rows here only when pg_stat_statements is loaded; then SELECT query, calls, total_exec_time FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 10 shows the heaviest queries"
+        "look_for": "rows here only when pg_stat_statements is loaded; then SELECT query, calls, total_exec_time FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 10 shows the heaviest queries",
+        "id": "check_7"
       }
     ],
     "causes": [
@@ -7279,39 +7733,64 @@
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME, CARDINALITY FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND SEQ_IN_INDEX = 1 ORDER BY CARDINALITY LIMIT 30",
-        "look_for": "CARDINALITY empty or 0 on an index of a big table = statistics are missing or stale"
+        "look_for": "CARDINALITY empty or 0 on an index of a big table = statistics are missing or stale",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('innodb_stats_persistent', 'innodb_stats_auto_recalc', 'innodb_stats_persistent_sample_pages', 'use_stat_tables', 'optimizer_switch')",
-        "look_for": "innodb_stats_auto_recalc OFF = numbers never refresh by themselves"
+        "look_for": "innodb_stats_auto_recalc OFF = numbers never refresh by themselves",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT TABLE_NAME, TABLE_ROWS, ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 1) AS size_mb, ROUND(INDEX_LENGTH / 1024 / 1024, 1) AS index_mb FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY DATA_LENGTH + INDEX_LENGTH DESC LIMIT 20",
-        "look_for": "which tables are big; a log/session table that grew huge is a common cause"
+        "look_for": "which tables are big; a log/session table that grew huge is a common cause",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, n_live_tup, n_mod_since_analyze, last_analyze, last_autoanalyze FROM pg_stat_user_tables ORDER BY n_mod_since_analyze DESC LIMIT 20",
-        "look_for": "many rows changed since the last analyze, or last_autoanalyze empty on a big table = the planner works from old numbers"
+        "look_for": "many rows changed since the last analyze, or last_autoanalyze empty on a big table = the planner works from old numbers",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT relname, n_live_tup, n_dead_tup, last_vacuum, last_autovacuum FROM pg_stat_user_tables ORDER BY n_dead_tup DESC LIMIT 20",
-        "look_for": "many dead rows or no recent vacuum = count(*) cannot use an index-only scan and reads more pages"
+        "look_for": "many dead rows or no recent vacuum = count(*) cannot use an index-only scan and reads more pages",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting, unit FROM pg_settings WHERE name IN ('shared_buffers', 'effective_cache_size', 'work_mem', 'maintenance_work_mem', 'max_connections', 'random_page_cost')",
-        "look_for": "shared_buffers at the 128MB default on a big server; work_mem at 4MB with big sorts"
+        "look_for": "shared_buffers at the 128MB default on a big server; work_mem at 4MB with big sorts",
+        "id": "check_6"
       }
     ],
     "causes": [
       {
         "id": "stale_stats",
         "title_en": "Table statistics are old after big inserts/deletes, so the planner misjudges row counts",
-        "title_hi": "Bade insert/delete ke baad table statistics purane hain, planner rows ka galat andaza lagata hai"
+        "title_hi": "Bade insert/delete ke baad table statistics purane hain, planner rows ka galat andaza lagata hai",
+        "signals": [
+          {
+            "check": "check_1",
+            "column": "CARDINALITY",
+            "aggregate": "min",
+            "op": "==",
+            "value": 0,
+            "evidence": "An index has cardinality {value}, so its statistics provide no useful estimate"
+          },
+          {
+            "check": "check_4",
+            "column": "n_mod_since_analyze",
+            "aggregate": "max",
+            "op": ">",
+            "value": 1000,
+            "evidence": "{value} rows changed since the last statistics refresh"
+          }
+        ],
+        "minimum_signals": 1
       },
       {
         "id": "skewed_data",
@@ -7321,7 +7800,18 @@
       {
         "id": "autovacuum_behind",
         "title_en": "PostgreSQL autovacuum/autoanalyze is not keeping up with a busy table",
-        "title_hi": "PostgreSQL autovacuum/autoanalyze busy table ke saath nahi chal pa raha"
+        "title_hi": "PostgreSQL autovacuum/autoanalyze busy table ke saath nahi chal pa raha",
+        "signals": [
+          {
+            "check": "check_5",
+            "column": "n_dead_tup",
+            "aggregate": "max",
+            "op": ">",
+            "value": 1000,
+            "evidence": "{value} dead rows remain on a table"
+          }
+        ],
+        "minimum_signals": 1
       },
       {
         "id": "upgrade",
@@ -7410,32 +7900,38 @@
       {
         "engine": "mysql",
         "sql": "SHOW GLOBAL VARIABLES WHERE Variable_name IN ('max_execution_time', 'max_statement_time', 'wait_timeout', 'net_read_timeout', 'net_write_timeout', 'innodb_lock_wait_timeout')",
-        "look_for": "max_execution_time (MySQL, ms) or max_statement_time (MariaDB, seconds) above 0 = long SELECTs are stopped on purpose"
+        "look_for": "max_execution_time (MySQL, ms) or max_statement_time (MariaDB, seconds) above 0 = long SELECTs are stopped on purpose",
+        "id": "check_1"
       },
       {
         "engine": "mysql",
         "sql": "SELECT start_time, query_time, rows_examined, rows_sent, LEFT(sql_text, 200) AS query FROM mysql.slow_log ORDER BY query_time DESC LIMIT 20",
-        "look_for": "the slowest recent queries (only filled when slow_query_log is ON and log_output includes TABLE)"
+        "look_for": "the slowest recent queries (only filled when slow_query_log is ON and log_output includes TABLE)",
+        "id": "check_2"
       },
       {
         "engine": "mysql",
         "sql": "SELECT ID, USER, DB, COMMAND, TIME, STATE, LEFT(INFO, 200) AS query FROM information_schema.PROCESSLIST WHERE COMMAND <> 'Sleep' ORDER BY TIME DESC LIMIT 20",
-        "look_for": "queries running for many seconds, or many copies of the same query at once"
+        "look_for": "queries running for many seconds, or many copies of the same query at once",
+        "id": "check_3"
       },
       {
         "engine": "postgres",
         "sql": "SELECT name, setting, unit, source FROM pg_settings WHERE name IN ('statement_timeout', 'lock_timeout', 'idle_in_transaction_session_timeout', 'transaction_timeout')",
-        "look_for": "statement_timeout above 0 stops long queries; source shows where it was set (database, user, config file)"
+        "look_for": "statement_timeout above 0 stops long queries; source shows where it was set (database, user, config file)",
+        "id": "check_4"
       },
       {
         "engine": "postgres",
         "sql": "SELECT r.rolname, d.datname, s.setconfig FROM pg_db_role_setting s LEFT JOIN pg_roles r ON r.oid = s.setrole LEFT JOIN pg_database d ON d.oid = s.setdatabase",
-        "look_for": "statement_timeout set for one user or one database only"
+        "look_for": "statement_timeout set for one user or one database only",
+        "id": "check_5"
       },
       {
         "engine": "postgres",
         "sql": "SELECT pid, state, now() - query_start AS running_for, wait_event_type, wait_event, left(query, 200) AS query FROM pg_stat_activity WHERE state <> 'idle' AND pid <> pg_backend_pid() ORDER BY query_start LIMIT 20",
-        "look_for": "queries running for a long time, or many copies of the same query"
+        "look_for": "queries running for a long time, or many copies of the same query",
+        "id": "check_6"
       }
     ],
     "causes": [

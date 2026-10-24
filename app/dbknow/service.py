@@ -21,6 +21,17 @@ def checks_for(issue: dict, db_type: str) -> list[dict]:
     return [d for d in issue["diagnose"] if d.get("engine") in engines and d.get("sql")]
 
 
+def diagnose_results(issue_id: str, db_type: str, raw_results: list[dict]) -> dict | None:
+    """Interpret connector results on the app side; connectors remain small and read-only."""
+    from app.dbknow.diagnosis import evaluate
+
+    issue = playbook(issue_id)
+    if not issue:
+        return None
+    checks = checks_for(issue, db_type)
+    return evaluate(issue, checks, raw_results)
+
+
 def start_checks(db, connector, issue_id: str):
     issue = playbook(issue_id)
     if issue is None:
@@ -28,7 +39,8 @@ def start_checks(db, connector, issue_id: str):
     checks = checks_for(issue, connector.db_type)
     if not checks:
         raise dbagent.DatabaseError("No automatic checks for this database type yet; the fixes below still apply")
-    job = dbagent.queue(db, connector, "checks", {"queries": [c["sql"] for c in checks]}, summary=f"Checks · {issue['title_en']}")
+    job = dbagent.queue(db, connector, "checks", {"queries": [c["sql"] for c in checks], "issue_id": issue_id,
+                                                   "db_type": connector.db_type}, summary=f"Checks · {issue['title_en']}")
     return job, issue, checks
 
 

@@ -456,7 +456,10 @@
       "breach hua hai turant kya kadam uthayein",
       "database pe hamla ho gaya pehla kadam batao",
       "हमला हो गया अब पहला कदम क्या है",
-      "हैकर ने हमला किया है तुरंत क्या करना है"
+      "हैकर ने हमला किया है तुरंत क्या करना है",
+      "database breach first response steps",
+      "hacker entered database what do we do first",
+      "immediate containment after database break in"
     ],
     "diagnose": [
       {
@@ -5431,7 +5434,10 @@
       "app can't find the database server name",
       "database server ka hostname nahi mil raha",
       "ऐप को डेटाबेस सर्वर का होस्टनेम नहीं मिलता",
-      "server name of the database not found"
+      "server name of the database not found",
+      "डेटाबेस का होस्ट नाम नहीं मिल रहा",
+      "डेटाबेस का नाम नहीं मिल रहा और सर्वर तक नहीं पहुंचता",
+      "database hostname cannot be found"
     ],
     "diagnose": [
       {
@@ -7996,5 +8002,4287 @@
       "badi sales report beech mein hi time khatam bol ke ruk jaati hai",
       "बड़ी सेल्स रिपोर्ट बीच में ही समय खत्म बोल कर रुक जाती है"
     ]
+  },
+  {
+    "id": "schema-table-without-primary-key",
+    "title_en": "Tables without a primary key",
+    "title_hi": "Primary key missing",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "schema_design",
+    "symptoms": [
+      "Tables without a primary key",
+      "Tables without a primary key in my database",
+      "mere database mein primary key missing"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME FROM information_schema.TABLES t WHERE TABLE_SCHEMA=DATABASE() AND TABLE_TYPE='BASE TABLE' AND NOT EXISTS (SELECT 1 FROM information_schema.TABLE_CONSTRAINTS c WHERE c.TABLE_SCHEMA=t.TABLE_SCHEMA AND c.TABLE_NAME=t.TABLE_NAME AND CONSTRAINT_TYPE='PRIMARY KEY')",
+        "look_for": "tables without a primary key"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT relname FROM pg_stat_user_tables t WHERE NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid=t.relid AND i.indisprimary)",
+        "look_for": "tables without a primary key"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Tables without a primary key",
+        "title_hi": "Primary key missing",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html",
+    "test_phrases": [
+      "Please investigate tables without a primary key",
+      "zara check karo primary key missing",
+      "कृपया जाँच करें: tables without a primary key"
+    ],
+    "codes": []
+  },
+  {
+    "id": "schema-money-float",
+    "title_en": "Money stored as FLOAT",
+    "title_hi": "Paise FLOAT mein",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "schema_design",
+    "symptoms": [
+      "Money stored as FLOAT",
+      "Money stored as FLOAT in my database",
+      "mere database mein paise float mein"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME,COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND DATA_TYPE IN ('float','double') AND COLUMN_NAME REGEXP 'amount|price|cost|total'",
+        "look_for": "money stored as float"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public' AND data_type IN ('real','double precision') AND column_name~'(amount|price|cost|total)'",
+        "look_for": "money stored as float"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Money stored as FLOAT",
+        "title_hi": "Paise FLOAT mein",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html",
+    "test_phrases": [
+      "Please investigate money stored as float",
+      "zara check karo paise float mein",
+      "कृपया जाँच करें: money stored as float"
+    ],
+    "codes": []
+  },
+  {
+    "id": "schema-date-as-text",
+    "title_en": "Dates stored as text",
+    "title_hi": "Date text mein",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "schema_design",
+    "symptoms": [
+      "Dates stored as text",
+      "Dates stored as text in my database",
+      "mere database mein date text mein"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME,COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND DATA_TYPE IN ('char','varchar','text') AND COLUMN_NAME REGEXP 'date|time|created'",
+        "look_for": "dates stored as text"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public' AND data_type IN ('text','character varying') AND column_name~'(date|time|created)'",
+        "look_for": "dates stored as text"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Dates stored as text",
+        "title_hi": "Date text mein",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html",
+    "test_phrases": [
+      "Please investigate dates stored as text",
+      "zara check karo date text mein",
+      "कृपया जाँच करें: dates stored as text"
+    ],
+    "codes": []
+  },
+  {
+    "id": "schema-missing-foreign-keys",
+    "title_en": "Relationship columns without foreign keys",
+    "title_hi": "Foreign key missing",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "schema_design",
+    "symptoms": [
+      "Relationship columns without foreign keys",
+      "Relationship columns without foreign keys in my database",
+      "mere database mein foreign key missing"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT c.TABLE_NAME,c.COLUMN_NAME FROM information_schema.COLUMNS c WHERE c.TABLE_SCHEMA=DATABASE() AND c.COLUMN_NAME LIKE '%\\_id' AND NOT EXISTS (SELECT 1 FROM information_schema.KEY_COLUMN_USAGE k WHERE k.TABLE_SCHEMA=c.TABLE_SCHEMA AND k.TABLE_NAME=c.TABLE_NAME AND k.COLUMN_NAME=c.COLUMN_NAME AND k.REFERENCED_TABLE_NAME IS NOT NULL)",
+        "look_for": "relationship columns without foreign keys"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT table_name,column_name FROM information_schema.columns c WHERE table_schema='public' AND column_name LIKE '%\\_id' AND NOT EXISTS (SELECT 1 FROM information_schema.key_column_usage k JOIN information_schema.table_constraints t USING(constraint_catalog,constraint_schema,constraint_name) WHERE k.table_name=c.table_name AND k.column_name=c.column_name AND t.constraint_type='FOREIGN KEY')",
+        "look_for": "relationship columns without foreign keys"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Relationship columns without foreign keys",
+        "title_hi": "Foreign key missing",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html",
+    "test_phrases": [
+      "Please investigate relationship columns without foreign keys",
+      "zara check karo foreign key missing",
+      "कृपया जाँच करें: relationship columns without foreign keys"
+    ],
+    "codes": []
+  },
+  {
+    "id": "schema-mixed-character-sets",
+    "title_en": "Tables use mixed character sets",
+    "title_hi": "Character set mixed",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "charset_encoding",
+    "symptoms": [
+      "Tables use mixed character sets",
+      "Tables use mixed character sets in my database",
+      "mere database mein character set mixed"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME,TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_COLLATION NOT LIKE 'utf8mb4%'",
+        "look_for": "tables use mixed character sets"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Tables use mixed character sets",
+        "title_hi": "Character set mixed",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/charset-unicode-utf8mb4.html",
+    "test_phrases": [
+      "Please investigate tables use mixed character sets",
+      "zara check karo character set mixed",
+      "कृपया जाँच करें: tables use mixed character sets"
+    ],
+    "codes": []
+  },
+  {
+    "id": "schema-large-text-hot-table",
+    "title_en": "Large text fields in a busy table",
+    "title_hi": "Busy table mein large text",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "schema_design",
+    "symptoms": [
+      "Large text fields in a busy table",
+      "Large text fields in a busy table in my database",
+      "mere database mein busy table mein large text"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME,COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND DATA_TYPE IN ('blob','longblob','text','longtext')",
+        "look_for": "large text fields in a busy table"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public' AND data_type IN ('text','bytea')",
+        "look_for": "large text fields in a busy table"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Large text fields in a busy table",
+        "title_hi": "Busy table mein large text",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html",
+    "test_phrases": [
+      "Please investigate large text fields in a busy table",
+      "zara check karo busy table mein large text",
+      "कृपया जाँच करें: large text fields in a busy table"
+    ],
+    "codes": []
+  },
+  {
+    "id": "schema-duplicate-indexes",
+    "title_en": "Duplicate indexes waste work",
+    "title_hi": "Duplicate index",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "schema_design",
+    "symptoms": [
+      "Duplicate indexes waste work",
+      "Duplicate indexes waste work in my database",
+      "mere database mein duplicate index"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME,COUNT(DISTINCT INDEX_NAME) n FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() GROUP BY TABLE_NAME HAVING n>8",
+        "look_for": "duplicate indexes waste work"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT tablename,COUNT(*) n FROM pg_indexes WHERE schemaname='public' GROUP BY tablename HAVING COUNT(*)>8",
+        "look_for": "duplicate indexes waste work"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Duplicate indexes waste work",
+        "title_hi": "Duplicate index",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html",
+    "test_phrases": [
+      "Please investigate duplicate indexes waste work",
+      "zara check karo duplicate index",
+      "कृपया जाँच करें: duplicate indexes waste work"
+    ],
+    "codes": []
+  },
+  {
+    "id": "schema-unused-indexes",
+    "title_en": "Indexes are never used",
+    "title_hi": "Unused index",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "schema_design",
+    "symptoms": [
+      "Indexes are never used",
+      "Indexes are never used in my database",
+      "mere database mein unused index"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT OBJECT_NAME,INDEX_NAME FROM performance_schema.table_io_waits_summary_by_index_usage WHERE OBJECT_SCHEMA=DATABASE() AND INDEX_NAME IS NOT NULL AND COUNT_STAR=0",
+        "look_for": "indexes are never used"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT relname,indexrelname FROM pg_stat_user_indexes WHERE idx_scan=0",
+        "look_for": "indexes are never used"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Indexes are never used",
+        "title_hi": "Unused index",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html",
+    "test_phrases": [
+      "Please investigate indexes are never used",
+      "zara check karo unused index",
+      "कृपया जाँच करें: indexes are never used"
+    ],
+    "codes": []
+  },
+  {
+    "id": "schema-too-many-indexes",
+    "title_en": "Too many indexes slow writes",
+    "title_hi": "Bahut index",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "schema_design",
+    "symptoms": [
+      "Too many indexes slow writes",
+      "Too many indexes slow writes in my database",
+      "mere database mein bahut index",
+      "bahut saare indexes check karo",
+      "table par zarurat se zyada index",
+      "too many indexes on one table"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME,COUNT(DISTINCT INDEX_NAME) n FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() GROUP BY TABLE_NAME HAVING n>8",
+        "look_for": "too many indexes slow writes"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT tablename,COUNT(*) n FROM pg_indexes WHERE schemaname='public' GROUP BY tablename HAVING COUNT(*)>8",
+        "look_for": "too many indexes slow writes"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Too many indexes slow writes",
+        "title_hi": "Bahut index",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html",
+    "test_phrases": [
+      "Please investigate too many indexes slow writes",
+      "zara check karo bahut index",
+      "कृपया जाँच करें: too many indexes slow writes"
+    ],
+    "codes": []
+  },
+  {
+    "id": "schema-overwide-varchar",
+    "title_en": "Oversized text columns waste memory",
+    "title_hi": "Text column bahut chaudi",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "schema_design",
+    "symptoms": [
+      "Oversized text columns waste memory",
+      "Oversized text columns waste memory in my database",
+      "mere database mein text column bahut chaudi"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME,COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND DATA_TYPE IN ('blob','longblob','text','longtext')",
+        "look_for": "oversized text columns waste memory"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public' AND data_type IN ('text','bytea')",
+        "look_for": "oversized text columns waste memory"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Oversized text columns waste memory",
+        "title_hi": "Text column bahut chaudi",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html",
+    "test_phrases": [
+      "Please investigate oversized text columns waste memory",
+      "zara check karo text column bahut chaudi",
+      "कृपया जाँच करें: oversized text columns waste memory"
+    ],
+    "codes": []
+  },
+  {
+    "id": "schema-nullable-required-fields",
+    "title_en": "Required fields allow NULL",
+    "title_hi": "Zaroori field NULL",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "data_quality",
+    "symptoms": [
+      "Required fields allow NULL",
+      "Required fields allow NULL in my database",
+      "mere database mein zaroori field null"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME,COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND IS_NULLABLE='YES' AND COLUMN_NAME REGEXP 'email|amount|status'",
+        "look_for": "required fields allow null"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='public' AND is_nullable='YES' AND column_name~'(email|amount|status)'",
+        "look_for": "required fields allow null"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Required fields allow NULL",
+        "title_hi": "Zaroori field NULL",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/ddl-constraints.html",
+    "test_phrases": [
+      "Please investigate required fields allow null",
+      "zara check karo zaroori field null",
+      "कृपया जाँच करें: required fields allow null"
+    ],
+    "codes": []
+  },
+  {
+    "id": "schema-case-sensitive-names",
+    "title_en": "Quoted mixed-case names cause surprises",
+    "title_hi": "Mixed case naam",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "schema_design",
+    "symptoms": [
+      "Quoted mixed-case names cause surprises",
+      "Quoted mixed-case names cause surprises in my database",
+      "mere database mein mixed case naam"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND BINARY TABLE_NAME<>LOWER(TABLE_NAME)",
+        "look_for": "quoted mixed-case names cause surprises"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name<>lower(table_name)",
+        "look_for": "quoted mixed-case names cause surprises"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Quoted mixed-case names cause surprises",
+        "title_hi": "Mixed case naam",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html",
+    "test_phrases": [
+      "Please investigate quoted mixed-case names cause surprises",
+      "zara check karo mixed case naam",
+      "कृपया जाँच करें: quoted mixed-case names cause surprises"
+    ],
+    "codes": []
+  },
+  {
+    "id": "maintenance-stale-statistics",
+    "title_en": "Table statistics are stale",
+    "title_hi": "Statistics purane",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "Table statistics are stale",
+      "Table statistics are stale in my database",
+      "mere database mein statistics purane"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME,INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND CARDINALITY=0",
+        "look_for": "table statistics are stale"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT relname FROM pg_stat_user_tables WHERE n_mod_since_analyze>1000",
+        "look_for": "table statistics are stale"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Table statistics are stale",
+        "title_hi": "Statistics purane",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/monitoring-stats.html",
+    "test_phrases": [
+      "Please investigate table statistics are stale",
+      "zara check karo statistics purane",
+      "कृपया जाँच करें: table statistics are stale"
+    ],
+    "codes": []
+  },
+  {
+    "id": "maintenance-table-bloat",
+    "title_en": "Table bloat wastes disk",
+    "title_hi": "Table bloat",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "storage_space",
+    "symptoms": [
+      "Table bloat wastes disk",
+      "Table bloat wastes disk in my database",
+      "mere database mein table bloat"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND DATA_FREE>104857600",
+        "look_for": "table bloat wastes disk"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT relname FROM pg_stat_user_tables WHERE n_dead_tup>10000",
+        "look_for": "table bloat wastes disk"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Table bloat wastes disk",
+        "title_hi": "Table bloat",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/routine-vacuuming.html",
+    "test_phrases": [
+      "Please investigate table bloat wastes disk",
+      "zara check karo table bloat",
+      "कृपया जाँच करें: table bloat wastes disk"
+    ],
+    "codes": []
+  },
+  {
+    "id": "maintenance-index-bloat",
+    "title_en": "Index bloat makes lookups larger",
+    "title_hi": "Index bloat",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "Index bloat makes lookups larger",
+      "Index bloat makes lookups larger in my database",
+      "mere database mein index bloat"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND INDEX_LENGTH>DATA_LENGTH*2",
+        "look_for": "index bloat makes lookups larger"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT relname FROM pg_stat_user_tables WHERE pg_indexes_size(relid)>pg_table_size(relid)*2",
+        "look_for": "index bloat makes lookups larger"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Index bloat makes lookups larger",
+        "title_hi": "Index bloat",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/monitoring-stats.html",
+    "test_phrases": [
+      "Please investigate index bloat makes lookups larger",
+      "zara check karo index bloat",
+      "कृपया जाँच करें: index bloat makes lookups larger"
+    ],
+    "codes": []
+  },
+  {
+    "id": "maintenance-autovacuum-behind",
+    "title_en": "Autovacuum is not keeping up",
+    "title_hi": "Autovacuum peeche",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "performance",
+    "symptoms": [
+      "Autovacuum is not keeping up",
+      "Autovacuum is not keeping up in my database",
+      "mere database mein autovacuum peeche"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND DATA_FREE>104857600",
+        "look_for": "autovacuum is not keeping up"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT relname FROM pg_stat_user_tables WHERE n_dead_tup>10000",
+        "look_for": "autovacuum is not keeping up"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Autovacuum is not keeping up",
+        "title_hi": "Autovacuum peeche",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/monitoring-stats.html",
+    "test_phrases": [
+      "Please investigate autovacuum is not keeping up",
+      "zara check karo autovacuum peeche",
+      "कृपया जाँच करें: autovacuum is not keeping up"
+    ],
+    "codes": []
+  },
+  {
+    "id": "maintenance-xid-wraparound",
+    "title_en": "Transaction ID wraparound is approaching",
+    "title_hi": "XID wraparound paas",
+    "engines": [
+      "postgres"
+    ],
+    "category": "crash_recovery",
+    "symptoms": [
+      "Transaction ID wraparound is approaching",
+      "Transaction ID wraparound is approaching in my database",
+      "mere database mein xid wraparound paas"
+    ],
+    "diagnose": [
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT datname FROM pg_database WHERE age(datfrozenxid)>1000000000",
+        "look_for": "transaction id wraparound is approaching"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Transaction ID wraparound is approaching",
+        "title_hi": "XID wraparound paas",
+        "signals": [
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/routine-vacuuming.html",
+    "test_phrases": [
+      "Please investigate transaction id wraparound is approaching",
+      "zara check karo xid wraparound paas",
+      "कृपया जाँच करें: transaction id wraparound is approaching"
+    ],
+    "codes": []
+  },
+  {
+    "id": "maintenance-table-corruption",
+    "title_en": "Table corruption needs safe recovery",
+    "title_hi": "Table corruption",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "crash_recovery",
+    "symptoms": [
+      "Table corruption needs safe recovery",
+      "Table corruption needs safe recovery in my database",
+      "mere database mein table corruption"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT 0 AS problem WHERE 1=0",
+        "look_for": "table corruption needs safe recovery"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT 0 AS problem WHERE false",
+        "look_for": "table corruption needs safe recovery"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Table corruption needs safe recovery",
+        "title_hi": "Table corruption",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/routine-vacuuming.html",
+    "test_phrases": [
+      "Please investigate table corruption needs safe recovery",
+      "zara check karo table corruption",
+      "कृपया जाँच करें: table corruption needs safe recovery"
+    ],
+    "codes": []
+  },
+  {
+    "id": "maintenance-index-invalid",
+    "title_en": "An index is invalid",
+    "title_hi": "Index invalid",
+    "engines": [
+      "postgres"
+    ],
+    "category": "crash_recovery",
+    "symptoms": [
+      "An index is invalid",
+      "An index is invalid in my database",
+      "mere database mein index invalid"
+    ],
+    "diagnose": [
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT c.relname FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE NOT i.indisvalid",
+        "look_for": "an index is invalid"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "An index is invalid",
+        "title_hi": "Index invalid",
+        "signals": [
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/routine-vacuuming.html",
+    "test_phrases": [
+      "Please investigate an index is invalid",
+      "zara check karo index invalid",
+      "कृपया जाँच करें: an index is invalid"
+    ],
+    "codes": []
+  },
+  {
+    "id": "maintenance-vacuum-disabled",
+    "title_en": "Automatic maintenance is disabled",
+    "title_hi": "Maintenance band",
+    "engines": [
+      "postgres"
+    ],
+    "category": "config_tuning",
+    "symptoms": [
+      "Automatic maintenance is disabled",
+      "Automatic maintenance is disabled in my database",
+      "mere database mein maintenance band"
+    ],
+    "diagnose": [
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT name FROM pg_settings WHERE name='autovacuum' AND setting='off'",
+        "look_for": "automatic maintenance is disabled"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Automatic maintenance is disabled",
+        "title_hi": "Maintenance band",
+        "signals": [
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config.html",
+    "test_phrases": [
+      "Please investigate automatic maintenance is disabled",
+      "zara check karo maintenance band",
+      "कृपया जाँच करें: automatic maintenance is disabled"
+    ],
+    "codes": []
+  },
+  {
+    "id": "backup-no-recent-copy",
+    "title_en": "No recent database backup is known",
+    "title_hi": "Recent backup nahi",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "backup_restore",
+    "symptoms": [
+      "No recent database backup is known",
+      "No recent database backup is known in my database",
+      "mere database mein recent backup nahi"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT 0 AS problem WHERE 1=0",
+        "look_for": "no recent database backup is known"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT 0 AS problem WHERE false",
+        "look_for": "no recent database backup is known"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "No recent database backup is known",
+        "title_hi": "Recent backup nahi",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/backup.html",
+    "test_phrases": [
+      "Please investigate no recent database backup is known",
+      "zara check karo recent backup nahi",
+      "कृपया जाँच करें: no recent database backup is known"
+    ],
+    "codes": []
+  },
+  {
+    "id": "backup-dump-permission-denied",
+    "title_en": "Database dump lacks permissions",
+    "title_hi": "Dump permission nahi",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "backup_restore",
+    "symptoms": [
+      "Database dump lacks permissions",
+      "Database dump lacks permissions in my database",
+      "mere database mein dump permission nahi"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE,PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE PRIVILEGE_TYPE IN ('FILE','SUPER') OR IS_GRANTABLE='YES'",
+        "look_for": "database dump lacks permissions"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT rolname FROM pg_roles WHERE rolsuper OR rolcreaterole OR rolbypassrls",
+        "look_for": "database dump lacks permissions"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Database dump lacks permissions",
+        "title_hi": "Dump permission nahi",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/backup.html",
+    "test_phrases": [
+      "Please investigate database dump lacks permissions",
+      "zara check karo dump permission nahi",
+      "कृपया जाँच करें: database dump lacks permissions"
+    ],
+    "codes": []
+  },
+  {
+    "id": "backup-dump-packet-too-large",
+    "title_en": "Dump fails on a large packet",
+    "title_hi": "Dump packet bada",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "backup_restore",
+    "symptoms": [
+      "Dump fails on a large packet",
+      "Dump fails on a large packet in my database",
+      "mere database mein dump packet bada"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT @@max_allowed_packet AS bytes WHERE @@max_allowed_packet<16777216",
+        "look_for": "dump fails on a large packet"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Dump fails on a large packet",
+        "title_hi": "Dump packet bada",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/backup.html",
+    "test_phrases": [
+      "Please investigate dump fails on a large packet",
+      "zara check karo dump packet bada",
+      "कृपया जाँच करें: dump fails on a large packet"
+    ],
+    "codes": []
+  },
+  {
+    "id": "backup-dump-locks-writes",
+    "title_en": "Backup dump blocks writes",
+    "title_hi": "Dump writes rokta",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "backup_restore",
+    "symptoms": [
+      "Backup dump blocks writes",
+      "Backup dump blocks writes in my database",
+      "mere database mein dump writes rokta"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT 0 AS problem WHERE 1=0",
+        "look_for": "backup dump blocks writes"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT 0 AS problem WHERE false",
+        "look_for": "backup dump blocks writes"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Backup dump blocks writes",
+        "title_hi": "Dump writes rokta",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/backup.html",
+    "test_phrases": [
+      "Please investigate backup dump blocks writes",
+      "zara check karo dump writes rokta",
+      "कृपया जाँच करें: backup dump blocks writes"
+    ],
+    "codes": []
+  },
+  {
+    "id": "restore-character-set-mismatch",
+    "title_en": "Restore uses the wrong character set",
+    "title_hi": "Restore charset galat",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "backup_restore",
+    "symptoms": [
+      "Restore uses the wrong character set",
+      "Restore uses the wrong character set in my database",
+      "mere database mein restore charset galat"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT TABLE_NAME,TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_COLLATION NOT LIKE 'utf8mb4%'",
+        "look_for": "restore uses the wrong character set"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Restore uses the wrong character set",
+        "title_hi": "Restore charset galat",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/backup.html",
+    "test_phrases": [
+      "Please investigate restore uses the wrong character set",
+      "zara check karo restore charset galat",
+      "कृपया जाँच करें: restore uses the wrong character set"
+    ],
+    "codes": []
+  },
+  {
+    "id": "restore-definer-missing",
+    "title_en": "Restore references a missing definer",
+    "title_hi": "Restore definer missing",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "backup_restore",
+    "symptoms": [
+      "Restore references a missing definer",
+      "Restore references a missing definer in my database",
+      "mere database mein restore definer missing"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT 0 AS problem WHERE 1=0",
+        "look_for": "restore references a missing definer"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT 0 AS problem WHERE false",
+        "look_for": "restore references a missing definer"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Restore references a missing definer",
+        "title_hi": "Restore definer missing",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/backup.html",
+    "test_phrases": [
+      "Please investigate restore references a missing definer",
+      "zara check karo restore definer missing",
+      "कृपया जाँच करें: restore references a missing definer"
+    ],
+    "codes": []
+  },
+  {
+    "id": "restore-foreign-key-order",
+    "title_en": "Restore loads children before parents",
+    "title_hi": "Restore order galat",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "backup_restore",
+    "symptoms": [
+      "Restore loads children before parents",
+      "Restore loads children before parents in my database",
+      "mere database mein restore order galat"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT c.TABLE_NAME,c.COLUMN_NAME FROM information_schema.COLUMNS c WHERE c.TABLE_SCHEMA=DATABASE() AND c.COLUMN_NAME LIKE '%\\_id' AND NOT EXISTS (SELECT 1 FROM information_schema.KEY_COLUMN_USAGE k WHERE k.TABLE_SCHEMA=c.TABLE_SCHEMA AND k.TABLE_NAME=c.TABLE_NAME AND k.COLUMN_NAME=c.COLUMN_NAME AND k.REFERENCED_TABLE_NAME IS NOT NULL)",
+        "look_for": "restore loads children before parents"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT table_name,column_name FROM information_schema.columns c WHERE table_schema='public' AND column_name LIKE '%\\_id' AND NOT EXISTS (SELECT 1 FROM information_schema.key_column_usage k JOIN information_schema.table_constraints t USING(constraint_catalog,constraint_schema,constraint_name) WHERE k.table_name=c.table_name AND k.column_name=c.column_name AND t.constraint_type='FOREIGN KEY')",
+        "look_for": "restore loads children before parents"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Restore loads children before parents",
+        "title_hi": "Restore order galat",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/backup.html",
+    "test_phrases": [
+      "Please investigate restore loads children before parents",
+      "zara check karo restore order galat",
+      "कृपया जाँच करें: restore loads children before parents"
+    ],
+    "codes": []
+  },
+  {
+    "id": "backup-point-in-time-not-ready",
+    "title_en": "Point-in-time recovery is not configured",
+    "title_hi": "PITR ready nahi",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "backup_restore",
+    "symptoms": [
+      "Point-in-time recovery is not configured",
+      "Point-in-time recovery is not configured in my database",
+      "mere database mein pitr ready nahi"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT @@log_bin AS enabled WHERE @@log_bin=0",
+        "look_for": "point-in-time recovery is not configured"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT name FROM pg_settings WHERE name='archive_mode' AND setting='off'",
+        "look_for": "point-in-time recovery is not configured"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Point-in-time recovery is not configured",
+        "title_hi": "PITR ready nahi",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/backup.html",
+    "test_phrases": [
+      "Please investigate point-in-time recovery is not configured",
+      "zara check karo pitr ready nahi",
+      "कृपया जाँच करें: point-in-time recovery is not configured"
+    ],
+    "codes": []
+  },
+  {
+    "id": "replication-lag-growing",
+    "title_en": "Replication lag keeps growing",
+    "title_hi": "Replication lag badh raha",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "replication",
+    "symptoms": [
+      "Replication lag keeps growing",
+      "Replication lag keeps growing in my database",
+      "mere database mein replication lag badh raha"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Replica_running','Slave_running')",
+        "look_for": "replication lag keeps growing"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT application_name FROM pg_stat_replication WHERE state<>'streaming'",
+        "look_for": "replication lag keeps growing"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Replication lag keeps growing",
+        "title_hi": "Replication lag badh raha",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/replication.html",
+    "test_phrases": [
+      "Please investigate replication lag keeps growing",
+      "zara check karo replication lag badh raha",
+      "कृपया जाँच करें: replication lag keeps growing"
+    ],
+    "codes": []
+  },
+  {
+    "id": "replication-duplicate-key",
+    "title_en": "Replication stopped on a duplicate key",
+    "title_hi": "Replication duplicate key",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "replication",
+    "symptoms": [
+      "Replication stopped on a duplicate key",
+      "Replication stopped on a duplicate key in my database",
+      "mere database mein replication duplicate key"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Replica_running','Slave_running')",
+        "look_for": "replication stopped on a duplicate key"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT application_name FROM pg_stat_replication WHERE state<>'streaming'",
+        "look_for": "replication stopped on a duplicate key"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Replication stopped on a duplicate key",
+        "title_hi": "Replication duplicate key",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/replication.html",
+    "test_phrases": [
+      "Please investigate replication stopped on a duplicate key",
+      "zara check karo replication duplicate key",
+      "कृपया जाँच करें: replication stopped on a duplicate key"
+    ],
+    "codes": []
+  },
+  {
+    "id": "replication-missing-row",
+    "title_en": "Replication stopped on a missing row",
+    "title_hi": "Replication row missing",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "replication",
+    "symptoms": [
+      "Replication stopped on a missing row",
+      "Replication stopped on a missing row in my database",
+      "mere database mein replication row missing"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SHOW GLOBAL STATUS WHERE Variable_name IN ('Replica_running','Slave_running')",
+        "look_for": "replication stopped on a missing row"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT application_name FROM pg_stat_replication WHERE state<>'streaming'",
+        "look_for": "replication stopped on a missing row"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Replication stopped on a missing row",
+        "title_hi": "Replication row missing",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/replication.html",
+    "test_phrases": [
+      "Please investigate replication stopped on a missing row",
+      "zara check karo replication row missing",
+      "कृपया जाँच करें: replication stopped on a missing row"
+    ],
+    "codes": []
+  },
+  {
+    "id": "replication-replica-writable",
+    "title_en": "A replica accepts accidental writes",
+    "title_hi": "Replica writable hai",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "replication",
+    "symptoms": [
+      "A replica accepts accidental writes",
+      "A replica accepts accidental writes in my database",
+      "mere database mein replica writable hai"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT @@read_only AS read_only WHERE @@read_only=0",
+        "look_for": "a replica accepts accidental writes"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT current_setting('default_transaction_read_only') WHERE current_setting('default_transaction_read_only')='off'",
+        "look_for": "a replica accepts accidental writes"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "A replica accepts accidental writes",
+        "title_hi": "Replica writable hai",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/replication.html",
+    "test_phrases": [
+      "Please investigate a replica accepts accidental writes",
+      "zara check karo replica writable hai",
+      "कृपया जाँच करें: a replica accepts accidental writes"
+    ],
+    "codes": []
+  },
+  {
+    "id": "replication-slot-retains-wal",
+    "title_en": "Replication slot retains too much WAL",
+    "title_hi": "Slot WAL rokta hai",
+    "engines": [
+      "postgres"
+    ],
+    "category": "storage_space",
+    "symptoms": [
+      "Replication slot retains too much WAL",
+      "Replication slot retains too much WAL in my database",
+      "mere database mein slot wal rokta hai"
+    ],
+    "diagnose": [
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT slot_name FROM pg_replication_slots WHERE NOT active AND pg_wal_lsn_diff(pg_current_wal_lsn(),restart_lsn)>1073741824",
+        "look_for": "replication slot retains too much wal"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Replication slot retains too much WAL",
+        "title_hi": "Slot WAL rokta hai",
+        "signals": [
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/routine-vacuuming.html",
+    "test_phrases": [
+      "Please investigate replication slot retains too much wal",
+      "zara check karo slot wal rokta hai",
+      "कृपया जाँच करें: replication slot retains too much wal"
+    ],
+    "codes": []
+  },
+  {
+    "id": "app-n-plus-one-queries",
+    "title_en": "N plus one queries repeat lookups",
+    "title_hi": "N plus one queries",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "orm_framework",
+    "symptoms": [
+      "N plus one queries repeat lookups",
+      "N plus one queries repeat lookups in my database",
+      "mere database mein n plus one queries"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT DIGEST FROM performance_schema.events_statements_summary_by_digest WHERE SCHEMA_NAME=DATABASE() AND COUNT_STAR>1000 ORDER BY COUNT_STAR DESC LIMIT 20",
+        "look_for": "n plus one queries repeat lookups"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT 0 AS problem WHERE false",
+        "look_for": "n plus one queries repeat lookups"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "N plus one queries repeat lookups",
+        "title_hi": "N plus one queries",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/performance-schema-statement-summary-tables.html",
+    "test_phrases": [
+      "Please investigate n plus one queries repeat lookups",
+      "zara check karo n plus one queries",
+      "कृपया जाँच करें: n plus one queries repeat lookups"
+    ],
+    "codes": []
+  },
+  {
+    "id": "app-connection-leak",
+    "title_en": "Application connections leak",
+    "title_hi": "Connection leak",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "Application connections leak",
+      "Application connections leak in my database",
+      "mere database mein connection leak"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT USER FROM information_schema.PROCESSLIST GROUP BY USER HAVING SUM(COMMAND='Sleep')>50",
+        "look_for": "application connections leak"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT usename FROM pg_stat_activity GROUP BY usename HAVING COUNT(*) FILTER (WHERE state='idle')>50",
+        "look_for": "application connections leak"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Application connections leak",
+        "title_hi": "Connection leak",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config-connection.html",
+    "test_phrases": [
+      "Please investigate application connections leak",
+      "zara check karo connection leak",
+      "कृपया जाँच करें: application connections leak"
+    ],
+    "codes": []
+  },
+  {
+    "id": "app-pool-waiting",
+    "title_en": "Connection pool is exhausted",
+    "title_hi": "Pool khatam",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "connection",
+    "symptoms": [
+      "Connection pool is exhausted",
+      "Connection pool is exhausted in my database",
+      "mere database mein pool khatam"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT USER FROM information_schema.PROCESSLIST GROUP BY USER HAVING SUM(COMMAND='Sleep')>50",
+        "look_for": "connection pool is exhausted"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT usename FROM pg_stat_activity GROUP BY usename HAVING COUNT(*) FILTER (WHERE state='idle')>50",
+        "look_for": "connection pool is exhausted"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Connection pool is exhausted",
+        "title_hi": "Pool khatam",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config-connection.html",
+    "test_phrases": [
+      "Please investigate connection pool is exhausted",
+      "zara check karo pool khatam",
+      "कृपया जाँच करें: connection pool is exhausted"
+    ],
+    "codes": []
+  },
+  {
+    "id": "app-orm-select-star",
+    "title_en": "ORM fetches every column",
+    "title_hi": "ORM sab column lata",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "orm_framework",
+    "symptoms": [
+      "ORM fetches every column",
+      "ORM fetches every column in my database",
+      "mere database mein orm sab column lata"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT DIGEST FROM performance_schema.events_statements_summary_by_digest WHERE SCHEMA_NAME=DATABASE() AND COUNT_STAR>1000 ORDER BY COUNT_STAR DESC LIMIT 20",
+        "look_for": "orm fetches every column"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT 0 AS problem WHERE false",
+        "look_for": "orm fetches every column"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "ORM fetches every column",
+        "title_hi": "ORM sab column lata",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/performance-schema-statement-summary-tables.html",
+    "test_phrases": [
+      "Please investigate orm fetches every column",
+      "zara check karo orm sab column lata",
+      "कृपया जाँच करें: orm fetches every column"
+    ],
+    "codes": []
+  },
+  {
+    "id": "app-laravel-slow-relations",
+    "title_en": "Laravel relationship loading is slow",
+    "title_hi": "Laravel relation slow",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "orm_framework",
+    "symptoms": [
+      "Laravel relationship loading is slow",
+      "Laravel relationship loading is slow in my database",
+      "mere database mein laravel relation slow"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT DIGEST FROM performance_schema.events_statements_summary_by_digest WHERE SCHEMA_NAME=DATABASE() AND COUNT_STAR>1000 ORDER BY COUNT_STAR DESC LIMIT 20",
+        "look_for": "laravel relationship loading is slow"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT 0 AS problem WHERE false",
+        "look_for": "laravel relationship loading is slow"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Laravel relationship loading is slow",
+        "title_hi": "Laravel relation slow",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/performance-schema-statement-summary-tables.html",
+    "test_phrases": [
+      "Please investigate laravel relationship loading is slow",
+      "zara check karo laravel relation slow",
+      "कृपया जाँच करें: laravel relationship loading is slow"
+    ],
+    "codes": []
+  },
+  {
+    "id": "app-wordpress-autoload-bloat",
+    "title_en": "WordPress autoloaded options are too large",
+    "title_hi": "WordPress autoload bada",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "orm_framework",
+    "symptoms": [
+      "WordPress autoloaded options are too large",
+      "WordPress autoloaded options are too large in my database",
+      "mere database mein wordpress autoload bada"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT SUM(OCTET_LENGTH(option_value)) bytes FROM wp_options WHERE autoload IN ('yes','on','auto-on','auto') HAVING bytes>800000",
+        "look_for": "wordpress autoloaded options are too large"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "WordPress autoloaded options are too large",
+        "title_hi": "WordPress autoload bada",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/performance-schema-statement-summary-tables.html",
+    "test_phrases": [
+      "Please investigate wordpress autoloaded options are too large",
+      "zara check karo wordpress autoload bada",
+      "कृपया जाँच करें: wordpress autoloaded options are too large"
+    ],
+    "codes": []
+  },
+  {
+    "id": "app-wordpress-postmeta-slow",
+    "title_en": "WordPress post meta lookups are slow",
+    "title_hi": "Postmeta slow",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "orm_framework",
+    "symptoms": [
+      "WordPress post meta lookups are slow",
+      "WordPress post meta lookups are slow in my database",
+      "mere database mein postmeta slow"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT COUNT(*) n FROM wp_postmeta HAVING n>100000",
+        "look_for": "wordpress post meta lookups are slow"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "WordPress post meta lookups are slow",
+        "title_hi": "Postmeta slow",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/performance-schema-statement-summary-tables.html",
+    "test_phrases": [
+      "Please investigate wordpress post meta lookups are slow",
+      "zara check karo postmeta slow",
+      "कृपया जाँच करें: wordpress post meta lookups are slow"
+    ],
+    "codes": []
+  },
+  {
+    "id": "app-migration-locks-table",
+    "title_en": "A migration locks a large table",
+    "title_hi": "Migration table lock",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "migration_upgrade",
+    "symptoms": [
+      "A migration locks a large table",
+      "A migration locks a large table in my database",
+      "mere database mein migration table lock"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT trx_mysql_thread_id FROM information_schema.INNODB_TRX WHERE trx_state='LOCK WAIT'",
+        "look_for": "a migration locks a large table"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT pid FROM pg_stat_activity WHERE wait_event_type='Lock'",
+        "look_for": "a migration locks a large table"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "A migration locks a large table",
+        "title_hi": "Migration table lock",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/explicit-locking.html",
+    "test_phrases": [
+      "Please investigate a migration locks a large table",
+      "zara check karo migration table lock",
+      "कृपया जाँच करें: a migration locks a large table"
+    ],
+    "codes": []
+  },
+  {
+    "id": "app-long-transaction",
+    "title_en": "A transaction stays open too long",
+    "title_hi": "Transaction bahut lambi",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "locking",
+    "symptoms": [
+      "A transaction stays open too long",
+      "A transaction stays open too long in my database",
+      "mere database mein transaction bahut lambi"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT trx_mysql_thread_id FROM information_schema.INNODB_TRX WHERE trx_started<NOW()-INTERVAL 5 MINUTE",
+        "look_for": "a transaction stays open too long"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT pid FROM pg_stat_activity WHERE xact_start<now()-interval '5 minutes'",
+        "look_for": "a transaction stays open too long"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "A transaction stays open too long",
+        "title_hi": "Transaction bahut lambi",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/explicit-locking.html",
+    "test_phrases": [
+      "Please investigate a transaction stays open too long",
+      "zara check karo transaction bahut lambi",
+      "कृपया जाँच करें: a transaction stays open too long"
+    ],
+    "codes": []
+  },
+  {
+    "id": "config-buffer-cache-small",
+    "title_en": "Main database cache is too small",
+    "title_hi": "Cache bahut chhota",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "memory",
+    "symptoms": [
+      "Main database cache is too small",
+      "Main database cache is too small in my database",
+      "mere database mein cache bahut chhota"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT Variable_name FROM performance_schema.global_variables WHERE Variable_name IN ('innodb_buffer_pool_size','max_connections') AND VARIABLE_VALUE+0=0",
+        "look_for": "main database cache is too small"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT name FROM pg_settings WHERE name='shared_buffers' AND setting::bigint<16384",
+        "look_for": "main database cache is too small"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Main database cache is too small",
+        "title_hi": "Cache bahut chhota",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config-resource.html",
+    "test_phrases": [
+      "Please investigate main database cache is too small",
+      "zara check karo cache bahut chhota",
+      "कृपया जाँच करें: main database cache is too small"
+    ],
+    "codes": []
+  },
+  {
+    "id": "config-buffer-cache-too-large",
+    "title_en": "Main database cache is too large",
+    "title_hi": "Cache bahut bada",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "memory",
+    "symptoms": [
+      "Main database cache is too large",
+      "Main database cache is too large in my database",
+      "mere database mein cache bahut bada"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT Variable_name FROM performance_schema.global_variables WHERE Variable_name IN ('innodb_buffer_pool_size','max_connections') AND VARIABLE_VALUE+0=0",
+        "look_for": "main database cache is too large"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT name FROM pg_settings WHERE name='shared_buffers' AND setting::bigint<16384",
+        "look_for": "main database cache is too large"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Main database cache is too large",
+        "title_hi": "Cache bahut bada",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config-resource.html",
+    "test_phrases": [
+      "Please investigate main database cache is too large",
+      "zara check karo cache bahut bada",
+      "कृपया जाँच करें: main database cache is too large"
+    ],
+    "codes": []
+  },
+  {
+    "id": "config-work-memory-small",
+    "title_en": "Sort memory is too small",
+    "title_hi": "Sort memory chhoti",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "memory",
+    "symptoms": [
+      "Sort memory is too small",
+      "Sort memory is too small in my database",
+      "mere database mein sort memory chhoti"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT 0 AS problem WHERE 1=0",
+        "look_for": "sort memory is too small"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT datname FROM pg_stat_database WHERE temp_bytes>1073741824",
+        "look_for": "sort memory is too small"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Sort memory is too small",
+        "title_hi": "Sort memory chhoti",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config-resource.html",
+    "test_phrases": [
+      "Please investigate sort memory is too small",
+      "zara check karo sort memory chhoti",
+      "कृपया जाँच करें: sort memory is too small"
+    ],
+    "codes": []
+  },
+  {
+    "id": "config-work-memory-risky",
+    "title_en": "Per-query memory is dangerously high",
+    "title_hi": "Query memory zyada",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "memory",
+    "symptoms": [
+      "Per-query memory is dangerously high",
+      "Per-query memory is dangerously high in my database",
+      "mere database mein query memory zyada"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT Variable_name FROM performance_schema.global_variables WHERE Variable_name IN ('innodb_buffer_pool_size','max_connections') AND VARIABLE_VALUE+0=0",
+        "look_for": "per-query memory is dangerously high"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT name FROM pg_settings WHERE name='shared_buffers' AND setting::bigint<16384",
+        "look_for": "per-query memory is dangerously high"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Per-query memory is dangerously high",
+        "title_hi": "Query memory zyada",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config-resource.html",
+    "test_phrases": [
+      "Please investigate per-query memory is dangerously high",
+      "zara check karo query memory zyada",
+      "कृपया जाँच करें: per-query memory is dangerously high"
+    ],
+    "codes": []
+  },
+  {
+    "id": "config-max-connections-high",
+    "title_en": "Connection limit is unsafe for memory",
+    "title_hi": "Connection limit zyada",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "config_tuning",
+    "symptoms": [
+      "Connection limit is unsafe for memory",
+      "Connection limit is unsafe for memory in my database",
+      "mere database mein connection limit zyada"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT @@max_connections n WHERE @@max_connections>1000",
+        "look_for": "connection limit is unsafe for memory"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT setting FROM pg_settings WHERE name='max_connections' AND setting::int>1000",
+        "look_for": "connection limit is unsafe for memory"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Connection limit is unsafe for memory",
+        "title_hi": "Connection limit zyada",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config.html",
+    "test_phrases": [
+      "Please investigate connection limit is unsafe for memory",
+      "zara check karo connection limit zyada",
+      "कृपया जाँच करें: connection limit is unsafe for memory"
+    ],
+    "codes": []
+  },
+  {
+    "id": "config-slow-log-off",
+    "title_en": "Slow query logging is off",
+    "title_hi": "Slow log band",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "config_tuning",
+    "symptoms": [
+      "Slow query logging is off",
+      "Slow query logging is off in my database",
+      "mere database mein slow log band"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT @@slow_query_log enabled WHERE @@slow_query_log=0",
+        "look_for": "slow query logging is off"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT setting FROM pg_settings WHERE name='log_min_duration_statement' AND setting='-1'",
+        "look_for": "slow query logging is off"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Slow query logging is off",
+        "title_hi": "Slow log band",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config.html",
+    "test_phrases": [
+      "Please investigate slow query logging is off",
+      "zara check karo slow log band",
+      "कृपया जाँच करें: slow query logging is off"
+    ],
+    "codes": []
+  },
+  {
+    "id": "config-timezone-mismatch",
+    "title_en": "Database and app time zones differ",
+    "title_hi": "Timezone alag",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "timezone",
+    "symptoms": [
+      "Database and app time zones differ",
+      "Database and app time zones differ in my database",
+      "mere database mein timezone alag"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT @@session.time_zone tz WHERE @@session.time_zone='SYSTEM'",
+        "look_for": "database and app time zones differ"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT current_setting('TimeZone') WHERE current_setting('TimeZone')<>'UTC'",
+        "look_for": "database and app time zones differ"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Database and app time zones differ",
+        "title_hi": "Timezone alag",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/datatype-datetime.html",
+    "test_phrases": [
+      "Please investigate database and app time zones differ",
+      "zara check karo timezone alag",
+      "कृपया जाँच करें: database and app time zones differ"
+    ],
+    "codes": []
+  },
+  {
+    "id": "config-strict-mode-surprise",
+    "title_en": "Strict mode rejects old data",
+    "title_hi": "Strict mode surprise",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "category": "config_tuning",
+    "symptoms": [
+      "Strict mode rejects old data",
+      "Strict mode rejects old data in my database",
+      "mere database mein strict mode surprise"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT @@sql_mode mode WHERE FIND_IN_SET('STRICT_TRANS_TABLES',@@sql_mode)>0",
+        "look_for": "strict mode rejects old data"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Strict mode rejects old data",
+        "title_hi": "Strict mode surprise",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/runtime-config.html",
+    "test_phrases": [
+      "Please investigate strict mode rejects old data",
+      "zara check karo strict mode surprise",
+      "कृपया जाँच करें: strict mode rejects old data"
+    ],
+    "codes": []
+  },
+  {
+    "id": "security-remote-root",
+    "title_en": "Administrator login is allowed remotely",
+    "title_hi": "Remote root allowed",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "Administrator login is allowed remotely",
+      "Administrator login is allowed remotely in my database",
+      "mere database mein remote root allowed"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT USER,HOST FROM mysql.user WHERE USER='' OR HOST='%' OR USER='root'",
+        "look_for": "administrator login is allowed remotely"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT rolname FROM pg_roles WHERE rolcanlogin AND (rolsuper OR rolvaliduntil IS NULL)",
+        "look_for": "administrator login is allowed remotely"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Administrator login is allowed remotely",
+        "title_hi": "Remote root allowed",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/ddl-priv.html",
+    "test_phrases": [
+      "Please investigate administrator login is allowed remotely",
+      "zara check karo remote root allowed",
+      "कृपया जाँच करें: administrator login is allowed remotely"
+    ],
+    "codes": []
+  },
+  {
+    "id": "security-anonymous-users",
+    "title_en": "Anonymous database users exist",
+    "title_hi": "Anonymous user",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "Anonymous database users exist",
+      "Anonymous database users exist in my database",
+      "mere database mein anonymous user"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT USER,HOST FROM mysql.user WHERE USER='' OR HOST='%' OR USER='root'",
+        "look_for": "anonymous database users exist"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT rolname FROM pg_roles WHERE rolcanlogin AND (rolsuper OR rolvaliduntil IS NULL)",
+        "look_for": "anonymous database users exist"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Anonymous database users exist",
+        "title_hi": "Anonymous user",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/ddl-priv.html",
+    "test_phrases": [
+      "Please investigate anonymous database users exist",
+      "zara check karo anonymous user",
+      "कृपया जाँच करें: anonymous database users exist"
+    ],
+    "codes": []
+  },
+  {
+    "id": "security-user-without-password",
+    "title_en": "A login may have no password",
+    "title_hi": "Login bina password",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "A login may have no password",
+      "A login may have no password in my database",
+      "mere database mein login bina password"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT USER,HOST FROM mysql.user WHERE USER='' OR HOST='%' OR USER='root'",
+        "look_for": "a login may have no password"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT rolname FROM pg_roles WHERE rolcanlogin AND (rolsuper OR rolvaliduntil IS NULL)",
+        "look_for": "a login may have no password"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "A login may have no password",
+        "title_hi": "Login bina password",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/ddl-priv.html",
+    "test_phrases": [
+      "Please investigate a login may have no password",
+      "zara check karo login bina password",
+      "कृपया जाँच करें: a login may have no password"
+    ],
+    "codes": []
+  },
+  {
+    "id": "security-old-auth-plugin",
+    "title_en": "An account uses old authentication",
+    "title_hi": "Old authentication",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "An account uses old authentication",
+      "An account uses old authentication in my database",
+      "mere database mein old authentication"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT USER,HOST FROM mysql.user WHERE USER='' OR HOST='%' OR USER='root'",
+        "look_for": "an account uses old authentication"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT rolname FROM pg_roles WHERE rolcanlogin AND (rolsuper OR rolvaliduntil IS NULL)",
+        "look_for": "an account uses old authentication"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "An account uses old authentication",
+        "title_hi": "Old authentication",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/ddl-priv.html",
+    "test_phrases": [
+      "Please investigate an account uses old authentication",
+      "zara check karo old authentication",
+      "कृपया जाँच करें: an account uses old authentication"
+    ],
+    "codes": []
+  },
+  {
+    "id": "security-port-public",
+    "title_en": "Database listens beyond local networks",
+    "title_hi": "Port public hai",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "Database listens beyond local networks",
+      "Database listens beyond local networks in my database",
+      "mere database mein port public hai"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT @@bind_address addr WHERE @@bind_address IN ('*','0.0.0.0')",
+        "look_for": "database listens beyond local networks"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT setting FROM pg_settings WHERE name='listen_addresses' AND setting='*'",
+        "look_for": "database listens beyond local networks"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Database listens beyond local networks",
+        "title_hi": "Port public hai",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/ddl-priv.html",
+    "test_phrases": [
+      "Please investigate database listens beyond local networks",
+      "zara check karo port public hai",
+      "कृपया जाँच करें: database listens beyond local networks"
+    ],
+    "codes": []
+  },
+  {
+    "id": "security-no-tls",
+    "title_en": "Database connections do not require TLS",
+    "title_hi": "TLS required nahi",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "Database connections do not require TLS",
+      "Database connections do not require TLS in my database",
+      "mere database mein tls required nahi"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT @@require_secure_transport required WHERE @@require_secure_transport=0",
+        "look_for": "database connections do not require tls"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT setting FROM pg_settings WHERE name='ssl' AND setting='off'",
+        "look_for": "database connections do not require tls"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Database connections do not require TLS",
+        "title_hi": "TLS required nahi",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/ddl-priv.html",
+    "test_phrases": [
+      "Please investigate database connections do not require tls",
+      "zara check karo tls required nahi",
+      "कृपया जाँच करें: database connections do not require tls"
+    ],
+    "codes": []
+  },
+  {
+    "id": "security-public-schema-create",
+    "title_en": "PUBLIC can create schema objects",
+    "title_hi": "PUBLIC create kar sakta",
+    "engines": [
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "PUBLIC can create schema objects",
+      "PUBLIC can create schema objects in my database",
+      "mere database mein public create kar sakta"
+    ],
+    "diagnose": [
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT nspname FROM pg_namespace WHERE nspname='public' AND has_schema_privilege('public',oid,'CREATE')",
+        "look_for": "public can create schema objects"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "PUBLIC can create schema objects",
+        "title_hi": "PUBLIC create kar sakta",
+        "signals": [
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/ddl-priv.html",
+    "test_phrases": [
+      "Please investigate public can create schema objects",
+      "zara check karo public create kar sakta",
+      "कृपया जाँच करें: public can create schema objects"
+    ],
+    "codes": []
+  },
+  {
+    "id": "security-default-public-connect",
+    "title_en": "Every role can connect by default",
+    "title_hi": "Har role connect kar sakta",
+    "engines": [
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "Every role can connect by default",
+      "Every role can connect by default in my database",
+      "mere database mein har role connect kar sakta"
+    ],
+    "diagnose": [
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT nspname FROM pg_namespace WHERE nspname='public' AND has_schema_privilege('public',oid,'CREATE')",
+        "look_for": "every role can connect by default"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Every role can connect by default",
+        "title_hi": "Har role connect kar sakta",
+        "signals": [
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/ddl-priv.html",
+    "test_phrases": [
+      "Please investigate every role can connect by default",
+      "zara check karo har role connect kar sakta",
+      "कृपया जाँच करें: every role can connect by default"
+    ],
+    "codes": []
+  },
+  {
+    "id": "security-password-never-expires",
+    "title_en": "Privileged passwords never expire",
+    "title_hi": "Password expire nahi",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "Privileged passwords never expire",
+      "Privileged passwords never expire in my database",
+      "mere database mein password expire nahi"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT USER,HOST FROM mysql.user WHERE USER='' OR HOST='%' OR USER='root'",
+        "look_for": "privileged passwords never expire"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT rolname FROM pg_roles WHERE rolcanlogin AND (rolsuper OR rolvaliduntil IS NULL)",
+        "look_for": "privileged passwords never expire"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Privileged passwords never expire",
+        "title_hi": "Password expire nahi",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/ddl-priv.html",
+    "test_phrases": [
+      "Please investigate privileged passwords never expire",
+      "zara check karo password expire nahi",
+      "कृपया जाँच करें: privileged passwords never expire"
+    ],
+    "codes": []
+  },
+  {
+    "id": "security-file-privilege",
+    "title_en": "Application user can access server files",
+    "title_hi": "App file access",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "Application user can access server files",
+      "Application user can access server files in my database",
+      "mere database mein app file access"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE,PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE PRIVILEGE_TYPE IN ('FILE','SUPER') OR IS_GRANTABLE='YES'",
+        "look_for": "application user can access server files"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT rolname FROM pg_roles WHERE rolsuper OR rolcreaterole OR rolbypassrls",
+        "look_for": "application user can access server files"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Application user can access server files",
+        "title_hi": "App file access",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/ddl-priv.html",
+    "test_phrases": [
+      "Please investigate application user can access server files",
+      "zara check karo app file access",
+      "कृपया जाँच करें: application user can access server files"
+    ],
+    "codes": []
+  },
+  {
+    "id": "security-grant-option",
+    "title_en": "Application user can grant privileges",
+    "title_hi": "App grant kar sakta",
+    "engines": [
+      "mysql",
+      "mariadb",
+      "postgres"
+    ],
+    "category": "security_permissions",
+    "symptoms": [
+      "Application user can grant privileges",
+      "Application user can grant privileges in my database",
+      "mere database mein app grant kar sakta"
+    ],
+    "diagnose": [
+      {
+        "id": "mysql_check",
+        "engine": "mysql",
+        "sql": "SELECT GRANTEE,PRIVILEGE_TYPE FROM information_schema.USER_PRIVILEGES WHERE PRIVILEGE_TYPE IN ('FILE','SUPER') OR IS_GRANTABLE='YES'",
+        "look_for": "application user can grant privileges"
+      },
+      {
+        "id": "postgres_check",
+        "engine": "postgres",
+        "sql": "SELECT rolname FROM pg_roles WHERE rolsuper OR rolcreaterole OR rolbypassrls",
+        "look_for": "application user can grant privileges"
+      }
+    ],
+    "causes": [
+      {
+        "id": "detected",
+        "title_en": "Application user can grant privileges",
+        "title_hi": "App grant kar sakta",
+        "signals": [
+          {
+            "check": "mysql_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          },
+          {
+            "check": "postgres_check",
+            "aggregate": "count",
+            "op": ">",
+            "value": 0,
+            "evidence": "{value} catalog row(s) support this cause"
+          }
+        ],
+        "minimum_signals": 1
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "detected",
+        "action": "advice",
+        "steps_en": "Take a backup first, confirm the affected objects, make the smallest safe correction, and test it on a copy before production.",
+        "steps_hi": "Pehle backup lo, affected objects confirm karo, sabse chhota safe correction karo, aur production se pehle copy par test karo."
+      }
+    ],
+    "verify": {
+      "en": "Repeat the same read-only check; the reported rows should be gone and the application should behave normally.",
+      "hi": "Wahi read-only check dobara chalao; reported rows khatam hon aur app normal chale."
+    },
+    "source": "https://www.postgresql.org/docs/current/ddl-priv.html",
+    "test_phrases": [
+      "Please investigate application user can grant privileges",
+      "zara check karo app grant kar sakta",
+      "कृपया जाँच करें: application user can grant privileges"
+    ],
+    "codes": []
   }
 ]

@@ -8551,7 +8551,18 @@
         "id": "detected",
         "title_en": "Tables use mixed character sets",
         "title_hi": "Character set mixed",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_mixed_charsets",
+            "manual": true,
+            "evidence": "Tables use mixed character sets: confirm this evidence manually — More than one returned character set means the schema contains mixed character sets."
+          },
+          {
+            "check": "postgres_not_applicable",
+            "manual": true,
+            "evidence": "Tables use mixed character sets: confirm this evidence manually — PostgreSQL encoding is database-wide rather than a MySQL-style per-table VARCHAR/TEXT character-set property."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -8615,7 +8626,18 @@
         "id": "detected",
         "title_en": "Large text fields in a busy table",
         "title_hi": "Busy table mein large text",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_large_text_candidates",
+            "manual": true,
+            "evidence": "Large text fields in a busy table: confirm this evidence manually — large TEXT/BLOB columns on high-row tables; this identifies candidates only, and runtime workload evidence is still needed to prove the table is hot"
+          },
+          {
+            "check": "postgres_large_text_hot",
+            "manual": true,
+            "evidence": "Large text fields in a busy table: confirm this evidence manually — TEXT/bytea columns on tables showing actual write activity; high activity makes large row payloads more relevant"
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -8673,7 +8695,18 @@
         "id": "detected",
         "title_en": "Duplicate indexes waste work",
         "title_hi": "Duplicate index",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_duplicate_indexes",
+            "manual": true,
+            "evidence": "Duplicate indexes waste work: confirm this evidence manually — two or more secondary indexes on the same table with the same column order, uniqueness and index type"
+          },
+          {
+            "check": "postgres_duplicate_indexes",
+            "manual": true,
+            "evidence": "Duplicate indexes waste work: confirm this evidence manually — multiple indexes with the same PostgreSQL index definition on the same table"
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -8873,7 +8906,18 @@
         "id": "detected",
         "title_en": "Oversized text columns waste memory",
         "title_hi": "Text column bahut chaudi",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_overwide_varchar",
+            "manual": true,
+            "evidence": "Oversized text columns waste memory: confirm this evidence manually — VARCHAR columns wider than 1024 characters that may be using an unnecessarily large bounded string definition"
+          },
+          {
+            "check": "postgres_overwide_varchar",
+            "manual": true,
+            "evidence": "Oversized text columns waste memory: confirm this evidence manually — very wide VARCHAR columns whose declared limit should be reviewed against the real data requirement"
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -9290,7 +9334,13 @@
         "id": "detected",
         "title_en": "Autovacuum is not keeping up",
         "title_hi": "Autovacuum peeche",
-        "signals": [],
+        "signals": [
+          {
+            "check": "postgres_autovacuum",
+            "manual": true,
+            "evidence": "Autovacuum is not keeping up: confirm this evidence manually — tables with a significant dead-tuple backlog and no recent autovacuum activity"
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -9406,7 +9456,18 @@
         "id": "detected",
         "title_en": "Table corruption needs safe recovery",
         "title_hi": "Table corruption",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_corruption_manual",
+            "manual": true,
+            "evidence": "Table corruption needs safe recovery: confirm this evidence manually — Confirm corruption from server errors and an engine-appropriate integrity check such as CHECK TABLE under DBA control."
+          },
+          {
+            "check": "postgres_corruption_manual",
+            "manual": true,
+            "evidence": "Table corruption needs safe recovery: confirm this evidence manually — Confirm corruption using PostgreSQL server errors and pg_amcheck or equivalent DBA integrity tooling."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -9580,7 +9641,18 @@
         "id": "detected",
         "title_en": "No recent database backup is known",
         "title_hi": "Recent backup nahi",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_backup_inventory",
+            "manual": true,
+            "evidence": "No recent database backup is known: confirm this evidence manually — Verify backup-system inventory, snapshots, object storage or backup logs. Database metadata cannot prove a usable recent off-server backup exists."
+          },
+          {
+            "check": "postgres_backup_inventory",
+            "manual": true,
+            "evidence": "No recent database backup is known: confirm this evidence manually — Verify backup inventory, base backups, snapshots and restore artifacts. WAL activity alone does not prove a usable backup."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -9638,7 +9710,18 @@
         "id": "detected",
         "title_en": "Database dump lacks permissions",
         "title_hi": "Dump permission nahi",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_dump_grants",
+            "manual": true,
+            "evidence": "Database dump lacks permissions: confirm this evidence manually — Compare current grants with the actual dump options. SELECT is required for data and additional object privileges may be needed for views, triggers or events."
+          },
+          {
+            "check": "postgres_dump_permissions",
+            "manual": true,
+            "evidence": "Database dump lacks permissions: confirm this evidence manually — Dump role must have CONNECT, schema USAGE and SELECT on tables included in the data dump."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -9755,7 +9838,18 @@
         "id": "detected",
         "title_en": "Backup dump blocks writes",
         "title_hi": "Dump writes rokta",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_dump_lock_manual",
+            "manual": true,
+            "evidence": "Backup dump blocks writes: confirm this evidence manually — Capture a blocked writer together with the dump session using PROCESSLIST and lock instrumentation. Prove the backup owns or requests the blocking lock."
+          },
+          {
+            "check": "postgres_dump_lock_manual",
+            "manual": true,
+            "evidence": "Backup dump blocks writes: confirm this evidence manually — Capture pg_stat_activity and pg_locks while writes are blocked. Identify the backup session as the actual blocker."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -9812,7 +9906,18 @@
         "id": "detected",
         "title_en": "Restore uses the wrong character set",
         "title_hi": "Restore charset galat",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_restore_charset",
+            "manual": true,
+            "evidence": "Restore uses the wrong character set: confirm this evidence manually — Compare target server/database/client charset with source dump SET NAMES and DEFAULT CHARSET declarations."
+          },
+          {
+            "check": "postgres_restore_encoding",
+            "manual": true,
+            "evidence": "Restore uses the wrong character set: confirm this evidence manually — Compare target server/client encoding with the source dump encoding and restore client settings."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -9870,7 +9975,18 @@
         "id": "detected",
         "title_en": "Restore references a missing definer",
         "title_hi": "Restore definer missing",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_object_definers",
+            "manual": true,
+            "evidence": "Restore references a missing definer: confirm this evidence manually — List object definers and compare them with accounts available on the restore target. This query alone does not prove a definer is missing."
+          },
+          {
+            "check": "postgres_owner_manual",
+            "manual": true,
+            "evidence": "Restore references a missing definer: confirm this evidence manually — Inspect restore output or source dump for OWNER TO / SET ROLE references to roles absent from the target server."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -9928,7 +10044,18 @@
         "id": "detected",
         "title_en": "Restore loads children before parents",
         "title_hi": "Restore order galat",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_fk_dependencies",
+            "manual": true,
+            "evidence": "Restore loads children before parents: confirm this evidence manually — restore parent tables before dependent child tables; each returned row represents a foreign-key dependency"
+          },
+          {
+            "check": "postgres_fk_dependencies",
+            "manual": true,
+            "evidence": "Restore loads children before parents: confirm this evidence manually — restore referenced parent tables before child tables that depend on them through foreign keys"
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -10059,7 +10186,18 @@
         "id": "detected",
         "title_en": "Replication lag keeps growing",
         "title_hi": "Replication lag badh raha",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_lag_manual",
+            "manual": true,
+            "evidence": "Replication lag keeps growing: confirm this evidence manually — With replication-monitor privileges sample SHOW REPLICA STATUS repeatedly and track lag/apply position. One snapshot cannot prove lag is growing."
+          },
+          {
+            "check": "postgres_lag",
+            "manual": true,
+            "evidence": "Replication lag keeps growing: confirm this evidence manually — Sample repeatedly. Increasing replay_lag_bytes or replay_lag demonstrates growing lag."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -10117,7 +10255,18 @@
         "id": "detected",
         "title_en": "Replication stopped on a duplicate key",
         "title_hi": "Replication duplicate key",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_duplicate_manual",
+            "manual": true,
+            "evidence": "Replication stopped on a duplicate key: confirm this evidence manually — Inspect SHOW REPLICA STATUS Last_SQL_Errno/Last_SQL_Error for duplicate-key evidence such as error 1062."
+          },
+          {
+            "check": "postgres_duplicate_manual",
+            "manual": true,
+            "evidence": "Replication stopped on a duplicate key: confirm this evidence manually — Inspect logical-replication/subscriber worker logs for unique_violation or duplicate-key errors during apply."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -10175,7 +10324,18 @@
         "id": "detected",
         "title_en": "Replication stopped on a missing row",
         "title_hi": "Replication row missing",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_missing_manual",
+            "manual": true,
+            "evidence": "Replication stopped on a missing row: confirm this evidence manually — Inspect SHOW REPLICA STATUS Last_SQL_Error for row-not-found evidence such as error 1032 and compare source/replica keys."
+          },
+          {
+            "check": "postgres_missing_manual",
+            "manual": true,
+            "evidence": "Replication stopped on a missing row: confirm this evidence manually — Use logical-replication worker logs plus source/subscriber row comparison to prove the expected target row is missing."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -10364,7 +10524,18 @@
         "id": "detected",
         "title_en": "N plus one queries repeat lookups",
         "title_hi": "N plus one queries",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_n_plus_one_trace",
+            "manual": true,
+            "evidence": "N plus one queries repeat lookups: confirm this evidence manually — Within one application request the same query shape executes many times with only lookup values changing. Use APM, query logs or statement history."
+          },
+          {
+            "check": "postgres_n_plus_one_trace",
+            "manual": true,
+            "evidence": "N plus one queries repeat lookups: confirm this evidence manually — Correlate repeated statement fingerprints with one request using application tracing and PostgreSQL statement evidence."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -10567,7 +10738,18 @@
         "id": "detected",
         "title_en": "ORM fetches every column",
         "title_hi": "ORM sab column lata",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_projection_trace",
+            "manual": true,
+            "evidence": "ORM fetches every column: confirm this evidence manually — Capture ORM-generated SQL and identify SELECT * or projections fetching substantially more columns than the request consumes."
+          },
+          {
+            "check": "postgres_projection_trace",
+            "manual": true,
+            "evidence": "ORM fetches every column: confirm this evidence manually — Capture ORM-generated SQL and compare selected columns with fields actually used by the request."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -10625,7 +10807,18 @@
         "id": "detected",
         "title_en": "Laravel relationship loading is slow",
         "title_hi": "Laravel relation slow",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_laravel_trace",
+            "manual": true,
+            "evidence": "Laravel relationship loading is slow: confirm this evidence manually — Use Laravel Telescope/query logs/APM to identify slow or repeated Eloquent relationship queries."
+          },
+          {
+            "check": "postgres_laravel_trace",
+            "manual": true,
+            "evidence": "Laravel relationship loading is slow: confirm this evidence manually — Correlate Laravel relationship loading with PostgreSQL query timings and request-level tracing."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -10939,7 +11132,18 @@
         "id": "detected",
         "title_en": "Main database cache is too small",
         "title_hi": "Cache bahut chhota",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_buffer_size",
+            "manual": true,
+            "evidence": "Main database cache is too small: confirm this evidence manually — Record buffer-pool size; size alone does not prove undersizing."
+          },
+          {
+            "check": "postgres_cache_pressure",
+            "manual": true,
+            "evidence": "Main database cache is too small: confirm this evidence manually — Evaluate shared_buffers together with sustained read pressure and cache-hit behavior."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -11003,7 +11207,18 @@
         "id": "detected",
         "title_en": "Main database cache is too large",
         "title_hi": "Cache bahut bada",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_buffer_allocation",
+            "manual": true,
+            "evidence": "Main database cache is too large: confirm this evidence manually — Compare configured buffer allocation with host/container memory. Database values alone cannot prove it is too large."
+          },
+          {
+            "check": "postgres_memory_allocation",
+            "manual": true,
+            "evidence": "Main database cache is too large: confirm this evidence manually — Compare configured database memory with host/container memory."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -11134,7 +11349,18 @@
         "id": "detected",
         "title_en": "Per-query memory is dangerously high",
         "title_hi": "Query memory zyada",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_per_connection_buffers",
+            "manual": true,
+            "evidence": "Per-query memory is dangerously high: confirm this evidence manually — Large per-session/per-operation buffers combined with high concurrency can create aggregate memory risk."
+          },
+          {
+            "check": "postgres_work_mem",
+            "manual": true,
+            "evidence": "Per-query memory is dangerously high: confirm this evidence manually — work_mem applies per sort/hash operation. Evaluate it with concurrent query count and hash_mem_multiplier."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -11470,7 +11696,18 @@
         "id": "detected",
         "title_en": "Administrator login is allowed remotely",
         "title_hi": "Remote root allowed",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_remote_root_manual",
+            "manual": true,
+            "evidence": "Administrator login is allowed remotely: confirm this evidence manually — With DBA access inspect mysql.user for root/admin accounts whose Host allows non-local connections. Normal application accounts cannot reliably prove remote root access."
+          },
+          {
+            "check": "postgres_remote_superuser_manual",
+            "manual": true,
+            "evidence": "Administrator login is allowed remotely: confirm this evidence manually — Remote PostgreSQL superuser access depends on pg_hba.conf and network exposure. pg_roles alone cannot prove remote access."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -11528,7 +11765,18 @@
         "id": "detected",
         "title_en": "Anonymous database users exist",
         "title_hi": "Anonymous user",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_anonymous_manual",
+            "manual": true,
+            "evidence": "Anonymous database users exist: confirm this evidence manually — With DBA access inspect mysql.user for rows where User is empty."
+          },
+          {
+            "check": "postgres_not_applicable",
+            "manual": true,
+            "evidence": "Anonymous database users exist: confirm this evidence manually — PostgreSQL has no MySQL-style anonymous login account. PUBLIC is a pseudo-role and cannot log in."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -11586,7 +11834,18 @@
         "id": "detected",
         "title_en": "A login may have no password",
         "title_hi": "Login bina password",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_password_manual",
+            "manual": true,
+            "evidence": "A login may have no password: confirm this evidence manually — With DBA access inspect mysql.user authentication fields for accounts that can authenticate without a password."
+          },
+          {
+            "check": "postgres_password_manual",
+            "manual": true,
+            "evidence": "A login may have no password: confirm this evidence manually — Password state is stored in pg_authid and hidden from normal users. Review pg_authid and pg_hba.conf with privileged access."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -11644,7 +11903,18 @@
         "id": "detected",
         "title_en": "An account uses old authentication",
         "title_hi": "Old authentication",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_auth_plugin_manual",
+            "manual": true,
+            "evidence": "An account uses old authentication: confirm this evidence manually — With DBA access inspect mysql.user authentication plugins and compare them with approved plugins for this server version."
+          },
+          {
+            "check": "postgres_password_encryption",
+            "manual": true,
+            "evidence": "An account uses old authentication: confirm this evidence manually — md5 means newly changed passwords are configured for legacy MD5 storage. Existing hashes require privileged inspection."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -11964,7 +12234,18 @@
         "id": "detected",
         "title_en": "Privileged passwords never expire",
         "title_hi": "Password expire nahi",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_expiry_manual",
+            "manual": true,
+            "evidence": "Privileged passwords never expire: confirm this evidence manually — With DBA access inspect password lifetime and expiry policy for privileged MySQL/MariaDB accounts."
+          },
+          {
+            "check": "postgres_privileged_no_expiry",
+            "manual": true,
+            "evidence": "Privileged passwords never expire: confirm this evidence manually — Privileged login roles with no password expiry. Confirm whether non-expiring credentials are intentional."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -12022,7 +12303,18 @@
         "id": "detected",
         "title_en": "Application user can access server files",
         "title_hi": "App file access",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_file_privilege",
+            "manual": true,
+            "evidence": "Application user can access server files: confirm this evidence manually — A returned FILE privilege means the current account has server-side file capability subject to server restrictions."
+          },
+          {
+            "check": "postgres_server_file_roles",
+            "manual": true,
+            "evidence": "Application user can access server files: confirm this evidence manually — A returned row means the current PostgreSQL account has server-file/program capability or superuser access."
+          }
+        ],
         "minimum_signals": 1
       }
     ],
@@ -12080,7 +12372,18 @@
         "id": "detected",
         "title_en": "Application user can grant privileges",
         "title_hi": "App grant kar sakta",
-        "signals": [],
+        "signals": [
+          {
+            "check": "mysql_grantable",
+            "manual": true,
+            "evidence": "Application user can grant privileges: confirm this evidence manually — Returned privileges are delegatable by the current account."
+          },
+          {
+            "check": "postgres_grantable",
+            "manual": true,
+            "evidence": "Application user can grant privileges: confirm this evidence manually — Grantable object privileges or superuser status indicate delegation capability beyond a normal application role."
+          }
+        ],
         "minimum_signals": 1
       }
     ],

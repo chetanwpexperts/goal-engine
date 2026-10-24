@@ -77,6 +77,10 @@ def evaluate(issue: dict, checks: list[dict], raw_results: list[dict]) -> dict:
         signals = cause.get("signals") or []
         matched = []
         for signal in signals:
+            # A manual signal documents the evidence an operator must
+            # confirm. Never turn it into an automatic conclusion.
+            if signal.get("manual"):
+                continue
             left, rows = _select(by_id, signal)
             right = signal.get("value")
             if signal.get("value_from"):

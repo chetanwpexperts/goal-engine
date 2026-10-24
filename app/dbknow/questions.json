@@ -617,9 +617,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT * FROM {table} WHERE {column} = 0 ORDER BY {date_col} LIMIT 500",
+      "mariadb": "SELECT * FROM {table} WHERE {column} = 0 ORDER BY {date_col} LIMIT 500",
+      "postgres": "SELECT * FROM {table} WHERE {column} = 0 ORDER BY {date_col} LIMIT 500"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -644,9 +644,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT * FROM {table} WHERE {column} IS NULL ORDER BY {date_col} LIMIT 500",
+      "mariadb": "SELECT * FROM {table} WHERE {column} IS NULL ORDER BY {date_col} LIMIT 500",
+      "postgres": "SELECT * FROM {table} WHERE {column} IS NULL ORDER BY {date_col} LIMIT 500"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -671,9 +671,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT {column} AS amount, COUNT(*) AS occurrences FROM {table} WHERE {column} IS NOT NULL GROUP BY {column} HAVING COUNT(*) > 1 ORDER BY occurrences DESC, amount LIMIT 100",
+      "mariadb": "SELECT {column} AS amount, COUNT(*) AS occurrences FROM {table} WHERE {column} IS NOT NULL GROUP BY {column} HAVING COUNT(*) > 1 ORDER BY occurrences DESC, amount LIMIT 100",
+      "postgres": "SELECT {column} AS amount, COUNT(*) AS occurrences FROM {table} WHERE {column} IS NOT NULL GROUP BY {column} HAVING COUNT(*) > 1 ORDER BY occurrences DESC, amount LIMIT 100"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -698,9 +698,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT COALESCE(AVG(v),0) AS answer FROM (SELECT {column} AS v, ROW_NUMBER() OVER (ORDER BY {column}) AS rn, COUNT(*) OVER () AS cnt FROM {table} WHERE {column} IS NOT NULL) x WHERE rn IN (FLOOR((cnt + 1) / 2), FLOOR((cnt + 2) / 2))",
+      "mariadb": "SELECT COALESCE(AVG(v),0) AS answer FROM (SELECT {column} AS v, ROW_NUMBER() OVER (ORDER BY {column}) AS rn, COUNT(*) OVER () AS cnt FROM {table} WHERE {column} IS NOT NULL) x WHERE rn IN (FLOOR((cnt + 1) / 2), FLOOR((cnt + 2) / 2))",
+      "postgres": "SELECT COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY {column}),0) AS answer FROM {table} WHERE {column} IS NOT NULL"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -1051,9 +1051,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH,'%Y-%m-01') AND {date_col} < DATE_FORMAT(CURDATE(),'%Y-%m-01')",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH,'%Y-%m-01') AND {date_col} < DATE_FORMAT(CURDATE(),'%Y-%m-01')",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= date_trunc('month', CURRENT_DATE) - interval '1 month' AND {date_col} < date_trunc('month', CURRENT_DATE)"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -1078,9 +1078,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
-      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
-      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+      "mysql": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH,'%Y-%m-01') AND {date_col} < DATE_FORMAT(CURDATE(),'%Y-%m-01')",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= DATE_FORMAT(CURDATE() - INTERVAL 1 MONTH,'%Y-%m-01') AND {date_col} < DATE_FORMAT(CURDATE(),'%Y-%m-01')",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= date_trunc('month', CURRENT_DATE) - interval '1 month' AND {date_col} < date_trunc('month', CURRENT_DATE)"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [

@@ -99,6 +99,10 @@ def validate() -> list[str]:
                     for signal in cause.get("signals", []):
                         if signal.get("check") not in check_ids:
                             problems.append(f"{where}: signal points to unknown check {signal.get('check')}")
+                        if signal.get("manual"):
+                            if not str(signal.get("evidence", "")).strip():
+                                problems.append(f"{where}: manual signal needs evidence text")
+                            continue
                         if signal.get("op") not in ("==", "!=", ">", ">=", "<", "<=", "contains", "in"):
                             problems.append(f"{where}: unknown signal operator {signal.get('op')}")
                 for f in e["fixes"]:

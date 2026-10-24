@@ -1,0 +1,59 @@
+# Runs the whole test suite on every pull request (and on main), with real MariaDB and PostgreSQL.
+# Merge only when this is green.
+name: tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: shop_db
+          MARIADB_USER: shopapp
+          MARIADB_PASSWORD: app pass
+        ports: ["3306:3306"]
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=5s --health-retries=20
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shopapp
+          POSTGRES_PASSWORD: app pass
+          POSTGRES_DB: shop_pg
+        ports: ["5432:5432"]
+        options: --health-cmd="pg_isready -U shopapp" --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq mariadb-client postgresql-client php-cli php-mysql >/dev/null
+          pip install -r requirements.txt pytest httpx
+      - name: Prepare the test databases
+        env:
+          MYSQL_PWD: root
+        run: |
+          mysql -h 127.0.0.1 -uroot -e "
+            GRANT ALL ON shop_db.* TO 'shopapp'@'%';
+            GRANT SELECT ON performance_schema.* TO 'shopapp'@'%';
+            GRANT PROCESS ON *.* TO 'shopapp'@'%';
+            FLUSH PRIVILEGES;"
+          sed -n '/^mysql -e "CREATE DATABASE/,/^su postgres/p' scripts/setup_test_dbs.sh | sed '$d' \
+            | sed 's/^mysql -e "/mysql --force -h 127.0.0.1 -uroot -e "/' > /tmp/mysql_setup.sh
+          bash /tmp/mysql_setup.sh || true
+          sed -n "/^PGPASSWORD='app pass' psql/,/>\/dev\/null$/p" scripts/setup_test_dbs.sh > /tmp/pg_setup.sh
+          bash /tmp/pg_setup.sh || true
+      - name: Test suite
+        run: python -m pytest -q
+      - name: Generators (new seeds each run)
+        run: |
+          python -m tests.fuzz.db --start $(( $(date +%Y%m%d) % 100000 * 10 + 7 )) --seeds 20
+          python -m tests.fuzz.sheets --start $(( $(date +%Y%m%d) % 100000 * 10 + 7 )) --seeds 20

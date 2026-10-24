@@ -12,6 +12,7 @@ CREATE USER IF NOT EXISTS 'shopapp'@'127.0.0.1' IDENTIFIED BY 'app pass';
 GRANT ALL ON shop_db.* TO 'shopapp'@'localhost'; GRANT ALL ON shop_db.* TO 'shopapp'@'127.0.0.1';
 GRANT SELECT ON performance_schema.* TO 'shopapp'@'127.0.0.1'; GRANT SELECT ON performance_schema.* TO 'shopapp'@'localhost';
 GRANT SELECT ON mysql.slow_log TO 'shopapp'@'127.0.0.1';
+GRANT PROCESS ON *.* TO 'shopapp'@'127.0.0.1'; GRANT PROCESS ON *.* TO 'shopapp'@'localhost';
 USE shop_db;
 CREATE TABLE IF NOT EXISTS orders(id INT PRIMARY KEY AUTO_INCREMENT, amount DECIMAL(10,2));
 INSERT INTO orders(amount) SELECT 100 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM orders);
@@ -29,6 +30,7 @@ ALTER TABLE wp_users ADD COLUMN IF NOT EXISTS display_name VARCHAR(250) DEFAULT 
   ADD COLUMN IF NOT EXISTS user_activation_key VARCHAR(255) DEFAULT '';
 CREATE TABLE IF NOT EXISTS wp_usermeta (umeta_id BIGINT AUTO_INCREMENT PRIMARY KEY, user_id BIGINT, meta_key VARCHAR(255), meta_value LONGTEXT);
 CREATE TABLE IF NOT EXISTS wp_options (option_id BIGINT AUTO_INCREMENT PRIMARY KEY, option_name VARCHAR(191) UNIQUE, option_value LONGTEXT, autoload VARCHAR(20) DEFAULT 'yes');
+CREATE TABLE IF NOT EXISTS wp_postmeta (meta_id BIGINT AUTO_INCREMENT PRIMARY KEY, post_id BIGINT, meta_key VARCHAR(255), meta_value LONGTEXT, KEY post_id (post_id), KEY meta_key (meta_key(191)));
 CREATE TABLE IF NOT EXISTS wp_posts (ID BIGINT AUTO_INCREMENT PRIMARY KEY, post_author BIGINT, post_date DATETIME, post_content LONGTEXT, post_title TEXT,
   post_status VARCHAR(20) DEFAULT 'publish', post_type VARCHAR(20) DEFAULT 'post', post_modified DATETIME);"
 su postgres -c "psql -q -tc \"SELECT 1 FROM pg_roles WHERE rolname='shopapp'\" | grep -q 1 || psql -q -c \"CREATE USER shopapp PASSWORD 'app pass';\""

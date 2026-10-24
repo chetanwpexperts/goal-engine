@@ -13,6 +13,7 @@ Families:
   followups  a chat through the API: the slow-database message, the query, then follow-ups (optimise, what changed,
              why slow, which indexes, explain)
   phrasings  new descriptions of every playbook in app/dbknow/issues.json: the right playbook, or "not sure"
+  diagnosis  randomly injected evidence for known causes plus healthy controls
 
 Tables are named fz<seed>_* and dropped afterwards. An engine whose server is down is skipped.
 """
@@ -28,8 +29,8 @@ import tempfile
 from collections import Counter, defaultdict
 from decimal import Decimal
 
-MYSQL = {"type": "mysql", "host": "127.0.0.1", "port": 3306, "user": "shopapp", "password": "app pass", "database": "shop_db"}
-PG = {"type": "postgres", "host": "127.0.0.1", "port": 5432, "user": "shopapp", "password": "app pass", "database": "shop_pg"}
+MYSQL = {"type": "mysql", "host": "127.0.0.1", "port": 13306, "user": "shopapp", "password": "app pass", "database": "shop_db"}
+PG = {"type": "postgres", "host": "127.0.0.1", "port": 15432, "user": "shopapp", "password": "app pass", "database": "shop_pg"}
 
 F_NAMES = ["Aditi", "Pooja", "Neha", "Simran", "Kavya", "Riya", "Anjali", "Sneha", "Isha", "Meera", "Tanvi", "Priya"]
 M_NAMES = ["Arjun", "Rohan", "Rahul", "Vikram", "Aman", "Karan", "Dev", "Ishaan", "Manav", "Yash", "Aarav", "Kabir"]
@@ -1043,8 +1044,38 @@ def phrasings(seed: int, rnd: random.Random) -> list[dict]:
     return out
 
 
+def diagnoses(seed: int, rnd: random.Random) -> list[dict]:
+    """Random evidence packets: injected causes must be named; clean packets stay clean."""
+    from app.dbknow.diagnosis import evaluate
+    from app.dbknow.service import playbook
+
+    issue = playbook("too-many-connections")
+    checks = [d for d in issue["diagnose"] if d["engine"] == "mysql"]
+    limit = rnd.randint(100, 400)
+    cases = []
+    for injected in ("leak", "traffic", "healthy"):
+        connected = rnd.randint(2, limit // 3)
+        sleeping = rnd.randint(0, 10)
+        if injected == "leak":
+            sleeping, connected = rnd.randint(51, 180), rnd.randint(55, limit - 1)
+        elif injected == "traffic":
+            connected = rnd.randint(max(1, int(limit * .85) + 1), limit)
+        raw = [
+            {"columns": ["Variable_name", "Value"], "rows": [["Threads_connected", connected]]},
+            {"columns": ["Variable_name", "Value"], "rows": [["max_connections", limit]]},
+            {"columns": ["USER", "n", "sleeping"], "rows": [["generated_app", connected, sleeping]]},
+        ]
+        got = evaluate(issue, checks, raw)
+        named = {c["id"] for c in got["likely_causes"]}
+        ok = (injected in named) if injected != "healthy" else (not named and got["no_problem_found"])
+        COVER[f"diagnosis {injected}"] += 1
+        cases.append({"seed": seed, "family": "diagnosis", "q": injected, "ok": ok,
+                      "why": "" if ok else f"injected {injected}, got {sorted(named)}"})
+    return cases
+
+
 # ---------------------------------------------------------------- the run
-def run(seeds, show=False, families=("queries", "followups", "phrasings"), client=None, queries_per_seed=8) -> dict:
+def run(seeds, show=False, families=("queries", "followups", "phrasings", "diagnosis"), client=None, queries_per_seed=8) -> dict:
     engines = engines_up() if "queries" in families or "followups" in families else {}
     COVER.clear()
     stats, fails = defaultdict(lambda: [0, 0]), []
@@ -1098,6 +1129,15 @@ def run(seeds, show=False, families=("queries", "followups", "phrasings"), clien
                             print(("NOT SURE " if r["ok"] else "FAIL ") + f"[phrase/{seed}] {r['q']!r} {r['why']}")
                         if not r["ok"]:
                             fails.append(r)
+                if "diagnosis" in families:
+                    for r in diagnoses(seed, random.Random(seed * 32452843)):
+                        st = stats["diagnosis"]
+                        st[0] += r["ok"]
+                        st[1] += 1
+                        if show:
+                            print(("PASS " if r["ok"] else "FAIL ") + f"[diagnosis/{seed}] {r['q']} {r['why']}")
+                        if not r["ok"]:
+                            fails.append(r)
             finally:
                 for eng in engines.values():
                     eng.drop(schema["order"])
@@ -1133,12 +1173,12 @@ def main(argv=None):
     ap.add_argument("--start", type=int, default=1)
     ap.add_argument("--seed", type=int)
     ap.add_argument("--show", action="store_true")
-    ap.add_argument("--family", action="append", choices=["queries", "followups", "phrasings"])
+    ap.add_argument("--family", action="append", choices=["queries", "followups", "phrasings", "diagnosis"])
     ap.add_argument("--json", help="write the report here")
     a = ap.parse_args(argv)
     _test_env()
     seeds = [a.seed] if a.seed is not None else list(range(a.start, a.start + a.seeds))
-    rep = run(seeds, show=a.show, families=tuple(a.family or ("queries", "followups", "phrasings")))
+    rep = run(seeds, show=a.show, families=tuple(a.family or ("queries", "followups", "phrasings", "diagnosis")))
     print(f"passed {rep['passed']}/{rep['total']} ({rep['rate']:.1%})   engines: {', '.join(rep['engines']) or 'none (engine checks skipped)'}")
     print(json.dumps(rep["by_family"], indent=1))
     print("phrasings recognised (rest: 'not sure'):", rep["phrasings_recognised"])

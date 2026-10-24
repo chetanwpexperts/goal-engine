@@ -2,6 +2,7 @@
 
 import os
 import resource
+import sys
 import time
 
 from openpyxl import Workbook, load_workbook
@@ -88,7 +89,9 @@ def test_big_file_streams_with_low_memory(tmp_path):
     start, mem0 = time.time(), resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     r = office.compare(a, b, out)
     took = time.time() - start
-    grew_mb = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss - mem0) / 1024
+    # Linux reports KiB; macOS reports bytes. Keep the same real 300 MB ceiling.
+    divisor = 1024 * 1024 if sys.platform == "darwin" else 1024
+    grew_mb = (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss - mem0) / divisor
     assert (r["only_in_a"], r["only_in_b"], r["changed_rows"]) == (1, 1, n // 1000 - 1)
     assert grew_mb < 300, grew_mb
     assert took < 120, took

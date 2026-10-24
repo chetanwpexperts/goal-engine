@@ -38,6 +38,11 @@ def test_new_ways_of_describing_every_playbook():
     assert not rep["fails"], _report(rep)
 
 
+def test_random_injected_diagnoses_and_healthy_cases():
+    rep = F.run(range(900, 908), families=("diagnosis",))
+    assert not rep["fails"], _report(rep)
+
+
 # ---------------------------------------------------------------- what the generator found (fixed), kept for good
 def test_unwrap_every_kind_of_code():
     q = "SELECT a FROM t WHERE x = 'y'\n  ORDER BY a"
@@ -118,7 +123,7 @@ def test_postgres_structure_is_read():
     assert any("(team_id)" in i for i in res["indexes"])                                        # a PostgreSQL FK has no index
 
 
-@pytest.mark.skipif(not _up(5432), reason="needs the local PostgreSQL test database")
+@pytest.mark.skipif(not _up(15432), reason="needs the local PostgreSQL test database")
 def test_rewrite_runs_on_postgres_with_the_same_rows():
     eng = F.Engine(F.PG).open()
     try:

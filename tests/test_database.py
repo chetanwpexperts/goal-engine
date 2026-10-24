@@ -222,7 +222,7 @@ def test_secret_round_trip(monkeypatch):
 
 def _local_mysql():
     try:
-        socket.create_connection(("127.0.0.1", 3306), timeout=1).close()
+        socket.create_connection(("127.0.0.1", 13306), timeout=1).close()
         return True
     except OSError:
         return False
@@ -238,9 +238,9 @@ def test_direct_end_to_end_with_real_mysql(client, ml_mode, monkeypatch):
     monkeypatch.setenv("DIRECT_DB_SYNC", "1")
     direct._attempts.clear()
     agent = say(client, "database se data Excel mein chahiye")["agents"][0]
-    bad = client.post("/api/connectors/direct", json={"host": "127.0.0.1", "database": "shop_db", "user": "shopapp", "password": "wrong"})
+    bad = client.post("/api/connectors/direct", json={"host": "127.0.0.1", "port": "13306", "database": "shop_db", "user": "shopapp", "password": "wrong"})
     assert bad.status_code == 400 and "said no" in bad.json()["error"]
-    res = client.post("/api/connectors/direct", json={"host": "127.0.0.1", "database": "shop_db", "user": "shopapp",
+    res = client.post("/api/connectors/direct", json={"host": "127.0.0.1", "port": "13306", "database": "shop_db", "user": "shopapp",
                                                       "password": "app pass", "agent_id": agent["id"]})
     assert res.status_code == 200, res.text
     card = res.json()["agents"][0]
@@ -293,7 +293,7 @@ def test_long_poll_waits_then_returns(client, ml_mode):
 
 def _local_pg():
     try:
-        socket.create_connection(("127.0.0.1", 5432), timeout=1).close()
+        socket.create_connection(("127.0.0.1", 15432), timeout=1).close()
         return True
     except OSError:
         return False
@@ -301,13 +301,13 @@ def _local_pg():
 
 @pytest.mark.skipif(not _local_pg(), reason="needs a local PostgreSQL with the shop_pg test database")
 def test_postgres_driver_for_real(monkeypatch):
-    db = gc.Database({"type": "postgres", "host": "127.0.0.1", "port": "5432", "database": "shop_pg",
+    db = gc.Database({"type": "postgres", "host": "127.0.0.1", "port": "15432", "database": "shop_pg",
                       "user": "shopapp", "password": "app pass"}).connect()
     assert db.version() and db.can_write() is True
     assert "orders" in [t["name"] for t in db.schema()["tables"]]
     q = db.query("SELECT id, amount, created FROM orders ORDER BY id", 50)
-    assert q["row_count"] == 2 and q["rows"][1][1] == "250.50"
-    assert db.export("SELECT * FROM orders")["row_count"] == 2
+    assert q["row_count"] == 4 and q["rows"][1][1] == "250.50"
+    assert db.export("SELECT * FROM orders")["row_count"] == 4
     assert db.explain("SELECT * FROM orders WHERE id = 1")["rows"]
     assert db.health()["checks"]
     # even if the safety check were bypassed, the transaction itself refuses writes
@@ -315,12 +315,12 @@ def test_postgres_driver_for_real(monkeypatch):
     with pytest.raises(Exception, match="read-only"):
         cur.execute("DELETE FROM orders")
     db.done()
-    assert db.query("SELECT count(*) FROM orders", 5)["rows"][0][0] == 2
+    assert db.query("SELECT count(*) FROM orders", 5)["rows"][0][0] == 4
 
 
 @pytest.mark.skipif(not _local_mysql(), reason="needs a local MySQL/MariaDB")
 def test_mysql_transaction_refuses_writes_even_without_the_check():
-    db = gc.Database({"type": "mysql", "host": "127.0.0.1", "port": "3306", "database": "shop_db",
+    db = gc.Database({"type": "mysql", "host": "127.0.0.1", "port": "13306", "database": "shop_db",
                       "user": "shopapp", "password": "app pass"}).connect()
     cur = db.cursor()
     with pytest.raises(Exception, match="(?i)read.only"):

@@ -288,6 +288,13 @@ def complete(db: Session, connector: Connector, job_id: int, data: dict, file_pa
         db.commit()
         return job
     result = data.get("result") or {}
+    if job.kind == "checks" and isinstance(result.get("results"), list):
+        from app.dbknow import service
+
+        payload = loads(job.payload, {}) or {}
+        diagnosis = service.diagnose_results(payload.get("issue_id", ""), payload.get("db_type", ""), result["results"])
+        if diagnosis is not None:
+            result["diagnosis"] = diagnosis
     csv_text = data.get("csv")
     if file_path:
         job.file_path = str(file_path)

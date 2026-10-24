@@ -950,12 +950,19 @@
             chk.append(r.error ? el("p", "fine", r.error) : grid(r));
             parts.push(chk);
           });
-          parts.push(el("p", "cap", T(hi, "Ho sakti wajah aur fix", "Likely causes and fixes")));
+          const diagnosis = j.result.diagnosis || { likely_causes: [] };
+          parts.push(el("p", "cap", T(hi, "Saboot se nateeja", "Evidence-backed conclusion")));
           const ul = el("ul", "causes");
-          for (const cause of d.playbook.causes) {
+          if (!diagnosis.likely_causes.length) {
+            ul.append(el("li", null, diagnosis.no_problem_found
+              ? T(hi, "In checks mein koi problem nahi mili.", "No problem found by these checks.")
+              : T(hi, "Pakka sabab nahi mila; agent andaza nahi laga raha.", "No cause matched the available evidence; the agent is not guessing.")));
+          }
+          for (const cause of diagnosis.likely_causes) {
             const li = el("li");
             li.append(el("b", null, hi ? cause.title_hi : cause.title_en));
-            for (const f of d.playbook.fixes.filter((x) => x.cause === cause.id)) {
+            for (const evidence of cause.evidence || []) li.append(el("p", "fine", evidence.evidence));
+            for (const f of [cause.fix].filter(Boolean)) {
               const fx = el("div", "fix");
               fx.append(el("span", `tag ${f.action}`, (ACTION[f.action] || ["", ""])[hi ? 0 : 1]), el("span", null, hi ? f.steps_hi : f.steps_en));
               li.append(fx);

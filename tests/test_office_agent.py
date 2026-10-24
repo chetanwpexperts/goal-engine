@@ -112,12 +112,24 @@ def test_old_files_removed_after_an_hour(client, ml_mode):
     assert not os.path.exists(path)
 
 
-def test_work_cut_off_by_a_restart_carries_on(client, ml_mode):
+def test_work_cut_off_by_a_restart_carries_on(client, ml_mode, tmp_path, monkeypatch):
     from datetime import timedelta
 
     from app.agents import office_agent
     from app.db import _SessionLocal
     from app.models import OfficeFile, utcnow
+
+    # Tests must never compete with the live server's resume lock.
+    monkeypatch.setattr(
+        office_agent,
+        "DATA",
+        tmp_path / "office-resume",
+    )
+    monkeypatch.setattr(
+        office_agent,
+        "_resume_lock",
+        None,
+    )
 
     r = say(client, "excel file ke formula check karo")
     agent = next(a for a in r["agents"] if a.get("office"))

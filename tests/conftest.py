@@ -14,6 +14,8 @@ os.environ["ENGINE_MODE"] = "ai"   # AI-path tests; ML tests switch it on per te
 os.environ["AGENT_SCHEDULER"] = "off"
 os.environ["EXPOSE_INTERNALS"] = "1"   # tests read how a message was understood; the live site never sends it
 os.environ["SITE_MODE"] = "open"   # the coming-soon gate has its own test
+os.environ["MAX_MESSAGE_CHARS"] = "10000"
+os.environ["COOKIE_SECURE"] = "false"   # TestClient uses http://testserver; keep visitor cookie in tests
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -64,6 +66,38 @@ def fresh_db():
     Base.metadata.drop_all(engine)
     init_db()
     yield
+
+    # Office jobs run in background threads. Do not let the next
+    # test drop the SQLite tables until those workers have committed.
+    import time
+
+    from sqlalchemy import func, select
+
+    from app.db import _SessionLocal
+    from app.models import OfficeFile
+
+    deadline = time.monotonic() + 30
+
+    while True:
+        with _SessionLocal() as db:
+            active = db.scalar(
+                select(func.count())
+                .select_from(OfficeFile)
+                .where(
+                    OfficeFile.status.in_(("queued", "working"))
+                )
+            ) or 0
+
+        if active == 0:
+            break
+
+        if time.monotonic() >= deadline:
+            raise AssertionError(
+                f"{active} Office background worker(s) "
+                "still active after test teardown"
+            )
+
+        time.sleep(0.02)
 
 
 @pytest.fixture()

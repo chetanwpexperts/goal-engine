@@ -85,9 +85,26 @@ def validate() -> list[str]:
                 if len(e["symptoms"]) < 3:
                     problems.append(f"{where}: give at least 3 ways people describe it (English and Hinglish)")
                 cause_ids = {c.get("id") for c in e["causes"]}
+                check_ids = set()
                 for d in e["diagnose"]:
                     if d.get("sql") and not re.match(r"^\s*(select|with|show|explain)\b", d["sql"], re.I):
                         problems.append(f"{where}: diagnose queries must be read-only")
+                    if d.get("sql") and not d.get("id"):
+                        problems.append(f"{where}: every automatic check needs an id")
+                    if d.get("id") and d.get("id") in check_ids:
+                        problems.append(f"{where}: duplicate check id {d.get('id')}")
+                    if d.get("id"):
+                        check_ids.add(d["id"])
+                for cause in e["causes"]:
+                    for signal in cause.get("signals", []):
+                        if signal.get("check") not in check_ids:
+                            problems.append(f"{where}: signal points to unknown check {signal.get('check')}")
+                        if signal.get("manual"):
+                            if not str(signal.get("evidence", "")).strip():
+                                problems.append(f"{where}: manual signal needs evidence text")
+                            continue
+                        if signal.get("op") not in ("==", "!=", ">", ">=", "<", "<=", "contains", "in"):
+                            problems.append(f"{where}: unknown signal operator {signal.get('op')}")
                 for f in e["fixes"]:
                     if f.get("cause") not in cause_ids:
                         problems.append(f"{where}: fix points to unknown cause {f.get('cause')}")

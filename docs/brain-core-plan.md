@@ -62,3 +62,23 @@ brain recognises them and goes to the real cause. Every fact carries: source(s),
 yes/no, trust score. The brain answers with certainty only from proven facts plus evidence from the
 user's own data; otherwise it says what it found and the next step.
 Ideas and facts only: never copy text or code from forums (licences); write our own.
+
+## Next brain: cybersecurity (agreed 2026-10-24; PHP waits)
+For small businesses AND developers/IT teams: same deep checks, the explanation adapts to the person's
+level (the mind already detects beginner/expert); "show technical details" / "explain simply" switch it.
+Scope (defensive only: detect, fix, recover, prevent; never attack steps, exploits or ways to break in):
+- Website security check: SSL/TLS, security headers, exposed files (.env, .git, backups), outdated CMS /
+  plugins, open admin pages, mixed content. Passive by default.
+- "Am I hacked?": signs of compromise (unknown admins, injected scripts/spam, redirects, odd logins),
+  then clean-up and recovery steps (reuses the database brain's 31 security playbooks).
+- Suspicious email check (.eml): sender, SPF/DKIM/DMARC results, look-alike links, risky attachments.
+- Logins/passwords: weak or shared admin accounts, no 2FA, brute-force in logs.
+- Server and database hardening: open ports, remote root, default passwords, firewall, backups.
+- Outdated software vs known vulnerabilities (vendor advisories / CVE IDs) -> "update X to Y".
+- Domain email protection: SPF/DKIM/DMARC set up correctly.
+- For bigger teams: many sites/servers, schedules, alerts, a report for management/auditors.
+Rules: deeper (active) checks only after the person proves ownership (file or DNS record); otherwise
+only public passive checks. Read-only by default; fixes need approval + Undo. Knowledge from OWASP, CISA,
+NIST, vendor advisories through the six trust filters.
+Order: knowledge nightly run from Thu 29 Oct; agent on the reasoning core from the week of 2 Nov; at
+launch at least the website security check, "am I hacked?" and the suspicious email check.

@@ -92,17 +92,3 @@ launch at least the website security check, "am I hacked?" and the suspicious em
 - Cybersecurity: the person should be able to relax. The brain watches continuously (scheduled checks,
   alerts), explains, and fixes with approval + Undo; it never changes their systems silently, and it
   says plainly what it can't protect against (no tool can promise zero risk).
-
-## Future: selling brains (business model, agreed direction 2026-10-24; not built yet)
-- Each brain (database, Microsoft, cybersecurity, ...) is sold as its own licensed package, with a
-  digital certificate per brain: signed by us (e.g. Ed25519), checked OFFLINE by the customer's
-  installation, naming the customer, the brain(s), the version range and the validity period.
-- After the sale the brain runs in the customer's own workspace. It NEVER sends their data, questions or
-  outcomes back to us. Its learning from outcomes stays local to that customer.
-- The parent brain (ours) keeps improving centrally. Customers PULL signed update packages (knowledge +
-  code) under their maintenance plan; the installation verifies the signature before applying, and can
-  roll back. Support for issues = maintenance: we reproduce with our parent brain and ship a fix package.
-- Workspace: one customer workspace can hold several brains (multi-brain), routed by the shared mind;
-  the brain map / workspace view shows which brain is working (see the multi-brain notes above).
-- Before selling: the repo must be private, code protected (compiled/packaged, licence check), and a
-  licence + maintenance agreement written.

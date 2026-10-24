@@ -291,7 +291,7 @@ def test_after_a_long_pause_the_chain_starts_fresh(client, open_file):  # noqa: 
 def test_how_many_sheets_gets_the_number(client, open_file):  # noqa: F811
     r = say(client, "now tell me how many sheets in this", open_file)
     assert "7 sheets" in r["reply"] and "Sales Data" in r["reply"], r["reply"]
-    assert r["options"] == []
+    assert all(o.startswith(("Show ", "dikhao")) or o.endswith(" dikhao") for o in r["options"])   # only the sheets, one tap each
 
 
 def test_what_it_could_not_answer_directly_goes_to_learning(client, open_file):  # noqa: F811

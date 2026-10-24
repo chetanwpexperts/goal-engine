@@ -1414,13 +1414,53 @@
    "rs",
    "rupees",
    "value",
-   "total"
+   "total",
+   "expense",
+   "expenses",
+   "kharcha",
+   "kharche",
+   "kharch"
   ],
   "spent": [
    "spent",
    "paid",
    "kharch",
    "kharcha"
+  ],
+  "building": [
+   "building",
+   "property",
+   "society",
+   "block",
+   "tower",
+   "imarat",
+   "apartment"
+  ],
+  "floor": [
+   "floor",
+   "flr",
+   "manzil",
+   "storey",
+   "level"
+  ],
+  "mode": [
+   "mode",
+   "via",
+   "method",
+   "payment mode",
+   "through"
+  ],
+  "tenant": [
+   "tenant",
+   "tenants",
+   "kirayedar",
+   "kirayadar",
+   "occupant"
+  ],
+  "rent": [
+   "rent",
+   "kiraya",
+   "kiraaya"
   ]
  }
 }

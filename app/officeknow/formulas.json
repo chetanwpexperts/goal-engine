@@ -291,7 +291,11 @@
       "pending payment walon ki list",
       "list banao jinka payment late hai",
       "जिनका पेमेंट बाकी है उनकी लिस्ट",
-      "बकाया वाले ग्राहकों की सूची बनाओ"
+      "बकाया वाले ग्राहकों की सूची बनाओ",
+      "due date nikal gayi payment nahi aaya unki list",
+      "jinka paisa due date ke baad bhi pending hai",
+      "overdue customers ki list jinka payment nahi aaya",
+      "नियत तारीख के बाद भी भुगतान न आने वालों की सूची"
     ],
     "needs": [
       "table",
@@ -834,6 +838,725 @@
     "seen_at": [
       "https://www.reddit.com/r/excel/",
       "https://www.mrexcel.com/board/"
+    ]
+  },
+  {
+    "id": "depreciation-straight-line",
+    "title_en": "Straight-line depreciation (SLM) per year / per month",
+    "title_hi": "Straight-line (SLM) depreciation har saal / har mahine",
+    "examples": [
+      "straight line depreciation formula",
+      "SLM depreciation nikalna hai",
+      "har saal barabar depreciation",
+      "yearly depreciation on cost minus scrap value",
+      "monthly depreciation of laptop",
+      "SLN formula excel",
+      "सीधी रेखा पद्धति से मूल्यह्रास",
+      "हर साल एक जैसा डेप्रिसिएशन",
+      "asset ka depreciation saal ka kitna",
+      "fixed asset depreciation over useful life",
+      "machine 5 saal chalegi depreciation kitna",
+      "मशीन की लागत पर सालाना घिसावट",
+      "equal depreciation every year till residual value",
+      "how much value does an asset lose every year",
+      "printer value loss each year over its life",
+      "asset lasts 4 years with scrap value, yearly loss in value",
+      "equipment loses how much value per year",
+      "har saal asset ki value kitni ghategi"
+    ],
+    "needs": [
+      "cost",
+      "salvage",
+      "life_years"
+    ],
+    "templates": {
+      "excel365": "=SLN({cost},{salvage},{life_years})",
+      "excel2016": "=SLN({cost},{salvage},{life_years})",
+      "google_sheets": "=SLN({cost},{salvage},{life_years})"
+    },
+    "explain_en": "(Cost - salvage/residual value) / useful life in years = the same depreciation every year. Divide by 12 for a monthly charge. Life must be in years if you want a yearly figure.",
+    "explain_hi": "(Cost - salvage/scrap value) / life (saal) = har saal barabar depreciation. Mahine ka chahiye to 12 se divide karo. Life saalon mein do.",
+    "test_phrases": [
+      "how much does my printer lose in value each year if it lasts 4 years and scrap is 2000",
+      "computer ka har saal ka depreciation barabar kitna banega",
+      "कंप्यूटर का हर साल का बराबर मूल्यह्रास कितना होगा"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/sln-function-cdb666e5-c1c6-40a7-806a-e695edc2f1c8",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "depreciation-wdv-rate",
+    "title_en": "Written down value (WDV) depreciation at a fixed rate %",
+    "title_hi": "WDV depreciation fixed rate % par",
+    "examples": [
+      "WDV method depreciation at 15%",
+      "written down value depreciation year 3",
+      "reducing balance depreciation at rate",
+      "wdv par depreciation kaise nikale",
+      "income tax depreciation 40% wdv",
+      "diminishing balance method excel",
+      "क्रमागत ह्रास पद्धति से मूल्यह्रास",
+      "घटते मूल्य पर डेप्रिसिएशन",
+      "har saal bache hue value par depreciation",
+      "depreciation on opening wdv",
+      "closing written down value after n years",
+      "डब्ल्यूडीवी विधि दर से",
+      "15 percent reducing balance depreciation for year n",
+      "बची हुई कीमत पर प्रतिशत से ह्रास",
+      "बचे मूल्य पर 15 प्रतिशत की दर से मूल्यह्रास",
+      "तीसरे साल का ह्रास बचे हुए मूल्य पर",
+      "remaining value par percentage se depreciation",
+      "depreciation on remaining value at percent"
+    ],
+    "needs": [
+      "cost",
+      "rate",
+      "year"
+    ],
+    "templates": {
+      "excel365": "=ROUND({cost}*(1-{rate})^({year}-1)*{rate},2)",
+      "excel2016": "=ROUND({cost}*(1-{rate})^({year}-1)*{rate},2)",
+      "google_sheets": "=ROUND({cost}*(1-{rate})^({year}-1)*{rate},2)"
+    },
+    "explain_en": "Depreciation for year N = opening WDV x rate, where opening WDV = cost x (1-rate)^(N-1). Closing WDV = cost x (1-rate)^N. Use this when the rate is given (Companies Act / tax rates); Excel's DB works out its own rate from the salvage value instead.",
+    "explain_hi": "Saal N ka depreciation = opening WDV x rate, opening WDV = cost x (1-rate)^(N-1). Closing WDV = cost x (1-rate)^N. Jab rate diya ho (tax/Companies Act) tab ye use karo; Excel ka DB salvage se apna rate banata hai.",
+    "test_phrases": [
+      "depreciation in the third year on the remaining value at 15 percent",
+      "bache hue value par 15 percent se teesre saal ka depreciation",
+      "बची हुई कीमत पर 15 प्रतिशत से तीसरे साल का ह्रास"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/db-function-354e7d28-5f93-4ff1-8a52-eb4ee549d9d7",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "depreciation-declining-db",
+    "title_en": "Declining balance depreciation from cost, salvage and life (DB)",
+    "title_hi": "Cost, salvage aur life se declining balance depreciation (DB)",
+    "examples": [
+      "DB function depreciation",
+      "fixed declining balance with salvage value",
+      "declining balance first year partial months",
+      "db formula month argument",
+      "डीबी फंक्शन से मूल्यह्रास",
+      "declining depreciation jab rate pata nahi bas scrap value pata hai",
+      "accelerated depreciation excel",
+      "double declining DDB vs DB",
+      "घटती शेष राशि पद्धति एक्सेल फंक्शन",
+      "depreciation reducing without rate only salvage",
+      "rate unknown only scrap value and life known",
+      "only salvage and useful life given, declining depreciation",
+      "दर पता नहीं, कबाड़ मूल्य और उम्र से ह्रास",
+      "कबाड़ मूल्य और जीवनकाल से घटता हुआ मूल्यह्रास",
+      "rate nahi pata, scrap value aur life se ghatta depreciation"
+    ],
+    "needs": [
+      "cost",
+      "salvage",
+      "life_years",
+      "period",
+      "months_first_year"
+    ],
+    "templates": {
+      "excel365": "=DB({cost},{salvage},{life_years},{period},{months_first_year})",
+      "excel2016": "=DB({cost},{salvage},{life_years},{period},{months_first_year})",
+      "google_sheets": "=DB({cost},{salvage},{life_years},{period},{months_first_year})"
+    },
+    "explain_en": "DB works out a fixed rate (rounded to 3 decimals) so the asset reaches the salvage value at the end of its life. The last argument is how many months the asset was owned in the first year (12 if a full year). If your rate is fixed by law, use the WDV-at-rate formula instead.",
+    "explain_hi": "DB khud ek rate nikalta hai (3 decimal tak) taaki life ke end par value salvage tak aaye. Aakhri argument = pehle saal kitne mahine asset tha (poora saal = 12). Rate kanoon se fixed hai to WDV-at-rate wala formula lo.",
+    "test_phrases": [
+      "reducing depreciation when I only know the scrap value and life, not the rate",
+      "rate nahi pata sirf scrap value aur life pata hai, ghatta hua depreciation nikalo",
+      "दर नहीं पता, सिर्फ़ कबाड़ मूल्य और उम्र से घटता ह्रास निकालो"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/db-function-354e7d28-5f93-4ff1-8a52-eb4ee549d9d7",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "depreciation-pro-rata-first-year",
+    "title_en": "First-year depreciation for part of the year (pro-rata by days)",
+    "title_hi": "Pehle saal ka depreciation sirf jitne din asset raha (pro-rata)",
+    "examples": [
+      "asset bought in october depreciation for remaining months",
+      "pro rata depreciation by days",
+      "depreciation from date of purchase to year end",
+      "beech saal mein khareeda asset depreciation",
+      "आधे साल का मूल्यह्रास",
+      "खरीद की तारीख से साल के अंत तक डेप्रिसिएशन",
+      "part year depreciation yearfrac",
+      "depreciation for days used in first year",
+      "31 march tak kitne din ka depreciation",
+      "partial period depreciation asset added mid year",
+      "vehicle bought in november depreciation for months left this year",
+      "gaadi saal ke beech mein li, bache mahino ka depreciation",
+      "beech saal li gaadi ka is saal ka depreciation",
+      "is saal ke bache hue mahino ka hi depreciation lagana hai",
+      "asset liya november mein to kitne mahine ka depreciation",
+      "साल के बीच खरीदी गाड़ी का इस साल के बचे दिनों का ह्रास"
+    ],
+    "needs": [
+      "cost",
+      "salvage",
+      "life_years",
+      "purchase_date",
+      "year_end"
+    ],
+    "templates": {
+      "excel365": "=ROUND(SLN({cost},{salvage},{life_years})*YEARFRAC({purchase_date},{year_end},1),2)",
+      "excel2016": "=ROUND(SLN({cost},{salvage},{life_years})*YEARFRAC({purchase_date},{year_end},1),2)",
+      "google_sheets": "=ROUND(SLN({cost},{salvage},{life_years})*YEARFRAC({purchase_date},{year_end},1),2)"
+    },
+    "explain_en": "Full-year straight-line charge x the fraction of the year the asset was owned (YEARFRAC with basis 1 = actual days). Some tax rules use half-rate for assets used under 180 days instead of exact days; follow the rule your books use.",
+    "explain_hi": "Poore saal ka SLM depreciation x saal ka jitna hissa asset paas raha (YEARFRAC basis 1 = asli din). Kuch tax rules 180 din se kam use par aadha rate lete hain; jo rule aapki books mein hai woh lo.",
+    "test_phrases": [
+      "we bought the van in november, how much depreciation for the months left in this year",
+      "gaadi november mein li thi, is saal ke bache mahino ka depreciation kitna",
+      "गाड़ी नवंबर में ली थी, इस साल के बचे दिनों का मूल्यह्रास कितना"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/functions/yearfrac-function",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "accumulated-depreciation",
+    "title_en": "Accumulated depreciation and net book value as on a date",
+    "title_hi": "Kisi date tak ka kul (accumulated) depreciation aur book value",
+    "examples": [
+      "accumulated depreciation till date",
+      "net book value of asset today",
+      "NBV formula excel",
+      "ab tak kitna depreciation ho chuka",
+      "asset ki aaj ki book value",
+      "संचित मूल्यह्रास अब तक",
+      "fixed asset register book value",
+      "carrying value of asset as on 31 march",
+      "संपत्ति का आज का बुक मूल्य",
+      "total depreciation charged so far capped at cost minus salvage",
+      "how much has been written off so far on this machine",
+      "asset worth on paper today",
+      "total written off till now and value on books",
+      "machine written off so far",
+      "kitna write off ho chuka ab tak"
+    ],
+    "needs": [
+      "cost",
+      "salvage",
+      "life_years",
+      "purchase_date",
+      "as_on"
+    ],
+    "templates": {
+      "excel365": "=MIN(ROUND(SLN({cost},{salvage},{life_years})*YEARFRAC({purchase_date},{as_on},1),2),{cost}-{salvage})",
+      "excel2016": "=MIN(ROUND(SLN({cost},{salvage},{life_years})*YEARFRAC({purchase_date},{as_on},1),2),{cost}-{salvage})",
+      "google_sheets": "=MIN(ROUND(SLN({cost},{salvage},{life_years})*YEARFRAC({purchase_date},{as_on},1),2),{cost}-{salvage})"
+    },
+    "explain_en": "Straight-line charge per year x years owned so far, never more than cost - salvage. Net book value = cost - this figure.",
+    "explain_hi": "Saal ka SLM charge x ab tak ke saal, lekin cost - salvage se zyada kabhi nahi. Book value = cost - ye figure.",
+    "test_phrases": [
+      "how much has this machine been written off so far and what's it worth on paper today",
+      "machine ka ab tak total kitna depreciation lag chuka hai",
+      "मशीन पर अब तक कुल कितना मूल्यह्रास लग चुका है"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/sln-function-cdb666e5-c1c6-40a7-806a-e695edc2f1c8",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "prepaid-expense-monthly",
+    "title_en": "Prepaid expense: monthly charge and balance left (deferral)",
+    "title_hi": "Prepaid expense: mahine ka kharcha aur bacha hua prepaid",
+    "examples": [
+      "prepaid insurance monthly amortization",
+      "annual subscription paid in advance spread over 12 months",
+      "prepaid expense balance at month end",
+      "advance rent ko mahino mein baantna",
+      "deferral schedule excel",
+      "अग्रिम भुगतान किया खर्च हर महीने",
+      "प्रीपेड बीमा का मासिक हिस्सा",
+      "prepaid kitna bacha hai is mahine ke baad",
+      "amortize yearly AMC over months",
+      "unexpired insurance at year end",
+      "पहले से दिया खर्च महीनों में बांटना",
+      "remaining prepaid after this month",
+      "insurance paid upfront for a year, unused portion after a month",
+      "how much of the advance insurance is still unused",
+      "unused part of insurance paid in advance",
+      "बीमा पहले दिया, बाकी कितना बचा",
+      "साल का बीमा एडवांस दिया, कितना हिस्सा बाकी",
+      "advance mein diya insurance kitna bacha hai",
+      "पहले से दिए बीमे का बचा हुआ हिस्सा"
+    ],
+    "needs": [
+      "amount",
+      "months",
+      "start_date",
+      "as_on"
+    ],
+    "templates": {
+      "excel365": "=ROUND({amount}-{amount}/{months}*MIN({months},MAX(0,(YEAR({as_on})-YEAR({start_date}))*12+MONTH({as_on})-MONTH({start_date})+1)),2)",
+      "excel2016": "=ROUND({amount}-{amount}/{months}*MIN({months},MAX(0,(YEAR({as_on})-YEAR({start_date}))*12+MONTH({as_on})-MONTH({start_date})+1)),2)",
+      "google_sheets": "=ROUND({amount}-{amount}/{months}*MIN({months},MAX(0,(YEAR({as_on})-YEAR({start_date}))*12+MONTH({as_on})-MONTH({start_date})+1)),2)"
+    },
+    "explain_en": "Monthly charge = amount / months. Months used up to the as-on month (counting the start month), capped at the total; balance left = amount - monthly charge x months used. That balance is the prepaid (asset) at month end.",
+    "explain_hi": "Mahine ka charge = amount / mahine. As-on mahine tak kitne mahine guzre (shuru wala mahina bhi), total se zyada nahi; bacha = amount - charge x guzre mahine. Yahi month end ka prepaid (asset) hai.",
+    "test_phrases": [
+      "we paid a year of insurance upfront, how much of it is still unused after september",
+      "saal ka insurance advance diya tha, september ke baad kitna bacha",
+      "साल भर का बीमा पहले दिया था, सितंबर के बाद कितना बाकी है"
+    ],
+    "source": "https://learn.microsoft.com/en-us/dynamics365/business-central/finance-how-defer-revenue-expenses",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "deferred-revenue-recognition",
+    "title_en": "Deferred (unearned) revenue: recognised so far and still deferred",
+    "title_hi": "Advance mili income: ab tak ki income aur abhi deferred",
+    "examples": [
+      "unearned revenue recognition monthly",
+      "advance received from customer recognise over contract months",
+      "deferred revenue balance",
+      "annual plan ka paisa advance aaya, income har mahine",
+      "revenue recognition schedule",
+      "अग्रिम प्राप्त आय का मासिक हिस्सा",
+      "अनर्जित आय अब तक कितनी",
+      "subscription revenue earned to date",
+      "customer advance kitna income ban gaya",
+      "income received in advance at year end"
+    ],
+    "needs": [
+      "amount",
+      "months",
+      "start_date",
+      "as_on"
+    ],
+    "templates": {
+      "excel365": "=ROUND({amount}/{months}*MIN({months},MAX(0,(YEAR({as_on})-YEAR({start_date}))*12+MONTH({as_on})-MONTH({start_date})+1)),2)",
+      "excel2016": "=ROUND({amount}/{months}*MIN({months},MAX(0,(YEAR({as_on})-YEAR({start_date}))*12+MONTH({as_on})-MONTH({start_date})+1)),2)",
+      "google_sheets": "=ROUND({amount}/{months}*MIN({months},MAX(0,(YEAR({as_on})-YEAR({start_date}))*12+MONTH({as_on})-MONTH({start_date})+1)),2)"
+    },
+    "explain_en": "Revenue earned to date = amount / contract months x months passed (capped). Still deferred (a liability) = amount - that.",
+    "explain_hi": "Ab tak kamaayi income = amount / contract ke mahine x guzre mahine (max tak). Abhi deferred (liability) = amount - ye.",
+    "test_phrases": [
+      "a client paid a full year's fee in advance, how much of it counts as income till now",
+      "client ne poore saal ki fees advance di, ab tak kitni income maan sakte hain",
+      "ग्राहक ने पूरे साल की फीस पहले दी, अब तक कितनी आय मानें"
+    ],
+    "source": "https://learn.microsoft.com/en-us/dynamics365/business-central/finance-how-defer-revenue-expenses",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "accrued-interest",
+    "title_en": "Accrued interest for the days till month end",
+    "title_hi": "Month end tak ke dino ka accrued interest",
+    "examples": [
+      "accrued interest on FD till 31 march",
+      "interest accrued but not due",
+      "interest for days formula",
+      "loan interest accrual month end",
+      "byaj kitne din ka banta hai",
+      "अर्जित ब्याज महीने के अंत तक",
+      "simple interest for number of days",
+      "provision for interest at month end",
+      "एफडी पर अब तक का ब्याज",
+      "interest receivable as on date"
+    ],
+    "needs": [
+      "principal",
+      "annual_rate",
+      "from_date",
+      "to_date"
+    ],
+    "templates": {
+      "excel365": "=ROUND({principal}*{annual_rate}*({to_date}-{from_date})/365,2)",
+      "excel2016": "=ROUND({principal}*{annual_rate}*({to_date}-{from_date})/365,2)",
+      "google_sheets": "=ROUND({principal}*{annual_rate}*({to_date}-{from_date})/365,2)"
+    },
+    "explain_en": "Principal x yearly rate x days / 365 (simple interest). Days = to date - last interest date. Book it as interest accrued (asset for FDs, liability for loans).",
+    "explain_hi": "Principal x saal ka rate x din / 365 (simple interest). Din = to date - pichli interest date. FD par asset, loan par liability ke roop mein book karo.",
+    "test_phrases": [
+      "how much interest has built up on our deposit since the last credit date up to month end",
+      "FD par pichhli date se month end tak kitna byaj ban gaya",
+      "पिछली तारीख से महीने के अंत तक जमा पर कितना ब्याज बना"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/add-or-subtract-dates",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "unbilled-expense-accrual",
+    "title_en": "Accrual for expenses with no bill yet (provision at month end)",
+    "title_hi": "Jin kharchon ka bill abhi nahi aaya unka provision",
+    "examples": [
+      "month end provision for expenses not billed",
+      "accrued expenses list",
+      "bill nahi aaya par kharcha hua provision",
+      "outstanding expenses at month end",
+      "electricity bill accrual estimate",
+      "बिना बिल के खर्च का प्रावधान",
+      "बकाया खर्च महीने के अंत में",
+      "total of estimates where invoice not received",
+      "provision for audit fees not billed",
+      "accrue utilities before invoice comes"
+    ],
+    "needs": [
+      "estimate_amounts",
+      "bill_status",
+      "period_dates",
+      "month_end"
+    ],
+    "templates": {
+      "excel365": "=SUMIFS({estimate_amounts},{bill_status},\"Not received\",{period_dates},\"<=\"&{month_end})",
+      "excel2016": "=SUMIFS({estimate_amounts},{bill_status},\"Not received\",{period_dates},\"<=\"&{month_end})",
+      "google_sheets": "=SUMIFS({estimate_amounts},{bill_status},\"Not received\",{period_dates},\"<=\"&{month_end})"
+    },
+    "explain_en": "Adds the estimated amounts of services used up to month end whose bill hasn't arrived. Book them as outstanding expenses; reverse on the 1st of next month when the real bill comes.",
+    "explain_hi": "Month end tak use hui services jinka bill nahi aaya, unke estimate jodta hai. Outstanding expense book karo; agle mahine ki 1 tareekh ko asli bill aane par reverse karo.",
+    "test_phrases": [
+      "which costs did we use this month but haven't got invoices for, total them for provision",
+      "is mahine ka kharcha jinka bill abhi tak nahi aaya uska total provision",
+      "इस महीने के जिन खर्चों का बिल नहीं आया उनका कुल प्रावधान"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/sumifs-function-c9e748f5-7ea7-455d-9406-611cebce642b",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "trial-balance-check",
+    "title_en": "Trial balance check: total debits = total credits",
+    "title_hi": "Trial balance check: total debit = total credit",
+    "examples": [
+      "does my trial balance tally",
+      "check debit total equals credit total",
+      "TB difference formula",
+      "trial balance mein dono side barabar hai kya",
+      "debit credit match check formula",
+      "तलपट मिलान डेबिट क्रेडिट",
+      "ट्रायल बैलेंस में अंतर",
+      "sum of debits minus sum of credits",
+      "tb tally hua ya nahi",
+      "suspense difference in trial balance",
+      "are debit and credit columns of TB equal",
+      "check if TB debit side equals credit side",
+      "is there a gap between debit and credit totals of TB",
+      "TB ke dono column ka total barabar check karo",
+      "तलपट के दोनों कॉलम का जोड़ बराबर है क्या"
+    ],
+    "needs": [
+      "debits",
+      "credits"
+    ],
+    "templates": {
+      "excel365": "=IF(ROUND(SUM({debits})-SUM({credits}),2)=0,\"Tallied\",\"Difference: \"&TEXT(SUM({debits})-SUM({credits}),\"0.00\"))",
+      "excel2016": "=IF(ROUND(SUM({debits})-SUM({credits}),2)=0,\"Tallied\",\"Difference: \"&TEXT(SUM({debits})-SUM({credits}),\"0.00\"))",
+      "google_sheets": "=IF(ROUND(SUM({debits})-SUM({credits}),2)=0,\"Tallied\",\"Difference: \"&TEXT(SUM({debits})-SUM({credits}),\"0.00\"))"
+    },
+    "explain_en": "Rounds to 2 decimals so tiny floating-point leftovers don't show as a difference. A positive difference means debits are higher. If it doesn't tally, check text numbers, one-sided entries and amounts on the wrong side.",
+    "explain_hi": "2 decimal tak round karta hai taaki chhote decimal ke fark difference na dikhe. Plus = debit zyada. Tally na ho to text numbers, ek-taraf entry aur galat side wali amount dekho.",
+    "test_phrases": [
+      "are the debit and credit columns of my TB equal or is there a gap",
+      "trial balance ke debit credit total barabar hain ya fark hai",
+      "तलपट के डेबिट और क्रेडिट जोड़ बराबर हैं या अंतर है"
+    ],
+    "source": "https://learn.microsoft.com/en-us/dynamics365/business-central/reports/report-6",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "trial-balance-wrong-side-check",
+    "title_en": "TB difference: find an amount posted on the wrong side (half the difference)",
+    "title_hi": "TB difference: galat side post hui amount dhoondo (difference ka aadha)",
+    "examples": [
+      "amount posted on wrong side trial balance",
+      "debit posted as credit find it",
+      "half of difference trick",
+      "galat side mein entry dal di",
+      "difference ka aadha amount dhoondo",
+      "गलत पक्ष में पोस्टिंग",
+      "अंतर का आधा राशि खोजें",
+      "credit instead of debit error",
+      "which entry is on the wrong side",
+      "tb difference double of an entry",
+      "someone put a debit in the credit column find which one",
+      "debit amount entered in credit column which entry",
+      "find the entry put in the wrong column debit credit",
+      "debit wali amount credit column mein daal di kaunsi",
+      "galti se debit ko credit mein likh diya, entry dhoondo",
+      "डेबिट की रकम क्रेडिट में डाल दी कौन सी",
+      "गलती से डेबिट को क्रेडिट कॉलम में लिखा, एंट्री ढूंढो",
+      "which amount went into the wrong column"
+    ],
+    "needs": [
+      "amounts",
+      "difference"
+    ],
+    "templates": {
+      "excel365": "=COUNTIF({amounts},ROUND(ABS({difference})/2,2))",
+      "excel2016": "=COUNTIF({amounts},ROUND(ABS({difference})/2,2))",
+      "google_sheets": "=COUNTIF({amounts},ROUND(ABS({difference})/2,2))"
+    },
+    "explain_en": "An amount posted on the wrong side makes the difference exactly twice that amount. This counts entries equal to half the difference; filter for that value to find them. If the difference divides by 9, look for transposed digits instead.",
+    "explain_hi": "Galat side post hui amount se difference theek uska double hota hai. Ye difference ke aadhe ke barabar entries ginta hai; us value par filter karke dhoondo. Difference 9 se kat jaye to ulte digits dekho.",
+    "test_phrases": [
+      "I think someone put a debit in the credit column, how do I find which one",
+      "kisi ne debit wali amount credit mein daal di, kaunsi hai kaise pata kare",
+      "किसी ने डेबिट की रकम क्रेडिट में डाल दी, कौन सी है कैसे पता करें"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/countif-function-e0de10c6-f885-4e71-abb4-1f464816df34",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "voucher-balanced-check",
+    "title_en": "Is each journal voucher balanced (its debits = its credits)?",
+    "title_hi": "Har voucher ka debit = credit hai kya?",
+    "examples": [
+      "journal entry not balanced",
+      "voucher wise debit minus credit",
+      "which voucher is out of balance",
+      "har entry number ka dr cr barabar check",
+      "unbalanced journal lines",
+      "वाउचर का डेबिट क्रेडिट बराबर",
+      "किस जर्नल एंट्री में अंतर है",
+      "jv number wise difference",
+      "journal import debits credits not equal per entry",
+      "find the unbalanced voucher"
+    ],
+    "needs": [
+      "debits",
+      "credits",
+      "vouchers",
+      "voucher"
+    ],
+    "templates": {
+      "excel365": "=ROUND(SUMIFS({debits},{vouchers},{voucher})-SUMIFS({credits},{vouchers},{voucher}),2)",
+      "excel2016": "=ROUND(SUMIFS({debits},{vouchers},{voucher})-SUMIFS({credits},{vouchers},{voucher}),2)",
+      "google_sheets": "=ROUND(SUMIFS({debits},{vouchers},{voucher})-SUMIFS({credits},{vouchers},{voucher}),2)"
+    },
+    "explain_en": "Debits minus credits for one voucher number; 0 = balanced. Fill it down next to each voucher and filter the non-zero ones: that's where the TB difference comes from.",
+    "explain_hi": "Ek voucher number ka debit - credit; 0 = balanced. Har voucher ke saamne neeche tak lagao aur non-zero filter karo: TB ka fark wahin se aata hai.",
+    "test_phrases": [
+      "which journal entry has unequal debit and credit lines",
+      "kis JV mein debit aur credit barabar nahi hain",
+      "किस जर्नल वाउचर में डेबिट और क्रेडिट बराबर नहीं"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/sumifs-function-c9e748f5-7ea7-455d-9406-611cebce642b",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "account-balance-from-journal",
+    "title_en": "Balance of an account (ledger code) from journal lines",
+    "title_hi": "Journal lines se kisi account code ka balance",
+    "examples": [
+      "ledger balance by account code",
+      "sumifs debit minus credit for account",
+      "account wise closing balance",
+      "gl code ka balance nikalo",
+      "build trial balance from journal",
+      "खाता कोड का शेष",
+      "लेजर खाते का बैलेंस जर्नल से",
+      "closing balance of cash account from entries",
+      "account head wise net balance",
+      "make TB from day book"
+    ],
+    "needs": [
+      "debits",
+      "credits",
+      "account_codes",
+      "code"
+    ],
+    "templates": {
+      "excel365": "=SUMIFS({debits},{account_codes},{code})-SUMIFS({credits},{account_codes},{code})",
+      "excel2016": "=SUMIFS({debits},{account_codes},{code})-SUMIFS({credits},{account_codes},{code})",
+      "google_sheets": "=SUMIFS({debits},{account_codes},{code})-SUMIFS({credits},{account_codes},{code})"
+    },
+    "explain_en": "Net balance of one account: positive = debit balance, negative = credit balance. Fill down a list of all codes to build a trial balance from the journal.",
+    "explain_hi": "Ek account ka net balance: plus = debit balance, minus = credit balance. Saare codes ki list par neeche tak lagao to journal se trial balance ban jayega.",
+    "test_phrases": [
+      "what is the closing balance of GL 4001 from the journal export",
+      "journal se account code 4001 ka closing balance kitna hai",
+      "जर्नल से खाता कोड 4001 का अंतिम शेष कितना है"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/sumifs-function-c9e748f5-7ea7-455d-9406-611cebce642b",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "account-code-valid",
+    "title_en": "Flag account codes that aren't in the chart of accounts",
+    "title_hi": "Jo account code chart of accounts mein nahi hai use flag karo",
+    "examples": [
+      "invalid gl codes in journal",
+      "check account code exists in chart of accounts",
+      "wrong ledger code entries",
+      "galat account code wali entries",
+      "code master mein hai ya nahi",
+      "गलत खाता कोड",
+      "खाता सूची में कोड नहीं है",
+      "validate cost centre codes",
+      "posting to non-existent account",
+      "find codes missing from coa",
+      "मास्टर सूची में न मिलने वाले लेजर कोड चिह्नित करो",
+      "जिन प्रविष्टियों का कोड मास्टर में नहीं उन्हें मार्क करो",
+      "ledger code master list mein nahi to mark karo",
+      "mark entries whose code isn't in master list",
+      "एंट्री का लेजर कोड मास्टर में नहीं तो निशान लगाओ"
+    ],
+    "needs": [
+      "code",
+      "chart_codes"
+    ],
+    "templates": {
+      "excel365": "=IF(ISNUMBER(MATCH({code},{chart_codes},0)),\"OK\",\"Not in chart\")",
+      "excel2016": "=IF(ISNUMBER(MATCH({code},{chart_codes},0)),\"OK\",\"Not in chart\")",
+      "google_sheets": "=IF(ISNUMBER(MATCH({code},{chart_codes},0)),\"OK\",\"Not in chart\")"
+    },
+    "explain_en": "MATCH looks for the exact code in the chart of accounts. 'Not in chart' for a code that looks right usually means one side is text and the other a number, or there's a hidden space; clean both and check again.",
+    "explain_hi": "MATCH chart of accounts mein exact code dhoondta hai. Sahi dikhne wala code bhi 'Not in chart' aaye to ek taraf text aur doosri taraf number hai, ya chhupa space; dono saaf karke dobara dekho.",
+    "test_phrases": [
+      "mark the entries whose ledger code doesn't exist in our account master",
+      "jin entries ka ledger code master list mein nahi hai unhe mark karo",
+      "जिन एंट्री का लेजर कोड मास्टर सूची में नहीं है उन्हें चिह्नित करो"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/match-function-e8dffd45-c762-47d6-bf89-533f4a37673a",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "account-name-from-code",
+    "title_en": "Bring the account name next to each code (from the chart of accounts)",
+    "title_hi": "Har code ke saamne account ka naam laao (chart of accounts se)",
+    "examples": [
+      "get ledger name from account code",
+      "lookup gl description",
+      "account code se naam lana",
+      "map account codes to names",
+      "coa lookup",
+      "खाता कोड से खाते का नाम",
+      "code ke aage account head chahiye",
+      "pull account description from master",
+      "कोड से लेजर का नाम लाओ",
+      "xlookup account name",
+      "show ledger name beside each GL number",
+      "ledger head name next to GL number in the journal",
+      "GL number ke aage ledger ka naam",
+      "har code ke saamne ledger ka naam dikhao",
+      "जीएल नंबर के आगे खाते का नाम",
+      "put the account title next to every ledger number"
+    ],
+    "needs": [
+      "code",
+      "chart_codes",
+      "chart_names"
+    ],
+    "templates": {
+      "excel365": "=XLOOKUP({code},{chart_codes},{chart_names},\"Not in chart\")",
+      "excel2016": "=IFERROR(INDEX({chart_names},MATCH({code},{chart_codes},0)),\"Not in chart\")",
+      "google_sheets": "=IFERROR(INDEX({chart_names},MATCH({code},{chart_codes},0)),\"Not in chart\")"
+    },
+    "explain_en": "Looks up the exact code and returns its account name; 'Not in chart' when the code is wrong or missing from the master.",
+    "explain_hi": "Exact code dhoond kar account ka naam deta hai; code galat ya master mein na ho to 'Not in chart'.",
+    "test_phrases": [
+      "show the ledger head name beside every GL number in the journal",
+      "journal mein har GL number ke aage ledger ka naam dikha do",
+      "जर्नल में हर जीएल नंबर के आगे खाते का नाम दिखा दो"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/xlookup-function-b7fd680e-6d10-43e6-84f9-88eae8bf5929",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
+    ]
+  },
+  {
+    "id": "month-end-cutoff-check",
+    "title_en": "Cut-off check: entries dated outside the closing month",
+    "title_hi": "Cut-off check: closing mahine ke bahar ki date wali entries",
+    "examples": [
+      "entries posted in wrong period",
+      "cut off check month end",
+      "next month dated entries in this month ledger",
+      "galat mahine ki entry pakdo",
+      "period check for journal dates",
+      "गलत अवधि की प्रविष्टियाँ",
+      "महीने के बाहर की तारीख वाली एंट्री",
+      "transactions after period end",
+      "is entry is mahine ki hai ya nahi",
+      "flag entries before month start or after month end",
+      "bills in october ledger dated november",
+      "entries in this month's ledger with next month dates",
+      "invoices booked in october but dated in november",
+      "october ke ledger mein november ki entries",
+      "अक्टूबर के खाते में नवंबर की एंट्री",
+      "find documents dated in another month inside this month's books"
+    ],
+    "needs": [
+      "entry_date",
+      "period"
+    ],
+    "templates": {
+      "excel365": "=IF({entry_date}>EOMONTH({period},0),\"Next period\",IF({entry_date}<=EOMONTH({period},-1),\"Earlier period\",\"OK\"))",
+      "excel2016": "=IF({entry_date}>EOMONTH({period},0),\"Next period\",IF({entry_date}<=EOMONTH({period},-1),\"Earlier period\",\"OK\"))",
+      "google_sheets": "=IF({entry_date}>EOMONTH({period},0),\"Next period\",IF({entry_date}<=EOMONTH({period},-1),\"Earlier period\",\"OK\"))"
+    },
+    "explain_en": "EOMONTH(period,0) is the last day of the closing month and EOMONTH(period,-1) the last day of the month before. Anything outside that window belongs to another period. Dates stored as text won't compare: convert them first.",
+    "explain_hi": "EOMONTH(period,0) = closing mahine ka aakhri din, EOMONTH(period,-1) = pichhle mahine ka aakhri din. Iske bahar wali entry doosre period ki hai. Text wali dates compare nahi hoti: pehle date banao.",
+    "test_phrases": [
+      "find bills in the october ledger that are actually dated november",
+      "october ke ledger mein november ki date wali entries dhoondo",
+      "अक्टूबर के खाते में नवंबर की तारीख वाली प्रविष्टियाँ ढूंढो"
+    ],
+    "source": "https://support.microsoft.com/en-us/office/eomonth-function-7314ffa1-2bc9-4005-9d66-f49db127d628",
+    "seen_at": [
+      "https://www.reddit.com/r/excel/",
+      "https://www.mrexcel.com/board/",
+      "https://forum.chandoo.org/"
     ]
   }
 ]

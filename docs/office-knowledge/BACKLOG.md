@@ -5,7 +5,7 @@ Work top to bottom, one item per run (10-20 playbooks or 20-40 formulas). Tick `
 ## Department tasks people do in Excel (Chetan's list, 22 Oct) — for each: how people ask it (Eng/Hinglish/Hindi), the formula, the common mistakes
 - [x] Accounts: invoice aging (0-30/31-60/61-90/90+), AR collections list, AP three-way matching (PO vs receipt vs invoice), duplicate vendor payments, early-payment discount tracking
 - [x] Accounts: bank reconciliation (ledger vs bank statement, timing differences, bank fees), credit card / POS settlement matching, intercompany matching
-- [ ] Accounts: month-end close: accruals/deferrals, depreciation schedule (straight-line, WDV), trial balance check (debits = credits), transposed numbers, wrong account codes
+- [x] Accounts: month-end close: accruals/deferrals, depreciation schedule (straight-line, WDV), trial balance check (debits = credits), transposed numbers, wrong account codes
 - [ ] Finance: budget vs actual variance, expense reports, cash flow forecast, GST/tax calculation
 - [ ] Sales & marketing: pipeline by stage, lead scoring, campaign ROI, commission calculation, dirty lead data (duplicates, missing phones, USA/U.S.A.)
 - [ ] HR & operations: attendance and leave, shift roster clashes, project Gantt, inventory reorder alerts, accidental formula overwrites (sheet protection)

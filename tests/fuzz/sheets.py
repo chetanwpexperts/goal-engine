@@ -88,12 +88,22 @@ FIELDS = {
                      ("fee", ["Fee Paid", "Amount Paid", "Fees"], "amount", {"choices": [1500, 4000, 12000]}, "fee"),
                      ("trainer", ["Trainer", "Coach"], "cat", {"values": ["Raj", "Sunny", "Pinky"]}, "trainer"),
                      ("phone", ["Mobile", "Phone", "Contact No"], "phone", {}, None)]},
-    "expenses": {"sheet": ["Expenses", "Kharcha", "Expense Sheet"], "entity": ("expenses", "kharche"),
+    "expenses": {"sheet": ["Expenses", "Kharcha", "Expense Sheet"], "entity": ("expenses", "kharche"), "money_entity": True,
                  "cols": [("date", ["Date", "Expense Date"], "date", {"from": (2026, 2026)}, "date"),
                           ("head", ["Head", "Category", "Expense Head", "Type"], "cat", {"values": ["Rent", "Salary", "Electricity", "Travel", "Food", "Stationery"]}, "category"),
                           ("by", ["Paid By", "Spent By"], "cat", {"values": ["Office", "Ramesh", "Suresh"]}, "paid by"),
                           ("amt", ["Amount", "Amt (Rs)", "Expense Amount", "Rs."], "amount", {"lo": 100, "hi": 50000, "step": 50}, "amount"),
                           ("approved", ["Approved", "Approved?"], "yesno", {}, "approved")]},
+    "rent": {"sheet": ["Rent", "Rent Collection", "Kiraya", "Tenants"], "entity": ("tenants", "kirayedar"),
+             "cols": [("id", ["Receipt No", "Rcpt No", "S.No"], "id", {"prefix": "R-"}, None),
+                      ("name", ["Tenant Name", "Tenant", "Kirayedar"], "person", {}, "tenant"),
+                      ("building", ["Building", "Property", "Society"], "cat", {"values": ["Shanti Niwas", "Green Park", "Sai Residency"]}, "building"),
+                      ("floor", ["Floor", "Flr"], "cat", {"values": ["Ground", "First", "Second"]}, "floor"),
+                      ("rent", ["Rent", "Rent Amount", "Monthly Rent", "Rent (Rs)"], "amount", {"choices": [6500, 8000, 9500, 12000, 15000]}, "rent"),
+                      ("on", ["Paid On", "Payment Date", "Date"], "date", {"from": (2025, 2026)}, "date"),
+                      ("mode", ["Mode", "Payment Mode", "Paid Via"], "cat", {"values": ["Cash", "UPI", "Cheque"]}, "mode"),
+                      ("paid", ["Paid?", "Received", "Rent Received"], "yesno", {}, "received"),
+                      ("phone", ["Mobile", "Phone No"], "phone", {}, None)]},
 }
 
 MESS = ["title_row", "blank_rows", "totals_row", "date_text", "money_text", "upper_headers", "trailing_spaces", "empty_col"]
@@ -180,7 +190,7 @@ def make_book(seed: int, folder: str) -> dict:
             ws.append(tot)
     wb.save(path)
     return {"seed": seed, "field": field, "path": path, "sheet": sheet, "cols": cols, "headers": headers, "rows": rows, "mess": mess,
-            "entity": spec["entity"]}
+            "entity": spec["entity"], "money_entity": spec.get("money_entity", False)}
 
 
 # ---------------------------------------------------------------- questions with their right answers
@@ -212,8 +222,16 @@ def questions(book: dict, rnd: random.Random) -> list[dict]:
                                       [f"how many {ent_en} in {v}", f"{v} mein kitne {ent_hi} hain", f"how many {ent_en} with {_sp(c)} {v}",
                                        f"{v} wale kitne hain"]), "number", n)
         cnt = Counter(r[c[0]] for r in rows)
-        add("group_count", rnd.choice([f"{_sp(c)} wise count", f"{_sp(c)} wise {ent_en}", f"{_sp(c)} ke hisaab se kitne {ent_hi}", f"count of {ent_en} by {_sp(c)}"]),
-            "pairs", dict(cnt))
+        q = rnd.choice([f"{_sp(c)} wise count", f"{_sp(c)} wise {ent_en}", f"{_sp(c)} ke hisaab se kitne {ent_hi}", f"count of {ent_en} by {_sp(c)}"])
+        named = [a for a in amounts if ent_en.rstrip("s") in book["headers"][a[0]].lower()]
+        money = (named + (amounts[:1] if book.get("money_entity") else []) + [None])[0] if q.endswith(f"wise {ent_en}") else None
+        if money is not None:                            # 'item wise bills' with a 'Bill Amount' column, 'paid by wise expenses': the money added up
+            g = defaultdict(int)
+            for r in rows:
+                g[r[c[0]]] += r[money[0]]
+            add("group_sum", q, "pairs", dict(g))
+        else:
+            add("group_count", q, "pairs", dict(cnt))
     for a in amounts[:1]:
         tot = sum(r[a[0]] for r in rows)
         add("sum", rnd.choice([f"total {_sp(a)}", f"{_sp(a)} ka total", f"total {_sp(a)} kitna hai", f"sum of {_sp(a)}"]), "number", tot)

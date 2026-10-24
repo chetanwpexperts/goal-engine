@@ -52,7 +52,12 @@ jobs:
           sed -n "/^PGPASSWORD='app pass' psql/,/>\/dev\/null$/p" scripts/setup_test_dbs.sh > /tmp/pg_setup.sh
           bash /tmp/pg_setup.sh || true
       - name: Test suite
-        run: python -m pytest -q
+        run: |
+          set -o pipefail
+          python -m pytest -q -rfE 2>&1 | tee /tmp/pytest.txt || {
+            grep -E "^(FAILED|ERROR) " /tmp/pytest.txt | head -20 | while read -r l; do echo "::error::$l"; done
+            grep -E "^E  " /tmp/pytest.txt | head -15 | while read -r l; do echo "::error::$l"; done
+            exit 1; }
       - name: Generators (new seeds each run)
         run: |
           python -m tests.fuzz.db --start $(( $(date +%Y%m%d) % 100000 * 10 + 7 )) --seeds 20

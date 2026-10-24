@@ -6,7 +6,13 @@
       "har mahine kitne orders aaye",
       "monthly orders count",
       "pichle 6 mahine ke orders mahine ke hisaab se",
-      "orders per month"
+      "orders per month",
+      "sale count by month",
+      "har mahine sale count",
+      "monthly sales count not amount",
+      "month wise kitne transactions",
+      "mahine ke hisaab se kitni bikri entries",
+      "mahine ke hisaab se sales entries ki ginti"
     ],
     "needs": {
       "table": "the table being counted",
@@ -82,6 +88,1005 @@
     "test_phrases": [
       "kaun se grahak bahut din se nahi aaye",
       "customers jinhone 2 mahine se order nahi kiya"
+    ]
+  },
+  {
+    "id": "sales-today",
+    "intent": "sales_today",
+    "examples": [
+      "sales today",
+      "aaj ki total sale",
+      "आज की बिक्री",
+      "please show sales today"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate sales today?",
+      "mujhe aaj ki total sale batao",
+      "कृपया आज की बिक्री बताइए"
+    ]
+  },
+  {
+    "id": "sales-week",
+    "intent": "sales_week",
+    "examples": [
+      "sales this week",
+      "is hafte ki sale",
+      "इस हफ्ते की बिक्री",
+      "please show sales this week"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate sales this week?",
+      "mujhe is hafte ki sale batao",
+      "कृपया इस हफ्ते की बिक्री बताइए"
+    ]
+  },
+  {
+    "id": "sales-month",
+    "intent": "sales_month",
+    "examples": [
+      "current calendar month revenue amount",
+      "sum revenue for current month",
+      "is calendar month ka revenue amount",
+      "इस कैलेंडर महीने की कुल कमाई"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "calculate revenue amount for the current calendar month",
+      "current month ka revenue sum batao",
+      "इस महीने की कुल कमाई जोड़कर बताइए"
+    ]
+  },
+  {
+    "id": "orders-today",
+    "intent": "orders_today",
+    "examples": [
+      "orders today",
+      "aaj kitne order",
+      "आज कितने ऑर्डर",
+      "please show orders today"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate orders today?",
+      "mujhe aaj kitne order batao",
+      "कृपया आज कितने ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "orders-week",
+    "intent": "orders_week",
+    "examples": [
+      "orders per day this week",
+      "hafte ke daily order",
+      "हफ्ते के रोज़ के ऑर्डर",
+      "please show orders per day this week"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate orders per day this week?",
+      "mujhe hafte ke daily order batao",
+      "कृपया हफ्ते के रोज़ के ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "average-order",
+    "intent": "average_order",
+    "examples": [
+      "average order value",
+      "average order kitna",
+      "औसत ऑर्डर मूल्य",
+      "please show average order value"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(AVG({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(AVG({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(AVG({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate average order value?",
+      "mujhe average order kitna batao",
+      "कृपया औसत ऑर्डर मूल्य बताइए"
+    ]
+  },
+  {
+    "id": "growth-month",
+    "intent": "growth_month",
+    "examples": [
+      "month over month growth",
+      "pichle month se growth",
+      "महीने की वृद्धि",
+      "please show month over month growth"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate month over month growth?",
+      "mujhe pichle month se growth batao",
+      "कृपया महीने की वृद्धि बताइए"
+    ]
+  },
+  {
+    "id": "highest-order",
+    "intent": "highest_order",
+    "examples": [
+      "largest order",
+      "sabse bada order",
+      "सबसे बड़ा ऑर्डर",
+      "please show largest order"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT MAX({column}) AS answer FROM {table}",
+      "mariadb": "SELECT MAX({column}) AS answer FROM {table}",
+      "postgres": "SELECT MAX({column}) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate largest order?",
+      "mujhe sabse bada order batao",
+      "कृपया सबसे बड़ा ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "lowest-order",
+    "intent": "lowest_order",
+    "examples": [
+      "smallest order",
+      "sabse chhota order",
+      "सबसे छोटा ऑर्डर",
+      "please show smallest order"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT MIN({column}) AS answer FROM {table}",
+      "mariadb": "SELECT MIN({column}) AS answer FROM {table}",
+      "postgres": "SELECT MIN({column}) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate smallest order?",
+      "mujhe sabse chhota order batao",
+      "कृपया सबसे छोटा ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "orders-over-amount",
+    "intent": "orders_over_amount",
+    "examples": [
+      "orders above an amount",
+      "amount se bade order",
+      "राशि से बड़े ऑर्डर",
+      "please show orders above an amount"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate orders above an amount?",
+      "mujhe amount se bade order batao",
+      "कृपया राशि से बड़े ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "orders-under-amount",
+    "intent": "orders_under_amount",
+    "examples": [
+      "orders below an amount",
+      "amount se chhote order",
+      "राशि से छोटे ऑर्डर",
+      "please show orders below an amount"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate orders below an amount?",
+      "mujhe amount se chhote order batao",
+      "कृपया राशि से छोटे ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "recent-orders",
+    "intent": "recent_orders",
+    "examples": [
+      "most recent orders",
+      "naye order dikhao",
+      "नए ऑर्डर दिखाओ",
+      "please show most recent orders"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate most recent orders?",
+      "mujhe naye order dikhao batao",
+      "कृपया नए ऑर्डर दिखाओ बताइए"
+    ]
+  },
+  {
+    "id": "oldest-orders",
+    "intent": "oldest_orders",
+    "examples": [
+      "oldest orders",
+      "sabse purane order",
+      "सबसे पुराने ऑर्डर",
+      "please show oldest orders"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate oldest orders?",
+      "mujhe sabse purane order batao",
+      "कृपया सबसे पुराने ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "order-count",
+    "intent": "order_count",
+    "examples": [
+      "total order count",
+      "kul kitne order",
+      "कुल ऑर्डर",
+      "please show total order count"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate total order count?",
+      "mujhe kul kitne order batao",
+      "कृपया कुल ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "sales-total",
+    "intent": "sales_total",
+    "examples": [
+      "total sales amount",
+      "kul sale amount",
+      "कुल बिक्री",
+      "please show total sales amount"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate total sales amount?",
+      "mujhe kul sale amount batao",
+      "कृपया कुल बिक्री बताइए"
+    ]
+  },
+  {
+    "id": "sales-by-day",
+    "intent": "sales_by_day",
+    "examples": [
+      "daily sales",
+      "din wise sale",
+      "दिन की बिक्री",
+      "please show daily sales"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate daily sales?",
+      "mujhe din wise sale batao",
+      "कृपया दिन की बिक्री बताइए"
+    ]
+  },
+  {
+    "id": "sales-by-week",
+    "intent": "sales_by_week",
+    "examples": [
+      "weekly sales",
+      "hafte wise sale",
+      "हफ्ते की बिक्री",
+      "please show weekly sales"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate weekly sales?",
+      "mujhe hafte wise sale batao",
+      "कृपया हफ्ते की बिक्री बताइए"
+    ]
+  },
+  {
+    "id": "sales-by-quarter",
+    "intent": "sales_by_quarter",
+    "examples": [
+      "quarterly sales",
+      "quarter wise sale",
+      "तिमाही बिक्री",
+      "please show quarterly sales"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate quarterly sales?",
+      "mujhe quarter wise sale batao",
+      "कृपया तिमाही बिक्री बताइए"
+    ]
+  },
+  {
+    "id": "orders-by-quarter",
+    "intent": "orders_by_quarter",
+    "examples": [
+      "quarterly order count",
+      "quarter wise order",
+      "तिमाही ऑर्डर",
+      "please show quarterly order count"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate quarterly order count?",
+      "mujhe quarter wise order batao",
+      "कृपया तिमाही ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "zero-amount-orders",
+    "intent": "zero_amount_orders",
+    "examples": [
+      "zero amount orders",
+      "zero wale order",
+      "शून्य राशि ऑर्डर",
+      "please show zero amount orders"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate zero amount orders?",
+      "mujhe zero wale order batao",
+      "कृपया शून्य राशि ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "missing-amounts",
+    "intent": "missing_amounts",
+    "examples": [
+      "orders missing amount",
+      "amount missing order",
+      "राशि गायब ऑर्डर",
+      "please show orders missing amount"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate orders missing amount?",
+      "mujhe amount missing order batao",
+      "कृपया राशि गायब ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "duplicate-order-amounts",
+    "intent": "duplicate_order_amounts",
+    "examples": [
+      "repeated order amounts",
+      "same amount wale order",
+      "समान राशि ऑर्डर",
+      "please show repeated order amounts"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate repeated order amounts?",
+      "mujhe same amount wale order batao",
+      "कृपया समान राशि ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "median-like-order",
+    "intent": "median_like_order",
+    "examples": [
+      "middle order amount",
+      "beech ka order amount",
+      "बीच की ऑर्डर राशि",
+      "please show middle order amount"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate middle order amount?",
+      "mujhe beech ka order amount batao",
+      "कृपया बीच की ऑर्डर राशि बताइए"
+    ]
+  },
+  {
+    "id": "sales-yesterday",
+    "intent": "sales_yesterday",
+    "examples": [
+      "sales yesterday",
+      "kal ki sale",
+      "कल की बिक्री",
+      "please show sales yesterday"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate sales yesterday?",
+      "mujhe kal ki sale batao",
+      "कृपया कल की बिक्री बताइए"
+    ]
+  },
+  {
+    "id": "sales-last-seven",
+    "intent": "sales_last_seven",
+    "examples": [
+      "sales in last seven days",
+      "saat din ki sale",
+      "सात दिन की बिक्री",
+      "please show sales in last seven days"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate sales in last seven days?",
+      "mujhe saat din ki sale batao",
+      "कृपया सात दिन की बिक्री बताइए"
+    ]
+  },
+  {
+    "id": "sales-last-thirty",
+    "intent": "sales_last_thirty",
+    "examples": [
+      "sales in last thirty days",
+      "tees din ki sale",
+      "तीस दिन की बिक्री",
+      "please show sales in last thirty days"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate sales in last thirty days?",
+      "mujhe tees din ki sale batao",
+      "कृपया तीस दिन की बिक्री बताइए"
+    ]
+  },
+  {
+    "id": "orders-last-seven",
+    "intent": "orders_last_seven",
+    "examples": [
+      "orders in last seven days",
+      "saat din ke order",
+      "सात दिन के ऑर्डर",
+      "please show orders in last seven days"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate orders in last seven days?",
+      "mujhe saat din ke order batao",
+      "कृपया सात दिन के ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "orders-last-thirty",
+    "intent": "orders_last_thirty",
+    "examples": [
+      "orders in last thirty days",
+      "tees din ke order",
+      "तीस दिन के ऑर्डर",
+      "please show orders in last thirty days"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate orders in last thirty days?",
+      "mujhe tees din ke order batao",
+      "कृपया तीस दिन के ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "average-daily-sales",
+    "intent": "average_daily_sales",
+    "examples": [
+      "average daily sales",
+      "roz ki average sale",
+      "औसत दैनिक बिक्री",
+      "please show average daily sales"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(AVG({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(AVG({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(AVG({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate average daily sales?",
+      "mujhe roz ki average sale batao",
+      "कृपया औसत दैनिक बिक्री बताइए"
+    ]
+  },
+  {
+    "id": "best-sales-day",
+    "intent": "best_sales_day",
+    "examples": [
+      "best sales day",
+      "sabse achha sale din",
+      "सबसे अच्छा बिक्री दिन",
+      "please show best sales day"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT MAX({column}) AS answer FROM {table}",
+      "mariadb": "SELECT MAX({column}) AS answer FROM {table}",
+      "postgres": "SELECT MAX({column}) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate best sales day?",
+      "mujhe sabse achha sale din batao",
+      "कृपया सबसे अच्छा बिक्री दिन बताइए"
+    ]
+  },
+  {
+    "id": "worst-sales-day",
+    "intent": "worst_sales_day",
+    "examples": [
+      "worst sales day",
+      "sabse kam sale din",
+      "सबसे कम बिक्री दिन",
+      "please show worst sales day"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT MIN({column}) AS answer FROM {table}",
+      "mariadb": "SELECT MIN({column}) AS answer FROM {table}",
+      "postgres": "SELECT MIN({column}) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate worst sales day?",
+      "mujhe sabse kam sale din batao",
+      "कृपया सबसे कम बिक्री दिन बताइए"
+    ]
+  },
+  {
+    "id": "order-range",
+    "intent": "order_range",
+    "examples": [
+      "orders between dates",
+      "do date ke beech order",
+      "तारीखों के बीच ऑर्डर",
+      "please show orders between dates"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate orders between dates?",
+      "mujhe do date ke beech order batao",
+      "कृपया तारीखों के बीच ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "amount-range",
+    "intent": "amount_range",
+    "examples": [
+      "orders between amounts",
+      "do amount ke beech order",
+      "राशियों के बीच ऑर्डर",
+      "please show orders between amounts"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate orders between amounts?",
+      "mujhe do amount ke beech order batao",
+      "कृपया राशियों के बीच ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "sales-year",
+    "intent": "sales_year",
+    "examples": [
+      "sales this year",
+      "is saal ki sale",
+      "इस साल की बिक्री",
+      "please show sales this year"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate sales this year?",
+      "mujhe is saal ki sale batao",
+      "कृपया इस साल की बिक्री बताइए"
+    ]
+  },
+  {
+    "id": "orders-year",
+    "intent": "orders_year",
+    "examples": [
+      "orders this year",
+      "is saal ke order",
+      "इस साल के ऑर्डर",
+      "please show orders this year"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate orders this year?",
+      "mujhe is saal ke order batao",
+      "कृपया इस साल के ऑर्डर बताइए"
+    ]
+  },
+  {
+    "id": "sales-previous-month",
+    "intent": "sales_previous_month",
+    "examples": [
+      "sales previous month",
+      "pichle mahine ki sale",
+      "पिछले महीने की बिक्री",
+      "please show sales previous month"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate sales previous month?",
+      "mujhe pichle mahine ki sale batao",
+      "कृपया पिछले महीने की बिक्री बताइए"
+    ]
+  },
+  {
+    "id": "orders-previous-month",
+    "intent": "orders_previous_month",
+    "examples": [
+      "orders previous month",
+      "pichle mahine ke order",
+      "पिछले महीने के ऑर्डर",
+      "please show orders previous month"
+    ],
+    "needs": {
+      "table": "the orders or sales table",
+      "column": "the amount column; ask which column if unclear",
+      "date_col": "the order date column when a period is requested"
+    },
+    "clarify": "Which table and amount/date columns should I use?",
+    "templates": {
+      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+    },
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+    "test_phrases": [
+      "Can you calculate orders previous month?",
+      "mujhe pichle mahine ke order batao",
+      "कृपया पिछले महीने के ऑर्डर बताइए"
     ]
   }
 ]

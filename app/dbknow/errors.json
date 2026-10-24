@@ -1,62 +1,790 @@
 [
   {
     "id": "mysql-unknown-column",
-    "engines": ["mysql", "mariadb"],
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
     "code": "1054",
     "match": "1054|Unknown column '([^']+)'",
     "title_en": "Unknown column",
     "title_hi": "Ye column table mein nahi hai",
     "explain_en": "The query names a column that doesn't exist in that table, usually a typo or an old name.",
     "explain_hi": "Query mein jo column likha hai wo table mein nahi hai. Aksar spelling galat hoti hai ya naam purana hota hai.",
-    "fix": {"type": "closest_column", "note": "Suggest the closest real column name from the schema map, then ask before re-running."},
+    "fix": {
+      "type": "closest_column",
+      "note": "Suggest the closest real column name from the schema map, then ask before re-running."
+    },
     "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
   },
   {
     "id": "mysql-ambiguous-column",
-    "engines": ["mysql", "mariadb"],
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
     "code": "1052",
     "match": "1052|Column '([^']+)' in [a-z ]+ is ambiguous",
     "title_en": "Ambiguous column",
     "title_hi": "Column do tables mein hai, kaunsa chahiye saaf nahi",
     "explain_en": "Two joined tables both have a column with this name, so the database doesn't know which one you mean.",
     "explain_hi": "Jin tables ko joda hai, dono mein is naam ka column hai. Database ko nahi pata kaunsa lena hai.",
-    "fix": {"type": "qualify_column", "note": "Prefix the column with its table name (orders.id)."},
+    "fix": {
+      "type": "qualify_column",
+      "note": "Prefix the column with its table name (orders.id)."
+    },
     "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
   },
   {
     "id": "mysql-unknown-table",
-    "engines": ["mysql", "mariadb"],
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
     "code": "1146",
     "match": "1146|Table '([^']+)' doesn't exist",
     "title_en": "Table doesn't exist",
     "title_hi": "Ye table database mein nahi hai",
     "explain_en": "The query names a table that isn't in this database.",
     "explain_hi": "Query mein jo table likha hai wo is database mein nahi hai.",
-    "fix": {"type": "closest_table", "note": "Suggest the closest real table name, then ask before re-running."},
+    "fix": {
+      "type": "closest_table",
+      "note": "Suggest the closest real table name, then ask before re-running."
+    },
     "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
   },
   {
     "id": "pg-undefined-column",
-    "engines": ["postgres"],
+    "engines": [
+      "postgres"
+    ],
     "code": "42703",
     "match": "42703|column \"?([^\" ]+)\"? does not exist",
     "title_en": "Unknown column",
     "title_hi": "Ye column table mein nahi hai",
     "explain_en": "The query names a column that doesn't exist. In PostgreSQL, names with capital letters must be in double quotes.",
     "explain_hi": "Query mein jo column likha hai wo nahi hai. PostgreSQL mein capital letters wale naam double quotes mein likhne padte hain.",
-    "fix": {"type": "closest_column", "note": "Suggest the closest real column; if only the case differs, add double quotes."},
+    "fix": {
+      "type": "closest_column",
+      "note": "Suggest the closest real column; if only the case differs, add double quotes."
+    },
     "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
   },
   {
     "id": "pg-group-by",
-    "engines": ["postgres"],
+    "engines": [
+      "postgres"
+    ],
     "code": "42803",
     "match": "42803|must appear in the GROUP BY clause",
     "title_en": "Column missing from GROUP BY",
     "title_hi": "GROUP BY mein column missing hai",
     "explain_en": "When you group rows, every column you show must either be in GROUP BY or inside a total like COUNT or SUM.",
     "explain_hi": "Jab rows ko group karte ho, to jo bhi column dikhana hai wo ya GROUP BY mein ho ya COUNT/SUM jaise total mein.",
-    "fix": {"type": "add_group_by", "note": "Add the plain columns of the SELECT list to GROUP BY."},
+    "fix": {
+      "type": "add_group_by",
+      "note": "Add the plain columns of the SELECT list to GROUP BY."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "mysql-duplicate-entry",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1062",
+    "match": "(?:ERROR\\s+1062\\b|\\(1062,)",
+    "title_en": "Duplicate value",
+    "title_hi": "Duplicate value",
+    "explain_en": "The database reported: duplicate value.",
+    "explain_hi": "Database ne bataya: duplicate value.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-fk-child",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1452",
+    "match": "(?:ERROR\\s+1452\\b|\\(1452,)",
+    "title_en": "Missing parent row",
+    "title_hi": "Missing parent row",
+    "explain_en": "The database reported: missing parent row.",
+    "explain_hi": "Database ne bataya: missing parent row.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-fk-parent",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1451",
+    "match": "(?:ERROR\\s+1451\\b|\\(1451,)",
+    "title_en": "Referenced row exists",
+    "title_hi": "Referenced row exists",
+    "explain_en": "The database reported: referenced row exists.",
+    "explain_hi": "Database ne bataya: referenced row exists.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-data-too-long",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1406",
+    "match": "(?:ERROR\\s+1406\\b|\\(1406,)",
+    "title_en": "Value is too long",
+    "title_hi": "Value is too long",
+    "explain_en": "The database reported: value is too long.",
+    "explain_hi": "Database ne bataya: value is too long.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-incorrect-integer",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1366",
+    "match": "(?:ERROR\\s+1366\\b|\\(1366,)",
+    "title_en": "Incorrect number value",
+    "title_hi": "Incorrect number value",
+    "explain_en": "The database reported: incorrect number value.",
+    "explain_hi": "Database ne bataya: incorrect number value.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-syntax",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1064",
+    "match": "(?:ERROR\\s+1064\\b|\\(1064,)",
+    "title_en": "SQL syntax error",
+    "title_hi": "SQL syntax error",
+    "explain_en": "The database reported: sql syntax error.",
+    "explain_hi": "Database ne bataya: sql syntax error.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-packet-large",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1153",
+    "match": "(?:ERROR\\s+1153\\b|\\(1153,)",
+    "title_en": "max allowed packet exceeded",
+    "title_hi": "max allowed packet exceeded",
+    "explain_en": "The database reported: max allowed packet exceeded.",
+    "explain_hi": "Database ne bataya: max allowed packet exceeded.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-lock-timeout",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1205",
+    "match": "(?:ERROR\\s+1205\\b|\\(1205,)",
+    "title_en": "Lock wait timed out",
+    "title_hi": "Lock wait timed out",
+    "explain_en": "The database reported: lock wait timed out.",
+    "explain_hi": "Database ne bataya: lock wait timed out.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-deadlock",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1213",
+    "match": "(?:ERROR\\s+1213\\b|\\(1213,)",
+    "title_en": "Transaction deadlock",
+    "title_hi": "Transaction deadlock",
+    "explain_en": "The database reported: transaction deadlock.",
+    "explain_hi": "Database ne bataya: transaction deadlock.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-too-many-connections",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1040",
+    "match": "(?:ERROR\\s+1040\\b|\\(1040,)",
+    "title_en": "Connection limit reached",
+    "title_hi": "Connection limit reached",
+    "explain_en": "The database reported: connection limit reached.",
+    "explain_hi": "Database ne bataya: connection limit reached.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-access-denied",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1045",
+    "match": "(?:ERROR\\s+1045\\b|\\(1045,)",
+    "title_en": "Login denied",
+    "title_hi": "Login denied",
+    "explain_en": "The database reported: login denied.",
+    "explain_hi": "Database ne bataya: login denied.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-unknown-database",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1049",
+    "match": "(?:ERROR\\s+1049\\b|\\(1049,)",
+    "title_en": "Database does not exist",
+    "title_hi": "Database does not exist",
+    "explain_en": "The database reported: database does not exist.",
+    "explain_hi": "Database ne bataya: database does not exist.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-table-missing",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1146",
+    "match": "(?:ERROR\\s+1146\\b|\\(1146,)",
+    "title_en": "Table does not exist",
+    "title_hi": "Table does not exist",
+    "explain_en": "The database reported: table does not exist.",
+    "explain_hi": "Database ne bataya: table does not exist.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-server-gone",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "2006",
+    "match": "(?:ERROR\\s+2006\\b|\\(2006,)",
+    "title_en": "Server connection was lost",
+    "title_hi": "Server connection was lost",
+    "explain_en": "The database reported: server connection was lost.",
+    "explain_hi": "Database ne bataya: server connection was lost.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-table-full",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1114",
+    "match": "(?:ERROR\\s+1114\\b|\\(1114,)",
+    "title_en": "Table storage is full",
+    "title_hi": "Table storage is full",
+    "explain_en": "The database reported: table storage is full.",
+    "explain_hi": "Database ne bataya: table storage is full.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-cannot-add-fk",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1215",
+    "match": "(?:ERROR\\s+1215\\b|\\(1215,)",
+    "title_en": "Foreign key cannot be created",
+    "title_hi": "Foreign key cannot be created",
+    "explain_en": "The database reported: foreign key cannot be created.",
+    "explain_hi": "Database ne bataya: foreign key cannot be created.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-check-failed",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "3819",
+    "match": "(?:ERROR\\s+3819\\b|\\(3819,)",
+    "title_en": "Check constraint failed",
+    "title_hi": "Check constraint failed",
+    "explain_en": "The database reported: check constraint failed.",
+    "explain_hi": "Database ne bataya: check constraint failed.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-no-default",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1364",
+    "match": "(?:ERROR\\s+1364\\b|\\(1364,)",
+    "title_en": "Required value missing",
+    "title_hi": "Required value missing",
+    "explain_en": "The database reported: required value missing.",
+    "explain_hi": "Database ne bataya: required value missing.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-truncated",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1265",
+    "match": "(?:ERROR\\s+1265\\b|\\(1265,)",
+    "title_en": "Value was truncated",
+    "title_hi": "Value was truncated",
+    "explain_en": "The database reported: value was truncated.",
+    "explain_hi": "Database ne bataya: value was truncated.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-read-only",
+    "engines": [
+      "mysql",
+      "mariadb"
+    ],
+    "code": "1290",
+    "match": "(?:ERROR\\s+1290\\b|\\(1290,)",
+    "title_en": "Server is read only",
+    "title_hi": "Server is read only",
+    "explain_en": "The database reported: server is read only.",
+    "explain_hi": "Database ne bataya: server is read only.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "pg-unique-violation",
+    "engines": [
+      "postgres"
+    ],
+    "code": "23505",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:23505|Duplicate\\ value)|SQLSTATE\\s*\\[?23505\\]?)",
+    "title_en": "Duplicate value",
+    "title_hi": "Duplicate value",
+    "explain_en": "The database reported: duplicate value.",
+    "explain_hi": "Database ne bataya: duplicate value.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-not-null",
+    "engines": [
+      "postgres"
+    ],
+    "code": "23502",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:23502|Required\\ value\\ missing)|SQLSTATE\\s*\\[?23502\\]?)",
+    "title_en": "Required value missing",
+    "title_hi": "Required value missing",
+    "explain_en": "The database reported: required value missing.",
+    "explain_hi": "Database ne bataya: required value missing.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-foreign-key",
+    "engines": [
+      "postgres"
+    ],
+    "code": "23503",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:23503|Foreign\\ key\\ failed)|SQLSTATE\\s*\\[?23503\\]?)",
+    "title_en": "Foreign key failed",
+    "title_hi": "Foreign key failed",
+    "explain_en": "The database reported: foreign key failed.",
+    "explain_hi": "Database ne bataya: foreign key failed.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-check",
+    "engines": [
+      "postgres"
+    ],
+    "code": "23514",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:23514|Check\\ constraint\\ failed)|SQLSTATE\\s*\\[?23514\\]?)",
+    "title_en": "Check constraint failed",
+    "title_hi": "Check constraint failed",
+    "explain_en": "The database reported: check constraint failed.",
+    "explain_hi": "Database ne bataya: check constraint failed.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-invalid-input",
+    "engines": [
+      "postgres"
+    ],
+    "code": "22P02",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:22P02|Invalid\\ value\\ type)|SQLSTATE\\s*\\[?22P02\\]?)",
+    "title_en": "Invalid value type",
+    "title_hi": "Invalid value type",
+    "explain_en": "The database reported: invalid value type.",
+    "explain_hi": "Database ne bataya: invalid value type.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-syntax",
+    "engines": [
+      "postgres"
+    ],
+    "code": "42601",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:42601|SQL\\ syntax\\ error)|SQLSTATE\\s*\\[?42601\\]?)",
+    "title_en": "SQL syntax error",
+    "title_hi": "SQL syntax error",
+    "explain_en": "The database reported: sql syntax error.",
+    "explain_hi": "Database ne bataya: sql syntax error.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-relation-missing",
+    "engines": [
+      "postgres"
+    ],
+    "code": "42P01",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:42P01|Table\\ does\\ not\\ exist)|SQLSTATE\\s*\\[?42P01\\]?)",
+    "title_en": "Table does not exist",
+    "title_hi": "Table does not exist",
+    "explain_en": "The database reported: table does not exist.",
+    "explain_hi": "Database ne bataya: table does not exist.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-permission",
+    "engines": [
+      "postgres"
+    ],
+    "code": "42501",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:42501|Permission\\ denied)|SQLSTATE\\s*\\[?42501\\]?)",
+    "title_en": "Permission denied",
+    "title_hi": "Permission denied",
+    "explain_en": "The database reported: permission denied.",
+    "explain_hi": "Database ne bataya: permission denied.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-timeout",
+    "engines": [
+      "postgres"
+    ],
+    "code": "57014",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:57014|Statement\\ timed\\ out)|SQLSTATE\\s*\\[?57014\\]?)",
+    "title_en": "Statement timed out",
+    "title_hi": "Statement timed out",
+    "explain_en": "The database reported: statement timed out.",
+    "explain_hi": "Database ne bataya: statement timed out.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-aborted",
+    "engines": [
+      "postgres"
+    ],
+    "code": "25P02",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:25P02|Transaction\\ is\\ aborted)|SQLSTATE\\s*\\[?25P02\\]?)",
+    "title_en": "Transaction is aborted",
+    "title_hi": "Transaction is aborted",
+    "explain_en": "The database reported: transaction is aborted.",
+    "explain_hi": "Database ne bataya: transaction is aborted.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-deadlock",
+    "engines": [
+      "postgres"
+    ],
+    "code": "40P01",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:40P01|Transaction\\ deadlock)|SQLSTATE\\s*\\[?40P01\\]?)",
+    "title_en": "Transaction deadlock",
+    "title_hi": "Transaction deadlock",
+    "explain_en": "The database reported: transaction deadlock.",
+    "explain_hi": "Database ne bataya: transaction deadlock.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-too-many",
+    "engines": [
+      "postgres"
+    ],
+    "code": "53300",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:53300|Connection\\ limit\\ reached)|SQLSTATE\\s*\\[?53300\\]?)",
+    "title_en": "Connection limit reached",
+    "title_hi": "Connection limit reached",
+    "explain_en": "The database reported: connection limit reached.",
+    "explain_hi": "Database ne bataya: connection limit reached.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-serialization",
+    "engines": [
+      "postgres"
+    ],
+    "code": "40001",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:40001|Concurrent\\ transaction\\ conflict)|SQLSTATE\\s*\\[?40001\\]?)",
+    "title_en": "Concurrent transaction conflict",
+    "title_hi": "Concurrent transaction conflict",
+    "explain_en": "The database reported: concurrent transaction conflict.",
+    "explain_hi": "Database ne bataya: concurrent transaction conflict.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-string-truncation",
+    "engines": [
+      "postgres"
+    ],
+    "code": "22001",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:22001|Value\\ is\\ too\\ long)|SQLSTATE\\s*\\[?22001\\]?)",
+    "title_en": "Value is too long",
+    "title_hi": "Value is too long",
+    "explain_en": "The database reported: value is too long.",
+    "explain_hi": "Database ne bataya: value is too long.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-numeric-range",
+    "engines": [
+      "postgres"
+    ],
+    "code": "22003",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:22003|Number\\ is\\ out\\ of\\ range)|SQLSTATE\\s*\\[?22003\\]?)",
+    "title_en": "Number is out of range",
+    "title_hi": "Number is out of range",
+    "explain_en": "The database reported: number is out of range.",
+    "explain_hi": "Database ne bataya: number is out of range.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-division-zero",
+    "engines": [
+      "postgres"
+    ],
+    "code": "22012",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:22012|Division\\ by\\ zero)|SQLSTATE\\s*\\[?22012\\]?)",
+    "title_en": "Division by zero",
+    "title_hi": "Division by zero",
+    "explain_en": "The database reported: division by zero.",
+    "explain_hi": "Database ne bataya: division by zero.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-invalid-date",
+    "engines": [
+      "postgres"
+    ],
+    "code": "22007",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:22007|Invalid\\ date\\ value)|SQLSTATE\\s*\\[?22007\\]?)",
+    "title_en": "Invalid date value",
+    "title_hi": "Invalid date value",
+    "explain_en": "The database reported: invalid date value.",
+    "explain_hi": "Database ne bataya: invalid date value.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-disk-full",
+    "engines": [
+      "postgres"
+    ],
+    "code": "53100",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:53100|Disk\\ is\\ full)|SQLSTATE\\s*\\[?53100\\]?)",
+    "title_en": "Disk is full",
+    "title_hi": "Disk is full",
+    "explain_en": "The database reported: disk is full.",
+    "explain_hi": "Database ne bataya: disk is full.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-read-only",
+    "engines": [
+      "postgres"
+    ],
+    "code": "25006",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:25006|Transaction\\ is\\ read\\ only)|SQLSTATE\\s*\\[?25006\\]?)",
+    "title_en": "Transaction is read only",
+    "title_hi": "Transaction is read only",
+    "explain_en": "The database reported: transaction is read only.",
+    "explain_hi": "Database ne bataya: transaction is read only.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-connection-failure",
+    "engines": [
+      "postgres"
+    ],
+    "code": "08006",
+    "match": "(?:(?:ERROR|FATAL):[^\\n]*(?:08006|Database\\ connection\\ failed)|SQLSTATE\\s*\\[?08006\\]?)",
+    "title_en": "Database connection failed",
+    "title_hi": "Database connection failed",
+    "explain_en": "The database reported: database connection failed.",
+    "explain_hi": "Database ne bataya: database connection failed.",
+    "fix": {
+      "type": "advice",
+      "note": "Check the named object and values, make the smallest safe correction, then retry."
+    },
     "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
   }
 ]

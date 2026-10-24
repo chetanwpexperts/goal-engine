@@ -50,6 +50,15 @@ and how to prove it's fixed.
 ## File formats
 See `app/dbknow/__init__.py` (`REQUIRED`, `FIX_TYPES`) and the existing entries. `dbknow.validate()` must return `[]`.
 
+### Evidence signals and diagnosis
+
+Every SQL check has a stable `id`. A cause may have a `signals` list whose entries name that check, a result column,
+an optional row filter and reducer (`first`, `count`, `sum`, `min`, `max`), a comparison operator, and a value. Signals
+are interpreted as data by `app/dbknow/diagnosis.py`; strings are never evaluated as code. `minimum_signals` controls
+how many signals must match. A diagnosis contains the checks run, plain-language evidence, only the causes supported by
+that evidence, their matching fixes, and the verification step. When nothing matches it says so; a failed/unavailable
+check is never reported as a healthy result.
+
 ## The test generator (proves the database agent on data it has never seen)
 `tests/fuzz/db.py` is to the database agent what `tests/fuzz/sheets.py` is to the Excel agent. Each seed makes a random
 schema from a field (school, shop orders, HR, clinic, hotel, inventory, fees, attendance, loans), with primary keys
@@ -58,7 +67,7 @@ numbers). It creates the tables (`fz<seed>_*`) on the local test databases (MySQ
 from `scripts/setup_test_dbs.sh`), runs the checks and drops them. An engine whose server is down is skipped.
 All data is generated: never real users' databases, real names or secrets.
 
-Three families, with the truth worked out by the generator (from the schema, the data and the engines), never by the agent:
+Four families, with the truth worked out by the generator (from the schema, the data and the engines), never by the agent:
 - **queries**: random SELECT / UPDATE / DELETE (filters, functions on columns, LIKE, AND/OR, joins, GROUP BY, ORDER BY,
   LIMIT/OFFSET, IN/EXISTS subqueries, comments, odd spacing, wrapped in PHP / heredoc / JS / Python / Java code).
   `analyze_sql` must not crash, `unwrap` must give the bare query, a rewrite must return exactly the same rows on every
@@ -70,6 +79,8 @@ Three families, with the truth worked out by the generator (from the schema, the
   fallback, no code wrapper left, next suggestions about the query.
 - **phrasings**: new ways of describing every playbook in `issues.json`: the right playbook, or "not sure".
   Confidently wrong is a failure.
+- **diagnosis**: random evidence with an injected cause plus healthy controls. The evidence evaluator must name the
+  injected cause, and must say no problem was found for a healthy control; guessing another cause is a failure.
 
 ```
 python -m tests.fuzz.db --start 1 --seeds 150 --json out.json     # pass rate per family, coverage, every failure

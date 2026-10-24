@@ -2,6 +2,14 @@
 
 Newest first. One entry per nightly run.
 
+## 2026-10-24 (launch database brain)
+- Added evidence-backed diagnosis: stable check ids, 125 declarative signals, plain-language evidence, matched fixes and verification, and an explicit no-guess result when no cause matches.
+- Knowledge counts: 128 issue playbooks (61 new), 45 pasted errors, and 40 read-only business questions. New coverage spans schema design, maintenance, backup/recovery, replication, application/ORM patterns, configuration, and defensive security.
+- The database card now shows what ran, what it found, only evidence-supported causes, the matching fix, and how to confirm recovery. Changes remain behind the existing preview, approval and Undo flow.
+- Added the fourth fuzz family, `diagnosis`, with injected connection-leak and saturation evidence plus healthy controls. Fixed slice: 24/24. A 150-seed run passed 21,450/21,450: diagnosis 450/450, follow-ups 600/600, phrasings 19,200/19,200, queries 1,200/1,200.
+- Required seed gates: database 4,290/4,290 and sheets 302/302. Full suite: 417 passed, 39 skipped. Database-server integration checks were skipped because no MySQL/PostgreSQL server was reachable on this macOS host; no engine result is claimed for those skips.
+- Corrected the macOS `ru_maxrss` unit conversion in the large-workbook memory test while retaining its 300 MB ceiling.
+
 ## 2026-10-23 (nightly: performance / slow database)
 - Feed: not read this run (the fetch needed a permission nobody was there to give), so no feed request ids covered.
 - Test generator: `tests/fuzz/db.py` does not exist on main yet, so it was not run.

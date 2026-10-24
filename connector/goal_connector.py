@@ -166,6 +166,41 @@ class Driver:
     def alive(self):
         return True
 
+    def resolve_check_sql(self, sql):
+        """Replace {{wp_prefix}} only when a complete WordPress core table set exists."""
+        if "{{wp_prefix}}" not in sql:
+            return sql
+
+        _, rows = self.rows(
+            "SELECT TABLE_NAME FROM information_schema.TABLES "
+            "WHERE TABLE_SCHEMA = DATABASE()"
+        )
+        names = {str(r[0]) for r in rows}
+
+        required = ("options", "posts", "users", "usermeta")
+        prefixes = []
+
+        for name in names:
+            if not name.endswith("options"):
+                continue
+
+            prefix = name[:-len("options")]
+
+            if not re.fullmatch(r"[A-Za-z0-9_]+", prefix or ""):
+                continue
+
+            if all(prefix + suffix in names for suffix in required):
+                prefixes.append(prefix)
+
+        if not prefixes:
+            raise ValueError(
+                "WordPress tables were not found; a matching options/posts/users/usermeta table set is required"
+            )
+
+        # Prefer the shortest valid prefix if more than one WP installation exists.
+        prefix = sorted(prefixes, key=lambda x: (len(x), x))[0]
+        return sql.replace("{{wp_prefix}}", prefix)
+
     def write_rights(self):
         return False
 
@@ -541,11 +576,15 @@ class Driver:
             m.pop("fingerprint", None)
         return {"original": orig, "candidates": cands, "tables": tables}
 
+    def resolve_check_sql(self, sql):
+        return sql
+
     def checks(self, queries):
         """Run a playbook's read-only checks. Each one on its own: one failing check doesn't stop the rest."""
         out = []
         for sql in list(queries)[:10]:
             try:
+                sql = self.resolve_check_sql(sql)
                 cols, rows = self.rows(safe_sql(sql), limit=50)
                 hidden = secret_columns(cols)
                 out.append({"columns": cols, "rows": [mask_row([clean(v) for v in r], hidden) for r in rows]})
@@ -603,6 +642,41 @@ def _why(exc):
 
 
 class MySQL(Driver):
+
+    def resolve_check_sql(self, sql):
+        """Replace {{wp_prefix}} only when a complete WordPress core table set exists."""
+        if "{{wp_prefix}}" not in sql:
+            return sql
+
+        _, rows = self.rows(
+            "SELECT TABLE_NAME FROM information_schema.TABLES "
+            "WHERE TABLE_SCHEMA = DATABASE()"
+        )
+        names = {str(r[0]) for r in rows}
+
+        required = ("options", "posts", "users", "usermeta")
+        prefixes = []
+
+        for name in names:
+            if not name.endswith("options"):
+                continue
+
+            prefix = name[:-len("options")]
+
+            if not re.fullmatch(r"[A-Za-z0-9_]+", prefix or ""):
+                continue
+
+            if all(prefix + suffix in names for suffix in required):
+                prefixes.append(prefix)
+
+        if not prefixes:
+            raise ValueError(
+                "WordPress tables were not found; a matching options/posts/users/usermeta table set is required"
+            )
+
+        prefix = sorted(prefixes, key=lambda x: (len(x), x))[0]
+        return sql.replace("{{wp_prefix}}", prefix)
+
     name, default_port, version_sql = "MySQL / MariaDB", 3306, "SELECT VERSION()"
 
     def open(self):

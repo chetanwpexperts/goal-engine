@@ -33,7 +33,7 @@ def test_chat_routes_db_problems_and_leaves_others_alone(client, ml_mode):
 def test_diagnose_and_optimize_through_the_api(client, ml_mode, monkeypatch):
     import socket
     try:
-        socket.create_connection(("127.0.0.1", 3306), timeout=1).close()
+        socket.create_connection(("127.0.0.1", 13306), timeout=1).close()
     except OSError:
         import pytest
         pytest.skip("needs local MySQL")
@@ -44,7 +44,7 @@ def test_diagnose_and_optimize_through_the_api(client, ml_mode, monkeypatch):
     direct._attempts.clear()
     from tests.test_ml import say
     agent = say(client, "database pe too many connections aa raha hai")["agents"][0]
-    res = client.post("/api/connectors/direct", json={"host": "127.0.0.1", "database": "shop_db", "user": "shopapp",
+    res = client.post("/api/connectors/direct", json={"host": "127.0.0.1", "port": "13306", "database": "shop_db", "user": "shopapp",
                                                       "password": "app pass", "agent_id": agent["id"]})
     cid = res.json()["agents"][0]["connector"]["id"]
     d = client.post(f"/api/connectors/{cid}/diagnose", json={"issue_id": "too-many-connections"}).json()

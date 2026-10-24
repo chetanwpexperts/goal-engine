@@ -123,7 +123,7 @@ def test_postgres_structure_is_read():
     assert any("(team_id)" in i for i in res["indexes"])                                        # a PostgreSQL FK has no index
 
 
-@pytest.mark.skipif(not _up(5432), reason="needs the local PostgreSQL test database")
+@pytest.mark.skipif(not _up(15432), reason="needs the local PostgreSQL test database")
 def test_rewrite_runs_on_postgres_with_the_same_rows():
     eng = F.Engine(F.PG).open()
     try:

@@ -29,8 +29,8 @@ def _sqlite(tmp_path):
 
 
 DBS = {
-    "mysql": (3306, {"type": "mysql", "host": "127.0.0.1", "port": "3306", "database": "shop_db", "user": "shopapp", "password": "app pass"}),
-    "postgres": (5432, {"type": "postgres", "host": "127.0.0.1", "port": "5432", "database": "shop_pg", "user": "shopapp", "password": "app pass"}),
+    "mysql": (13306, {"type": "mysql", "host": "127.0.0.1", "port": "13306", "database": "shop_db", "user": "shopapp", "password": "app pass"}),
+    "postgres": (15432, {"type": "postgres", "host": "127.0.0.1", "port": "15432", "database": "shop_pg", "user": "shopapp", "password": "app pass"}),
 }
 
 
@@ -236,7 +236,7 @@ def test_plan_rejects_unsafe_statements(client, agent_conn):
         assert client.post(f"/api/connectors/{cid}/plan", json={"sql": bad}).status_code == 400
 
 
-@pytest.mark.skipif(not _up(3306), reason="needs local MySQL")
+@pytest.mark.skipif(not _up(13306), reason="needs local MySQL")
 def test_direct_connection_change_and_undo(client, ml_mode, monkeypatch):
     monkeypatch.setenv("APP_SECRET", "s" * 32)
     monkeypatch.setenv("DIRECT_DB_ALLOW_PRIVATE", "1")
@@ -250,7 +250,7 @@ def test_direct_connection_change_and_undo(client, ml_mode, monkeypatch):
     d.conn.commit()
     before = snapshot(d)
     agent = say(client, "database ki tables dikhao")["agents"][0]
-    res = client.post("/api/connectors/direct", json={"host": "127.0.0.1", "database": "shop_db", "user": "shopapp",
+    res = client.post("/api/connectors/direct", json={"host": "127.0.0.1", "port": "13306", "database": "shop_db", "user": "shopapp",
                                                       "password": "app pass", "agent_id": agent["id"], "allow_changes": True})
     cid = res.json()["agents"][0]["connector"]["id"]
     assert res.json()["agents"][0]["connector"]["allow_changes"] is True
@@ -267,7 +267,7 @@ def test_direct_connection_change_and_undo(client, ml_mode, monkeypatch):
     assert s.get(ConnectorJob, change["id"]).undo_blob is None
 
 
-@pytest.mark.skipif(not _up(3306), reason="needs local MySQL with the parents/order_lines tables")
+@pytest.mark.skipif(not _up(13306), reason="needs local MySQL with the parents/order_lines tables")
 def test_cascade_deletes_are_blocked():
     d = gc.Database(DBS["mysql"][1]).connect()
     plan = d.plan_change("DELETE FROM parents WHERE id = 1")

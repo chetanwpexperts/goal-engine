@@ -28,13 +28,44 @@ def _up(port):
         return False
 
 
-SAMPLE = {"table": "orders", "date_col": "created", "months": 6, "column": "amount", "pk": "id", "child": "orders",
-          "fk": "id", "days": 60}
+SAMPLE = {
+    "table": "orders",
+    "date_col": "created",
+    "column": "amount",
+    "pk": "id",
+    "child": "orders",
+    "fk": "id",
+
+    "months": 6,
+    "days": 60,
+
+    "amount": 250,
+    "threshold": 250,
+    "value": 250,
+
+    "min_amount": 100,
+    "max_amount": 500,
+    "minimum_amount": 100,
+    "maximum_amount": 500,
+
+    "start": "2026-10-01",
+    "end": "2026-10-24",
+
+    "start_date": "2026-10-01",
+    "end_date": "2026-10-24",
+
+    "from_date": "2026-10-01",
+    "to_date": "2026-10-24",
+
+    "limit": 3,
+    "n": 3,
+    "top": 3,
+}
 
 
 @pytest.mark.parametrize("engine,port,cfg", [
-    ("mysql", 3306, {"type": "mysql", "host": "127.0.0.1", "port": "3306", "database": "shop_db", "user": "shopapp", "password": "app pass"}),
-    ("postgres", 5432, {"type": "postgres", "host": "127.0.0.1", "port": "5432", "database": "shop_pg", "user": "shopapp", "password": "app pass"}),
+    ("mysql", 13306, {"type": "mysql", "host": "127.0.0.1", "port": "13306", "database": "shop_db", "user": "shopapp", "password": "app pass"}),
+    ("postgres", 15432, {"type": "postgres", "host": "127.0.0.1", "port": "15432", "database": "shop_pg", "user": "shopapp", "password": "app pass"}),
 ])
 def test_templates_run_read_only(engine, port, cfg):
     """Every question template must be a valid read-only query on a real database (scripts/setup_test_dbs.sh)."""
@@ -60,8 +91,8 @@ def test_templates_run_read_only(engine, port, cfg):
 
 
 @pytest.mark.parametrize("engine,port,cfg", [
-    ("mysql", 3306, {"type": "mysql", "host": "127.0.0.1", "port": "3306", "database": "shop_db", "user": "shopapp", "password": "app pass"}),
-    ("postgres", 5432, {"type": "postgres", "host": "127.0.0.1", "port": "5432", "database": "shop_pg", "user": "shopapp", "password": "app pass"}),
+    ("mysql", 13306, {"type": "mysql", "host": "127.0.0.1", "port": "13306", "database": "shop_db", "user": "shopapp", "password": "app pass"}),
+    ("postgres", 15432, {"type": "postgres", "host": "127.0.0.1", "port": "15432", "database": "shop_pg", "user": "shopapp", "password": "app pass"}),
 ])
 def test_playbook_checks_run_read_only(engine, port, cfg):
     """Every automatic check in an issue playbook must run, read-only, on a real database."""
@@ -71,4 +102,5 @@ def test_playbook_checks_run_read_only(engine, port, cfg):
     for issue in dbknow.load("issues"):
         for d in issue["diagnose"]:
             if d.get("engine") == engine and d.get("sql"):
-                db.rows(gc.safe_sql(d["sql"]))
+                sql = db.resolve_check_sql(d["sql"])
+                db.rows(gc.safe_sql(sql))

@@ -100,15 +100,15 @@
       "please show sales today"
     ],
     "needs": {
-      "table": "the orders or sales table",
-      "column": "the amount column; ask which column if unclear",
-      "date_col": "the order date column when a period is requested"
+      "table": "sales/orders table",
+      "column": "amount column",
+      "date_col": "date/datetime column"
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= CURDATE() AND {date_col} < CURDATE() + INTERVAL 1 DAY",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= CURDATE() AND {date_col} < CURDATE() + INTERVAL 1 DAY",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= CURRENT_DATE AND {date_col} < CURRENT_DATE + INTERVAL '1 day'"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -127,15 +127,15 @@
       "please show sales this week"
     ],
     "needs": {
-      "table": "the orders or sales table",
-      "column": "the amount column; ask which column if unclear",
-      "date_col": "the order date column when a period is requested"
+      "table": "sales/orders table",
+      "column": "amount column",
+      "date_col": "date/datetime column"
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= date_trunc('week', CURRENT_DATE)"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -160,9 +160,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= DATE_FORMAT(CURDATE(), '%Y-%m-01')",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= DATE_FORMAT(CURDATE(), '%Y-%m-01')",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= date_trunc('month', CURRENT_DATE)"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -187,9 +187,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
-      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
-      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+      "mysql": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= CURDATE() AND {date_col} < CURDATE() + INTERVAL 1 DAY",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= CURDATE() AND {date_col} < CURDATE() + INTERVAL 1 DAY",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= CURRENT_DATE AND {date_col} < CURRENT_DATE + INTERVAL '1 day'"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -214,9 +214,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
-      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
-      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+      "mysql": "SELECT DATE({date_col}) AS day, COUNT(*) AS orders FROM {table} WHERE {date_col} >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) GROUP BY DATE({date_col}) ORDER BY day",
+      "mariadb": "SELECT DATE({date_col}) AS day, COUNT(*) AS orders FROM {table} WHERE {date_col} >= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY) GROUP BY DATE({date_col}) ORDER BY day",
+      "postgres": "SELECT {date_col}::date AS day, COUNT(*) AS orders FROM {table} WHERE {date_col} >= date_trunc('week', CURRENT_DATE) GROUP BY 1 ORDER BY 1"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -268,9 +268,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
-      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
-      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+      "mysql": "SELECT current_sales, previous_sales, CASE WHEN previous_sales=0 THEN NULL ELSE ROUND((current_sales-previous_sales)*100.0/previous_sales,2) END AS growth_percent FROM (SELECT SUM(CASE WHEN {date_col} >= DATE_FORMAT(CURDATE(),'%Y-%m-01') THEN {column} ELSE 0 END) AS current_sales, SUM(CASE WHEN {date_col} >= DATE_FORMAT(CURDATE()-INTERVAL 1 MONTH,'%Y-%m-01') AND {date_col} < DATE_FORMAT(CURDATE(),'%Y-%m-01') THEN {column} ELSE 0 END) AS previous_sales FROM {table}) x",
+      "mariadb": "SELECT current_sales, previous_sales, CASE WHEN previous_sales=0 THEN NULL ELSE ROUND((current_sales-previous_sales)*100.0/previous_sales,2) END AS growth_percent FROM (SELECT SUM(CASE WHEN {date_col} >= DATE_FORMAT(CURDATE(),'%Y-%m-01') THEN {column} ELSE 0 END) AS current_sales, SUM(CASE WHEN {date_col} >= DATE_FORMAT(CURDATE()-INTERVAL 1 MONTH,'%Y-%m-01') AND {date_col} < DATE_FORMAT(CURDATE(),'%Y-%m-01') THEN {column} ELSE 0 END) AS previous_sales FROM {table}) x",
+      "postgres": "SELECT current_sales, previous_sales, CASE WHEN previous_sales=0 THEN NULL ELSE ROUND(((current_sales-previous_sales)*100.0/previous_sales)::numeric,2) END AS growth_percent FROM (SELECT SUM(CASE WHEN {date_col} >= date_trunc('month',CURRENT_DATE) THEN {column} ELSE 0 END) AS current_sales, SUM(CASE WHEN {date_col} >= date_trunc('month',CURRENT_DATE)-INTERVAL '1 month' AND {date_col} < date_trunc('month',CURRENT_DATE) THEN {column} ELSE 0 END) AS previous_sales FROM {table}) x"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -343,15 +343,15 @@
       "please show orders above an amount"
     ],
     "needs": {
-      "table": "the orders or sales table",
-      "column": "the amount column; ask which column if unclear",
-      "date_col": "the order date column when a period is requested"
+      "table": "orders table",
+      "column": "amount column",
+      "amount": "minimum amount"
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT * FROM {table} WHERE {column} > {amount} ORDER BY {column} DESC LIMIT 100",
+      "mariadb": "SELECT * FROM {table} WHERE {column} > {amount} ORDER BY {column} DESC LIMIT 100",
+      "postgres": "SELECT * FROM {table} WHERE {column} > {amount} ORDER BY {column} DESC LIMIT 100"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -370,15 +370,15 @@
       "please show orders below an amount"
     ],
     "needs": {
-      "table": "the orders or sales table",
-      "column": "the amount column; ask which column if unclear",
-      "date_col": "the order date column when a period is requested"
+      "table": "orders table",
+      "column": "amount column",
+      "amount": "maximum amount"
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT * FROM {table} WHERE {column} < {amount} ORDER BY {column} ASC LIMIT 100",
+      "mariadb": "SELECT * FROM {table} WHERE {column} < {amount} ORDER BY {column} ASC LIMIT 100",
+      "postgres": "SELECT * FROM {table} WHERE {column} < {amount} ORDER BY {column} ASC LIMIT 100"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -397,15 +397,14 @@
       "please show most recent orders"
     ],
     "needs": {
-      "table": "the orders or sales table",
-      "column": "the amount column; ask which column if unclear",
-      "date_col": "the order date column when a period is requested"
+      "table": "orders table",
+      "date_col": "order date column"
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
-      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
-      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+      "mysql": "SELECT * FROM {table} ORDER BY {date_col} DESC LIMIT 20",
+      "mariadb": "SELECT * FROM {table} ORDER BY {date_col} DESC LIMIT 20",
+      "postgres": "SELECT * FROM {table} ORDER BY {date_col} DESC LIMIT 20"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -424,15 +423,14 @@
       "please show oldest orders"
     ],
     "needs": {
-      "table": "the orders or sales table",
-      "column": "the amount column; ask which column if unclear",
-      "date_col": "the order date column when a period is requested"
+      "table": "orders table",
+      "date_col": "order date column"
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
-      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
-      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+      "mysql": "SELECT * FROM {table} ORDER BY {date_col} ASC LIMIT 20",
+      "mariadb": "SELECT * FROM {table} ORDER BY {date_col} ASC LIMIT 20",
+      "postgres": "SELECT * FROM {table} ORDER BY {date_col} ASC LIMIT 20"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -511,9 +509,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT DATE({date_col}) AS day, COALESCE(SUM({column}),0) AS sales FROM {table} GROUP BY DATE({date_col}) ORDER BY day",
+      "mariadb": "SELECT DATE({date_col}) AS day, COALESCE(SUM({column}),0) AS sales FROM {table} GROUP BY DATE({date_col}) ORDER BY day",
+      "postgres": "SELECT {date_col}::date AS day, COALESCE(SUM({column}),0) AS sales FROM {table} GROUP BY 1 ORDER BY 1"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -538,9 +536,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT YEARWEEK({date_col},3) AS week, COALESCE(SUM({column}),0) AS sales FROM {table} GROUP BY YEARWEEK({date_col},3) ORDER BY week",
+      "mariadb": "SELECT YEARWEEK({date_col},3) AS week, COALESCE(SUM({column}),0) AS sales FROM {table} GROUP BY YEARWEEK({date_col},3) ORDER BY week",
+      "postgres": "SELECT date_trunc('week',{date_col}) AS week, COALESCE(SUM({column}),0) AS sales FROM {table} GROUP BY 1 ORDER BY 1"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -565,9 +563,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT YEAR({date_col}) AS year, QUARTER({date_col}) AS quarter, COALESCE(SUM({column}),0) AS sales FROM {table} GROUP BY YEAR({date_col}), QUARTER({date_col}) ORDER BY year, quarter",
+      "mariadb": "SELECT YEAR({date_col}) AS year, QUARTER({date_col}) AS quarter, COALESCE(SUM({column}),0) AS sales FROM {table} GROUP BY YEAR({date_col}), QUARTER({date_col}) ORDER BY year, quarter",
+      "postgres": "SELECT EXTRACT(YEAR FROM {date_col}) AS year, EXTRACT(QUARTER FROM {date_col}) AS quarter, COALESCE(SUM({column}),0) AS sales FROM {table} GROUP BY 1,2 ORDER BY 1,2"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -592,9 +590,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
-      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
-      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+      "mysql": "SELECT YEAR({date_col}) AS year, QUARTER({date_col}) AS quarter, COUNT(*) AS orders FROM {table} GROUP BY YEAR({date_col}), QUARTER({date_col}) ORDER BY year, quarter",
+      "mariadb": "SELECT YEAR({date_col}) AS year, QUARTER({date_col}) AS quarter, COUNT(*) AS orders FROM {table} GROUP BY YEAR({date_col}), QUARTER({date_col}) ORDER BY year, quarter",
+      "postgres": "SELECT EXTRACT(YEAR FROM {date_col}) AS year, EXTRACT(QUARTER FROM {date_col}) AS quarter, COUNT(*) AS orders FROM {table} GROUP BY 1,2 ORDER BY 1,2"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -727,9 +725,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= CURDATE() - INTERVAL 1 DAY AND {date_col} < CURDATE()",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= CURDATE() - INTERVAL 1 DAY AND {date_col} < CURDATE()",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= CURRENT_DATE - INTERVAL '1 day' AND {date_col} < CURRENT_DATE"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -754,9 +752,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= NOW() - INTERVAL 7 DAY",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= NOW() - INTERVAL 7 DAY",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= NOW() - INTERVAL '7 days'"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -781,9 +779,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= NOW() - INTERVAL 30 DAY",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= NOW() - INTERVAL 30 DAY",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= NOW() - INTERVAL '30 days'"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -808,9 +806,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
-      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
-      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+      "mysql": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= NOW() - INTERVAL 7 DAY",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= NOW() - INTERVAL 7 DAY",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= NOW() - INTERVAL '7 days'"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -835,9 +833,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
-      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
-      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+      "mysql": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= NOW() - INTERVAL 30 DAY",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= NOW() - INTERVAL 30 DAY",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= NOW() - INTERVAL '30 days'"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -862,9 +860,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(AVG({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(AVG({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(AVG({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT COALESCE(AVG(day_sales),0) AS answer FROM (SELECT DATE({date_col}) AS d, SUM({column}) AS day_sales FROM {table} GROUP BY DATE({date_col})) x",
+      "mariadb": "SELECT COALESCE(AVG(day_sales),0) AS answer FROM (SELECT DATE({date_col}) AS d, SUM({column}) AS day_sales FROM {table} GROUP BY DATE({date_col})) x",
+      "postgres": "SELECT COALESCE(AVG(day_sales),0) AS answer FROM (SELECT {date_col}::date AS d, SUM({column}) AS day_sales FROM {table} GROUP BY 1) x"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -889,9 +887,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT MAX({column}) AS answer FROM {table}",
-      "mariadb": "SELECT MAX({column}) AS answer FROM {table}",
-      "postgres": "SELECT MAX({column}) AS answer FROM {table}"
+      "mysql": "SELECT DATE({date_col}) AS day, SUM({column}) AS sales FROM {table} GROUP BY DATE({date_col}) ORDER BY sales DESC LIMIT 1",
+      "mariadb": "SELECT DATE({date_col}) AS day, SUM({column}) AS sales FROM {table} GROUP BY DATE({date_col}) ORDER BY sales DESC LIMIT 1",
+      "postgres": "SELECT {date_col}::date AS day, SUM({column}) AS sales FROM {table} GROUP BY 1 ORDER BY sales DESC LIMIT 1"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -916,9 +914,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT MIN({column}) AS answer FROM {table}",
-      "mariadb": "SELECT MIN({column}) AS answer FROM {table}",
-      "postgres": "SELECT MIN({column}) AS answer FROM {table}"
+      "mysql": "SELECT DATE({date_col}) AS day, SUM({column}) AS sales FROM {table} GROUP BY DATE({date_col}) ORDER BY sales ASC LIMIT 1",
+      "mariadb": "SELECT DATE({date_col}) AS day, SUM({column}) AS sales FROM {table} GROUP BY DATE({date_col}) ORDER BY sales ASC LIMIT 1",
+      "postgres": "SELECT {date_col}::date AS day, SUM({column}) AS sales FROM {table} GROUP BY 1 ORDER BY sales ASC LIMIT 1"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -937,15 +935,16 @@
       "please show orders between dates"
     ],
     "needs": {
-      "table": "the orders or sales table",
-      "column": "the amount column; ask which column if unclear",
-      "date_col": "the order date column when a period is requested"
+      "table": "orders table",
+      "date_col": "order date column",
+      "start": "start date",
+      "end": "end date"
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
-      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
-      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+      "mysql": "SELECT * FROM {table} WHERE {date_col} >= '{start}' AND {date_col} < DATE_ADD('{end}', INTERVAL 1 DAY) ORDER BY {date_col}",
+      "mariadb": "SELECT * FROM {table} WHERE {date_col} >= '{start}' AND {date_col} < DATE_ADD('{end}', INTERVAL 1 DAY) ORDER BY {date_col}",
+      "postgres": "SELECT * FROM {table} WHERE {date_col} >= '{start}'::date AND {date_col} < ('{end}'::date + INTERVAL '1 day') ORDER BY {date_col}"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -964,15 +963,16 @@
       "please show orders between amounts"
     ],
     "needs": {
-      "table": "the orders or sales table",
-      "column": "the amount column; ask which column if unclear",
-      "date_col": "the order date column when a period is requested"
+      "table": "orders table",
+      "column": "amount column",
+      "min_amount": "minimum amount",
+      "max_amount": "maximum amount"
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT * FROM {table} WHERE {column} BETWEEN {min_amount} AND {max_amount} ORDER BY {column}",
+      "mariadb": "SELECT * FROM {table} WHERE {column} BETWEEN {min_amount} AND {max_amount} ORDER BY {column}",
+      "postgres": "SELECT * FROM {table} WHERE {column} BETWEEN {min_amount} AND {max_amount} ORDER BY {column}"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -997,9 +997,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}",
-      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table}"
+      "mysql": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= MAKEDATE(YEAR(CURDATE()),1)",
+      "mariadb": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= MAKEDATE(YEAR(CURDATE()),1)",
+      "postgres": "SELECT COALESCE(SUM({column}),0) AS answer FROM {table} WHERE {date_col} >= date_trunc('year', CURRENT_DATE)"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [
@@ -1024,9 +1024,9 @@
     },
     "clarify": "Which table and amount/date columns should I use?",
     "templates": {
-      "mysql": "SELECT COUNT(*) AS answer FROM {table}",
-      "mariadb": "SELECT COUNT(*) AS answer FROM {table}",
-      "postgres": "SELECT COUNT(*) AS answer FROM {table}"
+      "mysql": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= MAKEDATE(YEAR(CURDATE()),1)",
+      "mariadb": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= MAKEDATE(YEAR(CURDATE()),1)",
+      "postgres": "SELECT COUNT(*) AS answer FROM {table} WHERE {date_col} >= date_trunc('year', CURRENT_DATE)"
     },
     "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
     "test_phrases": [

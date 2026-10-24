@@ -29,8 +29,8 @@ import tempfile
 from collections import Counter, defaultdict
 from decimal import Decimal
 
-MYSQL = {"type": "mysql", "host": "127.0.0.1", "port": 3306, "user": "shopapp", "password": "app pass", "database": "shop_db"}
-PG = {"type": "postgres", "host": "127.0.0.1", "port": 5432, "user": "shopapp", "password": "app pass", "database": "shop_pg"}
+MYSQL = {"type": "mysql", "host": "127.0.0.1", "port": 13306, "user": "shopapp", "password": "app pass", "database": "shop_db"}
+PG = {"type": "postgres", "host": "127.0.0.1", "port": 15432, "user": "shopapp", "password": "app pass", "database": "shop_pg"}
 
 F_NAMES = ["Aditi", "Pooja", "Neha", "Simran", "Kavya", "Riya", "Anjali", "Sneha", "Isha", "Meera", "Tanvi", "Priya"]
 M_NAMES = ["Arjun", "Rohan", "Rahul", "Vikram", "Aman", "Karan", "Dev", "Ishaan", "Manav", "Yash", "Aarav", "Kabir"]

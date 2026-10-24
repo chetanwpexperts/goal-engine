@@ -702,3 +702,17 @@ body[data-state="active"] .mic { background: #fff; border-color: #E2E5F3; }
 .ans-card { background: #fff; }
 body[data-state="active"] .btn.solid { background: linear-gradient(135deg, #5B5BF0, #7B4FE0); border-color: transparent; color: #fff;
   box-shadow: 0 12px 24px -14px rgba(91, 79, 230, .8); }
+
+/* the engine: what's behind it, for people who look deeper */
+.engine { width: min(1140px, 100%); margin-top: 44px; padding: 28px clamp(18px, 3vw, 36px); border-radius: 22px; text-align: left;
+  background: linear-gradient(135deg, rgba(255, 255, 255, .9), rgba(238, 236, 255, .85)); border: 1px solid #E4E7F5;
+  box-shadow: 0 22px 46px -34px rgba(64, 72, 160, .55); }
+.engine h2 { margin: 0 0 8px; font-size: clamp(22px, 2.4vw, 30px); letter-spacing: -0.02em; color: #141A38; }
+.engine p { margin: 0; max-width: 68ch; color: #4D5577; line-height: 1.6; }
+.engine-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 20px; }
+.engine-stats div { padding: 14px 16px; border-radius: 14px; background: #fff; border: 1px solid #E4E7F5; display: grid; gap: 2px; }
+.engine-stats b { font-size: 22px; color: #3550E8; letter-spacing: -0.01em; }
+.engine-stats span { font-size: 13.5px; color: #6A7193; }
+.byline { margin: 6px 0 0; font-size: 13px; color: #6A7193; }
+body.typing .engine { visibility: hidden; }
+@media (max-width: 640px) { .engine-stats { grid-template-columns: 1fr; } }

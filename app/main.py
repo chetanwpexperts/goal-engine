@@ -516,6 +516,23 @@ def index() -> FileResponse:
     return FileResponse(STATIC / "index.html")
 
 
+@app.get("/api/known")
+def known() -> dict:
+    """How many problems, errors, questions and fixes the agents know (grows every night)."""
+    import glob
+    import json as _json
+
+    n = 0
+    for f in glob.glob(str(Path(__file__).resolve().parent / "dbknow" / "*.json")) + \
+            glob.glob(str(Path(__file__).resolve().parent / "officeknow" / "*.json")):
+        try:
+            data = _json.loads(Path(f).read_text(encoding="utf-8"))
+            n += len(data) if isinstance(data, list) else len(data.get("items", data))
+        except (OSError, ValueError):
+            continue
+    return {"fixes": n}
+
+
 @app.get("/api/status")
 def live_status():
     """Home screen: one quiet line that the agents are up."""

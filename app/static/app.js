@@ -1917,6 +1917,7 @@
   }
   refreshStatus();
   setInterval(refreshStatus, 30000);
+  api("/api/known").then((k) => { const b = $("#stat-fixes"); if (b && k.fixes) b.textContent = Number(k.fixes).toLocaleString("en-IN"); }).catch(() => {});
   document.addEventListener("visibilitychange", refreshStatus);
 
   // ---------------------------------------------------------------- home: the brain tiles and the living network

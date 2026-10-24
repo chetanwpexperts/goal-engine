@@ -2,6 +2,32 @@
 
 Newest first. One entry per nightly run.
 
+## 2026-10-23 (nightly: performance / slow database)
+- Feed: not read this run (the fetch needed a permission nobody was there to give), so no feed request ids covered.
+- Test generator: `tests/fuzz/db.py` does not exist on main yet, so it was not run.
+- Added the PRIORITY list (P1-P9) at the top of BACKLOG.md. P1 "Database / site slow" done (also ticks the old "Performance" item).
+  15 new playbooks in `issues.json` (category `performance`, MySQL + MariaDB + PostgreSQL): database CPU at 100%, site suddenly slow,
+  only one page/report slow, slow since the data grew, full table scans / missing index, slow COUNT(*), slow LIKE '%text%' search,
+  slow ORDER BY + LIMIT / deep pagination, slow JOIN, temporary tables on disk / filesort, memory cache too small (buffer pool /
+  shared_buffers), high disk I/O, find the slow queries (slow log / pg_stat_statements), same query was fast now slow (stale statistics /
+  bad plan), query stopped by a time limit (codes 3024, 1969, 57014).
+- 101 read-only checks (49 distinct) (SHOW STATUS/VARIABLES, information_schema, performance_schema digests and index usage, mysql.slow_log,
+  pg_stat_activity, pg_stat_user_tables, pg_statio_user_tables, pg_stat_database, pg_settings, pg_constraint/pg_index); all ran on the
+  MariaDB + PostgreSQL test DBs as the unprivileged app user. 45 new test phrases (English, Hinglish, Hindi script); all 205 test phrases are recognised,
+  and the built-in "slow query" / "database dhima" phrases still go to the query checker.
+- The new playbooks pulled a few older phrases away, so I added symptoms (own wording) to `too-many-connections`, `hacked-locked-out-admin-changed`,
+  `hacked-elasticsearch-ransom-exposed`, `max-user-connections`, `mysql-host-blocked`.
+- Sources: MySQL manual (optimization, optimization-indexes, explain-output, order-by/limit optimization, nested-loop/hash joins,
+  internal-temporary-tables, fulltext-search, innodb-buffer-pool(-resize), optimizing-innodb-diskio, innodb-persistent-stats, slow-query-log,
+  statement digests, innodb restrictions), PostgreSQL docs (monitoring-stats, using-explain, indexes, pgtrgm, pgstatstatements,
+  runtime-config-resource/logging/client, planner-stats, wal-configuration), MariaDB KB (slow query log, aborting statements).
+  Ideas in `seen_at`: Percona, Cybertec, PostgreSQL wiki, Use The Index Luke, FromDual, Netdata, Releem, New Relic, EverSQL.
+  Stack Overflow pages again didn't show up in this run's web search.
+- For Chetan: (1) Full suite: 437 passed, 1 failed: `tests/test_mind.py::test_how_many_sheets_gets_the_number` (office/sheets, fails the
+  same way before this change, not database). (2) `test_dbbrain.py::test_diagnose_and_optimize_through_the_api` only passes after
+  `test_phpconn.py` has created the `big` table, so it fails on the first run in a fresh container; maybe create `big` in
+  `scripts/setup_test_dbs.sh`. (3) `setup_test_dbs.sh` still needs `apt-get update` first on a fresh container.
+
 ## 2026-10-23 (nightly: connection problems)
 - Feed: not read this run (the fetch needed a permission nobody was there to give), so no feed request ids covered.
 - Backlog: "Connection" done. 17 new playbooks in `issues.json` (category `connection`): connection refused, connection timed out,

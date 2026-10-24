@@ -82,3 +82,13 @@ only public passive checks. Read-only by default; fixes need approval + Undo. Kn
 NIST, vendor advisories through the six trust filters.
 Order: knowledge nightly run from Thu 29 Oct; agent on the reasoning core from the week of 2 Nov; at
 launch at least the website security check, "am I hacked?" and the suspicious email check.
+
+## Standard for all three brains (database, Microsoft, cybersecurity), agreed 2026-10-24
+- Learn from sources, then build OWN fundamentals, own reasoning and own suggestions. No copy-paste, no
+  answering by keyword match: every answer is reasoned from the map + the person's own evidence.
+- Every solved problem ends with a full report in plain words: what was wrong, WHY it happened (the
+  chain of causes, with the evidence that proves each link), what was done to fix it, proof it is fixed,
+  and how to stop it happening again. Technical detail on request.
+- Cybersecurity: the person should be able to relax. The brain watches continuously (scheduled checks,
+  alerts), explains, and fixes with approval + Undo; it never changes their systems silently, and it
+  says plainly what it can't protect against (no tool can promise zero risk).

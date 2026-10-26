@@ -10,7 +10,11 @@ English / Hinglish / Hindi. No AI."""
 import re
 from datetime import date, datetime
 
-from openpyxl.styles import Font
+from openpyxl.chart import BarChart, LineChart, PieChart, Reference
+from openpyxl.chart.label import DataLabelList
+from openpyxl.formatting.rule import CellIsRule, ColorScaleRule, FormulaRule, Rule
+from openpyxl.styles import Font, PatternFill
+from openpyxl.styles.differential import DifferentialStyle
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
@@ -19,6 +23,11 @@ DO = r"(?:make|set|add|put|insert|create|apply|remove|delete|drop|clear|freeze|l
      r"badlo|badal do|do|de do|dedo|daalo|daal do|tod do|alag karo)"
 
 ORDERS = [
+    ("chart", re.compile(r"\b(charts?|graphs?)\b", re.I)),
+    ("conditional_format", re.compile(
+        r"\bcolou?r scale\b|\bhighlight\b.{0,50}\b(overdue|duplicates?|blank|empty|khaali|khali)\b|"
+        r"\btop\s*10\b.{0,40}\bhighlight\b|\bhighlight\b.{0,60}\b(?:red|green|yellow|orange|blue)\b|"
+        r"\b(?:red|green|yellow|orange|blue)(?:\s+(?:karo|kar do|highlight))?\s*$", re.I)),
     ("bold_header", re.compile(r"\b(header|heading|headings|top row|first row|title row|pehli row|upar wali row)\b.{0,25}\b(bold|mota|motaa)\b|"
                                r"\b(bold)\b.{0,25}\b(header|heading|headings|top row|first row|pehli row)\b", re.I)),
     ("freeze", re.compile(r"\b(freeze|lock|fix|jama)\b.{0,25}\b(top row|first row|header|heading|row 1|pehli row|first column|column a|pehla column)\b|"
@@ -69,6 +78,11 @@ def _ask():
 
 
 WHOLE_FILE = ("bold_header", "freeze", "autofit", "filter", "remove_blank_rows", "replace")
+
+COLOURS = {
+    "red": "FFFFC7CE", "green": "FFC6EFCE", "yellow": "FFFFEB9C",
+    "orange": "FFF4B183", "blue": "FFBDD7EE",
+}
 
 
 def _named(text, tables):
@@ -149,6 +163,99 @@ def _no_column(text, t, what):
                      [h for h in t.header if h][:8])
 
 
+def _number(text):
+    """A number as people write it in India: 25k, 1 lakh, 2.5 crore."""
+    m = re.search(r"(?<![\w.])(\d[\d,]*(?:\.\d+)?)\s*(crores?|cr|lakhs?|lacs?|lac|k)?\b", text or "", re.I)
+    if not m:
+        return None
+    value = float(m.group(1).replace(",", ""))
+    unit = (m.group(2) or "").lower()
+    value *= 10_000_000 if unit.startswith("cr") else 100_000 if unit.startswith(("lakh", "lac")) else 1_000 if unit == "k" else 1
+    return int(value) if value.is_integer() else value
+
+
+def _colour(text, default="yellow"):
+    return next((name for name in COLOURS if re.search(rf"\b{name}\b", text or "", re.I)), default)
+
+
+def _chart_details(text, t):
+    a = _ask()
+    kind = "pie" if re.search(r"\bpie\b", text, re.I) else "line" if re.search(r"\bline\b", text, re.I) else "bar"
+    direction = "bar" if re.search(r"\bbar\s+(?:chart|graph)\b", text, re.I) else "col"
+    month = bool(a.MONTH_RE.search(text or ""))
+    if month:
+        dates = a.columns_in(text, t, {"date"})
+        group = dates[0][0] if dates else next((i for i in range(len(t.header)) if t.kind(i) == "date"), None)
+    else:
+        group = a._group_col(text, t, [])
+    if group is None:
+        _no_column(text, t, "use for the chart groups")
+
+    measure = _col(text, t, {"number"}, exclude=(group,))
+    generic_money = re.search(r"\b(sales|sale|revenue|amount|expenses?|cost|income)\b", text, re.I)
+    if generic_money:
+        named = [(i, sc) for i, sc in a.columns_in(text, t, {"number"}) if i != group and sc >= 1]
+        if named:
+            measure = named[0][0]
+        elif measure is None:
+            measure = a.main_amount(t)[0]
+    elif measure is None:
+        measure = a.main_amount(t)[0]
+    if measure is None:
+        _no_column(text, t, "chart")
+    group_name = "Month" if month else t.header[group]
+    title = f"{t.header[measure]} by {group_name}"
+    return {"chart_type": kind, "direction": direction, "group_col": group, "value_col": measure,
+            "month": month, "title": title, "next_to_data": bool(re.search(r"\b(next to|beside|alongside|data ke paas)\b", text, re.I))}
+
+
+def _conditional_details(text, t):
+    a = _ask()
+    low = (text or "").lower()
+    rule = None
+    col = None
+    out = {"colour": _colour(text)}
+    if re.search(r"\bcolou?r scale\b", low):
+        rule, col = "color_scale", _col(text, t, {"number"})
+    elif re.search(r"\btop\s*10\b", low):
+        rule, col = "top10", _col(text, t, {"number"})
+    elif re.search(r"\bduplicates?\b", low):
+        rule, col = "duplicate", _col(text, t)
+    elif re.search(r"\b(blank|empty|khaali|khali)\b", low):
+        rule, col = "blank", _col(text, t)
+    elif re.search(r"\boverdue\b", low):
+        rule = "overdue"
+        col = _col(text, t, {"date"})
+        if col is None:
+            dates = [i for i in range(len(t.header)) if t.kind(i) == "date"]
+            col = next((i for i in dates if re.search(r"due|delivery", t.header[i], re.I)), dates[0] if len(dates) == 1 else None)
+        out["colour"] = _colour(text, "red")
+    else:
+        vals = a.values_in(text, t)
+        comparison = re.search(r"\b(above|over|upar|more than|greater than|below|under|neeche|less than|between|equal to|equals?|barabar|kam|zyada)\b", low)
+        if vals and not comparison:
+            col, value = vals[0]
+            rule, out["value"] = "text_equal", value
+        else:
+            col = _col(text, t, {"number"})
+            if re.search(r"\bbetween\b", low):
+                nums = re.findall(r"\d[\d,]*(?:\.\d+)?\s*(?:crores?|cr|lakhs?|lacs?|lac|k)?", text, re.I)
+                parsed = [_number(x) for x in nums[:2]]
+                if len(parsed) == 2 and all(v is not None for v in parsed):
+                    rule, out["values"] = "between", parsed
+            elif re.search(r"\b(below|under|neeche|less than|kam)\b", low):
+                rule, out["value"] = "below", _number(text)
+            elif re.search(r"\b(equal to|equals?|barabar)\b", low):
+                rule, out["value"] = "equal", _number(text)
+            elif re.search(r"\b(above|over|upar|more than|greater than|zyada)\b", low):
+                rule, out["value"] = "above", _number(text)
+    if col is None:
+        _no_column(text, t, "format")
+    if rule is None or (rule in ("above", "below", "equal") and out.get("value") is None):
+        raise NotAnEdit
+    return {"col": col, "rule": rule, **out}
+
+
 def plan_edit(text: str, tables) -> dict | None:
     low = text or ""
     if QUESTION_RE.search(low) or (re.search(r"\?\s*$", low) and not re.search(rf"\b{DO}\b", low, re.I)):
@@ -157,6 +264,11 @@ def plan_edit(text: str, tables) -> dict | None:
         if not rx.search(low):
             continue
         t = _target(text, tables)
+        if op == "conditional_format" and re.search(r"\b(wale|wali|where|equals?|is)\b", text or "", re.I) and not re.search(
+                r"\b(above|over|upar|more than|greater than|below|under|neeche|less than|between|equal to|barabar|kam|zyada)\b", text or "", re.I):
+            with_value = [candidate for candidate in tables if candidate.rows and _ask().values_in(text, candidate)]
+            if with_value:
+                t = max(with_value, key=lambda candidate: len(_ask().values_in(text, candidate)))
         if t is None:
             return None
         plan = {"job": "edit", "op": op, "table": t.name,
@@ -171,6 +283,10 @@ def plan_edit(text: str, tables) -> dict | None:
 
 def _details(op, text, t, tables) -> dict:
     a = _ask()
+    if op == "chart":
+        return _chart_details(text, t)
+    if op == "conditional_format":
+        return _conditional_details(text, t)
     if op == "freeze":
         col = re.search(r"\b(first column|column a|pehla column)\b", text, re.I)
         both = re.search(r"\b(row and column|row aur column|both)\b", text, re.I)
@@ -262,19 +378,111 @@ def _has_formulas(ws) -> bool:
     return False
 
 
+def _safe_sheet_name(wb, title):
+    base = re.sub(r"[\[\]:*?/\\]", " ", f"Chart - {title}").strip()[:31] or "Chart"
+    name, n = base, 2
+    while name in wb.sheetnames:
+        suffix = f" ({n})"
+        name, n = base[:31 - len(suffix)] + suffix, n + 1
+    return name
+
+
+def _chart_sheet(p, t, wb, source):
+    """Write the grouped values first, then chart exactly those cells."""
+    target = source if p.get("next_to_data") else wb.create_sheet(_safe_sheet_name(wb, p["title"]))
+    start_col = source.max_column + 2 if target is source else 1
+    group, value = p["group_col"], p["value_col"]
+    totals = {}
+    for row in t.rows:
+        if group >= len(row) or value >= len(row):
+            continue
+        g, v = row[group], row[value]
+        if g in (None, "") or not isinstance(v, (int, float)) or isinstance(v, bool):
+            continue
+        if p.get("month"):
+            if not isinstance(g, (date, datetime)):
+                continue
+            g = g.strftime("%Y-%m")
+        else:
+            g = str(g).strip()
+        totals[g] = totals.get(g, 0) + v
+    items = sorted(totals.items(), key=lambda x: x[0])
+    target.cell(1, start_col, "Month" if p.get("month") else t.header[group]).font = Font(bold=True)
+    target.cell(1, start_col + 1, f"Total {t.header[value]}").font = Font(bold=True)
+    for r, (label, total) in enumerate(items, start=2):
+        target.cell(r, start_col, label)
+        target.cell(r, start_col + 1, total)
+    chart = PieChart() if p["chart_type"] == "pie" else LineChart() if p["chart_type"] == "line" else BarChart()
+    if isinstance(chart, BarChart):
+        chart.type = p.get("direction", "col")
+    chart.title = p["title"]
+    if not isinstance(chart, PieChart):
+        chart.x_axis.title = "Month" if p.get("month") else t.header[group]
+        chart.y_axis.title = f"Total {t.header[value]}"
+    else:
+        chart.dataLabels = DataLabelList()
+        chart.dataLabels.showPercent = True
+        chart.dataLabels.showLeaderLines = True
+    chart.width, chart.height = 12, 7.5
+    last = len(items) + 1
+    chart.add_data(Reference(target, min_col=start_col + 1, min_row=1, max_row=last), titles_from_data=True)
+    chart.set_categories(Reference(target, min_col=start_col, min_row=2, max_row=last))
+    target.add_chart(chart, f"{get_column_letter(start_col + 3)}2")
+    target.column_dimensions[get_column_letter(start_col)].width = 18
+    target.column_dimensions[get_column_letter(start_col + 1)].width = 20
+    return target.title
+
+
+def _add_conditional_format(ws, p, hr, last):
+    cidx = p["col"] + 1
+    letter = get_column_letter(cidx)
+    first = hr + 1
+    if last < first:
+        return 0
+    cell_range = f"{letter}{first}:{letter}{last}"
+    rule = p["rule"]
+    if rule == "color_scale":
+        cf = ColorScaleRule(start_type="min", start_color="FFF8696B", mid_type="percentile", mid_value=50,
+                            mid_color="FFFFEB84", end_type="max", end_color="FF63BE7B")
+    else:
+        fill = PatternFill(fill_type="solid", fgColor=COLOURS[p.get("colour", "yellow")])
+        if rule in ("above", "below", "equal", "between"):
+            op = {"above": "greaterThan", "below": "lessThan", "equal": "equal", "between": "between"}[rule]
+            formulas = [str(v) for v in (p.get("values") or [p.get("value")])]
+            cf = CellIsRule(operator=op, formula=formulas, fill=fill)
+        elif rule == "overdue":
+            cf = FormulaRule(formula=[f'AND(ISNUMBER({letter}{first}),{letter}{first}<TODAY())'], fill=fill)
+        elif rule == "duplicate":
+            cf = FormulaRule(formula=[f'AND({letter}{first}<>"",COUNTIF(${letter}${first}:${letter}${last},{letter}{first})>1)'], fill=fill)
+        elif rule == "blank":
+            cf = FormulaRule(formula=[f'LEN(TRIM({letter}{first}&""))=0'], fill=fill)
+        elif rule == "text_equal":
+            value = str(p["value"]).replace('"', '""')
+            cf = FormulaRule(formula=[f'{letter}{first}="{value}"'], fill=fill)
+        else:
+            cf = Rule(type="top10", rank=10, dxf=DifferentialStyle(fill=fill))
+    ws.conditional_formatting.add(cell_range, cf)
+    return 1
+
+
 def run_edit(p, tables, wb, hi, n) -> dict:
     if wb is None:
         raise ValueError("needs the workbook")
     op = p["op"]
     t = tables.get(p["table"])
-    done, notes = 0, []
+    done, notes, output_sheet = 0, [], p["table"]
     for ws in _sheets(p, wb, tables):
         tt = tables.get(ws.title) or t
         hr = _hdr(ws, tt)
         last = ws.max_row
         col = p.get("col")
         cidx = (col + 1) if col is not None else None
-        if op == "bold_header":
+        if op == "chart":
+            output_sheet = _chart_sheet(p, tt, wb, ws)
+            done += 1
+        elif op == "conditional_format":
+            done += _add_conditional_format(ws, p, hr, last)
+        elif op == "bold_header":
             for c in ws[hr]:
                 if c.value not in (None, ""):
                     c.font = Font(bold=True)
@@ -428,7 +636,7 @@ def run_edit(p, tables, wb, hi, n) -> dict:
                 for r in rows:
                     new.append([c.value for c in ws[r]])
                 done += 1
-    return {"say": _say(p, done, notes, tables, hi), "sheet": p["table"], "changes": done}
+    return {"say": _say(p, done, notes, tables, hi), "sheet": output_sheet, "changes": done}
 
 
 def _say(p, done, notes, tables, hi):
@@ -436,6 +644,8 @@ def _say(p, done, notes, tables, hi):
     where = ("every sheet" if not hi else "har sheet") if p.get("all") and not (op == "replace" and p.get("col") is not None) else p["table"]
     col = t.header[p["col"]] if (t is not None and p.get("col") is not None and p["col"] < len(t.header)) else ""
     en = {
+        "chart": f"Made a {p.get('chart_type', 'bar')} chart of {p.get('title', '')} in {where}",
+        "conditional_format": f"Added {p.get('rule', '').replace('_', ' ')} highlighting to {col} in {where}",
         "bold_header": f"Made the heading row bold in {where}",
         "freeze": f"Froze the {'heading row and first column' if p.get('cell', '').startswith('B2') else 'first column' if p.get('cell') == 'B1' else 'heading row'} in {where}, so it stays visible while scrolling",
         "autofit": f"Fitted the column widths in {where} to their contents",
@@ -455,6 +665,8 @@ def _say(p, done, notes, tables, hi):
     }[op]
     if hi:
         hn = {
+            "chart": f"{where} ke liye {p.get('title', '')} ka {p.get('chart_type', 'bar')} chart bana diya",
+            "conditional_format": f"{where} mein {col} par {p.get('rule', '').replace('_', ' ')} highlighting laga di",
             "bold_header": f"{where} ki heading row bold kar di",
             "freeze": f"{where} mein {'heading row aur pehla column' if p.get('cell', '').startswith('B2') else 'pehla column' if p.get('cell') == 'B1' else 'heading row'} freeze kar diya; scroll karne pe bhi dikhega",
             "autofit": f"{where} ke columns ki width unke data jitni kar di",

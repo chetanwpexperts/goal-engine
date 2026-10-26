@@ -390,10 +390,16 @@ def _summary(report: dict) -> dict:
 
 
 # ------------------------------------------------------------------ fix (always a copy)
-FIX_OPS = {"trim_spaces", "text_to_number", "fix_broken_refs", "remove_duplicates", "fix_case"}
+FIX_OPS = {"trim_spaces", "text_to_number", "fix_broken_refs", "remove_duplicates", "fix_case",
+           "extend_ranges", "exact_lookup", "auto_calc", "restore_formulas"}
+REASONED_OPS = {"extend_ranges", "exact_lookup", "auto_calc", "restore_formulas"}     # need the whole workbook
 LABELS = {"trim_spaces": "Extra space hataya (removed extra spaces)", "text_to_number": "Text ko number banaya (text turned into a number)",
           "fix_broken_refs": "Toota formula theek kiya (broken formula rebuilt)", "remove_duplicates": "Duplicate row hatayi (repeated row removed)",
-          "fix_case": "Capital/small letters ek jaise kiye (same spelling everywhere)"}
+          "fix_case": "Capital/small letters ek jaise kiye (same spelling everywhere)",
+          "extend_ranges": "Total ki range saari rows tak badhayi (total now covers every row)",
+          "exact_lookup": "Lookup ko exact match pe kiya (lookup set to exact match)",
+          "auto_calc": "Calculation Automatic ki (calculation set to Automatic)",
+          "restore_formulas": "Type kiye number ki jagah formula wapas (formula put back over a typed number)"}
 
 
 def case_maps(rows) -> dict:
@@ -426,6 +432,10 @@ def fix(path: str, out: str, ops: list[str], only_sheets=None) -> dict:
     if not ops:
         raise OfficeError("Nothing to fix.")
     k = kind_of(path)
+    if k != "xlsx" and k != "xlsm" or os.path.getsize(path) > FULL_MODE_MAX:
+        ops = [o for o in ops if o not in REASONED_OPS]
+        if not ops:
+            raise OfficeError("Nothing to fix.")
     if k == "csv":
         return _fix_csv(path, out, ops)
     if os.path.getsize(path) <= FULL_MODE_MAX:
@@ -510,12 +520,57 @@ def _fix_full(path, out, ops, only_sheets=None):
                         cell.number_format = "0%"
         if "remove_duplicates" in ops:
             _dedupe_sheet(wb, ws, log)
+    if REASONED_OPS & set(ops):
+        _reasoned_fixes(path, wb, ops, log, only_sheets)
     if "remove_duplicates" in ops and "Duplicates (Goal Engine)" in wb.sheetnames and log.counts.get("remove_duplicates"):
         del wb["Duplicates (Goal Engine)"]               # the list is out of date once they're removed
     had = CHANGES_SHEET in wb.sheetnames
     _changes_sheet(wb[CHANGES_SHEET] if had else wb.create_sheet(CHANGES_SHEET), log, fresh=not had)
     wb.save(out)
     return {"changes": dict(log.counts), "formatting_kept": True, "examples": log.examples()}
+
+
+def _reasoned_fixes(path, wb, ops, log, only_sheets=None):
+    """The fixes the diagnosis proved: each one changes exactly the cells the evidence named."""
+    from app.officeknow import evidence as ev
+
+    book = ev.Book(path)
+
+    def cell_of(ref):
+        sheet, addr = ref.rsplit("!", 1)
+        if sheet not in wb.sheetnames or (only_sheets and sheet not in only_sheets):
+            return None, None, None
+        return sheet, addr, wb[sheet][addr]
+
+    if "extend_ranges" in ops:
+        for it in ev.check_short_ranges(book).get("all", []):
+            sheet, addr, c = cell_of(it["cell"])
+            if c is not None and c.value == it["formula"] and it["fixed"] != it["formula"]:
+                log.add("extend_ranges", sheet, addr, c.value, it["fixed"])
+                c.value = it["fixed"]
+    if "exact_lookup" in ops:
+        for it in ev.check_lookups(book)["approx"].get("all", []):
+            sheet, addr, c = cell_of(it["cell"])
+            if c is not None and c.value == it["formula"] and it["fixed"] != it["formula"]:
+                log.add("exact_lookup", sheet, addr, c.value, it["fixed"])
+                c.value = it["fixed"]
+    if "restore_formulas" in ops:
+        for ref in ev.check_typed_over_formulas(book).get("all", []):
+            sheet, addr, c = cell_of(ref)
+            if c is None:
+                continue
+            counter = Counter(formula_shape(x.value, x.row, x.column) for x in wb[sheet][c.column_letter]
+                              if isinstance(x.value, str) and x.value.startswith("=") and x.row > 1)
+            if counter:
+                shape, n = counter.most_common(1)[0]
+                if n / sum(counter.values()) >= 0.6:
+                    new = formula_from_shape(shape, c.row, c.column)
+                    log.add("restore_formulas", sheet, addr, c.value, new)
+                    c.value = new
+    if "auto_calc" in ops and wb.calculation is not None and wb.calculation.calcMode == "manual":
+        wb.calculation.calcMode = "auto"
+        wb.calculation.fullCalcOnLoad = True
+        log.add("auto_calc", wb.sheetnames[0], "", "Manual", "Automatic")
 
 
 def _dedupe_sheet(wb, ws, log):

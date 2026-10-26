@@ -481,7 +481,10 @@ ALL_RE = re.compile(r"\b(sab|saari|saare|everything|all)\b.{0,20}\b(theek|thik|f
 REPORT_RE = re.compile(r"\b(kya galat|kya problem|what.{0,10}wrong|check (karo|my|the|this)|problems?|errors?|galti|galtiyan|issues?)\b", re.I)
 _OP_NAMES = {"trim_spaces": ("extra space", "extra spaces"), "remove_duplicates": ("duplicate rows", "duplicate rows"),
              "fix_case": ("capital/small letters", "capital letters"), "text_to_number": ("text wale numbers", "text-numbers"),
-             "fix_broken_refs": ("toote formula", "broken formulas")}
+             "fix_broken_refs": ("toote formula", "broken formulas"),
+             "extend_ranges": ("total ki range", "total ranges"), "exact_lookup": ("lookup exact match", "lookups to exact match"),
+             "auto_calc": ("automatic calculation", "automatic calculation"), "restore_formulas": ("formula wapas", "formulas put back")}
+UPLOADED_RE = re.compile(r"^\s*(done|uploaded|ho gaya|daal di|daal diya|upload (kar )?(di|diya|kiya|ho gayi)|here|ye lo|yeh lo|check (it|this|karo)|dekho)\b", re.I)
 
 
 def _words(text: str) -> list[str]:
@@ -606,6 +609,17 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
     if (f.path or "").lower().endswith(".docx"):
         return ask_task(db, agent, f, text, hi)           # a Word document: its own questions and changes
     ops = ops_in(text)
+    from app.officeknow import diagnose
+
+    inputs = loads(agent.inputs, {}) or {}
+    said_before = inputs.get("complaint")
+    if not ops and (diagnose.describes_problem(text) or (said_before and (REPORT_RE.search(text or "") or UPLOADED_RE.search(text or "")))):
+        # they say what's wrong: find WHY in their own file, prove it, and offer the fix
+        complaint = text if diagnose.describes_problem(text) else said_before
+        if said_before:
+            inputs.pop("complaint", None)
+            agent.inputs = dumps(inputs)
+        return _diagnose_reply(agent, f, report, complaint, hi)
     sheets = sheets_in(text, report)
     if FORMULA_RE.search(text or "") and ops:
         # "duplicate ka formula do": they want the formula for THEIR file, not a change
@@ -678,6 +692,18 @@ def _answer(agent, report, ops, sheets, hi, f) -> str:
     _set_offer(agent, {"ops": fixable, "sheets": sheets})
     return ("Mila" if hi else "Found") + f"{where}. " + ". ".join(parts) + ". " + (
         "Theek kar doon? 'haan' likho, ya card pe Theek karo dabao." if hi else "Shall I fix it? Type 'yes', or press Fix it on the card.")
+
+
+def _diagnose_reply(agent, f, report, text, hi) -> str:
+    from app import mind
+    from app.officeknow import diagnose, evidence
+
+    facts = evidence.collect(f.path, report)
+    result = diagnose.diagnose(text, facts)
+    msg, ops = diagnose.report(result, hi, f.name)
+    mind.set_pattern("review")
+    _set_offer(agent, {"ops": ops, "sheets": []} if ops else None)
+    return msg
 
 
 def _doing(f, ops, sheets, hi) -> str:
@@ -1024,6 +1050,13 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     describes_problem = rec.get("kind") != "issue" or bool(PROBLEM_WORDS.search(text or "") or SYMPTOM_WORDS.search(text or ""))
     if not describes_problem:
         rec = {**rec, "confidence": 0.0}           # 'I need to work on my excel file': no problem named, so none guessed
+    from app.officeknow import diagnose
+
+    if not task_reply and open_file(db, agent) is None and diagnose.describes_problem(text):
+        inputs["complaint"] = text
+        likely = diagnose.likely(text, turn.hi)
+    else:
+        likely = ""
     if rec["confidence"] >= SURE and describes_problem and not task_reply and open_file(db, agent) is None:
         inputs["brain"] = rec
         goal.title = officebrain.describe(rec, turn.hi)
@@ -1041,4 +1074,4 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     options = []
     if isinstance(task_reply, tuple):
         task_reply, options = task_reply
-    return (task_reply or plan_reply(rec, turn.hi)), options, "agent_plan"
+    return (task_reply or likely or plan_reply(rec, turn.hi)), options, "agent_plan"

@@ -239,3 +239,4 @@ if __name__ == "__main__":
     print(f"{ok}/{c} exactly right")
     for e in errs[:30]:
         print(" ", e)
+    sys.exit(1 if errs else 0)

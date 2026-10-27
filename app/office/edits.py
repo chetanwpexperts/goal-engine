@@ -530,7 +530,7 @@ def _chart_sheet(p, t, wb, source):
         if p.get("month"):
             if not isinstance(g, (date, datetime)):
                 continue
-            g = g.strftime("%Y-%m")
+            g = (g.year, g.month)
         else:
             g = str(g).strip()
         totals[g] = totals.get(g, 0) + v
@@ -538,6 +538,8 @@ def _chart_sheet(p, t, wb, source):
     target.cell(1, start_col, "Month" if p.get("month") else t.header[group]).font = Font(bold=True)
     target.cell(1, start_col + 1, f"Total {t.header[value]}").font = Font(bold=True)
     for r, (label, total) in enumerate(items, start=2):
+        if isinstance(label, tuple):
+            label = date(label[0], label[1], 1).strftime("%b %Y")          # in date order, shown as "Sep 2026"
         target.cell(r, start_col, label)
         target.cell(r, start_col + 1, total)
     chart = PieChart() if p["chart_type"] == "pie" else LineChart() if p["chart_type"] == "line" else BarChart()
@@ -550,11 +552,18 @@ def _chart_sheet(p, t, wb, source):
     else:
         chart.dataLabels = DataLabelList()
         chart.dataLabels.showPercent = True
+        chart.dataLabels.showCatName = True
+        chart.dataLabels.showVal = False
+        chart.dataLabels.showSerName = False
+        chart.dataLabels.showLegendKey = False
         chart.dataLabels.showLeaderLines = True
     chart.width, chart.height = 12, 7.5
     last = len(items) + 1
     chart.add_data(Reference(target, min_col=start_col + 1, min_row=1, max_row=last), titles_from_data=True)
     chart.set_categories(Reference(target, min_col=start_col, min_row=2, max_row=last))
+    if isinstance(chart, LineChart):
+        for series in chart.series:
+            series.smooth = False                      # straight lines between months: a curve would invent values
     target.add_chart(chart, f"{get_column_letter(start_col + 3)}2")
     target.column_dimensions[get_column_letter(start_col)].width = 18
     target.column_dimensions[get_column_letter(start_col + 1)].width = 20

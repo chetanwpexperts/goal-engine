@@ -73,12 +73,12 @@
 
   // ---------------------------------------------------------------- composer
   const EXAMPLES = [
-    "Describe your PHP, SQL, Excel or other problem…",
-    "My Excel sheet shows #REF! errors, fix them",
-    "My database is slow, check it",
-    "Remind customers with pending payments every Monday",
-    "Send me a report of pending payments every morning at 9",
-    "Export the orders table from my database to Excel",
+    "Tell it what's wrong with your Excel file or database…",
+    "My Excel total is wrong",
+    "VLOOKUP shows #N/A for some rows",
+    "ERROR 1062 Duplicate entry when saving the form",
+    "Net Sales 1 lakh se zyada wale rows green karo",
+    "Deadlock found when trying to get lock, why?",
     "Find duplicate entries in my sheet",
   ];
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;

@@ -738,3 +738,4 @@ body[data-state="active"] .stage { animation: stage-in .35s ease both; }
   body[data-state="active"] .stage, .turn-machine, .say { animation: none; }
 }
 .strong-hint { color: var(--ink, #1c2340); font-weight: 500; margin: 0 0 12px; }
+.hero .free-line { margin-top: 10px; font-weight: 600; color: #3B3FD8; letter-spacing: .01em; }

@@ -1939,15 +1939,47 @@
   document.addEventListener("visibilitychange", refreshStatus);
 
   // ---------------------------------------------------------------- home: the brain tiles and the living network
-  for (const tile of document.querySelectorAll(".brain-tile")) {
-    tile.addEventListener("click", () => {
+  // What each area can do today and what is still coming: said plainly before anyone starts
+  const SCOPE = {
+    db: {
+      title: ["Databases ke liye", "For databases"],
+      now: [["MySQL, MariaDB aur PostgreSQL", "MySQL, MariaDB and PostgreSQL"],
+            ["Error paste karo (jaise 1062 Duplicate entry, deadlock, access denied): wajah, fix aur aage se bachav", "Paste an error (e.g. 1062 Duplicate entry, deadlock, access denied): the cause, the fix and how to prevent it"],
+            ["Slow query paste karo: kya galat hai, nayi query aur sahi index", "Paste a slow query: what's wrong, a rewritten query and the right indexes"]],
+      soon: [["Aapka database khud check karna", "Checking your live database itself"], ["SQL Server, MongoDB, Redis, Oracle", "SQL Server, MongoDB, Redis, Oracle"]],
+    },
+    ms: {
+      title: ["Microsoft tools ke liye", "For Microsoft tools"],
+      now: [["Excel: problem batao, file mein asli wajah dhoondh ke saboot ke saath theek karta hai (Undo ke saath)", "Excel: tell it the problem; it finds the real cause in your file, shows the proof and fixes it (with Undo)"],
+            ["Excel: badlav, charts, highlight, sawaal (total, region-wise, top 10…)", "Excel: changes, charts, highlighting, questions (totals, region-wise, top 10…)"],
+            ["Word: replace, formatting, emails/phones/amounts nikalna, summary", "Word: replace, formatting, pulling out emails/phones/amounts, summary"]],
+      soon: [["PowerPoint, Outlook", "PowerPoint, Outlook"], ["Macros, printing setup, sheet protection, nayi file banana", "Macros, print setup, sheet protection, creating new files"]],
+    },
+  };
+  function showScope(tile) {
+    const box = $("#scope");
+    const sc = SCOPE[tile.dataset.scope];
+    if (!box || !sc) return;
+    const hi = lastLang !== "en";
+    const pick = (pair) => pair[hi ? 0 : 1];
+    const list = (items) => { const ul = el("ul"); for (const it of items) ul.append(el("li", null, pick(it))); return ul; };
+    const tryIt = el("button", "btn solid", hi ? "Example try karo" : "Try an example"); tryIt.type = "button";
+    tryIt.addEventListener("click", () => {
       input.value = tile.dataset.example;
       autosize();
       input.dispatchEvent(new Event("input"));
       input.focus();
       input.setSelectionRange(input.value.length, input.value.length);
     });
+    box.replaceChildren(
+      el("b", "scope-title", pick(sc.title)),
+      el("p", "scope-h now", hi ? "Abhi kaam karta hai" : "Works now"), list(sc.now),
+      el("p", "scope-h soon", hi ? "Jald aa raha hai" : "Coming soon"), list(sc.soon),
+      tryIt);
+    box.hidden = false;
+    for (const t of document.querySelectorAll(".brain-tile")) t.setAttribute("aria-pressed", String(t === tile));
   }
+  for (const tile of document.querySelectorAll(".brain-tile")) tile.addEventListener("click", () => showScope(tile));
   const syncTyping = () => body.classList.toggle("typing", !!input.value.trim() && !$("#options").hidden);
   input.addEventListener("input", syncTyping);
 

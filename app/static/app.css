@@ -739,3 +739,11 @@ body[data-state="active"] .stage { animation: stage-in .35s ease both; }
 }
 .strong-hint { color: var(--ink, #1c2340); font-weight: 500; margin: 0 0 12px; }
 .hero .free-line { margin-top: 10px; font-weight: 600; color: #3B3FD8; letter-spacing: .01em; }
+.scope { width: min(760px, 100%); margin: 16px auto 0; padding: 18px 22px; border-radius: 18px; background: rgba(255, 255, 255, .92);
+  border: 1px solid #E2E5F3; box-shadow: 0 18px 36px -24px rgba(64, 72, 160, .45); text-align: left; animation: say-in .3s ease both; }
+.scope-title { display: block; font-size: 17px; margin-bottom: 6px; }
+.scope-h { margin: 12px 0 4px; font-size: 13px; font-weight: 700; }
+.scope-h.now { color: #1E7A55; } .scope-h.soon { color: #9A6A12; }
+.scope ul { margin: 0; padding-left: 20px; line-height: 1.55; font-size: 14.5px; }
+.scope .btn { margin-top: 14px; }
+.brain-tile[aria-pressed="true"] { border-color: #6F6CF0; box-shadow: 0 0 0 3px rgba(111, 108, 240, .15); }

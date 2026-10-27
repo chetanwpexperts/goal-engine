@@ -35,5 +35,4 @@ Replaces "connect your database on our portal". Passwords and data never leave t
 1. Linux agent + dashboard (VPS, EC2, WHM) ~ 1 week.
 2. Shared-hosting cron agent.
 3. Windows service.
-Open decisions (Chetan): dashboard on our portal, self-hosted, or both; code protected (compiled + licence) or open;
-free or paid.
+Open decision (Chetan): dashboard on our portal, self-hosted, or both.

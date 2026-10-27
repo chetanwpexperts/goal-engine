@@ -61,3 +61,16 @@ These errors happen outside the database engine itself, blocking your applicatio
 - Concurrency: isolation levels, predictable lock order, short transactions, retry on deadlock/serialization failure.
 - Connectivity: pooling, firewall rules, least-privilege GRANT/REVOKE, high availability.
 - Cross-cutting: observability (slow query log, EXPLAIN ANALYZE, I/O), backup & point-in-time recovery, automation.
+
+## Built for every database (agreed 27 Oct)
+Three levels, so any database can be added later without touching the reasoning:
+1. The 5 layers: shared by every database.
+2. Families: the few fundamentals only some databases have.
+   - Relational (MySQL, MariaDB, PostgreSQL, SQL Server, Oracle, SQLite, DB2): tables, joins, foreign keys, transactions.
+   - Document (MongoDB, CouchDB, Firestore): no joins, nested data, schema validation, write concerns.
+   - Key-value / cache (Redis, Memcached, DynamoDB): memory limits, eviction, expiry, hot keys.
+   - Wide-column (Cassandra, ScyllaDB): consistency levels, partitions, tombstones.
+   - Search (Elasticsearch, OpenSearch): mappings, shards, refresh.
+   - Graph (Neo4j) and time-series (InfluxDB, TimescaleDB).
+3. One dialect file per database: its error codes, messages and words mapped onto the shared ideas.
+Now: relational family + MySQL, MariaDB, PostgreSQL dialects. Later order: SQL Server, SQLite, MongoDB, Redis, Oracle, then by demand.

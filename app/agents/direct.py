@@ -28,7 +28,11 @@ _spec = importlib.util.spec_from_file_location("goal_connector", Path(__file__).
 gc = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(gc)
 
-ATTEMPTS_PER_10_MIN = 8
+ATTEMPTS_PER_10_MIN = 8          # per browser
+IP_ATTEMPTS_PER_10_MIN = 12      # per network address: a new cookie doesn't give new tries
+TARGET_ATTEMPTS_PER_10_MIN = 10  # per database server, from everyone together: no password guessing through us
+ALL_ATTEMPTS_PER_10_MIN = 120    # the whole form, so it can't be used to scan the internet
+MIN_PORT = 1024                  # databases listen above 1024; below are SSH, mail, web... never ours to touch
 _attempts: dict[str, list[float]] = {}
 _lock = threading.Lock()
 _slots = threading.BoundedSemaphore(4)       # at most 4 database jobs at once on our server
@@ -111,14 +115,23 @@ def public_ip(host: str, port: int) -> str:
     return str(ips[0])
 
 
-def _rate_limit(visitor_id: str) -> None:
+def _rate_limit(visitor_id: str, client_ip: str = "", target: str = "") -> None:
+    """Tries are counted per browser, per network address, per database server and in total."""
     now = time.time()
+    keys = [(f"v:{visitor_id}", ATTEMPTS_PER_10_MIN), ("all", ALL_ATTEMPTS_PER_10_MIN)]
+    if client_ip:
+        keys.append((f"ip:{client_ip}", IP_ATTEMPTS_PER_10_MIN))
+    if target:
+        keys.append((f"t:{target.lower()}", TARGET_ATTEMPTS_PER_10_MIN))
     with _lock:
-        recent = [t for t in _attempts.get(visitor_id, []) if now - t < 600]
-        if len(recent) >= ATTEMPTS_PER_10_MIN:
-            raise DirectError("Too many tries. Wait 10 minutes and check the details")
-        recent.append(now)
-        _attempts[visitor_id] = recent
+        for key, limit in keys:
+            recent = [t for t in _attempts.get(key, []) if now - t < 600]
+            _attempts[key] = recent
+            if len(recent) >= limit:
+                log.warning("direct connect limit hit: %s", key.split(":")[0])
+                raise DirectError("Too many tries. Wait 10 minutes and check the details")
+        for key, _ in keys:
+            _attempts[key].append(now)
 
 
 def _open(details: dict):
@@ -143,7 +156,8 @@ def _open(details: dict):
             raise DirectError(f"Couldn't reach {details['host']}:{port}. The database may only accept local connections. "
                               "On cPanel, add " + (f"IP {ip}" if ip else "our server's IP") + " under Remote MySQL. "
                               "On a VPS, use the one-command option below", use_command=True) from exc
-        raise DirectError(f"Couldn't connect: {msg[:160]}") from exc
+        log.info("direct connect failed: %s", msg[:300])
+        raise DirectError("Couldn't connect to that database. Check the host, port, database name and user") from exc
 
 
 def _clean_form(form: dict) -> dict:
@@ -160,6 +174,8 @@ def _clean_form(form: dict) -> dict:
         host, port = host.split(":")
     if not port.isdigit() or not 0 < int(port) < 65536:
         port = "3306" if kind == "mysql" else "5432"
+    if int(port) < MIN_PORT:
+        raise DirectError("Databases use ports above 1024 (MySQL 3306, PostgreSQL 5432). Check the port")
     details = {"type": kind, "host": host[:200], "port": port, "database": (form.get("database") or "").strip()[:120],
                "user": (form.get("user") or "").strip()[:120], "password": form.get("password") or ""}
     if not details["host"] or not details["database"] or not details["user"]:
@@ -167,11 +183,11 @@ def _clean_form(form: dict) -> dict:
     return details
 
 
-def connect(db: Session, visitor_id: str, form: dict, name: str = "", allow_changes: bool = False) -> Connector:
+def connect(db: Session, visitor_id: str, form: dict, name: str = "", allow_changes: bool = False, client_ip: str = "") -> Connector:
     from app.agents import database as dbagent
 
     details = _clean_form(form)
-    _rate_limit(visitor_id)
+    _rate_limit(visitor_id, client_ip, details["host"])
     secret = encrypt(details)                     # fails early if the server can't keep secrets
     conn = _open(details)
     try:

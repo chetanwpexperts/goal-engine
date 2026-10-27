@@ -893,9 +893,13 @@ def create_connector(body: ConnectorIn, request: Request, db: Session = Depends(
 
 
 @app.post("/api/connectors/direct")
-def connect_direct(body: DirectIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+def connect_direct(body: DirectIn, request: Request, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    # the address nginx saw (the right-most forwarded one); the left-most part can be faked by the client
+    fwd = [x.strip() for x in (request.headers.get("x-forwarded-for") or "").split(",") if x.strip()]
+    client_ip = fwd[-1] if fwd else (request.client.host if request.client else "")
     try:
-        connector = dbagent_direct.connect(db, visitor, body.model_dump(), body.name, allow_changes=body.allow_changes)
+        connector = dbagent_direct.connect(db, visitor, body.model_dump(), body.name, allow_changes=body.allow_changes,
+                                           client_ip=client_ip)
     except (dbagent_direct.DirectError, dbagent.DatabaseError) as exc:
         return JSONResponse({"error": str(exc), "use_command": bool(getattr(exc, "use_command", False))}, status_code=400)
     if body.agent_id:

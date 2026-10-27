@@ -616,6 +616,7 @@ class MySQL(Driver):
         # FOUND_ROWS: an UPDATE reports the rows it matched, so we can check it touched exactly the previewed rows
         return pymysql.connect(host=c["host"], port=int(c.get("port") or 3306), user=c["user"], password=c["password"],
                                database=c["database"], charset="utf8mb4", connect_timeout=5, read_timeout=120, autocommit=False,
+                               local_infile=False,     # a fake server can never make us send a local file
                                client_flag=CLIENT.FOUND_ROWS)
 
     def alive(self):
@@ -743,7 +744,7 @@ class Postgres(Driver):
                 import psycopg
         c = self.cfg
         return psycopg.connect(host=c["host"], port=int(c.get("port") or 5432), user=c["user"], password=c["password"],
-                               dbname=c["database"], connect_timeout=10)
+                               dbname=c["database"], connect_timeout=10, passfile=os.devnull)   # never read saved passwords from disk
 
     def alive(self):
         return not self.conn.closed

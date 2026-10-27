@@ -1945,8 +1945,9 @@
       title: ["Databases ke liye", "For databases"],
       now: [["MySQL, MariaDB aur PostgreSQL", "MySQL, MariaDB and PostgreSQL"],
             ["Error paste karo (jaise 1062 Duplicate entry, deadlock, access denied): wajah, fix aur aage se bachav", "Paste an error (e.g. 1062 Duplicate entry, deadlock, access denied): the cause, the fix and how to prevent it"],
-            ["Slow query paste karo: kya galat hai, nayi query aur sahi index", "Paste a slow query: what's wrong, a rewritten query and the right indexes"]],
-      soon: [["Aapka database khud check karna", "Checking your live database itself"], ["SQL Server, MongoDB, Redis, Oracle", "SQL Server, MongoDB, Redis, Oracle"]],
+            ["Slow query paste karo: kya galat hai, nayi query aur sahi index", "Paste a slow query: what's wrong, a rewritten query and the right indexes"],
+            ["Free account ke saath: apna database jodo, agent khud check karke saboot ke saath jawab deta hai", "With a free account: connect your database and the agent checks it itself, with proof"]],
+      soon: [["SQL Server, MongoDB, Redis, Oracle", "SQL Server, MongoDB, Redis, Oracle"]],
     },
     ms: {
       title: ["Microsoft tools ke liye", "For Microsoft tools"],

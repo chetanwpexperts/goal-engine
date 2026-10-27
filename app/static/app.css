@@ -716,3 +716,24 @@ body[data-state="active"] .btn.solid { background: linear-gradient(135deg, #5B5B
 .byline { margin: 6px 0 0; font-size: 13px; color: #6A7193; }
 body.typing .engine { visibility: hidden; }
 @media (max-width: 640px) { .engine-stats { grid-template-columns: 1fr; } }
+
+/* ---------------------------------------------------------------- smooth loading (27 Oct) */
+.brain-hd { opacity: 0; transition: opacity .6s ease; }
+.brain-hd.ready { opacity: 1; }
+.brain-stage::before { content: ""; position: absolute; left: 50%; top: 50%; width: min(420px, 70vw); height: min(300px, 26vh);
+  transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(closest-side, rgba(124, 108, 240, .22), rgba(124, 108, 240, 0));
+  pointer-events: none; }
+body[data-state="active"] .composer { margin-bottom: 0; bottom: calc(34px + env(safe-area-inset-bottom)); }
+body[data-state="active"]::after { content: ""; position: fixed; left: 0; right: 0; bottom: 0; height: 130px; z-index: 5; pointer-events: none;
+  background: linear-gradient(to top, var(--bg, #F3F4FB) 55%, rgba(243, 244, 251, 0)); }
+@media (min-width: 641px) { body[data-state="active"] .stage { padding-bottom: 150px; } }
+body { transition: background-color .3s ease; }
+.home { transition: opacity .25s ease; }
+body[data-state="active"] .stage { animation: stage-in .35s ease both; }
+@keyframes stage-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.turn-machine, .say { animation: say-in .3s ease both; }
+@keyframes say-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .brain-hd, .home { transition: none; } .brain-hd { opacity: 1; }
+  body[data-state="active"] .stage, .turn-machine, .say { animation: none; }
+}

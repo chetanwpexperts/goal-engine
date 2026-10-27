@@ -100,7 +100,7 @@
     }
   }
   let BX = 0, BY = 0, BW = 0, BH = 0;
-  img.addEventListener("load", () => { if (W) { paintArt(); if (still) draw(performance.now()); else start(); } });
+  img.addEventListener("load", () => { if (W) { paintArt(); if (still) draw(performance.now()); else start(); } cv.classList.add("ready"); });
 
   function build() {
     dpr = Math.min(window.devicePixelRatio || 1, 3);

@@ -1,7 +1,10 @@
 """Everyday Excel orders the agent carries out on the file itself (a new version, so Undo works):
 bold header, freeze the top row, fit column widths, filter buttons, remove blank rows, delete / rename a column,
 serial numbers, split text into columns, a dropdown list, find & replace, date / money / decimal formats,
-UPPER / Proper / lower case, one sheet per value of a column.
+UPPER / Proper / lower case, one sheet per value of a column, charts, highlighting.
+
+Understood by meaning (app/office/meaning.py), never by fixed sentences: the words say what kind of order it is,
+the person's own file says which column, which value, which sheet.
 
 plan_edit(text, tables) -> a plan {"job": "edit", "op": ..., "table": ..., ...} or None (not an order).
 run_edit(plan, tables, wb, hi, n) -> {"say", "sheet", "changes"}.
@@ -18,54 +21,12 @@ from openpyxl.styles.differential import DifferentialStyle
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
-DO = r"(?:make|set|add|put|insert|create|apply|remove|delete|drop|clear|freeze|lock|split|separate|break|rename|change|convert|replace|" \
-     r"fit|resize|format|round|turn|give|karo|kar do|kardo|kar dijiye|karein|hatao|hata do|hatado|lagao|laga do|lagado|banao|bana do|" \
-     r"badlo|badal do|do|de do|dedo|daalo|daal do|tod do|alag karo)"
-
-ORDERS = [
-    ("chart", re.compile(r"\b(charts?|graphs?)\b", re.I)),
-    ("conditional_format", re.compile(
-        r"\bcolou?r scale\b|\bhighlight\b.{0,50}\b(overdue|duplicates?|blank|empty|khaali|khali)\b|"
-        r"\btop\s*10\b.{0,40}\bhighlight\b|\bhighlight\b.{0,60}\b(?:red|green|yellow|orange|blue)\b|"
-        r"\b(?:red|green|yellow|orange|blue)(?:\s+(?:karo|kar do|highlight))?\s*$", re.I)),
-    ("bold_header", re.compile(r"\b(header|heading|headings|top row|first row|title row|pehli row|upar wali row)\b.{0,25}\b(bold|mota|motaa)\b|"
-                               r"\b(bold)\b.{0,25}\b(header|heading|headings|top row|first row|pehli row)\b", re.I)),
-    ("freeze", re.compile(r"\b(freeze|lock|fix|jama)\b.{0,25}\b(top row|first row|header|heading|row 1|pehli row|first column|column a|pehla column)\b|"
-                          r"\b(header|heading|top row|first row|pehli row)\b.{0,25}\b(freeze|fixed|fix karo|lock|jama do)\b|\bfreeze panes?\b", re.I)),
-    ("autofit", re.compile(r"\b(auto ?fit|fit|adjust|resize|theek|set)\b.{0,25}\b(column )?(widths?|chaudai|size of columns|columns? width)\b|"
-                           r"\bcolumns? (ki )?(width|chaudai)\b.{0,20}\b(theek|fit|adjust|set|karo)\b|\bautofit\b", re.I)),
-    ("filter", re.compile(r"\b(add|put|apply|lagao|laga do|enable|turn on|daalo)\b.{0,20}\b(filters?|filter buttons?|auto ?filter)\b|"
-                          r"\b(filters?|filter buttons?|auto ?filter)\b.{0,15}\b(lagao|laga do|daalo|add karo|on karo)\b", re.I)),
-    ("remove_blank_rows", re.compile(r"\b(remove|delete|hatao|hata do|clear|drop|nikalo|nikal do)\b.{0,25}\b(blank|empty|khaali|khali)\s*(rows?|lines?|lineen)\b|"
-                                     r"\b(blank|empty|khaali|khali)\s*(rows?|lines?)\b.{0,20}\b(hatao|hata do|remove|delete|nikalo)\b", re.I)),
-    ("serial", re.compile(r"\b(add|insert|put|lagao|daalo|banao|do)\b.{0,25}\b(serial (no|number|numbers)s?|s\.?\s?no\.?|sr\.?\s?no\.?|sequence numbers?|kram sankhya|numbering)\b|"
-                          r"\b(serial (no|number|numbers)s?|s\.?\s?no\.?|sr\.?\s?no\.?)\b.{0,20}\b(lagao|daalo|add|do|banao)\b", re.I)),
-    ("split_sheets", re.compile(r"\b(split|separate|divide|break)\b.{0,40}\b(by|per|each|wise)\b.{0,30}\b(sheets|tabs|files)\b|\b(split|separate|divide|break|alag)\b.{0,40}\b(sheet|sheets|tabs?|files?)\b.{0,40}\b(by|per|each|for every|har|wise|ke hisaab)\b|"
-                                r"\b(one|alag|separate|ek)\s+(sheet|tab|file)\s+(for|per|har)\s+(each|every|har)?\b|\b(\w+)\s*wise\s+(alag|separate)\s+(sheets?|tabs?|files?)\b", re.I)),
-    ("split", re.compile(r"\b(split|separate|break|tod|alag)\b.{0,40}\b(into|in|mein|me)\b.{0,30}\b(first|last|columns?|parts?|alag)\b|"
-                         r"\btext to columns?\b|\b(first|pehla)\s+(and|aur)\s+(last|second|doosra)\s+name\b.{0,30}\b(alag|split|separate)\b", re.I)),
-    ("dropdown", re.compile(r"\b(dropdown|drop-down|drop down|list box|data validation|pick ?list)\b", re.I)),
-    ("rename", re.compile(r"\brename\b|\b(column|heading|header)\b.{0,40}\b(naam|name)\b.{0,30}\b(badlo|badal do|change|karo|kar do|rakho|rakh do)\b|"
-                          r"\bchange\b.{0,30}\b(column|heading|header)\b.{0,10}\bname\b", re.I)),
-    ("delete_column", re.compile(r"\b(delete|remove|drop|hatao|hata do|hatado|nikal do|nikalo)\b.{0,30}\b(column|col|columns)\b|"
-                                 r"\b(column|col)\b.{0,30}\b(delete|remove|hatao|hata do|hatado|nikal do)\b", re.I)),
-    ("date_format", re.compile(r"\b(date|dates|tarikh)\b.{0,30}\b(format|dd|mm|yyyy|dd-mm|dd/mm|mm/dd)\b|\b(format)\b.{0,20}\b(date|dates)\b", re.I)),
-    ("money_format", re.compile(r"\b(rupees?|rs|₹|inr|currency|indian|lakhs?|commas?)\b.{0,15}\b(format|formatting|style)\b|"
-                                r"\b(format|formatting)\b.{0,25}\b(rupees?|₹|currency|lakhs?|indian|commas?)\b", re.I)),
-    ("round", re.compile(r"\b(round( off)?|decimals?|decimal places?|dashamlav)\b.{0,25}\b(\d|two|one|zero|no|karo|kar do|off)\b|\bround off\b", re.I)),
-    ("case", re.compile(r"\b(upper ?case|capital letters?|all caps|proper case|title case|first letter capital|lower ?case|small letters?|"
-                        r"bade akshar|chhote akshar)\b", re.I)),
-    ("replace", re.compile(r"\breplace\b.{0,80}\bwith\b|\bchange\s+(?:all\s+(?:the\s+)?\S.{0,38}|['\"][^'\"]{1,40}['\"])\s+to\s+\S|"
-                           r"\b(\S+)\s+ko\s+(\S+)\s+(se|mein|me)\s+(badlo|badal do|replace karo|kar do)\b|\bfind and replace\b", re.I)),
-]
-
-MACRO_RE = re.compile(r"\b(macros?|vba|visual basic)\b", re.I)
-PIVOT_RE = re.compile(r"\bpivot\b", re.I)
-QUESTION_RE = re.compile(r"^\s*(how|what|which|who|whose|is|are|was|were|does|did|kitne|kitni|kitna|kya|kaun|kaunse|konse|where|kahan|tell me|batao)\b", re.I)
-
+from app.office import meaning as M
 
 # Indian grouping (1,23,45,678.00): Excel has no built-in code for it, so three ranges
 INDIAN = '[>=10000000]"₹"##\\,##\\,##\\,##0.00;[>=100000]"₹"##\\,##\\,##0.00;"₹"##,##0.00'
+COLOURS = M.lexicon()["colours"]
+WHOLE_FILE = ("bold_header", "freeze", "autofit", "filter", "remove_blank_rows", "replace")
 
 
 class NotAnEdit(Exception):
@@ -77,17 +38,33 @@ def _ask():
     return ask
 
 
-WHOLE_FILE = ("bold_header", "freeze", "autofit", "filter", "remove_blank_rows", "replace")
+def wants_macro(text: str) -> bool:
+    return M.Reading(text).has("macro")
 
-COLOURS = {
-    "red": "FFFFC7CE", "green": "FFC6EFCE", "yellow": "FFFFEB9C",
-    "orange": "FFF4B183", "blue": "FFBDD7EE",
-}
+
+def wants_pivot(text: str) -> bool:
+    return M.Reading(text).has("pivot")
+
+
+EDGE = ("act", "polite", "to", "with", "into", "name", "rename", "column", "change", "replace", "all", "header", "sheet", "file")
+
+
+def _edge_words() -> set[str]:
+    """Order words that can sit around the person's own words ('rename X to Y karo'), never part of them."""
+    lex = M.lexicon()["_words"]
+    order = {w for w, cs in lex.items() if cs & set(EDGE)}
+    return order | _ask().STOP | {"the", "of", "a", "an", "ka", "ki", "ke", "ko", "jagah", "wala", "wali", "wale", "likho"}
+
+
+def _plain(text: str, drop=("column", "header", "sheet", "file", "act", "polite")) -> str:
+    """The person's words without the order words, so column names stand out."""
+    lex = M.lexicon()["_words"]
+    toks = M.Reading(text).tokens
+    return " ".join(t for t in toks if not (lex.get(t, set()) & set(drop)))
 
 
 def _named(text, tables):
-    a = _ask()
-    return a.named_sheet(text, tables)
+    return _ask().named_sheet(text, tables)
 
 
 def _target(text, tables):
@@ -97,14 +74,16 @@ def _target(text, tables):
         return named
     # no sheet named: the sheet that has the column they named ('make region uppercase')
     best, best_sc = None, 0.0
+    plain = _plain(text)
     for t in tables:
         if not t.rows:
             continue
-        plain = re.sub(r"\b(columns?|cols?|heading|header|sheets?)\b", " ", text or "", flags=re.I)
         sc = max((x for _, x in a.columns_in(plain, t)), default=0)
         if sc > best_sc:
             best, best_sc = t, sc
-    if best is not None and best_sc >= 1:
+    scores = sorted((max((x for _, x in a.columns_in(plain, t)), default=0) for t in tables if t.rows), reverse=True)
+    clear = len(scores) < 2 or scores[0] - scores[1] >= 0.2
+    if best is not None and (best_sc >= 1 or (best_sc >= 0.6 and clear)):
         return best
     picked = a.pick_sheet(text, tables)
     if picked is not None:
@@ -113,27 +92,60 @@ def _target(text, tables):
     return max(data, key=lambda t: len(t.rows)) if data else (tables[0] if tables else None)
 
 
-def _all_sheets(text):
-    return bool(re.search(r"\b(all|every|har|saari|saare|sabhi|sab)\s+(sheets?|tabs?)\b|\b(whole|poori|puri|entire)\s+(file|workbook)\b", text or "", re.I))
+def _all_sheets(r: M.Reading) -> bool:
+    return r.has("all") and r.has("sheet", "file")
 
 
 def _col(text, t, kinds=None, exclude=(), need=0.5):
     a = _ask()
-    q = re.findall(r"['\"“”‘’]([^'\"“”‘’]{1,60})['\"“”‘’]", text or "")
-    for name in q:
+    for name in M.QUOTED.findall(text or ""):
         for i, h in enumerate(t.header):
             if h and h.strip().lower() == name.strip().lower() and i not in exclude:
                 return i
-    plain = re.sub(r"\b(columns?|cols?|heading|header|the|wala|wali|ka|ki|ke)\b", " ", text or "", flags=re.I)
-    cands = [(sc, i) for i, sc in a.columns_in(plain, t, kinds) if i not in exclude]
+    cands = [(sc, i) for i, sc in a.columns_in(_plain(text), t, kinds) if i not in exclude]
     return max(cands)[1] if cands and max(cands)[0] >= need else None
 
 
-def is_order(text: str) -> bool:
-    low = text or ""
-    if QUESTION_RE.search(low):
+def _with_file(r: M.Reading, t, tables=None) -> M.Reading:
+    """Add what the file knows: a column was named, a cell value was named, the value to find is in the data."""
+    if t is None:
+        return r
+    a = _ask()
+    text = r.text
+    for x in tables or []:
+        text = re.sub(rf"\b{re.escape(x.name)}\b", " ", text, flags=re.I)    # the sheet's own name isn't a value
+    if a.columns_in(_plain(text), t) and max(sc for _, sc in a.columns_in(_plain(text), t)) >= 0.5:
+        r.at.setdefault("COLUMN", []).append(-1)
+    if any(x.rows and a.values_in(text, x) for x in (tables or [t])):
+        r.at.setdefault("VALUE", []).append(-1)
+    find, _ = _find_repl(r.text)
+    if find and (M.QUOTED.search(r.text) or _in_data(find, t)):
+        r.at.setdefault("FIND_VALUE", []).append(-1)
+    doing = r.has("act", "remove", "change", "replace", "highlight", "freeze", "rename", "split", "round", "bold", "polite", "fit")
+    if r.has("show", "question") and not doing:
+        r.at.setdefault("show_only", []).append(-1)
+    return r
+
+
+def _in_data(value: str, t) -> bool:
+    v = value.strip().lower()
+    if not v:
         return False
-    return any(rx.search(low) for op, rx in ORDERS)
+    for i in range(len(t.header)):
+        for x in t.col(i)[:5000]:
+            if isinstance(x, str) and v in x.strip().lower():
+                return True
+    return False
+
+
+def is_order(text: str) -> bool:
+    """Could this be an order at all (before the file is read)? The file then decides (plan_edit)."""
+    r = M.Reading(text)
+    if r.asking():
+        return False
+    for c in ("COLUMN", "VALUE", "FIND_VALUE"):
+        r.at.setdefault(c, []).append(-1)
+    return bool(M.orders(r))
 
 
 def _splittable(said, t, col):
@@ -146,12 +158,12 @@ def _splittable(said, t, col):
 
     if col is not None and parts(col) >= 0.5:
         return col
-    cands = [(sc + parts(i), i) for i, sc in a.columns_in(said, t, {"text"}) if parts(i) >= 0.5]
+    cands = [(sc + parts(i), i) for i, sc in a.columns_in(_plain(said), t, {"text"}) if parts(i) >= 0.5]
     if cands:
         return max(cands)[1]
-    named = [i for i, h in enumerate(t.header) if h and re.search(r"name|naam", h, re.I) and parts(i) >= 0.5]
-    if named:
-        return named[0]
+    cands = [(parts(i), i) for i in range(len(t.header)) if t.kind(i) == "text" and parts(i) >= 0.5]
+    if len(cands) == 1:
+        return cands[0][1]
     _no_column(said, t, "split")
 
 
@@ -164,199 +176,315 @@ def _no_column(text, t, what):
 
 
 def _number(text):
-    """A number as people write it in India: 25k, 1 lakh, 2.5 crore."""
-    m = re.search(r"(?<![\w.])(\d[\d,]*(?:\.\d+)?)\s*(crores?|cr|lakhs?|lacs?|lac|k)?\b", text or "", re.I)
+    ns = M.numbers(text)
+    return ns[0] if ns else None
+
+
+# ------------------------------------------------------------------ the person's own words
+SEPARATORS = ("with", "to", "ko", "jagah", "into", "as", "by")
+
+
+def _strip_edges(s: str) -> str:
+    edge = _edge_words()
+    words = s.split()
+    while words and re.sub(r"\W", "", words[0].lower()) in edge:
+        words.pop(0)
+    while words and re.sub(r"\W", "", words[-1].lower()) in edge:
+        words.pop()
+    return " ".join(words).strip(" '\"“”‘’,.")
+
+
+def _find_repl(text: str):
+    """'replace X with Y', 'change X to Y', 'X ko Y se badlo', 'X ki jagah Y': (X, Y). Quotes win."""
+    q = M.QUOTED.findall(text or "")
+    if len(q) >= 2:
+        return q[0], q[1]
+    for sep in SEPARATORS:
+        m = re.search(rf"\s{sep}\s", f" {text} ", re.I)
+        if m:
+            left, right = (f" {text} ")[:m.start()], (f" {text} ")[m.end():]
+            find, repl = _strip_edges(left), _strip_edges(right)
+            if find and repl:
+                return find, repl
+    return None, None
+
+
+def _new_name(text: str, t, col: int) -> str | None:
+    q = M.QUOTED.findall(text or "")
+    if len(q) >= 2:
+        return q[1]
+    head = t.header[col] or ""
+    m = re.search(re.escape(head), text, re.I) if head else None
+    for part in ([text[m.end():], text[:m.start()]] if m else [text]):
+        for sep in ("to", "as", "into"):
+            mm = re.search(rf"\s{sep}\s", f" {part} ", re.I)
+            if mm:
+                part = (f" {part} ")[mm.end():]
+                break
+        name = _strip_edges(part)
+        if name and name.lower() != head.lower():
+            return name[:80]
+    return None
+
+
+def _list_values(text: str, r: M.Reading) -> list[str]:
+    """'with Paid, Pending, Overdue' / 'options: A / B / C' -> the values."""
+    words = M.lexicon()["concepts"]
+    intro = "|".join(re.escape(w) for w in words["options"] + words["with"] if " " not in w)
+    m = re.search(rf"(?:\b(?:{intro})\b|:)\s*(.+)$", text, re.I)
     if not m:
-        return None
-    value = float(m.group(1).replace(",", ""))
-    unit = (m.group(2) or "").lower()
-    value *= 10_000_000 if unit.startswith("cr") else 100_000 if unit.startswith(("lakh", "lac")) else 1_000 if unit == "k" else 1
-    return int(value) if value.is_integer() else value
+        return []
+    stop = _ask().STOP | {"the", "a", "an"}
+
+    def clean(v):
+        w = v.split()
+        while w and w[0].lower() in stop:
+            w.pop(0)
+        while w and w[-1].lower() in stop:
+            w.pop()
+        return " ".join(w).strip(" '\"“”‘’,.")
+    vals = [clean(v) for v in re.split(r",|/|;|\|\s|\bor\b|\band\b|\baur\b|\bya\b", m.group(1), flags=re.I)]
+    return [v for v in vals if v and len(v) <= 40]
 
 
-def _colour(text, default="yellow"):
-    return next((name for name in COLOURS if re.search(rf"\b{name}\b", text or "", re.I)), default)
-
-
-def _chart_details(text, t):
+# ------------------------------------------------------------------ understanding the order
+def _mask_values(text: str, tables) -> str:
+    """'Green Park', 'Red Fort': a value from the file is the person's data, not an order word (green, red)."""
     a = _ask()
-    kind = "pie" if re.search(r"\bpie\b", text, re.I) else "line" if re.search(r"\bline\b", text, re.I) else "bar"
-    direction = "bar" if re.search(r"\bbar\s+(?:chart|graph)\b", text, re.I) else "col"
-    month = bool(a.MONTH_RE.search(text or ""))
-    if month:
-        dates = a.columns_in(text, t, {"date"})
-        group = dates[0][0] if dates else next((i for i in range(len(t.header)) if t.kind(i) == "date"), None)
-    else:
-        group = a._group_col(text, t, [])
-    if group is None:
-        _no_column(text, t, "use for the chart groups")
-
-    measure = _col(text, t, {"number"}, exclude=(group,))
-    generic_money = re.search(r"\b(sales|sale|revenue|amount|expenses?|cost|income)\b", text, re.I)
-    if generic_money:
-        named = [(i, sc) for i, sc in a.columns_in(text, t, {"number"}) if i != group and sc >= 1]
-        if named:
-            measure = named[0][0]
-        elif measure is None:
-            measure = a.main_amount(t)[0]
-    elif measure is None:
-        measure = a.main_amount(t)[0]
-    if measure is None:
-        _no_column(text, t, "chart")
-    group_name = "Month" if month else t.header[group]
-    title = f"{t.header[measure]} by {group_name}"
-    return {"chart_type": kind, "direction": direction, "group_col": group, "value_col": measure,
-            "month": month, "title": title, "next_to_data": bool(re.search(r"\b(next to|beside|alongside|data ke paas)\b", text, re.I))}
+    out = text
+    for t in tables:
+        if not t.rows:
+            continue
+        lex = M.lexicon()["_words"]
+        for _, v in a.values_in(text, t):
+            words = re.findall(r"\w+", v.lower())
+            # 'Green Park' is data; 'Data Validation' is all order words, so it is what they're asking for
+            if len(words) > 1 and not all(w in lex for w in words):
+                out = re.sub(re.escape(v), " datavalue ", out, flags=re.I)
+    return out
 
 
-def _conditional_details(text, t):
-    a = _ask()
-    low = (text or "").lower()
-    rule = None
-    col = None
-    out = {"colour": _colour(text)}
-    if re.search(r"\bcolou?r scale\b", low):
-        rule, col = "color_scale", _col(text, t, {"number"})
-    elif re.search(r"\btop\s*10\b", low):
-        rule, col = "top10", _col(text, t, {"number"})
-    elif re.search(r"\bduplicates?\b", low):
-        rule, col = "duplicate", _col(text, t)
-    elif re.search(r"\b(blank|empty|khaali|khali)\b", low):
-        rule, col = "blank", _col(text, t)
-    elif re.search(r"\boverdue\b", low):
-        rule = "overdue"
-        col = _col(text, t, {"date"})
-        if col is None:
-            dates = [i for i in range(len(t.header)) if t.kind(i) == "date"]
-            col = next((i for i in dates if re.search(r"due|delivery", t.header[i], re.I)), dates[0] if len(dates) == 1 else None)
-        out["colour"] = _colour(text, "red")
-    else:
-        vals = a.values_in(text, t)
-        comparison = re.search(r"\b(above|over|upar|more than|greater than|below|under|neeche|less than|between|equal to|equals?|barabar|kam|zyada)\b", low)
-        if vals and not comparison:
-            col, value = vals[0]
-            rule, out["value"] = "text_equal", value
-        else:
-            col = _col(text, t, {"number"})
-            if re.search(r"\bbetween\b", low):
-                nums = re.findall(r"\d[\d,]*(?:\.\d+)?\s*(?:crores?|cr|lakhs?|lacs?|lac|k)?", text, re.I)
-                parsed = [_number(x) for x in nums[:2]]
-                if len(parsed) == 2 and all(v is not None for v in parsed):
-                    rule, out["values"] = "between", parsed
-            elif re.search(r"\b(below|under|neeche|less than|kam)\b", low):
-                rule, out["value"] = "below", _number(text)
-            elif re.search(r"\b(equal to|equals?|barabar)\b", low):
-                rule, out["value"] = "equal", _number(text)
-            elif re.search(r"\b(above|over|upar|more than|greater than|zyada)\b", low):
-                rule, out["value"] = "above", _number(text)
-    if col is None:
-        _no_column(text, t, "format")
-    if rule is None or (rule in ("above", "below", "equal") and out.get("value") is None):
-        raise NotAnEdit
-    return {"col": col, "rule": rule, **out}
+def _file_words(tables) -> set[str]:
+    from app.ml.normalize import tokens
+
+    return {w for t in tables for h in list(t.header) + [t.name] if h for w in tokens(str(h))}
+
+
+def _fix_typos(text: str, tables) -> str:
+    """'Regon' -> 'Region', 'Discoutn' -> 'Discount': the person's misspelt column names, put right from the file."""
+    import difflib
+
+    heads = {w.lower(): w for t in tables for h in t.header if h for w in re.findall(r"[A-Za-z]{4,}", h)}
+    lex = M.lexicon()["_words"]
+    out = []
+    for w in re.split(r"(\s+)", text or ""):
+        low = w.lower()
+        if len(low) >= 4 and low.isalpha() and low not in heads and low not in lex:
+            close = difflib.get_close_matches(low, list(heads), n=1, cutoff=0.8)
+            if close:
+                w = heads[close[0]]
+        out.append(w)
+    return "".join(out)
 
 
 def plan_edit(text: str, tables) -> dict | None:
-    low = text or ""
-    if QUESTION_RE.search(low) or (re.search(r"\?\s*$", low) and not re.search(rf"\b{DO}\b", low, re.I)):
+    text = _fix_typos(text, tables)
+    r = M.Reading(_mask_values(text, tables), _file_words(tables))
+    r.text = text
+    if r.asking():
         return None                                          # a question about the file, not an order
-    for op, rx in ORDERS:
-        if not rx.search(low):
-            continue
-        t = _target(text, tables)
-        if op == "conditional_format" and re.search(r"\b(wale|wali|where|equals?|is)\b", text or "", re.I) and not re.search(
-                r"\b(above|over|upar|more than|greater than|below|under|neeche|less than|between|equal to|barabar|kam|zyada)\b", text or "", re.I):
-            with_value = [candidate for candidate in tables if candidate.rows and _ask().values_in(text, candidate)]
+    t = _target(text, tables)
+    if t is None:
+        return None
+    _with_file(r, t, tables)
+    for _, op in M.orders(r):
+        tt = t
+        if op == "conditional_format" and r.has("VALUE") and not r.has("above", "below", "between", "equal", "NUMBER", "scale", "top",
+                                                                      "bottom", "duplicate", "blank", "overdue") \
+                and not _ask().values_in(text, t):
+            with_value = [c for c in tables if c.rows and _ask().values_in(text, c)]
             if with_value:
-                t = max(with_value, key=lambda candidate: len(_ask().values_in(text, candidate)))
-        if t is None:
-            return None
-        plan = {"job": "edit", "op": op, "table": t.name,
-                "all": _all_sheets(text) or (op in WHOLE_FILE and _named(text, tables) is None and len([x for x in tables if x.rows]) > 1)}
+                tt = max(with_value, key=lambda c: len(_ask().values_in(text, c)))
+        plan = {"job": "edit", "op": op, "table": tt.name,
+                "all": _all_sheets(r) or (op in WHOLE_FILE and _named(text, tables) is None and len([x for x in tables if x.rows]) > 1)}
         try:
-            plan.update(_details(op, text, t, tables))
+            plan.update(_details(op, text, r, tt, tables))
         except NotAnEdit:
             continue
         return plan
     return None
 
 
-def _details(op, text, t, tables) -> dict:
+def _details(op, text, r: M.Reading, t, tables) -> dict:
     a = _ask()
     if op == "chart":
-        return _chart_details(text, t)
+        return _chart_details(text, r, t)
     if op == "conditional_format":
-        return _conditional_details(text, t)
+        return _conditional_details(text, r, t)
     if op == "freeze":
-        col = re.search(r"\b(first column|column a|pehla column)\b", text, re.I)
-        both = re.search(r"\b(row and column|row aur column|both)\b", text, re.I)
-        return {"cell": "B2" if both else ("B1" if col else "A2")}
-    if op == "filter" and re.search(r"\b(where|jahan|jinka|jinki|only|sirf|whose|for)\b", text, re.I):
-        raise NotAnEdit                                      # "filter rows where...": those rows, not filter buttons
+        row = r.has("FIRST_ROW", "header") or (r.has("row") and not r.has("FIRST_COL"))
+        col = r.has("FIRST_COL") or (r.has("column") and not r.has("row", "header"))
+        return {"cell": "B2" if row and col else ("B1" if col else "A2")}
     if op in ("delete_column", "case", "round", "money_format", "date_format", "dropdown", "split_sheets", "split"):
-        kinds = {"date_format": {"date"}, "money_format": {"number"}, "round": {"number"}}.get(op)
-        said = re.split(r"\b(into|in to|mein|me|by|on|se)\b", text, maxsplit=1, flags=re.I)[0] if op == "split" else text
-        col = _col(said, t, kinds, need=1 if op == "delete_column" else 0.5)
+        kinds = {"date_format": {"date"}, "money_format": {"number"}, "round": {"number"}, "split_sheets": {"text"}}.get(op)
+        col = _col(text, t, kinds, need=1 if op == "delete_column" else 0.5)
         if op == "split":
-            col = _splittable(said, t, col)
+            col = _splittable(text, t, col)
         if op == "date_format" and col is None:
             col = next((i for i in range(len(t.header)) if t.kind(i) == "date"), None)
         if op in ("money_format", "round") and col is None:
-            from app.office.ask import main_amount
-            col = main_amount(t)[0]
-        if op == "split_sheets":
-            g = re.search(r"\b(?:by|per|each|har)\s+([\w ]{2,30}?)(?:\s+(?:wise|into|in|column|ke|$)|$)|\b(\w[\w ]{1,25}?)\s*wise\b", text, re.I)
-            if g:
-                col = _col(next(x for x in g.groups() if x), t, {"text"}) or col
-        if col is None and op == "delete_column" and re.search(r"\b(delete|remove|drop)\b.{0,30}\bcolumn\b|\bcolumn\b.{0,30}\b(hatao|hata do|delete)", text, re.I):
+            col = a.main_amount(t)[0]
+        if col is None and op == "delete_column":
             _no_column(text, t, "delete")
+        if col is None and op == "split_sheets":
+            _no_column(text, t, "split by")
         if col is None and op not in ("date_format",):
             raise NotAnEdit
         out = {"col": col}
         if op == "money_format":
-            out["rupee"] = not re.search(r"\bcommas?\b", text, re.I) or bool(re.search(r"rupee|₹|\brs\b|inr|currency", text, re.I))
+            said = set(r.tokens)
+            only_commas = bool(said & {"comma", "commas"}) and not (said & {"rupee", "rupees", "rs", "inr", "currency", "rupaye", "rupiya", "rupay"})
+            out["rupee"] = not only_commas
         if op == "case":
-            out["how"] = ("upper" if re.search(r"upper|capital|caps|bade", text, re.I) else
-                          "lower" if re.search(r"lower|small|chhote", text, re.I) else "proper")
+            first = min((r.first(c), c) for c in ("upper", "lower", "proper") if r.has(c))[1]
+            if r.has("first") and r.has("letter") and r.has("upper"):
+                first = "proper"
+            out["how"] = first
         if op == "round":
-            m = re.search(r"\b(\d)\s*(decimal|dashamlav|places?|digits?)", text, re.I)
-            out["places"] = int(m.group(1)) if m else (0 if re.search(r"\b(no|zero|whole|poore)\b", text, re.I) else 2)
+            small = [n for n in r.numbers if isinstance(n, int) and 0 <= n <= 6]
+            out["places"] = 0 if r.has("zero") else (small[0] if small else 2)
         if op == "date_format":
-            m = re.search(r"\b(dd[-/. ]mm[-/. ]yyyy|mm[-/. ]dd[-/. ]yyyy|yyyy[-/. ]mm[-/. ]dd|dd[-/. ]mmm[-/. ]yyyy|dd[-/. ]mm[-/. ]yy)\b", text, re.I)
-            out["fmt"] = (m.group(1) if m else "dd-mm-yyyy").lower().replace("mmm", "mmm")
+            out["fmt"] = r.mask.group(1).lower() if r.mask else "dd-mm-yyyy"
         if op == "dropdown":
-            m = re.search(r"\b(?:with|values?|options?|:)\s+([^.?!]+)$", text, re.I)
-            vals = [v.strip(" '\"") for v in re.split(r",|/|\bor\b|\band\b|\baur\b|\bya\b", m.group(1))] if m else []
-            vals = [v for v in vals if v and len(v) <= 40 and not re.search(r"\bcolumn\b", v, re.I)]
-            if not vals:
+            vals = [v for v in _list_values(text, r) if v.lower() != (t.header[col] or "").lower()]
+            if len(vals) < 2:
                 vals = sorted({str(v).strip() for v in t.col(col)[:5000] if v not in (None, "")})[:50]
             out["values"] = vals[:50]
         if op == "split":
-            sep = re.search(r"\b(?:by|on|at|se)\s+(comma|space|hyphen|dash|slash|['\"](.{1,3})['\"])", text, re.I)
-            mp = {"comma": ",", "space": " ", "hyphen": "-", "dash": "-", "slash": "/"}
-            out["sep"] = (sep.group(2) if sep and sep.group(2) else mp.get(sep.group(1).lower(), " ")) if sep else " "
-            out["names"] = bool(re.search(r"\bname", t.header[col], re.I)) and out["sep"] == " "
+            q = [x for x in M.QUOTED.findall(text) if len(x) <= 3]
+            sep = q[0] if q else ("," if r.has("comma_sep") else "-" if r.has("hyphen_sep") else "/" if r.has("slash_sep") else " ")
+            out["sep"] = sep
+            out["names"] = bool(re.search(r"name|naam", t.header[col] or "", re.I)) and sep == " "
         return out
     if op == "rename":
-        m = re.search(r"\brename\s+(?:the\s+)?(?:column\s+)?['\"]?(.+?)['\"]?\s+(?:column\s+)?(?:to|as|into)\s+['\"]?(.+?)['\"]?\s*$", text, re.I) or \
-            re.search(r"['\"]?([^'\"]+?)['\"]?\s+(?:column\s+)?(?:ka|ki)\s+(?:naam|name)\s+['\"]?(.+?)['\"]?\s+(?:karo|kar do|rakho|rakh do)\s*$", text, re.I) or \
-            re.search(r"\bchange\s+(?:the\s+)?(?:column\s+)?(?:name\s+)?(?:of\s+)?['\"]?(.+?)['\"]?\s+(?:column\s+)?(?:name\s+)?to\s+['\"]?(.+?)['\"]?\s*$", text, re.I)
-        if not m:
-            raise NotAnEdit
-        col = _col(f'"{m.group(1)}"', t) if any(h and h.strip().lower() == m.group(1).strip().lower() for h in t.header) else _col(m.group(1), t)
+        q = M.QUOTED.findall(text)
+        col = _col(f'"{q[0]}"', t) if q else _col(text, t)
         if col is None:
             _no_column(text, t, "rename")
-        return {"col": col, "new": m.group(2).strip()[:80]}
-    if op == "replace":
-        m = re.search(r"\breplace\s+(?:all\s+)?['\"]?(.+?)['\"]?\s+with\s+['\"]?(.*?)['\"]?(?:\s+in\s+(?:the\s+)?(.+?))?\s*$", text, re.I) or \
-            re.search(r"\bchange\s+(?:all\s+)?['\"]?(.+?)['\"]?\s+to\s+['\"]?(.*?)['\"]?(?:\s+in\s+(?:the\s+)?(.+?))?\s*$", text, re.I) or \
-            re.search(r"['\"]?(\S+?)['\"]?\s+ko\s+['\"]?(\S+?)['\"]?\s+(?:se|mein|me)\s+(?:badlo|badal do|replace karo|kar do)", text, re.I)
-        if not m or not m.group(1):
+        new = _new_name(text, t, col)
+        if not new:
             raise NotAnEdit
-        within = m.group(3) if m.lastindex and m.lastindex >= 3 else None
-        col = _col(within, t) if within else None
-        return {"find": m.group(1), "repl": m.group(2) or "", "col": col}
+        return {"col": col, "new": new}
+    if op == "replace":
+        find, repl = _find_repl(text)
+        if not find:
+            raise NotAnEdit
+        col = None
+        m = re.search(r"\s(?:in|mein|me)\s+(?:the\s+)?(.+?)\s*$", f" {repl} ", re.I)
+        if m:
+            c = _col(m.group(1), t, need=1)
+            if c is not None:
+                col, repl = c, _strip_edges((f" {repl} ")[:m.start()])
+        return {"find": find, "repl": repl, "col": col}
     return {}
+
+
+def _group_named(r: M.Reading, t):
+    """The word next to by / per / wise / ke hisaab: that is the grouping. A word there that isn't a column -> ask."""
+    a = _ask()
+    lex = M.lexicon()["_words"]
+    stop = a.STOP | {"the", "a"}
+    for p in r.at.get("group", []):
+        if p < 0:
+            continue
+        after = r.tokens[p] in ("by", "per", "each", "every", "har", "according")
+        near = [r.tokens[i] for i in ((p + 1, p + 2) if after else (p - 1, p - 2)) if 0 <= i < len(r.tokens)]
+        for w in near:
+            if w in stop or (w in lex and not (lex[w] & {"column"})) or w.isdigit() or M._fuzzy(w):
+                continue
+            hits = [(sc, i) for i, sc in a.columns_in(w, t) if sc >= 0.5 and t.kind(i) in ("text", "date")]
+            if hits:
+                return max(hits)[1]
+            if w not in lex:
+                _no_column(r.text, t, "use for the chart groups")
+    return None
+
+
+def _chart_details(text, r: M.Reading, t):
+    a = _ask()
+    lex = M.lexicon()["_words"]
+    rowish = any("row" in lex.get(w, ()) and "line_kind" not in lex.get(w, ()) for w in r.tokens)
+    kind = "pie" if r.has("pie") else "line" if r.has("line_kind") and not rowish else "bar"
+    direction = "bar" if "bar" in r.tokens or "bars" in r.tokens else "col"
+    month = r.has("month")
+    if month:
+        dates = a.columns_in(_plain(text), t, {"date"})
+        group = dates[0][0] if dates else next((i for i in range(len(t.header)) if t.kind(i) == "date"), None)
+    else:
+        group = _group_named(r, t)
+        if group is None:
+            named = [(sc, i) for i, sc in a.columns_in(_plain(text), t, {"text"}) if sc >= 0.5]
+            group = max(named)[1] if named else a._group_col(text, t, [])
+    if group is None:
+        _no_column(text, t, "use for the chart groups")
+    named = [(sc, i) for i, sc in a.columns_in(_plain(text), t, {"number"}) if i != group and sc >= 0.5]
+    measure = max(named)[1] if named else a.main_amount(t)[0]
+    if measure is None:
+        _no_column(text, t, "chart")
+    group_name = "Month" if month else t.header[group]
+    return {"chart_type": kind, "direction": direction, "group_col": group, "value_col": measure,
+            "month": month, "title": f"{t.header[measure]} by {group_name}", "next_to_data": r.has("beside")}
+
+
+def _conditional_details(text, r: M.Reading, t):
+    a = _ask()
+    out = {"colour": M.colour(r, "yellow")}
+    num_col = lambda: _col(text, t, {"number"}) if _col(text, t, {"number"}) is not None else a.main_amount(t)[0]  # noqa: E731
+    if r.has("scale"):
+        rule, col = "color_scale", num_col()
+    elif r.has("top", "bottom") and r.has("highlight", "red", "green", "yellow", "orange", "blue", "pink", "grey") and \
+            not r.has("above", "below", "between"):
+        rule, col = ("bottom" if r.has("bottom") and not r.has("top") else "top10"), num_col()
+        small = [n for n in r.numbers if isinstance(n, int) and 1 <= n <= 1000]
+        out["rank"] = small[0] if small else 10
+    elif r.has("duplicate"):
+        rule, col = "duplicate", _col(text, t)
+        if col is None:
+            _no_column(text, t, "check for repeats")
+    elif r.has("blank"):
+        rule, col = "blank", _col(text, t)
+        if col is None:
+            col = "all"
+    elif r.has("overdue"):
+        rule = "overdue"
+        col = _col(text, t, {"date"})
+        if col is None:
+            dates = [i for i in range(len(t.header)) if t.kind(i) == "date"]
+            due = [i for i in dates if re.search(r"due|delivery|expiry|last", t.header[i] or "", re.I)]
+            col = due[0] if due else (dates[0] if len(dates) == 1 else None)
+        if col is None:
+            _no_column(text, t, "check for overdue dates")
+        out["colour"] = M.colour(r, "red")
+    elif r.has("between") and len(r.numbers) >= 2:
+        rule, col, out["values"] = "between", num_col(), sorted(r.numbers[:2])
+    elif r.has("below") and r.numbers:
+        rule, col, out["value"] = "below", num_col(), r.numbers[0]
+    elif r.has("above") and r.numbers:
+        rule, col, out["value"] = "above", num_col(), r.numbers[0]
+    elif r.has("equal") and r.numbers:
+        rule, col, out["value"] = "equal", num_col(), r.numbers[0]
+    elif r.has("VALUE") and a.values_in(text, t):
+        col, value = a.values_in(text, t)[0]
+        rule, out["value"] = "text_equal", value
+    elif r.numbers:
+        rule, col, out["value"] = "equal", num_col(), r.numbers[0]
+    else:
+        raise NotAnEdit
+    if col is None:
+        _no_column(text, t, "highlight")
+    # "... wale", "rows where ...", "orders above ...": the whole row lights up, not just the cell
+    out["rows"] = r.has("row") and col != "all" and rule != "color_scale"
+    return {"col": col, "rule": rule, **out}
 
 
 # ------------------------------------------------------------------ doing it
@@ -433,36 +561,121 @@ def _chart_sheet(p, t, wb, source):
     return target.title
 
 
-def _add_conditional_format(ws, p, hr, last):
-    cidx = p["col"] + 1
-    letter = get_column_letter(cidx)
+def _add_conditional_format(ws, p, hr, last, t=None):
     first = hr + 1
     if last < first:
         return 0
-    cell_range = f"{letter}{first}:{letter}{last}"
+    end = get_column_letter(max(ws.max_column, 1))
+    rows = p.get("rows")
+    if p["col"] == "all":
+        letter, cell_range = "A", f"A{first}:{end}{last}"
+    else:
+        letter = get_column_letter(p["col"] + 1)
+        cell_range = f"A{first}:{end}{last}" if rows else f"{letter}{first}:{letter}{last}"
+    ref = f"${letter}{first}" if rows else f"{letter}{first}"          # whole rows: the column stays fixed
+    span = f"${letter}${first}:${letter}${last}"
     rule = p["rule"]
     if rule == "color_scale":
         cf = ColorScaleRule(start_type="min", start_color="FFF8696B", mid_type="percentile", mid_value=50,
                             mid_color="FFFFEB84", end_type="max", end_color="FF63BE7B")
     else:
         fill = PatternFill(fill_type="solid", fgColor=COLOURS[p.get("colour", "yellow")])
-        if rule in ("above", "below", "equal", "between"):
+        if rule in ("above", "below", "equal", "between") and not rows:
             op = {"above": "greaterThan", "below": "lessThan", "equal": "equal", "between": "between"}[rule]
             formulas = [str(v) for v in (p.get("values") or [p.get("value")])]
             cf = CellIsRule(operator=op, formula=formulas, fill=fill)
-        elif rule == "overdue":
-            cf = FormulaRule(formula=[f'AND(ISNUMBER({letter}{first}),{letter}{first}<TODAY())'], fill=fill)
-        elif rule == "duplicate":
-            cf = FormulaRule(formula=[f'AND({letter}{first}<>"",COUNTIF(${letter}${first}:${letter}${last},{letter}{first})>1)'], fill=fill)
-        elif rule == "blank":
-            cf = FormulaRule(formula=[f'LEN(TRIM({letter}{first}&""))=0'], fill=fill)
-        elif rule == "text_equal":
-            value = str(p["value"]).replace('"', '""')
-            cf = FormulaRule(formula=[f'{letter}{first}="{value}"'], fill=fill)
+        elif rule in ("top10", "bottom") and not rows:
+            cf = Rule(type="top10", rank=int(p.get("rank", 10)), bottom=(rule == "bottom"), dxf=DifferentialStyle(fill=fill))
         else:
-            cf = Rule(type="top10", rank=10, dxf=DifferentialStyle(fill=fill))
+            v = p.get("value")
+            f = {"above": f"AND(ISNUMBER({ref}),{ref}>{v})", "below": f"AND(ISNUMBER({ref}),{ref}<{v})",
+                 "equal": f"{ref}={v}",
+                 "between": f"AND(ISNUMBER({ref}),{ref}>={(p.get('values') or [0, 0])[0]},{ref}<={(p.get('values') or [0, 0])[1]})",
+                 "top10": f"AND(ISNUMBER({ref}),{ref}>=LARGE({span},{int(p.get('rank', 10))}))",
+                 "bottom": f"AND(ISNUMBER({ref}),{ref}<=SMALL({span},{int(p.get('rank', 10))}))",
+                 "overdue": f"AND(ISNUMBER({ref}),{ref}<TODAY())",
+                 "duplicate": f'AND({ref}<>"",COUNTIF({span},{ref})>1)',
+                 "blank": f'LEN(TRIM({ref}&""))=0',
+                 "text_equal": f'{ref}="{str(v).replace(chr(34), chr(34) * 2)}"'}[rule]
+            cf = FormulaRule(formula=[f], fill=fill)
     ws.conditional_formatting.add(cell_range, cf)
+    p["matched"] = p.get("matched", 0) + _matches(t, p)
     return 1
+
+
+def _matches(t, p) -> int:
+    """How many cells the highlight lights up now (said in the reply), from the values Excel shows."""
+    if t is None:
+        return 0
+    rule = p["rule"]
+    if p["col"] == "all":
+        cells = [v for row in t.rows for v in row]
+    else:
+        cells = list(t.col(p["col"]))
+    nums = [v for v in cells if isinstance(v, (int, float)) and not isinstance(v, bool)]
+    if rule == "above":
+        return sum(1 for v in nums if v > p["value"])
+    if rule == "below":
+        return sum(1 for v in nums if v < p["value"])
+    if rule == "equal":
+        return sum(1 for v in nums if v == p["value"])
+    if rule == "between":
+        lo, hi = p["values"]
+        return sum(1 for v in nums if lo <= v <= hi)
+    if rule in ("top10", "bottom"):
+        return min(int(p.get("rank", 10)), len(nums))
+    if rule == "blank":
+        return sum(1 for v in cells if v is None or (isinstance(v, str) and not v.strip()))
+    if rule == "text_equal":
+        return sum(1 for v in cells if isinstance(v, str) and v.strip() == str(p["value"]))
+    if rule == "duplicate":
+        from collections import Counter
+        cnt = Counter(v for v in cells if v not in (None, ""))
+        return sum(n for n in cnt.values() if n > 1)
+    if rule == "overdue":
+        today = date.today()
+        return sum(1 for v in cells if isinstance(v, (date, datetime)) and (v.date() if isinstance(v, datetime) else v) < today)
+    return 0
+
+
+def _indian(n) -> str:
+    if not isinstance(n, (int, float)) or isinstance(n, bool):
+        return str(n)
+    n = float(n)
+    whole, frac = int(abs(n)), abs(n) - int(abs(n))
+    s = str(whole)
+    if len(s) > 3:
+        head, tail = s[:-3], s[-3:]
+        head = ",".join([head[max(0, i - 2):i] for i in range(len(head), 0, -2)][::-1])
+        s = f"{head},{tail}"
+    if frac:
+        s += f"{frac:.2f}"[1:]
+    return ("-" if n < 0 else "") + s
+
+
+def _cf_say(p, col, where, hi):
+    colour = p.get("colour", "yellow")
+    hcol = {"red": "laal", "green": "hara", "yellow": "peela", "orange": "narangi", "blue": "neela", "pink": "gulabi", "grey": "grey"}[colour]
+    rule, n = p["rule"], p.get("matched", 0)
+    what = col or ("the table" if not hi else "table")
+    if rule == "color_scale":
+        return (f"{where} mein {col} pe colour scale laga diya: chhote laal, beech wale peele, bade hare." if hi else
+                f"Added a colour scale to {col} in {where}: low values red, middle yellow, high green.")
+    en = {"above": f"{col} above {_indian(p.get('value', 0))}", "below": f"{col} below {_indian(p.get('value', 0))}",
+          "equal": f"{col} equal to {_indian(p.get('value', 0))}",
+          "between": f"{col} between {_indian((p.get('values') or [0, 0])[0])} and {_indian((p.get('values') or [0, 0])[1])}",
+          "top10": f"the top {p.get('rank', 10)} {col}", "bottom": f"the bottom {p.get('rank', 10)} {col}",
+          "duplicate": f"repeated {col} values", "blank": f"blank cells in {what}", "overdue": f"overdue dates in {col}",
+          "text_equal": f"rows where {col} is {p.get('value')}"}[rule]
+    hn = {"above": f"{col} {_indian(p.get('value', 0))} se zyada", "below": f"{col} {_indian(p.get('value', 0))} se kam",
+          "equal": f"{col} {_indian(p.get('value', 0))} ke barabar",
+          "between": f"{col} {_indian((p.get('values') or [0, 0])[0])} aur {_indian((p.get('values') or [0, 0])[1])} ke beech",
+          "top10": f"sabse bade {p.get('rank', 10)} {col}", "bottom": f"sabse chhote {p.get('rank', 10)} {col}",
+          "duplicate": f"{col} ki dohrai values", "blank": f"{what} ke khaali cells", "overdue": f"{col} ki nikal chuki dates",
+          "text_equal": f"jahan {col} {p.get('value')} hai"}[rule]
+    unit = ("row" if not hi else "row") if p.get("rows") else "cell"
+    cnt = f" ({n} {unit}{'s' if n != 1 else ''})" if rule not in ("top10", "bottom") else ""
+    return (f"{where} mein {hn} {hcol} kar diye{cnt}." if hi else f"Highlighted {en} in {colour} in {where}{cnt}.")
 
 
 def run_edit(p, tables, wb, hi, n) -> dict:
@@ -476,12 +689,12 @@ def run_edit(p, tables, wb, hi, n) -> dict:
         hr = _hdr(ws, tt)
         last = ws.max_row
         col = p.get("col")
-        cidx = (col + 1) if col is not None else None
+        cidx = (col + 1) if isinstance(col, int) else None
         if op == "chart":
             output_sheet = _chart_sheet(p, tt, wb, ws)
             done += 1
         elif op == "conditional_format":
-            done += _add_conditional_format(ws, p, hr, last)
+            done += _add_conditional_format(ws, p, hr, last, tt)
         elif op == "bold_header":
             for c in ws[hr]:
                 if c.value not in (None, ""):
@@ -642,10 +855,10 @@ def run_edit(p, tables, wb, hi, n) -> dict:
 def _say(p, done, notes, tables, hi):
     op, t = p["op"], tables.get(p["table"])
     where = ("every sheet" if not hi else "har sheet") if p.get("all") and not (op == "replace" and p.get("col") is not None) else p["table"]
-    col = t.header[p["col"]] if (t is not None and p.get("col") is not None and p["col"] < len(t.header)) else ""
+    col = t.header[p["col"]] if (t is not None and isinstance(p.get("col"), int) and p["col"] < len(t.header)) else ""
     en = {
         "chart": f"Made a {p.get('chart_type', 'bar')} chart of {p.get('title', '')} in {where}",
-        "conditional_format": f"Added {p.get('rule', '').replace('_', ' ')} highlighting to {col} in {where}",
+        "conditional_format": "",
         "bold_header": f"Made the heading row bold in {where}",
         "freeze": f"Froze the {'heading row and first column' if p.get('cell', '').startswith('B2') else 'first column' if p.get('cell') == 'B1' else 'heading row'} in {where}, so it stays visible while scrolling",
         "autofit": f"Fitted the column widths in {where} to their contents",
@@ -663,10 +876,12 @@ def _say(p, done, notes, tables, hi):
         "case": f"Changed {done} values of {col} to {p.get('how', 'proper').replace('proper', 'Proper Case').replace('upper', 'UPPER CASE').replace('lower', 'lower case')} in {where}",
         "split_sheets": f"Made {done} new sheets from {where}, one for each {col}",
     }[op]
+    if op == "conditional_format":
+        en = _cf_say(p, col, where, False).rstrip(".")
     if hi:
         hn = {
             "chart": f"{where} ke liye {p.get('title', '')} ka {p.get('chart_type', 'bar')} chart bana diya",
-            "conditional_format": f"{where} mein {col} par {p.get('rule', '').replace('_', ' ')} highlighting laga di",
+            "conditional_format": "",
             "bold_header": f"{where} ki heading row bold kar di",
             "freeze": f"{where} mein {'heading row aur pehla column' if p.get('cell', '').startswith('B2') else 'pehla column' if p.get('cell') == 'B1' else 'heading row'} freeze kar diya; scroll karne pe bhi dikhega",
             "autofit": f"{where} ke columns ki width unke data jitni kar di",
@@ -684,6 +899,8 @@ def _say(p, done, notes, tables, hi):
             "case": f"{where} mein {col} ke {done} values {p.get('how', 'proper').replace('proper', 'Proper Case').replace('upper', 'UPPER CASE').replace('lower', 'lower case')} mein kar diye",
             "split_sheets": f"{where} se {done} nayi sheets bana di, har {col} ki ek",
         }[op]
+        if op == "conditional_format":
+            hn = _cf_say(p, col, where, True).rstrip(".")
         if notes:
             hn += f". {', '.join(notes)} mein formulas hain, isliye wahan rows/columns nahi khiskaye" if op in ("remove_blank_rows", "delete_column") \
                 else f". {', '.join(notes)} mein S.No aakhir mein lagaya taaki formulas sahi rahein"

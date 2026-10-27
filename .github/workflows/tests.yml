@@ -63,3 +63,4 @@ jobs:
           python -m tests.fuzz.db --start $(( $(date +%Y%m%d) % 100000 * 10 + 7 )) --seeds 20
           python -m tests.fuzz.sheets --start $(( $(date +%Y%m%d) % 100000 * 10 + 7 )) --seeds 20
           python -m tests.fuzz.excel_causes 300 $(( $(date +%Y%m%d) % 100000 ))
+          python -m tests.fuzz.orders 3000 $(( $(date +%Y%m%d) % 100000 ))

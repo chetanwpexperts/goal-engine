@@ -503,7 +503,7 @@ def _understand_en(text: str, tables: list[Table]) -> dict:
         raise NeedMore("Is file mein padhne layak koi sheet nahi mili.", "No readable sheet in this file.")
     from app.office import edits
 
-    if edits.MACRO_RE.search(text or ""):
+    if edits.wants_macro(text):
         raise NeedMore("Macro / VBA likhna aur chalana ye agent nahi karta (file mein code chalana safe nahi). Jo kaam macro se karna tha, "
                        "wo seedha bolo: jaise \"blank rows hatao\", \"region wise alag sheets bana do\", \"header bold karo\".",
                        "This agent doesn't write or run macros / VBA (running code inside your file isn't safe). Tell me the job the macro "
@@ -511,7 +511,7 @@ def _understand_en(text: str, tables: list[Table]) -> dict:
     order = edits.plan_edit(text, tables)                 # "make the header bold", "remove blank rows": do it on the file
     if order:
         return order
-    if edits.PIVOT_RE.search(text or ""):
+    if edits.wants_pivot(text):
         plan = _understand_core_or_show(text, tables)
         if plan.get("job") == "aggregate" and plan.get("group") is not None:
             plan["pivot"] = True

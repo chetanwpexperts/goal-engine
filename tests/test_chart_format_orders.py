@@ -111,7 +111,7 @@ def test_conditional_format_phrases_make_right_plan(text, rule, value, colour):
         ("highlight blank cells in Column1", "Tasks", "G2:G26", "expression"),
         ("colour scale on sales", "Sales Data", "K2:K61", "colorScale"),
         ("top 10 sales highlight karo", "Sales Data", "K2:K61", "top10"),
-        ("status Pending wale yellow", "Purchase Data", "L2:L41", "expression"),
+        ("status Pending wale yellow", "Purchase Data", "A2:L41", "expression"),      # "wale": the whole rows
     ],
 )
 def test_saved_file_has_rule_on_data_cells_only(tmp_path, text, sheet, expected_range, rule_type):

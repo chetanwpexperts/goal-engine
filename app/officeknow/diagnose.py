@@ -16,18 +16,27 @@ HERE = Path(__file__).resolve().parent
 NEW_OPS = {"extend_ranges", "exact_lookup", "auto_calc", "restore_formulas"}
 
 
+NA_CODE = re.compile(r"#\s*n\s*/?\s*a\b|\bn/a\b", re.I)
+ERR_CODE = re.compile(r"#(ref|value|div/?0|name|num|null|spill|calc)\b", re.I)
+
+
 @lru_cache(maxsize=1)
 def knowledge() -> dict:
-    k = json.loads((HERE / "fundamentals.json").read_text(encoding="utf-8"))
-    for c in k["complaints"].values():
-        c["re"] = re.compile(c["cues"], re.I)
-    return k
+    return json.loads((HERE / "fundamentals.json").read_text(encoding="utf-8"))
 
 
 def complaints(text: str) -> dict[str, float]:
-    """What the person says is wrong, from their words; the issue the ears recognised adds to it."""
+    """What the person says is wrong, read by meaning (app/office/meaning.py: any words, any order); the issue the
+    ears recognised adds to it."""
+    from app.office import meaning as M
+
     k = knowledge()
-    out = {cid: 1.0 for cid, c in k["complaints"].items() if c["re"].search(text or "")}
+    r = M.Reading(text)
+    if NA_CODE.search(text or ""):
+        r.at.setdefault("NA_CODE", []).append(-1)
+    if ERR_CODE.search(text or ""):
+        r.at.setdefault("ERR_CODE", []).append(-1)
+    out = {cid: 1.0 for cid, c in k["complaints"].items() if any(M.satisfied(r, rec) for rec in c.get("needs", []))}
     try:
         from app.officeknow import brain
 

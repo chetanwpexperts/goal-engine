@@ -59,3 +59,21 @@ def test_fundamentals_are_complete_and_official():
             assert c.get(f"{key}_en") and c.get(f"{key}_hi"), (cid, key)
         assert set(c["explains"]) <= set(k["complaints"]), cid
         assert cid in NO, cid
+
+
+@pytest.mark.parametrize("seed", [2, 17])
+def test_orders_understood_in_any_wording(seed):
+    """Random requests (any order, synonyms, Hinglish, Hindi script, typos, 1L/100k) and look-alike questions."""
+    from tests.fuzz import orders
+
+    ok, errs = orders.run(1500, seed)
+    assert not errs, "\n".join(errs[:10])
+
+
+def test_no_fixed_sentence_patterns_in_the_orders():
+    import inspect
+
+    from app.office import edits
+
+    src = inspect.getsource(edits)
+    assert "ORDERS = [" not in src and "QUESTION_RE" not in src and "MACRO_RE" not in src

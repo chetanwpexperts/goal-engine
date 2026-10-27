@@ -634,12 +634,13 @@
     return box;
   }
 
-  function formPanel(a, hi, onUseCommand) {
+  function formPanel(a, hi, onUseCommand, opts = {}) {
     const form = el("form", "dbform inner");
     const field = (label, input) => { const l = el("label", "f"); l.append(el("span", null, label), input); return l; };
     const type = el("select");
     for (const [v, t] of [["mysql", "MySQL / MariaDB"], ["postgres", "PostgreSQL"]]) { const o = el("option", null, t); o.value = v; type.append(o); }
-    const host = el("input"); host.placeholder = T(hi, "jaise db.provider.com", "e.g. db.provider.com"); host.autocomplete = "off"; host.required = true;
+    const host = el("input"); host.autocomplete = "off"; host.required = true;
+    host.placeholder = opts.hosting ? T(hi, "aapki website, jaise mysite.com", "your website, e.g. mysite.com") : T(hi, "jaise db.provider.com", "e.g. db.provider.com");
     const port = el("input"); port.inputMode = "numeric"; port.placeholder = "3306"; port.maxLength = 5;
     type.addEventListener("change", () => { port.placeholder = type.value === "postgres" ? "5432" : "3306"; });
     const dbn = el("input"); dbn.autocomplete = "off"; dbn.required = true;
@@ -653,15 +654,31 @@
                                                   "Allow approved changes (preview + Undo). The login must be able to change data.")));
     form.append(r1, field("Host", host), r2, field(T(hi, "Password", "Password"), pass), allowRow);
     const ipHint = el("p", "fine", T(hi, "Sirf-SELECT wala user sabse safe hai. Password encrypt karke rakha jaata hai.", "A SELECT-only user is safest. The password is stored encrypted."));
+    const allowStep = el("p", "fine strong-hint");
+    if (opts.hosting) {
+      allowStep.textContent = T(hi, "Ek baar: cPanel → Remote MySQL (Hostinger: hPanel → Databases → Remote MySQL) mein Goal Engine ka IP add karo. Phir neeche wahi details bharo jo aapki website ki config mein hain; host mein localhost ki jagah apni website ka naam.",
+        "Once: in cPanel → Remote MySQL (Hostinger: hPanel → Databases → Remote MySQL), add Goal Engine's IP. Then fill in the same details your website's config has; for host, your website's name instead of localhost.");
+      form.prepend(allowStep);
+    }
     api("/api/connector-info").then((d) => {
-      if (d.server_ip) ipHint.textContent += T(hi, ` Provider ke "allowed IPs" mein ye daalo: ${d.server_ip}`, ` Add this to your provider's allowed IPs: ${d.server_ip}`);
+      if (!d.server_ip) return;
+      if (opts.hosting) allowStep.textContent = allowStep.textContent.replace(T(hi, "Goal Engine ka IP", "Goal Engine's IP"), T(hi, `Goal Engine ka IP ${d.server_ip}`, `Goal Engine's IP ${d.server_ip}`));
+      else ipHint.textContent += T(hi, ` Provider ke "allowed IPs" mein ye daalo: ${d.server_ip}`, ` Add this to your provider's allowed IPs: ${d.server_ip}`);
     }).catch(() => {});
     const go = el("button", "btn solid", T(hi, "Jodo", "Connect")); go.type = "submit";
     const err = el("p", "note err"); err.hidden = true;
     const ga = el("div", "acts flat"); ga.append(go);
-    form.append(ipHint, ga, err);
+    const other = el("button", "btn ghost", T(hi, "Doosra tareeka: website pe ek file upload karo", "Another way: upload a file to the website")); other.type = "button";
+    other.hidden = true;
+    if (opts.other) other.addEventListener("click", opts.other);
+    form.append(ipHint, ga, err, other);
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      if (opts.hosting && /^(localhost|127\.0\.0\.1|::1)$/i.test(host.value.trim())) {
+        err.textContent = T(hi, "Host mein localhost nahi: apni website ka naam likho (jaise mysite.com). localhost sirf hosting ke andar kaam karta hai.",
+                               "Not localhost here: type your website's name (e.g. mysite.com). localhost only works inside the hosting.");
+        err.hidden = false; return;
+      }
       go.disabled = true; go.textContent = T(hi, "Jod raha hoon…", "Connecting…"); err.hidden = true;
       try {
         const data = await api("/api/connectors/direct", { method: "POST", body: JSON.stringify({
@@ -675,6 +692,7 @@
         err.textContent = ex.message; err.hidden = false;
         go.disabled = false; go.textContent = T(hi, "Jodo", "Connect");
         if (ex.data && ex.data.use_command && onUseCommand) onUseCommand();
+        if (opts.other) other.hidden = false;        // the hosting won't let us in from outside: offer the other way, never a dead end
       }
     });
     return form;
@@ -718,7 +736,7 @@
     const choices = el("div", "where");
     const panel = el("div", "where-panel");
     const options = [
-      ["hosting", T(hi, "Website hosting", "Website hosting"), T(hi, "cPanel, Hostinger, WordPress, PHP site · terminal nahi chahiye", "cPanel, Hostinger, WordPress, any PHP site · no terminal")],
+      ["hosting", T(hi, "Website hosting", "Website hosting"), T(hi, "cPanel, Hostinger, koi bhi website · bas details bharo", "cPanel, Hostinger, any website · just fill the details")],
       ["cloud", T(hi, "Cloud database", "Cloud database"), T(hi, "AWS, DigitalOcean, Supabase, Neon · bas details bharo", "AWS, DigitalOcean, Supabase, Neon · just fill the details")],
       ["vps", T(hi, "Apna server / VPS", "My own server / VPS"), T(hi, "Terminal access hai · ek command", "You have a terminal · one command")],
       ["windows", T(hi, "Windows PC / XAMPP", "Windows PC / XAMPP"), T(hi, "Jald aa raha", "Coming soon")],
@@ -726,7 +744,7 @@
     const pick = (key) => {
       for (const b of choices.children) b.setAttribute("aria-pressed", String(b.dataset.key === key));
       panel.replaceChildren();
-      if (key === "hosting") panel.append(phpPanel(a, hi, null));
+      if (key === "hosting") panel.append(formPanel(a, hi, null, { hosting: true, other: () => panel.replaceChildren(phpPanel(a, hi, null)) }));
       else if (key === "cloud") panel.append(formPanel(a, hi, () => pick("vps")));
       else if (key === "vps") panel.append(vpsPanel(a, hi));
       else panel.append(el("p", "fine", T(hi, "Windows connector ban raha hai. Agar aapki website kisi hosting pe hai to \"Website hosting\" chuno, wo abhi kaam karega.",

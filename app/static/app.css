@@ -737,3 +737,4 @@ body[data-state="active"] .stage { animation: stage-in .35s ease both; }
   .brain-hd, .home { transition: none; } .brain-hd { opacity: 1; }
   body[data-state="active"] .stage, .turn-machine, .say { animation: none; }
 }
+.strong-hint { color: var(--ink, #1c2340); font-weight: 500; margin: 0 0 12px; }

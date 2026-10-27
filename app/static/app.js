@@ -656,8 +656,8 @@
     const ipHint = el("p", "fine", T(hi, "Sirf-SELECT wala user sabse safe hai. Password encrypt karke rakha jaata hai.", "A SELECT-only user is safest. The password is stored encrypted."));
     const allowStep = el("p", "fine strong-hint");
     if (opts.hosting) {
-      allowStep.textContent = T(hi, "Ek baar: cPanel → Remote MySQL (Hostinger: hPanel → Databases → Remote MySQL) mein Goal Engine ka IP add karo. Phir neeche wahi details bharo jo aapki website ki config mein hain; host mein localhost ki jagah apni website ka naam.",
-        "Once: in cPanel → Remote MySQL (Hostinger: hPanel → Databases → Remote MySQL), add Goal Engine's IP. Then fill in the same details your website's config has; for host, your website's name instead of localhost.");
+      allowStep.textContent = T(hi, "Ek baar: apni hosting ke cPanel → Remote MySQL (Hostinger: hPanel → Databases → Remote MySQL) mein Goal Engine ka IP add karo. Ye Goal Engine ke server ka address hai, sabke liye same; isse aapki hosting Goal Engine ko andar aane deti hai. Phir neeche wahi details bharo jo aapki website ki config mein hain; host mein localhost ki jagah apni website ka naam.",
+        "Once: in your hosting's cPanel → Remote MySQL (Hostinger: hPanel → Databases → Remote MySQL), add Goal Engine's IP. It is Goal Engine's server address, the same for everyone; it lets your hosting accept Goal Engine. Then fill in the same details your website's config has; for host, your website's name instead of localhost.");
       form.prepend(allowStep);
     }
     api("/api/connector-info").then((d) => {

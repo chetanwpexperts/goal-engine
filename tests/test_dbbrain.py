@@ -37,6 +37,14 @@ def test_diagnose_and_optimize_through_the_api(client, ml_mode, monkeypatch):
     except OSError:
         import pytest
         pytest.skip("needs local MySQL")
+    import pymysql
+    # own test data: don't depend on another test having created `big` first
+    conn = pymysql.connect(host="127.0.0.1", user="shopapp", password="app pass", database="shop_db", autocommit=True)
+    with conn.cursor() as cur:
+        cur.execute("DROP TABLE IF EXISTS big")
+        cur.execute("CREATE TABLE big (id INT PRIMARY KEY, note VARCHAR(200))")
+        cur.execute("INSERT INTO big SELECT seq, REPEAT('x', 150) FROM seq_1_to_20000")
+    conn.close()
     from app.agents import direct
     monkeypatch.setenv("APP_SECRET", "s" * 32)
     monkeypatch.setenv("DIRECT_DB_ALLOW_PRIVATE", "1")

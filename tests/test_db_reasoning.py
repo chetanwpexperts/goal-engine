@@ -100,3 +100,14 @@ def test_a_new_database_is_one_dialect_file():
     for word in ("mysql", "postgres", "mariadb"):
         assert not re.search(rf"\b{word}\b.*(?:regex|re\.compile)", src, re.I)
     assert set(R.engines()) >= {"mysql", "mariadb", "postgresql"}
+
+
+def test_lowercase_code_and_title_follows_the_new_error(client, ml_mode):
+    """'error 1062' typed by hand is a real code, and a second, different error in the same chat retitles the goal."""
+    from tests.test_ml import say
+    first = say(client, "I get error 1062 duplicate entry when saving")
+    assert "unique" in first["reply"].lower() and "that value that value" not in first["reply"].lower()
+    assert "1062" not in first["goal"]["title"]
+    second = say(client, "ERROR 1040 (HY000): Too many connections")
+    assert "connections" in second["goal"]["title"].lower() and "duplicate" not in second["goal"]["title"].lower()
+    assert "The value that value" not in second["reply"] + first["reply"]

@@ -60,7 +60,7 @@ def dialect(name: str) -> dict:
     d = json.loads(json.dumps(_raw(name)))
     for m in d.get("messages", []):
         m["_re"] = re.compile(m["re"], re.I)
-    d["_codes"] = [re.compile(p) for p in d.get("code_patterns", [])]
+    d["_codes"] = [re.compile(p, re.I) for p in d.get("code_patterns", [])]   # "error 1062" is as real as "ERROR 1062"
     return d
 
 
@@ -218,8 +218,11 @@ def _say(tpl: str, ent: dict, hi: bool) -> str:
     """Explanations: a detail the message didn't give becomes plain words ('that value'), never a made-up name."""
     soft = SOFT["hi" if hi else "en"]
     out = re.sub(r"\{(\w+)\}", lambda m: str(ent.get(m.group(1)) or soft.get(m.group(1), "")), tpl)
-    return re.sub(r'"(that value|wo value|that table|wo table|that column|wo column|the parent table|parent table|that point|us jagah|that database|wo database|that user|wo user)"',
-                  r"\1", out)
+    out = re.sub(r'"(that value|wo value|that table|wo table|that column|wo column|the parent table|parent table|that point|us jagah|that database|wo database|that user|wo user)"',
+                 r"\1", out)
+    # "The value that value already exists" / "column that column" -> "That value already exists" / "that column"
+    fixed = re.sub(r"\b(?:[Tt]he )?(\w+) (that|wo) \1\b", r"\2 \1", out)
+    return fixed[:1].upper() + fixed[1:] if out[:1].isupper() else fixed
 
 
 def _fill(tpl: str, ent: dict) -> str:
@@ -239,6 +242,15 @@ def _engine_for(cause: str, fact: dict, engine: str | None) -> str:
     if engine and (not eng or engine in eng or (engine == "mariadb" and "mysql" in eng)):
         return engine
     return eng[0] if eng else (engine or "mysql")
+
+
+def headline(result: dict, hi: bool) -> str:
+    """A short name for what was found (the goal's title), or "" when nothing was pinned down."""
+    found = sorted(result.get("found") or [], key=lambda x: (-x["score"], x["cause"]))
+    if not found:
+        return ""
+    short = fundamentals()["causes"][found[0]["cause"]].get("short_" + ("hi" if hi else "en"), "")
+    return short[:1].upper() + short[1:] if short else ""
 
 
 def report(result: dict, hi: bool, signed_in: bool = False) -> str:

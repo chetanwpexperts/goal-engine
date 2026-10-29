@@ -589,7 +589,8 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
             inputs = loads(agent.inputs, {}) or {}
             inputs["brain"] = {**rec, "sql": ""}
             agent.inputs = dumps(inputs)
-        goal.title = goal.title or ("Database error ki wajah" if turn.hi else "Database error: cause and fix")
+        # the title follows what this message is about (an earlier, different problem must not stay on it)
+        goal.title = (reasoning.headline(result, turn.hi) or ("Database error ki wajah" if turn.hi else "Database error: cause and fix"))[:200]
         goal.intent = goal.intent or "db_error"
         goal.missing_info, goal.pending = "[]", None
         db.commit()

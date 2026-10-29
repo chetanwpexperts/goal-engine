@@ -1,0 +1,777 @@
+{
+ "about": "How databases work, in our own words, the same for every database: 5 layers -> causes -> the complaints they explain. Each database's own error codes, words and exact commands live in app/dbknow/dialects/. Learned from official documentation first, then real users' problems.",
+ "layers": {
+  "parser": {
+   "en": "Command layer (the database couldn't read the command)",
+   "hi": "Command layer (database command padh nahi paya)"
+  },
+  "schema": {
+   "en": "Rules layer (the data broke a rule of the table)",
+   "hi": "Rules layer (data ne table ka koi rule toda)"
+  },
+  "resources": {
+   "en": "Capacity layer (the server ran out of something)",
+   "hi": "Capacity layer (server mein kuch khatam ho gaya)"
+  },
+  "transactions": {
+   "en": "Many-users layer (two jobs got in each other's way)",
+   "hi": "Many-users layer (do kaam ek doosre ke raste mein aaye)"
+  },
+  "gateway": {
+   "en": "Door layer (the app couldn't get in)",
+   "hi": "Door layer (app andar nahi aa payi)"
+  }
+ },
+ "causes": {
+  "syntax_error": {
+   "layer": "parser",
+   "family": "any",
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.8
+   },
+   "prior": 0.35,
+   "shown_by": "syntax_error",
+   "title_en": "The command has a grammar mistake near \"{token}\"",
+   "title_hi": "Command mein \"{token}\" ke paas grammar ki galti hai",
+   "why_en": "Before running anything, the database reads the command word by word. At \"{token}\" it found something that doesn't fit the grammar (often a missing comma, an unclosed quote or bracket, or a word that belongs to another database's dialect), so it refused to run any of it.",
+   "why_hi": "Chalane se pehle database command ko shabd-shabd padhta hai. \"{token}\" pe use kuch aisa mila jo grammar mein fit nahi hota (aksar comma missing, quote/bracket band nahi, ya doosre database ka syntax), isliye usne kuch bhi nahi chalaya.",
+   "confirm_en": "Run the corrected command; it is accepted without the error.",
+   "confirm_hi": "Sahi command chalao; error nahi aayega.",
+   "prevent_en": "Build queries with parameters (never by joining strings), and lint SQL in your code review or CI before it reaches production.",
+   "prevent_hi": "Queries parameters se banao (string jodkar nahi), aur production se pehle SQL ko lint/check karo.",
+   "needs": [],
+   "short_en": "Grammar mistake in the command",
+   "short_hi": "Command mein grammar ki galti"
+  },
+  "reserved_word": {
+   "layer": "parser",
+   "family": "any",
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.8
+   },
+   "prior": 0.15,
+   "shown_by": "reserved_word",
+   "title_en": "\"{token}\" is a reserved word of the database",
+   "title_hi": "\"{token}\" database ka reserved shabd hai",
+   "why_en": "Words like ORDER, GROUP, KEY, DESC, USER are part of the command language. Used as a table or column name without quoting, the database reads them as a command word and the grammar breaks there.",
+   "why_hi": "ORDER, GROUP, KEY, DESC, USER jaise shabd command language ke hain. Bina quote ke table/column naam ki tarah likhne par database inhe command samajhta hai aur grammar wahin toot jaati hai.",
+   "confirm_en": "The command runs once the name is quoted.",
+   "confirm_hi": "Naam quote karte hi command chal jayegi.",
+   "prevent_en": "Avoid reserved words as names (order -> orders, key -> item_key); quote identifiers in generated SQL.",
+   "prevent_hi": "Reserved shabd naam mein mat rakho (order -> orders, key -> item_key); generated SQL mein naam quote karo.",
+   "needs": [],
+   "short_en": "A reserved word used as a name",
+   "short_hi": "Reserved shabd naam ki tarah use hua"
+  },
+  "unknown_table": {
+   "layer": "parser",
+   "family": "relational",
+   "explains": {
+    "query_error": 1.0,
+    "missing_thing": 1.0,
+    "wont_run": 0.6
+   },
+   "prior": 0.3,
+   "shown_by": "unknown_table",
+   "title_en": "Table \"{table}\" doesn't exist here",
+   "title_hi": "Table \"{table}\" yahan hai hi nahi",
+   "why_en": "The command names a table the database can't find in this database: a typo, a different letter case, the wrong database selected, or a table that was never created (a migration that didn't run).",
+   "why_hi": "Command mein aisi table ka naam hai jo is database mein nahi mili: spelling, capital/small letters, galat database chuna hua, ya table bani hi nahi (migration nahi chali).",
+   "confirm_en": "List the tables and check the exact name; the command runs with the right one.",
+   "confirm_hi": "Tables ki list dekho aur sahi naam lo; sahi naam se command chalegi.",
+   "prevent_en": "Run migrations in deploy before the new code goes live; keep table names lower-case with underscores.",
+   "prevent_hi": "Deploy mein naya code chalne se pehle migrations chalao; table naam small letters aur underscore mein rakho.",
+   "needs": [
+    "table"
+   ],
+   "short_en": "A table that doesn't exist",
+   "short_hi": "Aisi table jo hai hi nahi"
+  },
+  "unknown_column": {
+   "layer": "parser",
+   "family": "relational",
+   "explains": {
+    "query_error": 1.0,
+    "missing_thing": 1.0,
+    "wont_run": 0.6
+   },
+   "prior": 0.3,
+   "shown_by": "unknown_column",
+   "title_en": "Column \"{column}\" doesn't exist in that table",
+   "title_hi": "Column \"{column}\" us table mein nahi hai",
+   "why_en": "The command uses a column name the table doesn't have: a typo, an old name after a rename, a column from another table used without joining it, or (PostgreSQL) a text value written in double quotes, which PostgreSQL reads as a column name.",
+   "why_hi": "Command aisa column use karti hai jo table mein nahi: spelling, rename ke baad purana naam, doosri table ka column bina join ke, ya (PostgreSQL) text value double quotes mein, jise PostgreSQL column naam samajhta hai.",
+   "confirm_en": "Check the table's columns; the command runs with the real name.",
+   "confirm_hi": "Table ke columns dekho; asli naam se command chalegi.",
+   "prevent_en": "Keep schema and code changes in the same release; in PostgreSQL use single quotes for text and double quotes only for names.",
+   "prevent_hi": "Schema aur code ka badlav ek saath release karo; PostgreSQL mein text ke liye single quote, naam ke liye hi double quote.",
+   "needs": [
+    "column"
+   ],
+   "short_en": "A column that doesn't exist",
+   "short_hi": "Aisa column jo hai hi nahi"
+  },
+  "ambiguous_column": {
+   "layer": "parser",
+   "family": "relational",
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.6
+   },
+   "prior": 0.15,
+   "shown_by": "ambiguous_column",
+   "title_en": "Column \"{column}\" exists in more than one joined table",
+   "title_hi": "Column \"{column}\" join ki gayi ek se zyada tables mein hai",
+   "why_en": "When two joined tables both have a column with the same name (often id, name, created_at), the database can't know which one you mean unless the table is written in front of it.",
+   "why_hi": "Jab join ki do tables mein same naam ka column ho (aksar id, name, created_at), to database nahi jaanta kaunsa chahiye jab tak aage table ka naam na likho.",
+   "confirm_en": "Prefix the column with its table (users.{column}); the command runs.",
+   "confirm_hi": "Column ke aage table ka naam lagao (users.{column}); command chalegi.",
+   "prevent_en": "Always write table.column (or alias.column) in queries that join tables.",
+   "prevent_hi": "Join wali queries mein hamesha table.column (ya alias.column) likho.",
+   "needs": [
+    "column"
+   ],
+   "short_en": "A column name found in two joined tables",
+   "short_hi": "Do joined tables mein same column naam"
+  },
+  "unknown_function": {
+   "layer": "parser",
+   "family": "any",
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.6
+   },
+   "prior": 0.1,
+   "shown_by": "unknown_function",
+   "title_en": "Function \"{token}\" doesn't exist in this database",
+   "title_hi": "Function \"{token}\" is database mein nahi hai",
+   "why_en": "Each database has its own functions. A function from another database (IFNULL vs COALESCE, NOW() vs CURRENT_TIMESTAMP, GROUP_CONCAT vs STRING_AGG) or wrong argument types make it unknown here.",
+   "why_hi": "Har database ke apne functions hote hain. Doosre database ka function (IFNULL vs COALESCE, GROUP_CONCAT vs STRING_AGG) ya galat type ke arguments se wo yahan unknown ho jata hai.",
+   "confirm_en": "The command runs with this database's function.",
+   "confirm_hi": "Is database ke function se command chalegi.",
+   "prevent_en": "Prefer standard SQL functions (COALESCE, CAST, CURRENT_TIMESTAMP) in code meant for more than one database.",
+   "prevent_hi": "Ek se zyada database wale code mein standard functions (COALESCE, CAST, CURRENT_TIMESTAMP) use karo.",
+   "needs": [],
+   "short_en": "A function this database doesn't have",
+   "short_hi": "Aisa function jo is database mein nahi"
+  },
+  "group_by_strict": {
+   "layer": "parser",
+   "family": "relational",
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.6
+   },
+   "prior": 0.15,
+   "shown_by": "group_by_strict",
+   "title_en": "A selected column isn't in GROUP BY",
+   "title_hi": "Select kiya column GROUP BY mein nahi hai",
+   "why_en": "With GROUP BY, every selected column must either be grouped or summarised (SUM, MAX, COUNT...). Otherwise the database would have to pick a random row's value, and strict mode refuses that.",
+   "why_hi": "GROUP BY ke saath har select kiya column ya to group mein ho ya summary (SUM, MAX, COUNT...) mein. Warna database ko kisi bhi random row ki value leni padti, strict mode ye mana karta hai.",
+   "confirm_en": "The query runs and every row of the result is well defined.",
+   "confirm_hi": "Query chalegi aur result ki har value saaf hogi.",
+   "prevent_en": "Keep strict mode on (it prevents silently wrong reports) and write explicit aggregates.",
+   "prevent_hi": "Strict mode on rakho (ye chupchaap galat report rokta hai) aur saaf aggregate likho.",
+   "needs": [],
+   "short_en": "A selected column missing from GROUP BY",
+   "short_hi": "GROUP BY mein column missing"
+  },
+  "duplicate_key": {
+   "layer": "schema",
+   "family": "any",
+   "explains": {
+    "save_fails": 1.0,
+    "duplicate": 1.0
+   },
+   "prior": 0.4,
+   "shown_by": "duplicate_key",
+   "title_en": "The value \"{value}\" already exists in a unique field ({key})",
+   "title_hi": "Value \"{value}\" pehle se ek unique field ({key}) mein hai",
+   "why_en": "A UNIQUE rule (or the primary key) allows each value only once. The row being saved carries \"{value}\", which another row already has, so the database refuses the whole statement to keep the rule true. Common real causes: a form submitted twice, a retry after a timeout, importing the same file again, or an auto-increment counter behind the data after an import.",
+   "why_hi": "UNIQUE rule (ya primary key) har value sirf ek baar allow karta hai. Save ho rahi row mein \"{value}\" hai, jo kisi aur row mein pehle se hai, isliye database poora statement mana kar deta hai. Asli wajah aksar: form do baar submit, timeout ke baad retry, same file dobara import, ya import ke baad auto-increment counter peeche reh gaya.",
+   "confirm_en": "Look up the existing row with that value; after the fix, saving no longer fails.",
+   "confirm_hi": "Us value wali maujood row dekho; fix ke baad save fail nahi hoga.",
+   "prevent_en": "Use an upsert (insert-or-update) where the same record can arrive twice, make the save idempotent (a request key), and keep sequences/auto-increment ahead of imported data.",
+   "prevent_hi": "Jahan same record do baar aa sakta hai wahan upsert (insert ya update) use karo, save ko idempotent banao (request key), aur import ke baad sequence/auto-increment aage rakho.",
+   "needs": [],
+   "short_en": "A value that must be unique already exists",
+   "short_hi": "Unique value pehle se maujood"
+  },
+  "fk_missing_parent": {
+   "layer": "schema",
+   "family": "relational",
+   "explains": {
+    "save_fails": 1.0,
+    "link_broken": 1.0
+   },
+   "prior": 0.25,
+   "shown_by": "fk_missing_parent",
+   "title_en": "The linked record (\"{value}\" in {parent}) doesn't exist",
+   "title_hi": "Jude hue record (\"{parent}\" mein \"{value}\") maujood nahi",
+   "why_en": "A foreign key says every child row must point to a real parent row. The row being saved points to a {parent} entry that isn't there, so saving it would leave an orphan, and the database refuses.",
+   "why_hi": "Foreign key kehti hai har child row ek asli parent row ko point kare. Save ho rahi row {parent} ki aisi entry ko point karti hai jo hai hi nahi, isliye database mana karta hai (warna anaath row ban jaati).",
+   "confirm_en": "Create the parent first (or use the right id); the save then goes through.",
+   "confirm_hi": "Pehle parent banao (ya sahi id lo); phir save ho jayega.",
+   "prevent_en": "Save parent and child in one transaction, parent first; validate ids in the app before saving.",
+   "prevent_hi": "Parent aur child ek transaction mein save karo, pehle parent; save se pehle app mein id check karo.",
+   "needs": [],
+   "short_en": "The linked record doesn't exist",
+   "short_hi": "Juda hua record maujood nahi"
+  },
+  "fk_has_children": {
+   "layer": "schema",
+   "family": "relational",
+   "explains": {
+    "delete_fails": 1.0,
+    "link_broken": 0.8,
+    "save_fails": 0.5
+   },
+   "prior": 0.2,
+   "shown_by": "fk_has_children",
+   "title_en": "Other rows still point to this record",
+   "title_hi": "Doosri rows abhi bhi is record ko point karti hain",
+   "why_en": "The record being deleted (or whose key is being changed) is still used by rows in a child table. Removing it would break those links, so the database refuses unless the foreign key says what to do with the children.",
+   "why_hi": "Jo record delete ho raha hai (ya jiski key badal rahi hai) wo abhi child table ki rows mein use ho raha hai. Hatane se wo links toot jaate, isliye database mana karta hai jab tak foreign key na bataye children ka kya karna hai.",
+   "confirm_en": "Count the child rows that point to it; after deciding their fate, the delete goes through.",
+   "confirm_hi": "Usse judi child rows gino; unka faisla karke delete ho jayega.",
+   "prevent_en": "Decide per relation: ON DELETE CASCADE (children go too), SET NULL, or soft-delete (a deleted_at column) for business records.",
+   "prevent_hi": "Har relation ke liye tay karo: ON DELETE CASCADE (children bhi jayen), SET NULL, ya business records ke liye soft-delete (deleted_at column).",
+   "needs": [],
+   "short_en": "Other rows still point to the record",
+   "short_hi": "Doosri rows abhi bhi record ko point karti hain"
+  },
+  "not_null": {
+   "layer": "schema",
+   "family": "any",
+   "explains": {
+    "save_fails": 1.0,
+    "missing_thing": 0.5
+   },
+   "prior": 0.25,
+   "shown_by": "not_null",
+   "title_en": "Field \"{column}\" requires a value but got none",
+   "title_hi": "Field \"{column}\" mein value zaroori hai par khaali bheji gayi",
+   "why_en": "The table says \"{column}\" may never be empty (NOT NULL) and has no default. The statement didn't give it a value (often a new column the app doesn't send yet, or an empty form field turned into NULL).",
+   "why_hi": "Table kehti hai \"{column}\" kabhi khaali nahi ho sakta (NOT NULL) aur iska default nahi. Statement ne value nahi di (aksar naya column jo app abhi nahi bhejti, ya khaali form field NULL ban gaya).",
+   "confirm_en": "Saving with a value (or after a default is added) works.",
+   "confirm_hi": "Value ke saath (ya default lagne ke baad) save ho jayega.",
+   "prevent_en": "Add new NOT NULL columns with a DEFAULT, and validate required fields in the app.",
+   "prevent_hi": "Naye NOT NULL columns DEFAULT ke saath jodo, aur zaroori fields app mein check karo.",
+   "needs": [
+    "column"
+   ],
+   "short_en": "A required field was left empty",
+   "short_hi": "Zaroori field khaali chhoda"
+  },
+  "value_too_long": {
+   "layer": "schema",
+   "family": "any",
+   "explains": {
+    "save_fails": 1.0
+   },
+   "prior": 0.2,
+   "shown_by": "value_too_long",
+   "title_en": "The value is longer than column \"{column}\" allows",
+   "title_hi": "Value column \"{column}\" ki limit se lambi hai",
+   "why_en": "The column has a maximum length (e.g. VARCHAR(50)). The value is longer, and in strict mode the database refuses rather than silently cutting it.",
+   "why_hi": "Column ki ek maximum length hoti hai (jaise VARCHAR(50)). Value lambi hai, aur strict mode mein database use chupchaap kaatne ki jagah mana karta hai.",
+   "confirm_en": "Check the longest value and the column size; after widening, the save works.",
+   "confirm_hi": "Sabse lambi value aur column size dekho; badhane ke baad save hoga.",
+   "prevent_en": "Size text columns for real data (names 100+, emails 255, URLs TEXT) and validate length in forms.",
+   "prevent_hi": "Text columns asli data ke hisaab se rakho (naam 100+, email 255, URL TEXT) aur form mein length check karo.",
+   "needs": [
+    "column"
+   ],
+   "short_en": "Text longer than the column allows",
+   "short_hi": "Text column ki limit se lamba"
+  },
+  "out_of_range": {
+   "layer": "schema",
+   "family": "any",
+   "explains": {
+    "save_fails": 1.0
+   },
+   "prior": 0.15,
+   "shown_by": "out_of_range",
+   "title_en": "The number is too big for column \"{column}\"",
+   "title_hi": "Number column \"{column}\" ke liye bahut bada hai",
+   "why_en": "Number columns have limits (TINYINT up to 127, INT about 2.1 billion, DECIMAL(10,2) up to 99,999,999.99). The value is outside that range. A common cause: an INT id running out after years of growth, or money stored with too few digits.",
+   "why_hi": "Number columns ki limit hoti hai (TINYINT 127 tak, INT lagbhag 2.1 arab, DECIMAL(10,2) 99,999,999.99 tak). Value us range se bahar hai. Aksar: saalon baad INT id khatam, ya paise kam digits mein.",
+   "confirm_en": "After widening the column type, the save works.",
+   "confirm_hi": "Column type bada karne ke baad save hoga.",
+   "prevent_en": "Use BIGINT for ids of growing tables and DECIMAL with enough digits for money from day one.",
+   "prevent_hi": "Badhti tables ki id ke liye BIGINT aur paise ke liye kaafi digits wala DECIMAL pehle din se rakho.",
+   "needs": [
+    "column"
+   ],
+   "short_en": "A number too big for its column",
+   "short_hi": "Number column ke liye bahut bada"
+  },
+  "bad_value_type": {
+   "layer": "schema",
+   "family": "any",
+   "explains": {
+    "save_fails": 1.0,
+    "query_error": 0.5
+   },
+   "prior": 0.2,
+   "shown_by": "bad_value_type",
+   "title_en": "The value \"{value}\" doesn't fit the column's type",
+   "title_hi": "Value \"{value}\" column ke type mein fit nahi hoti",
+   "why_en": "The column expects a number, date or time, but got text it can't read as one (an empty string for a number, '31-02-2026', '1,200' with a comma, or a date in the wrong order).",
+   "why_hi": "Column number, date ya time chahta hai, par use aisa text mila jo wo padh nahi sakta (number ki jagah khaali string, '31-02-2026', comma wala '1,200', ya ulta date order).",
+   "confirm_en": "Saving the cleaned value works.",
+   "confirm_hi": "Saaf value ke saath save hoga.",
+   "prevent_en": "Convert and validate input in the app (numbers without commas, ISO dates YYYY-MM-DD) and send NULL, not '', for missing numbers.",
+   "prevent_hi": "App mein input convert aur check karo (comma bina numbers, ISO date YYYY-MM-DD) aur missing number ke liye '' nahi, NULL bhejo.",
+   "needs": [],
+   "short_en": "A value of the wrong type (number/date)",
+   "short_hi": "Galat type ki value (number/date)"
+  },
+  "check_violation": {
+   "layer": "schema",
+   "family": "any",
+   "explains": {
+    "save_fails": 1.0
+   },
+   "prior": 0.1,
+   "shown_by": "check_violation",
+   "title_en": "The value breaks a CHECK rule ({constraint})",
+   "title_hi": "Value ek CHECK rule ({constraint}) todti hai",
+   "why_en": "The table has a business rule written as a CHECK (e.g. price > 0, status in a list). The saved value breaks it, so the database refuses.",
+   "why_hi": "Table mein CHECK ke roop mein business rule likha hai (jaise price > 0, status ek list mein). Save ki value use todti hai, isliye database mana karta hai.",
+   "confirm_en": "A value that meets the rule saves fine.",
+   "confirm_hi": "Rule maanne wali value save ho jayegi.",
+   "prevent_en": "Mirror CHECK rules in the app's validation so users see a clear message first.",
+   "prevent_hi": "CHECK rules app ki validation mein bhi rakho taaki user ko pehle saaf message dikhe.",
+   "needs": [],
+   "short_en": "A value that breaks a CHECK rule",
+   "short_hi": "CHECK rule todne wali value"
+  },
+  "charset_mismatch": {
+   "layer": "schema",
+   "family": "relational",
+   "explains": {
+    "save_fails": 1.0,
+    "strange_text": 1.0
+   },
+   "prior": 0.15,
+   "shown_by": "charset_mismatch",
+   "title_en": "The text has characters the column's character set can't store",
+   "title_hi": "Text mein aise characters hain jo column ka charset store nahi kar sakta",
+   "why_en": "Old MySQL 'utf8' stores only 3 bytes per character, so emoji and some Hindi/Asian characters (4 bytes) are refused or turn into ???.",
+   "why_hi": "Purana MySQL 'utf8' ek character ke 3 byte hi rakhta hai, isliye emoji aur kuch Hindi/Asian characters (4 byte) mana ho jaate hain ya ??? ban jaate hain.",
+   "confirm_en": "After converting to utf8mb4, the same text saves and shows correctly.",
+   "confirm_hi": "utf8mb4 mein badalne ke baad wahi text save aur sahi dikhega.",
+   "prevent_en": "Use utf8mb4 everywhere: database, tables, and the app's connection charset.",
+   "prevent_hi": "Har jagah utf8mb4: database, tables aur app ka connection charset.",
+   "needs": [],
+   "short_en": "Characters the column can't store (emoji, some Hindi)",
+   "short_hi": "Aise characters jo column store nahi kar sakta"
+  },
+  "disk_full": {
+   "layer": "resources",
+   "family": "any",
+   "explains": {
+    "save_fails": 0.8,
+    "server_down": 0.8,
+    "slow": 0.4
+   },
+   "prior": 0.2,
+   "shown_by": "disk_full",
+   "title_en": "The server's disk is full",
+   "title_hi": "Server ki disk bhar gayi hai",
+   "why_en": "The database writes data, logs and temporary sort files to disk. With no space left, writes fail and the database may stop. Usual culprits: binary/WAL logs never cleaned, a huge log or backup file, or temporary files from a big sort.",
+   "why_hi": "Database data, logs aur temporary sort files disk pe likhta hai. Jagah khatam hone par likhna fail hota hai aur database ruk bhi sakta hai. Aksar: binary/WAL logs saaf nahi hue, badi log/backup file, ya bade sort ki temporary files.",
+   "confirm_en": "Free space is back above 15-20% and writes succeed.",
+   "confirm_hi": "Free space 15-20% se upar aa jaye aur likhna chal jaye.",
+   "prevent_en": "Set log retention (binlog_expire_logs_seconds / WAL archiving), move backups off the server, and alert at 80% disk.",
+   "prevent_hi": "Log retention set karo (binlog_expire_logs_seconds / WAL archiving), backups server se bahar rakho, aur 80% disk pe alert lagao.",
+   "needs": [],
+   "short_en": "The disk is full",
+   "short_hi": "Disk bhar gayi"
+  },
+  "out_of_memory": {
+   "layer": "resources",
+   "family": "any",
+   "explains": {
+    "server_down": 1.0,
+    "slow": 0.5,
+    "crash": 1.0
+   },
+   "prior": 0.15,
+   "shown_by": "out_of_memory",
+   "title_en": "The database ran out of memory",
+   "title_hi": "Database ki memory khatam ho gayi",
+   "why_en": "When the memory the database is allowed (buffers + per-connection memory x connections) is more than the server has, the operating system kills the database (the OOM killer), or big queries fail. A large unindexed sort/join or too many connections usually tips it over.",
+   "why_hi": "Jab database ko di gayi memory (buffers + har connection ki memory x connections) server se zyada ho, to operating system database ko maar deta hai (OOM killer) ya badi queries fail hoti hain. Aksar bina index ka bada sort/join ya bahut connections isko gira dete hain.",
+   "confirm_en": "After resizing, memory use stays under about 80% of RAM at peak.",
+   "confirm_hi": "Size theek karne ke baad peak pe memory 80% RAM se kam rahegi.",
+   "prevent_en": "Size the main buffer to ~50-70% of RAM on a database-only server (less when shared), cap connections with a pool, and index the queries that sort or join big tables.",
+   "prevent_hi": "Sirf database wale server pe main buffer RAM ka ~50-70% rakho (shared ho to kam), pool se connections limit karo, aur bade sort/join wali queries pe index lagao.",
+   "needs": [],
+   "short_en": "The database ran out of memory",
+   "short_hi": "Database ki memory khatam"
+  },
+  "packet_too_large": {
+   "layer": "resources",
+   "family": "relational",
+   "explains": {
+    "save_fails": 0.8,
+    "connection_lost": 1.0
+   },
+   "prior": 0.15,
+   "shown_by": "packet_too_large",
+   "title_en": "A single command or value is bigger than the server accepts",
+   "title_hi": "Ek command ya value server ki limit se badi hai",
+   "why_en": "The server has a maximum size for one message (max_allowed_packet). A big insert, a large file/image saved in a column, or a huge IN (...) list goes over it, and the server drops the connection.",
+   "why_hi": "Server ek message ka maximum size rakhta hai (max_allowed_packet). Bada insert, column mein badi file/image, ya bahut lambi IN (...) list isse upar jaati hai, aur server connection kaat deta hai.",
+   "confirm_en": "The same command goes through after the limit is raised or the data is split.",
+   "confirm_hi": "Limit badhane ya data todne ke baad wahi command chalegi.",
+   "prevent_en": "Store files on disk/object storage and keep only the path; insert in batches of a few hundred rows.",
+   "prevent_hi": "Files disk/object storage pe rakho, database mein sirf path; insert sau-do sau rows ke batches mein karo.",
+   "needs": [],
+   "short_en": "A command bigger than the server accepts",
+   "short_hi": "Server ki limit se badi command"
+  },
+  "temp_space_full": {
+   "layer": "resources",
+   "family": "relational",
+   "explains": {
+    "query_error": 0.6,
+    "slow": 0.5
+   },
+   "prior": 0.1,
+   "shown_by": "temp_space_full",
+   "title_en": "A temporary table filled up while running a big query",
+   "title_hi": "Badi query ke dauraan temporary table bhar gayi",
+   "why_en": "Sorting, grouping or DISTINCT on many rows needs a temporary table. If it grows past its memory/disk limit (or the disk is nearly full), the query fails with 'table is full'.",
+   "why_hi": "Bahut rows pe sort, group ya DISTINCT ko temporary table chahiye. Wo apni memory/disk limit se badi ho jaye (ya disk lagbhag bhari ho), to query 'table is full' se fail hoti hai.",
+   "confirm_en": "The query finishes after it's indexed or given room.",
+   "confirm_hi": "Index ya jagah milne ke baad query poori hogi.",
+   "prevent_en": "Index the GROUP BY / ORDER BY columns so no huge temporary table is needed; keep disk headroom.",
+   "prevent_hi": "GROUP BY / ORDER BY columns pe index lagao taaki badi temporary table na bane; disk mein jagah rakho.",
+   "needs": [],
+   "short_en": "A temporary table filled up",
+   "short_hi": "Temporary table bhar gayi"
+  },
+  "statement_timeout": {
+   "layer": "resources",
+   "family": "any",
+   "explains": {
+    "slow": 1.0,
+    "query_error": 0.6
+   },
+   "prior": 0.2,
+   "shown_by": "statement_timeout",
+   "title_en": "The query was stopped for running too long",
+   "title_hi": "Query bahut der chalne ki wajah se rok di gayi",
+   "why_en": "A time limit (statement_timeout / max_execution_time) stops queries after a set time. The query is slower than that limit, usually because it scans a whole table without a useful index or waits on a lock.",
+   "why_hi": "Ek time limit (statement_timeout / max_execution_time) queries ko tay time ke baad rok deti hai. Query usse dheemi hai, aksar poori table scan karti hai bina index ke, ya kisi lock pe atki hai.",
+   "confirm_en": "Run EXPLAIN; after the index the query finishes well inside the limit.",
+   "confirm_hi": "EXPLAIN chalao; index ke baad query limit ke andar khatam hogi.",
+   "prevent_en": "Keep the timeout (it protects the server), index the filters and joins, and paginate big reads.",
+   "prevent_hi": "Timeout rakho (server ko bachata hai), filters/joins pe index lagao, aur bade reads ko pages mein todo.",
+   "needs": [],
+   "short_en": "A query stopped for taking too long",
+   "short_hi": "Bahut der wali query rok di gayi"
+  },
+  "full_scan": {
+   "layer": "resources",
+   "family": "relational",
+   "explains": {
+    "slow": 1.0
+   },
+   "prior": 0.3,
+   "shown_by": "full_scan",
+   "title_en": "The query reads the whole table ({rows} rows) instead of using an index",
+   "title_hi": "Query poori table ({rows} rows) padh rahi hai, index use nahi kar rahi",
+   "why_en": "Without an index on the columns in WHERE / JOIN / ORDER BY, the database has to read every row to find the few you want. Fine at 1,000 rows; very slow at a million.",
+   "why_hi": "WHERE / JOIN / ORDER BY ke columns pe index na ho to database ko kuch rows dhoondhne ke liye har row padhni padti hai. 1,000 rows pe theek; 10 lakh pe bahut dheema.",
+   "confirm_en": "EXPLAIN shows the index used and far fewer rows read.",
+   "confirm_hi": "EXPLAIN mein index dikhega aur bahut kam rows padhi jayengi.",
+   "prevent_en": "Add indexes for the filters your app really uses; review EXPLAIN for new queries; watch the slow query log.",
+   "prevent_hi": "App jo filters sach mein use karti hai unpe index lagao; nayi queries ka EXPLAIN dekho; slow query log pe nazar rakho.",
+   "needs": [],
+   "short_en": "A query reading the whole table (missing index)",
+   "short_hi": "Query poori table padh rahi (index nahi)"
+  },
+  "deadlock": {
+   "layer": "transactions",
+   "family": "any",
+   "explains": {
+    "save_fails": 0.8,
+    "lock_problem": 1.0,
+    "random_fail": 1.0
+   },
+   "prior": 0.25,
+   "shown_by": "deadlock",
+   "title_en": "Two transactions blocked each other (deadlock)",
+   "title_hi": "Do transactions ne ek doosre ko rok diya (deadlock)",
+   "why_en": "Transaction A held a row B needed while B held a row A needed. Neither could ever finish, so the database picked one as the victim and rolled it back. It happens when the same rows are updated in different orders by different parts of the app, inside long transactions.",
+   "why_hi": "Transaction A ne wo row pakdi jo B ko chahiye thi, aur B ne wo jo A ko. Dono kabhi poore nahi hote, isliye database ne ek ko victim chun ke rollback kar diya. Ye tab hota hai jab app ke alag hisse same rows alag order mein, lambi transactions mein update karte hain.",
+   "confirm_en": "The deadlock count stops rising after the change.",
+   "confirm_hi": "Badlav ke baad deadlock ki ginti badhna band hogi.",
+   "prevent_en": "Always lock/update rows in the same order (e.g. by id), keep transactions short, index the columns used to find rows to update, and retry a deadlocked transaction automatically (it is safe to retry).",
+   "prevent_hi": "Rows hamesha same order mein lock/update karo (jaise id se), transactions chhoti rakho, update wali rows dhoondhne ke columns pe index lagao, aur deadlock wali transaction automatic retry karo (retry safe hai).",
+   "needs": [],
+   "short_en": "Two transactions blocking each other (deadlock)",
+   "short_hi": "Do transactions ek doosre ko rok rahi (deadlock)"
+  },
+  "lock_wait": {
+   "layer": "transactions",
+   "family": "any",
+   "explains": {
+    "slow": 0.8,
+    "lock_problem": 1.0,
+    "save_fails": 0.6
+   },
+   "prior": 0.25,
+   "shown_by": "lock_wait",
+   "title_en": "The query waited too long for a lock held by another transaction",
+   "title_hi": "Query ne doosri transaction ke lock ka bahut intezaar kiya",
+   "why_en": "Another transaction is holding the rows (or table) this one needs and didn't finish in time, often a long-running job, a transaction left open by the app, or a big UPDATE without an index locking many rows.",
+   "why_hi": "Doosri transaction wo rows (ya table) pakde hue hai jo isko chahiye, aur time pe khatam nahi hui. Aksar lamba chalne wala job, app ki khuli chhodi transaction, ya bina index ka bada UPDATE jo bahut rows lock karta hai.",
+   "confirm_en": "Find the blocking transaction; after it's fixed, waits disappear.",
+   "confirm_hi": "Rokne wali transaction dhoondho; theek hone ke baad intezaar khatam.",
+   "prevent_en": "Keep transactions short, commit promptly, never wait for user input inside a transaction, run big updates in small batches, and index the WHERE of UPDATE/DELETE.",
+   "prevent_hi": "Transactions chhoti rakho, turant commit karo, transaction ke andar user ka intezaar mat karo, bade updates chhote batches mein, aur UPDATE/DELETE ke WHERE pe index.",
+   "needs": [],
+   "short_en": "Waiting too long for another transaction's lock",
+   "short_hi": "Doosri transaction ke lock ka lamba intezaar"
+  },
+  "serialization_failure": {
+   "layer": "transactions",
+   "family": "any",
+   "explains": {
+    "random_fail": 1.0,
+    "save_fails": 0.6
+   },
+   "prior": 0.1,
+   "shown_by": "serialization_failure",
+   "title_en": "Two transactions changed the same data at once under strict isolation",
+   "title_hi": "Strict isolation mein do transactions ne ek saath same data badla",
+   "why_en": "Under SERIALIZABLE (or REPEATABLE READ in PostgreSQL), the database guarantees results as if transactions ran one by one. When two overlap on the same data, one is cancelled so the guarantee holds.",
+   "why_hi": "SERIALIZABLE (ya PostgreSQL mein REPEATABLE READ) mein database guarantee deta hai ki result aisa ho jaise transactions ek-ek karke chali. Do transactions same data pe overlap karein to ek cancel hoti hai.",
+   "confirm_en": "With the retry in place, the operation succeeds on the next attempt.",
+   "confirm_hi": "Retry lagne ke baad agli koshish mein kaam ho jayega.",
+   "prevent_en": "Wrap such transactions in an automatic retry (2-3 times with a short wait); use the strict level only where it's needed.",
+   "prevent_hi": "Aisi transactions ko automatic retry mein lapeto (2-3 baar, thoda ruk ke); strict level sirf jahan zaroori ho.",
+   "needs": [],
+   "short_en": "Two transactions changing the same data at once",
+   "short_hi": "Do transactions ek saath same data badal rahi"
+  },
+  "idle_transaction": {
+   "layer": "transactions",
+   "family": "any",
+   "explains": {
+    "slow": 0.7,
+    "lock_problem": 1.0
+   },
+   "prior": 0.15,
+   "shown_by": "idle_transaction",
+   "title_en": "A transaction was left open and is holding locks",
+   "title_hi": "Ek transaction khuli chhod di gayi hai aur locks pakde hue hai",
+   "why_en": "A connection began a transaction and then went idle without COMMIT or ROLLBACK (an app error path, a debugging session). Everything it touched stays locked and, in PostgreSQL, old row versions can't be cleaned up.",
+   "why_hi": "Ek connection ne transaction shuru ki aur bina COMMIT/ROLLBACK ke idle ho gaya (app ka error path, debugging session). Jo bhi usne chhua wo lock rehta hai aur PostgreSQL mein purani rows saaf nahi ho paati.",
+   "confirm_en": "After it ends, nothing waits on it any more.",
+   "confirm_hi": "Uske khatam hote hi koi uska intezaar nahi karega.",
+   "prevent_en": "Always commit/rollback in a finally block; set idle_in_transaction_session_timeout (PostgreSQL) or a short wait_timeout.",
+   "prevent_hi": "Commit/rollback hamesha finally block mein; idle_in_transaction_session_timeout (PostgreSQL) ya chhota wait_timeout set karo.",
+   "needs": [],
+   "short_en": "A transaction left open, holding locks",
+   "short_hi": "Khuli chhodi transaction locks pakde hue"
+  },
+  "metadata_lock": {
+   "layer": "transactions",
+   "family": "relational",
+   "explains": {
+    "slow": 0.8,
+    "lock_problem": 1.0,
+    "wont_run": 0.5
+   },
+   "prior": 0.1,
+   "shown_by": "metadata_lock",
+   "title_en": "A schema change is waiting for (and blocking) the table",
+   "title_hi": "Ek schema change table ka intezaar kar raha hai (aur use rok raha hai)",
+   "why_en": "ALTER TABLE needs the table to itself. An open transaction that read the table keeps it busy, so the ALTER waits, and every new query on that table queues behind the ALTER: the site freezes.",
+   "why_hi": "ALTER TABLE ko table akele chahiye. Table padhne wali ek khuli transaction use busy rakhti hai, ALTER intezaar karta hai, aur us table ki har nayi query ALTER ke peeche line mein lag jaati hai: site atak jaati hai.",
+   "confirm_en": "Once the blocker ends, the ALTER finishes and the queue clears.",
+   "confirm_hi": "Rokne wala khatam hote hi ALTER poora hoga aur line saaf.",
+   "prevent_en": "Run schema changes with a short lock timeout, off-peak, and use online/zero-downtime migration methods for big tables.",
+   "prevent_hi": "Schema changes chhote lock timeout ke saath, kam traffic mein chalao, aur badi tables ke liye online/zero-downtime migration tareeke.",
+   "needs": [],
+   "short_en": "A schema change stuck waiting for the table",
+   "short_hi": "Schema change table ke intezaar mein atka"
+  },
+  "access_denied": {
+   "layer": "gateway",
+   "family": "any",
+   "explains": {
+    "cant_connect": 1.0,
+    "login_fails": 1.0
+   },
+   "prior": 0.35,
+   "shown_by": "access_denied",
+   "title_en": "The database refused this user/password",
+   "title_hi": "Database ne is user/password ko mana kiya",
+   "why_en": "The server checks the user, the password and where the connection comes from. One of them doesn't match: a wrong or changed password, a user that exists only for localhost, or a user name with a different host part.",
+   "why_hi": "Server user, password aur connection kahan se aaya, teeno check karta hai. Inme se ek match nahi: galat ya badla password, user jo sirf localhost ke liye hai, ya alag host wala user naam.",
+   "confirm_en": "Logging in with the corrected user/host works.",
+   "confirm_hi": "Sahi user/host se login ho jayega.",
+   "prevent_en": "Keep credentials in one config (.env), give each app its own user with only the rights it needs, and rotate passwords in all places together.",
+   "prevent_hi": "Credentials ek hi config (.env) mein rakho, har app ka apna user sirf zaroori rights ke saath, aur password badlo to sab jagah ek saath.",
+   "needs": [],
+   "short_en": "Wrong user or password",
+   "short_hi": "Galat user ya password"
+  },
+  "host_not_allowed": {
+   "layer": "gateway",
+   "family": "any",
+   "explains": {
+    "cant_connect": 1.0
+   },
+   "prior": 0.2,
+   "shown_by": "host_not_allowed",
+   "title_en": "The database doesn't accept connections from this machine",
+   "title_hi": "Database is machine se connection accept nahi karta",
+   "why_en": "The user is allowed only from certain hosts (MySQL user@host, PostgreSQL pg_hba.conf). Connections from anywhere else are turned away before the password is even checked.",
+   "why_hi": "User sirf kuch hosts se allowed hai (MySQL user@host, PostgreSQL pg_hba.conf). Baaki jagah se connection password check se pehle hi lauta diya jaata hai.",
+   "confirm_en": "Connecting from the allowed host works.",
+   "confirm_hi": "Allowed host se connect ho jayega.",
+   "prevent_en": "Allow only the app servers' exact IPs, never '%' / 0.0.0.0/0 for admin users.",
+   "prevent_hi": "Sirf app servers ke exact IP allow karo, admin users ke liye kabhi '%' / 0.0.0.0/0 nahi.",
+   "needs": [],
+   "short_en": "This machine isn't allowed to connect",
+   "short_hi": "Is machine ko connect ki ijazat nahi"
+  },
+  "too_many_connections": {
+   "layer": "gateway",
+   "family": "any",
+   "explains": {
+    "cant_connect": 1.0,
+    "server_down": 0.6,
+    "slow": 0.4
+   },
+   "prior": 0.3,
+   "shown_by": "too_many_connections",
+   "title_en": "The database reached its maximum number of connections",
+   "title_hi": "Database apne maximum connections tak pahunch gaya",
+   "why_en": "Each app process opens connections; the server allows only max_connections at once. Traffic spikes, connections never closed (leaks), or slow queries keeping connections busy fill every slot, so new visitors are refused.",
+   "why_hi": "Har app process connections kholta hai; server ek saath sirf max_connections allow karta hai. Traffic spike, band na hone wale connections (leak), ya dheemi queries jo connections pakde rehti hain, saare slots bhar dete hain, aur naye visitors mana ho jaate hain.",
+   "confirm_en": "At peak, connections in use stay comfortably below the maximum.",
+   "confirm_hi": "Peak pe use ho rahe connections maximum se kaafi neeche rahenge.",
+   "prevent_en": "Use a connection pool (PgBouncer / ProxySQL / the framework's pool), close connections in a finally block, set a sensible wait_timeout, and fix slow queries that hold connections.",
+   "prevent_hi": "Connection pool use karo (PgBouncer / ProxySQL / framework ka pool), connections finally block mein band karo, sahi wait_timeout rakho, aur connections pakadne wali dheemi queries theek karo.",
+   "needs": [],
+   "short_en": "Too many connections at once",
+   "short_hi": "Ek saath bahut zyada connections"
+  },
+  "server_unreachable": {
+   "layer": "gateway",
+   "family": "any",
+   "explains": {
+    "cant_connect": 1.0,
+    "server_down": 1.0
+   },
+   "prior": 0.25,
+   "shown_by": "server_unreachable",
+   "title_en": "Nothing answered at {host}:{port}",
+   "title_hi": "{host}:{port} pe kisi ne jawab nahi diya",
+   "why_en": "The connection never reached a database: the database service is stopped or crashed, it listens on another port or only on localhost (bind-address), or a firewall blocks the port.",
+   "why_hi": "Connection database tak pahuncha hi nahi: database service band ya crash hai, doosre port pe ya sirf localhost pe sun rahi hai (bind-address), ya firewall port rok raha hai.",
+   "confirm_en": "The service is running and the port answers from the app server.",
+   "confirm_hi": "Service chal rahi hai aur app server se port jawab deta hai.",
+   "prevent_en": "Monitor the service (auto-restart), keep bind-address and firewall rules documented, and alert when the port stops answering.",
+   "prevent_hi": "Service monitor karo (auto-restart), bind-address aur firewall rules likh ke rakho, aur port jawab na de to alert.",
+   "needs": [],
+   "short_en": "The database server isn't answering",
+   "short_hi": "Database server jawab nahi de raha"
+  },
+  "connection_lost": {
+   "layer": "gateway",
+   "family": "relational",
+   "explains": {
+    "connection_lost": 1.0,
+    "random_fail": 0.6
+   },
+   "prior": 0.2,
+   "shown_by": "connection_lost",
+   "title_en": "The server closed the connection in the middle",
+   "title_hi": "Server ne beech mein connection band kar diya",
+   "why_en": "'Server has gone away / lost connection' means the connection was alive and then closed: it sat idle longer than wait_timeout, a packet was too large, a query was killed, or the database restarted (often after running out of memory).",
+   "why_hi": "'Server has gone away / lost connection' ka matlab connection zinda tha phir band hua: wait_timeout se zyada idle raha, packet bahut bada tha, query kill hui, ya database restart hua (aksar memory khatam hone par).",
+   "confirm_en": "Long jobs reconnect cleanly and the error stops.",
+   "confirm_hi": "Lambe jobs saaf reconnect karenge aur error band.",
+   "prevent_en": "Reconnect or ping before reusing an idle connection (pool 'pre-ping'), keep packets small, and check the error log for restarts.",
+   "prevent_hi": "Idle connection dobara use karne se pehle reconnect/ping (pool 'pre-ping'), packets chhote rakho, aur restart ke liye error log dekho.",
+   "needs": [],
+   "short_en": "The connection was cut in the middle",
+   "short_hi": "Connection beech mein kat gaya"
+  },
+  "unknown_database": {
+   "layer": "gateway",
+   "family": "any",
+   "explains": {
+    "cant_connect": 0.8,
+    "missing_thing": 1.0
+   },
+   "prior": 0.15,
+   "shown_by": "unknown_database",
+   "title_en": "Database \"{db}\" doesn't exist on this server",
+   "title_hi": "Database \"{db}\" is server pe nahi hai",
+   "why_en": "The connection asked for a database name the server doesn't have: a typo, a different letter case, or the database was never created/restored on this server.",
+   "why_hi": "Connection ne aisa database naam maanga jo server pe nahi: spelling, capital/small letters, ya database is server pe bana/restore hi nahi.",
+   "confirm_en": "Listing the databases shows the exact name; connecting with it works.",
+   "confirm_hi": "Databases ki list mein sahi naam dikhega; usse connect ho jayega.",
+   "prevent_en": "Keep the database name in one config value and create it in your setup script.",
+   "prevent_hi": "Database naam ek config value mein rakho aur setup script mein banao.",
+   "needs": [],
+   "short_en": "A database name that doesn't exist",
+   "short_hi": "Aisa database naam jo hai hi nahi"
+  },
+  "permission_denied": {
+   "layer": "gateway",
+   "family": "any",
+   "explains": {
+    "query_error": 0.8,
+    "login_fails": 0.4
+   },
+   "prior": 0.15,
+   "shown_by": "permission_denied",
+   "title_en": "This user isn't allowed to do that ({token})",
+   "title_hi": "Is user ko ye ({token}) karne ki ijazat nahi",
+   "why_en": "Login worked, but the user lacks the right for this action on this table or database (e.g. SELECT, INSERT, CREATE).",
+   "why_hi": "Login ho gaya, par user ke paas is table/database pe ye kaam (jaise SELECT, INSERT, CREATE) karne ka haq nahi.",
+   "confirm_en": "The action works after the exact right is granted.",
+   "confirm_hi": "Sahi haq milne ke baad kaam ho jayega.",
+   "prevent_en": "Grant only what each app needs (least privilege); separate users for the app, migrations and reporting.",
+   "prevent_hi": "Har app ko sirf zaroori haq do (least privilege); app, migrations aur reporting ke alag users.",
+   "needs": [],
+   "short_en": "The user lacks the right for that action",
+   "short_hi": "User ko us kaam ka haq nahi"
+  },
+  "ssl_required": {
+   "layer": "gateway",
+   "family": "any",
+   "explains": {
+    "cant_connect": 1.0
+   },
+   "prior": 0.1,
+   "shown_by": "ssl_required",
+   "title_en": "The server requires an encrypted (SSL/TLS) connection",
+   "title_hi": "Server encrypted (SSL/TLS) connection maangta hai",
+   "why_en": "The server (or this user) only accepts encrypted connections, and the client connected without SSL, or with certificates the server doesn't trust.",
+   "why_hi": "Server (ya ye user) sirf encrypted connection leta hai, aur client ne bina SSL ke, ya aise certificate se connect kiya jo server nahi maanta.",
+   "confirm_en": "Connecting with SSL enabled works.",
+   "confirm_hi": "SSL ke saath connect ho jayega.",
+   "prevent_en": "Keep SSL on for remote connections and set it in the app's connection settings, not per script.",
+   "prevent_hi": "Remote connections ke liye SSL on rakho aur app ki connection settings mein set karo.",
+   "needs": [],
+   "short_en": "The server requires an encrypted connection",
+   "short_hi": "Server encrypted connection maangta hai"
+  }
+ }
+}

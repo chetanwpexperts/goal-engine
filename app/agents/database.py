@@ -367,7 +367,13 @@ SQL_TEXT = re.compile(r"\bselect\b[\s\S]+?\bfrom\b", re.I)
 
 def wants_database(goal: Goal | None, text: str) -> bool:
     """A database job the connector can do (not a pasted query to review, that's the SQL checker)."""
-    if goal is None or SQL_TEXT.search(text or ""):
+    if goal is None:
+        return False
+    from app.dbknow import reasoning
+
+    if reasoning.evidence(text):
+        return True                       # a pasted database error (even with the query in it): the reasoning explains it
+    if SQL_TEXT.search(text or ""):
         return False
     from app.dbknow import brain
 
@@ -570,7 +576,25 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     """Database work: the agent works through a connector on the user's own server."""
     from app.agents.core import query_in
     from app.dbknow import brain as dbbrain
+    from app.dbknow import reasoning
 
+    if reasoning.evidence(text):          # a pasted error / EXPLAIN / lock report: cause, proof, fix, prevention
+        from app import mind
+
+        result = reasoning.diagnose(text)
+        mind.set_pattern("diagnose")
+        agent = goal_agent(db, goal) or create_agent(db, goal, detect_mode(text))     # the card stays: connect to prove it
+        rec = dbbrain.recognize(text)
+        if rec["kind"] in ("error", "issue"):
+            inputs = loads(agent.inputs, {}) or {}
+            inputs["brain"] = {**rec, "sql": ""}
+            agent.inputs = dumps(inputs)
+        goal.title = goal.title or ("Database error ki wajah" if turn.hi else "Database error: cause and fix")
+        goal.intent = goal.intent or "db_error"
+        goal.missing_info, goal.pending = "[]", None
+        db.commit()
+        signed_in = False                 # accounts arrive with the isolated database area
+        return reasoning.report(result, turn.hi, signed_in=signed_in), [], "agent_plan"
     if query_in(text):                    # a pasted query is for the SQL checker, whatever else the message says
         return _check_pasted_query(db, goal, text, turn.hi)
 

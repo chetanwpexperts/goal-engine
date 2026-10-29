@@ -1,0 +1,409 @@
+{
+ "name": "PostgreSQL",
+ "family": "relational",
+ "words": [
+  "postgres",
+  "postgresql",
+  "psql",
+  "pg",
+  "pgsql",
+  "pgbouncer",
+  "supabase",
+  "neon",
+  "pg_hba",
+  "libpq",
+  "psycopg"
+ ],
+ "codes": {
+  "42601": "syntax_error",
+  "42P01": "unknown_table",
+  "42703": "unknown_column",
+  "42702": "ambiguous_column",
+  "42883": "unknown_function",
+  "42803": "group_by_strict",
+  "23505": "duplicate_key",
+  "23503": "fk_missing_parent",
+  "23502": "not_null",
+  "22001": "value_too_long",
+  "22003": "out_of_range",
+  "22P02": "bad_value_type",
+  "22007": "bad_value_type",
+  "22008": "bad_value_type",
+  "23514": "check_violation",
+  "22021": "charset_mismatch",
+  "53100": "disk_full",
+  "53200": "out_of_memory",
+  "54000": "packet_too_large",
+  "57014": "statement_timeout",
+  "40P01": "deadlock",
+  "55P03": "lock_wait",
+  "40001": "serialization_failure",
+  "25P03": "idle_transaction",
+  "28P01": "access_denied",
+  "28000": "host_not_allowed",
+  "53300": "too_many_connections",
+  "08001": "server_unreachable",
+  "08006": "connection_lost",
+  "57P01": "connection_lost",
+  "3D000": "unknown_database",
+  "42501": "permission_denied"
+ },
+ "code_patterns": [
+  "SQLSTATE\\[?\\s*([0-9A-Z]{5})\\]?",
+  "\\bcode:?\\s*'?([0-9][0-9A-Z]{4})'?",
+  "\\(([0-9][0-9A-Z]{4})\\)",
+  "ERRCODE[_ ]?\\w*:?\\s*([0-9A-Z]{5})"
+ ],
+ "messages": [
+  {
+   "cause": "duplicate_key",
+   "re": "duplicate key value violates unique constraint \\\"(?P<key>[^\\\"]+)\\\"(?:[\\s\\S]*?Key \\((?P<column>[^)]+)\\)=\\((?P<value>[^)]*)\\) already exists)?"
+  },
+  {
+   "cause": "fk_has_children",
+   "re": "update or delete on table \\\"(?P<table>[^\\\"]+)\\\" violates foreign key constraint \\\"(?P<constraint>[^\\\"]+)\\\" on table \\\"(?P<child>[^\\\"]+)\\\"(?:[\\s\\S]*?Key \\((?P<parent_column>[^)]+)\\)=\\((?P<value>[^)]*)\\) is still referenced)?"
+  },
+  {
+   "cause": "fk_missing_parent",
+   "re": "insert or update on table \\\"(?P<table>[^\\\"]+)\\\" violates foreign key constraint \\\"(?P<constraint>[^\\\"]+)\\\"(?:[\\s\\S]*?Key \\((?P<column>[^)]+)\\)=\\((?P<value>[^)]*)\\) is not present in table \\\"(?P<parent>[^\\\"]+)\\\")?"
+  },
+  {
+   "cause": "not_null",
+   "re": "null value in column \\\"(?P<column>[^\\\"]+)\\\"(?: of relation \\\"(?P<table>[^\\\"]+)\\\")? violates not-null constraint"
+  },
+  {
+   "cause": "value_too_long",
+   "re": "value too long for type character(?: varying)?\\((?P<limit>\\d+)\\)"
+  },
+  {
+   "cause": "out_of_range",
+   "re": "(?:integer|bigint|smallint) out of range|numeric field overflow"
+  },
+  {
+   "cause": "bad_value_type",
+   "re": "invalid input syntax for type (?P<token>[\\w ]+): \\\"(?P<value>[^\\\"]*)\\\""
+  },
+  {
+   "cause": "bad_value_type",
+   "re": "date/time field value out of range: \\\"(?P<value>[^\\\"]*)\\\""
+  },
+  {
+   "cause": "check_violation",
+   "re": "violates check constraint \\\"(?P<constraint>[^\\\"]+)\\\""
+  },
+  {
+   "cause": "charset_mismatch",
+   "re": "invalid byte sequence for encoding|character with byte sequence .* has no equivalent"
+  },
+  {
+   "cause": "reserved_word",
+   "re": "syntax error at or near \\\"(?P<token>order|group|user|desc|asc|default|check|offset|column|end|analyse|analyze|both|leading|trailing|cast)\\\""
+  },
+  {
+   "cause": "syntax_error",
+   "re": "syntax error at or near \\\"(?P<token>[^\\\"]{0,60})\\\"|syntax error at end of input"
+  },
+  {
+   "cause": "unknown_table",
+   "re": "relation \\\"(?:(?P<db>[\\w$]+)\\.)?(?P<table>[^\\\"]+)\\\" does not exist"
+  },
+  {
+   "cause": "unknown_column",
+   "re": "column \\\"(?:(?P<prefix>[\\w$]+)\\.)?(?P<column>[^\\\"]+)\\\"(?: of relation \\\"(?P<table>[^\\\"]+)\\\")? does not exist"
+  },
+  {
+   "cause": "ambiguous_column",
+   "re": "column reference \\\"(?P<column>[^\\\"]+)\\\" is ambiguous"
+  },
+  {
+   "cause": "unknown_function",
+   "re": "function (?P<token>[\\w.]+)\\([^)]*\\) does not exist"
+  },
+  {
+   "cause": "group_by_strict",
+   "re": "must appear in the GROUP BY clause or be used in an aggregate function"
+  },
+  {
+   "cause": "disk_full",
+   "re": "could not extend file|No space left on device|could not write to file"
+  },
+  {
+   "cause": "out_of_memory",
+   "re": "out of memory|server process .* was terminated by signal 9|Killed process \\d+ \\(postgres"
+  },
+  {
+   "cause": "statement_timeout",
+   "re": "canceling statement due to statement timeout"
+  },
+  {
+   "cause": "lock_wait",
+   "re": "canceling statement due to lock timeout|could not obtain lock on"
+  },
+  {
+   "cause": "deadlock",
+   "re": "deadlock detected"
+  },
+  {
+   "cause": "serialization_failure",
+   "re": "could not serialize access"
+  },
+  {
+   "cause": "idle_transaction",
+   "re": "idle-in-transaction timeout|idle in transaction"
+  },
+  {
+   "cause": "access_denied",
+   "re": "password authentication failed for user \\\"(?P<user>[^\\\"]+)\\\""
+  },
+  {
+   "cause": "ssl_required",
+   "re": "SSL connection is required|no pg_hba\\.conf entry for host \\\"(?P<host>[^\\\"]+)\\\"[^\\n]*(?:SSL off|no encryption)[^\\n]*hostssl"
+  },
+  {
+   "cause": "host_not_allowed",
+   "re": "no pg_hba\\.conf entry for host \\\"(?P<host>[^\\\"]+)\\\", user \\\"(?P<user>[^\\\"]+)\\\", database \\\"(?P<db>[^\\\"]+)\\\""
+  },
+  {
+   "cause": "too_many_connections",
+   "re": "too many clients already|remaining connection slots are reserved|too many connections for role"
+  },
+  {
+   "cause": "server_unreachable",
+   "re": "(?:could not connect to server|connection to server at \\\"(?P<host>[^\\\"]+)\\\"[^,]*, port (?P<port>\\d+) failed)[\\s\\S]{0,80}?Connection refused|Connection refused[\\s\\S]{0,40}Is the server running"
+  },
+  {
+   "cause": "connection_lost",
+   "re": "server closed the connection unexpectedly|terminating connection due to administrator command|SSL SYSCALL error: EOF detected"
+  },
+  {
+   "cause": "unknown_database",
+   "re": "database \\\"(?P<db>[^\\\"]+)\\\" does not exist"
+  },
+  {
+   "cause": "permission_denied",
+   "re": "permission denied for (?:table|relation|schema|database|sequence) (?P<table>[\\w.\\\"]+)"
+  }
+ ],
+ "fix": {
+  "syntax_error": [
+   "-- Look just before \"{token}\": a missing comma, an unclosed ' or ( , or MySQL-only syntax.\n-- PostgreSQL: 'single quotes' for text, \"double quotes\" only for names, no `backticks`; LIMIT n OFFSET m (not LIMIT m, n)."
+  ],
+  "reserved_word": [
+   "-- Quote the name with double quotes wherever it is used:\nSELECT \"{word}\" FROM ...;\n-- or rename it once:\nALTER TABLE {table} RENAME COLUMN \"{word}\" TO {word}_value;"
+  ],
+  "unknown_table": [
+   "SELECT table_schema, table_name FROM information_schema.tables WHERE table_name ILIKE '%{table_hint}%';",
+   "-- Check the schema/search_path too:\nSHOW search_path;"
+  ],
+  "unknown_column": [
+   "SELECT column_name FROM information_schema.columns WHERE table_name = '{table}';",
+   "-- A text value in \"double quotes\" is read as a column name: use 'single quotes' for text."
+  ],
+  "ambiguous_column": [
+   "-- Put the table (or its alias) in front of the column:\nSELECT t1.{column}, ... FROM t1 JOIN t2 ON ... WHERE t1.{column} = ...;"
+  ],
+  "unknown_function": [
+   "-- PostgreSQL equivalents: GROUP_CONCAT -> STRING_AGG(col, ','), IFNULL -> COALESCE, DATE_FORMAT -> TO_CHAR, or add an explicit ::type cast to the arguments"
+  ],
+  "group_by_strict": [
+   "SELECT customer_id, MAX(customer_name) AS customer_name, SUM(total)\nFROM orders GROUP BY customer_id;"
+  ],
+  "duplicate_key": [
+   "-- See the row that already has it:\nSELECT * FROM {table} WHERE {column} = '{value}';",
+   "-- Save without failing when it already exists (upsert):\nINSERT INTO {table} ({column}, ...) VALUES (...)\nON CONFLICT ({column}) DO UPDATE SET ... = EXCLUDED....;   -- or DO NOTHING",
+   "-- Only for an id after an import: move the sequence past the data\nSELECT setval(pg_get_serial_sequence('{table}', 'id'), (SELECT MAX(id) FROM {table}));"
+  ],
+  "fk_missing_parent": [
+   "SELECT * FROM {parent} WHERE <its key> = '{value}';",
+   "-- Create the {parent} row first, or use an existing one."
+  ],
+  "fk_has_children": [
+   "SELECT COUNT(*) FROM {child} WHERE <its {parent_column} column> = '{value}';",
+   "-- Then choose: remove/move those rows first, or let the relation decide:\nALTER TABLE {child} DROP CONSTRAINT {constraint};\nALTER TABLE {child} ADD CONSTRAINT {constraint} FOREIGN KEY (<column>) REFERENCES {table}({parent_column}) ON DELETE CASCADE;  -- or ON DELETE SET NULL"
+  ],
+  "not_null": [
+   "ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT <value>;",
+   "-- or send a value for {column} from the app"
+  ],
+  "value_too_long": [
+   "ALTER TABLE {table} ALTER COLUMN {column} TYPE varchar(255);  -- or text (no length limit in PostgreSQL)"
+  ],
+  "out_of_range": [
+   "ALTER TABLE {table} ALTER COLUMN {column} TYPE bigint;  -- or numeric(15,2) for money"
+  ],
+  "bad_value_type": [
+   "-- Send a real {token}: numbers without commas, dates as 'YYYY-MM-DD', NULL (not '') when empty.\n-- To read '{value}' as a date: to_date('{value}', 'DD-MM-YYYY')"
+  ],
+  "check_violation": [
+   "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = '{constraint}';"
+  ],
+  "charset_mismatch": [
+   "SHOW server_encoding; SHOW client_encoding;",
+   "-- Set the client/app connection to UTF8: SET client_encoding = 'UTF8';"
+  ],
+  "disk_full": [
+   "SELECT pg_size_pretty(pg_database_size(current_database()));\nSELECT relname, pg_size_pretty(pg_total_relation_size(relid)) FROM pg_catalog.pg_statio_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 10;",
+   "-- Check WAL: a stuck replication slot or failing archive_command keeps WAL forever:\nSELECT slot_name, active FROM pg_replication_slots;"
+  ],
+  "out_of_memory": [
+   "SHOW shared_buffers; SHOW work_mem; SHOW max_connections;",
+   "-- work_mem is per sort, per connection: keep it modest (e.g. 16MB) and pool connections; shared_buffers ~25% of RAM."
+  ],
+  "packet_too_large": [
+   "-- Split the statement into batches; keep big files outside the database (store a path)."
+  ],
+  "statement_timeout": [
+   "EXPLAIN (ANALYZE, BUFFERS) <your query>;  -- look for Seq Scan on a big table",
+   "-- Add the index the plan is missing; paste the query here and I'll write it."
+  ],
+  "full_scan": [
+   "CREATE INDEX CONCURRENTLY idx_{table}_{column} ON {table} ({column});"
+  ],
+  "deadlock": [
+   "SELECT deadlocks FROM pg_stat_database WHERE datname = current_database();",
+   "-- In code: update rows in the same order (ORDER BY id ... FOR UPDATE) and retry on error 40P01."
+  ],
+  "lock_wait": [
+   "SELECT pid, pg_blocking_pids(pid) AS blocked_by, state, now() - xact_start AS running, query\nFROM pg_stat_activity WHERE cardinality(pg_blocking_pids(pid)) > 0;",
+   "-- If a forgotten transaction blocks: SELECT pg_terminate_backend(<blocking pid>);  (after checking what it is)"
+  ],
+  "serialization_failure": [
+   "-- Retry the whole transaction 2-3 times with a short wait on error 40001."
+  ],
+  "idle_transaction": [
+   "SELECT pid, now() - xact_start AS open_for, query FROM pg_stat_activity WHERE state = 'idle in transaction' ORDER BY xact_start;",
+   "SET idle_in_transaction_session_timeout = '60s';  -- per role/database: ALTER ROLE app SET idle_in_transaction_session_timeout = '60s';"
+  ],
+  "metadata_lock": [
+   "SELECT pid, state, query FROM pg_stat_activity WHERE wait_event_type = 'Lock';",
+   "-- Run the ALTER with a short lock wait:\nSET lock_timeout = '5s';"
+  ],
+  "access_denied": [
+   "ALTER ROLE {user} WITH PASSWORD '<new password>';",
+   "-- and update the same password in the app's config"
+  ],
+  "host_not_allowed": [
+   "-- In pg_hba.conf allow just the app server, then reload:\nhost  {db}  {user}  {host}/32  scram-sha-256\nSELECT pg_reload_conf();"
+  ],
+  "too_many_connections": [
+   "SHOW max_connections;\nSELECT count(*), state FROM pg_stat_activity GROUP BY state;",
+   "-- Real fix: PgBouncer (transaction pooling) in front, and close idle connections:\nALTER ROLE app SET idle_session_timeout = '10min';"
+  ],
+  "server_unreachable": [
+   "-- On the database server:\nsystemctl status postgresql\nss -ltnp | grep 5432",
+   "-- For remote access: listen_addresses = '*' (postgresql.conf), a pg_hba.conf line for the app server, and the firewall open for 5432 from that server only."
+  ],
+  "connection_lost": [
+   "SELECT pg_postmaster_start_time();  -- recent = the server restarted",
+   "-- In the app/pool: enable pre-ping / reconnect on stale connections."
+  ],
+  "unknown_database": [
+   "SELECT datname FROM pg_database;"
+  ],
+  "permission_denied": [
+   "GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO <app role>;  -- only what is missing\nGRANT USAGE ON SCHEMA public TO <app role>;"
+  ],
+  "ssl_required": [
+   "-- Connect with sslmode=require (e.g. postgresql://user@host/db?sslmode=require)"
+  ]
+ },
+ "settings": {
+  "timeout": "statement_timeout",
+  "lock_timeout": "lock_timeout",
+  "buffer": "shared_buffers",
+  "connections": "max_connections"
+ },
+ "live": {
+  "unknown_table": {
+   "type": "closest_name",
+   "sql": "SELECT table_name FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema')",
+   "want": "table"
+  },
+  "unknown_column": {
+   "type": "closest_name",
+   "sql": "SELECT column_name FROM information_schema.columns WHERE table_name = :table",
+   "want": "column",
+   "needs": [
+    "table"
+   ]
+  },
+  "duplicate_key": {
+   "type": "row_exists",
+   "sql": "SELECT * FROM \"{table}\" WHERE \"{column}\"::text = :value LIMIT 1",
+   "needs": [
+    "table",
+    "column",
+    "value"
+   ],
+   "resolve": {
+    "sql": "SELECT c.conrelid::regclass::text, a.attname FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY(c.conkey) WHERE c.conname = :key LIMIT 1",
+    "sets": [
+     "table",
+     "column"
+    ],
+    "needs": [
+     "key"
+    ]
+   }
+  },
+  "fk_missing_parent": {
+   "type": "row_missing",
+   "sql": "SELECT 1 FROM \"{parent}\" WHERE \"{parent_column}\"::text = :value LIMIT 1",
+   "needs": [
+    "parent",
+    "parent_column",
+    "value"
+   ],
+   "resolve": {
+    "sql": "SELECT c.confrelid::regclass::text, a.attname FROM pg_constraint c JOIN pg_attribute a ON a.attrelid = c.confrelid AND a.attnum = ANY(c.confkey) WHERE c.conname = :constraint LIMIT 1",
+    "sets": [
+     "parent",
+     "parent_column"
+    ],
+    "needs": [
+     "constraint"
+    ]
+   }
+  },
+  "value_too_long": {
+   "type": "max_length",
+   "sql": "SELECT character_maximum_length FROM information_schema.columns WHERE table_name = :table AND column_name = :column",
+   "needs": [
+    "table",
+    "column"
+   ]
+  },
+  "too_many_connections": {
+   "type": "ratio",
+   "sql": [
+    "SELECT count(*) FROM pg_stat_activity",
+    "SELECT current_setting('max_connections')::int"
+   ],
+   "above": 0.9
+  },
+  "deadlock": {
+   "type": "count_positive",
+   "sql": "SELECT deadlocks FROM pg_stat_database WHERE datname = current_database()"
+  },
+  "lock_wait": {
+   "type": "rows_present",
+   "sql": "SELECT pid, now() - xact_start AS running, query FROM pg_stat_activity WHERE cardinality(pg_blocking_pids(pid)) > 0"
+  },
+  "idle_transaction": {
+   "type": "rows_present",
+   "sql": "SELECT pid, now() - xact_start AS open_for FROM pg_stat_activity WHERE state = 'idle in transaction' AND now() - xact_start > interval '60 seconds'"
+  }
+ },
+ "style": [
+  "\\bDETAIL:\\s",
+  "\\bHINT:\\s",
+  "\\bERROR:\\s{1,2}[a-z]",
+  "\\b5432\\b",
+  "memory context",
+  "\\(code: '[0-9A-Z]{5}'\\)",
+  "SQLSTATE\\[[0-9][0-9A-Z]{4}\\]: [a-z]",
+  "\\bpsql\\b|\\bpgsql\\b|psycopg|PSQLException|postgres",
+  "relation \\\"",
+  "\\bbase/\\d+/\\d+"
+ ]
+}

@@ -1,0 +1,491 @@
+{
+ "about": "How people describe database problems: single words in English, Hinglish, Hindi (transliterated). Read by meaning, any order, typos allowed.",
+ "concepts": {
+  "error": [
+   "error",
+   "errors",
+   "err",
+   "exception",
+   "failed",
+   "fails",
+   "failing",
+   "fail",
+   "failure",
+   "issue",
+   "problem",
+   "aa",
+   "aata",
+   "raha",
+   "dikha",
+   "dikhata",
+   "showing",
+   "shows",
+   "throws",
+   "giving"
+  ],
+  "negation": [
+   "not",
+   "nahi",
+   "nhi",
+   "nai",
+   "cant",
+   "cannot",
+   "can't",
+   "don't",
+   "doesn't",
+   "won't",
+   "unable",
+   "no",
+   "na",
+   "didn't",
+   "isnt",
+   "isn't"
+  ],
+  "save": [
+   "save",
+   "saving",
+   "saved",
+   "insert",
+   "inserting",
+   "add",
+   "adding",
+   "store",
+   "storing",
+   "submit",
+   "submitting",
+   "update",
+   "updating",
+   "register",
+   "registration",
+   "signup",
+   "import",
+   "importing",
+   "upload",
+   "write",
+   "writing",
+   "entry"
+  ],
+  "delete": [
+   "delete",
+   "deleting",
+   "remove",
+   "removing",
+   "drop",
+   "hatao",
+   "hata",
+   "delete karne"
+  ],
+  "run": [
+   "run",
+   "running",
+   "execute",
+   "executing",
+   "query",
+   "queries",
+   "command",
+   "statement",
+   "sql",
+   "chal",
+   "chalta",
+   "chalti",
+   "chalana"
+  ],
+  "dup": [
+   "duplicate",
+   "duplicates",
+   "dupliate",
+   "already",
+   "exists",
+   "existing",
+   "twice",
+   "same",
+   "pehle",
+   "repeat",
+   "unique",
+   "primary"
+  ],
+  "link": [
+   "foreign",
+   "fk",
+   "constraint",
+   "reference",
+   "referenced",
+   "references",
+   "parent",
+   "child",
+   "linked",
+   "relation",
+   "relationship"
+  ],
+  "missing": [
+   "exist",
+   "exists",
+   "missing",
+   "found",
+   "unknown",
+   "gayab",
+   "doesnt",
+   "doesn't",
+   "undefined"
+  ],
+  "table": [
+   "table",
+   "tables",
+   "column",
+   "columns",
+   "field",
+   "fields",
+   "database",
+   "db",
+   "schema"
+  ],
+  "slow": [
+   "slow",
+   "slowly",
+   "dheema",
+   "dheemi",
+   "dheere",
+   "lag",
+   "lagging",
+   "hang",
+   "hanging",
+   "stuck",
+   "atak",
+   "taking",
+   "time",
+   "timeout",
+   "timed",
+   "loading",
+   "forever",
+   "late"
+  ],
+  "down": [
+   "down",
+   "crash",
+   "crashed",
+   "crashing",
+   "stopped",
+   "stop",
+   "band",
+   "dead",
+   "restart",
+   "restarted",
+   "killed",
+   "oom",
+   "memory",
+   "ram"
+  ],
+  "disk": [
+   "disk",
+   "space",
+   "storage",
+   "full",
+   "bhar",
+   "bhari",
+   "jagah"
+  ],
+  "lock": [
+   "lock",
+   "locks",
+   "locked",
+   "locking",
+   "deadlock",
+   "deadlocks",
+   "waiting",
+   "wait",
+   "blocked",
+   "blocking",
+   "block"
+  ],
+  "connect": [
+   "connect",
+   "connection",
+   "connections",
+   "connecting",
+   "connected",
+   "login",
+   "log",
+   "access",
+   "denied",
+   "password",
+   "user",
+   "host",
+   "port",
+   "refused",
+   "reach",
+   "socket",
+   "remote",
+   "ssl",
+   "tls"
+  ],
+  "many": [
+   "many",
+   "too",
+   "max",
+   "maximum",
+   "limit",
+   "exceeded",
+   "zyada",
+   "bahut"
+  ],
+  "gone": [
+   "gone",
+   "lost",
+   "away",
+   "dropped",
+   "closed",
+   "disconnected",
+   "disconnect",
+   "reset",
+   "broken"
+  ],
+  "strange": [
+   "???",
+   "question",
+   "marks",
+   "emoji",
+   "hindi",
+   "garbled",
+   "weird",
+   "ajeeb",
+   "characters",
+   "charset",
+   "encoding",
+   "utf8",
+   "utf8mb4"
+  ],
+  "random": [
+   "sometimes",
+   "random",
+   "randomly",
+   "kabhi",
+   "occasionally",
+   "intermittent",
+   "once"
+  ],
+  "permission": [
+   "permission",
+   "permissions",
+   "privilege",
+   "privileges",
+   "grant",
+   "denied",
+   "allowed",
+   "rights",
+   "haq"
+  ]
+ },
+ "multiword": {
+  "gone away": "gone",
+  "too many": "too many",
+  "primary key": "primary",
+  "foreign key": "foreign",
+  "already exists": "already exists",
+  "time out": "timeout",
+  "out of memory": "oom",
+  "no space": "disk full",
+  "kam ho gaya": "slow"
+ },
+ "complaints": {
+  "query_error": [
+   {
+    "all": [
+     [
+      "error"
+     ],
+     [
+      "run"
+     ]
+    ]
+   },
+   {
+    "all": [
+     [
+      "run"
+     ],
+     [
+      "negation"
+     ]
+    ]
+   }
+  ],
+  "wont_run": [
+   {
+    "all": [
+     [
+      "run"
+     ],
+     [
+      "negation"
+     ]
+    ]
+   }
+  ],
+  "missing_thing": [
+   {
+    "all": [
+     [
+      "missing"
+     ],
+     [
+      "table"
+     ]
+    ]
+   }
+  ],
+  "save_fails": [
+   {
+    "all": [
+     [
+      "save"
+     ],
+     [
+      "error",
+      "negation"
+     ]
+    ]
+   }
+  ],
+  "duplicate": [
+   {
+    "all": [
+     [
+      "dup"
+     ]
+    ]
+   }
+  ],
+  "link_broken": [
+   {
+    "all": [
+     [
+      "link"
+     ]
+    ]
+   }
+  ],
+  "delete_fails": [
+   {
+    "all": [
+     [
+      "delete"
+     ],
+     [
+      "error",
+      "negation",
+      "link"
+     ]
+    ]
+   }
+  ],
+  "strange_text": [
+   {
+    "all": [
+     [
+      "strange"
+     ]
+    ]
+   }
+  ],
+  "server_down": [
+   {
+    "all": [
+     [
+      "down"
+     ]
+    ]
+   },
+   {
+    "all": [
+     [
+      "disk"
+     ]
+    ]
+   }
+  ],
+  "crash": [
+   {
+    "all": [
+     [
+      "down"
+     ]
+    ]
+   }
+  ],
+  "slow": [
+   {
+    "all": [
+     [
+      "slow"
+     ]
+    ]
+   }
+  ],
+  "connection_lost": [
+   {
+    "all": [
+     [
+      "gone"
+     ],
+     [
+      "connect",
+      "error",
+      "run"
+     ]
+    ]
+   }
+  ],
+  "lock_problem": [
+   {
+    "all": [
+     [
+      "lock"
+     ]
+    ]
+   }
+  ],
+  "random_fail": [
+   {
+    "all": [
+     [
+      "random"
+     ],
+     [
+      "error",
+      "negation",
+      "save"
+     ]
+    ]
+   }
+  ],
+  "cant_connect": [
+   {
+    "all": [
+     [
+      "connect"
+     ],
+     [
+      "negation",
+      "error",
+      "gone",
+      "many"
+     ]
+    ]
+   }
+  ],
+  "login_fails": [
+   {
+    "all": [
+     [
+      "connect"
+     ],
+     [
+      "permission",
+      "negation",
+      "error"
+     ]
+    ]
+   }
+  ]
+ }
+}

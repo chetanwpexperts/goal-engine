@@ -1,0 +1,54 @@
+{
+ "extends": "mysql",
+ "name": "MariaDB",
+ "words": [
+  "mariadb",
+  "mariadbd",
+  "galera",
+  "aria"
+ ],
+ "codes": {
+  "1969": "statement_timeout",
+  "4025": "check_violation"
+ },
+ "messages": [
+  {
+   "cause": "statement_timeout",
+   "re": "max_statement_time exceeded"
+  },
+  {
+   "cause": "check_violation",
+   "re": "CONSTRAINT `(?P<constraint>[^`]+)` failed for"
+  }
+ ],
+ "fix": {
+  "statement_timeout": [
+   "EXPLAIN <your query>;  -- look for type = ALL and a big rows number",
+   "-- MariaDB's limit is max_statement_time (seconds); add the missing index rather than raising it."
+  ],
+  "check_violation": [
+   "SELECT CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_NAME = '{constraint}';"
+  ],
+  "lock_wait": [
+   "-- Who is blocking whom (MariaDB):\nSELECT * FROM information_schema.innodb_lock_waits;\nSELECT trx_id, trx_started, trx_query, trx_mysql_thread_id FROM information_schema.innodb_trx ORDER BY trx_started;",
+   "-- If a forgotten transaction blocks: KILL <trx_mysql_thread_id>;  (after checking what it is)"
+  ],
+  "too_many_connections": [
+   "SHOW VARIABLES LIKE 'max_connections';\nSHOW GLOBAL STATUS LIKE 'Threads_connected';\nSHOW GLOBAL STATUS LIKE 'Max_used_connections';",
+   "-- Short term: SET GLOBAL max_connections = 300;  (and in my.cnf)\n-- Real fix: a connection pool and closing connections; lower wait_timeout:\nSET GLOBAL wait_timeout = 120;"
+  ]
+ },
+ "settings": {
+  "timeout": "max_statement_time"
+ },
+ "live": {
+  "too_many_connections": {
+   "type": "ratio",
+   "sql": [
+    "SELECT variable_value FROM information_schema.global_status WHERE variable_name = 'MAX_USED_CONNECTIONS'",
+    "SELECT @@max_connections"
+   ],
+   "above": 0.9
+  }
+ }
+}

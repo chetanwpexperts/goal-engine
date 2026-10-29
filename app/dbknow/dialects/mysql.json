@@ -1,0 +1,442 @@
+{
+ "name": "MySQL",
+ "family": "relational",
+ "words": [
+  "mysql",
+  "mysqli",
+  "innodb",
+  "phpmyadmin",
+  "mysqld",
+  "my.cnf",
+  "aurora mysql"
+ ],
+ "codes": {
+  "1064": "syntax_error",
+  "1146": "unknown_table",
+  "1054": "unknown_column",
+  "1052": "ambiguous_column",
+  "1305": "unknown_function",
+  "1055": "group_by_strict",
+  "1062": "duplicate_key",
+  "1452": "fk_missing_parent",
+  "1216": "fk_missing_parent",
+  "1451": "fk_has_children",
+  "1217": "fk_has_children",
+  "1048": "not_null",
+  "1364": "not_null",
+  "1406": "value_too_long",
+  "1264": "out_of_range",
+  "1366": "bad_value_type",
+  "1292": "bad_value_type",
+  "3819": "check_violation",
+  "1021": "disk_full",
+  "1114": "temp_space_full",
+  "1041": "out_of_memory",
+  "1037": "out_of_memory",
+  "1153": "packet_too_large",
+  "3024": "statement_timeout",
+  "1213": "deadlock",
+  "1205": "lock_wait",
+  "1045": "access_denied",
+  "1130": "host_not_allowed",
+  "1040": "too_many_connections",
+  "2002": "server_unreachable",
+  "2003": "server_unreachable",
+  "2006": "connection_lost",
+  "2013": "connection_lost",
+  "1049": "unknown_database",
+  "1142": "permission_denied",
+  "1044": "permission_denied",
+  "1227": "permission_denied",
+  "3159": "ssl_required",
+  "1047": "syntax_error"
+ },
+ "code_patterns": [
+  "\\bERROR\\s+(\\d{4})\\b",
+  "\\[(\\d{4})\\]",
+  "#(\\d{4})\\b",
+  "\\berrno:?\\s*(\\d{4})\\b",
+  "(?<![\\d.])(1\\d{3}|2\\d{3}|3\\d{3})\\s+(?=[A-Z][a-z])",
+  "\\((\\d{4})\\)",
+  "Error\\s*(?:Code|code)?:?\\s*(\\d{4})\\b",
+  "\\((\\d{4}),"
+ ],
+ "messages": [
+  {
+   "cause": "duplicate_key",
+   "re": "Duplicate entry '(?P<value>[^']*)' for key '(?:(?P<table>[\\w$]+)\\.)?(?P<key>[^']+)'"
+  },
+  {
+   "cause": "fk_missing_parent",
+   "re": "Cannot add or update a child row: a foreign key constraint fails \\(`[^`]+`\\.`(?P<table>[^`]+)`, CONSTRAINT `(?P<constraint>[^`]+)` FOREIGN KEY \\(`(?P<column>[^`]+)`\\) REFERENCES `(?P<parent>[^`]+)` \\(`(?P<parent_column>[^`]+)`\\)"
+  },
+  {
+   "cause": "fk_missing_parent",
+   "re": "Cannot add or update a child row"
+  },
+  {
+   "cause": "fk_has_children",
+   "re": "Cannot delete or update a parent row: a foreign key constraint fails \\(`[^`]+`\\.`(?P<child>[^`]+)`, CONSTRAINT `(?P<constraint>[^`]+)` FOREIGN KEY \\(`(?P<column>[^`]+)`\\) REFERENCES `(?P<table>[^`]+)` \\(`(?P<parent_column>[^`]+)`\\)"
+  },
+  {
+   "cause": "fk_has_children",
+   "re": "Cannot delete or update a parent row"
+  },
+  {
+   "cause": "not_null",
+   "re": "Column '(?P<column>[^']+)' cannot be null"
+  },
+  {
+   "cause": "not_null",
+   "re": "Field '(?P<column>[^']+)' doesn't have a default value"
+  },
+  {
+   "cause": "value_too_long",
+   "re": "Data too long for column '(?P<column>[^']+)'"
+  },
+  {
+   "cause": "out_of_range",
+   "re": "Out of range value for column '(?P<column>[^']+)'"
+  },
+  {
+   "cause": "charset_mismatch",
+   "re": "Incorrect string value: '(?P<value>\\\\x[0-9A-Fa-f]{2}[^']*)' for column '(?P<column>[^']+)'"
+  },
+  {
+   "cause": "bad_value_type",
+   "re": "Incorrect (?:integer|decimal|double|date|datetime|time|timestamp) value: '(?P<value>[^']*)' for column '(?P<column>[^']+)'"
+  },
+  {
+   "cause": "check_violation",
+   "re": "Check constraint '(?P<constraint>[^']+)' is violated"
+  },
+  {
+   "cause": "reserved_word",
+   "re": "right syntax to use near '(?P<token>(?:order|group|key|desc|asc|index|user|range|rank|read|condition|interval|change|status|option|separator|usage|lines|leave|loop|match)\\b[^']*)'"
+  },
+  {
+   "cause": "syntax_error",
+   "re": "right syntax to use near '(?P<token>[^']{0,60})"
+  },
+  {
+   "cause": "unknown_table",
+   "re": "Table '(?:(?P<db>[\\w$]+)\\.)?(?P<table>[^']+)' doesn't exist"
+  },
+  {
+   "cause": "unknown_column",
+   "re": "Unknown column '(?:(?P<prefix>[\\w$]+)\\.)?(?P<column>[^']+)' in '(?P<where>[^']+)'"
+  },
+  {
+   "cause": "ambiguous_column",
+   "re": "Column '(?P<column>[^']+)' in [^']{0,30}?is ambiguous"
+  },
+  {
+   "cause": "unknown_function",
+   "re": "FUNCTION (?:[\\w$]+\\.)?(?P<token>\\w+) does not exist"
+  },
+  {
+   "cause": "group_by_strict",
+   "re": "not in GROUP BY clause|only_full_group_by"
+  },
+  {
+   "cause": "disk_full",
+   "re": "Disk full|No space left on device|errno:? ?28\\b"
+  },
+  {
+   "cause": "temp_space_full",
+   "re": "The table '(?P<table>[^']+)' is full"
+  },
+  {
+   "cause": "out_of_memory",
+   "re": "Out of memory|OOM[- ]kill|Killed process \\d+ \\(mysqld|oom-kill"
+  },
+  {
+   "cause": "packet_too_large",
+   "re": "max_allowed_packet|packet bigger than"
+  },
+  {
+   "cause": "statement_timeout",
+   "re": "maximum statement execution time exceeded"
+  },
+  {
+   "cause": "deadlock",
+   "re": "Deadlock found when trying to get lock|LATEST DETECTED DEADLOCK"
+  },
+  {
+   "cause": "lock_wait",
+   "re": "Lock wait timeout exceeded"
+  },
+  {
+   "cause": "metadata_lock",
+   "re": "Waiting for table metadata lock"
+  },
+  {
+   "cause": "access_denied",
+   "re": "Access denied for user '(?P<user>[^']*)'@'(?P<host>[^']*)' \\(using password"
+  },
+  {
+   "cause": "permission_denied",
+   "re": "Access denied for user '(?P<user>[^']*)'@'(?P<host>[^']*)' to database '(?P<db>[^']+)'"
+  },
+  {
+   "cause": "permission_denied",
+   "re": "(?P<token>\\w+) command denied to user '(?P<user>[^']*)'@'(?P<host>[^']*)' for table '(?P<table>[^']+)'"
+  },
+  {
+   "cause": "host_not_allowed",
+   "re": "Host '(?P<host>[^']+)' is not allowed to connect"
+  },
+  {
+   "cause": "too_many_connections",
+   "re": "Too many connections|max_user_connections"
+  },
+  {
+   "cause": "server_unreachable",
+   "re": "Can't connect to (?:local )?MySQL server(?: on '(?P<host>[^':]+)(?::(?P<port>\\d+))?')?|Connection refused"
+  },
+  {
+   "cause": "connection_lost",
+   "re": "MySQL server has gone away|Lost connection to MySQL server|Server has gone away"
+  },
+  {
+   "cause": "unknown_database",
+   "re": "Unknown database '(?P<db>[^']+)'"
+  },
+  {
+   "cause": "ssl_required",
+   "re": "insecure transport are prohibited|require_secure_transport|SSL connection error"
+  }
+ ],
+ "fix": {
+  "syntax_error": [
+   "-- Look just before \"{token}\": a missing comma, an unclosed ' or ( , or a keyword from another database.\n-- MySQL uses `backticks` for names and 'single quotes' for text; LIMIT offset, count is fine here."
+  ],
+  "reserved_word": [
+   "-- Quote the name with backticks wherever it is used:\nSELECT `{word}` FROM ...;\n-- or better, rename it once:\nALTER TABLE {table} RENAME COLUMN `{word}` TO {word}_value;"
+  ],
+  "unknown_table": [
+   "SHOW TABLES LIKE '%{table_hint}%';",
+   "-- If it should exist: run the missing migration, or check you're connected to the right database:\nSELECT DATABASE();"
+  ],
+  "unknown_column": [
+   "SHOW COLUMNS FROM {table};",
+   "-- then use the real column name in the query"
+  ],
+  "ambiguous_column": [
+   "-- Put the table (or its alias) in front of the column everywhere it appears:\nSELECT t1.{column}, ... FROM t1 JOIN t2 ON ... WHERE t1.{column} = ...;"
+  ],
+  "unknown_function": [
+   "-- MySQL equivalents: STRING_AGG -> GROUP_CONCAT, COALESCE works, NOW() works, ILIKE -> LIKE (case-insensitive by default collation)"
+  ],
+  "group_by_strict": [
+   "-- Group by every selected plain column, or summarise it:\nSELECT customer_id, MAX(customer_name) AS customer_name, SUM(total)\nFROM orders GROUP BY customer_id;"
+  ],
+  "duplicate_key": [
+   "-- See the row that already has this value:\nSELECT * FROM {table} WHERE <unique column> = '{value}';",
+   "-- Save without failing when it already exists (upsert):\nINSERT INTO {table} (...) VALUES (...)\nON DUPLICATE KEY UPDATE <column> = VALUES(<column>);",
+   "-- Only if it's the primary key after an import: move the counter past the data\nSELECT MAX(id) + 1 FROM {table};\nALTER TABLE {table} AUTO_INCREMENT = <that number>;"
+  ],
+  "fk_missing_parent": [
+   "-- Check the parent exists:\nSELECT * FROM {parent} WHERE {parent_column} = <the value you saved in {column}>;",
+   "-- Create the parent first, or save the child with an existing {parent}.{parent_column}."
+  ],
+  "fk_has_children": [
+   "-- See how many rows still point to it:\nSELECT COUNT(*) FROM {child} WHERE {column} = <the id you're deleting>;",
+   "-- Then choose: delete/move those rows first, or let the relation decide:\nALTER TABLE {child} DROP FOREIGN KEY {constraint};\nALTER TABLE {child} ADD CONSTRAINT {constraint} FOREIGN KEY ({column}) REFERENCES {table}({parent_column}) ON DELETE CASCADE;  -- or ON DELETE SET NULL"
+  ],
+  "not_null": [
+   "-- Send a value for {column}, or give the column a default:\nALTER TABLE {table} MODIFY {column} <its type> NOT NULL DEFAULT <value>;"
+  ],
+  "value_too_long": [
+   "SELECT MAX(CHAR_LENGTH({column})) FROM {table};\nSHOW COLUMNS FROM {table} LIKE '{column}';",
+   "ALTER TABLE {table} MODIFY {column} VARCHAR(255);  -- or TEXT for long text"
+  ],
+  "out_of_range": [
+   "ALTER TABLE {table} MODIFY {column} BIGINT;  -- or DECIMAL(15,2) for money"
+  ],
+  "bad_value_type": [
+   "-- Send a real {column} value: numbers without commas, dates as 'YYYY-MM-DD', NULL (not '') when empty.\n-- To read a date like '{value}': STR_TO_DATE('{value}', '%d-%m-%Y')"
+  ],
+  "check_violation": [
+   "SELECT CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_NAME = '{constraint}';",
+   "-- then save a value that meets that rule"
+  ],
+  "charset_mismatch": [
+   "ALTER DATABASE <db> CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\nALTER TABLE {table} CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;",
+   "-- and in the app's connection: charset=utf8mb4"
+  ],
+  "disk_full": [
+   "-- See what takes the space:\nSELECT table_schema, ROUND(SUM(data_length+index_length)/1024/1024) AS mb FROM information_schema.tables GROUP BY table_schema ORDER BY mb DESC;\nSHOW BINARY LOGS;",
+   "-- Remove old binary logs safely (keep what replicas still need):\nPURGE BINARY LOGS BEFORE NOW() - INTERVAL 3 DAY;\nSET GLOBAL binlog_expire_logs_seconds = 259200;"
+  ],
+  "out_of_memory": [
+   "SHOW VARIABLES LIKE 'innodb_buffer_pool_size';\nSHOW VARIABLES LIKE 'max_connections';",
+   "-- In my.cnf, size it to the server (database-only: ~60% of RAM; shared server: much less), then restart:\ninnodb_buffer_pool_size = <e.g. 1G on a 4 GB shared server>\nmax_connections = <what the app really needs>"
+  ],
+  "packet_too_large": [
+   "SHOW VARIABLES LIKE 'max_allowed_packet';\nSET GLOBAL max_allowed_packet = 64*1024*1024;  -- also set it in my.cnf to keep it after restart",
+   "-- Better: insert in batches and keep files outside the database."
+  ],
+  "temp_space_full": [
+   "-- Add an index for the GROUP BY / ORDER BY columns of that query, then:\nSHOW VARIABLES LIKE 'tmp_table_size'; SHOW VARIABLES LIKE 'max_heap_table_size';"
+  ],
+  "statement_timeout": [
+   "EXPLAIN <your query>;  -- look for type = ALL and a big rows number",
+   "-- Add the index EXPLAIN is missing; paste the query here and I'll write it."
+  ],
+  "full_scan": [
+   "-- Paste the query and I'll give the exact index, e.g.:\nALTER TABLE {table} ADD INDEX idx_{table}_{column} ({column});"
+  ],
+  "deadlock": [
+   "SHOW ENGINE INNODB STATUS;  -- the LATEST DETECTED DEADLOCK section shows both transactions and the rows",
+   "-- In code: update rows in the same order (e.g. ORDER BY id) and retry the transaction when error 1213 comes back."
+  ],
+  "lock_wait": [
+   "-- Who is blocking whom:\nSELECT r.trx_id waiting, r.trx_query waiting_query, b.trx_id blocking, b.trx_query blocking_query, b.trx_started\nFROM information_schema.innodb_trx b JOIN performance_schema.data_lock_waits w ON w.BLOCKING_ENGINE_TRANSACTION_ID = b.trx_id\nJOIN information_schema.innodb_trx r ON r.trx_id = w.REQUESTING_ENGINE_TRANSACTION_ID;",
+   "-- If a forgotten transaction blocks: KILL <its thread id>;  (after checking what it is)"
+  ],
+  "serialization_failure": [
+   "-- Retry the whole transaction 2-3 times with a short wait when it fails."
+  ],
+  "idle_transaction": [
+   "SELECT trx_id, trx_started, trx_mysql_thread_id FROM information_schema.innodb_trx ORDER BY trx_started LIMIT 5;",
+   "-- then KILL <trx_mysql_thread_id>; and fix the code path that leaves it open"
+  ],
+  "metadata_lock": [
+   "SELECT * FROM performance_schema.metadata_locks WHERE OBJECT_NAME = '{table}';\nSHOW PROCESSLIST;",
+   "-- End the long transaction holding the table, then run the ALTER off-peak with:\nSET SESSION lock_wait_timeout = 5;"
+  ],
+  "access_denied": [
+   "-- As an admin, check how the user exists:\nSELECT user, host FROM mysql.user WHERE user = '{user}';",
+   "-- Reset the password for the host the app connects from:\nALTER USER '{user}'@'{host_pattern}' IDENTIFIED BY '<new password>';"
+  ],
+  "host_not_allowed": [
+   "CREATE USER '{user}'@'{host}' IDENTIFIED BY '<password>';\nGRANT SELECT, INSERT, UPDATE, DELETE ON <db>.* TO '{user}'@'{host}';",
+   "-- On cPanel hosting: Remote MySQL -> add {host}"
+  ],
+  "too_many_connections": [
+   "SHOW VARIABLES LIKE 'max_connections';\nSHOW GLOBAL STATUS LIKE 'Threads_connected';\nSHOW GLOBAL STATUS LIKE 'Max_used_connections';",
+   "-- Short term: SET GLOBAL max_connections = 300;  (and in my.cnf)\n-- Real fix: a connection pool and closing connections; lower wait_timeout:\nSET GLOBAL wait_timeout = 120;"
+  ],
+  "server_unreachable": [
+   "-- On the database server:\nsystemctl status mysql   # is it running?\nss -ltnp | grep 3306     # is it listening, on which address?",
+   "-- For remote access, bind-address in my.cnf must not be 127.0.0.1, and the firewall must allow 3306 from the app server."
+  ],
+  "connection_lost": [
+   "SHOW VARIABLES LIKE 'wait_timeout';\nSHOW VARIABLES LIKE 'max_allowed_packet';\nSHOW GLOBAL STATUS LIKE 'Uptime';  -- a small number = the server restarted recently",
+   "-- In the app: reconnect/ping before reusing an idle connection."
+  ],
+  "unknown_database": [
+   "SHOW DATABASES;"
+  ],
+  "permission_denied": [
+   "SHOW GRANTS FOR '{user}'@'{host}';",
+   "GRANT {token} ON <db>.{table} TO '{user}'@'{host}';  -- only the right that's missing"
+  ],
+  "ssl_required": [
+   "-- Connect with SSL, e.g. mysql --ssl-mode=REQUIRED ..., or in PHP PDO: PDO::MYSQL_ATTR_SSL_CA => '/path/ca.pem'"
+  ]
+ },
+ "settings": {
+  "timeout": "max_execution_time",
+  "lock_timeout": "innodb_lock_wait_timeout",
+  "buffer": "innodb_buffer_pool_size",
+  "connections": "max_connections"
+ },
+ "live": {
+  "unknown_table": {
+   "type": "closest_name",
+   "sql": "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()",
+   "want": "table"
+  },
+  "unknown_column": {
+   "type": "closest_name",
+   "sql": "SELECT column_name FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = :table",
+   "want": "column",
+   "needs": [
+    "table"
+   ]
+  },
+  "duplicate_key": {
+   "type": "row_exists",
+   "sql": "SELECT * FROM `{table}` WHERE `{column}` = :value LIMIT 1",
+   "needs": [
+    "table",
+    "column",
+    "value"
+   ],
+   "resolve": {
+    "sql": "SELECT table_name, column_name FROM information_schema.statistics WHERE table_schema = DATABASE() AND index_name = :key ORDER BY seq_in_index LIMIT 1",
+    "sets": [
+     "table",
+     "column"
+    ],
+    "needs": [
+     "key"
+    ]
+   }
+  },
+  "fk_missing_parent": {
+   "type": "row_missing",
+   "sql": "SELECT 1 FROM `{parent}` WHERE `{parent_column}` = :value LIMIT 1",
+   "needs": [
+    "parent",
+    "parent_column",
+    "value"
+   ],
+   "resolve": {
+    "sql": "SELECT referenced_table_name, referenced_column_name FROM information_schema.key_column_usage WHERE table_schema = DATABASE() AND constraint_name = :constraint LIMIT 1",
+    "sets": [
+     "parent",
+     "parent_column"
+    ],
+    "needs": [
+     "constraint"
+    ]
+   }
+  },
+  "value_too_long": {
+   "type": "max_length",
+   "sql": "SELECT character_maximum_length FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = :table AND column_name = :column",
+   "needs": [
+    "table",
+    "column"
+   ]
+  },
+  "too_many_connections": {
+   "type": "ratio",
+   "sql": [
+    "SELECT variable_value FROM performance_schema.global_status WHERE variable_name = 'Max_used_connections'",
+    "SELECT @@max_connections"
+   ],
+   "above": 0.9
+  },
+  "deadlock": {
+   "type": "text_contains",
+   "sql": "SHOW ENGINE INNODB STATUS",
+   "contains": "LATEST DETECTED DEADLOCK"
+  },
+  "lock_wait": {
+   "type": "rows_present",
+   "sql": "SELECT trx_id, trx_started, trx_query FROM information_schema.innodb_trx WHERE trx_started < NOW() - INTERVAL 30 SECOND"
+  },
+  "idle_transaction": {
+   "type": "rows_present",
+   "sql": "SELECT trx_id, trx_started, trx_mysql_thread_id FROM information_schema.innodb_trx WHERE trx_query IS NULL AND trx_started < NOW() - INTERVAL 60 SECOND"
+  }
+ },
+ "style": [
+  "\\bERROR \\d{4} \\(",
+  "(?<![\\d.])\\d{4} [A-Z][a-z]",
+  "\\b3306\\b",
+  "\\bmysqld?\\b",
+  "\\(errno:",
+  "SQLSTATE\\[[0-9A-Z]{5}\\]:? [A-Z][a-z]+ ?[a-z]* ?[a-z]*:? ?\\d{4}",
+  "#\\d{4} - ",
+  "Error Code: \\d{4}",
+  "\\[\\d{4}\\] [A-Z]",
+  "mysqli_",
+  "\\bMySQL\\b",
+  "doesn't exist|in field list|for key '"
+ ]
+}

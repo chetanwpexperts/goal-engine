@@ -24,9 +24,10 @@ QUOTED = re.compile(r"['\"“”‘’]([^'\"“”‘’]{1,80})['\"“”‘�
 SYMBOLS = {">": "above", "<": "below", "=": "equal", ">=": "above", "<=": "below"}
 
 
-@lru_cache(maxsize=1)
-def lexicon() -> dict:
-    lex = json.loads(LEX.read_text(encoding="utf-8"))
+@lru_cache(maxsize=8)
+def lexicon(path: str = str(LEX)) -> dict:
+    """A vocabulary file: the Excel one by default; other agents pass their own (e.g. the database one)."""
+    lex = json.loads(Path(path).read_text(encoding="utf-8"))
     words: dict[str, set[str]] = {}
     for concept, ws in lex["concepts"].items():
         for w in ws:
@@ -36,28 +37,29 @@ def lexicon() -> dict:
     return lex
 
 
-@lru_cache(maxsize=20000)
-def _fuzzy(tok: str) -> tuple[str, ...]:
+@lru_cache(maxsize=40000)
+def _fuzzy(tok: str, path: str = str(LEX)) -> tuple[str, ...]:
     """A misspelt word -> the known word it most likely is ('higlight' -> highlight). Long words only."""
     if tok.isdigit() or len(tok) < 4:
         return ()
     if len(tok) == 4:
         # 'free' (freeze with a letter lost): a 4-letter start of exactly one meaning
-        words = lexicon()["_words"]
-        starts = [w for w in lexicon()["_long"] if w.startswith(tok)]
+        words = lexicon(path)["_words"]
+        starts = [w for w in lexicon(path)["_long"] if w.startswith(tok)]
         meanings = {frozenset(words[w]) for w in starts}
         return (starts[0],) if starts and len(meanings) == 1 else ()
-    best = [w for w in difflib.get_close_matches(tok, lexicon()["_long"], n=3, cutoff=0.8) if abs(len(w) - len(tok)) <= 2]
+    best = [w for w in difflib.get_close_matches(tok, lexicon(path)["_long"], n=3, cutoff=0.8) if abs(len(w) - len(tok)) <= 2]
     return tuple(best[:1])
 
 
 class Reading:
     """What one message means: meanings with where they were said, plus what came from the file."""
 
-    def __init__(self, text: str, known: set[str] | frozenset = frozenset()):
+    def __init__(self, text: str, known: set[str] | frozenset = frozenset(), lex_path: str = str(LEX)):
         """known: the words of the person's own file (column names, sheet names): never 'corrected' into an order word."""
         self.text = text or ""
-        lex = lexicon()
+        self.lex_path = lex_path
+        lex = lexicon(lex_path)
         raw = tokens(self.text)
         joined = []
         i = 0
@@ -74,7 +76,7 @@ class Reading:
         for pos, tok in enumerate(joined):
             cs = lex["_words"].get(tok)
             if cs is None and tok not in known:
-                cs = set().union(*(lex["_words"][w] for w in _fuzzy(tok))) if _fuzzy(tok) else set()
+                cs = set().union(*(lex["_words"][w] for w in _fuzzy(tok, lex_path))) if _fuzzy(tok, lex_path) else set()
             for c in cs or ():
                 self.at.setdefault(c, []).append(pos)
         for sym, c in SYMBOLS.items():

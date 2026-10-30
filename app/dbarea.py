@@ -42,12 +42,18 @@ def enabled() -> bool:
     return os.getenv("DB_AREA_LOCK", "on").strip().lower() != "off"
 
 
+def connect_open() -> bool:
+    """DB_CONNECT=off: connecting databases is closed for everyone (launch fallback); paste answers keep working."""
+    return os.getenv("DB_CONNECT", "on").strip().lower() != "off"
+
+
 NOT_FOUND = JSONResponse({"detail": "Not Found"}, status_code=404)
 
 
 def _locked_reply(state: str) -> JSONResponse:
     msg = {"verify": "Confirm your email first, then you can connect a database.",
-           "locked": "Your database area is locked. We'll email you a code to open it."}[state]
+           "locked": "Your database area is locked. We'll email you a code to open it.",
+           "soon": "Connecting your database opens in a few days. Until then, paste the error and get the cause and the fix."}[state]
     return JSONResponse({"error": msg, "db_area": state}, status_code=403,
                         headers={"X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store"})
 
@@ -56,6 +62,8 @@ def state(db: Session, user: User | None, sess: UserSession | None) -> str:
     """none (logged out) / verify / locked / open"""
     if user is None or sess is None:
         return "none"
+    if not connect_open():
+        return "soon"
     if not user.email_verified:
         return "verify"
     if sess.stepup_at is None or sess.db_seen_at is None or utcnow() - sess.db_seen_at > IDLE_LOCK:
@@ -65,8 +73,10 @@ def state(db: Session, user: User | None, sess: UserSession | None) -> str:
 
 def guard(request: Request):
     """Middleware helper: None to let the request through, or the reply to send instead."""
-    if not enabled() or not LOCKED.match(request.url.path):
+    if not LOCKED.match(request.url.path):
         return None
+    if not enabled():
+        return None if connect_open() else _locked_reply("soon")
     user, sess = accounts.current_user(request), getattr(request.state, "user_session", None)
     from app.db import get_engine
 
@@ -208,6 +218,8 @@ def area_code(request: Request, db: Session = Depends(get_db)):
     user, sess = _who(request, db)
     if user is None:
         return NOT_FOUND
+    if not connect_open():
+        return _locked_reply("soon")
     if not user.email_verified:
         return _locked_reply("verify")
     try:
@@ -222,6 +234,8 @@ def area_open(body: CodeIn, request: Request, db: Session = Depends(get_db)):
     user, sess = _who(request, db)
     if user is None:
         return NOT_FOUND
+    if not connect_open():
+        return _locked_reply("soon")
     if not user.email_verified:
         return _locked_reply("verify")
     try:

@@ -58,3 +58,12 @@ def test_unknown_errors_dont_echo_the_other_server():
     import inspect
 
     assert "Couldn't connect: {msg" not in inspect.getsource(direct)
+
+
+@pytest.mark.parametrize("host", ["0.0.0.0", "127.1", "2130706433", "0x7f000001", "0177.0.0.1", "::1", "[::1]",
+                                  "::ffff:127.0.0.1", "169.254.169.254", "100.64.0.1", "192.0.0.8", "198.18.0.1",
+                                  "metadata.google.internal"])
+def test_localhost_tricks_are_refused(host):
+    """Other ways of writing 'this machine' or an internal address (the attack list in the security plan)."""
+    with pytest.raises(direct.DirectError):
+        direct.public_ip(host, 3306)

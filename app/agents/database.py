@@ -409,7 +409,7 @@ def live_checks(db: Session, user, agent: Agent | None, visitor_id: str, result:
     from app.dbknow import reasoning
     from app.models import UserSession
 
-    if not user.email_verified:
+    if not user.email_verified or not dbarea.connect_open():
         return None
     if dbarea.enabled() and not db.scalar(select(UserSession.id).where(
             UserSession.user_id == user.id, UserSession.stepup_at.is_not(None),

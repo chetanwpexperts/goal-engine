@@ -738,6 +738,8 @@
   async function dbGate(a, hi, box) {
     const me = window.GE_me;
     const btn = (label, cls, fn) => { const b = el("button", cls, label); b.type = "button"; b.addEventListener("click", fn); return b; };
+    if (window.GE_dbSoon) { box.replaceChildren(el("p", "ask", T(hi, "Database jodna kuch dinon mein shuru hoga", "Connecting your database opens in a few days")),
+      el("p", "fine", T(hi, "Tab tak error paste karo: wajah aur fix turant milega.", "Until then, paste the error and get the cause and the fix right away."))); return; }
     if (!me) {
       const row = el("div", "acts flat");
       row.append(btn(T(hi, "Free account banao", "Create free account"), "btn solid", () => window.GE_openAccount("signup")),
@@ -755,6 +757,7 @@
     }
     let st;
     try { st = await api("/api/db-area"); } catch (ex) { box.replaceChildren(el("p", "note err", ex.message)); return; }
+    if (st.state === "soon") { window.GE_dbSoon = true; return dbGate(a, hi, box); }
     if (st.state !== "open") { box.replaceChildren(...dbUnlock(hi, () => dbGate(a, hi, box))); return; }
     box.replaceChildren();
     setupBoxOpen(a, hi, box);
@@ -2377,8 +2380,9 @@
     accountBtn.title = user ? user.username : "Account";
     document.dispatchEvent(new CustomEvent("ge:account", { detail: user }));
   }
-  window.GE_meReady = api("/api/account/me").then((d) => showMe(d.user)).catch(() => {});
+  window.GE_meReady = api("/api/account/me").then((d) => { window.GE_dbSoon = d.db_connect === false; showMe(d.user); }).catch(() => {});
   document.addEventListener("ge:dbarea", (e) => {
+    if (e.detail === "soon") { window.GE_dbSoon = true; return; }
     if (e.detail === "verify") { openAccount("verify"); return; }
     if (!drawer.hidden) return;
     openDrawer([el("h2", "acc-h", "Database area"), ...window.GE_dbUnlock(false, () => { drawer.hidden = true; refreshGoal(); })]);

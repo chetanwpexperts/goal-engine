@@ -302,7 +302,11 @@ def report(result: dict, hi: bool, signed_in: bool = False) -> str:
     else:
         lines.append("Ye aapke paste kiye text pe based hai, aapke database pe check nahi kiya." if hi
                      else "Based on what you pasted, not checked on your database.")
-        if not signed_in:
+        import os
+        if os.getenv("DB_CONNECT", "on").strip().lower() == "off":
+            lines.append("Database jodkar check karna kuch dinon mein shuru hoga." if hi
+                         else "Checking it on your own database opens in a few days.")
+        elif not signed_in:
             lines.append("Free account banao aur database jodo: main khud check karke saboot ke saath pakka jawab dunga." if hi
                          else "Create a free account to connect your database and get a proven answer.")
         else:

@@ -435,8 +435,10 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
 
 @router.get("/api/account/me")
 def me(request: Request):
+    from app import dbarea
+
     user = current_user(request)
-    return {"user": as_dict(user) if user else None}
+    return {"user": as_dict(user) if user else None, "db_connect": dbarea.connect_open()}
 
 
 @router.post("/api/account/forgot")
@@ -467,6 +469,9 @@ def reset(body: ResetIn, request: Request, response: Response, db: Session = Dep
         user.email_verified = True        # the code proved they own the email
         db.execute(delete(UserSession).where(UserSession.user_id == user.id))   # every other device is logged out
         db.commit()
+        from app import dbarea
+
+        dbarea._wipe_passwords(db, user)        # and typed database passwords go now, not at the next clean-up
         _start_session(db, user, request, response)
         return {"ok": True, "user": as_dict(user)}
     except AccountError as exc:

@@ -2626,6 +2626,13 @@
   }
   window.GE_openAccount = openAccount;
   accountBtn.addEventListener("click", () => openAccount());
+  // long messages are folded to a few lines in the chat; a tap opens or closes them
+  const markFolded = () => { for (const u of document.querySelectorAll(".turn-user:not(.open)")) u.classList.toggle("folded", u.scrollHeight > u.clientHeight + 2); };
+  new MutationObserver(markFolded).observe(thread, { childList: true });
+  document.addEventListener("click", (e) => {
+    const u = e.target.closest(".turn-user");
+    if (u && (u.classList.contains("folded") || u.classList.contains("open"))) { u.classList.toggle("open"); markFolded(); }
+  });
   document.addEventListener("click", (e) => {
     const t = e.target.closest("[data-account]");
     if (t) { e.preventDefault(); openAccount(t.dataset.account || undefined); }

@@ -96,8 +96,14 @@ body[data-state="idle"] .options { bottom: auto; top: calc(var(--below, 60%) + 1
 .stage { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: clamp(20px, 4vw, 56px);
   padding: 76px var(--gutter) 150px; max-width: 1380px; margin: 0 auto; min-height: 100dvh; }
 .thread { display: flex; flex-direction: column; gap: 22px; padding-top: 8px; }
-.turn-user { font-size: clamp(20px, 2.2vw, 26px); font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; margin: 0;
-  overflow-wrap: anywhere; }
+.turn-user { align-self: flex-end; max-width: min(85%, 560px); margin: 0; padding: 10px 14px; border-radius: 16px 16px 6px 16px;
+  background: #E9ECFB; border: 1px solid #DCE0F5; font-size: 15.5px; font-weight: 500; line-height: 1.5; letter-spacing: 0;
+  overflow-wrap: anywhere; white-space: pre-wrap; max-height: calc(1.5em * 5 + 20px); overflow: hidden; cursor: default; }
+.turn-user.open { max-height: none; }
+.turn-user.folded { cursor: pointer; position: relative; }
+.turn-user.folded::after { content: "Tap to read all"; position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 14px 7px; text-align: right;
+  font-size: 12.5px; font-weight: 600; color: #4B55C8; background: linear-gradient(rgba(233, 236, 251, 0), #E9ECFB 55%);
+  border-radius: 0 0 6px 16px; }
 .turn-machine { border-left: 2px solid var(--line); padding-left: 16px; margin-left: 2px; }
 .turn-machine.error { border-color: var(--alert); }
 .trace { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 2px; font-size: 13px; color: var(--muted); }
@@ -672,7 +678,7 @@ body[data-state="active"]::after { background: linear-gradient(rgba(244, 245, 25
 .say p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .say-list { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
 .say .code { margin: 2px 0; }
-.turn-user { color: #141A38; }
+.turn-user { color: #1B2340; }
 .turn-machine { border: 1px solid #E4E7F5; border-left: 3px solid #7B6CF0; background: rgba(255, 255, 255, .82); border-radius: 16px;
   padding: 14px 18px; margin-left: 0; box-shadow: 0 16px 34px -28px rgba(64, 72, 160, .45); }
 .turn-machine.error { border-left-color: var(--alert); }

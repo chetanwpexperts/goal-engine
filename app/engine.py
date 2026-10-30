@@ -280,7 +280,7 @@ def agent_mode(agent) -> str:
 
 
 def handle_message(db: Session, visitor_id: str, text: str, router: AIRouter, settings: Settings,
-                   brain=None, goal_id: int | None = None) -> dict[str, Any]:
+                   brain=None, goal_id: int | None = None, client_ip: str = "") -> dict[str, Any]:
     text = (text or "").strip()
     if not text:
         raise InvalidMessage("Please write something first.")
@@ -296,7 +296,7 @@ def handle_message(db: Session, visitor_id: str, text: str, router: AIRouter, se
         return {"reply": reply, "relation": "list", "goal": None,
                 "goals": [g.summary() for g in all_goals(db, visitor_id)], "provider": "app"}
 
-    reserve_ai_call(db, visitor_id, settings)
+    reserve_ai_call(db, visitor_id, settings, client_ip)
     if settings.engine_mode == "ml" and brain is not None:
         return _handle_ml(db, visitor_id, text, brain, goal_id)
 

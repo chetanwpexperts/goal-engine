@@ -135,6 +135,9 @@ def _scheduler(stop: threading.Event) -> None:
                     log.info("Privacy clean-up: %s", privacy.maintain(db))
                     log.info("Account clean-up: %s", accounts.maintain(db))
                     log.info("Database area: %s", dbarea.maintain(db))
+                    from app.limits import prune_bursts
+
+                    prune_bursts(db)
             finally:
                 db.close()
         except Exception:  # noqa: BLE001 - the scheduler must keep going
@@ -337,8 +340,13 @@ def _office_call(fn):
 
 
 @app.post("/api/office/files")
-def office_start(body: OfficeStartIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+def office_start(body: OfficeStartIn, request: Request, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     from app.agents import office_agent as oa
+
+    try:
+        accounts._limit(db, "upload-ip", accounts.client_ip(request))
+    except accounts.AccountError as exc:
+        return JSONResponse({"error": "Too many uploads from your network. Please try again in an hour."}, status_code=exc.status)
 
     if body.agent_id is not None:
         agent = db.get(Agent, body.agent_id)
@@ -598,10 +606,10 @@ def state(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)) -> 
 
 
 @app.post("/api/message")
-def post_message(body: MessageIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+def post_message(body: MessageIn, request: Request, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     try:
         result = handle_message(db, visitor, body.text, app.state.router, get_settings(),
-                                brain=app.state.brain, goal_id=body.goal_id)
+                                brain=app.state.brain, goal_id=body.goal_id, client_ip=accounts.client_ip(request))
     except InvalidMessage as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     except LimitReached as exc:

@@ -147,3 +147,18 @@ def test_session_cookie_is_safe(client, mail):
     client.cookies.clear()
     client.cookies.set("ge_sess", "made-up")
     assert client.get("/api/account/me").json()["user"] is None
+
+
+def test_no_daily_cap_in_ml_mode_but_floods_stop(client, ml_mode):
+    from app import limits
+    from tests.test_ml import say
+    old = limits.BURST["visitor"]
+    limits.BURST["visitor"] = 26
+    try:
+        for _ in range(25):                               # more than the old 25-a-day cap
+            say(client, "My Excel total is wrong")
+        r = client.post("/api/message", json={"text": "My Excel total is wrong"})
+        r = client.post("/api/message", json={"text": "My Excel total is wrong"})
+        assert r.status_code == 429 and "very fast" in r.json()["error"]
+    finally:
+        limits.BURST["visitor"] = old

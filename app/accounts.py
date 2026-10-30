@@ -42,6 +42,7 @@ LIMITS = {
     "code-send-ip": (10, timedelta(hours=1)),
     "code-check-user": (20, timedelta(hours=1)),
     "forgot-ip": (5, timedelta(hours=1)),
+    "upload-ip": (30, timedelta(hours=1)),       # a fresh browser cookie doesn't give fresh uploads
 }
 ATTEMPT_KEEP = timedelta(days=2)
 

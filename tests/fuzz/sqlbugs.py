@@ -102,7 +102,9 @@ def check(item, eng) -> list[str]:
         bad.append(f"{tag}: extra findings {wrong_kinds}")
     knowable = not (item["bug"] == "bare_column" and item["truth"].count(item["broken"].split("WHERE ")[1].split()[0]) < 2)
     if res["corrected"]:
-        again = [f["title_en"] for f in sqlcorrect.check(res["corrected"])["findings"] if f["kind"] in ("error", "wrong")]
+        told = {x["title_en"] for x in res.get("left", [])}                # left for the person, and the reply says so
+        again = [f["title_en"] for f in sqlcorrect.check(res["corrected"])["findings"] if f["kind"] in ("error", "wrong")
+                 and f["title_en"] not in told]
         if again:
             bad.append(f"{tag}: the corrected query still has mistakes {again}\n{res['corrected']}")
     if eng is not None and item["bug"] in SAME_ROWS and knowable:      # a lone bare column: only the structure can say whose

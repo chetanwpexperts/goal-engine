@@ -111,6 +111,11 @@ def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up:
         for f in part:
             k += 1
             out.append(f"{k}. {f['title_hi' if hi else 'title_en']}: {f['fix_hi' if hi else 'fix_en']}")
+    left = result["correct"].get("left") or []
+    if left and result["correct"].get("corrected"):
+        out.append(("Theek ki hui query mein ye abhi bhi aapka faisla hai (iska ek sahi jawab nahi): " if hi else
+                    "Still your call in the corrected query (there's no single right answer): ")
+                   + "; ".join(f["title_hi" if hi else "title_en"] for f in left) + ".")
     if result["correct"].get("corrected") and not follow_up:
         out.append("Theek ki hui query card mein hai; jo naam maine andaze se rakhe hain unpe '-- check' likha hai, apni table ke hisaab se badal lena."
                    if hi else "The corrected query is in the card. Names I guessed are marked '-- check': change them to your table's real names.")

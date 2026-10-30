@@ -181,7 +181,7 @@ def _firm_refs(s: str, where, owners=None) -> list:
     out = []
     for a1, b1 in zip(cuts, cuts[1:]):
         part = plain_w[a1:b1]
-        if not re.search(r"\bor\b", part, re.I) and not re.search(r"\bis\s+null\b|\bcoalesce\s*\(|\bifnull\s*\(", part, re.I):
+        if not re.search(r"\bor\b", part, re.I) and not re.search(r"\bis\s+null\b|\bcoalesce\s*\(|\bifnull\s*\(|(?:!=|<>|=)\s*null\b", part, re.I):
             out += _qrefs(part, where[0] + a1)
             for m in WORD.finditer(part):          # a column with no table: its owner, if the query names only one
                 w = m.group(1).lower()
@@ -216,6 +216,7 @@ def _close(text: str, i: int) -> int:
     return len(text) - 1
 
 
+EQ = re.compile(r"[`\"]?([A-Za-z_]\w*)[`\"]?\.[`\"]?(\w+)[`\"]?\s*=\s*[`\"]?([A-Za-z_]\w*)[`\"]?\.[`\"]?(\w+)[`\"]?")
 QREF = re.compile(r"(?<![\w.`\"$])[`\"]?([A-Za-z_][\w$]*)[`\"]?\.[`\"]?([A-Za-z_][\w$]*|\*)[`\"]?(?![\w$`\"(])")
 WORD = re.compile(r"(?<![\w.`\"'$@:])([A-Za-z_][\w$]*)(?![\w$`\".]|\s*\()")
 
@@ -237,10 +238,26 @@ def _bare(text: str, skip: set) -> list[str]:
     return out
 
 
+def _slip(a: str, b: str) -> bool:
+    """One letter added, missing, wrong or swapped, in names long enough to be the same word (max_mark / max_marks)."""
+    if min(len(a), len(b)) < 5 or abs(len(a) - len(b)) > 1 or a == b or any(ch.isdigit() for ch in a + b):
+        return False
+    i = 0
+    while i < min(len(a), len(b)) and a[i] == b[i]:
+        i += 1
+    ja, jb = len(a), len(b)
+    while ja > i and jb > i and a[ja - 1] == b[jb - 1]:
+        ja, jb = ja - 1, jb - 1
+    da, db = a[i:ja], b[i:jb]
+    return (len(da) <= 1 and len(db) <= 1) or (len(da) == len(db) == 2 and da == db[::-1])
+
+
 def _singulars(name: str) -> set:
     """Every likely singular: courses -> course, classes -> class, categories -> category, staff -> staff."""
     n = name.lower().split(".")[-1]
     out = {n}
+    if "_" in n:                                   # wp_posts, fz11_students: the name after a prefix counts too
+        out |= _singulars(n.split("_", 1)[1])
     if n.endswith("ies"):
         out.add(n[:-3] + "y")
     if n.endswith("es"):
@@ -261,7 +278,7 @@ def _singular(name: str) -> str:
     return n
 
 
-def check(sql: str) -> dict:
+def check(sql: str, _again: bool = False) -> dict:
     """Returns {'findings': [...], 'corrected': str|None, 'guesses': [...] }. Only plain SELECTs are read in depth."""
     s = _mask(sql)
     dep = _depths(s)
@@ -422,7 +439,7 @@ def check(sql: str) -> dict:
         twins = [y for y in srcs[:i] if y.name and y.name.lower() == x.name.lower()]
         if not twins:
             continue
-        for m in re.finditer(r"([A-Za-z_]\w*)\.(\w+)\s*=\s*([A-Za-z_]\w*)\.(\w+)", x.on):
+        for m in EQ.finditer(x.on):
             l, lc, r, rc = alias_of(m.group(1)), m.group(2), alias_of(m.group(3)), m.group(4)
             pair = {(l, lc), (r, rc)}
             mine = next(((q, c) for q, c in pair if q == x.alias.lower()), None)
@@ -487,7 +504,7 @@ def check(sql: str) -> dict:
                     line_of(where[0] + m.start()), "WHERE runs before SELECT, so it can't see SELECT's names (error 1054). Repeat the "
                     "expression itself in WHERE.", "WHERE, SELECT se pehle chalta hai, use SELECT ke naam nahi dikhte (error 1054). "
                     "Wahi expression WHERE mein likho.")
-                edits.append((where[0] + m.start(), where[0] + m.end(), "(" + _expr(sql, sel_aliases[w.lower()]) + ")"))
+                edits.append((where[0] + m.start(), where[0] + m.end(), f"\x01{w.lower()}\x01"))   # filled in at the end
         for q, c, p in firm:
             qa = alias_of(q)
             if qa in removed:
@@ -519,7 +536,7 @@ def check(sql: str) -> dict:
     for x in srcs:
         if not x.on:
             continue
-        for m in re.finditer(r"([A-Za-z_]\w*)\.(\w+)\s*=\s*([A-Za-z_]\w*)\.(\w+)", x.on):
+        for m in EQ.finditer(x.on):
             sides = [(m.group(1), m.group(2), x.on_start + m.start(1)), (m.group(3), m.group(4), x.on_start + m.start(3))]
             for (q, c, p), (q2, c2, _p2) in (sides, sides[::-1]):
                 t = by_alias.get(alias_of(q))
@@ -553,19 +570,40 @@ def check(sql: str) -> dict:
     cols_by = {}
     for q, c, p in all_refs:
         cols_by.setdefault(alias_of(q), {}).setdefault(c.lower(), []).append((q, c, p))
+    shown = {re.sub(r"\s+", "", i["text"]).lower() for i in items}
     for al, cols in cols_by.items():
-        for c in list(cols):
-            longer = [d for d in cols if d != c and len(c) >= 4 and d.endswith("_" + c) and not c.endswith("id") and not d.endswith("_id")]
-            if len(longer) == 1:
-                d = longer[0]
-                for q, cc, p in cols[c]:
-                    guesses.append(f"{q}.{cc} -> {q}.{d}")
-                    add("check", "column", f"{q}.{cc} and {q}.{d}: probably the same column", f"{q}.{cc} aur {q}.{d}: shayad ek hi column",
-                        line_of(p), f"The query uses both names on {q}; a table rarely has both. Use the one your table has (I used {d}).",
-                        f"Query {q} pe dono naam use karti hai; table mein aksar ek hi hota hai. Jo aapki table mein hai wo likho (maine {d} liya).")
-                    cs = p + len(q) + 1
-                    edits.append((cs, cs + len(cc), d))
-                    note(cs + len(cc), f"check: {d} (you wrote {cc})")
+        done = set()
+        for c in sorted(cols):
+            for d in sorted(cols):
+                if d <= c or (c, d) in done:
+                    continue
+                done.add((c, d))
+                if _slip(c, d):                    # max_mark / max_marks: one typing slip, so one of them is a typo
+                    pick = [x for x in (c, d) if any(q + "." + x == t for q in {r[0].lower() for r in cols[x]} for t in shown)]
+                    if len(pick) != 1:
+                        pick = [x for x in (c, d) if len(cols[x]) > len(cols[c if x == d else d])]
+                    if len(pick) != 1:
+                        add("check", "column", f"{al}.{c} and {al}.{d}: one is probably a typo", f"{al}.{c} aur {al}.{d}: ek shayad typo hai",
+                            line_of(cols[c][0][2]), "They differ by one letter; use the name your table really has in both places.",
+                            "Sirf ek letter ka farak hai; jo naam aapki table mein hai wahi dono jagah likho.")
+                        continue
+                    right = pick[0]
+                    wrong = d if right == c else c
+                    for q, cc, p in cols[wrong]:
+                        guesses.append(f"{q}.{cc} -> {q}.{right}")
+                        add("check", "column", f"{q}.{cc} is probably {q}.{right}", f"{q}.{cc} shayad {q}.{right} hai", line_of(p),
+                            f"One letter away from {q}.{right}, which the query uses elsewhere; a table rarely has both. Check your table.",
+                            f"{q}.{right} se sirf ek letter alag, jo query mein aur jagah hai. Table check karo.")
+                        cs = p + len(q) + 1
+                        edits.append((cs, cs + len(cc), right))
+                        note(cs + len(cc), f"check: {right} (you wrote {cc})")
+                elif len(c) >= 4 and not c.endswith("id") and not d.endswith("_id") and (d.endswith("_" + c) or c.endswith("_" + d)):
+                    short, long_ = (c, d) if d.endswith("_" + c) else (d, c)
+                    q = cols[short][0][0]
+                    add("check", "column", f"{q}.{short} and {q}.{long_}: two columns, or one?", f"{q}.{short} aur {q}.{long_}: do column ya ek?",
+                        line_of(cols[short][0][2]), f"If your table has only one of these, use it in both places (MySQL error 1054 otherwise). "
+                        f"If it has both, this is fine.", f"Table mein inme se ek hi hai to dono jagah wahi likho (warna error 1054). "
+                        "Dono hain to theek hai.")
 
     # ------------------------------------------------ 5. unqualified columns in a many-table query
     qualified = [c.lower() for _q, c, _p in all_refs]
@@ -633,7 +671,8 @@ def check(sql: str) -> dict:
         gbare = {w.lower() for w in _bare(gtext, set())}
         def is_key(al: str, col: str) -> bool:              # 'id', or students.student_id: the table's own key
             t = by_alias.get(al)
-            return col == "id" or bool(t and t.name and col in {x + "_id" for x in _singulars(t.name)})
+            c = col.lower().replace("_", "")
+            return c == "id" or bool(t and t.name and c in {x.replace("_", "") + "id" for x in _singulars(t.name)})
 
         single = {q for q, c in gref if is_key(q, c)}       # grouped by its key: one row per group
         changed = True
@@ -643,7 +682,7 @@ def check(sql: str) -> dict:
                 al = (x.alias or "").lower()
                 if al in single or not x.on:
                     continue
-                for m in re.finditer(r"([A-Za-z_]\w*)\.(\w+)\s*=\s*([A-Za-z_]\w*)\.(\w+)", x.on):
+                for m in EQ.finditer(x.on):
                     l, lc, r, rc = alias_of(m.group(1)), m.group(2).lower(), alias_of(m.group(3)), m.group(4).lower()
                     if (l == al and is_key(l, lc) and r in single and not is_key(r, rc)) or \
                             (r == al and is_key(r, rc) and l in single and not is_key(l, lc)):
@@ -671,6 +710,39 @@ def check(sql: str) -> dict:
                 "Bina GROUP BY ke total (COUNT/SUM) aur plain columns saath", items[0]["text"][:60],
                 "MySQL refuses this (error 1140) or squashes everything into one row. Add GROUP BY for the plain columns.",
                 "MySQL error 1140 deta hai ya sab ek row mein daba deta hai. Plain columns ka GROUP BY lagao.")
+        links = [(alias_of(m2.group(1)), m2.group(2).lower(), alias_of(m2.group(3)), m2.group(4).lower())
+                 for x in srcs if x.on for m2 in EQ.finditer(x.on)]
+
+        def to_one_from(start: set) -> set:                 # tables reached one row each from these (any join's ON)
+            got, more = set(start), True
+            while more:
+                more = False
+                for l, lc, r, rc in links:
+                    for a1, c1, b1 in ((l, lc, r), (r, rc, l)):
+                        if a1 not in got and b1 in got and is_key(a1, c1):
+                            got.add(a1)
+                            more = True
+            return got
+
+        live = [(x.alias or "").lower() for x in srcs if x.alias and x.alias.lower() not in removed]
+        for i in aggs:                                       # SUM(f.amount) with marks joined too: each fee counted per mark
+            fm = re.search(r"\b(sum|count|avg)\s*\(\s*(distinct\s+)?([A-Za-z_]\w*)\.(\w+)", i["text"], re.I)
+            if not fm or fm.group(2):
+                continue
+            A = alias_of(fm.group(3))
+            if A in single:
+                continue
+            mine = to_one_from({A})
+            others = [y for y in live if y not in single and y not in mine and y != A and A not in to_one_from({y})]
+            if others:
+                o = by_alias[others[0]]
+                add("wrong", "group", f"{fm.group(1).upper()}({fm.group(3)}.{fm.group(4)}) is multiplied by the {o.name} rows",
+                    f"{fm.group(1).upper()}({fm.group(3)}.{fm.group(4)}) {o.name} ki rows se guna ho jaata hai", i["text"],
+                    f"{by_alias[A].name} and {o.name} are both many rows per group, so every {by_alias[A].name} row repeats once per "
+                    f"{o.name} row and the {fm.group(1).upper()} comes out too big. Total {by_alias[A].name} in its own subquery "
+                    f"(SELECT {fm.group(3)}.<key>, {fm.group(1).upper()}(...) ... GROUP BY ...) and join that.",
+                    f"{by_alias[A].name} aur {o.name} dono ki ek group mein kai rows hain, isliye har row baar baar gini jaati hai aur "
+                    f"{fm.group(1).upper()} bada aata hai. {by_alias[A].name} ka total alag subquery mein nikaal ke join karo.")
         for i in aggs:
             m = re.search(r"\bcount\s*\(\s*(distinct\s+)?([A-Za-z_]\w*)\.(\w+)\s*\)", i["text"], re.I)
             if m and not m.group(1) and (alias_of(m.group(2)), m.group(3).lower()) in gref:
@@ -703,7 +775,11 @@ def check(sql: str) -> dict:
     corrected = _apply(sql, s, cl, items, edits, notes, drop_grouping, sel_aliases, removed, srcs)
     order = {"error": 0, "wrong": 1, "check": 2}
     F.sort(key=lambda f: order[f.kind])
-    return {"findings": [f.as_dict() for f in _dedupe(F)], "corrected": corrected, "guesses": list(dict.fromkeys(guesses))}
+    left = []
+    if corrected and not _again:
+        left = [f for f in check(corrected, _again=True)["findings"] if f["kind"] in ("error", "wrong")]
+    return {"findings": [f.as_dict() for f in _dedupe(F)], "corrected": corrected, "guesses": list(dict.fromkeys(guesses)),
+            "left": [{"title_en": f["title_en"], "title_hi": f["title_hi"]} for f in left]}
 
 
 def _dedupe(F):
@@ -793,6 +869,7 @@ def _apply(sql, s, cl, items, edits, notes, drop_grouping, sel_aliases, removed,
                 parts.append(_edited(sql, o[0] + off, o[0] + off + len(txt), edits))
             edits.append((o[0], o[1], " " + ",".join(p.rstrip() if k < len(parts) - 1 else p for k, p in enumerate(parts)).strip() + "\n"
                           if parts else ""))
+    edits = [(a, b, re.sub(r"\x01(\w+)\x01", lambda m: "(" + _expr(sql, sel_aliases[m.group(1)], edits) + ")", t)) for a, b, t in edits]
     edits.sort(key=lambda e: (e[0], e[1]))
     out, last = [], 0
     for a, b, t in edits:

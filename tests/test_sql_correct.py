@@ -66,3 +66,15 @@ def test_the_conversation(client, ml_mode):
     assert "lines down to" in r["reply"] and "dep2" not in r["reply"].split("Removed:")[0]
     r = client.post("/api/message", json={"text": "query slow hai", "goal_id": goal}).json()
     assert "MySQL won't run it" not in r["reply"] and "ALTER TABLE" in r["reply"]      # speed advice, for the corrected query
+
+
+def test_second_broken_query_school():
+    r = sqlcorrect.check((Path(__file__).parent / "data" / "broken_school.sql").read_text())
+    titles = " | ".join(f["title_en"] for f in r["findings"])
+    for must in ["'subjects.id'", "WHERE uses percentage", "ORDER BY uses student", "aren't grouped", "INNER JOIN sub",
+                 "Self join on teachers", "fees is joined twice", "'= NULL'", "SUM(f.amount) is multiplied by the marks rows",
+                 "HAVING marks", "s.class is probably s.class_id", "m.max_mark is probably m.max_marks", "exam_year has no table"]:
+        assert must in titles, must
+    assert "m.marks and m.max_marks: two columns, or one?" in titles          # asked, never merged
+    assert "m.marks," in r["corrected"] and "AND f.status IS NULL" in r["corrected"] and "LEFT JOIN fees f" in r["corrected"]
+    assert {x["title_en"] for x in r["left"]} >= {"SUM(f.amount) is multiplied by the marks rows"}

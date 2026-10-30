@@ -70,3 +70,28 @@ def _add_missing_columns() -> None:
                     conn.execute(text(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {col_type} NULL"))
                 except Exception:  # noqa: BLE001 - another worker added it first
                     pass
+    _widen_columns()
+
+
+def _widen_columns() -> None:
+    """MySQL/MariaDB: a VARCHAR made longer in the model is widened on the server (never shortened).
+    SQLite (tests) doesn't enforce lengths, so this is the only place a too-short column gets fixed."""
+    from sqlalchemy import String, inspect, text
+
+    engine = get_engine()
+    if engine.dialect.name not in ("mysql", "mariadb"):
+        return
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            have = {c["name"]: c for c in inspector.get_columns(table.name)}
+            for column in table.columns:
+                want = getattr(column.type, "length", None)
+                got = getattr(have.get(column.name, {}).get("type"), "length", None)
+                if not isinstance(column.type, String) or not want or not got or got >= want:
+                    continue
+                null = "NULL" if column.nullable else "NOT NULL"
+                try:
+                    conn.execute(text(f"ALTER TABLE {table.name} MODIFY {column.name} VARCHAR({want}) {null}"))
+                except Exception:  # noqa: BLE001 - another worker did it first
+                    pass

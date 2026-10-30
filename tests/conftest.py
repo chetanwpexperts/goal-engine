@@ -90,3 +90,23 @@ def ml_mode():
     settings.engine_mode, settings.visitor_daily_cap, settings.ai_daily_cap = "ml", 100, 1000
     yield
     settings.engine_mode, settings.visitor_daily_cap, settings.ai_daily_cap = old_mode, old_cap, old_all
+
+
+# SQLite ignores VARCHAR lengths; MySQL refuses. Fail any test that saves a text longer than its column,
+# so a too-short column is caught here and not on the live server (the email-code bug, 30 Oct 2026).
+from sqlalchemy import String, event  # noqa: E402
+from sqlalchemy.orm import Session as _S  # noqa: E402
+
+
+@event.listens_for(_S, "before_flush")
+def _check_lengths(session, _ctx, _instances):
+    for obj in list(session.new) + list(session.dirty):
+        table = getattr(obj, "__table__", None)
+        if table is None:
+            continue
+        for col in table.columns:
+            limit = getattr(col.type, "length", None)
+            if isinstance(col.type, String) and limit and type(col.type).__name__ in ("String", "VARCHAR"):
+                val = getattr(obj, col.key, None)
+                if isinstance(val, str) and len(val) > limit:
+                    raise AssertionError(f"{table.name}.{col.name} is VARCHAR({limit}) but got {len(val)} characters")

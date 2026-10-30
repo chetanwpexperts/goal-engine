@@ -377,9 +377,40 @@ def analyze_sql(query: str, extra: str = "") -> dict:
 
     findings.sort(key=lambda f: f.severity, reverse=True)
     notes = _notes(sql, tables, original)
-    return {"ok": True, "findings": [f.as_dict() for f in findings], "indexes": indexes, "check_query": check_query,
-            "indexes_verified": bool(seen_structure), "assumed_primary": skipped, "notes": notes,
-            "rewritten": rewritten if rewritten != original else None, "tables": [t.name for t in tables]}
+    out = {"ok": True, "findings": [f.as_dict() for f in findings], "indexes": indexes, "check_query": check_query,
+           "indexes_verified": bool(seen_structure), "assumed_primary": skipped, "notes": notes,
+           "rewritten": rewritten if rewritten != original else None, "tables": [t.name for t in tables]}
+    return _with_correctness(original, out)
+
+
+SEVERITY = {"error": 5, "wrong": 4, "check": 3}
+
+
+def _with_correctness(original: str, out: dict) -> dict:
+    """Is it right before is it fast: mistakes come first, and while the query is wrong there's no speed advice
+    (indexes for a query that doesn't run, or returns wrong rows, help nobody). Speed comes when it's right, or on asking."""
+    from app.agents import sqlcorrect
+
+    try:
+        c = sqlcorrect.check(original)
+    except Exception:  # noqa: BLE001 - never let the correctness reader break the speed check
+        c = {"findings": [], "corrected": None, "guesses": []}
+    out["correct"] = c
+    broken = [f for f in c["findings"] if f["kind"] in ("error", "wrong")]
+    if not c["findings"]:
+        return out
+    mine = [{"severity": SEVERITY[f["kind"]], "title_en": f["title_en"], "title_hi": f["title_hi"], "evidence": f["evidence"],
+             "fix_en": f["fix_en"], "fix_hi": f["fix_hi"], "kind": f["kind"], "topic": f["topic"]} for f in c["findings"]]
+    speed = [f for f in out["findings"] if not (f["title_en"].startswith("HAVING") and any(m["topic"] == "having" for m in mine))]
+    if broken:
+        out["speed_later"] = {"findings": speed, "indexes": out["indexes"], "check_query": out["check_query"]}
+        out["findings"], out["indexes"], out["check_query"] = mine, [], None
+        out["notes"] = []
+    else:
+        out["findings"] = mine + speed
+    if c.get("corrected"):
+        out["rewritten"] = c["corrected"]
+    return out
 
 
 def _notes(sql: str, tables, original: str = "") -> list[dict]:

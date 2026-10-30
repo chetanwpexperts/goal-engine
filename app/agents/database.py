@@ -721,7 +721,11 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
 
 # ------------------------------------------------------------------ after a query check: "optimize it", "why slow", "kya karu"
 SQL_FOLLOW_RE = re.compile(r"\b(optimi[sz]\w*|faster|speed( (it|this|that))? up|improve|better|rewrite|re-write|fix (it|this|the query)|tune|slow|fast|"
-                           r"index(es)?|why|explain|kaise|kya karu|kya karna|theek karo|tez|jaldi|behtar|sudharo|samjhao)\b", re.I)
+                           r"index(es)?|why|explain|kaise|kya karu|kya karna|theek karo|tez|jaldi|behtar|sudharo|samjhao|"
+                           r"wrong|galat|joins?|mistakes?|errors?|correct|sahi|small(er)?|short(er)?|chhot\w*|big|badi|bada|problems?)\b", re.I)
+WRONG_RE = re.compile(r"\b(wrong|galat|mistakes?|errors?|correct|sahi|problems?|issues?|kya galat|what.s wrong)\b", re.I)
+SHORT_RE = re.compile(r"\b(small(er)?|short(er)?|chhot\w*|big query|badi query|bada|simplif\w*|less code|kam)\b", re.I)
+SPEED_RE = re.compile(r"\b(slow|fast(er)?|speed|optimi[sz]\w*|index(es)?|tez|jaldi|performance|tune)\b", re.I)
 DEV_FOLLOW_RE = re.compile(r"तेज़|तेज|ऑप्टिमाइ|बेहतर|सुधार|धीम|स्लो|इंडेक्स|क्यों|क्यूं|समझा|बदल|फ़र्क|फर्क|अंतर|वजह|कारण")
 NEW_SQL_RE = re.compile(r"\b(select|update|delete|insert)\b[\s\S]+\b(from|into|set)\b", re.I)
 
@@ -769,6 +773,31 @@ def continue_turn(db, goal, agent, text: str):
     changed = _norm(better) != _norm(query)
     last = db.scalars(select(Message).where(Message.goal_id == goal.id, Message.role == "assistant")
                       .order_by(Message.id.desc()).limit(1)).first()
+    corr = res.get("correct") or {}
+    if corr.get("findings") and not SPEED_RE.search(text or ""):
+        from app.agents.core import correctness_text
+
+        if SHORT_RE.search(text or "") and not WRONG_RE.search(text or ""):
+            fixed = corr.get("corrected") or query
+            gone = [f for f in corr["findings"] if "joined twice" in f["title_en"]]
+            reply = ((f"Chhoti aur sahi query ({len(query.splitlines())} se {len(fixed.splitlines())} lines):" if hi else
+                      f"The shorter, corrected query ({len(query.splitlines())} lines down to {len(fixed.splitlines())}):")
+                     + f"\n\n{fixed}" + (("\n\nHataya: " if hi else "\n\nRemoved: ") + "; ".join(f["title_hi" if hi else "title_en"] for f in gone)
+                                          if gone else ""))
+        else:
+            only = "join" if re.search(r"\bjoins?\b", text or "", re.I) and any(f["topic"] == "join" for f in corr["findings"]) else None
+            reply = correctness_text(res, hi, only, follow_up=True)
+            if corr.get("corrected"):
+                reply += "\n\n" + ("Theek ki hui query ('-- check' wale naam apni table se mila lena):" if hi else
+                                    "The corrected query (match the names marked '-- check' to your tables):") + f"\n\n{corr['corrected']}"
+        inputs["last_ask"] = "correct"
+        agent.inputs = dumps(inputs)
+        return reply, [], hi
+    if corr.get("findings") and corr.get("corrected"):
+        query = corr["corrected"]                                    # speed advice is for the corrected query
+        res = analyze_sql(query, inputs.get("explain", ""))
+        better = res.get("rewritten") or rewrite(query)
+        changed = _norm(better) != _norm(query)
     ask = ("diff" if DIFF_RE.search(text or "") or DIFF_DEV_RE.search(text or "") else "why" if WHY_RE.search(text or "")
            else "index" if INDEX_RE.search(text or "") else "optimize")
     asked = ask

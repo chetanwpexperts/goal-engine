@@ -144,7 +144,8 @@ def _after_run(agent, run, hi: bool) -> tuple[str, list[str]]:
         reply += "\n\n" + ("Poori report goal card mein hai. Roz check karta rahoon, taaki kuch toote to turant pata chale?"
                             if hi else "The full report is in the goal card. Shall I keep checking it daily, so you know the moment something breaks?")
         options = [next(k for k, v in WATCH_LABELS.items() if v == hi)]
-    elif agent.recipe == "sql_review" and run.status == "done":
+    elif agent.recipe == "sql_review" and run.status == "done" and "corrected query is in the card" not in reply.lower() \
+            and "query card mein hai" not in reply.lower() and "speed and indexes come" not in reply.lower():
         reply += "\n\n" + ("Fixes (rewritten query aur index commands) goal card mein hai, copy kar lo." if hi
                             else "The fixes (rewritten query and index commands) are in the goal card, ready to copy.")
     return reply, options

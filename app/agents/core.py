@@ -68,6 +68,8 @@ def _website_summary(result: dict, hi: bool) -> str:
 def _sql_summary(result: dict, hi: bool) -> str:
     if not result.get("ok"):
         return (f"Query check nahi ho payi: {result.get('error')}" if hi else f"Couldn't check the query: {result.get('error')}")
+    if (result.get("correct") or {}).get("findings"):
+        return correctness_text(result, hi)
     n, idx = len(result["findings"]), len(result.get("indexes", []))
     extra = (" Rewritten query bhi taiyar hai." if hi else " A rewritten query is ready too.") if result.get("rewritten") else ""
     if idx and not result.get("indexes_verified"):
@@ -78,6 +80,44 @@ def _sql_summary(result: dict, hi: bool) -> str:
         "index suggest kiye" if hi else f"index{'es' if idx != 1 else ''} suggested")
     return (f"Query check ki: {n} problem mili, {idx} {what}.{extra}" if hi
             else f"Checked the query: {n} problem{'s' if n != 1 else ''} found, {idx} {what}.{extra}")
+
+
+def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up: bool = False) -> str:
+    """Every mistake in the query, in plain words, grouped by how sure: won't run, wrong rows, please check."""
+    fs = [f for f in result["correct"]["findings"] if only is None or f["topic"] == only or
+          (only == "join" and re.match(r"(on\b|.*\bjoin\b)", f["evidence"], re.I))]
+    groups = [("error", "MySQL won't run it:", "MySQL ise chalayega hi nahi:"),
+              ("wrong", "Runs, but gives wrong rows:", "Chalegi, par rows galat aayengi:"),
+              ("check", "Please check (these depend on your tables, which I can't see):",
+               "Ye check karo (ye aapki tables pe depend karta hai, jo mujhe nahi dikhti):")]
+    n_err = sum(f["kind"] == "error" for f in fs)
+    n_wrong = sum(f["kind"] == "wrong" for f in fs)
+    if hi:
+        head = (f"Query check ki: {n_err + n_wrong} galti mili" + (f" ({n_err} ki wajah se chalegi hi nahi)" if n_err else "")
+                + (f", aur {len(fs) - n_err - n_wrong} cheezein check karni hain." if len(fs) - n_err - n_wrong else "."))
+    else:
+        head = (f"Checked the query: {n_err + n_wrong} mistake{'s' if n_err + n_wrong != 1 else ''}"
+                + (f" ({n_err} stop it running)" if n_err else "")
+                + (f", and {len(fs) - n_err - n_wrong} thing{'s' if len(fs) - n_err - n_wrong != 1 else ''} to check." if len(fs) - n_err - n_wrong else "."))
+    if not n_err and not n_wrong and only is None:
+        head = ("Query chalegi, par ye check karo:" if hi else "The query runs, but please check these:")
+    out = [head]
+    k = 0
+    for kind, en, hn in groups:
+        part = [f for f in fs if f["kind"] == kind]
+        if not part:
+            continue
+        out.append(hn if hi else en)
+        for f in part:
+            k += 1
+            out.append(f"{k}. {f['title_hi' if hi else 'title_en']}: {f['fix_hi' if hi else 'fix_en']}")
+    if result["correct"].get("corrected") and not follow_up:
+        out.append("Theek ki hui query card mein hai; jo naam maine andaze se rakhe hain unpe '-- check' likha hai, apni table ke hisaab se badal lena."
+                   if hi else "The corrected query is in the card. Names I guessed are marked '-- check': change them to your table's real names.")
+    if result.get("speed_later") and not follow_up:
+        out.append("Speed (index) ki baat query sahi hone ke baad: 'ise fast karo' likho." if hi
+                   else "Speed and indexes come once it's right: type 'make it faster' when you want them.")
+    return "\n".join(out)
 
 
 def _run_website(inputs: dict) -> dict:
@@ -111,10 +151,10 @@ RECIPES: dict[str, Recipe] = {
         "sql_review", "SQL Query Checker", "SQL Query Checker", "none",
         (Block("connect", "Read only the query you paste (no database access, no data)",
                "Sirf aapki paste ki hui query padhunga (database access nahi, data nahi)"),
-         Block("check", "Check it against common slow-query problems and real bugs",
-               "Slow query ki aam problems aur asli bugs check karunga"),
-         Block("act", "Give a rewritten query and the exact index commands",
-               "Rewritten query aur exact index commands dunga")),
+         Block("check", "Check it's right first: joins, aliases, columns, NULLs, GROUP BY; then speed",
+               "Pehle check karunga query sahi hai: joins, alias, columns, NULL, GROUP BY; phir speed"),
+         Block("act", "Give the corrected query, every mistake explained; indexes only when it's right",
+               "Theek ki hui query aur har galti ki wajah dunga; index sirf query sahi hone ke baad")),
         (Input("query", "sql", "Paste the SQL query", "SQL query yahan paste karo", multiline=True),
          Input("explain", "text", "EXPLAIN output or CREATE TABLE (optional)", "EXPLAIN output ya CREATE TABLE (optional)",
                required=False, multiline=True)),

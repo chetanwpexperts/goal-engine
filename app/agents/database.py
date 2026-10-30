@@ -390,6 +390,11 @@ def wants_database(goal: Goal | None, text: str) -> bool:
     if rec["kind"] == "error" or (rec["kind"] == "issue" and rec["confidence"] >= 0.55):
         return True                       # "too many connections", "Hindi text ???? ban jata hai", a pasted DB error
     if goal.intent == "slow_db_query":   # a slow query: the SQL checker, unless they ask about the whole database
+        sure = (loads(goal.slots, {}) or {}).get("_conf", goal.confidence or 0)
+        if (sure or 0) < 0.5 and not reasoning.complaints(text):
+            # the reader wasn't sure it's about a slow query ('how can I connect my database' scores a coin flip) and
+            # nothing slow or failing was said: a request for the database agent, not the query checker
+            return True
         return bool(re.search(r"\b(health|size|tables|connections|kitna bada|poora database)\b", text or "", re.I))
     return goal.intent == "db_automation" or bool(DB_WORDS.search(text or ""))
 
@@ -644,7 +649,12 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     from app.dbknow import brain as dbbrain
     from app.dbknow import reasoning
 
-    if reasoning.evidence(text):          # a pasted error / EXPLAIN / lock report: cause, proof, fix, prevention
+    from app.agents.core import query_in as _query_in
+
+    described = bool(reasoning.complaints(text)) and not _query_in(text)   # 'cannot connect', 'connect nahi ho raha'
+    if described and not reasoning.evidence(text) and not reasoning.report(reasoning.diagnose(text), turn.hi):
+        described = False                 # the core has no likely causes for it: the usual reply below
+    if reasoning.evidence(text) or described:   # an error / EXPLAIN / lock report, or a problem put in words
         from app import mind
 
         result = reasoning.diagnose(text)
@@ -660,7 +670,9 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
             inputs["brain"] = {**rec, "sql": ""}
             agent.inputs = dumps(inputs)
         # the title follows what this message is about (an earlier, different problem must not stay on it)
-        goal.title = (reasoning.headline(result, turn.hi) or ("Database error ki wajah" if turn.hi else "Database error: cause and fix"))[:200]
+        goal.title = (reasoning.headline(result, turn.hi) or (("Database ki dikkat ki wajah" if turn.hi else "Database problem: likely causes")
+                                                              if not reasoning.evidence(text) else
+                                                              ("Database error ki wajah" if turn.hi else "Database error: cause and fix")))[:200]
         goal.intent = goal.intent or "db_error"
         goal.missing_info, goal.pending = "[]", None
         db.commit()
@@ -678,8 +690,11 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     inputs = loads(agent.inputs, {}) or {}
     if mode != "explore":
         inputs["mode"] = mode
+    from app.dbknow import reasoning as _r
+
     if rec["kind"] in ("sql", "error") or (rec["kind"] == "do" and rec["confidence"] >= 0.35) or (
-            rec["kind"] == "issue" and _sure(rec)):                   # name a specific problem only when sure
+            rec["kind"] == "issue" and _sure(rec) and (_r.complaints(text) or _r.evidence(text))):
+        # name a specific problem only when sure, and only when a problem was actually said ('connect db' is a request)
         inputs["brain"] = {**rec, "sql": text if rec["kind"] == "sql" else ""}
     agent.inputs = dumps(inputs)
     goal.title = MODE_TEXT[inputs.get("mode", "explore")][0 if turn.hi else 1].split(" (")[0]

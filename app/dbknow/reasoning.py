@@ -270,7 +270,7 @@ def report(result: dict, hi: bool, signed_in: bool = False, can_connect: bool = 
         lines.append("")
         lines.append(("Pakki wajah ke liye poora error message (code ke saath) paste karo."
                       if hi else "To pin it down, paste the full error message (with its code).")
-                     + ("" if signed_in else (" Ya free account banao, database jodo, aur main khud check karke saboot ke saath bataunga."
+                     + ("" if signed_in or not can_connect else (" Ya free account banao, database jodo, aur main khud check karke saboot ke saath bataunga."
                                               if hi else " Or create a free account, connect your database, and I'll check it myself and prove it.")))
         return "\n".join(lines)
     eng = result.get("engine")

@@ -177,13 +177,18 @@ def normalize(text: str) -> str:
     return " ".join(tokens(text))
 
 
+# Hinglish words that are also everyday English ('how to connect', 'the main sheet'): they count only next to a sure one
+_ALSO_ENGLISH = {"to", "main"}
+
+
 def detect_language(text: str) -> str:
     if _DEVANAGARI.search(text):
         return "Hindi"
     words = tokens(text)
     if not words:
         return "English"
-    hits = sum(1 for w in words if w in HINGLISH_MARKERS)
+    sure = sum(1 for w in words if w in HINGLISH_MARKERS and w not in _ALSO_ENGLISH)
+    hits = sure + (sum(1 for w in words if w in _ALSO_ENGLISH and w in HINGLISH_MARKERS) if sure else 0)
     if hits >= 2 or (hits == 1 and len(words) <= 4):
         return "Hinglish"
     return "English"

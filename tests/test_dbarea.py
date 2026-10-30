@@ -204,3 +204,31 @@ def test_testers_can_connect_while_it_is_closed_for_everyone_else(client, locked
     _verified(client, locked, 30)                                           # not on the list
     assert client.get("/api/account/me").json()["db_connect"] is False
     assert client.post("/api/connectors/direct", json=DB).json()["db_area"] == "soon"
+
+
+@pytest.mark.parametrize("text", ["How do I connect my database?", "how I can connect database?", "how to connect database",
+                                  "database kaise connect karu", "connect db", "how do i add my database"])
+def test_every_way_of_asking_to_connect_gets_the_same_answer(client, monkeypatch, ml_mode, text):
+    from tests.test_ml import say
+
+    monkeypatch.setenv("DB_CONNECT", "off")
+    r = say(client, text)
+    assert [a["recipe"] for a in r["agents"]] == ["database"], (text, r["agents"])
+    assert "opens in a few days" in r["reply"] or "kuch dinon mein" in r["reply"]
+    assert "timed out" not in r["reply"] and "SQL Query Checker" not in r["reply"]
+
+
+def test_a_connection_problem_in_words_gets_its_likely_causes(client, monkeypatch, ml_mode):
+    from tests.test_ml import say
+
+    monkeypatch.setenv("DB_CONNECT", "off")
+    reply = say(client, "cannot connect to database")["reply"]
+    assert "Wrong user or password" in reply and "paste the full error" in reply and "create a free account" not in reply
+
+
+def test_plain_english_with_to_stays_english():
+    from app.ml.normalize import detect_language
+
+    assert detect_language("how to connect database") == "English"
+    assert detect_language("cannot connect to database") == "English"
+    assert detect_language("excel to theek karo") == "Hinglish"

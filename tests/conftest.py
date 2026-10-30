@@ -110,3 +110,14 @@ def _check_lengths(session, _ctx, _instances):
                 val = getattr(obj, col.key, None)
                 if isinstance(val, str) and len(val) > limit:
                     raise AssertionError(f"{table.name}.{col.name} is VARCHAR({limit}) but got {len(val)} characters")
+
+
+@pytest.fixture(autouse=True)
+def _no_flood_limits_between_tests():
+    """Every test request comes from one address within the same minute; the flood limits have their own test."""
+    from app import limits
+
+    old = dict(limits.BURST)
+    limits.BURST.update(visitor=10**6, ip=10**6, all=10**6)
+    yield
+    limits.BURST.clear(); limits.BURST.update(old)

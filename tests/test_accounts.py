@@ -153,7 +153,7 @@ def test_no_daily_cap_in_ml_mode_but_floods_stop(client, ml_mode):
     from app import limits
     from tests.test_ml import say
     old = limits.BURST["visitor"]
-    limits.BURST["visitor"] = 26
+    limits.BURST["visitor"] = 26                          # (the address and total limits stay high for tests)
     try:
         for _ in range(25):                               # more than the old 25-a-day cap
             say(client, "My Excel total is wrong")

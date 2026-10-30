@@ -135,12 +135,23 @@
   if (slot && body.dataset.state === "idle") slot.appendChild(composerEl);
 
   function setActive() {
-    if (body.dataset.state === "active") return;
+    try { localStorage.setItem("ge_chat", "1"); } catch (_) { /* private mode: just no early chat view */ }
+    if (body.dataset.state === "active" && composerEl.parentNode !== slot) return;
     body.dataset.state = "active";
     document.body.insertBefore(composerEl, document.getElementById("options"));
     clearTimeout(typer);
     typeExamples();
   }
+  function setIdle() {
+    try { localStorage.removeItem("ge_chat"); } catch (_) { /* nothing to clear */ }
+    if (body.dataset.state === "idle") return;
+    body.dataset.state = "idle";
+    if (slot) slot.appendChild(composerEl);
+    clearTimeout(typer);
+    typeExamples();
+  }
+  // opened straight into the chat view (the page remembered a conversation): dock the input box there too
+  if (body.dataset.state === "active") setActive();
 
   // the likely next questions, written with the person's own sheet and column names; one tap asks it
   function nextChips(items, hi) {
@@ -2656,6 +2667,7 @@
   });
 
   $("#new-chat").addEventListener("click", async () => {
+    try { localStorage.removeItem("ge_chat"); } catch (_) { /* fine */ }
     try { await api("/api/new-chat", { method: "POST" }); } catch (_) { /* reload anyway */ }
     window.location.reload();
   });
@@ -2667,6 +2679,7 @@
     input.focus();
     try {
       const state = await api("/api/state");
+      if (!state.messages.length) setIdle();          // remembered a chat that isn't there any more (new chat, logout, deleted)
       if (state.messages.length) {
         setActive();
         for (const m of state.messages) {

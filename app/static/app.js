@@ -63,6 +63,16 @@
   };
   const W = (lang) => RUN_WORDS[lang === "en" ? "en" : "hi"];
 
+  // each agent's own name: DBaba (databases, queries), Sheetu (Excel, CSV, Word)
+  const AGENT_NAMES = { database: "DBaba", sql_review: "DBaba", db_report: "DBaba", office: "Sheetu" };
+  function agentTitle(a) {
+    const h = el("h2");
+    const who = AGENT_NAMES[a.recipe];
+    if (who) h.append(el("span", "agent-tag", who));
+    h.append(document.createTextNode(a.name || ""));
+    return h;
+  }
+
   async function api(path, options = {}) {
     const res = await fetch(path, { headers: { "Content-Type": "application/json" }, credentials: "same-origin", ...options });
     let data = {};
@@ -414,7 +424,7 @@
     const w = W(a.lang);
     const card = el("article", `agent${a.status === "active" ? " is-active" : ""}`);
     const head = el("div", "agent-name");
-    head.append(el("h2", null, a.name), stateBadge(a, w));
+    head.append(agentTitle(a), stateBadge(a, w));
     card.append(head, blockLine(a.blocks));
     const run = a.runs && a.runs[0];
     const previewOk = run && run.status === "done";
@@ -490,7 +500,7 @@
     const hi = a.lang !== "en";
     const card = el("article", `agent${a.status === "active" ? " is-active" : ""}`);
     const head = el("div", "agent-name");
-    head.append(el("h2", null, a.name), stateBadge(a, w));
+    head.append(agentTitle(a), stateBadge(a, w));
     card.append(head, blockLine(a.blocks));
     card.append(el("p", `access ${a.access}`, a.access === "none" ? w.noAccess : w.connector));
     if (!a.available) { card.append(el("p", "note", w.soon)); return card; }
@@ -1680,7 +1690,7 @@
     const hi = a.lang !== "en";
     const card = el("article", "agent office-agent");
     const head = el("div", "agent-name");
-    head.append(el("h2", null, a.name), el("span", "state proposed", T(hi, "Taiyar", "Ready")));
+    head.append(agentTitle(a), el("span", "state proposed", T(hi, "Taiyar", "Ready")));
     card.append(head);
     if (a.brain && a.brain.text) card.append(el("p", "brain-seen", (hi ? "Samjha: " : "Understood: ") + a.brain.text));
     if (a.formula) {
@@ -1702,7 +1712,7 @@
     const hi = a.lang !== "en";
     const card = el("article", "agent db");
     const head = el("div", "agent-name");
-    head.append(el("h2", null, a.name));
+    head.append(agentTitle(a));
     const c = a.connector;
     const st = el("span", `state ${c && c.online ? "active" : c ? "paused" : "proposed"}`,
                   c && c.online ? T(hi, "Juda hua", "Connected") : c ? T(hi, "Offline", "Offline") : T(hi, "Taiyar", "Ready"));
@@ -1867,7 +1877,7 @@
     const w = W(a.lang);
     const card = el("article", `agent${a.status === "active" ? " is-active" : ""}`);
     const head = el("div", "agent-name");
-    head.append(el("h2", null, a.name), stateBadge(a, w));
+    head.append(agentTitle(a), stateBadge(a, w));
     card.append(head);
     card.append(el("p", "access connector", a.schedule));
     if (a.next_run_at) {
@@ -2041,7 +2051,7 @@
   // What each area can do today and what is still coming: said plainly before anyone starts
   const SCOPE = {
     db: {
-      title: ["Databases ke liye", "For databases"],
+      title: ["DBaba: databases ke liye", "DBaba: for databases"],
       now: [["MySQL, MariaDB aur PostgreSQL", "MySQL, MariaDB and PostgreSQL"],
             ["Error paste karo (jaise 1062 Duplicate entry, deadlock, access denied): wajah, fix aur aage se bachav", "Paste an error (e.g. 1062 Duplicate entry, deadlock, access denied): the cause, the fix and how to prevent it"],
             ["Slow query paste karo: kya galat hai, nayi query aur sahi index", "Paste a slow query: what's wrong, a rewritten query and the right indexes"],
@@ -2049,7 +2059,7 @@
       soon: [["SQL Server, MongoDB, Redis, Oracle", "SQL Server, MongoDB, Redis, Oracle"]],
     },
     ms: {
-      title: ["Microsoft tools ke liye", "For Microsoft tools"],
+      title: ["Sheetu: Excel aur Word ke liye", "Sheetu: for Excel and Word"],
       now: [["Excel: problem batao, file mein asli wajah dhoondh ke saboot ke saath theek karta hai (Undo ke saath)", "Excel: tell it the problem; it finds the real cause in your file, shows the proof and fixes it (with Undo)"],
             ["Excel: badlav, charts, highlight, sawaal (total, region-wise, top 10…)", "Excel: changes, charts, highlighting, questions (totals, region-wise, top 10…)"],
             ["Word: replace, formatting, emails/phones/amounts nikalna, summary", "Word: replace, formatting, pulling out emails/phones/amounts, summary"]],

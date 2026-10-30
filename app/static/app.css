@@ -775,3 +775,6 @@ body[data-state="active"] .stage { animation: stage-in .35s ease both; }
 /* in a conversation the chat scrolls under the fixed bar: give the bar a soft background so its icons never sit on text */
 body[data-state="active"] .bar { background: linear-gradient(to bottom, var(--paper) 72%, rgba(238, 241, 246, 0)); padding-bottom: 22px; }
 .ans-view { margin-top: 10px; padding: 6px 14px; font-size: 14px; }
+.agent-tag { display: inline-block; margin-right: 10px; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  letter-spacing: .02em; vertical-align: 3px; color: #fff; background: linear-gradient(135deg, #5B5BF0, #7B4FE0); }
+.brain-tile .tile-sub { font-size: 13px; color: var(--muted); font-weight: 500; margin-left: 6px; }

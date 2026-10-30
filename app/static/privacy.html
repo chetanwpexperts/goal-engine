@@ -30,7 +30,8 @@
     button:focus-visible, a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
     #done { color: var(--ok); font-weight: 600; margin-top: 12px; }
     @media (max-width: 560px) { .rules li { grid-template-columns: 1fr; gap: 2px; } }
-  </style>
+  .acct-warn { color: #8A5300; background: #FCEBD2; padding: 10px 12px; border-radius: 10px; }
+</style>
 </head>
 <body>
 <main>
@@ -58,6 +59,7 @@
 
   <h2>Delete all my data</h2>
   <p>Removes everything from this browser at once: conversations, goals, agents, results, connected databases (with saved passwords), your email, and the email log. It can't be undone.</p>
+  <p id="acct-warn" class="acct-warn" hidden></p>
   <div class="del">
     <button id="delete" type="button">Delete all my data</button>
     <p id="done" hidden>Everything is deleted.</p>
@@ -67,13 +69,24 @@
   (() => {
     const b = document.getElementById("delete");
     let armed = false;
+    let account = null;
+    fetch("/api/account/me", { credentials: "same-origin" }).then((r) => r.json()).then((d) => {
+      account = d.user;
+      if (!account) return;
+      const w = document.getElementById("acct-warn");
+      w.textContent = `You're logged in as ${account.username}. This also deletes your free account; you'd need to sign up again.`;
+      w.hidden = false;
+      b.textContent = "Delete all my data and my account";
+    }).catch(() => {});
     b.addEventListener("click", async () => {
-      if (!armed) { armed = true; b.classList.add("sure"); b.textContent = "Tap again to delete everything"; return; }
+      if (!armed) { armed = true; b.classList.add("sure");
+        b.textContent = account ? "Tap again to delete everything, including your account" : "Tap again to delete everything"; return; }
       b.disabled = true;
       try {
         const r = await fetch("/api/privacy/delete-all", { method: "POST", credentials: "same-origin" });
         if (!r.ok) throw new Error();
         b.hidden = true;
+        document.getElementById("done").textContent = account ? "Everything is deleted, including your account." : "Everything is deleted.";
         document.getElementById("done").hidden = false;
       } catch (_) { b.disabled = false; b.textContent = "Couldn't delete. Try again"; }
     });

@@ -192,12 +192,13 @@
     if (ans && currentGoalId) {
       // every answer that made a sheet keeps a View button, even after newer answers replace the card
       const gid = currentGoalId;
-      const view = el("button", "btn ghost ans-view", /mein jod di|Download karo/.test(text) ? "Dekho" : "View"); view.type = "button";
+      const view = el("button", "btn ans-view", /mein jod di|Download karo/.test(text) ? "Dekho" : "View"); view.type = "button";
       view.addEventListener("click", async () => {
         view.disabled = true;
         try {
           const d = await api(`/api/office/answer?goal_id=${gid}&name=${encodeURIComponent(ans[1])}`);
-          const nodes = [el("h2", "acc-h", d.name), grid({ columns: d.columns, rows: d.rows })];
+          const rows = d.rows.map((r) => r.map((v) => (typeof v === "number" ? v.toLocaleString("en-IN") : v)));
+          const nodes = [el("h2", "acc-h", d.name), grid({ columns: d.columns, rows })];
           if (d.more) nodes.push(el("p", "fine", "First 50 rows. Download the file from the card for all of them."));
           openDrawer(nodes);
         } catch (ex) { addMachine(ex.message, [], true); }

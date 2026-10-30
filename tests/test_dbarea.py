@@ -179,3 +179,11 @@ def test_launch_switch_keeps_connecting_closed_for_everyone(client, locked, monk
     assert r.status_code == 403 and r.json()["db_area"] == "soon"
     assert client.post("/api/db-area/code").json()["db_area"] == "soon"
     assert client.get("/api/db-area").json()["state"] == "soon"
+
+
+def test_connect_question_doesnt_promise_a_closed_connection(client, monkeypatch, ml_mode):
+    from tests.test_ml import say
+
+    monkeypatch.setenv("DB_CONNECT", "off")
+    reply = say(client, "How do I connect my database?")["reply"]
+    assert "opens in a few days" in reply and "step or two" not in reply

@@ -555,6 +555,13 @@ def _owner(db: Session, visitor_id: str) -> dict:
 
 def plan_reply(mode: str, hi: bool, has_connector: bool, later: list[str] | None = None) -> str:
     title = MODE_TEXT[mode][0 if hi else 1]
+    from app import dbarea
+
+    if not dbarea.connect_open():          # launch switch: never promise a connection that isn't open yet
+        return ("Database jodna kuch dinon mein shuru hoga. Tab tak apna error message paste karo: main wajah, saboot aur fix "
+                "turant bataunga." if hi else
+                "Connecting your database opens in a few days. Until then, paste the error message you see and I'll give "
+                "you the cause, the proof and the fix right away.")
     if mode not in ("backup", "write") and later:
         names = ", ".join(("backup" if p == "backup" else ("data badalna" if hi else "changing data")) for p in later)
         note = (f" {names.capitalize()} agle level mein aayega." if hi else f" {names.capitalize()} comes in the next level.")

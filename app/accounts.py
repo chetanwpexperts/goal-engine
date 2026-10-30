@@ -438,7 +438,7 @@ def me(request: Request):
     from app import dbarea
 
     user = current_user(request)
-    return {"user": as_dict(user) if user else None, "db_connect": dbarea.connect_open()}
+    return {"user": as_dict(user) if user else None, "db_connect": dbarea.connect_open(user)}
 
 
 @router.post("/api/account/forgot")

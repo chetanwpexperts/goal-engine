@@ -187,3 +187,20 @@ def test_connect_question_doesnt_promise_a_closed_connection(client, monkeypatch
     monkeypatch.setenv("DB_CONNECT", "off")
     reply = say(client, "How do I connect my database?")["reply"]
     assert "opens in a few days" in reply and "step or two" not in reply
+
+
+def test_testers_can_connect_while_it_is_closed_for_everyone_else(client, locked, monkeypatch, ml_mode):
+    from tests.test_ml import say
+
+    monkeypatch.setenv("DB_CONNECT", "off")
+    monkeypatch.setenv("DB_CONNECT_TESTERS", " Asha29@example.com , other@example.com")
+    _verified(client, locked, 29)
+    assert client.get("/api/account/me").json()["db_connect"] is True
+    assert client.get("/api/db-area").json()["state"] == "locked"          # the normal lock still applies
+    _open(client, locked, 29)
+    assert client.get("/api/connectors").status_code == 200
+    assert "opens in a few days" not in say(client, "How do I connect my database?")["reply"]
+    client.post("/api/account/logout")
+    _verified(client, locked, 30)                                           # not on the list
+    assert client.get("/api/account/me").json()["db_connect"] is False
+    assert client.post("/api/connectors/direct", json=DB).json()["db_area"] == "soon"

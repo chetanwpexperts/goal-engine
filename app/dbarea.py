@@ -42,9 +42,13 @@ def enabled() -> bool:
     return os.getenv("DB_AREA_LOCK", "on").strip().lower() != "off"
 
 
-def connect_open() -> bool:
-    """DB_CONNECT=off: connecting databases is closed for everyone (launch fallback); paste answers keep working."""
-    return os.getenv("DB_CONNECT", "on").strip().lower() != "off"
+def connect_open(user=None) -> bool:
+    """DB_CONNECT=off: connecting databases is closed (launch fallback); paste answers keep working.
+    DB_CONNECT_TESTERS=a@x.com,b@y.com: those confirmed accounts can still connect, to test it before it opens."""
+    if os.getenv("DB_CONNECT", "on").strip().lower() != "off":
+        return True
+    testers = {e.strip().lower() for e in os.getenv("DB_CONNECT_TESTERS", "").split(",") if e.strip()}
+    return bool(user is not None and getattr(user, "email_verified", False) and (user.email or "").lower() in testers)
 
 
 NOT_FOUND = JSONResponse({"detail": "Not Found"}, status_code=404)
@@ -62,7 +66,7 @@ def state(db: Session, user: User | None, sess: UserSession | None) -> str:
     """none (logged out) / verify / locked / open"""
     if user is None or sess is None:
         return "none"
-    if not connect_open():
+    if not connect_open(user):
         return "soon"
     if not user.email_verified:
         return "verify"
@@ -75,9 +79,9 @@ def guard(request: Request):
     """Middleware helper: None to let the request through, or the reply to send instead."""
     if not LOCKED.match(request.url.path):
         return None
-    if not enabled():
-        return None if connect_open() else _locked_reply("soon")
     user, sess = accounts.current_user(request), getattr(request.state, "user_session", None)
+    if not enabled():
+        return None if connect_open(user) else _locked_reply("soon")
     from app.db import get_engine
 
     with Session(get_engine(), expire_on_commit=False) as db:
@@ -218,7 +222,7 @@ def area_code(request: Request, db: Session = Depends(get_db)):
     user, sess = _who(request, db)
     if user is None:
         return NOT_FOUND
-    if not connect_open():
+    if not connect_open(user):
         return _locked_reply("soon")
     if not user.email_verified:
         return _locked_reply("verify")
@@ -234,7 +238,7 @@ def area_open(body: CodeIn, request: Request, db: Session = Depends(get_db)):
     user, sess = _who(request, db)
     if user is None:
         return NOT_FOUND
-    if not connect_open():
+    if not connect_open(user):
         return _locked_reply("soon")
     if not user.email_verified:
         return _locked_reply("verify")

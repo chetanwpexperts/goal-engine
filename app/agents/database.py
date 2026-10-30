@@ -409,7 +409,7 @@ def live_checks(db: Session, user, agent: Agent | None, visitor_id: str, result:
     from app.dbknow import reasoning
     from app.models import UserSession
 
-    if not user.email_verified or not dbarea.connect_open():
+    if not user.email_verified or not dbarea.connect_open(user):
         return None
     if dbarea.enabled() and not db.scalar(select(UserSession.id).where(
             UserSession.user_id == user.id, UserSession.stepup_at.is_not(None),
@@ -553,11 +553,9 @@ def _owner(db: Session, visitor_id: str) -> dict:
             "business": owner.business_name if owner else ""}
 
 
-def plan_reply(mode: str, hi: bool, has_connector: bool, later: list[str] | None = None) -> str:
+def plan_reply(mode: str, hi: bool, has_connector: bool, later: list[str] | None = None, can_connect: bool = True) -> str:
     title = MODE_TEXT[mode][0 if hi else 1]
-    from app import dbarea
-
-    if not dbarea.connect_open():          # launch switch: never promise a connection that isn't open yet
+    if not can_connect:          # launch switch: never promise a connection that isn't open yet
         return ("Database jodna kuch dinon mein shuru hoga. Tab tak apna error message paste karo: main wajah, saboot aur fix "
                 "turant bataunga." if hi else
                 "Connecting your database opens in a few days. Until then, paste the error message you see and I'll give "
@@ -565,7 +563,7 @@ def plan_reply(mode: str, hi: bool, has_connector: bool, later: list[str] | None
     if mode not in ("backup", "write") and later:
         names = ", ".join(("backup" if p == "backup" else ("data badalna" if hi else "changing data")) for p in later)
         note = (f" {names.capitalize()} agle level mein aayega." if hi else f" {names.capitalize()} comes in the next level.")
-        return plan_reply(mode, hi, has_connector) + note
+        return plan_reply(mode, hi, has_connector, can_connect=can_connect) + note
     if mode in ("backup", "write"):
         return (f"Main ye karunga: {title}. Pehle read-only connector lagaate hain; badlaav wala level uske baad aayega."
                 if hi else f"Here's what I'll do: {title}. First we connect read-only; the changes level comes after that.")
@@ -666,7 +664,9 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
         goal.intent = goal.intent or "db_error"
         goal.missing_info, goal.pending = "[]", None
         db.commit()
-        return reasoning.report(result, turn.hi, signed_in=user is not None), [], "agent_plan"
+        from app import dbarea
+
+        return reasoning.report(result, turn.hi, signed_in=user is not None, can_connect=dbarea.connect_open(user)), [], "agent_plan"
     if query_in(text):                    # a pasted query is for the SQL checker, whatever else the message says
         return _check_pasted_query(db, goal, text, turn.hi)
 
@@ -689,7 +689,9 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     goal.next_action = "Connect the database, then pick a table"
     db.commit()
     has = bool(visitor_connectors(db, visitor_id))
-    reply = plan_reply(mode, turn.hi, has, later_parts(text))
+    from app import dbarea
+
+    reply = plan_reply(mode, turn.hi, has, later_parts(text), can_connect=dbarea.connect_open(account_for(db, visitor_id)))
     b = inputs.get("brain") or {}
     seen = dbbrain.describe(b, turn.hi) if (b.get("kind") in ("issue", "error", "sql") or b.get("id") == "slow_query") else ""
     if seen:

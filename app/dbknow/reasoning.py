@@ -253,7 +253,7 @@ def headline(result: dict, hi: bool) -> str:
     return short[:1].upper() + short[1:] if short else ""
 
 
-def report(result: dict, hi: bool, signed_in: bool = False) -> str:
+def report(result: dict, hi: bool, signed_in: bool = False, can_connect: bool = True) -> str:
     k = fundamentals()
     causes, layers = k["causes"], k["layers"]
     L = "hi" if hi else "en"
@@ -302,8 +302,7 @@ def report(result: dict, hi: bool, signed_in: bool = False) -> str:
     else:
         lines.append("Ye aapke paste kiye text pe based hai, aapke database pe check nahi kiya." if hi
                      else "Based on what you pasted, not checked on your database.")
-        import os
-        if os.getenv("DB_CONNECT", "on").strip().lower() == "off":
+        if not can_connect:
             lines.append("Database jodkar check karna kuch dinon mein shuru hoga." if hi
                          else "Checking it on your own database opens in a few days.")
         elif not signed_in:

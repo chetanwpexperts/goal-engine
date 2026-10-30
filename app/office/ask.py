@@ -1303,6 +1303,10 @@ def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:
                                            ". (An Excel PivotTable itself can't be built here; this is a summary table with the same numbers, "
                                            "and its formulas update when the data changes)")}
     if wb is not None:
+        if wb.calculation is None:                       # files from other tools (Python, exports) carry no calc settings
+            from openpyxl.workbook.properties import CalcProperties
+
+            wb.calculation = CalcProperties()
         wb.calculation.fullCalcOnLoad = True
         wb.save(out)
     return res

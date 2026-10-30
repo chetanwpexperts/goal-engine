@@ -5,6 +5,7 @@ time, and the privacy clean-up deletes everything after an hour. No AI: app/offi
 app/office (doing it).
 """
 
+import logging
 import os
 import json
 import re
@@ -455,7 +456,10 @@ def _work(file_id: int, task: str, args: dict) -> None:
         except office.OfficeError as exc:
             f.status, f.error = "error", str(exc)
         except Exception as exc:  # noqa: BLE001 - a broken file must not crash the worker
-            f.status, f.error = "error", f"File padhi nahi ja saki ({type(exc).__name__}). Excel mein khol kar Save As .xlsx karke dobara daalo."
+            logging.getLogger(__name__).exception("Office %s job on file %s failed", task, f.id)
+            f.status, f.error = "error", (f"File padhi nahi ja saki ({type(exc).__name__}). Excel mein khol kar Save As .xlsx karke dobara daalo."
+                                          if (args or {}).get("hi") else
+                                          f"I couldn't work on this file ({type(exc).__name__}). Open it in Excel, Save As .xlsx and upload it again.")
         finally:
             if lane:
                 lane.release()
@@ -725,8 +729,10 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
         return "Aakhri badlav wapas le raha hoon." if hi else "Undoing the last change."
     from app.office import edits
 
-    if edits.is_order(text) and _edit_plan(f, text):
-        return ask_task(db, agent, f, text, hi)           # "make names UPPER CASE", "remove blank rows": the edit, not a scan fix
+    if edits.is_order(text) and len(ops_in(text)) < 2 and _edit_plan(f, text):
+        # "make names UPPER CASE", "remove blank rows": the edit, not a scan fix. A message naming several of the
+        # agent's fixes ('clean it: duplicates, extra spaces, north/NORTH, numbers as text...') is a clean-up, not one edit.
+        return ask_task(db, agent, f, text, hi)
     if (f.path or "").lower().endswith(".docx"):
         return ask_task(db, agent, f, text, hi)           # a Word document: its own questions and changes
     ops = ops_in(text)
@@ -782,7 +788,65 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
                 "To remove them later, type 'remove duplicates'.")
     if not wants_do(text):
         return _answer(agent, report, ops, sheets, hi, f)
+    if len(ops) >= 2:
+        return _clean_now(db, f, ops, sheets, hi, text)    # a clean-up list: do it, then say exactly what changed and what didn't
     return _doing(start_fix(db, f, ops, sheets), ops, sheets, hi)
+
+
+NOT_CHECKED_EN = ("dates in mixed or impossible formats, email addresses, negative or missing numbers, wrong or typed-in totals, "
+                  "and spelling in headings")
+NOT_CHECKED_HI = ("alag-alag ya galat format ki dates, email addresses, negative ya khaali numbers, galat ya haath se likhe totals, "
+                  "aur headings ki spelling")
+
+
+def _clean_now(db: Session, f: OfficeFile, ops: list[str], sheets: list[str], hi: bool, text: str) -> str:
+    """A clean-up request: run the fixes (small files right away) and report only what really happened."""
+    ops = [o for o in ops if o in office.FIX_OPS]
+    if heavy(f) or not ops:
+        return _doing(start_fix(db, f, ops, sheets), ops, sheets, hi)
+    start_fix(db, f, ops, sheets)
+    f.status = "queued"
+    db.commit()
+    _work(f.id, "fix", {"ops": ops, "sheets": sheets or []})
+    db.refresh(f)
+    if f.status != "ready":
+        return f.error or ("Ye file theek nahi ho payi." if hi else "I couldn't fix this file.")
+    r = loads(f.result, {}) or {}
+    ch, ex = r.get("changes") or {}, r.get("examples") or {}
+    lines = []
+    for op in ops:
+        n = ch.get(op) or 0
+        if not n:
+            continue
+        e = (ex.get(op) or [None])[0]
+        eg = (f' (jaise {e[2]} → {e[3]}, {e[1]})' if hi else f' (e.g. "{e[2]}" → "{e[3]}" in {e[1]})') if e else ""
+        lines.append(f"- {_OP_NAMES[op][0 if hi else 1].capitalize()}: {n}{eg}")
+    if "remove_duplicates" in ops and ch.get("duplicates_skipped_sheets"):
+        lines.append("- Duplicate rows: hataye nahi, kyunki is sheet mein formulas hain jo rows hatane se toot sakte hain. "
+                     "'duplicate dikhao' likho, nayi sheet mein list kar dunga." if hi else
+                     "- Duplicate rows: not deleted, because this sheet has formulas that deleting rows could break. "
+                     "Type 'show duplicates' and I'll list them in a new sheet.")
+    left = (loads(f.report, {}) or {}).get("summary", {})
+    odd, errs = left.get("odd_formulas") or 0, left.get("errors") or 0
+    head = ((f"{f.name} mein ye theek kiya:" if lines else f"{f.name} mein in cheezon mein kuch theek karne layak nahi mila.") if hi else
+            (f"Done in {f.name}:" if lines else f"Nothing of these needed fixing in {f.name}."))
+    out = [head, *lines]
+    still = ([f"{odd} formula jo apne column se alag hain" if hi else f"{odd} formula{'s' if odd != 1 else ''} that don't match the rest of their column"] if odd else []) + \
+            ([f"{errs} cells mein error" if hi else f"{errs} cell{'s' if errs != 1 else ''} showing an error"] if errs else [])
+    if still:
+        out.append((f"Abhi bhi dekhna hai: {', '.join(still)}. Card pe dikh rahe hain." if hi else
+                    f"Still to look at: {' and '.join(still)}. They're on the card."))
+    out.append((f"Ye main abhi apne aap check nahi karta: {NOT_CHECKED_HI}. Inke liye expert se baat kar sakte ho." if hi else
+                f"Not checked automatically yet: {NOT_CHECKED_EN}. You can talk to an expert for these."))
+    out.append("Theek ki hui copy card pe Download karo; 'undo' likhoge to wapas ho jayega." if hi else
+               "Download the fixed copy from the card; type 'undo' to put it back.")
+    try:
+        from app import learning
+
+        learning.ask_to_learn(db, "office", text, guess="partly done: clean-up list")
+    except ValueError:
+        pass
+    return "\n".join(out)
 
 
 def _answer(agent, report, ops, sheets, hi, f) -> str:
@@ -1124,11 +1188,11 @@ def holds_conversation(db: Session, goal: Goal, text: str, any_text: bool = Fals
 
 
 def continue_turn(db: Session, goal: Goal, agent: Agent, text: str):
-    from app.ml.normalize import HINGLISH_MARKERS, detect_language, tokens
+    from app.ml.normalize import _ALSO_ENGLISH, HINGLISH_MARKERS, detect_language, tokens
 
     lang = detect_language(text)
     if lang == "English" and goal.detected_language in ("Hinglish", "Hindi") and (
-            len(text.split()) < 4 or any(w in HINGLISH_MARKERS for w in tokens(text))):
+            len(text.split()) < 4 or any(w in HINGLISH_MARKERS and w not in _ALSO_ENGLISH for w in tokens(text))):
         lang = goal.detected_language
     hi = lang in ("Hinglish", "Hindi")
     reply = chat_task(db, agent, text, hi)

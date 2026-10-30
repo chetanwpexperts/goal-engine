@@ -319,3 +319,38 @@ def test_one_column_compared_with_another(client, ml_mode):
     assert "Reorder Level" in ask["reply"] and any("Closing Stock below Reorder Level" == o for o in ask.get("options", []))
     got = say(client, "Closing Stock below Reorder Level", goal)["reply"]
     assert "Printer" in got and "Router" in got and "Laptop" not in got
+
+
+def _messy_without_calc_settings():
+    """A workbook like ones made by other tools: no calculation settings in it (openpyxl's wb.calculation is None)."""
+    import zipfile
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sales"
+    ws.append(["Invoice", "Region", "Qty", "Price", "Total"])
+    rows = [("INV-1", "North", 2, 100), ("INV-2", "north", 1, "₹1,499"), ("INV-3", "NORTH ", 3, 50), ("INV-4", " South", 1, "200")]
+    for i, (inv, reg, q, p) in enumerate(rows, start=2):
+        ws.append([inv, reg, q, p, f"=C{i}*D{i}"])
+    raw = io.BytesIO(); wb.save(raw)
+    src, out = zipfile.ZipFile(io.BytesIO(raw.getvalue())), io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for item in src.infolist():
+            data = src.read(item.filename)
+            if item.filename == "xl/workbook.xml":
+                data = re.sub(rb"<calcPr[^>]*/>", b"", data)
+            z.writestr(item, data)
+    return out.getvalue()
+
+
+def test_clean_up_list_on_a_file_without_calc_settings(client, ml_mode):
+    r = say(client, "excel file ke formula check karo")
+    goal, agent = r["goal"]["id"], next(a for a in r["agents"] if a.get("office"))
+    f = _upload(client, agent["id"], _messy_without_calc_settings(), name="sales.xlsx")
+    assert f["status"] == "ready"
+    reply = say(client, "Your task is to clean and correct this file: - Duplicate records - Extra spaces in text - Region values like "
+                        "North, north, NORTH - Numbers stored as text - Currency symbol inside numeric data - Mixed date formats", goal)["reply"]
+    assert "column widths" not in reply.lower() and "AttributeError" not in reply
+    assert reply.startswith("Done in sales.xlsx") and "Extra spaces" in reply and "Text-numbers" in reply   # English, what really changed
+    assert "Not checked automatically yet" in reply and "dates" in reply
+    assert "Duplicate rows: not deleted" in reply or "Duplicate rows" not in reply
+    assert say(client, "make a pivot of qty by region", goal)["reply"] and "AttributeError" not in say(client, "total qty by region", goal)["reply"]

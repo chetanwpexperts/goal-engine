@@ -16,10 +16,14 @@ import secrets
 from datetime import timedelta
 from pathlib import Path
 
+import logging
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Agent, Connector, ConnectorJob, Goal, dumps, loads, utcnow
+
+log = logging.getLogger(__name__)
 from app.mind import packs
 
 
@@ -171,6 +175,11 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
         raise DatabaseError("This connector is disconnected")
     if kind not in JOB_KINDS:
         raise DatabaseError("Unknown job")
+    if connector.kind in ("direct", "php"):
+        from app import dbarea
+
+        if dbarea.enabled():
+            dbarea.check_queue(db, connector.visitor_id)       # jobs run on our server: per-account and total limits
     payload = dict(payload or {})
     if kind in ("query", "export", "explain"):
         payload["sql"] = read_only_sql(payload.get("sql", ""))
@@ -385,6 +394,58 @@ def wants_database(goal: Goal | None, text: str) -> bool:
     return goal.intent == "db_automation" or bool(DB_WORDS.search(text or ""))
 
 
+def account_for(db: Session, visitor_id: str):
+    from app.models import User
+
+    return db.scalar(select(User).where(User.visitor_id == visitor_id)) if visitor_id else None
+
+
+def live_checks(db: Session, user, agent: Agent | None, visitor_id: str, result: dict) -> dict | None:
+    """Read-only checks on the account's connected database (typed details), only while its database area is open."""
+    from datetime import timedelta
+
+    from app import dbarea
+    from app.agents import direct
+    from app.dbknow import reasoning
+    from app.models import UserSession
+
+    if not user.email_verified:
+        return None
+    if dbarea.enabled() and not db.scalar(select(UserSession.id).where(
+            UserSession.user_id == user.id, UserSession.stepup_at.is_not(None),
+            UserSession.db_seen_at > utcnow() - dbarea.IDLE_LOCK).limit(1)):
+        return None
+    inputs = (loads(agent.inputs, {}) or {}) if agent else {}
+    connector = db.get(Connector, inputs["connector_id"]) if inputs.get("connector_id") else None
+    if connector is None or connector.visitor_id != visitor_id or connector.kind != "direct" or not connector.secret:
+        connector = db.scalar(select(Connector).where(Connector.visitor_id == visitor_id, Connector.kind == "direct",
+                                                      Connector.secret.is_not(None), Connector.status != "disconnected")
+                              .order_by(Connector.last_seen_at.desc()).limit(1))
+    if connector is None:
+        return None
+    plan = reasoning.live_plan(result)
+    if not plan:
+        return None
+    try:
+        conn = direct._open(direct.decrypt(connector.secret))
+    except Exception as exc:  # noqa: BLE001 - can't reach it now: the answer stays "based on what you pasted"
+        log.info("live checks: couldn't open connector %s: %s", connector.id, str(exc)[:200])
+        return None
+    try:
+        if (connector.db_type or "mysql") == "mysql":
+            for limit in ("SET SESSION max_execution_time = 10000", "SET SESSION max_statement_time = 10"):   # MySQL / MariaDB
+                try:
+                    conn.conn.cursor().execute(limit)
+                except Exception:  # noqa: BLE001
+                    pass
+        live = reasoning.run_live(plan, lambda sql, params: conn.rows(sql, params, limit=50)[1])
+        connector.last_seen_at = utcnow()
+        db.commit()
+        return {k: v for k, v in live.items() if v is not None} or None
+    finally:
+        direct._close(conn)
+
+
 def goal_agent(db: Session, goal: Goal) -> Agent | None:
     return db.scalar(select(Agent).where(Agent.goal_id == goal.id, Agent.recipe == "database").order_by(Agent.id.desc()))
 
@@ -584,6 +645,10 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
         result = reasoning.diagnose(text)
         mind.set_pattern("diagnose")
         agent = goal_agent(db, goal) or create_agent(db, goal, detect_mode(text))     # the card stays: connect to prove it
+        user = account_for(db, visitor_id)
+        live = live_checks(db, user, agent, visitor_id, result) if user is not None else None
+        if live:
+            result = reasoning.diagnose(text, live)          # proved (or ruled out) on their own database
         rec = dbbrain.recognize(text)
         if rec["kind"] in ("error", "issue"):
             inputs = loads(agent.inputs, {}) or {}
@@ -594,8 +659,7 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
         goal.intent = goal.intent or "db_error"
         goal.missing_info, goal.pending = "[]", None
         db.commit()
-        signed_in = False                 # accounts arrive with the isolated database area
-        return reasoning.report(result, turn.hi, signed_in=signed_in), [], "agent_plan"
+        return reasoning.report(result, turn.hi, signed_in=user is not None), [], "agent_plan"
     if query_in(text):                    # a pasted query is for the SQL checker, whatever else the message says
         return _check_pasted_query(db, goal, text, turn.hi)
 

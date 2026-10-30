@@ -765,3 +765,5 @@ body[data-state="active"] .stage { animation: stage-in .35s ease both; }
 .acc-cta { margin-top: 10px; }
 .drawer .linkish { margin: 4px 0 0; }
 .drawer .acc-cta, .drawer .btn { justify-self: start; }
+.linkish.inline { margin: 0; display: inline; }
+.db-open { margin: 0 0 10px; }

@@ -392,6 +392,7 @@ class UserSession(Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime)
     stepup_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)   # last email code for the database area
+    db_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # last use of the database area (15 min idle lock)
     ip: Mapped[str] = mapped_column(String(64), default="")
 
 
@@ -415,3 +416,17 @@ class AuthAttempt(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     key: Mapped[str] = mapped_column(String(120), index=True)   # e.g. "login-ip:1.2.3.4", "login-user:5"
     at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class DbConnectLog(Base):
+    """Every attempt to connect a database from the locked area: when, where from, to which server. No passwords."""
+    __tablename__ = "db_connect_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    host: Mapped[str] = mapped_column(String(200))
+    database: Mapped[str] = mapped_column(String(120), default="")
+    ip: Mapped[str] = mapped_column(String(64), default="")
+    ok: Mapped[bool] = mapped_column(Boolean, default=False)
+    note: Mapped[str] = mapped_column(String(200), default="")

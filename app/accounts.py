@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_db
-from app.models import AuthAttempt, EmailCode, User, UserSession, utcnow
+from app.models import AuthAttempt, EmailCode, User, UserSession, utcnow  # noqa: F401 - User used by main
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -420,6 +420,11 @@ def _new_guest_cookie(response: Response) -> None:
 def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     s = getattr(request.state, "user_session", None)
     if s is not None:
+        from app import dbarea
+
+        sess = db.get(UserSession, s.id)
+        if sess is not None:
+            dbarea.lock(db, sess)                 # typed database passwords go with the session
         db.execute(delete(UserSession).where(UserSession.id == s.id))
         db.commit()
     response.delete_cookie(SESSION_COOKIE)

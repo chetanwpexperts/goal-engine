@@ -305,6 +305,9 @@ def report(result: dict, hi: bool, signed_in: bool = False) -> str:
         if not signed_in:
             lines.append("Free account banao aur database jodo: main khud check karke saboot ke saath pakka jawab dunga." if hi
                          else "Create a free account to connect your database and get a proven answer.")
+        else:
+            lines.append("Database area kholo aur database jodo: main khud check karke saboot ke saath bataunga." if hi
+                         else "Open your database area and connect your database, and I'll check it there and prove it.")
     return "\n".join(lines).rstrip()
 
 

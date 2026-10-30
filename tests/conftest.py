@@ -13,6 +13,7 @@ os.environ["AI_DAILY_CAP"] = "8"
 os.environ["ENGINE_MODE"] = "ai"   # AI-path tests; ML tests switch it on per test
 os.environ["AGENT_SCHEDULER"] = "off"
 os.environ["EXPOSE_INTERNALS"] = "1"   # tests read how a message was understood; the live site never sends it
+os.environ["DB_AREA_LOCK"] = "off"   # older tests connect without an account; test_dbarea switches it on
 os.environ["SITE_MODE"] = "open"   # the coming-soon gate has its own test
 
 from fastapi.testclient import TestClient  # noqa: E402

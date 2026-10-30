@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.ai.router import AIRouter, AIUnavailable
 from app.ml.brain import Brain
 from app.agents import automation
-from app import accounts, expert, privacy
+from app import accounts, dbarea, expert, privacy
 from app.agents import database as dbagent
 from app.agents import direct as dbagent_direct
 from app.agents import phpconn
@@ -67,6 +67,7 @@ _MIN_JS: dict = {}
 
 
 app.include_router(accounts.router)
+app.include_router(dbarea.router)
 
 
 @app.get("/static/app.js", include_in_schema=False)
@@ -133,6 +134,7 @@ def _scheduler(stop: threading.Event) -> None:
                     _last_maintenance = time.monotonic()
                     log.info("Privacy clean-up: %s", privacy.maintain(db))
                     log.info("Account clean-up: %s", accounts.maintain(db))
+                    log.info("Database area: %s", dbarea.maintain(db))
             finally:
                 db.close()
         except Exception:  # noqa: BLE001 - the scheduler must keep going
@@ -240,7 +242,8 @@ async def visitor_cookie(request: Request, call_next):
     if request.state.user is not None:
         # logged in: the account's own chats, on every device (the guest cookie is left as it is)
         request.state.visitor_id = request.state.user.visitor_id
-    response = await call_next(request)
+    blocked = await run_in_threadpool(dbarea.guard, request)     # the locked database area
+    response = blocked if blocked is not None else await call_next(request)
     if fresh:
         response.set_cookie(COOKIE, visitor, max_age=60 * 60 * 24 * 180, httponly=True,
                             samesite="lax", secure=get_settings().cookie_secure)
@@ -909,11 +912,20 @@ def connect_direct(body: DirectIn, request: Request, db: Session = Depends(get_d
     # the address nginx saw (the right-most forwarded one); the left-most part can be faked by the client
     fwd = [x.strip() for x in (request.headers.get("x-forwarded-for") or "").split(",") if x.strip()]
     client_ip = fwd[-1] if fwd else (request.client.host if request.client else "")
+    user = db.get(accounts.User, accounts.current_user(request).id) if accounts.current_user(request) else None
+    form = body.model_dump()
     try:
-        connector = dbagent_direct.connect(db, visitor, body.model_dump(), body.name, allow_changes=body.allow_changes,
+        if user is not None and dbarea.enabled():
+            dbarea.before_connect(db, user, (form.get("host") or "").strip().lower()[:200], client_ip)
+        connector = dbagent_direct.connect(db, visitor, form, body.name, allow_changes=body.allow_changes,
                                            client_ip=client_ip)
     except (dbagent_direct.DirectError, dbagent.DatabaseError) as exc:
+        if user is not None:
+            dbarea.record(db, user, form, client_ip, False, str(exc)[:200])
         return JSONResponse({"error": str(exc), "use_command": bool(getattr(exc, "use_command", False))}, status_code=400)
+    if user is not None:
+        dbarea.record(db, user, form, client_ip, True)
+        dbarea.tell_owner(user, connector.host_label or "", connector.db_name or "", client_ip)
     if body.agent_id:
         agent = own_agent(db, body.agent_id, visitor)
         inputs = loads(agent.inputs, {}) or {}

@@ -67,7 +67,10 @@
     const res = await fetch(path, { headers: { "Content-Type": "application/json" }, credentials: "same-origin", ...options });
     let data = {};
     try { data = await res.json(); } catch (_) { /* empty */ }
-    if (!res.ok) { const e = new Error(data.error || data.detail || "Something went wrong. Try again."); e.data = data; throw e; }
+    if (!res.ok) {
+      if (data.db_area) document.dispatchEvent(new CustomEvent("ge:dbarea", { detail: data.db_area }));
+      const e = new Error(data.error || data.detail || "Something went wrong. Try again."); e.data = data; throw e;
+    }
     return data;
   }
 
@@ -724,8 +727,68 @@
     return box;
   }
 
+  // ---- the locked database area: account, confirmed email, fresh code; locks after 15 idle minutes
   function setupBox(a, hi) {
     const box = el("div", "slot");
+    box.append(el("p", "fine", T(hi, "Check kar raha hoon…", "Checking…")));
+    (window.GE_meReady || Promise.resolve()).then(() => dbGate(a, hi, box));
+    return box;
+  }
+
+  async function dbGate(a, hi, box) {
+    const me = window.GE_me;
+    const btn = (label, cls, fn) => { const b = el("button", cls, label); b.type = "button"; b.addEventListener("click", fn); return b; };
+    if (!me) {
+      const row = el("div", "acts flat");
+      row.append(btn(T(hi, "Free account banao", "Create free account"), "btn solid", () => window.GE_openAccount("signup")),
+                 btn(T(hi, "Log in", "Log in"), "btn", () => window.GE_openAccount("login")));
+      box.replaceChildren(
+        el("p", "ask", T(hi, "Database jodne ke liye free account chahiye", "Connecting a database needs a free account")),
+        el("p", "fine", T(hi, "Taaki sirf aap hi apna database dekh sako. Password sirf kaam ke dauraan rakha jaata hai, phir delete.",
+                              "So only you can reach your database. Your password is kept only while you're working, then deleted.")), row);
+      return;
+    }
+    if (!me.email_verified) {
+      box.replaceChildren(el("p", "ask", T(hi, "Pehle apna email confirm karo", "Confirm your email first")),
+                          btn(T(hi, "Email confirm karo", "Confirm email"), "btn solid", () => window.GE_openAccount("verify")));
+      return;
+    }
+    let st;
+    try { st = await api("/api/db-area"); } catch (ex) { box.replaceChildren(el("p", "note err", ex.message)); return; }
+    if (st.state !== "open") { box.replaceChildren(...dbUnlock(hi, () => dbGate(a, hi, box))); return; }
+    box.replaceChildren();
+    setupBoxOpen(a, hi, box);
+    const lockRow = el("p", "fine db-open");
+    lockRow.append(el("span", null, T(hi, "Database area khula hai. 15 minute bina kaam ke apne aap lock ho jayega. ",
+                                        "Database area open. It locks itself after 15 minutes without use. ")));
+    const lockNow = el("button", "linkish inline", T(hi, "Abhi lock karo", "Lock now")); lockNow.type = "button";
+    lockNow.addEventListener("click", async () => { await api("/api/db-area/lock", { method: "POST" }); dbGate(a, hi, box); });
+    lockRow.append(lockNow);
+    box.prepend(lockRow);
+  }
+
+  function dbUnlock(hi, onOpen) {
+    const send = el("button", "btn solid", T(hi, "Code bhejo", "Email me a code")); send.type = "button";
+    const note = el("p", "fine", T(hi, "Har baar database area kholne ke liye aapke email pe ek naya code aata hai. Isse koi aur aapke account se database nahi jod sakta.",
+                                       "Each time you open the database area, we email you a fresh code. So nobody else can connect a database with your account."));
+    const holder = el("div");
+    send.addEventListener("click", async () => {
+      send.disabled = true;
+      try {
+        const d = await api("/api/db-area/code", { method: "POST" });
+        note.textContent = T(hi, `Code ${d.email} pe bheja. 10 minute chalega.`, `Code sent to ${d.email}. It works for 10 minutes.`);
+        send.hidden = true;
+        holder.replaceChildren(codeForm(async (code) => {
+          await api("/api/db-area/open", { method: "POST", body: JSON.stringify({ code }) });
+          onOpen();
+        }, T(hi, "Kholo", "Open")));
+      } catch (ex) { note.textContent = ex.message; send.disabled = false; }
+    });
+    return [el("p", "ask", T(hi, "Database area locked hai", "Your database area is locked")), note, send, holder];
+  }
+  window.GE_dbUnlock = dbUnlock;
+
+  function setupBoxOpen(a, hi, box) {
     if (a.connectors && a.connectors.some((c) => c.online)) {
       box.append(el("label", null, T(hi, "Pehle se juda database use karo", "Use a database you already connected")));
       const row = el("div", "acts flat");
@@ -2314,7 +2377,12 @@
     accountBtn.title = user ? user.username : "Account";
     document.dispatchEvent(new CustomEvent("ge:account", { detail: user }));
   }
-  api("/api/account/me").then((d) => showMe(d.user)).catch(() => {});
+  window.GE_meReady = api("/api/account/me").then((d) => showMe(d.user)).catch(() => {});
+  document.addEventListener("ge:dbarea", (e) => {
+    if (e.detail === "verify") { openAccount("verify"); return; }
+    if (!drawer.hidden) return;
+    openDrawer([el("h2", "acc-h", "Database area"), ...window.GE_dbUnlock(false, () => { drawer.hidden = true; refreshGoal(); })]);
+  });
 
   function accForm(cls) { const f = el("form", "expert-form acc " + (cls || "")); f.noValidate = true; return f; }
   function accField(label, input, hint) {

@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.ai.router import AIRouter, AIUnavailable
 from app.ml.brain import Brain
 from app.agents import automation
-from app import expert, privacy
+from app import accounts, expert, privacy
 from app.agents import database as dbagent
 from app.agents import direct as dbagent_direct
 from app.agents import phpconn
@@ -64,6 +64,9 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(title="Goal Engine", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 _MIN_JS: dict = {}
+
+
+app.include_router(accounts.router)
 
 
 @app.get("/static/app.js", include_in_schema=False)
@@ -129,6 +132,7 @@ def _scheduler(stop: threading.Event) -> None:
                 if time.monotonic() - _last_maintenance > 600:
                     _last_maintenance = time.monotonic()
                     log.info("Privacy clean-up: %s", privacy.maintain(db))
+                    log.info("Account clean-up: %s", accounts.maintain(db))
             finally:
                 db.close()
         except Exception:  # noqa: BLE001 - the scheduler must keep going
@@ -232,6 +236,10 @@ async def visitor_cookie(request: Request, call_next):
     if fresh:
         visitor = secrets.token_urlsafe(24)
     request.state.visitor_id = visitor
+    await run_in_threadpool(accounts.resolve, request)
+    if request.state.user is not None:
+        # logged in: the account's own chats, on every device (the guest cookie is left as it is)
+        request.state.visitor_id = request.state.user.visitor_id
     response = await call_next(request)
     if fresh:
         response.set_cookie(COOKIE, visitor, max_age=60 * 60 * 24 * 180, httponly=True,
@@ -490,6 +498,10 @@ def delete_all(request: Request, response: Response, db: Session = Depends(get_d
     for vid in [visitor] + _earlier_ids(request):
         for k, v in privacy.delete_visitor(db, vid).items():
             counts[k] = counts.get(k, 0) + (v or 0)
+    user = accounts.current_user(request)
+    if user is not None:
+        counts["account"] = accounts.delete_account(db, user.id)
+        response.delete_cookie(accounts.SESSION_COOKIE)
     response.delete_cookie(COOKIE)
     response.delete_cookie(PREV_COOKIE)
     return {"ok": True, "deleted": counts}

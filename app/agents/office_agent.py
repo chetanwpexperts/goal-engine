@@ -108,6 +108,33 @@ CAN_NOW_HI = ("extra space, duplicate rows, capital/small letters, text wale num
               "karna; aur aapke data ke sawaal (total, count, top 10)")
 
 
+# 'the whole file', 'every sheet': a question about all sheets, not the one in focus
+WHOLE_FILE = re.compile(r"\b(whole|entire|full|poori|puri|saari|sari|all|every|har|sab|sabhi)\b.{0,8}\b(file|workbook|sheets?)\b", re.I)
+
+
+def _focus_table(text: str, tables: list, focus_name: str | None):
+    """The sheet the conversation is on, unless this question names or clearly points at another, or asks about all."""
+    from app.office import ask as asker
+
+    if not focus_name or WHOLE_FILE.search(text or ""):
+        return None
+    focus = next((t for t in tables if t.name == focus_name), None)
+    if focus is None:
+        return None
+    other = asker.named_sheet(text, tables) or asker.pick_sheet(text, tables)
+    return None if other is not None and other is not focus else focus
+
+
+def _understand_in(asker, U, text: str, tables: list, focus):
+    """Try the sheet in focus first; if the question doesn't fit it, read it against the whole file."""
+    if focus is not None:
+        try:
+            return asker.understand(text, [focus])
+        except (asker.NeedMore, U.Missing):
+            pass
+    return asker.understand(text, tables)
+
+
 def not_yet(text: str) -> dict | None:
     for item, rx in NOT_YET:
         if rx is not None and rx.search(text or ""):
@@ -632,6 +659,34 @@ def open_file(db: Session, agent: Agent) -> OfficeFile | None:
                      .order_by(OfficeFile.updated_at.desc()))
 
 
+def answer_sheet(db: Session, goal: Goal, name: str) -> dict:
+    """An earlier answer, from its 'Answer N - ...' sheet in the file as it is now (View on an old answer)."""
+    from openpyxl import load_workbook
+
+    from app.office import is_own_sheet
+
+    agent = goal_agent(db, goal)
+    f = open_file(db, agent) if agent else None
+    if f is None or not f.path or not os.path.exists(f.path):
+        raise OfficeAgentError("That file has been removed (files are deleted an hour after you last use them). Upload it again to see answers.")
+    if not name.startswith("Answer ") or not is_own_sheet(name):
+        raise OfficeAgentError("Only Goal Engine's answer sheets can be opened here.")
+    for path in [p for p in (f.result_path, f.path) if p and os.path.exists(p) and p.lower().endswith((".xlsx", ".xlsm"))]:
+        wb = load_workbook(path, read_only=True, data_only=True)
+        try:
+            if name not in wb.sheetnames:
+                continue
+            rows = []
+            for i, row in enumerate(wb[name].iter_rows(values_only=True)):
+                if i > 50:
+                    break
+                rows.append(["" if v is None else (v.strftime("%d-%m-%Y") if hasattr(v, "strftime") else v) for v in row])
+            return {"name": name, "columns": [str(c) for c in rows[0]] if rows else [], "rows": rows[1:], "more": i > 50}
+        finally:
+            wb.close()
+    raise OfficeAgentError("That answer isn't in the file any more (it was undone or the file was replaced).")
+
+
 def pending_offer(agent: Agent) -> dict | None:
     return (loads(agent.inputs, {}) or {}).get("offer")
 
@@ -930,8 +985,9 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
     is_doc = (f.path or "").lower().endswith(".docx")
     if is_doc:
         from app.office import word
+    focus = None if is_doc else _focus_table(text, tables, inputs.get("focus_sheet"))
     try:
-        plan = (word.plan(text, f.path) if is_doc else None) or asker.understand(text, tables)
+        plan = (word.plan(text, f.path) if is_doc else None) or _understand_in(asker, U, text, tables, focus)
     except U.Missing as miss:
         # not in this file and can't be worked out from it: say so plainly, with what it does have
         agent.inputs = dumps(inputs)
@@ -990,6 +1046,8 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
             plan = asker.understand(text, [named])
         except asker.NeedMore:
             pass
+    if plan.get("table"):
+        inputs["focus_sheet"] = plan["table"]            # the next question that names no sheet stays here
     # the same question again after an answer: don't repeat that answer; offer the other readings
     if (sig.get("repeat") or sig.get("frustrated")) and last_plan and mo._same(plan, last_plan) and not plan.get("derive"):
         alts = mo.other_readings(text, tables, plan, hi)

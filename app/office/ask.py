@@ -340,6 +340,65 @@ def _compare_filters(text: str, t: Table):
     return out, text
 
 
+# 'closing stock below reorder level', 'stock reorder level se kam': one number column compared with another
+_COLCMP_WORD = re.compile(r"\b(?P<en>below|less than|lower than|smaller than|above|more than|greater than|higher than|bigger than|exceeds?)\b"
+                          r"|(?<!\bsab )\bse\s+(?P<hi>kam|kum|neeche|niche|zyada|jyada|jada|upar|adhik)\b", re.I)   # 'X se kam', never 'sabse/sab se kam' (= the least)
+_COLCMP_OP = {"below": "lt", "under": "lt", "less than": "lt", "lower than": "lt", "smaller than": "lt", "above": "gt", "over": "gt",
+              "more than": "gt", "greater than": "gt", "higher than": "gt", "bigger than": "gt", "exceeds": "gt", "exceed": "gt",
+              "kam": "lt", "kum": "lt", "neeche": "lt", "niche": "lt", "zyada": "gt", "jyada": "gt", "jada": "gt", "upar": "gt", "adhik": "gt"}
+
+
+def _col_spans(text: str, t: Table, cols: list[int]) -> list[tuple[int, int, int]]:
+    """Every place a number column is named in the text, by its full heading: (start, end, column), in text order."""
+    low = (text or "").lower()
+    out = []
+    for i in cols:
+        h = re.sub(r"\s+", " ", str(t.header[i] or "").strip().lower())
+        if len(h) < 3:
+            continue
+        for m in re.finditer(rf"(?<![\w]){re.escape(h)}(?![\w])", low):
+            out.append((m.start(), m.end(), i))
+    keep = [sp for sp in out if not any(a <= sp[0] and sp[1] <= b and (a, b) != sp[:2] for a, b, _ in out)]   # longer name wins
+    return sorted(keep)
+
+
+def _column_compare(text: str, t: Table):
+    """Two number columns compared ('X below Y' / 'X Y se kam') -> (X, ('colcmp', op, Y)). One named and compared with no
+    number ('below reorder level') -> ask which column, with the sheet's number columns as choices: never list every row.
+    The last comparison in the text wins (an answer to 'which column?' comes after the question it answers)."""
+    if CMP_RE.search(text or ""):
+        return [], text
+    text = re.sub(r"\s+", " ", text or "")
+    words = list(_COLCMP_WORD.finditer(text))
+    if not words:
+        return [], text
+    cols = _num_cols_of(t)
+    spans = _col_spans(text, t, cols)
+    for m in reversed(words):
+        op = _COLCMP_OP[(m.group("en") or m.group("hi")).lower()]
+        before = [sp for sp in spans if sp[1] <= m.start()]
+        after = [sp for sp in spans if sp[0] >= m.end()]
+        if before and after and before[-1][2] != after[0][2]:
+            a, b = before[-1], after[0]                    # 'closing stock below reorder level'
+        elif m.group("hi") and len(before) >= 2 and before[-2][2] != before[-1][2]:
+            a, b = before[-2], before[-1]                  # 'closing stock reorder level se kam'
+        else:
+            continue
+        return [(a[2], ("colcmp", op, b[2]))], text[:min(a[0], b[0])] + " " + text[max(a[1], b[1]):]
+    m = words[-1]
+    op = _COLCMP_OP[(m.group("en") or m.group("hi")).lower()]
+    named = {sp[2] for sp in spans}
+    if len(named) == 1:
+        one = next(iter(named))
+        others = [i for i in cols if i != one and t.header[i]]
+        if others:
+            word = "below" if op == "lt" else "above"
+            raise NeedMore(f"Kaunsa column {t.header[one]} se {'kam' if op == 'lt' else 'zyada'} hona chahiye?",
+                           f"Which column should be {word} {t.header[one]}?",
+                           [f"{t.header[i]} {word} {t.header[one]}" for i in others[:6]])
+    return [], text
+
+
 def _date_cols(t: Table) -> list[int]:
     return [i for i in range(len(t.header)) if t.header[i] and t.kind(i) == "date"]
 
@@ -594,6 +653,8 @@ def _concept_plan(text, tables, t, col, concept, vals):
     if agg in ("sum", "avg", "max", "min") and measure is None:
         agg = "count"
     cmp_f, stripped = _compare_filters(stripped, t)
+    if not cmp_f:
+        cmp_f, stripped = _column_compare(stripped, t)
     date_f, stripped = _date_filters(stripped, t)
     filters = [(i, v) for i, v in values_in(stripped, t) if i != col]
     filters += [f for f in _short_values(stripped, t, {i for i, _ in filters} | {col})] + cmp_f + date_f
@@ -770,6 +831,8 @@ def _plan_rows(text, tables):
         return {"job": "rows", "table": t.name}
     if any(values_in(text, o) for o in tables) or GROUP_RE.search(text or ""):
         return None
+    if len(tables) == 1:
+        return {"job": "rows", "table": tables[0].name}   # one sheet in view (the one the conversation is on): its count
     return {"job": "rows", "table": None}             # no sheet named: every sheet's count
 
 
@@ -821,6 +884,8 @@ def _plan_question(text, tables) -> dict:
     if named_sheet(text, tables) is t:
         text = _without_sheet_name(text, t)
     cmp_f, text = _compare_filters(text, t)                # 'above 60', '50k se zyada'
+    if not cmp_f:
+        cmp_f, text = _column_compare(text, t)             # 'closing stock below reorder level'
     date_f, text = _date_filters(text, t)                  # 'in 2024', 'march mein'
     special = _plan_order(text, t, cmp_f + date_f)
     if special:
@@ -1095,6 +1160,11 @@ def _match_filters(row, filters):
         if isinstance(v, (list, tuple)) and v and v[0] in ("filled", "blank"):
             empty = x is None or (isinstance(x, str) and not x.strip())
             return empty if v[0] == "blank" else not empty
+        if isinstance(v, (list, tuple)) and v and v[0] == "colcmp":
+            y = row[v[2]] if v[2] < len(row) else None
+            if not isinstance(x, (int, float)) or isinstance(x, bool) or not isinstance(y, (int, float)) or isinstance(y, bool):
+                return False
+            return {"gt": x > y, "ge": x >= y, "lt": x < y, "le": x <= y}[v[1]]
         if isinstance(v, (list, tuple)) and v and v[0] in ("cmp", "year", "month"):
             if v[0] == "year":
                 return isinstance(x, (datetime, date)) and x.year == v[1]
@@ -1118,7 +1188,9 @@ def _fdesc(t: Table, filters) -> str:
     out = []
     for i, v in filters:
         h = t.header[i] if i < len(t.header) else "?"
-        if isinstance(v, (list, tuple)) and v and v[0] == "cmp":
+        if isinstance(v, (list, tuple)) and v and v[0] == "colcmp":
+            out.append(f"{h} {OPS[v[1]]} {t.header[v[2]]}")
+        elif isinstance(v, (list, tuple)) and v and v[0] == "cmp":
             out.append(f"{h} {OPS[v[1]]} {_fmt(v[2])}")
         elif isinstance(v, (list, tuple)) and v and v[0] == "year":
             out.append(f"{h} in {v[1]}")
@@ -1221,6 +1293,8 @@ def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:
         return {"say": ("Ye badlav .xlsx file mein hi ho sakta hai; file ko Excel mein .xlsx save karke dobara upload karo" if hi else
                         "That change needs an .xlsx file; save it as .xlsx in Excel and upload it again"), "formula": "", "sheet": None}
     res = globals()[f"_run_{job}"](plan, tables, wb, hi, n)
+    if any(isinstance(v, (list, tuple)) and v and v[0] == "colcmp" for _, v in plan.get("filters") or []) and isinstance(res, dict):
+        res = {**res, "formula": ""}                     # COUNTIFS/SUMIFS can't compare two columns: no half-true formula
     if info is not None:
         res = {**res, **_derived_note(info, hi, res)}
     if plan.get("pivot"):

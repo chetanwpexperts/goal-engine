@@ -1,6 +1,7 @@
 """Microsoft agent end to end: chat -> card -> upload in pieces -> automatic check -> fix -> download -> compare -> cleanup."""
 
 import pytest
+import re
 import io
 import time
 
@@ -291,3 +292,30 @@ def test_unknown_excel_task_gets_no_false_promise(client, ml_mode):
 def test_charts_are_not_called_coming_soon(client, ml_mode):
     reply = say(client, "create a bar chart from my excel data")["reply"]
     assert "can't help with" not in reply and "charts" in reply
+
+
+def test_old_answers_can_still_be_viewed_and_the_sheet_stays_in_focus(client, ml_mode):
+    data = open("tests/data/practice.xlsx", "rb").read()
+    r = say(client, "excel file ke formula check karo")
+    goal, agent = r["goal"]["id"], next(a for a in r["agents"] if a.get("office"))
+    _upload(client, agent["id"], data, name="practice.xlsx")
+    first = say(client, "employee data sheet mein department wise total salary", goal)["reply"]
+    say(client, "location wise?", goal)
+    assert "Employee Data mein 40 records" in say(client, "how many rows?", goal)["reply"]      # stays on that sheet
+    name = re.search(r'"(Answer \d+ - [^"]+)"', first).group(1)
+    v = client.get(f"/api/office/answer?goal_id={goal}&name={name}").json()
+    assert v["name"] == name and v["rows"] and "Sales" in str(v["rows"])                      # the first answer, after newer ones
+    assert client.get(f"/api/office/answer?goal_id={goal}&name=Sales Data").status_code == 400   # only answer sheets
+    dup = say(client, "show duplicates", goal)["reply"]
+    assert "Answer" not in dup.split("Duplicates (Goal Engine)")[0]                            # its own sheets aren't data
+
+
+def test_one_column_compared_with_another(client, ml_mode):
+    data = open("tests/data/practice.xlsx", "rb").read()
+    r = say(client, "excel file ke formula check karo")
+    goal, agent = r["goal"]["id"], next(a for a in r["agents"] if a.get("office"))
+    _upload(client, agent["id"], data, name="practice.xlsx")
+    ask = say(client, "inventory sheet mein kaunse items reorder level se neeche hain", goal)
+    assert "Reorder Level" in ask["reply"] and any("Closing Stock below Reorder Level" == o for o in ask.get("options", []))
+    got = say(client, "Closing Stock below Reorder Level", goal)["reply"]
+    assert "Printer" in got and "Router" in got and "Laptop" not in got

@@ -491,7 +491,9 @@ def _conditional_details(text, r: M.Reading, t):
 def _sheets(p, wb, tables=None):
     every = p.get("all") and not (p["op"] == "replace" and p.get("col") is not None)
     names = [n for n in wb.sheetnames if tables is None or (tables.get(n) is not None and tables[n].rows)] if every else [p["table"]]
-    return [wb[n] for n in names if n in wb.sheetnames and not n.startswith("Answer ") and n not in ("Changes (Goal Engine)",)]
+    from app import office
+
+    return [wb[n] for n in names if n in wb.sheetnames and not office.is_own_sheet(n)]
 
 
 def _hdr(ws, t):

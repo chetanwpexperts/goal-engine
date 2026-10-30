@@ -370,6 +370,14 @@ def office_done(token: str, db: Session = Depends(get_db), visitor: str = Depend
     return _office_call(lambda: oa.file_dict(oa.finish_upload(db, oa.own_file(db, token, visitor))))
 
 
+@app.get("/api/office/answer")
+def office_answer(goal_id: int, name: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    from app.agents import office_agent as oa
+
+    goal = own_goal(db, goal_id, visitor)
+    return _office_call(lambda: oa.answer_sheet(db, goal, name[:40]))
+
+
 @app.get("/api/office/files/{token}")
 def office_get(token: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     from app.agents import office_agent as oa

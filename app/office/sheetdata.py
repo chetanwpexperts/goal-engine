@@ -97,7 +97,7 @@ def _load_tables(path: str) -> list[Table]:
     wb_f = None if big else load_workbook(path, read_only=True, data_only=False)
     raw = {}
     for ws in wb_v.worksheets:
-        if ws.title in (office.CHANGES_SHEET, "Duplicates (Goal Engine)") or ws.title.startswith("Answer "):
+        if office.is_own_sheet(ws.title):
             continue
         vals = [list(r) for r, _ in zip(ws.iter_rows(values_only=True), range(MAX_ROWS + 50))]
         forms = [list(r) for r, _ in zip(wb_f[ws.title].iter_rows(values_only=True), range(MAX_ROWS + 50))] if wb_f else None

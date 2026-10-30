@@ -180,6 +180,12 @@ def sheet_names(path: str) -> list[str]:
 
 # ------------------------------------------------------------------ small helpers
 CHANGES_SHEET = "Changes by Goal Engine"
+_OWN = re.compile(r"^Answer \d+ - |\(Goal Engine\)$|^Changes by Goal Engine$")
+
+
+def is_own_sheet(name: str) -> bool:
+    """Sheets Goal Engine added (answers, duplicate lists, the change log): never the person's data to scan or count."""
+    return bool(_OWN.search(name or ""))
 _ROWNO = re.compile(r"^\s*(record\s*id|s\.?\s*no\.?|sr\.?\s*no\.?|sl\.?\s*no\.?|serial(\s*no\.?)?|row(\s*no\.?)?|#|no\.?|id)\s*$", re.I)
 
 
@@ -255,7 +261,7 @@ def scan(path: str) -> dict:
     report = {"kind": kind_of(path), "size": os.path.getsize(path), "sheets": []}
     shapes: dict = {}
     for name, rows in sheets(path, formulas=True):
-        if name in (CHANGES_SHEET, "Duplicates (Goal Engine)"):
+        if is_own_sheet(name):
             continue
         info = {"name": name, "rows": 0, "columns": 0, "header": [], "formulas": 0, "broken_refs": [],
                 "odd_formulas": [], "errors": {}, "text_numbers": 0, "text_number_cells": [], "spaces": 0,
@@ -494,7 +500,7 @@ def _fix_full(path, out, ops, only_sheets=None):
                 if n >= 3 and n / sum(counter.values()) >= 0.6:
                     shapes[(ws.title, c)] = main
     for ws in wb.worksheets:
-        if ws.title in (CHANGES_SHEET, "Duplicates (Goal Engine)") or (only_sheets and ws.title not in only_sheets):
+        if is_own_sheet(ws.title) or (only_sheets and ws.title not in only_sheets):
             continue
         maps = case_maps(ws.iter_rows(values_only=True)) if "fix_case" in ops else {}
         for row in ws.iter_rows():
@@ -684,7 +690,7 @@ def find_duplicates(path: str, only_sheets=None) -> list[dict]:
     """Two kinds: the same whole row twice, and the same ID / invoice / email used on more than one row."""
     found = []
     for name, rows in sheets(path, formulas=False):
-        if name in (CHANGES_SHEET, DUP_SHEET) or (only_sheets and name not in only_sheets):
+        if is_own_sheet(name) or (only_sheets and name not in only_sheets):
             continue
         header, seen, keys, keycols, vals = None, {}, defaultdict(dict), [], defaultdict(list)
         for r_i, row in enumerate(rows, start=1):

@@ -1452,7 +1452,7 @@
     const drop = el("div", "dropzone");
     const [btn, inp] = pick(T(hi, "File chuno", "Choose a file"));
     const another = el("span", "another", T(hi, "Nayi file?", "Another file?"));
-    drop.append(el("p", "lead", T(hi, "Excel (.xlsx) ya CSV file yahan chhodo. 1.5 GB tak.", "Drop an Excel (.xlsx) or CSV file here. Up to 1.5 GB.")), another, btn, inp,
+    drop.append(el("p", "lead", T(hi, "Excel (.xlsx) ya CSV file yahan chhodo. Excel 16 MB tak, CSV 26 MB tak.", "Drop an Excel (.xlsx) or CSV file here. Excel up to 16 MB, CSV up to 26 MB.")), another, btn, inp,
                 el("p", "fine small", T(hi, "Original file kabhi nahi badalti; aapko theek ki hui copy milti hai. Files 1 ghante mein apne aap delete.",
                                          "Your original never changes; you get a fixed copy. Files are deleted automatically within an hour.")));
     const go = async (file) => {

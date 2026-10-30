@@ -256,3 +256,15 @@ def test_formula_requests_get_a_formula_for_their_sheet(client, ml_mode):
         assert f["report"]["summary"]["duplicate_rows"] == 2, text        # nothing was deleted
     r = say(client, "extra space hatane ka formula batao", goal_id)
     assert "TRIM(" in r["reply"], r["reply"]
+
+
+def test_files_too_big_for_the_ram_are_refused_before_upload(client, ml_mode):
+    from app.agents import office_agent as oa
+    r = say(client, "excel file ke formula check karo")
+    agent = next(a for a in r["agents"] if a.get("office"))
+    mb = 1024 * 1024
+    big = client.post("/api/office/files", json={"name": "huge.xlsx", "size": 17 * mb, "agent_id": agent["id"]})
+    assert big.status_code == 400 and "Excel files up to 16 MB" in big.json()["detail"] and "CSV" in big.json()["detail"]
+    ok = client.post("/api/office/files", json={"name": "rows.csv", "size": 20 * mb, "agent_id": agent["id"]})
+    assert ok.status_code == 200
+    assert oa.heavy(type("F", (), {"name": "a.xlsx", "size": 4 * mb})()) and not oa.heavy(type("F", (), {"name": "a.xlsx", "size": 2 * mb})())

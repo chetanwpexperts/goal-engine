@@ -1,6 +1,6 @@
 """The Microsoft agent: the person gives a file, the agent finds what's wrong and fixes it (a copy), or compares two.
 
-Files go to data/office/ in chunks (resumable, up to 1.5 GB), work runs in the background one big file at a
+Files go to data/office/ in chunks (resumable, size capped by the RAM they'd need), work runs in the background one big file at a
 time, and the privacy clean-up deletes everything after an hour. No AI: app/officeknow (what's wrong) +
 app/office (doing it).
 """
@@ -27,6 +27,34 @@ CHUNK_MAX = 8 * 1024 * 1024
 FILE_TTL = timedelta(hours=1)          # after the last thing done with the file
 FILE_MAX_AGE = timedelta(hours=8)      # whatever happens
 BIG = 50 * 1024 * 1024
+# Measured (Oct 2026, 300k rows): reading a file takes about this many MB of RAM per MB of file. Compressed formats
+# (xlsx is a zip) grow the most. Used to refuse files the server can't hold and to queue heavy ones one at a time.
+MEMORY_PER_MB = {".xlsx": 125, ".xlsm": 125, ".ods": 125, ".xlsb": 100, ".xls": 100, ".csv": 75, ".txt": 75,
+                 ".docx": 40, ".doc": 40}
+HEAVY_MB = 400                         # above this estimate a file waits for the one-at-a-time lane
+
+
+def memory_budget_mb() -> int:
+    try:
+        return max(200, int(os.getenv("OFFICE_MEMORY_MB", "2000")))
+    except ValueError:
+        return 2000
+
+
+def _factor(name: str) -> int:
+    return MEMORY_PER_MB.get(os.path.splitext(name or "")[1].lower(), 125)
+
+
+def memory_mb(name: str, size: int) -> float:
+    return size / (1024 * 1024) * _factor(name)
+
+
+def max_file_mb(name: str) -> int:
+    return max(1, int(memory_budget_mb() / _factor(name)))
+
+
+def heavy(f) -> bool:
+    return memory_mb(f.name, f.size) > HEAVY_MB or f.size > BIG
 OPEN_FILES_PER_VISITOR = 6
 class _ServerLane:
     """One big file at a time on the WHOLE server (all app processes), so a few huge uploads can't use up the RAM
@@ -175,8 +203,12 @@ def start_upload(db: Session, visitor_id: str, agent_id: int | None, name: str, 
     name = os.path.basename(name or "file.xlsx")[:150]
     if not name.lower().endswith(ALLOWED):
         raise OfficeAgentError("Upload an Excel (.xlsx, .xls, .xlsm, .xlsb), OpenDocument (.ods), CSV or Word (.docx) file.")
-    if not 0 < size <= MAX_SIZE:
-        raise OfficeAgentError("Files can be up to 1.5 GB.")
+    if not 0 < size <= MAX_SIZE or memory_mb(name, size) > memory_budget_mb():
+        ext = os.path.splitext(name)[1].lower()
+        kind = "CSV" if ext in (".csv", ".txt") else "Word" if ext in (".docx", ".doc") else "Excel"
+        raise OfficeAgentError(f"This file is too big for Goal Engine right now: {kind} files up to {max_file_mb(name)} MB. "
+                               + ("Save it as CSV (that allows bigger files), split it, or remove sheets you don't need."
+                                  if kind == "Excel" else "Split it into smaller files."))
     DATA.mkdir(parents=True, exist_ok=True)
     if shutil.disk_usage(DATA).free < size * 3 + 2 * 1024**3:
         raise OfficeAgentError("The server can't take a file this big right now. Please try again in a little while.")
@@ -297,7 +329,7 @@ def _work(file_id: int, task: str, args: dict) -> None:
     get_engine()
     with _SessionLocal() as db:
         f = db.get(OfficeFile, file_id)
-        big = f.size > BIG or task == "compare"
+        big = heavy(f) or task == "compare"
         lane = _big_lane if big else None
         if lane:
             lane.acquire()
@@ -644,7 +676,7 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
         # "duplicates dhund ke do", "alag sheet mein daalo": list them in a new sheet, delete nothing
         _set_offer(agent, {"ops": ["remove_duplicates"], "sheets": sheets})
         where = f" ({', '.join(sheets)})" if sheets else ""
-        if f.size <= BIG:                        # small file: do it now and answer with the result
+        if not heavy(f):                         # small file: do it now and answer with the result
             f.status, f.task, f.args = "queued", "extract", dumps({"sheets": sheets})
             db.commit()
             _work(f.id, "extract", {"sheets": sheets})
@@ -949,7 +981,7 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
     agent.inputs = dumps(inputs)
     mind.set_pattern(mo.label_of(plan), plan)
     args = {"plan": plan, "hi": hi}
-    if f.size <= BIG:
+    if not heavy(f):
         f.status, f.task, f.args = "queued", "ask", dumps(args)
         db.commit()
         _work(f.id, "ask", args)

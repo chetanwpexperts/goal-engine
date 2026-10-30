@@ -117,7 +117,10 @@ def after(db: Session, visitor_id: str, goal, text: str, reply: str, agents: lis
             profile.add_pattern(p, f"{brain}:{pack['first']}")     # where this agent's work starts (e.g. the file arrived)
             chain = [pack["first"]]
         try:
-            predict.record(db, brain, chain, label, visitor=visitor_id)
+            if db.get_bind().dialect.name == "sqlite":          # one process (tests, dev): no other writer to clash with
+                predict.record(db, brain, chain, label, visitor=visitor_id)
+            else:
+                _record_apart(brain, chain, label, visitor_id)
         except Exception:  # noqa: BLE001 - learning never breaks a reply
             pass
         profile.add_pattern(p, f"{brain}:{label}", pack.get("goals", {}).get(label))
@@ -181,3 +184,21 @@ def _next(db: Session, brain: str, agent, chain: list[str], cur: dict, hi: bool,
         if len(out) >= 3:
             break
     return out
+
+
+def _record_apart(brain: str, chain: list[str], label: str, visitor_id: str) -> None:
+    """The shared pattern counts in their own short transaction: many people asking the same kind of thing must not
+    queue behind one row lock held until each reply is finished, and a clash (two inserts of the same new row)
+    costs one count, never the reply."""
+    from sqlalchemy.exc import IntegrityError, OperationalError
+
+    from app.db import get_engine
+
+    for _ in range(2):
+        with Session(get_engine()) as own:
+            try:
+                predict.record(own, brain, chain, label, visitor=visitor_id)
+                own.commit()
+                return
+            except (IntegrityError, OperationalError):
+                own.rollback()

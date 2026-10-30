@@ -73,10 +73,23 @@ DIGIT_WORDS = {"zero": "0", "oh": "0", "one": "1", "two": "2", "three": "3", "fo
 _HINDI_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
 
 
+_SQL_VERBS = {"fix", "correct", "check", "review", "optimize", "optimise", "improve", "debug", "write", "rewrite", "see", "read",
+              "tune", "explain", "theek", "dekho", "sudharo"}
+_SQL_NOUNS = {"query", "queries", "code", "statement", "statements", "syntax", "join", "joins"}
+
+
+def _owns_sql(words: list[str], i: int) -> bool:
+    return (i > 0 and words[i - 1] in _SQL_VERBS) or (i + 2 < len(words) and words[i + 2] in _SQL_NOUNS)
+
+
 def _join_phrases(words: list[str]) -> list[str]:
     out, i = [], 0
     while i < len(words):
         pair = tuple(words[i:i + 2])
+        if pair == ("my", "sql") and _owns_sql(words, i):
+            out.append(words[i])                     # 'correct my sql', 'my sql query': my own SQL, not MySQL
+            i += 1
+            continue
         if pair in PHRASES:
             out.extend(PHRASES[pair])
             i += 2

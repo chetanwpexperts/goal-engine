@@ -232,3 +232,21 @@ def test_plain_english_with_to_stays_english():
     assert detect_language("how to connect database") == "English"
     assert detect_language("cannot connect to database") == "English"
     assert detect_language("excel to theek karo") == "Hinglish"
+
+
+@pytest.mark.parametrize("text", ["I have query make joins correct in this", "can you correct my sql", "my left join returns wrong count",
+                                  "help me with this query", "query sahi karo", "join two tables query"])
+def test_asking_for_help_with_a_query_goes_to_the_query_checker(client, monkeypatch, ml_mode, text):
+    from tests.test_ml import say
+
+    monkeypatch.setenv("DB_CONNECT", "off")
+    r = say(client, text)
+    assert [a["recipe"] for a in r["agents"]] == ["sql_review"], (text, r["agents"])
+    assert "opens in a few days" not in r["reply"] and "kuch dinon mein" not in r["reply"]
+
+
+def test_my_sql_as_mine_stays_two_words():
+    from app.ml.normalize import normalize
+
+    assert "mysql" not in normalize("can you correct my sql")
+    assert "mysql" in normalize("my sql server is not starting")

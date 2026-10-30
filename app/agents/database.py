@@ -372,6 +372,7 @@ def visitor_connectors(db: Session, visitor_id: str) -> list[Connector]:
 # ---------------------------------------------------------------- the database agent (one per goal)
 DB_WORDS = packs.words("database", "about")            # the field's words come from its knowledge pack
 SQL_TEXT = re.compile(r"\bselect\b[\s\S]+?\bfrom\b", re.I)
+QUERY_TALK = re.compile(r"\b(quer(y|ies)|joins?|sql|select|subquer(y|ies)|group by|where clause)\b", re.I)
 
 
 def wants_database(goal: Goal | None, text: str) -> bool:
@@ -387,15 +388,17 @@ def wants_database(goal: Goal | None, text: str) -> bool:
     from app.dbknow import brain
 
     rec = brain.recognize(text)
-    if rec["kind"] == "error" or (rec["kind"] == "issue" and rec["confidence"] >= 0.55):
-        return True                       # "too many connections", "Hindi text ???? ban jata hai", a pasted DB error
+    if rec["kind"] == "error" or (rec["kind"] == "issue" and rec["confidence"] >= 0.55 and
+                                  (reasoning.complaints(text) or not QUERY_TALK.search(text or ""))):
+        return True                       # (a query with nothing said to be wrong is a query to check, not a problem)                       # "too many connections", "Hindi text ???? ban jata hai", a pasted DB error
     if goal.intent == "slow_db_query":   # a slow query: the SQL checker, unless they ask about the whole database
         sure = (loads(goal.slots, {}) or {}).get("_conf", goal.confidence or 0)
-        if (sure or 0) < 0.5 and not reasoning.complaints(text):
-            # the reader wasn't sure it's about a slow query ('how can I connect my database' scores a coin flip) and
-            # nothing slow or failing was said: a request for the database agent, not the query checker
+        if (sure or 0) < 0.5 and not reasoning.complaints(text) and DB_WORDS.search(text or "") and not QUERY_TALK.search(text or ""):
+            # the reader wasn't sure it's about a slow query ('how can I connect my database' scores a coin flip),
+            # nothing slow or failing was said, and it's about the database itself, not a query: the database agent
             return True
-        return bool(re.search(r"\b(health|size|tables|connections|kitna bada|poora database)\b", text or "", re.I))
+        return bool(re.search(r"\b(health|size|tables|connections|kitna bada|poora database)\b", text or "", re.I)) and \
+            not QUERY_TALK.search(text or "")
     return goal.intent == "db_automation" or bool(DB_WORDS.search(text or ""))
 
 

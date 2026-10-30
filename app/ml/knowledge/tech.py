@@ -4,9 +4,9 @@ from app.ml.knowledge import T
 
 
 TYPES = [
-    T("slow_db_query", "tech", "Speed up slow database queries",
-      "Database queries are slow or the database is overloaded.",
-      "Fast queries and a database that stays responsive",
+    T("slow_db_query", "tech", "Fix or speed up a SQL query",
+      "A SQL query is slow, wrong or needs correcting, or the database is overloaded.",
+      "Correct, fast queries and a database that stays responsive",
       ["database query slow hai", "mujhe database ki query optimize karni hai", "mysql query bahut time leti hai",
        "my sql query is slow", "how to optimize a slow query", "database pe load bahut hai",
        "main php developer hoon database mein issue aa rahe hai query optimize karni hai",

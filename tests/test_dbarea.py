@@ -150,3 +150,32 @@ def test_account_holder_gets_an_answer_checked_on_their_database(client, locked,
     client.post("/api/new-chat")
     again = say(client, err)["reply"]
     assert "not checked on your database" in again and "Create a free account" not in again and "Open your database area" in again
+
+
+@pytest.mark.skipif(not _mysql_up(), reason="needs local MySQL")
+def test_password_reset_wipes_typed_passwords_at_once(client, locked):
+    from app.db import _SessionLocal
+    from app.models import Connector
+
+    _verified(client, locked, 27)
+    _open(client, locked, 27)
+    cid = client.post("/api/connectors/direct", json=DB).json()["connector"]["id"]
+    client.post("/api/account/forgot", json={"email": "asha27@example.com"})
+    client.post("/api/account/reset", json={"email": "asha27@example.com", "code": locked.last_code("asha27@example.com"),
+                                            "password": "another-good-pass-1"})
+    with _SessionLocal() as db:
+        assert db.get(Connector, cid).secret is None
+
+
+def test_launch_switch_keeps_connecting_closed_for_everyone(client, locked, monkeypatch, ml_mode):
+    from tests.test_ml import say
+
+    monkeypatch.setenv("DB_CONNECT", "off")
+    assert client.get("/api/account/me").json()["db_connect"] is False
+    reply = say(client, "ERROR 1040 (HY000): Too many connections")["reply"]
+    assert "opens in a few days" in reply and "Create a free account" not in reply
+    _verified(client, locked, 28)
+    r = client.post("/api/connectors/direct", json=DB)
+    assert r.status_code == 403 and r.json()["db_area"] == "soon"
+    assert client.post("/api/db-area/code").json()["db_area"] == "soon"
+    assert client.get("/api/db-area").json()["state"] == "soon"

@@ -104,7 +104,8 @@ def public_ip(host: str, port: int) -> str:
                               "Use the one-command option below: it connects from inside, and your password stays there",
                               use_command=True)
         if not allow_private and (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast
-                                  or ip.is_unspecified or (ip.version == 6 and ip.ipv4_mapped and not ip.ipv4_mapped.is_global)):
+                                  or ip.is_unspecified or not ip.is_global   # e.g. 100.64.0.0/10 (shared, carrier NAT)
+                                  or (ip.version == 6 and ip.ipv4_mapped and not ip.ipv4_mapped.is_global)):
             raise DirectError("That's a private network address, so Goal Engine can't reach it from outside. "
                               "Use the one-command option below instead", use_command=True)
         if not allow_private and str(ip) in _own_addresses():

@@ -743,6 +743,9 @@ def _sql_agent(db, goal):
 
 def holds_conversation(db, goal, text: str, any_text: bool = False):
     """A query was checked in this conversation and the person asks about it: answer about THAT query."""
+    if (text or "").strip().startswith(("Why: ", "Kyun: ")) and not any_text:
+        a, run = _sql_agent(db, goal)
+        return a if run is not None and run.status == "done" else None
     if any_text or NEW_SQL_RE.search(text or "") or not (SQL_FOLLOW_RE.search(text or "") or DIFF_RE.search(text or "")
                                                          or WHY_RE.search(text or "") or DEV_FOLLOW_RE.search(text or "")):
         return None
@@ -774,6 +777,18 @@ def continue_turn(db, goal, agent, text: str):
     last = db.scalars(select(Message).where(Message.goal_id == goal.id, Message.role == "assistant")
                       .order_by(Message.id.desc()).limit(1)).first()
     corr = res.get("correct") or {}
+    from app.agents.core import why_label
+
+    tapped = next((f for f in corr.get("findings") or [] if text.strip() in (why_label(f, False), why_label(f, True))), None)
+    if tapped is not None:                                   # 'Why: ...' tapped: that one mistake, nothing else
+        h = text.strip().startswith("Kyun:")
+        fix = tapped["fix_hi" if h else "fix_en"]
+        reply = f"{fix}\n\n{tapped['evidence']}" if tapped.get("evidence") else fix
+        asked = set(inputs.get("why_asked") or []) | {tapped["title_en"]}
+        inputs["last_ask"], inputs["why_asked"] = "why_one", sorted(asked)
+        agent.inputs = dumps(inputs)
+        rest = [why_label(f, h) for f in corr["findings"] if f["kind"] in ("error", "wrong") and f["title_en"] not in asked][:3]
+        return reply, rest, h
     if corr.get("findings") and not SPEED_RE.search(text or ""):
         from app.agents.core import correctness_text
 
@@ -791,6 +806,11 @@ def continue_turn(db, goal, agent, text: str):
                 reply += "\n\n" + ("Theek ki hui query ('-- check' wale naam apni table se mila lena):" if hi else
                                     "The corrected query (match the names marked '-- check' to your tables):") + f"\n\n{corr['corrected']}"
         inputs["last_ask"] = "correct"
+        agent.inputs = dumps(inputs)
+        return reply, [], hi
+    if corr.get("findings") and SPEED_RE.search(text or ""):
+        reply = _optimized(corr.get("corrected") or query, inputs.get("explain", ""), hi)   # asked for speed: give it, now
+        inputs["last_ask"] = "optimize"
         agent.inputs = dumps(inputs)
         return reply, [], hi
     if corr.get("findings") and corr.get("corrected"):
@@ -812,6 +832,23 @@ def continue_turn(db, goal, agent, text: str):
     inputs["last_ask"] = asked
     agent.inputs = dumps(inputs)
     return reply, [], hi
+
+
+def _optimized(query: str, explain: str, hi: bool) -> str:
+    """The optimized query and its index commands, with at most 3 short notes. No questions, no theory."""
+    from app.agents.sql import analyze_sql
+
+    res = analyze_sql(query, explain)
+    sp = res.get("speed_later") or res
+    better = res.get("rewritten") if res.get("rewritten") and not (res.get("correct") or {}).get("corrected") else query
+    out = [("Fast query:" if hi else "Optimized query:") + f"\n\n{better}"]
+    if sp.get("indexes"):
+        out.append(("Ye index lagao (jo pehle se hain unhe chhod do):" if hi else "Add these indexes (skip any you already have):")
+                   + "\n\n" + "\n".join(sp["indexes"]))
+    notes = [f["title_hi" if hi else "title_en"] for f in sp.get("findings") or []
+             if not f["title_en"].lower().startswith(("these columns need an index", "missing indexes"))][:3]
+    out += [f"- {n}" for n in notes]
+    return "\n\n".join(out)
 
 
 def _first_part(reply: str) -> str:

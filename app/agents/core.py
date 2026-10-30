@@ -83,46 +83,62 @@ def _sql_summary(result: dict, hi: bool) -> str:
 
 
 def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up: bool = False) -> str:
-    """Every mistake in the query, in plain words, grouped by how sure: won't run, wrong rows, please check."""
+    """The mistakes, one short line each (the why is one tap away). Detail only when asked for."""
     fs = [f for f in result["correct"]["findings"] if only is None or f["topic"] == only or
           (only == "join" and re.match(r"(on\b|.*\bjoin\b)", f["evidence"], re.I))]
-    groups = [("error", "MySQL won't run it:", "MySQL ise chalayega hi nahi:"),
-              ("wrong", "Runs, but gives wrong rows:", "Chalegi, par rows galat aayengi:"),
-              ("check", "Please check (these depend on your tables, which I can't see):",
-               "Ye check karo (ye aapki tables pe depend karta hai, jo mujhe nahi dikhti):")]
     n_err = sum(f["kind"] == "error" for f in fs)
     n_wrong = sum(f["kind"] == "wrong" for f in fs)
-    if hi:
-        head = (f"Query check ki: {n_err + n_wrong} galti mili" + (f" ({n_err} ki wajah se chalegi hi nahi)" if n_err else "")
-                + (f", aur {len(fs) - n_err - n_wrong} cheezein check karni hain." if len(fs) - n_err - n_wrong else "."))
-    else:
-        head = (f"Checked the query: {n_err + n_wrong} mistake{'s' if n_err + n_wrong != 1 else ''}"
-                + (f" ({n_err} stop it running)" if n_err else "")
-                + (f", and {len(fs) - n_err - n_wrong} thing{'s' if len(fs) - n_err - n_wrong != 1 else ''} to check." if len(fs) - n_err - n_wrong else "."))
-    if not n_err and not n_wrong and only is None:
-        head = ("Query chalegi, par ye check karo:" if hi else "The query runs, but please check these:")
-    out = [head]
-    k = 0
-    for kind, en, hn in groups:
-        part = [f for f in fs if f["kind"] == kind]
-        if not part:
-            continue
-        out.append(hn if hi else en)
-        for f in part:
-            k += 1
-            out.append(f"{k}. {f['title_hi' if hi else 'title_en']}: {f['fix_hi' if hi else 'fix_en']}")
+    n_check = len(fs) - n_err - n_wrong
+    bits = []
+    if n_err + n_wrong:
+        bits.append((f"{n_err + n_wrong} galti" + (f" ({n_err} se query chalegi hi nahi)" if n_err else "")) if hi else
+                    f"{n_err + n_wrong} mistake{'s' if n_err + n_wrong != 1 else ''}" + (f" ({n_err} stop it running)" if n_err else ""))
+    if n_check:
+        bits.append(f"{n_check} check karne layak" if hi else f"{n_check} to check")
+    if not follow_up and result["correct"].get("corrected"):   # the fix, and at most 3 short notes: the card has the rest
+        left_t = {x["title_en"] for x in result["correct"].get("left") or []}
+        fixed = [f for f in sorted(fs, key=lambda f: "ewc".index(f["kind"][0])) if f["kind"] != "check" and f["title_en"] not in left_t]
+        top, n = fixed[:3], len(fixed)
+        out = [(f"{n} galti theek ki; sahi query card mein hai." if hi else
+                f"Fixed {n} mistake{'s' if n != 1 else ''}; the corrected query is in the card.")]
+        out += [f"- {f['title_hi' if hi else 'title_en']}" for f in top]
+        if result["correct"].get("left"):
+            out.append("GROUP BY/total wala hissa waisa hi chhoda: wo aapke data ke hisaab se badlega." if hi else
+                       "The GROUP BY/total part is left as written: the right version depends on the result you want.")
+        return "\n".join(out)
+    out = [", ".join(bits) + ":"]
+    tag = {"error": "✗", "wrong": "!", "check": "?"}
+    for k, f in enumerate(sorted(fs, key=lambda f: "ewc".index(f["kind"][0])), 1):
+        out.append(f"{k}. {tag[f['kind']]} {f['title_hi' if hi else 'title_en']}")
     left = result["correct"].get("left") or []
-    if left and result["correct"].get("corrected"):
-        out.append(("Theek ki hui query mein ye abhi bhi aapka faisla hai (iska ek sahi jawab nahi): " if hi else
-                    "Still your call in the corrected query (there's no single right answer): ")
-                   + "; ".join(f["title_hi" if hi else "title_en"] for f in left) + ".")
+    if left and not follow_up:
+        out.append(("Aapka faisla: " if hi else "Your call: ") + "; ".join(f["title_hi" if hi else "title_en"] for f in left) + ".")
     if result["correct"].get("corrected") and not follow_up:
-        out.append("Theek ki hui query card mein hai; jo naam maine andaze se rakhe hain unpe '-- check' likha hai, apni table ke hisaab se badal lena."
-                   if hi else "The corrected query is in the card. Names I guessed are marked '-- check': change them to your table's real names.")
-    if result.get("speed_later") and not follow_up:
-        out.append("Speed (index) ki baat query sahi hone ke baad: 'ise fast karo' likho." if hi
-                   else "Speed and indexes come once it's right: type 'make it faster' when you want them.")
+        out.append("Theek ki hui query card mein hai ('-- check' wale naam andaze se)." if hi else
+                   "Corrected query is in the card ('-- check' marks names I guessed).")
     return "\n".join(out)
+
+
+def correctness_options(result: dict, hi: bool) -> list[str]:
+    """Taps made from THIS query's mistakes: the why of the worst ones, and speed only once nothing is wrong."""
+    fs = (result.get("correct") or {}).get("findings") or []
+    return ["Ise fast karo" if hi else "Optimize it"] if fs else []      # the next real action, nothing to quiz about
+
+
+def quiet_next(db, goal, text: str) -> bool:
+    """The query checker is waiting for the query someone said they have: that is the next step, nothing else."""
+    from app.agents.database import QUERY_TALK
+
+    return goal is not None and QUERY_TALK.search(text or "") is not None and \
+        any(a.recipe == "sql_review" and a.status == "proposed" for a in goal_agents(db, goal.id))
+
+
+def why_label(f: dict, hi: bool) -> str:
+    t = f["title_hi" if hi else "title_en"]
+    head = t.split(":")[0] if ":" in t[:45] else t
+    if len(head) > 38:
+        head = head[:38].rsplit(" ", 1)[0] + "…"
+    return (f"Kyun: {head}" if hi else f"Why: {head}")
 
 
 def _run_website(inputs: dict) -> dict:

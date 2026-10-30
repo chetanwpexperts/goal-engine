@@ -342,20 +342,30 @@
       s.append(el("b", null, String(r.score)), el("span", null, `/ 100 · ${r.url || ""}`));
       wrap.append(s);
     }
-    wrap.append(el("p", "result-head", run.summary || ""));
+    const corr = r.correct && r.correct.findings && r.correct.findings.length;
+    if (!corr) wrap.append(el("p", "result-head", run.summary || ""));      // the chat already says it for a query with mistakes
+    if (corr && r.rewritten) wrap.append(codeBox(T(hi, "Theek ki hui query", "Corrected query"), r.rewritten, w));
     if (r.findings && r.findings.length) {
-      const ul = el("ul", "found");
+      const ul = el("ul", corr ? "found folded" : "found");
       for (const f of r.findings) {
         const li = el("li", `s${f.severity}`);
-        li.append(el("div", "t", hi ? f.title_hi : f.title_en));
         const fix = hi ? f.fix_hi : f.fix_en;
-        if (fix) li.append(el("div", "f", fix));
-        if (f.evidence) li.append(el("div", "e", f.evidence));
+        if (corr) {                                   // one line each; the why opens on a tap
+          const d = el("details");
+          d.append(el("summary", "t", hi ? f.title_hi : f.title_en));
+          if (fix) d.append(el("div", "f", fix));
+          if (f.evidence) d.append(el("div", "e", f.evidence));
+          li.append(d);
+        } else {
+          li.append(el("div", "t", hi ? f.title_hi : f.title_en));
+          if (fix) li.append(el("div", "f", fix));
+          if (f.evidence) li.append(el("div", "e", f.evidence));
+        }
         ul.append(li);
       }
       wrap.append(ul);
     }
-    if (r.rewritten) wrap.append(codeBox(w.rewritten, r.rewritten, w));
+    if (r.rewritten && !corr) wrap.append(codeBox(w.rewritten, r.rewritten, w));
     if (r.check_query) wrap.append(codeBox(w.check, r.check_query, w));
     if (r.indexes && r.indexes.length) wrap.append(codeBox(r.indexes_verified === false ? w.maybe : w.indexes, r.indexes.join("\n"), w));
     if (r.note) wrap.append(el("p", "note", r.note));

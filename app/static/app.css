@@ -784,3 +784,11 @@ body[data-state="active"] .bar { background: linear-gradient(to bottom, var(--pa
 .agent-tag { display: inline-block; margin-right: 10px; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 700;
   letter-spacing: .02em; vertical-align: 3px; color: #fff; background: linear-gradient(135deg, #5B5BF0, #7B4FE0); }
 .brain-tile .tile-sub { font-size: 13px; color: var(--muted); font-weight: 500; margin-left: 6px; }
+
+/* query mistakes: one line each, the reason opens on a tap */
+.found.folded li { padding: 6px 0 6px 12px; }
+.found.folded details > summary { cursor: pointer; list-style: none; font-weight: 500; font-size: 0.95rem; line-height: 1.4; }
+.found.folded details > summary::-webkit-details-marker { display: none; }
+.found.folded details > summary::after { content: " ›"; color: var(--muted, #888); }
+.found.folded details[open] > summary::after { content: " ⌄"; }
+.found.folded details .f, .found.folded details .e { margin-top: 4px; }

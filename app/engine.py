@@ -107,7 +107,11 @@ def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: 
 
         thought = mind.after(db, visitor_id, goal, text, reply, goal_agents(db, goal.id) if goal else [], hi)
         # when the agent just asked the person something, the answer comes first: no suggestions next to it
-        nxt = [x for x in thought["next"] if x not in (options or [])]
+        from app.agents.core import quiet_next
+
+        own = any(o in ("Optimize it", "Ise fast karo") for o in options or []) or quiet_next(db, goal, text)
+        # (the query checker waiting for its query: the query is the next step, nothing else)
+        nxt = [] if own else [x for x in thought["next"] if x not in (options or [])]   # taps made from this reply replace the general ones
         if thought["reply"] != reply:
             reply = thought["reply"]
             last = db.scalars(select(Message).where(Message.visitor_id == visitor_id, Message.role == "assistant")
@@ -137,6 +141,11 @@ def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: 
     }
 
 
+def _sql_res(run) -> dict:
+    r = run.result
+    return (loads(r, {}) if isinstance(r, str) else r) or {}
+
+
 def _after_run(agent, run, hi: bool) -> tuple[str, list[str]]:
     reply = run.summary or ""
     options: list[str] = []
@@ -144,8 +153,11 @@ def _after_run(agent, run, hi: bool) -> tuple[str, list[str]]:
         reply += "\n\n" + ("Poori report goal card mein hai. Roz check karta rahoon, taaki kuch toote to turant pata chale?"
                             if hi else "The full report is in the goal card. Shall I keep checking it daily, so you know the moment something breaks?")
         options = [next(k for k, v in WATCH_LABELS.items() if v == hi)]
-    elif agent.recipe == "sql_review" and run.status == "done" and "corrected query is in the card" not in reply.lower() \
-            and "query card mein hai" not in reply.lower() and "speed and indexes come" not in reply.lower():
+    elif agent.recipe == "sql_review" and run.status == "done" and _sql_res(run).get("correct", {}).get("findings"):
+        from app.agents.core import correctness_options
+
+        options = correctness_options(_sql_res(run), hi)          # taps made from this query's own mistakes
+    elif agent.recipe == "sql_review" and run.status == "done":
         reply += "\n\n" + ("Fixes (rewritten query aur index commands) goal card mein hai, copy kar lo." if hi
                             else "The fixes (rewritten query and index commands) are in the goal card, ready to copy.")
     return reply, options

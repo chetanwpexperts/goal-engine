@@ -59,13 +59,15 @@ def test_the_conversation(client, ml_mode):
     assert [a["recipe"] for a in r["agents"]] == ["sql_review"]
     goal = r["goal"]["id"]
     r = client.post("/api/message", json={"text": BROKEN, "goal_id": goal}).json()
-    assert "MySQL won't run it" in r["reply"] and "ALTER TABLE" not in r["reply"] and "make it faster" in r["reply"]
+    assert "in the card" in r["reply"] and "ALTER TABLE" not in r["reply"]
+    assert len(r["reply"].splitlines()) <= 5 and "Fixed" in r["reply"]
+    assert r["options"] == ["Optimize it"] and r["next"] == []                                  # no quiz buttons
     r = client.post("/api/message", json={"text": "In this query join galat tha join sahi krna tha", "goal_id": goal}).json()
     assert "'products.id'" in r["reply"] and "Self join" in r["reply"] and "'!= NULL'" not in r["reply"]
     r = client.post("/api/message", json={"text": "big query I need small query", "goal_id": goal}).json()
     assert "lines down to" in r["reply"] and "dep2" not in r["reply"].split("Removed:")[0]
     r = client.post("/api/message", json={"text": "query slow hai", "goal_id": goal}).json()
-    assert "MySQL won't run it" not in r["reply"] and "ALTER TABLE" in r["reply"]      # speed advice, for the corrected query
+    assert "stop it running" not in r["reply"] and "ALTER TABLE" in r["reply"]      # speed advice, for the corrected query
 
 
 def test_second_broken_query_school():

@@ -297,7 +297,7 @@ def check(sql: str, _again: bool = False) -> dict:
     guesses: list[str] = []
 
     def add(kind, topic, ten, thi, ev, fen, fhi):
-        F.append(Finding(kind, topic, ten, thi, ev.strip(), fen, fhi))
+        F.append(Finding(kind, topic, ten, thi, re.sub(r"\s+", " ", ev.strip()), fen, fhi))
 
     def line_of(pos: int) -> str:
         a = sql.rfind("\n", 0, pos) + 1
@@ -378,6 +378,15 @@ def check(sql: str, _again: bool = False) -> dict:
         owners_of.setdefault(c.lower(), set()).add(q)
     firm = _firm_refs(s, where, owners_of) if where else []
     firm_aliases = {alias_of(q) for q, _c, _p in firm}
+    grew = True
+    while grew:                         # a required row needs the rows its ON points at: refunds r ON r.payment_id = p.id
+        grew = False
+        for x in srcs:
+            if (x.alias or "").lower() in firm_aliases and x.on:
+                for q, _c, _p in _qrefs(x.on):
+                    if alias_of(q) not in firm_aliases and alias_of(q) in by_alias:
+                        firm_aliases.add(alias_of(q))
+                        grew = True
     seen_aliases: list[str] = []
     nullable: set[str] = set()          # can be NULL in the result (and nothing else already demands a row there)
     outer: set[str] = set()             # put on the outer side of some join
@@ -761,10 +770,18 @@ def check(sql: str, _again: bool = False) -> dict:
     having = cl.get("having")
     if having:
         htext = s[having[0]:having[1]]
-        if not AGG.search(htext):
-            names_used = [w for w in _bare(htext, set()) if w.lower() in sel_aliases]
-            add("wrong" if group else "check", "having", f"HAVING {sql[having[0]:having[1]].strip()[:40]} filters a per-row value",
-                f"HAVING {sql[having[0]:having[1]].strip()[:40]} ek row ki value pe filter hai", "HAVING " + sql[having[0]:having[1]].strip(),
+        hd = _depths(htext)
+        cuts = [0] + [m.end() for m in re.finditer(r"\band\b", htext, re.I) if hd[m.start()] == 0] + [len(htext)]
+        totals = {a for a, it in sel_aliases.items() if it["agg"]}
+        per_row = []                     # AND-parts that use no total (SUM, COUNT, or a SELECT name for one)
+        for a1, b1 in zip(cuts, cuts[1:]):
+            part = htext[a1:b1]
+            if not AGG.search(part) and not any(w.lower() in totals for w in _bare(part, set())):
+                per_row.append(re.sub(r"(?i)^\s*and\s+|\s+and\s*$", "", sql[having[0] + a1:having[0] + b1]).strip())
+        if per_row:
+            hv = _short(" AND ".join(per_row))
+            add("wrong" if group else "check", "having", f"HAVING {hv} filters a per-row value",
+                f"HAVING {hv} ek row ki value pe filter hai", "HAVING " + re.sub(r"\s+", " ", " AND ".join(per_row)),
                 "HAVING is for totals (SUM, COUNT…). After grouping, a per-row value like this is taken from one random row of the "
                 "group. Put the condition in WHERE, written with the columns themselves.",
                 "HAVING totals (SUM, COUNT…) ke liye hai. Group ke baad aisi value group ki kisi ek row se aati hai. Condition WHERE "
@@ -780,6 +797,11 @@ def check(sql: str, _again: bool = False) -> dict:
         left = [f for f in check(corrected, _again=True)["findings"] if f["kind"] in ("error", "wrong")]
     return {"findings": [f.as_dict() for f in _dedupe(F)], "corrected": corrected, "guesses": list(dict.fromkeys(guesses)),
             "left": [{"title_en": f["title_en"], "title_hi": f["title_hi"]} for f in left]}
+
+
+def _short(text: str, n: int = 32) -> str:
+    t = re.sub(r"\s+", " ", text.strip().rstrip(";"))
+    return t if len(t) <= n else t[:n].rsplit(" ", 1)[0] + " …"
 
 
 def _dedupe(F):

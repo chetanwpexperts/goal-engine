@@ -23,7 +23,10 @@
    "word doc",
    "docx",
    "ms word",
-   "microsoft word"
+   "microsoft word",
+   "E+0",
+   "E+1",
+   "E+2"
   ],
   "about": [
    "excel",
@@ -1462,5 +1465,93 @@
    "kiraya",
    "kiraaya"
   ]
- }
+ },
+ "not_yet": [
+  {
+   "en": "PowerPoint",
+   "hi": "PowerPoint",
+   "words": [
+    "powerpoint",
+    "power point",
+    "ppt",
+    "pptx",
+    "slides",
+    "presentation"
+   ]
+  },
+  {
+   "en": "Outlook and email",
+   "hi": "Outlook aur email",
+   "words": [
+    "outlook",
+    "0x800",
+    "pst file",
+    "ost file",
+    "send/receive"
+   ]
+  },
+  {
+   "en": "PDF files",
+   "hi": "PDF files",
+   "words": [
+    "pdf"
+   ]
+  },
+  {
+   "en": "OneDrive, SharePoint and Teams",
+   "hi": "OneDrive, SharePoint aur Teams",
+   "words": [
+    "onedrive",
+    "one drive",
+    "sharepoint",
+    "ms teams",
+    "microsoft teams"
+   ]
+  },
+  {
+   "en": "installing or activating Windows and Office",
+   "hi": "Windows/Office install ya activation",
+   "words": [
+    "product key",
+    "activation",
+    "activate office",
+    "activate windows",
+    "deactivated",
+    "office install",
+    "windows update"
+   ]
+  },
+  {
+   "en": "macros and VBA",
+   "hi": "macros aur VBA",
+   "words": [
+    "macro",
+    "macros",
+    "vba",
+    "run-time error",
+    "runtime error"
+   ]
+  },
+  {
+   "en": "charts and pivot tables",
+   "hi": "chart aur pivot table",
+   "words": [
+    "chart",
+    "charts",
+    "graph",
+    "pivot"
+   ]
+  },
+  {
+   "en": "recovering a file that was never saved",
+   "hi": "bina save ki file wapas laane",
+   "words": [
+    "without saving",
+    "unsaved",
+    "not saved",
+    "save nahi",
+    "bina save"
+   ]
+  }
+ ]
 }

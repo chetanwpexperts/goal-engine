@@ -98,6 +98,30 @@ SYMPTOM_WORDS = re.compile(r"\b(won'?t|wont|can'?t|cannot|not (open|opening|savi
 PROBLEM_WORDS = re.compile(r"\b(issues?|problems?|errors?|kharab|broken|galat|wrong|not working|nahi chal|help|fix|theek|check|messy|dikkat|gadbad)\b", re.I)
 
 
+# what people ask for that this agent can't do yet (its pack lists them): say so plainly, never pretend
+NOT_YET = [(item, packs._word_rx(item.get("words", []))) for item in packs.get("office").get("not_yet", [])]
+CAN_NOW_EN = ("fix extra spaces, duplicate rows, mixed capitals, numbers saved as text and broken formulas, compare two files, "
+              "and answer questions about your data (totals, counts, top 10, filters)")
+CAN_NOW_HI = ("extra space, duplicate rows, capital/small letters, text wale numbers aur toote formula theek karna, do files compare "
+              "karna, aur aapke data ke sawaal (total, count, top 10, filter)")
+
+
+def not_yet(text: str) -> dict | None:
+    for item, rx in NOT_YET:
+        if rx is not None and rx.search(text or ""):
+            return item
+    return None
+
+
+def coming_soon(item: dict, hi: bool) -> str:
+    what = item.get("hi" if hi else "en") or item["en"]
+    if hi:
+        return (f"{what} mein main abhi madad nahi kar sakta, ye jald aa raha hai. Abhi main Excel, CSV aur Word files pe ye kar sakta hoon: "
+                f"{CAN_NOW_HI}. Agar {what} ka kaam abhi chahiye, to neeche 'expert se baat karo' dabao.")
+    return (f"I can't help with {what} yet; it's coming soon. Right now I work on Excel, CSV and Word "
+            f"files: {CAN_NOW_EN}. If you need this done now, tap \"Talk to an expert\" below.")
+
+
 class OfficeAgentError(Exception):
     pass
 
@@ -116,6 +140,8 @@ def wants_office(goal: Goal | None, text: str, db: Session | None = None) -> boo
 
     if any(packs.mentions(name, text) for name, p in packs.all_packs().items() if "office" in p.get("outranks", [])):
         return False                                  # "database se excel chahiye": that agent's words win (its pack says so)
+    if not_yet(text):
+        return True                                   # PowerPoint, macros, charts...: this agent answers honestly that it can't yet
     rec = brain.recognize(text)
     if rec["confidence"] >= 0.99:
         return True                                   # an Excel error value like #REF!
@@ -148,8 +174,14 @@ def plan_reply(rec: dict, hi: bool) -> str:
     if rec.get("kind") == "formula" and seen:
         return lead + ("Formula card mein hai. File daaloge to main khud laga dunga." if hi
                        else "The formula is on the card. Give me the file and I'll put it in for you.")
-    return lead + ("File card mein daalo. Main khud check karke theek kar dunga, aur aapko fixed copy milegi." if hi
-                   else "Drop the file on the card. I'll check it myself, fix it, and give you a fixed copy.")
+    if seen:
+        return lead + ("File card mein daalo. Main khud check karke theek kar dunga, aur aapko fixed copy milegi." if hi
+                       else "Drop the file on the card. I'll check it myself, fix it, and give you a fixed copy.")
+    # not sure what's needed: no promise of a fix it may not be able to make
+    return (f"File card mein daalo, main dekhta hoon. Abhi main ye kar sakta hoon: {CAN_NOW_HI}. Agar aapka kaam inmein nahi hai, "
+            "main seedha bata dunga, aur aap expert se baat kar sakte ho." if hi else
+            f"Drop the file on the card and I'll look. Right now I can {CAN_NOW_EN}. If what you need is something else, "
+            "I'll tell you straight, and you can talk to an expert.")
 
 
 def office_dict(db: Session, agent: Agent, hi: bool) -> dict:
@@ -1077,6 +1109,12 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
         db.commit()
         return ("Google Sheet mil gayi. Padh raha hoon; card pe dikhega, phir kuch bhi poocho." if turn.hi else
                 "Got your Google Sheet. Reading it now; it shows on the card, then ask me anything about it."), [], "agent_plan"
+    soon = not_yet(text)
+    if soon and not ops_in(text):
+        goal.title = (soon.get("hi" if turn.hi else "en") or soon["en"])[:1].upper() + (soon.get("hi" if turn.hi else "en") or soon["en"])[1:]
+        goal.missing_info, goal.pending = "[]", None
+        db.commit()
+        return coming_soon(soon, turn.hi), [], "agent_plan"
     task_reply = chat_task(db, agent, text, turn.hi)
     inputs = loads(agent.inputs, {}) or {}
     describes_problem = rec.get("kind") != "issue" or bool(PROBLEM_WORDS.search(text or "") or SYMPTOM_WORDS.search(text or ""))

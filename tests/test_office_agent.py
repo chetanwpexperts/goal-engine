@@ -1,5 +1,6 @@
 """Microsoft agent end to end: chat -> card -> upload in pieces -> automatic check -> fix -> download -> compare -> cleanup."""
 
+import pytest
 import io
 import time
 
@@ -268,3 +269,20 @@ def test_files_too_big_for_the_ram_are_refused_before_upload(client, ml_mode):
     ok = client.post("/api/office/files", json={"name": "rows.csv", "size": 20 * mb, "agent_id": agent["id"]})
     assert ok.status_code == 200
     assert oa.heavy(type("F", (), {"name": "a.xlsx", "size": 4 * mb})()) and not oa.heavy(type("F", (), {"name": "a.xlsx", "size": 2 * mb})())
+
+
+@pytest.mark.parametrize("text,what", [
+    ("my powerpoint file won't open", "PowerPoint"), ("outlook not sending emails error 0x800CCC0E", "Outlook"),
+    ("make a pivot table of sales by region", "pivot"), ("my excel macro shows run-time error 1004", "macros"),
+    ("I closed excel without saving, recover my file", "never saved"), ("convert this pdf to excel", "PDF"),
+])
+def test_what_it_cant_do_yet_is_said_plainly(client, ml_mode, text, what):
+    reply = say(client, text)["reply"]
+    assert "can't help with" in reply and what in reply and "fix it, and give you a fixed copy" not in reply, reply
+
+
+def test_unknown_excel_task_gets_no_false_promise(client, ml_mode):
+    reply = say(client, "excel mein GST calculate karna hai")["reply"]
+    assert "fixed copy milegi" not in reply and "expert" in reply
+    sci = say(client, "aadhaar numbers showing as 1.23E+11")["reply"]       # an Excel display problem, not Aadhaar advice
+    assert "Drop the file" in sci and "Seva Kendra" not in sci

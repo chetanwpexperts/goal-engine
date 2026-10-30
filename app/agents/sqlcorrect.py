@@ -190,6 +190,32 @@ def _firm_refs(s: str, where, owners=None) -> list:
     return out
 
 
+def _grain(srcs, alias_of, removed) -> str | None:
+    """The table the result has one row per: every other table is reached one row each from it
+    (users u JOIN orders o ON u.id = o.customer_id lists orders). None when no single table is."""
+    def is_key(al, col):
+        t = next((x for x in srcs if (x.alias or "").lower() == al), None)
+        c = col.lower().replace("_", "")
+        return c == "id" or bool(t and t.name and c in {x.replace("_", "") + "id" for x in _singulars(t.name)})
+
+    links = [(alias_of(m.group(1)), m.group(2).lower(), alias_of(m.group(3)), m.group(4).lower())
+             for x in srcs if x.on for m in EQ.finditer(x.on)]
+    live = [(x.alias or "").lower() for x in srcs if x.alias and x.alias.lower() not in removed]
+    found = []
+    for g in live:
+        got, more = {g}, True
+        while more:
+            more = False
+            for l, lc, r, rc in links:
+                for a1, c1, b1 in ((l, lc, r), (r, rc, l)):
+                    if a1 not in got and b1 in got and is_key(a1, c1):
+                        got.add(a1)
+                        more = True
+        if set(live) <= got:
+            found.append(g)
+    return found[0] if len(found) == 1 else None
+
+
 def _no_subqueries(text: str) -> str:
     """Same length, with every (SELECT ...) blanked out: its names belong to its own scope."""
     out, i = list(text), 0
@@ -616,6 +642,23 @@ def check(sql: str, _again: bool = False) -> dict:
 
     # ------------------------------------------------ 5. unqualified columns in a many-table query
     qualified = [c.lower() for _q, c, _p in all_refs]
+    grain = _grain(srcs, alias_of, removed)
+
+    def bare_to_grain(w: str, pos: int):
+        if grain is None:                                     # no single table the rows belong to: only the structure can say
+            add("check", "column", f"{w} has no table in front of it", f"{w} ke aage table ka naam nahi", line_of(pos),
+                f"With {len(srcs)} tables, write which table it's from (alias.{w}); if two tables have it, MySQL stops with error 1052.",
+                f"{len(srcs)} tables mein batao ye kis table ka hai (alias.{w}); warna error 1052 ho sakta hai.")
+            return
+        g = by_alias[grain]
+        add("check", "column", f"{w} has no table in front of it: most likely {g.alias}.{w}",
+            f"{w} ke aage table nahi: shayad {g.alias}.{w}", line_of(pos),
+            f"Each result row is one {g.name} row (the other tables are looked up from it), so {w} most likely means "
+            f"{g.alias}.{w}. Without the table name MySQL stops (error 1052) if two tables have {w}.",
+            f"Har row ek {g.name} row hai, isliye {w} shayad {g.alias}.{w} hai. Table ke bina, do tables mein {w} ho to error 1052.")
+        guesses.append(f"{w} -> {g.alias}.{w}")
+        edits.append((pos, pos + len(w), f"{g.alias}.{w}"))
+        note(pos + len(w), f"check: {g.alias}.{w} (you wrote {w})")
     bare_seen = set()
     if len([x for x in srcs if x.alias.lower() not in removed]) > 1:
         for clause in ("select", "where", "group by", "having", "order by"):
@@ -661,13 +704,9 @@ def check(sql: str, _again: bool = False) -> dict:
                         edits.append((pos, pos + len(w), c))
                         note(pos + len(w), f"check: {c} (you wrote {w})")
                     else:
-                        add("check", "column", f"{w} has no table in front of it", f"{w} ke aage table ka naam nahi", line_of(pos),
-                            f"With {len(srcs)} tables, write which table it's from (alias.{w}); if two tables have it, MySQL stops with error 1052.",
-                            f"{len(srcs)} tables mein batao ye kis table ka hai (alias.{w}); warna error 1052 ho sakta hai.")
+                        bare_to_grain(w, pos)
                 elif clause in ("select", "where"):
-                    add("check", "column", f"{w} has no table in front of it", f"{w} ke aage table ka naam nahi", line_of(pos),
-                        f"With {len(srcs)} tables, write which table it's from (alias.{w}); if two tables have it, MySQL stops with error 1052.",
-                        f"{len(srcs)} tables mein batao ye kis table ka hai (alias.{w}); warna error 1052 ho sakta hai.")
+                    bare_to_grain(w, pos)
 
     # ------------------------------------------------ 6. GROUP BY and totals
     group = cl.get("group by")

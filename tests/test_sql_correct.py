@@ -80,3 +80,10 @@ def test_second_broken_query_school():
     assert "m.marks and m.max_marks: two columns, or one?" in titles          # asked, never merged
     assert "m.marks," in r["corrected"] and "AND f.status IS NULL" in r["corrected"] and "LEFT JOIN fees f" in r["corrected"]
     assert {x["title_en"] for x in r["left"]} >= {"SUM(f.amount) is multiplied by the marks rows"}
+
+
+def test_a_bare_column_goes_to_the_table_the_rows_belong_to():
+    q = ("SELECT u.id, u.name, o.id AS order_id, o.total_amount FROM users u LEFT JOIN orders o ON u.id = o.customer_id "
+         "WHERE o.status = 'paid' AND u.email != NULL ORDER BY created_at DESC;")
+    fixed = sqlcorrect.check(q)["corrected"]
+    assert "INNER JOIN orders o" in fixed and "u.email IS NOT NULL" in fixed and "ORDER BY o.created_at DESC;" in fixed

@@ -232,6 +232,9 @@ def maintain(db: Session, now=None) -> dict:
         if at and (vid not in last_seen or at > last_seen[vid]):
             last_seen[vid] = at
     busy = set(db.scalars(select(Agent.visitor_id).where(Agent.status == "active")))
+    from app.accounts import account_visitors
+
+    busy |= account_visitors(db)          # an account's chats stay until they delete them (or the account)
     for vid, at in last_seen.items():
         if at and at < now - INACTIVE_TTL and vid not in busy:
             delete_visitor(db, vid)

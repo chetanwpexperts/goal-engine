@@ -185,6 +185,11 @@
       box.append(ul);
     }
     box.append(richSay(text));
+    if (!window.GE_me && /Create a free account|free account banao/.test(text || "")) {
+      const cta = el("button", "btn solid acc-cta", /banao/.test(text) ? "Free account banao" : "Create free account");
+      cta.type = "button"; cta.dataset.account = "signup";
+      box.append(cta);
+    }
     thread.append(box);
     box.scrollIntoView({ block: "end", behavior: reduceMotion ? "auto" : "smooth" });
     return box;
@@ -2295,6 +2300,200 @@
   }
   drawer.addEventListener("click", (e) => { if (e.target === drawer || e.target.closest("[data-close]")) drawer.hidden = true; });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") drawer.hidden = true; });
+
+  // ---------------------------------------------------------------- free account
+  let me = null;
+  const accountBtn = $("#account");
+  const accountDot = $("#account-dot");
+  function showMe(user) {
+    me = user;
+    window.GE_me = user;
+    accountDot.hidden = !user;
+    accountDot.textContent = user ? "✓" : "";
+    accountBtn.setAttribute("aria-label", user ? `Your account (${user.username})` : "Log in or create a free account");
+    accountBtn.title = user ? user.username : "Account";
+    document.dispatchEvent(new CustomEvent("ge:account", { detail: user }));
+  }
+  api("/api/account/me").then((d) => showMe(d.user)).catch(() => {});
+
+  function accForm(cls) { const f = el("form", "expert-form acc " + (cls || "")); f.noValidate = true; return f; }
+  function accField(label, input, hint) {
+    const l = el("label", "f"); l.append(el("span", null, label), input);
+    if (hint) l.append(el("small", "hint", hint));
+    return l;
+  }
+  function accInput(type, auto, name, max) {
+    const i = el("input"); i.type = type; i.autocomplete = auto; i.name = name; i.maxLength = max || 120; return i;
+  }
+  async function accSubmit(form, go, err, fields, run) {
+    go.disabled = true; err.hidden = true;
+    for (const i of form.querySelectorAll("[aria-invalid]")) i.removeAttribute("aria-invalid");
+    try { await run(); } catch (ex) {
+      err.textContent = ex.message; err.hidden = false; go.disabled = false;
+      const bad = ex.data && ex.data.field && fields[ex.data.field];
+      if (bad) { bad.setAttribute("aria-invalid", "true"); bad.focus(); }
+    }
+  }
+  function accTabs(active) {
+    const row = el("div", "how acc-tabs");
+    for (const [k, label] of [["signup", "Create free account"], ["login", "Log in"]]) {
+      const b = el("button", "pill", label); b.type = "button"; b.setAttribute("aria-pressed", String(k === active));
+      b.addEventListener("click", () => openAccount(k));
+      row.append(b);
+    }
+    return row;
+  }
+
+  function signupView() {
+    const form = accForm();
+    const f = {
+      full_name: accInput("text", "name", "full_name"), phone: accInput("tel", "tel", "phone", 20),
+      email: accInput("email", "email", "email", 190), location: accInput("text", "address-level2", "location"),
+      username: accInput("text", "username", "username", 30), password: accInput("password", "new-password", "password", 128),
+      why: el("textarea"),
+    };
+    f.phone.placeholder = "+91 98xxx xxxxx"; f.why.maxLength = 2000; f.why.name = "why";
+    f.why.placeholder = "e.g. I run a clothing shop and keep stock and sales in Excel. Our website uses MySQL.";
+    const trap = el("input"); trap.name = "website"; trap.tabIndex = -1; trap.autocomplete = "off"; trap.className = "trap"; trap.setAttribute("aria-hidden", "true");
+    const go = el("button", "btn go", "Create free account"); go.type = "submit";
+    const err = el("p", "note err"); err.hidden = true; err.setAttribute("role", "alert");
+    form.append(
+      accField("Full name", f.full_name), accField("Phone", f.phone), accField("Email", f.email, "We'll send a 6-digit code to confirm it."),
+      accField("City or country", f.location), accField("Username", f.username),
+      accField("Password", f.password, "At least 10 characters."),
+      accField("Why are you here?", f.why, "Your work or business, in a sentence or two. The agents use it to fit their answers to you."),
+      trap, err, go, el("p", "fine", "Free. No card, no UPI."));
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      accSubmit(form, go, err, f, async () => {
+        const body = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.value]));
+        body.website = trap.value;
+        const d = await api("/api/account/signup", { method: "POST", body: JSON.stringify(body) });
+        showMe(d.user);
+        openAccount("verify", { sent: d.code_sent });
+      });
+    });
+    return [el("h2", "acc-h", "Your free account"), el("p", "acc-sub", "Keep your chats on every device. Connect your database and get answers checked on it."),
+            accTabs("signup"), form];
+  }
+
+  function loginView() {
+    const form = accForm();
+    const f = { login: accInput("text", "username", "login", 190), password: accInput("password", "current-password", "password", 128) };
+    const go = el("button", "btn go", "Log in"); go.type = "submit";
+    const err = el("p", "note err"); err.hidden = true; err.setAttribute("role", "alert");
+    const forgot = el("button", "linkish", "Forgot password?"); forgot.type = "button";
+    forgot.addEventListener("click", () => openAccount("forgot"));
+    form.append(accField("Email or username", f.login), accField("Password", f.password), err, go, forgot);
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      accSubmit(form, go, err, f, async () => {
+        const d = await api("/api/account/login", { method: "POST", body: JSON.stringify({ login: f.login.value, password: f.password.value }) });
+        showMe(d.user);
+        location.reload();          // this account's chats
+      });
+    });
+    return [el("h2", "acc-h", "Welcome back"), accTabs("login"), form];
+  }
+
+  function codeForm(onCode, label) {
+    const form = accForm();
+    const code = accInput("text", "one-time-code", "code", 7); code.inputMode = "numeric"; code.pattern = "[0-9]*"; code.className = "code-in";
+    const go = el("button", "btn go", label || "Confirm"); go.type = "submit";
+    const err = el("p", "note err"); err.hidden = true; err.setAttribute("role", "alert");
+    form.append(accField("6-digit code", code), err, go);
+    form.addEventListener("submit", (e) => { e.preventDefault(); accSubmit(form, go, err, { code }, () => onCode(code.value)); });
+    setTimeout(() => code.focus(), 30);
+    return form;
+  }
+
+  function verifyView(opts) {
+    const note = el("p", "acc-sub", opts && opts.sent === false
+      ? "Your account is ready, but the email didn't go out. Tap 'Send the code again'."
+      : `We sent a 6-digit code to ${me ? me.email : "your email"}. It works for 10 minutes.`);
+    const form = codeForm(async (code) => {
+      const d = await api("/api/account/verify", { method: "POST", body: JSON.stringify({ code }) });
+      showMe(d.user);
+      openAccount("me", { welcome: true });
+    }, "Confirm email");
+    const again = el("button", "linkish", "Send the code again"); again.type = "button";
+    again.addEventListener("click", async () => {
+      again.disabled = true;
+      try { await api("/api/account/resend", { method: "POST" }); note.textContent = "Sent. Check your inbox (and spam)."; }
+      catch (ex) { note.textContent = ex.message; }
+      setTimeout(() => { again.disabled = false; }, 30000);
+    });
+    return [el("h2", "acc-h", "Confirm your email"), note, form, again];
+  }
+
+  function forgotView() {
+    const form = accForm();
+    const email = accInput("email", "email", "email", 190);
+    const go = el("button", "btn go", "Send me a code"); go.type = "submit";
+    const err = el("p", "note err"); err.hidden = true; err.setAttribute("role", "alert");
+    form.append(accField("Your account's email", email), err, go);
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      accSubmit(form, go, err, { email }, async () => {
+        await api("/api/account/forgot", { method: "POST", body: JSON.stringify({ email: email.value }) });
+        openAccount("reset", { email: email.value });
+      });
+    });
+    return [el("h2", "acc-h", "Forgot password"), el("p", "acc-sub", "We'll email you a code to set a new password."), form];
+  }
+
+  function resetView(opts) {
+    const form = accForm();
+    const f = { code: accInput("text", "one-time-code", "code", 7), password: accInput("password", "new-password", "password", 128) };
+    f.code.inputMode = "numeric"; f.code.className = "code-in";
+    const go = el("button", "btn go", "Set new password"); go.type = "submit";
+    const err = el("p", "note err"); err.hidden = true; err.setAttribute("role", "alert");
+    form.append(accField("6-digit code", f.code), accField("New password", f.password, "At least 10 characters."), err, go);
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      accSubmit(form, go, err, f, async () => {
+        const d = await api("/api/account/reset", { method: "POST", body: JSON.stringify({ email: opts.email, code: f.code.value, password: f.password.value }) });
+        showMe(d.user);
+        location.reload();
+      });
+    });
+    return [el("h2", "acc-h", "Set a new password"),
+            el("p", "acc-sub", `If ${opts.email} has an account, a code is on its way. It works for 10 minutes.`), form];
+  }
+
+  function meView(opts) {
+    const out = [el("h2", "acc-h", opts && opts.welcome ? "You're all set" : `Hi, ${(me.full_name || "").split(" ")[0]}`)];
+    if (!me.email_verified) {
+      const b = el("button", "btn solid", "Confirm your email"); b.type = "button";
+      b.addEventListener("click", () => openAccount("verify"));
+      out.push(el("p", "acc-sub", "Confirm your email to connect a database."), b);
+    } else {
+      out.push(el("p", "acc-sub", "Your chats are saved to your account and show on every device you log in on."));
+    }
+    const dl = el("dl", "acc-me");
+    for (const [k, label] of [["username", "Username"], ["email", "Email"], ["phone", "Phone"], ["location", "City"]]) {
+      dl.append(el("dt", null, label), el("dd", null, me[k] || ""));
+    }
+    const out2 = el("button", "btn", "Log out"); out2.type = "button";
+    out2.addEventListener("click", async () => { await api("/api/account/logout", { method: "POST" }); location.href = "/"; });
+    out.push(dl, out2);
+    return out;
+  }
+
+  const ACC_VIEWS = { signup: signupView, login: loginView, verify: verifyView, forgot: forgotView, reset: resetView, me: meView };
+  function openAccount(view, opts) {
+    if (!view) view = me ? "me" : "signup";
+    if (view === "me" && !me) view = "login";
+    openDrawer(ACC_VIEWS[view](opts || {}));
+    const first = drawerBody.querySelector("input:not(.trap)");
+    if (first && view !== "verify") setTimeout(() => first.focus(), 30);
+  }
+  window.GE_openAccount = openAccount;
+  accountBtn.addEventListener("click", () => openAccount());
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("[data-account]");
+    if (t) { e.preventDefault(); openAccount(t.dataset.account || undefined); }
+  });
 
   async function openGoal(id) {
     drawer.hidden = true;

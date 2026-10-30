@@ -360,3 +360,58 @@ class PersonalStep(Base):
     nxt: Mapped[str] = mapped_column(String(40))
     weight: Mapped[float] = mapped_column(Float, default=0.0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class User(Base):
+    """A free account. Chats belong to the account's own visitor id, so the rest of the app needs no change."""
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    full_name: Mapped[str] = mapped_column(String(120))
+    phone: Mapped[str] = mapped_column(String(20))
+    email: Mapped[str] = mapped_column(String(190), unique=True, index=True)      # stored lower-case
+    location: Mapped[str] = mapped_column(String(120))
+    username: Mapped[str] = mapped_column(String(30), unique=True, index=True)    # stored lower-case
+    password_hash: Mapped[str] = mapped_column(String(255))
+    why: Mapped[str] = mapped_column(Text, default="")                              # "why are you here": their work / business
+    visitor_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    failed_logins: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)  # sha256 of the cookie; the cookie itself is never stored
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    stepup_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)   # last email code for the database area
+    ip: Mapped[str] = mapped_column(String(64), default="")
+
+
+class EmailCode(Base):
+    __tablename__ = "email_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    purpose: Mapped[str] = mapped_column(String(20))          # verify / reset / database
+    code_hash: Mapped[str] = mapped_column(String(64))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class AuthAttempt(Base):
+    """One row per attempt (login, signup, code); limits count recent rows, so every app process sees the same numbers."""
+    __tablename__ = "auth_attempts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    key: Mapped[str] = mapped_column(String(120), index=True)   # e.g. "login-ip:1.2.3.4", "login-user:5"
+    at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)

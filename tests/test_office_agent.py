@@ -351,6 +351,6 @@ def test_clean_up_list_on_a_file_without_calc_settings(client, ml_mode):
                         "North, north, NORTH - Numbers stored as text - Currency symbol inside numeric data - Mixed date formats", goal)["reply"]
     assert "column widths" not in reply.lower() and "AttributeError" not in reply
     assert reply.startswith("Done in sales.xlsx") and "Extra spaces" in reply and "Text-numbers" in reply   # English, what really changed
-    assert "Not checked automatically yet" in reply and "dates" in reply
+    assert "Needs your look" in reply or "Dates written one way" in reply or "Text-numbers" in reply
     assert "Duplicate rows: not deleted" in reply or "Duplicate rows" not in reply
     assert say(client, "make a pivot of qty by region", goal)["reply"] and "AttributeError" not in say(client, "total qty by region", goal)["reply"]

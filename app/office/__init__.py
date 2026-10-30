@@ -203,8 +203,8 @@ def text_number(v):
     if not s or not _NUM_TEXT.match(s):
         return None
     digits = re.sub(r"\D", "", s.split(".")[0])
-    if (len(digits) > 1 and digits.startswith("0") and "." not in s) or len(digits) >= 12:
-        return None                               # leading zero or long code: an ID, keep as text
+    if (len(digits) > 1 and digits.startswith("0") and "." not in s) or len(digits) >= 12 or (s.isdigit() and len(s) >= 8):
+        return None                               # leading zero, long code, a bare 10-digit phone: an ID, keep as text
     pct = s.endswith("%")
     s = re.sub(r"[₹$€£,%\s]", "", s)
     try:
@@ -397,7 +397,7 @@ def _summary(report: dict) -> dict:
 
 # ------------------------------------------------------------------ fix (always a copy)
 FIX_OPS = {"trim_spaces", "text_to_number", "fix_broken_refs", "remove_duplicates", "fix_case",
-           "extend_ranges", "exact_lookup", "auto_calc", "restore_formulas"}
+           "extend_ranges", "exact_lookup", "auto_calc", "restore_formulas", "data_quality"}
 REASONED_OPS = {"extend_ranges", "exact_lookup", "auto_calc", "restore_formulas"}     # need the whole workbook
 LABELS = {"trim_spaces": "Extra space hataya (removed extra spaces)", "text_to_number": "Text ko number banaya (text turned into a number)",
           "fix_broken_refs": "Toota formula theek kiya (broken formula rebuilt)", "remove_duplicates": "Duplicate row hatayi (repeated row removed)",
@@ -405,7 +405,21 @@ LABELS = {"trim_spaces": "Extra space hataya (removed extra spaces)", "text_to_n
           "extend_ranges": "Total ki range saari rows tak badhayi (total now covers every row)",
           "exact_lookup": "Lookup ko exact match pe kiya (lookup set to exact match)",
           "auto_calc": "Calculation Automatic ki (calculation set to Automatic)",
-          "restore_formulas": "Type kiye number ki jagah formula wapas (formula put back over a typed number)"}
+          "restore_formulas": "Type kiye number ki jagah formula wapas (formula put back over a typed number)",
+          "fix_dates": "Date ek format mein ki (date written one way)",
+          "fix_rates": "Percent ek jaisa kiya (rate written one way)",
+          "fix_categories": "Naam ek jaisa kiya (same name everywhere)",
+          "fix_formulas": "Column ka formula wapas (the column's formula put back)",
+          "fix_typed_total": "Type kiye total ki jagah formula (typed total replaced by the formula)",
+          "fix_missing_formula": "Khaali total mein formula (missing total filled with the formula)",
+          "fix_headings": "Heading ki spelling theek ki (heading spelling fixed)",
+          "flag_bad_date": "DEKHO: date galat hai (CHECK: impossible date)",
+          "flag_missing": "DEKHO: khaali hai (CHECK: missing value)",
+          "flag_bad_email": "DEKHO: email galat hai (CHECK: invalid email)",
+          "flag_negative": "DEKHO: minus mein hai (CHECK: negative value)",
+          "flag_not_number": "DEKHO: number nahi hai (CHECK: not a number)",
+          "flag_repeated_id": "DEKHO: ID do baar (CHECK: repeated ID)",
+          "flag_maybe_same": "DEKHO: shayad spelling galti (CHECK: maybe a misspelling)"}
 
 
 def case_maps(rows) -> dict:
@@ -419,7 +433,30 @@ def case_maps(rows) -> dict:
                 w = clean_spaces(v)
                 if 0 < len(w) <= 60 and len(groups[c_i]) < 5000:
                     groups[c_i][w.lower()][w] += 1
-    return {c: {k: cnt.most_common(1)[0][0] for k, cnt in g.items() if len(cnt) > 1} for c, g in groups.items()}
+    return {c: {k: best_form(cnt) for k, cnt in g.items() if len(cnt) > 1} for c, g in groups.items()}
+
+
+def _proper(w: str) -> bool:
+    letters = [ch for ch in w if ch.isalpha()]
+    return bool(letters) and any(ch.isupper() for ch in letters) and (not all(ch.isupper() for ch in letters) or len(letters) <= 4)
+
+
+def best_form(cnt: Counter) -> str:
+    """The spelling to keep: the commonest, unless it is all small or all CAPITAL letters and a properly written form
+    is nearly as common ('north' x3, 'North' x2 -> 'North')."""
+    top, n = cnt.most_common(1)[0]
+    for good in (_mixed, _proper):                 # 'West' over 'WEST' over 'west'
+        if good(top):
+            return top
+        better = [(k, v) for k, v in cnt.most_common() if good(k)]
+        if better and better[0][1] * 2 >= n:
+            return better[0][0]
+    return top
+
+
+def _mixed(w: str) -> bool:
+    letters = [ch for ch in w if ch.isalpha()]
+    return any(ch.isupper() for ch in letters) and any(ch.islower() for ch in letters)
 
 
 def _cased(v, maps, c_i, r_i, log, sheet, cell):
@@ -524,6 +561,10 @@ def _fix_full(path, out, ops, only_sheets=None):
                     cell.value = new
                     if isinstance(new, float) and isinstance(v, str) and v.strip().endswith("%"):
                         cell.number_format = "0%"
+        if "data_quality" in ops:
+            from app.office import quality
+
+            quality.check_sheet(ws, log)               # each column's own rules: dates, emails, rates, categories, formulas...
         if "remove_duplicates" in ops:
             _dedupe_sheet(wb, ws, log)
     if REASONED_OPS & set(ops):

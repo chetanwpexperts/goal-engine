@@ -793,16 +793,34 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
     return _doing(start_fix(db, f, ops, sheets), ops, sheets, hi)
 
 
-NOT_CHECKED_EN = ("dates in mixed or impossible formats, email addresses, negative or missing numbers, wrong or typed-in totals, "
-                  "and spelling in headings")
-NOT_CHECKED_HI = ("alag-alag ya galat format ki dates, email addresses, negative ya khaali numbers, galat ya haath se likhe totals, "
-                  "aur headings ki spelling")
+QUALITY_FIXES = {"fix_dates": ("dates ek format mein", "dates written one way"), "fix_rates": ("percent ek jaise", "rates written one way"),
+                 "fix_categories": ("naam ek jaise", "names made the same"), "fix_formulas": ("galat formula theek", "wrong formulas put right"),
+                 "fix_typed_total": ("type kiye total ki jagah formula", "typed-in totals replaced by the formula"),
+                 "fix_missing_formula": ("khaali totals bhare", "missing totals filled"), "fix_headings": ("heading ki spelling", "heading spelling")}
+QUALITY_FLAGS = {"flag_bad_date": ("galat dates", "impossible dates"), "flag_missing": ("khaali cells", "missing values"),
+                 "flag_bad_email": ("galat emails", "invalid emails"), "flag_negative": ("minus wale numbers", "negative numbers"),
+                 "flag_not_number": ("number ki jagah text", "text where a number belongs"),
+                 "flag_repeated_id": ("do baar aaye ID", "repeated IDs"),
+                 "flag_maybe_same": ("shayad spelling galti", "maybe misspelled")}
+
+
+def _cap(t: str) -> str:
+    return t[:1].upper() + t[1:]
+
+
+def _eg(e, hi) -> str:
+    if not e:
+        return ""
+    return f' (jaise {e[2]} → {e[3]}, {e[1]})' if hi else f' (e.g. "{e[2]}" → "{e[3]}" in {e[1]})'
 
 
 def _clean_now(db: Session, f: OfficeFile, ops: list[str], sheets: list[str], hi: bool, text: str) -> str:
-    """A clean-up request: run the fixes (small files right away) and report only what really happened."""
+    """A clean-up request: every column checked by its own kind's rules (small files right away), then a report of only
+    what really happened: what was fixed, and what needs the person's look (never guessed)."""
     ops = [o for o in ops if o in office.FIX_OPS]
-    if heavy(f) or not ops:
+    if "data_quality" not in ops:
+        ops = [*ops, "data_quality"]
+    if heavy(f):
         return _doing(start_fix(db, f, ops, sheets), ops, sheets, hi)
     start_fix(db, f, ops, sheets)
     f.status = "queued"
@@ -815,37 +833,42 @@ def _clean_now(db: Session, f: OfficeFile, ops: list[str], sheets: list[str], hi
     ch, ex = r.get("changes") or {}, r.get("examples") or {}
     lines = []
     for op in ops:
-        n = ch.get(op) or 0
-        if not n:
-            continue
-        e = (ex.get(op) or [None])[0]
-        eg = (f' (jaise {e[2]} → {e[3]}, {e[1]})' if hi else f' (e.g. "{e[2]}" → "{e[3]}" in {e[1]})') if e else ""
-        lines.append(f"- {_OP_NAMES[op][0 if hi else 1].capitalize()}: {n}{eg}")
+        if op in _OP_NAMES and ch.get(op):
+            lines.append(f"- {_OP_NAMES[op][0 if hi else 1].capitalize()}: {ch[op]}{_eg((ex.get(op) or [None])[0], hi)}")
+    for op, (nh, ne) in QUALITY_FIXES.items():
+        if ch.get(op):
+            lines.append(f"- {_cap(nh if hi else ne)}: {ch[op]}{_eg((ex.get(op) or [None])[0], hi)}")
     if "remove_duplicates" in ops and ch.get("duplicates_skipped_sheets"):
         lines.append("- Duplicate rows: hataye nahi, kyunki is sheet mein formulas hain jo rows hatane se toot sakte hain. "
                      "'duplicate dikhao' likho, nayi sheet mein list kar dunga." if hi else
                      "- Duplicate rows: not deleted, because this sheet has formulas that deleting rows could break. "
                      "Type 'show duplicates' and I'll list them in a new sheet.")
-    left = (loads(f.report, {}) or {}).get("summary", {})
-    odd, errs = left.get("odd_formulas") or 0, left.get("errors") or 0
-    head = ((f"{f.name} mein ye theek kiya:" if lines else f"{f.name} mein in cheezon mein kuch theek karne layak nahi mila.") if hi else
-            (f"Done in {f.name}:" if lines else f"Nothing of these needed fixing in {f.name}."))
+    flags = []
+    for op, (nh, ne) in QUALITY_FLAGS.items():
+        n = ch.get(op) or 0
+        if n:
+            cells = ", ".join(e[1] for e in (ex.get(op) or [])[:4]) + (" …" if n > 4 else "")
+            flags.append(f"- {_cap(nh if hi else ne)}: {n} ({cells})")
+    head = ((f"{f.name} mein ye theek kiya:" if lines else f"{f.name} mein theek karne layak kuch nahi mila.") if hi else
+            (f"Done in {f.name}:" if lines else f"Nothing in {f.name} needed fixing."))
     out = [head, *lines]
-    still = ([f"{odd} formula jo apne column se alag hain" if hi else f"{odd} formula{'s' if odd != 1 else ''} that don't match the rest of their column"] if odd else []) + \
-            ([f"{errs} cells mein error" if hi else f"{errs} cell{'s' if errs != 1 else ''} showing an error"] if errs else [])
-    if still:
-        out.append((f"Abhi bhi dekhna hai: {', '.join(still)}. Card pe dikh rahe hain." if hi else
-                    f"Still to look at: {' and '.join(still)}. They're on the card."))
-    out.append((f"Ye main abhi apne aap check nahi karta: {NOT_CHECKED_HI}. Inke liye expert se baat kar sakte ho." if hi else
-                f"Not checked automatically yet: {NOT_CHECKED_EN}. You can talk to an expert for these."))
+    if flags:
+        out += [("Ye aap dekho, main andaza nahi lagata (sab 'Changes by Goal Engine' sheet mein):" if hi else
+                 "Needs your look, I don't guess these (all listed in the 'Changes by Goal Engine' sheet):"), *flags]
+    left = (loads(f.report, {}) or {}).get("summary", {})
+    errs = left.get("errors") or 0
+    if errs:
+        out.append(f"Abhi bhi {errs} cells mein error dikh raha hai; card pe hain." if hi else
+                   f"Still {errs} cell{'s' if errs != 1 else ''} showing an error; they're on the card.")
     out.append("Theek ki hui copy card pe Download karo; 'undo' likhoge to wapas ho jayega." if hi else
                "Download the fixed copy from the card; type 'undo' to put it back.")
-    try:
-        from app import learning
+    if flags:
+        try:
+            from app import learning
 
-        learning.ask_to_learn(db, "office", text, guess="partly done: clean-up list")
-    except ValueError:
-        pass
+            learning.ask_to_learn(db, "office", text, guess="flagged: " + ", ".join(k for k in QUALITY_FLAGS if ch.get(k)))
+        except ValueError:
+            pass
     return "\n".join(out)
 
 

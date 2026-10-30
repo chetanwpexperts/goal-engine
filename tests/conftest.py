@@ -117,7 +117,12 @@ def _no_flood_limits_between_tests():
     """Every test request comes from one address within the same minute; the flood limits have their own test."""
     from app import limits
 
+    from app import accounts
+
     old = dict(limits.BURST)
     limits.BURST.update(visitor=10**6, ip=10**6, all=10**6)
+    up = accounts.LIMITS["upload-ip"]
+    accounts.LIMITS["upload-ip"] = (10**6, up[1])          # every test uploads from one address within the hour
     yield
     limits.BURST.clear(); limits.BURST.update(old)
+    accounts.LIMITS["upload-ip"] = up

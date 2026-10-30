@@ -772,3 +772,5 @@ body[data-state="active"] .stage { animation: stage-in .35s ease both; }
 .pass-eye { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: 0; background: transparent; color: var(--muted);
   font: inherit; font-size: 13px; font-weight: 600; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
 .pass-eye:hover { background: var(--paper); color: var(--ink); }
+/* in a conversation the chat scrolls under the fixed bar: give the bar a soft background so its icons never sit on text */
+body[data-state="active"] .bar { background: linear-gradient(to bottom, var(--paper) 72%, rgba(238, 241, 246, 0)); padding-bottom: 22px; }

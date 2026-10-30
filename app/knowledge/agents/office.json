@@ -26,7 +26,9 @@
    "microsoft word",
    "E+0",
    "E+1",
-   "E+2"
+   "E+2",
+   "pivot table",
+   "pivot tables"
   ],
   "about": [
    "excel",
@@ -1530,16 +1532,6 @@
     "vba",
     "run-time error",
     "runtime error"
-   ]
-  },
-  {
-   "en": "charts and pivot tables",
-   "hi": "chart aur pivot table",
-   "words": [
-    "chart",
-    "charts",
-    "graph",
-    "pivot"
    ]
   },
   {

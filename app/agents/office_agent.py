@@ -100,10 +100,12 @@ PROBLEM_WORDS = re.compile(r"\b(issues?|problems?|errors?|kharab|broken|galat|wr
 
 # what people ask for that this agent can't do yet (its pack lists them): say so plainly, never pretend
 NOT_YET = [(item, packs._word_rx(item.get("words", []))) for item in packs.get("office").get("not_yet", [])]
-CAN_NOW_EN = ("fix extra spaces, duplicate rows, mixed capitals, numbers saved as text and broken formulas, compare two files, "
-              "and answer questions about your data (totals, counts, top 10, filters)")
-CAN_NOW_HI = ("extra space, duplicate rows, capital/small letters, text wale numbers aur toote formula theek karna, do files compare "
-              "karna, aur aapke data ke sawaal (total, count, top 10, filter)")
+CAN_NOW_EN = ("fix extra spaces, duplicate rows, mixed capitals, numbers saved as text and broken formulas; make charts, pivot-style "
+              "summaries and highlighting; format dates and money, split or remove columns, add filters and dropdowns; compare two "
+              "files; and answer questions about your data (totals, counts, top 10)")
+CAN_NOW_HI = ("extra space, duplicate rows, capital/small letters, text wale numbers aur toote formula theek karna; chart, pivot jaisi "
+              "summary aur highlight banana; date/paise ka format, column todna ya hatana, filter aur dropdown; do files compare "
+              "karna; aur aapke data ke sawaal (total, count, top 10)")
 
 
 def not_yet(text: str) -> dict | None:
@@ -1109,13 +1111,14 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
         db.commit()
         return ("Google Sheet mil gayi. Padh raha hoon; card pe dikhega, phir kuch bhi poocho." if turn.hi else
                 "Got your Google Sheet. Reading it now; it shows on the card, then ask me anything about it."), [], "agent_plan"
-    soon = not_yet(text)
+    task_reply = chat_task(db, agent, text, turn.hi)
+    soon = not_yet(text) if not task_reply else None          # the file tools come first: only what they can't do is "not yet"
     if soon and not ops_in(text):
-        goal.title = (soon.get("hi" if turn.hi else "en") or soon["en"])[:1].upper() + (soon.get("hi" if turn.hi else "en") or soon["en"])[1:]
+        name = soon.get("hi" if turn.hi else "en") or soon["en"]
+        goal.title = name[:1].upper() + name[1:]
         goal.missing_info, goal.pending = "[]", None
         db.commit()
         return coming_soon(soon, turn.hi), [], "agent_plan"
-    task_reply = chat_task(db, agent, text, turn.hi)
     inputs = loads(agent.inputs, {}) or {}
     describes_problem = rec.get("kind") != "issue" or bool(PROBLEM_WORDS.search(text or "") or SYMPTOM_WORDS.search(text or ""))
     if not describes_problem:

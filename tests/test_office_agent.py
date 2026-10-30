@@ -273,7 +273,7 @@ def test_files_too_big_for_the_ram_are_refused_before_upload(client, ml_mode):
 
 @pytest.mark.parametrize("text,what", [
     ("my powerpoint file won't open", "PowerPoint"), ("outlook not sending emails error 0x800CCC0E", "Outlook"),
-    ("make a pivot table of sales by region", "pivot"), ("my excel macro shows run-time error 1004", "macros"),
+    ("my excel macro shows run-time error 1004", "macros"),
     ("I closed excel without saving, recover my file", "never saved"), ("convert this pdf to excel", "PDF"),
 ])
 def test_what_it_cant_do_yet_is_said_plainly(client, ml_mode, text, what):
@@ -286,3 +286,8 @@ def test_unknown_excel_task_gets_no_false_promise(client, ml_mode):
     assert "fixed copy milegi" not in reply and "expert" in reply
     sci = say(client, "aadhaar numbers showing as 1.23E+11")["reply"]       # an Excel display problem, not Aadhaar advice
     assert "Drop the file" in sci and "Seva Kendra" not in sci
+
+
+def test_charts_are_not_called_coming_soon(client, ml_mode):
+    reply = say(client, "create a bar chart from my excel data")["reply"]
+    assert "can't help with" not in reply and "charts" in reply

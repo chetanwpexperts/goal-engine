@@ -550,7 +550,8 @@ def known() -> dict:
             glob.glob(str(Path(__file__).resolve().parent / "officeknow" / "*.json")):
         try:
             data = _json.loads(Path(f).read_text(encoding="utf-8"))
-            n += len(data) if isinstance(data, list) else len(data.get("items", data))
+            if isinstance(data, list):              # lists of problems/errors/formulas; dict files are settings, not fixes
+                n += len(data)
         except (OSError, ValueError):
             continue
     return {"fixes": n}

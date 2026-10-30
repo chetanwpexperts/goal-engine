@@ -199,7 +199,7 @@
   }
 
   // A reply in readable parts: paragraphs, bullet lists, and code (queries, formulas) in a box with Copy.
-  const CODE_START = /^\s*(select|with|update|delete|insert|alter|create|drop|show|explain|set|begin|commit|grant|=[A-Z]|\$|<\?php|function |def |SELECT)/i;
+  const CODE_START = /^\s*(--\s|select|with|update|delete|insert|alter|create|drop|show|explain|set|begin|commit|grant|=[A-Z]|\$|<\?php|function |def |SELECT)/i;
   function richSay(text) {
     const wrap = el("div", "say");
     const blocks = String(text || "").split(/\n\s*\n/);
@@ -2043,10 +2043,15 @@
       input.focus();
       input.setSelectionRange(input.value.length, input.value.length);
     });
+    // connecting a database is switched off at launch for most people: then it belongs under "coming soon"
+    const connectItem = (it) => /connect your database/.test(it[1]);
+    const now = window.GE_dbSoon ? sc.now.filter((it) => !connectItem(it)) : sc.now;
+    const soon = window.GE_dbSoon ? [...sc.now.filter(connectItem).map(() => ["Apna database jodo, agent khud check karke saboot ke saath jawab deta hai",
+                                                                              "Connect your database: the agent checks it itself, with proof"]), ...sc.soon] : sc.soon;
     box.replaceChildren(
       el("b", "scope-title", pick(sc.title)),
-      el("p", "scope-h now", hi ? "Abhi kaam karta hai" : "Works now"), list(sc.now),
-      el("p", "scope-h soon", hi ? "Jald aa raha hai" : "Coming soon"), list(sc.soon),
+      el("p", "scope-h now", hi ? "Abhi kaam karta hai" : "Works now"), list(now),
+      el("p", "scope-h soon", hi ? "Jald aa raha hai" : "Coming soon"), list(soon),
       tryIt);
     box.hidden = false;
     for (const t of document.querySelectorAll(".brain-tile")) t.setAttribute("aria-pressed", String(t === tile));

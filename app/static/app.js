@@ -2364,8 +2364,12 @@
     drawer.hidden = false;
     drawer.querySelector("[data-close]").focus();
   }
-  drawer.addEventListener("click", (e) => { if (e.target === drawer || e.target.closest("[data-close]")) drawer.hidden = true; });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") drawer.hidden = true; });
+  // a form in the panel (signup, login, codes): only the X closes it, so a stray click outside never loses what was typed
+  const drawerHasForm = () => !!drawerBody.querySelector("form");
+  drawer.addEventListener("click", (e) => {
+    if (e.target.closest("[data-close]") || (e.target === drawer && !drawerHasForm())) drawer.hidden = true;
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !drawerHasForm()) drawer.hidden = true; });
 
   // ---------------------------------------------------------------- free account
   let me = null;
@@ -2396,6 +2400,23 @@
   }
   function accInput(type, auto, name, max) {
     const i = el("input"); i.type = type; i.autocomplete = auto; i.name = name; i.maxLength = max || 120; return i;
+  }
+  // password with a Show button: a typo at signup is the usual reason a login "doesn't match" later
+  function accPassField(label, input, hint) {
+    const l = accField(label, input, hint);
+    const wrap = el("div", "pass-wrap");
+    const eye = el("button", "pass-eye", "Show"); eye.type = "button";
+    eye.setAttribute("aria-label", "Show password");
+    eye.addEventListener("click", () => {
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      eye.textContent = show ? "Hide" : "Show";
+      eye.setAttribute("aria-label", show ? "Hide password" : "Show password");
+      input.focus();
+    });
+    input.replaceWith(wrap);
+    wrap.append(input, eye);
+    return l;
   }
   async function accSubmit(form, go, err, fields, run) {
     go.disabled = true; err.hidden = true;
@@ -2432,7 +2453,7 @@
     form.append(
       accField("Full name", f.full_name), accField("Phone", f.phone), accField("Email", f.email, "We'll send a 6-digit code to confirm it."),
       accField("City or country", f.location), accField("Username", f.username),
-      accField("Password", f.password, "At least 10 characters."),
+      accPassField("Password", f.password, "At least 10 characters. Tap Show to check it."),
       accField("Why are you here?", f.why, "Your work or business, in a sentence or two. The agents use it to fit their answers to you."),
       trap, err, go, el("p", "fine", "Free. No card, no UPI."));
     form.addEventListener("submit", (e) => {
@@ -2456,7 +2477,7 @@
     const err = el("p", "note err"); err.hidden = true; err.setAttribute("role", "alert");
     const forgot = el("button", "linkish", "Forgot password?"); forgot.type = "button";
     forgot.addEventListener("click", () => openAccount("forgot"));
-    form.append(accField("Email or username", f.login), accField("Password", f.password), err, go, forgot);
+    form.append(accField("Email or username", f.login), accPassField("Password", f.password), err, go, forgot);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       accSubmit(form, go, err, f, async () => {
@@ -2520,7 +2541,7 @@
     f.code.inputMode = "numeric"; f.code.className = "code-in";
     const go = el("button", "btn go", "Set new password"); go.type = "submit";
     const err = el("p", "note err"); err.hidden = true; err.setAttribute("role", "alert");
-    form.append(accField("6-digit code", f.code), accField("New password", f.password, "At least 10 characters."), err, go);
+    form.append(accField("6-digit code", f.code), accPassField("New password", f.password, "At least 10 characters."), err, go);
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       accSubmit(form, go, err, f, async () => {

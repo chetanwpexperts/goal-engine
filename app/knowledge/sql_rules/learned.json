@@ -809,5 +809,1452 @@
    "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
   },
   "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect column name",
+  "why": "The query contains a column name 'address' which does not exist in the 'customers' table.",
+  "fix": "Replace 'address' with a valid column name from the 'customers' table.",
+  "bad_sql": "SELECT name, address FROM customers",
+  "fixed_sql": "SELECT name, email FROM customers",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'address' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'address' in 'SELECT'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column \"address\" does not exist"
+   }
+  },
+  "id": "787a95df7f9b",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using a non-existent table",
+  "why": "The query references a table 'non_existent_table' which does not exist in the database.",
+  "fix": "Replace 'non_existent_table' with an existing table name.",
+  "bad_sql": "SELECT name FROM non_existent_table",
+  "fixed_sql": "SELECT name FROM customers",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1146,
+    "message": "Table 'ge.non_existent_table' doesn't exist"
+   },
+   "mariadb": {
+    "code": 1146,
+    "message": "Table 'ge.non_existent_table' doesn't exist"
+   },
+   "postgres": {
+    "code": "42P01",
+    "message": "relation \"non_existent_table\" does not exist"
+   }
+  },
+  "id": "0bbe61ee6c51",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect Quoting",
+  "why": "Quoted identifiers should be used only when necessary to preserve case or include special characters.",
+  "fix": "Remove unnecessary quotes around identifiers.",
+  "bad_sql": "SELECT \"name\" FROM \"customers\" WHERE \"city\" = 'New York'",
+  "fixed_sql": "SELECT name FROM customers WHERE city = 'New York'",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '\"customers\" WHERE \"city\" = 'New York'' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '\"customers\" WHERE \"city\" = 'New York'' at line 1"
+   }
+  },
+  "id": "fc137029b624",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of escape sequences",
+  "why": "The escape sequence E'\\n' is unnecessary.",
+  "fix": "Remove the 'E' before the opening single quote.",
+  "bad_sql": "SELECT E'\\n' FROM customers",
+  "fixed_sql": "SELECT '\\n' FROM customers",
+  "detect": "(?i)SELECT\\s+E'[^'\\s]+'",
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'E' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'E' in 'SELECT'"
+   }
+  },
+  "id": "4db0612317db",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of string concatenation",
+  "why": "The string constants 'foo' and 'bar' are not concatenated correctly.",
+  "fix": "Remove the space between 'foo' and 'bar'.",
+  "bad_sql": "SELECT 'foo' 'bar' FROM customers",
+  "fixed_sql": "SELECT 'foobar' FROM customers",
+  "detect": "(?i)SELECT\\s+'[^'\\s]+'\\s+'[^'\\s]+'\\s+FROM\\s+[^'\\s]+",
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"'bar'\""
+   }
+  },
+  "id": "7ed5a4f66ac7",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect Use of Parentheses",
+  "why": "Parentheses are used incorrectly to select multiple columns.",
+  "fix": "Remove the parentheses around the column names.",
+  "bad_sql": "SELECT (id, name) FROM customers",
+  "fixed_sql": "SELECT id, name FROM customers",
+  "detect": "\\bSELECT\\s*\\(([^)]+)\\)\\s*FROM\\b",
+  "engines": {
+   "mysql": {
+    "code": 1241,
+    "message": "Operand should contain 1 column(s)"
+   },
+   "mariadb": {
+    "code": 1241,
+    "message": "Operand should contain 1 column(s)"
+   }
+  },
+  "id": "fd345bcdf438",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Misuse of Commas",
+  "why": "A comma is incorrectly placed after the 'email' column.",
+  "fix": "Remove the extra comma after the 'email' column.",
+  "bad_sql": "SELECT id, name, email, FROM customers",
+  "fixed_sql": "SELECT id, name, email FROM customers",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FROM customers' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'FROM customers' at line 1"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"FROM\""
+   }
+  },
+  "id": "358c80d98a1e",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using DISTINCT without an expression",
+  "why": "DISTINCT requires an expression to operate on",
+  "fix": "Specify an expression to apply DISTINCT to",
+  "bad_sql": "SELECT DISTINCT FROM customers",
+  "fixed_sql": "SELECT DISTINCT city FROM customers",
+  "detect": "(?i)SELECT\\s+DISTINCT\\s+FROM\\s+customers",
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FROM customers' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'FROM customers' at line 1"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"FROM\""
+   }
+  },
+  "id": "649e92ce4d5f",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of WITHIN GROUP for non-ordered-set aggregates",
+  "why": "WITHIN GROUP is only required for ordered-set aggregates.",
+  "fix": "Remove the WITHIN GROUP clause.",
+  "bad_sql": "SELECT avg(price) WITHIN GROUP (ORDER BY price) FROM products;",
+  "fixed_sql": "SELECT avg(price) FROM products;",
+  "detect": "(?i)SELECT\\s+avg\\(.*?\\)\\s+WITHIN\\s+GROUP\\s*\\(ORDER\\s+BY\\s+.*?\\)",
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(ORDER BY price) FROM products' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '(ORDER BY price) FROM products' at line 1"
+   },
+   "postgres": {
+    "code": "42883",
+    "message": "function avg(numeric, numeric) does not exist"
+   }
+  },
+  "id": "0c31ffb8e3f9",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Aggregate in WHERE clause",
+  "why": "Aggregate functions are not allowed in WHERE clauses.",
+  "fix": "Use HAVING instead of WHERE for aggregate conditions.",
+  "bad_sql": "SELECT * FROM orders WHERE count(*) > 5",
+  "fixed_sql": "SELECT * FROM orders HAVING count(*) > 5",
+  "detect": "\\bWHERE\\b\\s*count\\(\\*\\)\\s*",
+  "engines": {
+   "mariadb": {
+    "code": 1111,
+    "message": "Invalid use of group function"
+   }
+  },
+  "id": "860539b7ed3a",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Aggregate in subquery without outer reference",
+  "why": "Aggregates in subqueries without outer reference are not allowed.",
+  "fix": "Use an alias for the aggregate result in the subquery.",
+  "bad_sql": "SELECT * FROM (SELECT count(*) FROM orders) AS subquery WHERE subquery.count > 5",
+  "fixed_sql": "SELECT * FROM (SELECT count(*) AS cnt FROM orders) AS subquery WHERE subquery.cnt > 5",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'subquery.count' in 'where clause'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'subquery.count' in 'WHERE'"
+   }
+  },
+  "id": "0889d0cf6662",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of frame_start and frame_end",
+  "why": "The frame_start cannot be UNBOUNDED FOLLOWING and frame_end cannot be UNBOUNDED PRECEDING.",
+  "fix": "Use UNBOUNDED PRECEDING and CURRENT ROW for the frame_start and frame_end respectively.",
+  "bad_sql": "SELECT id, name, salary, RANK() OVER (ORDER BY salary RANGE BETWEEN CURRENT ROW AND 100000 PRECEDING) AS rank FROM employees",
+  "fixed_sql": "SELECT id, name, salary, RANK() OVER (ORDER BY salary RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS rank FROM employees",
+  "detect": "(?i)RANGE\\s+BETWEEN\\s+CURRENT\\s+ROW\\s+AND\\s+\\d+\\s+PRECEDING",
+  "engines": {
+   "postgres": {
+    "code": "42P20",
+    "message": "frame starting from current row cannot have preceding rows"
+   }
+  },
+  "id": "6f796decdd60",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Non-matching COLLATE Clauses Error",
+  "why": "Attaching non-matching COLLATE clauses to more than one argument is an error.",
+  "fix": "Remove non-matching COLLATE clauses.",
+  "bad_sql": "SELECT * FROM customers WHERE name COLLATE \"C\" > 'John' COLLATE \"POSIX\"",
+  "fixed_sql": "SELECT * FROM customers WHERE name COLLATE \"C\" > 'John'",
+  "detect": "(?i)\\bCOLLATE\\b\\s*\\b[^\b]*\\b\\s*\\b[^\b]*\\b\\s*\\bCOLLATE\\b\\s*\\b[^\b]*\\b",
+  "engines": {
+   "postgres": {
+    "code": "42P21",
+    "message": "collation mismatch between explicit collations \"C\" and \"POSIX\""
+   }
+  },
+  "id": "2fb347cd804d",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Collation on non-collatable data type",
+  "why": "The > operator returns a boolean, which is not collatable.",
+  "fix": "Remove the COLLATE clause.",
+  "bad_sql": "SELECT * FROM customers WHERE (name > 'foo') COLLATE \"C\"",
+  "fixed_sql": "SELECT * FROM customers WHERE name > 'foo'",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1273,
+    "message": "Unknown collation: 'C'"
+   },
+   "mariadb": {
+    "code": 1273,
+    "message": "Unknown collation: 'C'"
+   },
+   "postgres": {
+    "code": "42804",
+    "message": "collations are not supported by type boolean"
+   }
+  },
+  "id": "0f9edf655252",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Empty array without explicit type cast",
+  "why": "PostgreSQL cannot infer the type of an empty array.",
+  "fix": "Explicitly cast the empty array to the desired type.",
+  "bad_sql": "SELECT ARRAY[] AS arr",
+  "fixed_sql": "SELECT ARRAY[]::integer[] AS arr",
+  "detect": "\\bARRAY\\s*\\[\\]\\s*AS\\s*arr",
+  "engines": {
+   "postgres": {
+    "code": "42P18",
+    "message": "cannot determine type of empty array"
+   }
+  },
+  "id": "b0af91f58cf0",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using * without specifying table",
+  "why": "The SELECT statement without a FROM clause is invalid.",
+  "fix": "Specify the table from which to select data, e.g., FROM customers.",
+  "bad_sql": "SELECT *;",
+  "fixed_sql": "SELECT * FROM customers;",
+  "detect": "\\bSELECT\\s*\\*\\s*;",
+  "engines": {
+   "mysql": {
+    "code": 1096,
+    "message": "No tables used"
+   },
+   "mariadb": {
+    "code": 1096,
+    "message": "No tables used"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "SELECT * with no tables specified is not valid"
+   }
+  },
+  "id": "2b693e4d2dab",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using non-existent column",
+  "why": "The column 'age' does not exist in the 'customers' table.",
+  "fix": "Use an existing column from the table, e.g., 'created_at'.",
+  "bad_sql": "SELECT name, age FROM customers;",
+  "fixed_sql": "SELECT name, created_at FROM customers;",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'age' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'age' in 'SELECT'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column \"age\" does not exist"
+   }
+  },
+  "id": "f9c6c506309f",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect table name",
+  "why": "The table 'product' does not exist; it should be 'products'.",
+  "fix": "Correct the table name to match the actual table in the database.",
+  "bad_sql": "SELECT name FROM product;",
+  "fixed_sql": "SELECT name FROM products;",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1146,
+    "message": "Table 'ge.product' doesn't exist"
+   },
+   "mariadb": {
+    "code": 1146,
+    "message": "Table 'ge.product' doesn't exist"
+   },
+   "postgres": {
+    "code": "42P01",
+    "message": "relation \"product\" does not exist"
+   }
+  },
+  "id": "1ad90ecb50d4",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using 'ONLY' with a table name that has no descendants",
+  "why": "The 'ONLY' keyword is unnecessary when the table has no descendant tables.",
+  "fix": "Remove the 'ONLY' keyword if it is not needed.",
+  "bad_sql": "SELECT * FROM ONLY products",
+  "fixed_sql": "SELECT * FROM products",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1146,
+    "message": "Table 'ge.ONLY' doesn't exist"
+   },
+   "mariadb": {
+    "code": 1146,
+    "message": "Table 'ge.ONLY' doesn't exist"
+   }
+  },
+  "id": "3964f031aeca",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using 'ONLY' with a table name that has descendants but the keyword is not followed by a table name",
+  "why": "The 'ONLY' keyword should be followed by a table name to specify that only the table itself should be included, not its descendants.",
+  "fix": "Specify a table name after the 'ONLY' keyword.",
+  "bad_sql": "SELECT * FROM ONLY",
+  "fixed_sql": "SELECT * FROM customers",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1146,
+    "message": "Table 'ge.ONLY' doesn't exist"
+   },
+   "mariadb": {
+    "code": 1146,
+    "message": "Table 'ge.ONLY' doesn't exist"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at end of input"
+   }
+  },
+  "id": "c0f5d882a3da",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using 'ONLY' with a table name that has descendants but the keyword is followed by a table name that is not a valid tabl",
+  "why": "The 'ONLY' keyword should be followed by a valid table name that has descendants.",
+  "fix": "Specify a valid table name after the 'ONLY' keyword.",
+  "bad_sql": "SELECT * FROM ONLY invalid_table",
+  "fixed_sql": "SELECT * FROM customers",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1146,
+    "message": "Table 'ge.ONLY' doesn't exist"
+   },
+   "mariadb": {
+    "code": 1146,
+    "message": "Table 'ge.ONLY' doesn't exist"
+   },
+   "postgres": {
+    "code": "42P01",
+    "message": "relation \"invalid_table\" does not exist"
+   }
+  },
+  "id": "d5ec2d57078e",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Missing JOIN condition",
+  "why": "The query lacks a join condition, which will result in a Cartesian product.",
+  "fix": "Add a join condition that matches the common column between the tables.",
+  "bad_sql": "SELECT * FROM customers JOIN orders;",
+  "fixed_sql": "SELECT * FROM customers JOIN orders ON customers.id = orders.customer_id;",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at end of input"
+   }
+  },
+  "id": "d7473a62e519",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect JOIN type",
+  "why": "The query uses a LEFT JOIN but does not specify the join condition.",
+  "fix": "Add the join condition that matches the common column between the tables.",
+  "bad_sql": "SELECT * FROM customers LEFT JOIN orders;",
+  "fixed_sql": "SELECT * FROM customers LEFT JOIN orders ON customers.id = orders.customer_id;",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '' at line 1"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at end of input"
+   }
+  },
+  "id": "1713e454b9f4",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using USING with non-matching columns",
+  "why": "The query uses USING with a column that does not exist in both tables.",
+  "fix": "Use a regular JOIN with an appropriate ON clause.",
+  "bad_sql": "SELECT * FROM customers USING (name);",
+  "fixed_sql": "SELECT * FROM customers JOIN products ON customers.name = products.name;",
+  "detect": "\\bUSING\\b\\s+\\([^\\s,]+\\)",
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'USING (name)' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'USING (name)' at line 1"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"USING\""
+   }
+  },
+  "id": "8f3d729e7d01",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using 'FULL' join without specifying columns",
+  "why": "A 'FULL' join automatically joins on all columns with the same name, which can lead to unintended joins.",
+  "fix": "Specify the join condition explicitly using 'ON'.",
+  "bad_sql": "SELECT * FROM customers FULL JOIN orders",
+  "fixed_sql": "SELECT * FROM customers FULL JOIN orders ON customers.id = orders.customer_id",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at end of input"
+   }
+  },
+  "id": "016fafb3e98c",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using the original table name after aliasing",
+  "why": "The alias 'c' is used for 'customers', but the original table name 'customers' is used in the WHERE clause.",
+  "fix": "Replace 'customers' with 'c' in the WHERE clause.",
+  "bad_sql": "SELECT * FROM customers AS c WHERE customers.id > 10;",
+  "fixed_sql": "SELECT * FROM customers AS c WHERE c.id > 10;",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'customers.id' in 'where clause'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'customers.id' in 'WHERE'"
+   },
+   "postgres": {
+    "code": "42P01",
+    "message": "invalid reference to FROM-clause entry for table \"customers\""
+   }
+  },
+  "id": "f61c4428367c",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of ROWS FROM",
+  "why": "The ROWS FROM syntax should be used with an alias, and column aliases are optional but recommended.",
+  "fix": "Assign a table alias and optionally column aliases to the ROWS FROM construct.",
+  "bad_sql": "SELECT * FROM ROWS FROM (SELECT 1 AS a, 2 AS b), (SELECT 3 AS a, 4 AS b)",
+  "fixed_sql": "SELECT * FROM (SELECT 1 AS a, 2 AS b), (SELECT 3 AS a, 4 AS b) AS rows(a, b)",
+  "detect": "\\bSELECT\\b.*\\bFROM\\b\\s+ROWS\\b\\s+FROM\\b\\s*\\(.*\\)",
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"SELECT\""
+   }
+  },
+  "id": "14d8eccfa6d8",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "LATERAL subquery without LATERAL keyword",
+  "why": "The subquery is not preceded by the LATERAL keyword, which is required for cross-referencing columns from preceding FROM items.",
+  "fix": "Add the LATERAL keyword before the subquery.",
+  "bad_sql": "SELECT * FROM customers, (SELECT * FROM orders WHERE orders.customer_id = customers.id) AS o",
+  "fixed_sql": "SELECT * FROM customers, LATERAL (SELECT * FROM orders WHERE orders.customer_id = customers.id) AS o",
+  "detect": "(?i)SELECT\\s+.*?FROM\\s+[^,]+,\\s*\\(([^)]+)\\)\\s+AS\\s+[^,]+",
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'customers.id' in 'where clause'"
+   },
+   "postgres": {
+    "code": "42P01",
+    "message": "invalid reference to FROM-clause entry for table \"customers\""
+   }
+  },
+  "id": "eb1e647d26dc",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of HAVING with non-aggregated column",
+  "why": "The HAVING clause references a non-aggregated column 'product_id'.",
+  "fix": "Use an aggregate function in the HAVING clause or include the column in the GROUP BY clause.",
+  "bad_sql": "SELECT product_id, sum(qty) FROM order_items HAVING product_id = 1",
+  "fixed_sql": "SELECT product_id, sum(qty) FROM order_items GROUP BY product_id HAVING sum(qty) = 1",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1140,
+    "message": "In aggregated query without GROUP BY, expression #1 of SELECT list contains nonaggregated column 'ge.order_items.product_id'; this is incompatible with sql_mode=only_full_group_by"
+   },
+   "postgres": {
+    "code": "42803",
+    "message": "column \"order_items.product_id\" must appear in the GROUP BY clause or be used in an aggregate function"
+   }
+  },
+  "id": "742d31ec4293",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using aggregate function in WHERE clause",
+  "why": "The aggregate function 'sum' is used in the WHERE clause.",
+  "fix": "Use the HAVING clause instead of the WHERE clause for conditions involving aggregate functions.",
+  "bad_sql": "SELECT product_id, sum(qty) FROM order_items WHERE sum(qty) > 10",
+  "fixed_sql": "SELECT product_id, sum(qty) FROM order_items GROUP BY product_id HAVING sum(qty) > 10",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1111,
+    "message": "Invalid use of group function"
+   },
+   "mariadb": {
+    "code": 1111,
+    "message": "Invalid use of group function"
+   },
+   "postgres": {
+    "code": "42803",
+    "message": "aggregate functions are not allowed in WHERE"
+   }
+  },
+  "id": "26b8e7475ee9",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using aggregate functions in WHERE clause",
+  "why": "The query uses an aggregate function (AVG) in the WHERE clause, which is not allowed.",
+  "fix": "Move the aggregate function to the HAVING clause.",
+  "bad_sql": "SELECT name FROM products WHERE AVG(price) > 100",
+  "fixed_sql": "SELECT name FROM products GROUP BY name HAVING AVG(price) > 100",
+  "detect": "\\bSELECT\\s+[^,]+\\s+FROM\\s+[^\\s]+\\s+WHERE\\s+AVG\\([^)]+\\)\\s*>\\s*[^\\s]+",
+  "engines": {
+   "mysql": {
+    "code": 1111,
+    "message": "Invalid use of group function"
+   },
+   "mariadb": {
+    "code": 1111,
+    "message": "Invalid use of group function"
+   },
+   "postgres": {
+    "code": "42803",
+    "message": "aggregate functions are not allowed in WHERE"
+   }
+  },
+  "id": "0629c774c86a",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of ROLLUP",
+  "why": "ROLLUP is used in the SELECT clause instead of the GROUP BY clause.",
+  "fix": "Move ROLLUP to the GROUP BY clause.",
+  "bad_sql": "SELECT city, ROLLUP(name, email) FROM customers",
+  "fixed_sql": "SELECT city, name, email FROM customers GROUP BY ROLLUP(city, name, email)",
+  "detect": "(?i)SELECT\\s+[^\\s]+\\s*,\\s*ROLLUP\\s*\\([^)]+\\)",
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(name, email) FROM customers' at line 1"
+   },
+   "postgres": {
+    "code": "42883",
+    "message": "function rollup(character varying, character varying) does not exist"
+   }
+  },
+  "id": "f3c75fe1767a",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of CUBE",
+  "why": "CUBE is used in the SELECT clause instead of the GROUP BY clause.",
+  "fix": "Move CUBE to the GROUP BY clause.",
+  "bad_sql": "SELECT city, CUBE(name, email) FROM customers",
+  "fixed_sql": "SELECT city, name, email FROM customers GROUP BY CUBE(city, name, email)",
+  "detect": "(?i)SELECT\\s+[^\\s]+\\s*,\\s*CUBE\\s*\\([^)]+\\)",
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "function cube(character varying, character varying) does not exist"
+   }
+  },
+  "id": "52073ac3967b",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of GROUPING SETS",
+  "why": "GROUPING SETS is used in the SELECT clause instead of the GROUP BY clause.",
+  "fix": "Move GROUPING SETS to the GROUP BY clause.",
+  "bad_sql": "SELECT city, GROUPING SETS(name, email) FROM customers",
+  "fixed_sql": "SELECT city, name, email FROM customers GROUP BY GROUPING SETS(city, name, email)",
+  "detect": "(?i)SELECT\\s+[^\\s]+\\s*,\\s*GROUPING SETS\\s*\\([^)]+\\)",
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"(\""
+   }
+  },
+  "id": "0a94fe7a0dbd",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using LIMIT ALL",
+  "why": "LIMIT ALL is the same as omitting the LIMIT clause.",
+  "fix": "Omit the LIMIT clause if you want to retrieve all rows.",
+  "bad_sql": "SELECT id, name FROM customers LIMIT ALL;",
+  "fixed_sql": "SELECT id, name FROM customers;",
+  "detect": "\\bLIMIT\\s+ALL\\b",
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ALL' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'ALL' at line 1"
+   }
+  },
+  "id": "9fd22eb4aa7f",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Ambiguous column name",
+  "why": "The query uses an ambiguous column name 'name' without specifying the table.",
+  "fix": "Specify the table name for the column 'name'.",
+  "bad_sql": "SELECT name FROM customers, products",
+  "fixed_sql": "SELECT customers.name FROM customers, products",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1052,
+    "message": "Column 'name' in field list is ambiguous"
+   },
+   "mariadb": {
+    "code": 1052,
+    "message": "Column 'name' in SELECT is ambiguous"
+   },
+   "postgres": {
+    "code": "42702",
+    "message": "column reference \"name\" is ambiguous"
+   }
+  },
+  "id": "a34760bdea02",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Missing LIMIT in Recursive Query",
+  "why": "The query might loop forever without a LIMIT.",
+  "fix": "Add a LIMIT clause to the parent query.",
+  "bad_sql": "WITH RECURSIVE t(n) AS (\n    SELECT 1\n  UNION ALL\n    SELECT n+1 FROM t\n)\nSELECT n FROM t;",
+  "fixed_sql": "WITH RECURSIVE t(n) AS (\n    SELECT 1\n  UNION ALL\n    SELECT n+1 FROM t\n)\nSELECT n FROM t LIMIT 100;",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "53100",
+    "message": "could not write to file \"base/pgsql_tmp/pgsql_tmp399.4\": No space left on device"
+   }
+  },
+  "id": "630708a1f488",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Unnecessary Sorting in Recursive Query",
+  "why": "Sorting might cause the query to fetch all rows instead of stopping early.",
+  "fix": "Remove the ORDER BY clause or ensure it only sorts a limited number of rows.",
+  "bad_sql": "WITH RECURSIVE t(n) AS (\n    SELECT 1\n  UNION ALL\n    SELECT n+1 FROM t\n)\nSELECT n FROM t ORDER BY n;",
+  "fixed_sql": "WITH RECURSIVE t(n) AS (\n    SELECT 1\n  UNION ALL\n    SELECT n+1 FROM t\n)\nSELECT n FROM t LIMIT 100;",
+  "detect": "\\bWITH RECURSIVE\\b.*?\\bSELECT\\b.*?\\bFROM\\b.*?\\bORDER BY\\b",
+  "engines": {
+   "postgres": {
+    "code": "53100",
+    "message": "could not write to file \"base/pgsql_tmp/pgsql_tmp399.10\": No space left on device"
+   }
+  },
+  "id": "7aa129ce70ff",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Unnecessary Join in Recursive Query",
+  "why": "Joining might cause the query to fetch all rows instead of stopping early.",
+  "fix": "Remove the JOIN clause or ensure it only joins a limited number of rows.",
+  "bad_sql": "WITH RECURSIVE t(n) AS (\n    SELECT 1\n  UNION ALL\n    SELECT n+1 FROM t\n)\nSELECT n FROM t JOIN other_table ON t.n = other_table.id;",
+  "fixed_sql": "WITH RECURSIVE t(n) AS (\n    SELECT 1\n  UNION ALL\n    SELECT n+1 FROM t\n)\nSELECT n FROM t LIMIT 100;",
+  "detect": "\\bWITH RECURSIVE\\b.*?\\bSELECT\\b.*?\\bFROM\\b.*?\\bJOIN\\b",
+  "engines": {
+   "mariadb": {
+    "code": 1146,
+    "message": "Table 'ge.other_table' doesn't exist"
+   },
+   "postgres": {
+    "code": "42P01",
+    "message": "relation \"other_table\" does not exist"
+   }
+  },
+  "id": "531193cb7ff0",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using a table with ALSO rule",
+  "why": "The table 'products' has an ALSO rule that is not allowed in a data-modifying statement in WITH.",
+  "fix": "Remove the ALSO rule or use a different table without ALSO rules.",
+  "bad_sql": "WITH t AS (SELECT * FROM products WHERE category = 'Electronics' ALSO SELECT * FROM orders WHERE status = 'Pending') SELECT * FROM t",
+  "fixed_sql": "WITH t AS (SELECT * FROM products WHERE category = 'Electronics') SELECT * FROM t",
+  "detect": "(?i)WITH\\s+t\\s+AS\\s*\\(SELECT\\s+.*\\s+FROM\\s+products\\s+WHERE\\s+.*\\s+ALSO\\s+SELECT\\s+.*\\s+FROM\\s+.*\\s+WHERE\\s+.*\\)\\s+SELECT\\s+.*\\s+FROM\\s+t",
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ALSO SELECT * FROM orders WHERE status = 'Pending') SELECT * FROM t' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'ALSO SELECT * FROM orders WHERE status = 'Pending') SELECT * FROM t' at line 1"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"ALSO\""
+   }
+  },
+  "id": "f91ed3848dd9",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using a table with INSTEAD rule",
+  "why": "The table 'products' has an INSTEAD rule that is not allowed in a data-modifying statement in WITH.",
+  "fix": "Remove the INSTEAD rule or use a different table without INSTEAD rules.",
+  "bad_sql": "WITH t AS (SELECT * FROM products WHERE category = 'Electronics' INSTEAD SELECT * FROM orders WHERE status = 'Pending') SELECT * FROM t",
+  "fixed_sql": "WITH t AS (SELECT * FROM products WHERE category = 'Electronics') SELECT * FROM t",
+  "detect": "(?i)WITH\\s+t\\s+AS\\s*\\(SELECT\\s+.*\\s+FROM\\s+products\\s+WHERE\\s+.*\\s+INSTEAD\\s+SELECT\\s+.*\\s+FROM\\s+.*\\s+WHERE\\s+.*\\)\\s+SELECT\\s+.*\\s+FROM\\s+t",
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'INSTEAD SELECT * FROM orders WHERE status = 'Pending') SELECT * FROM t' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'INSTEAD SELECT * FROM orders WHERE status = 'Pending') SELECT * FROM t' at line 1"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"INSTEAD\""
+   }
+  },
+  "id": "544b7d1efe58",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Operator Overloading",
+  "why": "The date string is implicitly converted to text, causing an error.",
+  "fix": "Cast the date string to date.",
+  "bad_sql": "SELECT '2023-01-01' + INTERVAL '1 day'",
+  "fixed_sql": "SELECT '2023-01-01'::date + INTERVAL '1 day'",
+  "detect": "\\bSELECT\\s+'\\d{4}-\\d{2}-\\d{2}'\\s*\\+\\s+INTERVAL",
+  "engines": {
+   "postgres": {
+    "code": "22007",
+    "message": "invalid input syntax for type interval: \"2023-01-01\""
+   }
+  },
+  "id": "68f4ac91cfd0",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Implicit Type Conversion",
+  "why": "The city column is of type text, but an integer is being compared to it.",
+  "fix": "Convert the integer to a string using the CAST function.",
+  "bad_sql": "SELECT name FROM customers WHERE city = 123",
+  "fixed_sql": "SELECT name FROM customers WHERE city = '123'",
+  "detect": "\\bWHERE\\b\\s+city\\s*=\\s*\\d+",
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "operator does not exist: character varying = integer"
+   }
+  },
+  "id": "3a86192d0233",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Implicit Type Resolution Error",
+  "why": "The system cannot decide which ~ operator to use for an unknown type.",
+  "fix": "Use an explicit type cast to specify the type as INTEGER.",
+  "bad_sql": "SELECT ~ '20' AS \"negation\"",
+  "fixed_sql": "SELECT ~ CAST('20' AS INTEGER) AS \"negation\"",
+  "detect": "(?i)SELECT\\s+~\\s+'\\d+'\\s+AS",
+  "engines": {
+   "postgres": {
+    "code": "42725",
+    "message": "operator is not unique: ~ unknown"
+   }
+  },
+  "id": "0f9422454baa",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect Operator Usage",
+  "why": "The operator is used incorrectly for the specified types.",
+  "fix": "Remove the explicit type cast for the first argument.",
+  "bad_sql": "SELECT text 'abc' || 'def' AS \"text and unknown\"",
+  "fixed_sql": "SELECT 'abc' || 'def' AS \"text and unknown\"",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '|| 'def' AS \"text and unknown\"' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '|| 'def' AS \"text and unknown\"' at line 1"
+   }
+  },
+  "id": "05ef72f8e6b8",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Implicit Cast Error",
+  "why": "The parser does not have an implicit cast from integer to text.",
+  "fix": "Use an explicit cast with CAST(1234 AS text).",
+  "bad_sql": "SELECT substr(1234, 3)",
+  "fixed_sql": "SELECT substr(CAST(1234 AS text), 3)",
+  "detect": "\\bsubstr\\s*\\(\\s*\\d+\\s*,\\s*\\d+\\s*\\)",
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "function substr(integer, integer) does not exist"
+   }
+  },
+  "id": "a7a023bfbe43",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Type Mismatch in UNION",
+  "why": "The UNION operator requires all columns to have the same type. The name column is of type character varying, and the price column is of type numeric. Casting both to text resolves the type mismatch.",
+  "fix": "Cast both columns to text using the :: operator.",
+  "bad_sql": "SELECT name FROM customers UNION SELECT price FROM products",
+  "fixed_sql": "SELECT name::text FROM customers UNION SELECT price::text FROM products",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42804",
+    "message": "UNION types character varying and numeric cannot be matched"
+   }
+  },
+  "id": "01b9408e747d",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Type Mismatch in Nested UNION",
+  "why": "PostgreSQL resolves multiple UNIONs as a nest of pairwise operations, leading to a type mismatch error.",
+  "fix": "Ensure the leftmost UNION has at least one input of the desired result type.",
+  "bad_sql": "SELECT NULL UNION SELECT NULL UNION SELECT 1",
+  "fixed_sql": "SELECT NULL UNION SELECT 1 UNION SELECT NULL",
+  "detect": "\\b(SELECT\\s+NULL\\s+UNION\\s+SELECT\\s+NULL\\s+UNION\\s+SELECT\\s+\\d+)\\b",
+  "engines": {
+   "postgres": {
+    "code": "42804",
+    "message": "UNION types text and integer cannot be matched"
+   }
+  },
+  "id": "54dbde75cc5a",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using non-default sort order on a single-column index",
+  "why": "Default behavior is NULLS LAST, but ASC is used with NULLS FIRST.",
+  "fix": "Remove NULLS FIRST if not necessary.",
+  "bad_sql": "SELECT * FROM customers ORDER BY created_at ASC NULLS FIRST",
+  "fixed_sql": "SELECT * FROM customers ORDER BY created_at ASC",
+  "detect": "(?i)SELECT\\s+.*?\\s+ORDER\\s+BY\\s+[^\\s]+\\s+ASC\\s+NULLS\\s+FIRST",
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'NULLS FIRST' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'NULLS FIRST' at line 1"
+   }
+  },
+  "id": "5cae605c97bd",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using random() in a way that doesn't benefit from initplan",
+  "why": "The random() function is evaluated for each row, leading to unnecessary computation.",
+  "fix": "Use a static range that benefits from initplan.",
+  "bad_sql": "SELECT * FROM customers WHERE id = (SELECT random() * 1000)::int",
+  "fixed_sql": "SELECT * FROM customers WHERE id BETWEEN 1 AND 1000",
+  "detect": "(?i)SELECT.*random\\(\\).*::int",
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '() * 1000)::int' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '::int' at line 1"
+   }
+  },
+  "id": "9e843f62ca21",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using non-existent column",
+  "why": "The query attempts to select a non-existent column from the products table.",
+  "fix": "Remove the non-existent column from the SELECT clause.",
+  "bad_sql": "SELECT customers.name, products.non_existent_column FROM customers JOIN products ON customers.id = products.id",
+  "fixed_sql": "SELECT customers.name, products.name FROM customers JOIN products ON customers.id = products.id",
+  "detect": "(?i)\\bproducts\\.non_existent_column\\b",
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'products.non_existent_column' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'products.non_existent_column' in 'SELECT'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column products.non_existent_column does not exist"
+   }
+  },
+  "id": "3d204e5dd311",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using incorrect table alias",
+  "why": "The query uses an incorrect alias for the products table.",
+  "fix": "Correct the alias to match the actual table alias used in the JOIN condition.",
+  "bad_sql": "SELECT c.name, p.name FROM customers AS c JOIN products AS p ON c.id = p.non_existent_alias",
+  "fixed_sql": "SELECT c.name, p.name FROM customers AS c JOIN products AS p ON c.id = p.id",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'p.non_existent_alias' in 'on clause'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'p.non_existent_alias' in 'ON'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column p.non_existent_alias does not exist"
+   }
+  },
+  "id": "f53593778c31",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using dependent columns in WHERE clause",
+  "why": "The query planner assumes that the conditions on dependent columns (city and zip) are independent, leading to an underestimation of the result size.",
+  "fix": "Remove the condition on the dependent column (zip) if it is not necessary for the query.",
+  "bad_sql": "SELECT * FROM customers WHERE city = 'New York' AND zip = '10001'",
+  "fixed_sql": "SELECT * FROM customers WHERE city = 'New York'",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'zip' in 'where clause'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'zip' in 'WHERE'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column \"zip\" does not exist"
+   }
+  },
+  "id": "8eb8ddd6ea6d",
+  "source": "postgresql-19-A4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
  }
 ]

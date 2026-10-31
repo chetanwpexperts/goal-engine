@@ -34,9 +34,10 @@ def test_every_learned_rule_is_proved_and_its_pattern_is_safe():
 
 def test_a_learned_rule_shows_up_in_the_check(monkeypatch):
     rule = {"title": "Aggregate in WHERE", "why": "WHERE runs before grouping.", "fix": "Put it in HAVING.",
-            "detect": r"where[^;]*\b(sum|count|avg|min|max)\s*\(", "engines": {"mysql": {"code": 1111}, "mariadb": {"code": 1111},
-                                                                           "postgres": {"code": "42803"}}}
+            "detect": r"where[^;]*\b(sum|count|avg|min|max)\s*\(", "fixed_sql": "SELECT 1",
+            "engines": {"mysql": {"code": 1111, "message": "Invalid use of group function"}, "mariadb": {"code": 1111, "message": "Invalid use of group function"},
+                        "postgres": {"code": "42803", "message": "aggregate functions are not allowed in WHERE"}}}
     monkeypatch.setattr(sqlcorrect, "_LEARNED", [{**rule, "_rx": re.compile(rule["detect"], re.I | re.S)}])
     r = sqlcorrect.check("SELECT o.customer_id FROM orders o WHERE SUM(o.total) > 100 GROUP BY o.customer_id")
-    f = next(x for x in r["findings"] if x["title_en"] == "Aggregate in WHERE")
-    assert f["kind"] == "error" and "PostgreSQL (error 42803)" in f["fix_en"]
+    f = next(x for x in r["findings"] if x["topic"] == "learned")
+    assert f["kind"] == "error" and "Invalid use of group function" in f["title_en"] and "PostgreSQL error 42803" in f["fix_en"]

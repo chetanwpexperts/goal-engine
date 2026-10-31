@@ -862,10 +862,13 @@ def check(sql: str, _again: bool = False) -> dict:
         ev = line_of(m.start())
         if any(ev in h for h in have):
             continue                                          # already said, in our own words
-        where = ", ".join(f"{_ENGINE_NAME[k]} (error {e['code']})" for k, e in r["engines"].items())
+        # the engine's own words are the reason (proved); the drafted title and fix are only a pointer, with the example
+        said = "; ".join(f"{_ENGINE_NAME[k]} error {e['code']}: {e.get('message', '')}".strip() for k, e in r["engines"].items())
         everywhere = set(r["engines"]) >= {"mysql", "mariadb", "postgres"}
-        add("error" if everywhere else "check", "learned", r["title"], r["title"], ev,
-            f"{r['why']} {r['fix']} Fails on: {where}.".strip(), f"{r['why']} {r['fix']} Yahan fail hota hai: {where}.".strip())
+        head = next(iter(r["engines"].values())).get("message") or r["title"]
+        title = f"{_ENGINE_NAME[next(iter(r['engines']))]} refuses this: {head[:90]}"
+        example = f" Works: {r['fixed_sql'][:160]}" if r.get("fixed_sql") else ""
+        add("error" if everywhere else "check", "learned", title, title, ev, f"{said}.{example}", f"{said}.{example}")
     F = [f for f in F if not (f.title_en.startswith("CROSS JOIN") and f.title_en.split()[3].lower() in removed)]
     corrected = _apply(sql, s, cl, items, edits, notes, drop_grouping, sel_aliases, removed, srcs)
     order = {"error": 0, "wrong": 1, "check": 2}

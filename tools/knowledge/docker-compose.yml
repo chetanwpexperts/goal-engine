@@ -1,0 +1,17 @@
+# The three real engines that decide whether a drafted rule is true. Data lives in memory: nothing to clean up.
+services:
+  mysql:
+    image: mysql:8.4
+    environment: { MYSQL_ROOT_PASSWORD: ge, MYSQL_DATABASE: ge }
+    ports: ["3307:3306"]
+    tmpfs: ["/var/lib/mysql"]
+  mariadb:
+    image: mariadb:11.4
+    environment: { MARIADB_ROOT_PASSWORD: ge, MARIADB_DATABASE: ge }
+    ports: ["3308:3306"]
+    tmpfs: ["/var/lib/mysql"]
+  postgres:
+    image: postgres:16
+    environment: { POSTGRES_PASSWORD: ge, POSTGRES_DB: ge }
+    ports: ["5433:5432"]
+    tmpfs: ["/var/lib/postgresql/data"]

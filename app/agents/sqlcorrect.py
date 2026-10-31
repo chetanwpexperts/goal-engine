@@ -853,6 +853,19 @@ def check(sql: str, _again: bool = False) -> dict:
                 "mein columns ke saath likho.")
     # ---- unknown ORDER BY etc. are handled above; aggregate-alias in ORDER BY dropped with grouping below
 
+    # ---- rules learned from the engines' own docs and proved on MySQL / MariaDB / PostgreSQL (tools/knowledge)
+    have = {f.topic + f.evidence for f in F}
+    for r in learned_rules():
+        m = r["_rx"].search(sql)
+        if not m:
+            continue
+        ev = line_of(m.start())
+        if any(ev in h for h in have):
+            continue                                          # already said, in our own words
+        where = ", ".join(f"{_ENGINE_NAME[k]} (error {e['code']})" for k, e in r["engines"].items())
+        everywhere = set(r["engines"]) >= {"mysql", "mariadb", "postgres"}
+        add("error" if everywhere else "check", "learned", r["title"], r["title"], ev,
+            f"{r['why']} {r['fix']} Fails on: {where}.".strip(), f"{r['why']} {r['fix']} Yahan fail hota hai: {where}.".strip())
     F = [f for f in F if not (f.title_en.startswith("CROSS JOIN") and f.title_en.split()[3].lower() in removed)]
     corrected = _apply(sql, s, cl, items, edits, notes, drop_grouping, sel_aliases, removed, srcs)
     order = {"error": 0, "wrong": 1, "check": 2}
@@ -867,6 +880,31 @@ def check(sql: str, _again: bool = False) -> dict:
 def _short(text: str, n: int = 32) -> str:
     t = re.sub(r"\s+", " ", text.strip().rstrip(";"))
     return t if len(t) <= n else t[:n].rsplit(" ", 1)[0] + " …"
+
+
+_ENGINE_NAME = {"mysql": "MySQL", "mariadb": "MariaDB", "postgres": "PostgreSQL"}
+_LEARNED = None
+
+
+def learned_rules() -> list:
+    """Verified rules with a verified pattern, from app/knowledge/sql_rules/learned.json (read once)."""
+    global _LEARNED
+    if _LEARNED is None:
+        import json
+        from pathlib import Path
+
+        out = []
+        try:
+            for r in json.loads((Path(__file__).resolve().parents[1] / "knowledge" / "sql_rules" / "learned.json").read_text()):
+                if r.get("detect") and r.get("engines"):
+                    try:
+                        out.append({**r, "_rx": re.compile(r["detect"], re.I | re.S)})
+                    except re.error:
+                        pass
+        except (OSError, ValueError):
+            pass
+        _LEARNED = out
+    return _LEARNED
 
 
 def _dedupe(F):

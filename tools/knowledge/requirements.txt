@@ -1,0 +1,3 @@
+pymysql
+psycopg[binary]
+beautifulsoup4

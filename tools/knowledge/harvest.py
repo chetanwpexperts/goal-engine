@@ -148,12 +148,20 @@ def draft(url: str, text: str) -> list[dict]:
     body = json.dumps({"model": MODEL, "prompt": PROMPT.format(url=url, text=text[:3800]), "format": "json",
                        "stream": False, "options": {"temperature": 0.2}}).encode()
     req = urllib.request.Request(OLLAMA, data=body, headers={"Content-Type": "application/json"})
-    raw = json.loads(urllib.request.urlopen(req, timeout=600).read())["response"]
+    raw = json.loads(urllib.request.urlopen(req, timeout=300).read())["response"]
     try:
         rules = json.loads(raw).get("rules") or []
     except (ValueError, AttributeError):
         return []
     return [r for r in rules if isinstance(r, dict) and r.get("bad_sql") and r.get("fixed_sql")]
+
+
+def _ollama_up() -> bool:
+    try:
+        urllib.request.urlopen(OLLAMA.rsplit("/api/", 1)[0] + "/api/tags", timeout=10).read()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 # ------------------------------------------------------------------ the engines decide
@@ -302,11 +310,18 @@ def main():
             if key in done:
                 continue
             t = time.time()
-            try:
-                rules = draft(url, part)
-            except Exception as exc:  # noqa: BLE001
-                print(f"model failed ({exc}); is Ollama running?")
-                return
+            rules, fails = None, 0
+            while rules is None:
+                try:
+                    rules = draft(url, part)
+                except Exception as exc:  # noqa: BLE001 - a stuck or sleeping model: retry once, then skip this section
+                    fails += 1
+                    print(f"model didn't answer ({exc}); {'retrying' if fails < 2 else 'skipping this section'}")
+                    if fails >= 2:
+                        rules = []
+                        if not _ollama_up():
+                            print("Ollama isn't answering at all: open the Ollama app, then run the same command again")
+                            return
             drafted += len(rules)
             for r in rules:
                 v = verify(r, conns, valid)

@@ -15,3 +15,10 @@ On the Mac, from the repo folder:
     git add app/knowledge/sql_rules/learned.json && git commit -m "Learned SQL rules" && git push
 
 Add more doc pages to sources.json any time. Stop the engines: docker compose -f tools/knowledge/docker-compose.yml down
+
+Downloaded manuals (no website, no blocking):
+
+    # PostgreSQL PDF: only the SQL chapters (syntax, queries, types, indexes, performance)
+    .kvenv/bin/python tools/knowledge/harvest.py --file ~/Downloads/postgresql-19-A4.pdf --pages 72-96,156-185,470-497,553-578
+    # MySQL Reference Manual, "HTML download" from dev.mysql.com/doc, unzipped: only the query pages
+    .kvenv/bin/python tools/knowledge/harvest.py --file ~/Downloads/refman-8.4-en.html-chapter --match select,join,group-by,null,union,subquer,alias,order-by,window,aggregate

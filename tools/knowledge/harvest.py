@@ -80,7 +80,12 @@ def _download(url: str) -> str:
         return out.stdout
 
 
+_fetched: dict = {}
+
+
 def fetch(url: str) -> str:
+    if url in _fetched:                                       # a downloaded manual, already read
+        return _fetched[url]
     CACHE.mkdir(exist_ok=True)
     f = CACHE / ("page-" + hashlib.sha1(url.encode()).hexdigest()[:16] + ".txt")
     if f.exists():
@@ -96,6 +101,34 @@ def fetch(url: str) -> str:
     text = re.sub(r"\n\s*\n+", "\n\n", main.get_text("\n"))
     f.write_text(text)
     return text
+
+
+def local_docs(path: str, pages: str = "") -> list[tuple[str, str]]:
+    """A downloaded manual: a PDF (only the pages asked for, e.g. 72-96,156-185) or a folder of HTML pages
+    (the MySQL Reference Manual 'HTML download'). Returns (name, text) per page or file; no website involved."""
+    p = Path(path).expanduser()
+    out = []
+    if p.suffix.lower() == ".pdf":
+        from pypdf import PdfReader
+
+        r = PdfReader(str(p))
+        want = set()
+        for part in (pages or f"1-{len(r.pages)}").split(","):
+            a, _, b = part.strip().partition("-")
+            want.update(range(int(a), int(b or a) + 1))
+        for n in sorted(want):
+            if 1 <= n <= len(r.pages):
+                out.append((f"{p.name} p{n}", r.pages[n - 1].extract_text() or ""))
+        return out
+    from bs4 import BeautifulSoup
+
+    files = sorted(p.rglob("*.htm*")) if p.is_dir() else [p]
+    for f in files:
+        soup = BeautifulSoup(f.read_text(errors="replace"), "html.parser")
+        for t in soup(["script", "style", "nav", "header", "footer"]):
+            t.decompose()
+        out.append((f.name, re.sub(r"\n\s*\n+", "\n\n", soup.get_text("\n"))))
+    return out
 
 
 def chunks(text: str, size: int = 3500) -> list[str]:
@@ -220,6 +253,9 @@ def valid_queries(n: int = 400) -> list[str]:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0, help="only the first N doc pages")
+    ap.add_argument("--file", default="", help="a downloaded manual: a .pdf or a folder of .html pages")
+    ap.add_argument("--pages", default="", help="with a PDF: which pages, e.g. 72-96,156-185")
+    ap.add_argument("--match", default="", help="with a folder: only files whose name contains one of these words (comma list)")
     ap.add_argument("--hours", type=float, default=0, help="stop after this many hours (nightly runs)")
     ap.add_argument("--only", default="", help="only sources whose address contains this (mysql, mariadb, postgresql)")
     args = ap.parse_args()
@@ -234,6 +270,18 @@ def main():
     valid = valid_queries()
     print(f"engines: {versions}; {len(valid)} valid queries guard the patterns")
     sources = json.loads((HERE / "sources.json").read_text())
+    if args.file:                                             # a downloaded manual instead of the website list
+        docs = local_docs(args.file, args.pages)
+        if args.match:
+            words = [w.strip().lower() for w in args.match.split(",") if w.strip()]
+            docs = [d for d in docs if any(w in d[0].lower() for w in words)]
+        text_by = {}
+        for name, text in docs:                               # PDF pages are joined so sections aren't cut in half
+            key = name.split(" p")[0] if name.endswith(tuple("0123456789")) and " p" in name else name
+            text_by[key] = text_by.get(key, "") + "\n\n" + text
+        _fetched.update(text_by)
+        sources = list(text_by)
+        print(f"{len(docs)} pages/files from {args.file}")
     if args.only:
         sources = [u for u in sources if args.only.lower() in u.lower()]
     if args.limit:

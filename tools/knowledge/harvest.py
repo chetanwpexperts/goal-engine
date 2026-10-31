@@ -112,6 +112,9 @@ def local_docs(path: str, pages: str = "") -> list[tuple[str, str]]:
         from pypdf import PdfReader
 
         r = PdfReader(str(p))
+        if pages.startswith("chapters:"):                     # topic words -> the sections whose title has them
+            pages = chapter_pages(r, pages[len("chapters:"):])
+            print(f"sections picked from the table of contents: pages {pages or 'none'}")
         want = set()
         for part in (pages or f"1-{len(r.pages)}").split(","):
             a, _, b = part.strip().partition("-")
@@ -129,6 +132,36 @@ def local_docs(path: str, pages: str = "") -> list[tuple[str, str]]:
             t.decompose()
         out.append((f.name, re.sub(r"\n\s*\n+", "\n\n", soup.get_text("\n"))))
     return out
+
+
+def chapter_pages(r, words: str) -> str:
+    """Page ranges of every table-of-contents entry whose title contains one of the words, up to the next entry."""
+    flat = []
+
+    def walk(items):
+        for it in items:
+            if isinstance(it, list):
+                walk(it)
+                continue
+            try:
+                flat.append((r.get_destination_page_number(it) + 1, it.title))
+            except Exception:  # noqa: BLE001
+                pass
+    walk(r.outline)
+    flat.sort()
+    ws = [w.strip().lower() for w in words.split(",") if w.strip()]
+    ranges = []
+    for i, (pg, title) in enumerate(flat):
+        if any(w in title.lower() for w in ws):
+            nxt = next((q for q, _t in flat[i + 1:] if q > pg), pg + 1)
+            ranges.append((pg, min(nxt - 1 if nxt > pg else pg, pg + 25)))
+    merged = []
+    for a, b in sorted(ranges):
+        if merged and a <= merged[-1][1] + 1:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], b))
+        else:
+            merged.append((a, b))
+    return ",".join(f"{a}-{b}" for a, b in merged)
 
 
 def chunks(text: str, size: int = 3500) -> list[str]:
@@ -263,6 +296,7 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="only the first N doc pages")
     ap.add_argument("--file", default="", help="a downloaded manual: a .pdf or a folder of .html pages")
     ap.add_argument("--pages", default="", help="with a PDF: which pages, e.g. 72-96,156-185")
+    ap.add_argument("--chapters", default="", help="with a PDF: topic words; sections whose title has them (comma list)")
     ap.add_argument("--match", default="", help="with a folder: only files whose name contains one of these words (comma list)")
     ap.add_argument("--hours", type=float, default=0, help="stop after this many hours (nightly runs)")
     ap.add_argument("--only", default="", help="only sources whose address contains this (mysql, mariadb, postgresql)")
@@ -279,7 +313,7 @@ def main():
     print(f"engines: {versions}; {len(valid)} valid queries guard the patterns")
     sources = json.loads((HERE / "sources.json").read_text())
     if args.file:                                             # a downloaded manual instead of the website list
-        docs = local_docs(args.file, args.pages)
+        docs = local_docs(args.file, ("chapters:" + args.chapters) if args.chapters else args.pages)
         if args.match:
             words = [w.strip().lower() for w in args.match.split(",") if w.strip()]
             docs = [d for d in docs if any(w in d[0].lower() for w in words)]

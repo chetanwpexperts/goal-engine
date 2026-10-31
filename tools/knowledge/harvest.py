@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 import time
@@ -28,8 +29,8 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 OUT = ROOT / "app" / "knowledge" / "sql_rules" / "learned.json"
 CACHE = HERE / ".cache"
-MODEL = "qwen2.5-coder:7b"
-OLLAMA = "http://localhost:11434/api/generate"
+MODEL = os.getenv("HARVEST_MODEL", "qwen2.5-coder:7b")
+OLLAMA = os.getenv("OLLAMA_URL", "http://localhost:11434") + "/api/generate"
 ENGINES = {
     "mysql": {"kind": "mysql", "port": 3307},
     "mariadb": {"kind": "mysql", "port": 3308},
@@ -219,6 +220,7 @@ def valid_queries(n: int = 400) -> list[str]:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0, help="only the first N doc pages")
+    ap.add_argument("--hours", type=float, default=0, help="stop after this many hours (nightly runs)")
     ap.add_argument("--only", default="", help="only sources whose address contains this (mysql, mariadb, postgresql)")
     args = ap.parse_args()
     known = json.loads(OUT.read_text()) if OUT.exists() else []
@@ -237,7 +239,11 @@ def main():
     if args.limit:
         sources = sources[:args.limit]
     added = drafted = 0
+    stop_at = time.time() + args.hours * 3600 if args.hours else None
     for url in sources:
+        if stop_at and time.time() > stop_at:
+            print("time's up for tonight; the next run carries on from here")
+            break
         try:
             text = fetch(url)
         except Exception as exc:  # noqa: BLE001

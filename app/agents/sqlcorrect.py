@@ -618,15 +618,12 @@ def check(sql: str, _again: bool = False) -> dict:
                     note(cs + len(c), f"check: {new} (you wrote {c})")
                 # categories.category_id used as the key, while every other table's key is id
                 if c.lower() in {x + "_id" for x in _singulars(t.name)} and pk_style >= 2 and c2.lower() == c.lower() and t is not t2:
-                    guesses.append(f"{q}.{c} -> {q}.id")
-                    add("check", "column", f"{q}.{c} is probably {q}.id", f"{q}.{c} shayad {q}.id hai", line_of(p),
+                    add("check", "column", f"{q}.{c}: is the key of {t.name} called id?", f"{q}.{c}: kya {t.name} ki key id hai?", line_of(p),
                         f"Every other table here is matched on its id, and {t.name} is the table {c} points to, so its own key is "
                         f"most likely id. Check your table: if {t.name} really has {c} as its key, keep it.",
                         f"Baaki sab tables id se judti hain, aur {c} isi {t.name} ki taraf ishara karta hai, isliye iski key shayad id hai. "
                         "Table check karo.")
-                    cs = p + len(q) + 1
-                    edits.append((cs, cs + len(c), "id"))
-                    note(cs + len(c), f"check: id (you wrote {c})")
+                    # a note only: some schemas key a table on class_id while others use id, and the query can't say which
     # one alias, two names for what looks like one column: oi.price and oi.unit_price
     cols_by = {}
     for q, c, p in all_refs:

@@ -19,7 +19,7 @@ def test_every_kind_of_mistake_in_one_query_is_found():
     titles = " | ".join(f["title_en"] for f in r["findings"])
     for must in ["'products.id'", "'city.id'", "FULL OUTER JOIN", "ORDER BY uses customer", "aren't grouped", "Self join",
                  "departments is joined twice", "cities is joined twice", "'!= NULL'", "COUNT(o.id)", "HAVING", "RIGHT JOIN",
-                 "o.customer is probably o.customer_id", "cat.category_id is probably cat.id", "oi.price and oi.unit_price",
+                 "o.customer is probably o.customer_id", "cat.category_id: is the key of categories called id?", "oi.price and oi.unit_price",
                  "quantity has no table"]:
         assert must in titles, must
     fixed = r["corrected"]

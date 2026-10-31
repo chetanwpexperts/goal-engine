@@ -777,6 +777,8 @@ def continue_turn(db, goal, agent, text: str):
     last = db.scalars(select(Message).where(Message.goal_id == goal.id, Message.role == "assistant")
                       .order_by(Message.id.desc()).limit(1)).first()
     corr = res.get("correct") or {}
+    broken = [f for f in corr.get("findings") or [] if f["kind"] in ("error", "wrong")]   # real mistakes, not notes
+    asks_other = bool(DIFF_RE.search(text or "") or DIFF_DEV_RE.search(text or "") or WHY_RE.search(text or ""))
     from app.agents.core import why_label
 
     tapped = next((f for f in corr.get("findings") or [] if text.strip() in (why_label(f, False), why_label(f, True))), None)
@@ -789,7 +791,7 @@ def continue_turn(db, goal, agent, text: str):
         agent.inputs = dumps(inputs)
         rest = [why_label(f, h) for f in corr["findings"] if f["kind"] in ("error", "wrong") and f["title_en"] not in asked][:3]
         return reply, rest, h
-    if corr.get("findings") and not SPEED_RE.search(text or ""):
+    if broken and not SPEED_RE.search(text or "") and not DEV_FOLLOW_RE.search(text or ""):
         from app.agents.core import correctness_text
 
         if SHORT_RE.search(text or "") and not WRONG_RE.search(text or ""):
@@ -808,12 +810,12 @@ def continue_turn(db, goal, agent, text: str):
         inputs["last_ask"] = "correct"
         agent.inputs = dumps(inputs)
         return reply, [], hi
-    if corr.get("findings") and SPEED_RE.search(text or ""):
+    if broken and SPEED_RE.search(text or "") and not asks_other:
         reply = _optimized(corr.get("corrected") or query, inputs.get("explain", ""), hi)   # asked for speed: give it, now
         inputs["last_ask"] = "optimize"
         agent.inputs = dumps(inputs)
         return reply, [], hi
-    if corr.get("findings") and corr.get("corrected"):
+    if broken and corr.get("corrected"):
         query = corr["corrected"]                                    # speed advice is for the corrected query
         res = analyze_sql(query, inputs.get("explain", ""))
         better = res.get("rewritten") or rewrite(query)

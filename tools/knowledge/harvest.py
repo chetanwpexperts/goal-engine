@@ -59,13 +59,33 @@ Answer with JSON only:
 
 
 # ------------------------------------------------------------------ docs
+BROWSER = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
+                         "Chrome/130.0 Safari/537.36",
+           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.9"}
+
+
+def _download(url: str) -> str:
+    try:
+        return urllib.request.urlopen(urllib.request.Request(url, headers=BROWSER), timeout=30).read().decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001 - some doc sites refuse Python; curl usually gets through
+        import subprocess
+
+        args = ["curl", "-sSL", "--compressed", "--max-time", "40"]
+        for k, v in BROWSER.items():
+            args += ["-H", f"{k}: {v}"]
+        out = subprocess.run(args + [url], capture_output=True, text=True, timeout=60)
+        if out.returncode != 0 or len(out.stdout) < 2000 or "Access Denied" in out.stdout[:3000]:
+            raise RuntimeError("the site refused (save the page into tools/knowledge/pages/ from your browser)")
+        return out.stdout
+
+
 def fetch(url: str) -> str:
     CACHE.mkdir(exist_ok=True)
     f = CACHE / ("page-" + hashlib.sha1(url.encode()).hexdigest()[:16] + ".txt")
     if f.exists():
         return f.read_text()
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (knowledge harvester)"})
-    html = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
+    saved = HERE / "pages" / (url.rstrip("/").split("/")[-1].replace(".html", "") + ".html")
+    html = saved.read_text(errors="replace") if saved.exists() else _download(url)   # a page saved by hand wins
     from bs4 import BeautifulSoup
 
     soup = BeautifulSoup(html, "html.parser")
@@ -199,6 +219,7 @@ def valid_queries(n: int = 400) -> list[str]:
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=0, help="only the first N doc pages")
+    ap.add_argument("--only", default="", help="only sources whose address contains this (mysql, mariadb, postgresql)")
     args = ap.parse_args()
     known = json.loads(OUT.read_text()) if OUT.exists() else []
     seen = {r["id"] for r in known}
@@ -211,6 +232,8 @@ def main():
     valid = valid_queries()
     print(f"engines: {versions}; {len(valid)} valid queries guard the patterns")
     sources = json.loads((HERE / "sources.json").read_text())
+    if args.only:
+        sources = [u for u in sources if args.only.lower() in u.lower()]
     if args.limit:
         sources = sources[:args.limit]
     added = drafted = 0

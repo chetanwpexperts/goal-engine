@@ -520,6 +520,32 @@ def check(sql: str, _again: bool = False) -> dict:
                     edits.append((p, p + len(q), twin.alias))
 
     # ------------------------------------------------ 3. conditions
+    # a number in quotes compared with > < BETWEEN: on a text column '999' > '1000' (letter by letter); a plain number is
+    # compared as a number whatever the column is. (= keeps its quotes: a bare number on a text id column skips its index)
+    num_lit = re.compile(r"(>=|<=|(?<![<!])>|<(?![>=])|\bbetween\b|\band\b)\s*'(-?\d+(?:\.\d+)?)'", re.I)
+    numeric_name = re.compile(r"(amount|price|qty|quantity|total|count|age|salary|rate|fee|fees|balance|marks|score|stock|"
+                              r"cost|discount|tax|paid|due|weight|height|percent|percentage|level|rank|year|days|hours|minutes)s?$", re.I)
+    for m in num_lit.finditer(sql):
+        if dep[m.start()] < 0 or s[m.start(2) - 1] != "'":
+            continue
+        op = m.group(1).lower()
+        if op == "and" and not re.search(r"\bbetween\s+'?-?[\d.]+'?\s*$", sql[max(0, m.start() - 40):m.start()], re.I):
+            continue                                       # a plain AND, not BETWEEN x AND 'y'
+        lhs = re.search(r"([`\"]?\w+[`\"]?(?:\.[`\"]?\w+[`\"]?)?)\s*(?:not\s+)?(?:between\s+'?-?[\d.]+'?\s*)?$", sql[:m.start()], re.I)
+        col = lhs.group(1) if lhs else "the column"
+        val = m.group(2)
+        bare_col = col.split(".")[-1].strip("`\"")
+        sure = bool(numeric_name.search(bare_col)) and not (len(val) > 1 and val.startswith("0"))
+        add("check", "column", f"{col} {m.group(1).upper() if op != 'and' else 'BETWEEN'} '{val}': a number in quotes",
+            f"{col} ke saath '{val}': number quotes mein", line_of(m.start()),
+            f"If {col} is a text column, '{val}' is compared letter by letter ('999' counts as bigger than '1000'). Without quotes "
+            f"it's compared as a number either way: {val}.",
+            f"Agar {col} text column hai to '{val}' letter-by-letter compare hota hai ('999' > '1000'). Bina quotes ke number ki "
+            f"tarah compare hoga: {val}.")
+        if sure:                                           # a money/count column: compare as a number (PostgreSQL refuses
+            q0 = m.start(2) - 1                            # text > number, so a column that may be text keeps its quotes)
+            edits.append((q0, q0 + len(val) + 2, val))
+
     for m in re.finditer(r"(!=|<>|=)\s*null\b|\bnull\s*(!=|<>|=)", s, re.I):
         op = (m.group(1) or m.group(2))
         right = "IS NOT NULL" if op in ("!=", "<>") else "IS NULL"

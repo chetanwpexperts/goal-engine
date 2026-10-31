@@ -87,3 +87,20 @@ def test_a_bare_column_goes_to_the_table_the_rows_belong_to():
          "WHERE o.status = 'paid' AND u.email != NULL ORDER BY created_at DESC;")
     fixed = sqlcorrect.check(q)["corrected"]
     assert "INNER JOIN orders o" in fixed and "u.email IS NOT NULL" in fixed and "ORDER BY o.created_at DESC;" in fixed
+
+
+def test_numbers_in_quotes_in_range_comparisons():
+    q = ("SELECT c.id, c.name, p.amount, p.payment_date FROM customers c INNER JOIN payments p ON c.id = p.customer "
+         "WHERE p.status = 'success' AND p.amount > '1000' AND c.phone = NULL ORDER BY payment_date ASC;")
+    fixed = sqlcorrect.check(q)["corrected"]
+    for must in ["p.customer_id", "p.amount > 1000", "c.phone IS NULL", "ORDER BY p.payment_date ASC", "p.status = 'success'"]:
+        assert must in fixed, must
+    kept = sqlcorrect.check("SELECT t.a FROM t WHERE t.code = '0042' AND t.d >= '2026-01-01'")
+    assert kept["corrected"] is None                              # = keeps its quotes; a date string isn't a number
+
+
+def test_the_recognisers_are_ready_before_the_first_message():
+    from app.dbknow import brain as dbb
+    from app.officeknow import brain as ofb
+
+    assert dbb._train() is dbb._train() and ofb._train() is ofb._train()

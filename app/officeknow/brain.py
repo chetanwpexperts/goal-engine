@@ -2,6 +2,7 @@
 Trained on the knowledge files plus what users taught it (app/learning.py)."""
 
 import hashlib
+import os
 import re
 import threading
 
@@ -67,6 +68,17 @@ def _train():
     fp = hashlib.sha256(repr((texts, labels_)).encode()).hexdigest()
     if _model is not None and fp == _fingerprint:
         return _model
+    from app.ml.intent import DATA_DIR
+    import joblib
+
+    saved = DATA_DIR / "models" / "officeknow.joblib"
+    try:                                       # trained before with the same examples: load it (a restart is instant)
+        got = joblib.load(saved)
+        if got.get("fingerprint") == fp:
+            _model, _fingerprint = got["pipeline"], fp
+            return _model
+    except Exception:  # noqa: BLE001 - missing or old file: train
+        pass
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.linear_model import LogisticRegression
     from sklearn.pipeline import FeatureUnion, Pipeline
@@ -80,6 +92,13 @@ def _train():
     ])
     pipe.fit(texts, labels_)
     _model, _fingerprint = pipe, fp
+    try:
+        saved.parent.mkdir(parents=True, exist_ok=True)
+        tmp = saved.with_suffix(f".{os.getpid()}.tmp")
+        joblib.dump({"fingerprint": fp, "pipeline": pipe}, tmp)
+        os.replace(tmp, saved)                 # whole file or nothing, even with two workers
+    except OSError:
+        pass
     return pipe
 
 

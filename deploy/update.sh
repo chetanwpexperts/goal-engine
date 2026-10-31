@@ -13,14 +13,14 @@ echo "== Installing any new Python packages"
 echo "== Restarting"
 sudo supervisorctl restart goal-engine
 
-echo "== Health check (waits up to 60s while the ML model loads)"
-for i in $(seq 1 30); do
+echo "== Health check (waits up to 3 min while the models train after a change)"
+for i in $(seq 1 90); do
   if curl -fsS localhost:8098/api/health 2>/dev/null; then
     echo && echo "UPDATE-OK $(git log --oneline -1)"
     exit 0
   fi
   sleep 2
 done
-echo "Not answering after 60s. Last errors:"
+echo "Not answering after 3 min. Last errors:"
 tail -20 logs/app.err.log
 exit 1

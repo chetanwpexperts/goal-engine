@@ -49,6 +49,14 @@ async def lifespan(application: FastAPI):
     if not hasattr(application.state, "brain"):
         application.state.brain = Brain()
     application.state.brain.model.load()  # train or load the ML model before the first visitor
+    try:                                  # and the problem recognisers, so the first visitor never waits for training
+        from app.dbknow import brain as _dbb
+        from app.officeknow import brain as _ofb
+
+        _dbb._train()
+        _ofb._train()
+    except Exception:  # noqa: BLE001
+        logging.getLogger("goal-engine").warning("Recognisers not warmed", exc_info=True)
     from app.agents import office_agent
 
     try:

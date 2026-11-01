@@ -63,6 +63,34 @@
  ],
  "messages": [
   {
+   "cause": "source_log_purged",
+   "re": "Got fatal error 1236 from (?:master|source) when reading data from binary log: '(?:Could not find first log file name in binary log index file|[^']*purged[^']*)'"
+  },
+  {
+   "cause": "source_log_purged",
+   "re": "Could not find first log file name in binary log index file|(?:master|source) has purged binary logs containing GTIDs that the (?:slave|replica) requires|purged required binary logs"
+  },
+  {
+   "cause": "replication_stopped",
+   "re": "Last_SQL_Error:[ \\t]*(?P<detail>\\S[^\\n]{4,200})"
+  },
+  {
+   "cause": "replication_stopped",
+   "re": "Could not execute (?P<event>Write|Update|Delete)_rows(?:_v\\d)? event on table (?P<db>[\\w$]+)\\.(?P<table>[\\w$]+)"
+  },
+  {
+   "cause": "replication_stopped",
+   "re": "(?:Slave|Replica)_(?:SQL|IO)_Running:\\s*No\\b|' on query\\. Default database: '|Coordinator stopped because there were error\\(s\\) in the worker\\(s\\)"
+  },
+  {
+   "cause": "replica_lag",
+   "re": "Seconds_Behind_(?:Master|Source):\\s*(?P<seconds>[1-9]\\d{2,}|[6-9]\\d)\\b"
+  },
+  {
+   "cause": "write_on_replica",
+   "re": "server is running with the --(?P<option>super-read-only|read-only|read_only|super_read_only) option so it cannot execute this statement"
+  },
+  {
    "cause": "duplicate_key",
    "re": "Duplicate entry '(?P<value>[^']*)' for key '(?:(?P<table>[\\w$]+)\\.)?(?P<key>[^']+)'"
   },
@@ -335,6 +363,27 @@
   ],
   "ssl_required": [
    "-- Connect with SSL, e.g. mysql --ssl-mode=REQUIRED ..., or in PHP PDO: PDO::MYSQL_ATTR_SSL_CA => '/path/ca.pem'"
+  ],
+  "replica_lag": [
+   "SHOW REPLICA STATUS\\G   -- MySQL 8.0.22+; older MySQL and MariaDB: SHOW SLAVE STATUS\\G\n-- Seconds_Behind_Source = how far behind; Relay_Log_Space growing = changes arrive faster than they are applied",
+   "-- Find which of these it is, then fix that one:\n-- 1) one huge UPDATE/DELETE on the primary: redo such jobs in small batches (e.g. 5,000 rows per transaction)\n-- 2) tables without a PRIMARY KEY under row-based logging: every row change searches the whole table on the replica, so add a primary key\n-- 3) one apply thread: use parallel apply (replica_parallel_workers; MariaDB: slave_parallel_threads)\n-- 4) a weaker or busy replica (slow disk, long reports running there)",
+   "-- Reads that must see a save made a moment ago (login, checkout) should go to the primary, not the replica."
+  ],
+  "replication_stopped": [
+   "SHOW REPLICA STATUS\\G   -- MariaDB/older: SHOW SLAVE STATUS\\G\n-- Last_SQL_Errno / Last_SQL_Error (or Last_IO_Error) is the real reason; MySQL 8 also: SELECT * FROM performance_schema.replication_applier_status_by_worker\\G",
+   "-- Duplicate entry (1062) or Can't find record (1032) on the replica = its data has drifted from the primary.\n-- Compare that row on both servers ({table}), make the replica's row match the primary (take a backup first), then:\nSTART REPLICA;   -- MariaDB/older: START SLAVE;",
+   "-- Common mistake: SET GLOBAL sql_replica_skip_counter = 1 (sql_slave_skip_counter) or slave_skip_errors as the fix.\n-- Each skip throws a change away, the replica silently drifts further, and the next error comes back worse.\n-- If many rows differ, rebuild the replica from a fresh backup of the primary instead.",
+   "-- Stop new drift: make the replica refuse app writes:\nSET GLOBAL super_read_only = ON;   -- MySQL (MariaDB: SET GLOBAL read_only = ON;)"
+  ],
+  "source_log_purged": [
+   "-- The changes the replica needs no longer exist on the primary, so it can't be repaired by restarting.\n-- Safe fix: rebuild the replica from a fresh, consistent backup of the primary\n-- (mysqldump --single-transaction --source-data=2, MariaDB: mariadb-dump --single-transaction --master-data=2, or a physical backup), then start replication from the position recorded in it.",
+   "-- Common mistake: pointing the replica at the next log file that still exists (CHANGE REPLICATION SOURCE TO SOURCE_LOG_FILE=...).\n-- It starts again, but every change in the deleted files is silently missing on the replica.",
+   "-- Before purging logs in future, check what each replica has read:\nSHOW REPLICA STATUS\\G   -- on each replica: Source_Log_File (MariaDB: Master_Log_File)\nSHOW BINARY LOGS;        -- on the primary\n-- and keep logs longer than a replica could be down: binlog_expire_logs_seconds"
+  ],
+  "write_on_replica": [
+   "SELECT @@hostname, @@port, @@read_only, @@super_read_only;   -- read_only = 1: this server is a replica or switched to read-only",
+   "-- Send writes to the primary: check the host in the app's database config (or the writer endpoint of your cloud database).\n-- After a failover, restart or recycle the app's connection pool so it stops using connections to the old primary.",
+   "-- Common mistake: SET GLOBAL read_only = OFF on a replica to make the error go away; writes there make it drift and stop replication later."
   ]
  },
  "settings": {
@@ -423,6 +472,11 @@
   "idle_transaction": {
    "type": "rows_present",
    "sql": "SELECT trx_id, trx_started, trx_mysql_thread_id FROM information_schema.innodb_trx WHERE trx_query IS NULL AND trx_started < NOW() - INTERVAL 60 SECOND"
+  },
+  "write_on_replica": {
+   "type": "rows_present",
+   "sql": "SELECT @@read_only FROM DUAL WHERE @@read_only = 1",
+   "proof": "this server has read_only = ON (it only accepts reads)"
   }
  },
  "style": [
@@ -437,6 +491,9 @@
   "\\[\\d{4}\\] [A-Z]",
   "mysqli_",
   "\\bMySQL\\b",
-  "doesn't exist|in field list|for key '"
+  "doesn't exist|in field list|for key '",
+  "\\b(?:Slave|Replica)_(?:SQL|IO)_Running\\b",
+  "Seconds_Behind_(?:Master|Source)",
+  "binary log index file"
  ]
 }

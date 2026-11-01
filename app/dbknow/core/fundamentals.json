@@ -462,7 +462,8 @@
    "family": "any",
    "explains": {
     "slow": 1.0,
-    "query_error": 0.6
+    "query_error": 0.6,
+    "query_cancelled": 0.8
    },
    "prior": 0.2,
    "shown_by": "statement_timeout",
@@ -526,7 +527,8 @@
    "explains": {
     "slow": 0.8,
     "lock_problem": 1.0,
-    "save_fails": 0.6
+    "save_fails": 0.6,
+    "query_cancelled": 0.5
    },
    "prior": 0.25,
    "shown_by": "lock_wait",
@@ -772,6 +774,159 @@
    "needs": [],
    "short_en": "The server requires an encrypted connection",
    "short_hi": "Server encrypted connection maangta hai"
+  },
+  "replica_lag": {
+   "layer": "resources",
+   "family": "any",
+   "explains": {
+    "replication_problem": 1.0,
+    "slow": 0.3,
+    "stale_data": 1.0
+   },
+   "prior": 0.25,
+   "shown_by": "replica_lag",
+   "title_en": "The replica (copy server) is applying changes later than the primary makes them",
+   "title_hi": "Replica (copy server) changes primary ke baad der se laga raha hai",
+   "why_en": "A replica replays every change the primary made, one after another. When the primary writes faster than the replica can replay (one huge UPDATE/DELETE, tables without a primary key under row-based logging, a single replay thread, a weaker or busy replica disk, or long reports on the replica holding replay back), the replica falls behind, so reads sent there show old data.",
+   "why_hi": "Replica primary ke har change ko ek ke baad ek dobara chalata hai. Jab primary replica se tez likhta hai (ek bahut bada UPDATE/DELETE, row-based logging mein bina primary key ki tables, ek hi replay thread, kamzor ya busy replica disk, ya replica pe lambi reports jo replay rokti hain), to replica peeche reh jata hai aur wahan se padha gaya data purana dikhta hai.",
+   "confirm_en": "The delay (Seconds_Behind_Source / replay_lag) shrinks to near zero and stays there under normal load.",
+   "confirm_hi": "Delay (Seconds_Behind_Source / replay_lag) zero ke paas aa jaye aur normal load mein wahin rahe.",
+   "prevent_en": "Write big changes in small batches, give every table a primary key, enable parallel replay, alert on lag, and send reads that must see the latest data (right after a save) to the primary.",
+   "prevent_hi": "Bade changes chhote batches mein karo, har table pe primary key rakho, parallel replay on karo, lag pe alert lagao, aur jo read turant naya data dekhna chahiye (save ke turant baad) use primary pe bhejo.",
+   "needs": [],
+   "short_en": "The replica is behind the primary",
+   "short_hi": "Replica primary se peeche chal raha hai",
+   "source": [
+    "https://dev.mysql.com/doc/refman/8.4/en/replication-administration-status.html",
+    "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-REPLICATION-VIEW",
+    "https://www.postgresql.org/docs/current/runtime-config-replication.html"
+   ],
+   "seen_at": [
+    "https://www.percona.com/blog/mysql-replication-how-to-deal-with-the-got-fatal-error-1236-or-my-013114-error/"
+   ]
+  },
+  "replication_stopped": {
+   "layer": "schema",
+   "family": "any",
+   "explains": {
+    "replication_problem": 1.0,
+    "stale_data": 0.8
+   },
+   "prior": 0.2,
+   "shown_by": "replication_stopped",
+   "title_en": "Replication stopped: the replica hit an error while applying a change",
+   "title_hi": "Replication ruk gayi: change lagate waqt replica pe error aaya",
+   "why_en": "The replica's data no longer matches the primary's, so a replayed change breaks a rule there: a row the primary inserted already exists on the replica (duplicate key) or a row it updated/deleted is missing (can't find record). It usually starts with someone writing directly on the replica, or an earlier error that was skipped. The replica then stops and stays behind until it's fixed.",
+   "why_hi": "Replica ka data primary se match nahi karta, isliye dobara chalaya gaya change wahan rule todta hai: jo row primary ne daali wo replica pe pehle se hai (duplicate key) ya jo row update/delete hui wo replica pe hai hi nahi (can't find record). Aksar shuruaat kisi ke replica pe seedha likhne se hoti hai, ya pehle skip kiye gaye error se. Phir replica ruk jata hai aur theek hone tak peeche rehta hai.",
+   "confirm_en": "Replica_SQL_Running / Replica_IO_Running both show Yes (or the subscription worker stays up) and the lag falls back to zero.",
+   "confirm_hi": "Replica_SQL_Running / Replica_IO_Running dono Yes dikhayein (ya subscription worker chalta rahe) aur lag wapas zero ho jaye.",
+   "prevent_en": "Keep replicas read-only (super_read_only / read_only) so nobody writes there, don't make skipping errors a habit (each skip hides a lost change), and compare primary and replica data from time to time.",
+   "prevent_hi": "Replicas read-only rakho (super_read_only / read_only) taaki wahan koi na likhe, errors skip karne ki aadat mat banao (har skip ek khoya hua change chhupata hai), aur primary aur replica ka data beech-beech mein compare karo.",
+   "needs": [],
+   "short_en": "Replication stopped on an error",
+   "short_hi": "Replication ek error pe ruk gayi",
+   "source": [
+    "https://dev.mysql.com/doc/refman/8.4/en/replication-administration-status.html",
+    "https://dev.mysql.com/doc/refman/8.4/en/replication-administration-skip.html",
+    "https://www.postgresql.org/docs/current/logical-replication-conflicts.html"
+   ],
+   "seen_at": [
+    "https://www.percona.com/blog/mysql-replication-how-to-deal-with-the-got-fatal-error-1236-or-my-013114-error/"
+   ]
+  },
+  "source_log_purged": {
+   "layer": "resources",
+   "family": "any",
+   "explains": {
+    "replication_problem": 0.9,
+    "stale_data": 0.5
+   },
+   "prior": 0.12,
+   "shown_by": "source_log_purged",
+   "title_en": "The primary deleted the change logs (binary log / WAL) the replica still needed",
+   "title_hi": "Primary ne change logs (binary log / WAL) mita diye jo replica ko abhi chahiye the",
+   "why_en": "A replica catches up by reading the primary's change log files. The primary removes old files to save disk (a short expiry, a manual purge, or no replication slot / wal_keep_size). If the replica was down or far behind for longer than that, the files it needs are gone and it can't continue: those changes no longer exist on the primary.",
+   "why_hi": "Replica primary ki change log files padhkar barabar hota hai. Primary disk bachane ke liye purani files hata deta hai (kam expiry, haath se purge, ya replication slot / wal_keep_size nahi). Agar replica utni der se zyada band ya peeche raha, to zaroori files ja chuki hain aur wo aage nahi badh sakta: wo changes ab primary pe hain hi nahi.",
+   "confirm_en": "The rebuilt replica connects, reads from the new position, and its lag drops to zero.",
+   "confirm_hi": "Dobara banaya gaya replica connect ho, nayi position se padhe, aur lag zero ho jaye.",
+   "prevent_en": "Keep change logs longer than a replica could be down (binlog_expire_logs_seconds / wal_keep_size), check what every replica has read before purging, use replication slots in PostgreSQL with max_slot_wal_keep_size as a disk safety limit, and alert on replica lag early.",
+   "prevent_hi": "Change logs utni der rakho jitni der replica band reh sakta hai (binlog_expire_logs_seconds / wal_keep_size), purge se pehle dekho har replica ne kahan tak padha, PostgreSQL mein replication slots aur disk ki hifazat ke liye max_slot_wal_keep_size lagao, aur replica lag pe jaldi alert lagao.",
+   "needs": [],
+   "short_en": "The primary already deleted the logs the replica needs",
+   "short_hi": "Primary ne wo logs mita diye jo replica ko chahiye",
+   "source": [
+    "https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html",
+    "https://dev.mysql.com/doc/refman/8.4/en/replication-administration-status.html",
+    "https://www.postgresql.org/docs/current/runtime-config-replication.html"
+   ],
+   "seen_at": [
+    "https://www.percona.com/blog/mysql-replication-how-to-deal-with-the-got-fatal-error-1236-or-my-013114-error/",
+    "https://www.postgresql.org/message-id/m01qrbnvd9.fsf@comcast.net"
+   ]
+  },
+  "write_on_replica": {
+   "layer": "gateway",
+   "family": "any",
+   "explains": {
+    "save_fails": 0.6,
+    "replication_problem": 0.6,
+    "query_error": 0.3
+   },
+   "prior": 0.12,
+   "shown_by": "write_on_replica",
+   "title_en": "The app sent a write to a server that only accepts reads (a replica, or read-only mode is on)",
+   "title_hi": "App ne likhne wali query aise server ko bheji jo sirf padhne deta hai (replica, ya read-only mode on hai)",
+   "why_en": "Replicas, hot standbys and servers switched to read-only refuse INSERT/UPDATE/DELETE so their data can't drift from the primary. This shows up when the app's connection points at the replica, when a read/write split sends a write to the wrong side, or after a failover when old pooled connections or cached addresses still reach the old primary that is now read-only.",
+   "why_hi": "Replicas, hot standbys aur read-only kiye gaye servers INSERT/UPDATE/DELETE mana karte hain taaki unka data primary se alag na ho. Ye tab dikhta hai jab app ka connection replica pe point karta hai, read/write split ek write galat taraf bhej deta hai, ya failover ke baad purane pooled connections ya cached address abhi bhi purane primary tak jaate hain jo ab read-only hai.",
+   "confirm_en": "The same write succeeds once it is sent to the primary (read_only = OFF / pg_is_in_recovery() = false there).",
+   "confirm_hi": "Wahi write primary pe bhejne par chal jaye (wahan read_only = OFF / pg_is_in_recovery() = false).",
+   "prevent_en": "Keep one clear writer address in the app config, let the pool drop connections after a failover, and test writes after every switchover. Don't turn read-only off on a replica to make the error go away: writes there break replication later.",
+   "prevent_hi": "App config mein likhne ke liye ek saaf address rakho, failover ke baad pool purane connections chhod de, aur har switchover ke baad write test karo. Error hatane ke liye replica pe read-only band mat karo: wahan ke writes baad mein replication tod dete hain.",
+   "needs": [],
+   "short_en": "Writing to a read-only server (replica)",
+   "short_hi": "Read-only server (replica) pe likhne ki koshish",
+   "source": [
+    "https://dev.mysql.com/doc/refman/8.4/en/server-system-variables.html#sysvar_read_only",
+    "https://mariadb.com/kb/en/server-system-variables/#read_only",
+    "https://www.postgresql.org/docs/current/hot-standby.html",
+    "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+   ],
+   "seen_at": [
+    "https://jira.mariadb.org/browse/MDEV-9419"
+   ]
+  },
+  "standby_query_conflict": {
+   "layer": "transactions",
+   "family": "any",
+   "explains": {
+    "replication_problem": 0.6,
+    "random_fail": 0.7,
+    "query_error": 0.4,
+    "slow": 0.2,
+    "query_cancelled": 1.0,
+    "replica_query_cancelled": 1.0
+   },
+   "prior": 0.1,
+   "shown_by": "standby_query_conflict",
+   "title_en": "A query on the standby was cancelled because it blocked replaying the primary's changes",
+   "title_hi": "Standby pe query cancel hui kyunki wo primary ke changes ka replay rok rahi thi",
+   "why_en": "A hot standby must keep replaying the primary's changes. When the primary cleans up old row versions (VACUUM) or takes a strong lock (TRUNCATE, DROP, some ALTERs) that a long query on the standby still needs, the standby waits only max_standby_streaming_delay (30 seconds by default) and then cancels the query so replay can continue.",
+   "why_hi": "Hot standby ko primary ke changes lagaatar replay karne hote hain. Jab primary purane row versions saaf karta hai (VACUUM) ya strong lock leta hai (TRUNCATE, DROP, kuch ALTER) jo standby ki lambi query ko abhi chahiye, to standby sirf max_standby_streaming_delay (default 30 second) rukta hai aur phir query cancel kar deta hai taaki replay chalta rahe.",
+   "confirm_en": "The report finishes on the standby, and pg_stat_database_conflicts stops growing.",
+   "confirm_hi": "Report standby pe poori chale, aur pg_stat_database_conflicts badhna band ho jaye.",
+   "prevent_en": "Keep standby queries short or retry them; for long reports either turn on hot_standby_feedback (costs some bloat on the primary) or raise max_standby_streaming_delay on a standby used only for reports (costs more lag).",
+   "prevent_hi": "Standby queries chhoti rakho ya retry karo; lambi reports ke liye ya to hot_standby_feedback on karo (primary pe thoda bloat badhta hai) ya sirf reports wale standby pe max_standby_streaming_delay badhao (lag badhta hai).",
+   "needs": [],
+   "short_en": "A standby query was cancelled by replay",
+   "short_hi": "Standby pe query replay ki wajah se cancel hui",
+   "source": [
+    "https://www.postgresql.org/docs/current/hot-standby.html",
+    "https://www.postgresql.org/docs/current/runtime-config-replication.html",
+    "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+   ],
+   "seen_at": [
+    "https://pganalyze.com/docs/log-insights/standby/B95"
+   ]
   }
  }
 }

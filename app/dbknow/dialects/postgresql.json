@@ -46,7 +46,8 @@
   "08006": "connection_lost",
   "57P01": "connection_lost",
   "3D000": "unknown_database",
-  "42501": "permission_denied"
+  "42501": "permission_denied",
+  "25006": "write_on_replica"
  },
  "code_patterns": [
   "SQLSTATE\\[?\\s*([0-9A-Z]{5})\\]?",
@@ -55,6 +56,22 @@
   "ERRCODE[_ ]?\\w*:?\\s*([0-9A-Z]{5})"
  ],
  "messages": [
+  {
+   "cause": "standby_query_conflict",
+   "re": "canceling statement due to conflict with recovery"
+  },
+  {
+   "cause": "source_log_purged",
+   "re": "requested WAL segment (?P<segment>[0-9A-F]{24}) has already been removed|invalidated because it exceeded the maximum reserved size"
+  },
+  {
+   "cause": "replication_stopped",
+   "re": "processing remote data for replication origin \\\"(?P<origin>[^\\\"]+)\\\"(?: during message type \\\"(?P<event>\\w+)\\\")?(?: for replication target relation \\\"(?:[\\w$]+\\.)?(?P<table>[\\w$]+)\\\")?"
+  },
+  {
+   "cause": "write_on_replica",
+   "re": "cannot execute (?P<command>[A-Z][A-Z ]*?) in a read-only transaction"
+  },
   {
    "cause": "duplicate_key",
    "re": "duplicate key value violates unique constraint \\\"(?P<key>[^\\\"]+)\\\"(?:[\\s\\S]*?Key \\((?P<column>[^)]+)\\)=\\((?P<value>[^)]*)\\) already exists)?"
@@ -305,6 +322,31 @@
   ],
   "ssl_required": [
    "-- Connect with sslmode=require (e.g. postgresql://user@host/db?sslmode=require)"
+  ],
+  "replica_lag": [
+   "-- On the primary: how far each standby is behind\nSELECT application_name, client_addr, state, write_lag, flush_lag, replay_lag FROM pg_stat_replication;",
+   "-- On the standby:\nSELECT pg_is_in_recovery(), now() - pg_last_xact_replay_timestamp() AS replay_delay;\n-- (when the primary is idle this number grows even though nothing is wrong: there is simply nothing new to replay)",
+   "-- write_lag high = the network; replay_lag high while write/flush lag are low = the standby can't apply fast enough\n-- (busy disk, long queries delaying replay, or one huge transaction on the primary: batch big changes)."
+  ],
+  "replication_stopped": [
+   "-- Logical replication: the subscriber's apply worker fails on that row and keeps restarting. On the subscriber:\nSELECT subname, apply_error_count, sync_error_count FROM pg_stat_subscription_stats;   -- PostgreSQL 15+\n-- the server log's CONTEXT line shows the table ({table}) and the change that failed",
+   "-- Make the subscriber's row match the publisher (a duplicate key: remove or fix the row that was written on the subscriber, after a backup);\n-- the worker retries by itself and continues.",
+   "-- Common mistake: ALTER SUBSCRIPTION ... SKIP (lsn = ...) as the routine fix. It throws that whole transaction away on the subscriber,\n-- so the two databases differ from then on. Use it only when you know the change must not be applied."
+  ],
+  "source_log_purged": [
+   "-- The standby needs WAL the primary has already deleted. Unless that WAL is in your WAL archive (restore_command), the standby can't continue:\n-- rebuild it with a fresh pg_basebackup from the primary.",
+   "-- Prevent: give the standby a physical replication slot (primary_slot_name), and cap what slots may keep:\nSELECT slot_name, active, wal_status, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS kept FROM pg_replication_slots;\n-- max_slot_wal_keep_size protects the disk; wal_keep_size keeps extra WAL even without slots.",
+   "-- Careful: a slot whose standby is gone keeps WAL forever and can fill the disk. Drop slots you no longer use:\n-- SELECT pg_drop_replication_slot('<unused slot>');"
+  ],
+  "write_on_replica": [
+   "SELECT pg_is_in_recovery() AS is_standby, current_setting('default_transaction_read_only') AS read_only_default, current_setting('transaction_read_only') AS read_only_now;",
+   "-- is_standby = true: you're connected to a standby; send writes to the primary (check the host in the app's config, or use target_session_attrs=read-write in the connection string).\n-- read_only_default = on: the database or user was set read-only (ALTER DATABASE/ROLE ... SET default_transaction_read_only = on); find who set it before changing it back.",
+   "-- After a failover, recycle the app's connection pool so it stops using connections to the old primary."
+  ],
+  "standby_query_conflict": [
+   "-- On the standby: which kind of conflict keeps cancelling queries\nSELECT datname, confl_snapshot, confl_lock, confl_bufferpin, confl_deadlock FROM pg_stat_database_conflicts;",
+   "-- Retry short queries. For long reports on the standby pick one trade-off (postgresql.conf on the standby, then reload):\n-- hot_standby_feedback = on             -> queries aren't cancelled for old row versions, but the primary keeps dead rows longer (bloat)\n-- max_standby_streaming_delay = 5min    -> queries get more time, but this standby falls further behind",
+   "-- 'User was holding a relation lock for too long' = the primary ran TRUNCATE/DROP/ALTER on a table the query was reading: schedule those outside report hours."
   ]
  },
  "settings": {
@@ -392,6 +434,11 @@
   "idle_transaction": {
    "type": "rows_present",
    "sql": "SELECT pid, now() - xact_start AS open_for FROM pg_stat_activity WHERE state = 'idle in transaction' AND now() - xact_start > interval '60 seconds'"
+  },
+  "write_on_replica": {
+   "type": "rows_present",
+   "sql": "SELECT 1 WHERE pg_is_in_recovery() OR current_setting('default_transaction_read_only') = 'on'",
+   "proof": "this server only accepts reads (a standby, or read-only is the default)"
   }
  },
  "style": [
@@ -404,6 +451,9 @@
   "SQLSTATE\\[[0-9][0-9A-Z]{4}\\]: [a-z]",
   "\\bpsql\\b|\\bpgsql\\b|psycopg|PSQLException|postgres",
   "relation \\\"",
-  "\\bbase/\\d+/\\d+"
+  "\\bbase/\\d+/\\d+",
+  "\\bWAL segment\\b",
+  "conflict with recovery",
+  "replication origin \\\""
  ]
 }

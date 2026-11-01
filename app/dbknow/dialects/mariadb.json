@@ -13,6 +13,10 @@
  },
  "messages": [
   {
+   "cause": "source_log_purged",
+   "re": "connecting slave requested to start from GTID [\\d-]+, which is not in the master's binlog"
+  },
+  {
    "cause": "statement_timeout",
    "re": "max_statement_time exceeded"
   },
@@ -36,6 +40,11 @@
   "too_many_connections": [
    "SHOW VARIABLES LIKE 'max_connections';\nSHOW GLOBAL STATUS LIKE 'Threads_connected';\nSHOW GLOBAL STATUS LIKE 'Max_used_connections';",
    "-- Short term: SET GLOBAL max_connections = 300;  (and in my.cnf)\n-- Real fix: a connection pool and closing connections; lower wait_timeout:\nSET GLOBAL wait_timeout = 120;"
+  ],
+  "write_on_replica": [
+   "SELECT @@hostname, @@port, @@read_only;   -- read_only = 1: this server is a replica or switched to read-only (MariaDB has no super_read_only; users with READ ONLY ADMIN can still write)",
+   "-- Send writes to the primary: check the host in the app's database config. After a failover, recycle the app's connection pool.",
+   "-- Common mistake: SET GLOBAL read_only = OFF on a replica to make the error go away; writes there make it drift and stop replication later."
   ]
  },
  "settings": {

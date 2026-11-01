@@ -273,6 +273,44 @@
    "allowed",
    "rights",
    "haq"
+  ],
+  "replica": [
+   "replica",
+   "replicas",
+   "replication",
+   "replicate",
+   "replicated",
+   "replicating",
+   "slave",
+   "slaves",
+   "standby",
+   "standbys"
+  ],
+  "stale": [
+   "old",
+   "purana",
+   "purani",
+   "stale",
+   "outdated",
+   "late",
+   "behind",
+   "peeche",
+   "delay",
+   "delayed",
+   "lag",
+   "lagging",
+   "sync"
+  ],
+  "cancel": [
+   "cancel",
+   "cancels",
+   "cancelled",
+   "canceled",
+   "canceling",
+   "cancelling",
+   "cancellation",
+   "aborted",
+   "terminated"
   ]
  },
  "multiword": {
@@ -284,7 +322,11 @@
   "time out": "timeout",
   "out of memory": "oom",
   "no space": "disk full",
-  "kam ho gaya": "slow"
+  "kam ho gaya": "slow",
+  "read replica": "replica",
+  "out of sync": "sync",
+  "not in sync": "sync",
+  "peeche hai": "behind"
  },
  "complaints": {
   "query_error": [
@@ -486,6 +528,75 @@
      ]
     ]
    }
+  ],
+  "replication_problem": [
+   {
+    "all": [
+     [
+      "replica"
+     ]
+    ]
+   }
+  ],
+  "stale_data": [
+   {
+    "all": [
+     [
+      "replica"
+     ],
+     [
+      "stale",
+      "missing",
+      "slow"
+     ]
+    ]
+   }
+  ],
+  "query_cancelled": [
+   {
+    "all": [
+     [
+      "cancel"
+     ]
+    ]
+   }
+  ],
+  "replica_query_cancelled": [
+   {
+    "all": [
+     [
+      "replica"
+     ],
+     [
+      "cancel"
+     ]
+    ]
+   }
+  ]
+ },
+ "outranks": {
+  "_about": "A specific complaint makes the loose ones it usually comes with weaker (\"replica data purana dikhta hai\" is not a failing query).",
+  "replication_problem": [
+   "query_error",
+   "save_fails",
+   "wont_run"
+  ],
+  "stale_data": [
+   "query_error",
+   "save_fails",
+   "wont_run",
+   "slow"
+  ],
+  "query_cancelled": [
+   "replication_problem",
+   "query_error",
+   "wont_run"
+  ],
+  "replica_query_cancelled": [
+   "query_cancelled",
+   "replication_problem",
+   "query_error",
+   "wont_run"
   ]
  }
 }

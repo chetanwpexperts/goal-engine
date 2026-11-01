@@ -40,6 +40,10 @@ MY = {  # MySQL / MariaDB: (code, sqlstate, message)
     "unknown_database": lambda r: ("1049", "42000", "Unknown database 'appx'"),
     "permission_denied": lambda r: ("1142", "42000", f"INSERT command denied to user 'app'@'localhost' for table '{r['t']}'"),
     "statement_timeout": lambda r: ("3024", "HY000", "Query execution was interrupted, maximum statement execution time exceeded"),
+    # replication (formats seen on a real MariaDB source + replica)
+    "replication_stopped": lambda r: ("1032", "HY000", f"Could not execute Delete_rows_v1 event on table app.{r['t']}; Can't find record in '{r['t']}', Error_code: 1032; handler error HA_ERR_KEY_NOT_FOUND; the event's master log bin.000003, end_log_pos 1124"),
+    "source_log_purged": lambda r: ("1236", "HY000", "Got fatal error 1236 from source when reading data from binary log: 'Could not find first log file name in binary log index file'"),
+    "write_on_replica": lambda r: ("1290", "HY000", "The MySQL server is running with the --super-read-only option so it cannot execute this statement"),
 }
 PG = {  # PostgreSQL: (sqlstate, message, detail)
     "duplicate_key": lambda r: ("23505", f"duplicate key value violates unique constraint \"{r['t']}_{r['c']}_key\"", f"Key ({r['c']})=({r['v']}) already exists."),
@@ -70,6 +74,11 @@ PG = {  # PostgreSQL: (sqlstate, message, detail)
     "connection_lost": lambda r: ("08006", "server closed the connection unexpectedly\n\tThis probably means the server terminated abnormally", ""),
     "unknown_database": lambda r: ("3D000", "database \"appx\" does not exist", ""),
     "permission_denied": lambda r: ("42501", f"permission denied for table {r['t']}", ""),
+    # replication (formats seen on a real PostgreSQL primary, hot standby and logical subscriber)
+    "standby_query_conflict": lambda r: ("40001", "canceling statement due to conflict with recovery", "User query might have needed to see row versions that must be removed."),
+    "source_log_purged": lambda r: ("58P01", "could not receive data from WAL stream: ERROR:  requested WAL segment 00000001000000000000000F has already been removed", ""),
+    "write_on_replica": lambda r: ("25006", "cannot execute UPDATE in a read-only transaction", ""),
+    "replication_stopped": lambda r: ("23505", f"duplicate key value violates unique constraint \"{r['t']}_pkey\"\nCONTEXT:  processing remote data for replication origin \"pg_16393\" during message type \"INSERT\" for replication target relation \"public.{r['t']}\"", f"Key (id)=({r['v']}) already exists."),
 }
 MY_WRAP = [
     "ERROR {code} ({state}): {msg}",
@@ -99,6 +108,7 @@ PLAIN = {  # descriptions without any error text -> the likely causes must inclu
     "duplicate_key": ["form submit karne pe duplicate wala error aata hai", "it says the email already exists when saving"],
     "full_scan": ["database bahut slow ho gaya hai pages load nahi hote", "queries are very slow since the data grew"],
     "access_denied": ["app database se connect nahi ho rahi, password change kiya tha", "login to mysql fails after password change"],
+    "replica_lag": ["replica pe data der se aata hai, replica peeche chal raha hai", "our read replica is lagging behind and shows old data"],
 }
 
 
@@ -124,7 +134,7 @@ def case(i, seed):
         cause = rng.choice(list(MY))
         code, state, msg = MY[cause](r)
         if engine == "mariadb":
-            msg = msg.replace("your MySQL server version", "your MariaDB server version")
+            msg = msg.replace("your MySQL server version", "your MariaDB server version").replace("The MySQL server is", "The MariaDB server is")
         body = rng.choice(MY_WRAP).format(code=code, state=state, msg=msg, t=r["t"], c=r["c"])
     said = " ".join(typo(w, rng) for w in rng.choice(SAY).split())
     eng_word = rng.choice(ENGINE_SAY[engine])

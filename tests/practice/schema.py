@@ -60,7 +60,8 @@ ORDER = list(TABLES)
 def build(eng) -> None:
     """(Re)create the practice tables as temporary tables on this connection."""
     for name in reversed(ORDER):
-        eng.run(f"DROP {'TEMPORARY ' if eng.kind == 'mysql' else ''}TABLE IF EXISTS {name}")
+        # only ever the temporary copy: a bare DROP on PostgreSQL would fall through to the real table of that name
+        eng.run(f"DROP TEMPORARY TABLE IF EXISTS {name}" if eng.kind == "mysql" else f"DROP TABLE IF EXISTS pg_temp.{name}")
     for name in ORDER:
         cols, rows = TABLES[name]
         eng.run(f"CREATE TEMPORARY TABLE {name} ({', '.join(cols)}, PRIMARY KEY (id))")

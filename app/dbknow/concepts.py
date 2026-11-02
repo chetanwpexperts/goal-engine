@@ -57,7 +57,8 @@ OWN_WORK = re.compile(
     r"\b(my|this|that|the above|our|mera|meri|mere|ye|yeh|iss|isme|ismein|upar wali) (sql )?(query|queries|statement|code|error)\b|"
     r"\b(error|errors|fail(s|ed|ing)?|failure|slow(ly|er)?|not working|doesn.?t work|isn.?t working|stuck|crash\w*|denied|refused|"
     r"time(d)? ?out|exception|warning|broken|hang(s|ing)?|nahi chal\w*|kaam nahi|atak\w*|dheem\w*|dhire)\b|"
-    r"\b(sqlstate|errno|err(or)? ?code)\b|\b[0-9]{4,5}\b|एरर|त्रुटि|धीम|काम नहीं|चल नहीं", re.I)
+    r"\b(sqlstate|errno|err(or)? ?code)\b|\b[0-9]{4,5}\b|एरर|त्रुटि|धीम|काम नहीं|चल नहीं|"
+    r"(ये|यह|इस|इसे|इसको|मेरी|मेरा|हमारी|ऊपर वाली)\s*(sql\s*)?(क्वेरी|query|स्टेटमेंट)", re.I)
 # another field's file (a spreadsheet's duplicates are the office agent's work)
 OTHER_FIELD = re.compile(r"\b(excel|spreadsheets?|sheets?|xlsx?|csv|vlookup|xlookup|pivot table|word file|docx|google sheets?)\b|एक्सेल|शीट", re.I)
 # the words that make an unknown 'what is X' a question about databases (so it is answered honestly here, not elsewhere)

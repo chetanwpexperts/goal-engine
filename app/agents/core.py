@@ -76,6 +76,10 @@ def _sql_summary(result: dict, hi: bool) -> str:
         extra += (" Aapke maujooda index mujhe nahi dikhte, isliye pehle card wali check query chalao (ya SHOW CREATE TABLE paste karo)."
                   if hi else " I can't see your current indexes from the query alone, so run the check query in the card first "
                              "(or paste SHOW CREATE TABLE) and I'll list only the missing ones.")
+    if not n and not idx and not result.get("rewritten"):
+        note = (" Ye kaise chalti hai, uska note goal card mein hai." if hi else " A note on how it runs is in the goal card.") \
+            if result.get("notes") else ""
+        return (f"Query check ki: koi problem nahi mili.{note}" if hi else f"Checked the query: no problems found.{note}")
     what = ("index lag sakte hain" if hi else "possible indexes") if idx and not result.get("indexes_verified") else (
         "index suggest kiye" if hi else f"index{'es' if idx != 1 else ''} suggested")
     return (f"Query check ki: {n} problem mili, {idx} {what}.{extra}" if hi

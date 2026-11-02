@@ -157,7 +157,7 @@ def _after_run(agent, run, hi: bool) -> tuple[str, list[str]]:
         from app.agents.core import correctness_options
 
         options = correctness_options(_sql_res(run), hi)          # taps made from this query's own mistakes
-    elif agent.recipe == "sql_review" and run.status == "done":
+    elif agent.recipe == "sql_review" and run.status == "done" and any(_sql_res(run).get(k) for k in ("rewritten", "indexes", "check_query")):
         reply += "\n\n" + ("Fixes (rewritten query aur index commands) goal card mein hai, copy kar lo." if hi
                             else "The fixes (rewritten query and index commands) are in the goal card, ready to copy.")
     return reply, options

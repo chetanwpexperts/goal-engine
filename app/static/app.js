@@ -369,6 +369,7 @@
     if (r.check_query) wrap.append(codeBox(w.check, r.check_query, w));
     if (r.indexes && r.indexes.length) wrap.append(codeBox(r.indexes_verified === false ? w.maybe : w.indexes, r.indexes.join("\n"), w));
     if (r.note) wrap.append(el("p", "note", r.note));
+    if (!corr && Array.isArray(r.notes)) for (const n of r.notes) wrap.append(el("p", "note", hi ? n.hi : n.en));
     return wrap;
   }
 

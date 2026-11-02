@@ -228,9 +228,11 @@ def analyze_sql(query: str, extra: str = "") -> dict:
     if re.search(r"\bnot\s+in\s*\(\s*select\b", low):
         add(2, "NOT IN (SELECT ...) is slow and breaks on NULLs", "NOT IN (SELECT ...) slow hai aur NULL pe galat",
             "NOT IN subquery", "Use NOT EXISTS (or LEFT JOIN ... WHERE x IS NULL).", "NOT EXISTS (ya LEFT JOIN ... WHERE x IS NULL) use karo.")
-    elif re.search(r"\bin\s*\(\s*select\b", low):
-        add(1, "IN (SELECT ...) subquery", "IN (SELECT ...) subquery", "IN subquery",
-            "Rewrite as a JOIN or EXISTS if it's slow.", "Slow ho to JOIN ya EXISTS mein badlo.")
+    elif re.search(r"\bin\s*\(\s*select\b", low) and not is_select:
+        # UPDATE/DELETE ... IN (SELECT): older MySQL (before 8.0.21) doesn't turn these into a semi-join
+        add(1, "IN (SELECT ...) inside UPDATE/DELETE", "UPDATE/DELETE ke andar IN (SELECT ...)", "IN subquery",
+            "On older MySQL this can run once per row: if it's slow, use a multi-table UPDATE/DELETE with a JOIN.",
+            "Purane MySQL pe ye har row ke liye chal sakta hai: slow ho to JOIN wala multi-table UPDATE/DELETE use karo.")
     select_list = _clause(sql, "select", ("from",))
     if re.search(r"\(\s*select\b", select_list, re.I):
         add(3, "Subquery inside SELECT runs once per row", "SELECT ke andar subquery har row ke liye chalti hai",
@@ -429,6 +431,15 @@ def _notes(sql: str, tables, original: str = "") -> list[dict]:
                           "(LIMIT 50 OFFSET ...) or filter it (by center, batch, date): that is usually the biggest speed-up.",
                     "hi": "LIMIT nahi hai, isliye saari rows aati hain. Page pe list hai to page-wise dikhao (LIMIT 50 OFFSET ...) "
                           "ya filter lagao (center, batch, date): aksar sabse bada fayda yahi hota hai."})
+    if re.search(r"\bin\s*\(\s*select\b", low) and not re.search(r"\bnot\s+in\s*\(\s*select\b", low) and \
+            low.lstrip("( ").startswith(("select", "with")):
+        # checked on MariaDB (materialized semi-join) and PostgreSQL (semi-join / HashAggregate): a plain JOIN returned duplicates
+        out.append({"en": "WHERE ... IN (SELECT ...) is fine as it is: MySQL 5.6+, MariaDB and PostgreSQL run it as a semi-join, not once "
+                          "per row. Don't rewrite it as a plain JOIN: when the inner table has several matching rows, a JOIN returns "
+                          "each outer row more than once. If it's slow, index the inner table's column used in the subquery.",
+                    "hi": "WHERE ... IN (SELECT ...) jaisa hai theek hai: MySQL 5.6+, MariaDB aur PostgreSQL ise semi-join ki tarah chalate "
+                          "hain, har row ke liye nahi. Ise seedha JOIN mat banao: andar wali table mein ek se zyada matching rows hon "
+                          "to JOIN har bahar wali row baar baar deta hai. Slow ho to subquery wale column pe index lagao."})
     if re.search(r"\bcase\s+when\b[^;]*\blike\s+'%", (original or sql).lower()):
         out.append({"en": "The LIKE '%...%' checks inside CASE run on rows already found; they don't search the table, so they "
                           "don't need an index and aren't what makes it slow.",

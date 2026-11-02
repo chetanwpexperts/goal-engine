@@ -251,6 +251,25 @@ class LearnRequest(Base):
     last_seen: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
+class LearnMiss(Base):
+    """An answer the user said was wrong ("still not right", "galat hai"): what they said, the agent's own masked copy of
+    what it was working on (every value hidden by the agent's pack), and the answer it gave. Same miss again = count + 1,
+    never a new row. No visitor id. The nightly learning reads these; deleted after 180 days."""
+
+    __tablename__ = "learn_misses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    brain: Mapped[str] = mapped_column(String(20), index=True)
+    fingerprint: Mapped[str] = mapped_column(String(64), unique=True)  # brain + normalized detail
+    said: Mapped[str] = mapped_column(String(300))
+    detail: Mapped[str] = mapped_column(Text)                           # at most 4000 characters, values hidden
+    answer: Mapped[str] = mapped_column(String(300), default="")
+    count: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(12), default="new", index=True)   # new / learned / ignored
+    first_seen: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
 class LearnVote(Base):
     """'I meant this one': a user picked the right meaning for a sentence. voter = keyed fingerprint, never the id.
     Deleted after 90 days; three different people agreeing teaches the brain (LearnedPhrase)."""

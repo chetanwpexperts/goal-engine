@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <title>Requests · Goal Engine</title>
+  <title>Admin · Goal Engine</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
@@ -38,17 +38,31 @@
     .lrow .t { flex: 1 1 320px; }
     .lrow small { color: var(--muted); display: block; }
     .lrow button { border: 1px solid var(--ink); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 13px; background: transparent; color: var(--ink); cursor: pointer; }
+    .user { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px 18px; margin-bottom: 10px; display: grid; gap: 6px; }
+    .user.unverified { border-left: 4px solid var(--alert); }
+    .user .why { margin: 0; white-space: pre-wrap; font-size: 14px; }
+    .badge { font-size: 12px; font-weight: 600; border-radius: 999px; padding: 2px 9px; margin-left: 6px; vertical-align: middle; }
+    .badge.ok { background: var(--ok-soft); color: var(--ok); }
+    .badge.no { background: var(--signal-soft); color: var(--alert); }
+    .stats { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 0; }
+    .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; font-size: 14px; color: var(--muted); }
+    .stat b { display: block; font-size: 22px; color: var(--ink); }
+    .detail { white-space: pre-wrap; font: 13px/1.45 ui-monospace, Menlo, monospace; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 6px 0 0; max-height: 220px; overflow: auto; }
     h2 { font-size: 18px; margin: 20px 0 4px; }
     a:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   </style>
 </head>
 <body>
 <main>
-  <header><h1>Expert requests</h1><span class="count" id="count"></span></header>
+  <header><h1>Users</h1><span class="count" id="ucount"></span></header>
+  <div class="stats" id="ustats"></div>
+  <div class="filters" id="ufilters"></div>
+  <section id="users"></section>
+  <header class="learn-head"><h1>Expert requests</h1><span class="count" id="count"></span></header>
   <div class="filters" id="filters"></div>
   <section id="list"></section>
   <header class="learn-head"><h1>Learning</h1><span class="count" id="lcount"></span></header>
-  <p class="who">Sentences people asked the agents to learn ("None of these"), most asked first. The nightly learning reads them too. Below: sentences the brains learned from 3+ people agreeing. Reject anything wrong.</p>
+  <p class="who">Questions the agents couldn't answer, and answers people said were wrong. The nightly learning reads both and teaches the agents; mark a line "Learned" once it is fixed, or "Ignore" if it is junk. Last list: sentences the agents picked up by themselves after 3+ people agreed. Reject anything wrong. Times are India time.</p>
   <section id="learn"></section>
 </main>
 <script>
@@ -58,6 +72,48 @@
   const filters = document.getElementById("filters");
   const labels = { "": "All", new: "New", talking: "Talking", done: "Done", spam: "Spam" };
   let status = "new";
+  const when = (iso) => iso ? new Date(`${iso}Z`).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "never";
+  const agentName = { database: "DBaba (database)", office: "Sheetu (Excel / Word)" };
+
+  // ---------------------------------------------------------------- users who signed up
+  const ulabels = { today: "Today", week: "Last 7 days", unverified: "Email not verified", all: "All" };
+  let uview = "all";
+  const ufilters = document.getElementById("ufilters");
+  const usersBox = document.getElementById("users");
+  for (const [k, v] of Object.entries(ulabels)) {
+    const b = el("button", null, v); b.type = "button"; b.dataset.k = k;
+    b.addEventListener("click", () => { uview = k; loadUsers(); });
+    ufilters.append(b);
+  }
+  async function loadUsers() {
+    for (const b of ufilters.children) b.setAttribute("aria-pressed", String(b.dataset.k === uview));
+    const r = await fetch(`/api/admin/users?view=${uview}`);
+    if (!r.ok) { usersBox.replaceChildren(el("p", "empty", "Not signed in. Open your private admin link again.")); return; }
+    const { counts, users } = await r.json();
+    const stats = document.getElementById("ustats");
+    stats.replaceChildren(...[["today", "new today"], ["week", "last 7 days"], ["all", "total"], ["unverified", "not verified"]].map(([k, t]) => {
+      const d = el("div", "stat"); d.append(el("b", null, String(counts[k])), document.createTextNode(t)); return d;
+    }));
+    document.getElementById("ucount").textContent = `${users.length} shown`;
+    if (!users.length) { usersBox.replaceChildren(el("p", "empty", uview === "today" ? "No one signed up today yet." : "Nothing here.")); return; }
+    usersBox.replaceChildren(...users.map((u) => {
+      const card = el("article", `user${u.verified ? "" : " unverified"}`);
+      const top = el("div", "top");
+      const name = el("span", "topic", u.name);
+      name.append(el("span", `badge ${u.verified ? "ok" : "no"}`, u.verified ? "verified" : "email not verified"));
+      top.append(name, el("span", "when", `signed up ${when(u.created_at)}`));
+      const who = el("p", "who");
+      who.append(el("b", null, `@${u.username}`), document.createTextNode(` · ${u.email} · ${u.phone}${u.location ? " · " + u.location : ""} · last login ${when(u.last_login_at)}`));
+      const acts = el("div", "acts");
+      if (u.whatsapp) { const a = el("a", "wa", "WhatsApp"); a.href = u.whatsapp; a.target = "_blank"; a.rel = "noopener"; acts.append(a); }
+      if (u.phone) { const a = el("a", null, "Call"); a.href = `tel:${u.phone.replace(/\s/g, "")}`; acts.append(a); }
+      { const a = el("a", null, "Email"); a.href = `mailto:${u.email}?subject=${encodeURIComponent("Welcome to Goal Engine")}`; acts.append(a); }
+      card.append(top, who);
+      if (u.why) card.append(el("p", "why", `Why they joined: ${u.why}`));
+      card.append(acts);
+      return card;
+    }));
+  }
 
   for (const [k, v] of Object.entries(labels)) {
     const b = el("button", null, v); b.type = "button"; b.dataset.k = k;
@@ -77,7 +133,7 @@
     if (!r.ok) { list.replaceChildren(el("p", "empty", "Not signed in. Open your private admin link again.")); return; }
     const { requests } = await r.json();
     document.getElementById("count").textContent = `${requests.length} ${labels[status].toLowerCase()}`;
-    if (!requests.length) { list.replaceChildren(el("p", "empty", "Nothing here.")); return; }
+    if (!requests.length) { list.replaceChildren(el("p", "empty", status ? `No requests marked "${labels[status]}".` : "No one has asked for an expert yet.")); return; }
     list.replaceChildren(...requests.map((q) => {
       const card = el("article", `req ${q.status}`);
       const top = el("div", "top");
@@ -108,27 +164,37 @@
   async function loadLearning() {
     const r = await fetch("/api/admin/learning?status=new");
     if (!r.ok) return;
-    const { requests, learned } = await r.json();
-    document.getElementById("lcount").textContent = `${requests.length} to learn`;
+    const { requests, learned, misses = [] } = await r.json();
+    document.getElementById("lcount").textContent = `${requests.length + misses.length} to learn`;
     const row = (text, meta, buttons) => {
       const d = el("div", "lrow"); const t = el("div", "t", text); t.append(el("small", null, meta)); d.append(t);
       for (const [label, fn] of buttons) { const b = el("button", null, label); b.type = "button"; b.addEventListener("click", fn); d.append(b); }
       return d;
     };
-    const parts = [el("h2", null, "Asked to learn")];
+    const asked = (x) => x.count > 1 ? `first asked ${when(x.first_seen)} · last asked ${when(x.last_seen)}` : `asked ${when(x.first_seen)}`;
+    const parts = [el("h2", null, "Couldn't answer")];
     if (!requests.length) parts.push(el("p", "empty", "Nothing waiting."));
-    for (const q of requests) parts.push(row(q.text, `${q.brain} · asked ${q.count}× · best guess ${q.guess || "none"}`,
+    for (const q of requests) parts.push(row(q.text, `${agentName[q.brain] || q.brain} · asked ${q.count}× · ${asked(q)} · it replied: ${q.guess || "nothing"}`,
       [["Learned", () => setL("request", q.id, "learned")], ["Ignore", () => setL("request", q.id, "ignored")]]));
-    parts.push(el("h2", null, "Learned from users"));
+    parts.push(el("h2", null, "Said the answer was wrong"));
+    if (!misses.length) parts.push(el("p", "empty", "Nothing waiting."));
+    for (const m of misses) {
+      const d = row(`"${m.said}"`, `${agentName[m.brain] || m.brain} · ${m.count}× · ${asked(m)} · its answer: ${m.answer || "none"}`,
+        [["Learned", () => setL("miss", m.id, "learned")], ["Ignore", () => setL("miss", m.id, "ignored")]]);
+      if (m.detail) d.querySelector(".t").append(el("pre", "detail", m.detail));
+      parts.push(d);
+    }
+    parts.push(el("h2", null, "Picked up from users"));
     if (!learned.length) parts.push(el("p", "empty", "Nothing yet."));
     for (const p of learned) parts.push(row(p.text, `${p.brain} → ${p.label} · ${p.status}`,
       p.status === "rejected" ? [["Allow", () => setL("phrase", p.id, "approved")]] : [["Reject", () => setL("phrase", p.id, "rejected")]]));
     learnBox.replaceChildren(...parts);
   }
 
+  loadUsers();
   load();
   loadLearning();
-  setInterval(() => { if (!document.hidden && document.activeElement.tagName !== "TEXTAREA") load(); }, 30000);
+  setInterval(() => { if (!document.hidden && document.activeElement.tagName !== "TEXTAREA") { loadUsers(); load(); loadLearning(); } }, 30000);
 })();
 </script>
 </body>

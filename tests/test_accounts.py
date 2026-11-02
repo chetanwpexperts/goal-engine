@@ -162,3 +162,43 @@ def test_no_daily_cap_in_ml_mode_but_floods_stop(client, ml_mode):
         assert r.status_code == 429 and "very fast" in r.json()["error"]
     finally:
         limits.BURST["visitor"] = old
+
+
+def test_admin_sees_new_users_with_dates(client, ml_mode, mail, monkeypatch):
+    """The private admin page lists signups newest first, with when they joined and whether they verified."""
+    monkeypatch.setenv("ADMIN_KEY", "k" * 24)
+    assert client.get("/api/admin/users").status_code == 404                  # no admin cookie: hidden
+    assert signup(client, n=71).status_code == 200
+    client.post("/api/account/verify", json={"code": mail.last_code("asha71@example.com")})
+    client.post("/api/account/logout")
+    client.cookies.clear()
+    assert signup(client, n=72).status_code == 200                           # never verified
+    client.cookies.clear()
+    client.get(f"/admin?key={'k' * 24}", follow_redirects=False)
+    out = client.get("/api/admin/users").json()
+    mine = [u for u in out["users"] if u["email"] in ("asha71@example.com", "asha72@example.com")]
+    assert [u["email"] for u in mine] == ["asha72@example.com", "asha71@example.com"]        # newest first
+    assert mine[0]["verified"] is False and mine[1]["verified"] is True
+    assert mine[1]["created_at"] and mine[1]["location"] == "Chandigarh" and "Excel" in mine[1]["why"]
+    assert mine[1]["whatsapp"].startswith("https://wa.me/91") and "password" not in str(out) and "pink-river" not in str(out)
+    assert out["counts"]["today"] >= 2 and out["counts"]["all"] >= 2 and out["counts"]["unverified"] >= 1
+    today = client.get("/api/admin/users?view=today").json()["users"]
+    assert {"asha71@example.com", "asha72@example.com"} <= {u["email"] for u in today}
+    unv = client.get("/api/admin/users?view=unverified").json()["users"]
+    assert all(not u["verified"] for u in unv) and "asha72@example.com" in {u["email"] for u in unv}
+
+
+def test_admin_learning_shows_dates_and_wrong_answers(client, ml_mode, monkeypatch):
+    from app import learning
+    from app.db import get_db
+
+    monkeypatch.setenv("ADMIN_KEY", "k" * 24)
+    db = next(get_db())
+    learning.report_miss(db, "database", "still wrong", "SELECT name FROM t WHERE city = ?", "No problems found.")
+    client.get(f"/admin?key={'k' * 24}", follow_redirects=False)
+    out = client.get("/api/admin/learning").json()
+    miss = [m for m in out["misses"] if m["said"] == "still wrong"][0]
+    assert miss["first_seen"] and miss["last_seen"] and miss["detail"].startswith("SELECT")
+    assert all(r["first_seen"] and r["last_seen"] for r in out["requests"])
+    assert client.post(f"/api/admin/learning/miss/{miss['id']}", json={"status": "learned"}).json() == {"ok": True}
+    assert not [m for m in client.get("/api/admin/learning").json()["misses"] if m["id"] == miss["id"]]

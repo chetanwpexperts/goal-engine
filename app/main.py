@@ -478,6 +478,15 @@ def learn_ask(body: LearnAskIn, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@app.get("/api/admin/users")
+def admin_users(request: Request, view: str = "all", db: Session = Depends(get_db)):
+    from app import accounts
+
+    if not _is_admin(request):
+        raise HTTPException(404, "Not Found")
+    return accounts.admin_users(db, view if view in ("today", "week", "unverified", "all") else "all")
+
+
 @app.get("/api/admin/learning")
 def admin_learning(request: Request, status: str = "new", db: Session = Depends(get_db)):
     from app import learning

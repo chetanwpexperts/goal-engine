@@ -489,3 +489,37 @@ def delete_account(db: Session, user_id: int) -> int:
 
 def account_visitors(db: Session) -> set[str]:
     return set(db.scalars(select(User.visitor_id)))
+
+
+# ---------------------------------------------------------------- the private admin page: who signed up
+def _india_midnight_utc(days_back: int = 0):
+    """Midnight in India (UTC+5:30) today, or days_back days ago, as naive UTC like the stored times."""
+    now = utcnow() + timedelta(hours=5, minutes=30)
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=days_back)
+    return start - timedelta(hours=5, minutes=30)
+
+
+def _wa_number(phone: str) -> str:
+    digits = re.sub(r"\D", "", phone or "")
+    return ("91" + digits) if len(digits) == 10 else digits
+
+
+def admin_users(db: Session, view: str = "all", limit: int = 300) -> dict:
+    """Signups for the admin page, newest first: today / week (last 7 days, India time) / unverified / all."""
+    today, week = _india_midnight_utc(), _india_midnight_utc(6)
+    counts = {"today": db.scalar(select(func.count(User.id)).where(User.created_at >= today)) or 0,
+              "week": db.scalar(select(func.count(User.id)).where(User.created_at >= week)) or 0,
+              "unverified": db.scalar(select(func.count(User.id)).where(User.email_verified.is_(False))) or 0,
+              "all": db.scalar(select(func.count(User.id))) or 0}
+    q = select(User).order_by(User.created_at.desc()).limit(limit)
+    if view == "today":
+        q = q.where(User.created_at >= today)
+    elif view == "week":
+        q = q.where(User.created_at >= week)
+    elif view == "unverified":
+        q = q.where(User.email_verified.is_(False))
+    users = [{"id": u.id, "name": u.full_name, "username": u.username, "email": u.email, "phone": u.phone, "location": u.location,
+              "why": u.why, "verified": bool(u.email_verified), "created_at": u.created_at.isoformat(),
+              "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+              "whatsapp": f"https://wa.me/{_wa_number(u.phone)}" if _wa_number(u.phone) else ""} for u in db.scalars(q)]
+    return {"counts": counts, "users": users}

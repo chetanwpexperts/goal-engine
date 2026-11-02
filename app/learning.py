@@ -21,7 +21,7 @@ from datetime import timedelta
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.models import LearnedPhrase, LearnRequest, LearnVote, utcnow
+from app.models import LearnedPhrase, LearnMiss, LearnRequest, LearnVote, utcnow
 from app.ml.normalize import normalize
 
 def _brains() -> tuple[str, ...]:
@@ -173,16 +173,20 @@ def overview(db: Session, status: str = "new", limit: int = 100) -> dict:
     reqs = db.scalars(select(LearnRequest).where(LearnRequest.status == status if status else True)
                       .order_by(LearnRequest.count.desc(), LearnRequest.last_seen.desc()).limit(limit))
     phrases = db.scalars(select(LearnedPhrase).order_by(LearnedPhrase.id.desc()).limit(limit))
+    misses = db.scalars(select(LearnMiss).where(LearnMiss.status == status if status else True)
+                        .order_by(LearnMiss.last_seen.desc()).limit(limit))
     return {
         "requests": [{"id": r.id, "brain": r.brain, "text": r.text, "guess": r.guess, "confidence": r.confidence, "count": r.count,
-                      "status": r.status, "last_seen": r.last_seen.isoformat()} for r in reqs],
+                      "status": r.status, "first_seen": r.first_seen.isoformat(), "last_seen": r.last_seen.isoformat()} for r in reqs],
+        "misses": [{"id": m.id, "brain": m.brain, "said": m.said, "detail": m.detail, "answer": m.answer, "count": m.count,
+                    "status": m.status, "first_seen": m.first_seen.isoformat(), "last_seen": m.last_seen.isoformat()} for m in misses],
         "learned": [{"id": p.id, "brain": p.brain, "text": p.text, "label": p.label, "status": p.status,
                      "created_at": p.created_at.isoformat()} for p in phrases],
     }
 
 
 def set_status(db: Session, kind: str, item_id: int, status: str) -> bool:
-    model, allowed = {"request": (LearnRequest, {"new", "learned", "ignored"}),
+    model, allowed = {"request": (LearnRequest, {"new", "learned", "ignored"}), "miss": (LearnMiss, {"new", "learned", "ignored"}),
                       "phrase": (LearnedPhrase, {"auto", "approved", "rejected"})}.get(kind, (None, set()))
     if model is None or status not in allowed:
         return False

@@ -377,7 +377,8 @@
    "explains": {
     "save_fails": 0.8,
     "server_down": 0.8,
-    "slow": 0.4
+    "slow": 0.4,
+    "disk_space": 1.0
    },
    "prior": 0.2,
    "shown_by": "disk_full",
@@ -391,7 +392,12 @@
    "prevent_hi": "Log retention set karo (binlog_expire_logs_seconds / WAL archiving), backups server se bahar rakho, aur 80% disk pe alert lagao.",
    "needs": [],
    "short_en": "The disk is full",
-   "short_hi": "Disk bhar gayi"
+   "short_hi": "Disk bhar gayi",
+   "deeper": [
+    "wal_retained_by_slot",
+    "wal_archive_failing",
+    "binlog_not_expiring"
+   ]
   },
   "out_of_memory": {
    "layer": "resources",
@@ -441,7 +447,8 @@
    "family": "relational",
    "explains": {
     "query_error": 0.6,
-    "slow": 0.5
+    "slow": 0.5,
+    "disk_space": 0.6
    },
    "prior": 0.1,
    "shown_by": "temp_space_full",
@@ -926,6 +933,143 @@
    ],
    "seen_at": [
     "https://pganalyze.com/docs/log-insights/standby/B95"
+   ],
+   "engines": [
+    "postgresql"
+   ]
+  },
+  "wal_retained_by_slot": {
+   "layer": "resources",
+   "family": "any",
+   "explains": {
+    "disk_space": 0.9,
+    "logs_growing": 1.0,
+    "server_down": 0.5,
+    "save_fails": 0.5
+   },
+   "prior": 0.12,
+   "shown_by": "wal_retained_by_slot",
+   "title_en": "A replication slot keeps old WAL files that nobody is reading, so pg_wal keeps growing",
+   "title_hi": "Ek replication slot purani WAL files rakhe hue hai jinhe koi padh nahi raha, isliye pg_wal badhta ja raha hai",
+   "why_en": "A replication slot promises a standby or a logical consumer that the server keeps every WAL file it hasn't read yet. When that standby is gone, broken or far behind, the slot still holds the files, and by default (max_slot_wal_keep_size = -1) there is no limit: pg_wal grows until the disk is full and the server stops.",
+   "why_hi": "Replication slot standby ya logical consumer se vaada karta hai ki jo WAL file usne nahi padhi wo rakhi jayegi. Jab wo standby hata diya gaya, toot gaya ya bahut peeche hai, slot files rakhe rehta hai, aur default (max_slot_wal_keep_size = -1) mein koi limit nahi: pg_wal disk bharne tak badhta hai aur server ruk jata hai.",
+   "confirm_en": "After the unused slot is dropped (or its standby catches up) and a CHECKPOINT runs, pg_wal shrinks.",
+   "confirm_hi": "Bekaar slot drop karne (ya standby ke barabar aane) aur CHECKPOINT ke baad pg_wal chhota ho jaye.",
+   "prevent_en": "Drop slots when you remove a standby or a CDC tool, set max_slot_wal_keep_size as a safety limit, and alert on how much WAL each slot holds.",
+   "prevent_hi": "Standby ya CDC tool hatate waqt uska slot bhi drop karo, max_slot_wal_keep_size ko safety limit ki tarah set karo, aur har slot kitna WAL rok raha hai uspe alert lagao.",
+   "needs": [],
+   "short_en": "A replication slot is holding old WAL",
+   "short_hi": "Replication slot purana WAL rok ke baitha hai",
+   "source": [
+    "https://www.postgresql.org/docs/current/wal-configuration.html",
+    "https://www.postgresql.org/docs/current/runtime-config-replication.html",
+    "https://www.postgresql.org/docs/current/view-pg-replication-slots.html"
+   ],
+   "seen_at": [
+    "https://www.crunchydata.com/blog/postgres-wal-files-and-sequuence-numbers"
+   ],
+   "engines": [
+    "postgresql"
+   ]
+  },
+  "wal_archive_failing": {
+   "layer": "resources",
+   "family": "any",
+   "explains": {
+    "disk_space": 0.9,
+    "logs_growing": 1.0,
+    "server_down": 0.5,
+    "save_fails": 0.4
+   },
+   "prior": 0.08,
+   "shown_by": "wal_archive_failing",
+   "title_en": "WAL archiving keeps failing, so PostgreSQL can't remove old WAL files",
+   "title_hi": "WAL archiving baar baar fail ho rahi hai, isliye PostgreSQL purani WAL files hata nahi pa raha",
+   "why_en": "With archive_mode on, a WAL file may only be removed after archive_command (or archive_library) has copied it and reported success. If the command fails (full or unmounted backup disk, wrong path, permissions, an expired cloud key), PostgreSQL retries forever and keeps every unarchived file in pg_wal, which keeps growing until the disk fills and the server does a PANIC shutdown.",
+   "why_hi": "archive_mode on ho to WAL file tabhi hatti hai jab archive_command (ya archive_library) use copy karke success bataye. Command fail ho (backup disk full ya mount nahi, galat path, permission, expired cloud key) to PostgreSQL hamesha retry karta hai aur har bina-archive file pg_wal mein rakhta hai, jo disk bharne tak badhta hai aur server PANIC se band ho jata hai.",
+   "confirm_en": "pg_stat_archiver shows new archived files after the last failure, and the .ready files in pg_wal/archive_status go away.",
+   "confirm_hi": "pg_stat_archiver mein aakhri failure ke baad naye archived files dikhein, aur pg_wal/archive_status ki .ready files khatam ho jayein.",
+   "prevent_en": "Test the archive command by hand after every change, alert on pg_stat_archiver.failed_count and on disk use, and keep the archive destination on a different disk with its own monitoring.",
+   "prevent_hi": "Har badlaav ke baad archive command haath se test karo, pg_stat_archiver.failed_count aur disk use pe alert lagao, aur archive ki jagah alag disk pe rakho jiski apni monitoring ho.",
+   "needs": [],
+   "short_en": "WAL archiving is failing",
+   "short_hi": "WAL archiving fail ho rahi hai",
+   "source": [
+    "https://www.postgresql.org/docs/current/continuous-archiving.html",
+    "https://www.postgresql.org/docs/current/wal-configuration.html"
+   ],
+   "seen_at": [
+    "https://www.crunchydata.com/blog/tuning-your-postgres-database-for-high-write-loads"
+   ],
+   "engines": [
+    "postgresql"
+   ]
+  },
+  "binlog_not_expiring": {
+   "layer": "resources",
+   "family": "any",
+   "explains": {
+    "disk_space": 0.9,
+    "logs_growing": 1.0,
+    "server_down": 0.5,
+    "save_fails": 0.4
+   },
+   "prior": 0.15,
+   "shown_by": "binlog_not_expiring",
+   "title_en": "Binary logging is on but old binary log files are never removed automatically",
+   "title_hi": "Binary logging on hai lekin purani binary log files apne aap kabhi nahi hat-ti",
+   "why_en": "With log_bin on, every change is also written to binary log files. They are only removed when an expiry is set (binlog_expire_logs_seconds / expire_logs_days) or someone runs PURGE BINARY LOGS. MariaDB's built-in default is no expiry; MySQL 8 keeps 30 days, which can still be too much for a busy server on a small disk. The files pile up until the disk is full.",
+   "why_hi": "log_bin on ho to har change binary log files mein bhi likha jata hai. Ye tabhi hat-ti hain jab expiry set ho (binlog_expire_logs_seconds / expire_logs_days) ya koi PURGE BINARY LOGS chalaye. MariaDB ka apna default hai: kabhi expire nahi; MySQL 8 30 din rakhta hai, jo chhoti disk wale busy server ke liye bhi zyada ho sakta hai. Files disk bharne tak jama hoti rehti hain.",
+   "confirm_en": "SHOW BINARY LOGS lists only recent files and their total size stays steady from day to day.",
+   "confirm_hi": "SHOW BINARY LOGS mein sirf haal ki files hon aur unka total size roz same rahe.",
+   "prevent_en": "Set binlog_expire_logs_seconds longer than any replica could be behind (and longer than your point-in-time restore window), put it in the config file too, and alert on disk use.",
+   "prevent_hi": "binlog_expire_logs_seconds ko replica ke sabse zyada peeche hone ke time (aur point-in-time restore window) se lamba rakho, config file mein bhi likho, aur disk use pe alert lagao.",
+   "needs": [],
+   "short_en": "Old binary logs are never removed",
+   "short_hi": "Purane binary logs kabhi hat-te nahi",
+   "source": [
+    "https://dev.mysql.com/doc/refman/8.4/en/purge-binary-logs.html",
+    "https://dev.mysql.com/doc/refman/8.4/en/replication-options-binary-log.html#sysvar_binlog_expire_logs_seconds",
+    "https://mariadb.com/docs/server/server-management/server-monitoring-logs/binary-log/using-and-maintaining-the-binary-log"
+   ],
+   "seen_at": [
+    "https://www.percona.com/blog/mysql-replication-how-to-deal-with-the-got-fatal-error-1236-or-my-013114-error/"
+   ],
+   "engines": [
+    "mysql",
+    "mariadb"
+   ]
+  },
+  "checkpoints_too_frequent": {
+   "layer": "resources",
+   "family": "any",
+   "explains": {
+    "slow": 0.6,
+    "logs_growing": 0.3
+   },
+   "prior": 0.1,
+   "shown_by": "checkpoints_too_frequent",
+   "title_en": "Checkpoints are happening too often because max_wal_size is too small for the write load",
+   "title_hi": "Checkpoints bahut jaldi ho rahe hain kyunki write load ke hisaab se max_wal_size chhota hai",
+   "why_en": "PostgreSQL starts a checkpoint (writing all changed pages to disk) every checkpoint_timeout or when WAL is about to pass max_wal_size. If max_wal_size is small for the amount being written, checkpoints come every few seconds: heavy disk writes, and more WAL, because the first change to each page after a checkpoint writes the whole page into WAL. Writes and queries slow down in waves.",
+   "why_hi": "PostgreSQL har checkpoint_timeout pe ya jab WAL max_wal_size paar karne wala ho tab checkpoint shuru karta hai (saare badle pages disk pe likhna). Agar likhe ja rahe data ke hisaab se max_wal_size chhota hai, to checkpoint har kuch second mein aata hai: disk pe bhaari writes, aur WAL bhi zyada, kyunki checkpoint ke baad har page ka pehla change poora page WAL mein likhta hai. Writes aur queries lehron mein slow hoti hain.",
+   "confirm_en": "The 'checkpoints are occurring too frequently' message stops appearing during normal load and most checkpoints are timed, not requested.",
+   "confirm_hi": "Normal load mein 'checkpoints are occurring too frequently' message aana band ho jaye aur zyada checkpoints timed hon, requested nahi.",
+   "prevent_en": "Size max_wal_size for your busiest hour (a few GB is common on busy servers), keep checkpoint_timeout at 5-15 minutes, and leave disk headroom: max_wal_size is a soft target, not a hard limit. An occasional warning during a big bulk load is normal.",
+   "prevent_hi": "max_wal_size apne sabse busy ghante ke hisaab se rakho (busy servers pe kuch GB aam hai), checkpoint_timeout 5-15 minute, aur disk mein jagah chhodo: max_wal_size soft target hai, hard limit nahi. Bade bulk load mein kabhi kabhi warning aana normal hai.",
+   "needs": [],
+   "short_en": "Checkpoints happen too often",
+   "short_hi": "Checkpoints bahut jaldi jaldi ho rahe hain",
+   "source": [
+    "https://www.postgresql.org/docs/current/wal-configuration.html",
+    "https://www.postgresql.org/docs/current/runtime-config-wal.html#GUC-CHECKPOINT-WARNING"
+   ],
+   "seen_at": [
+    "https://www.crunchydata.com/blog/tuning-your-postgres-database-for-high-write-loads",
+    "https://thebuild.com/blog/all-your-gucs-in-a-row-checkpointflushafter-and-checkpointwarning/"
+   ],
+   "engines": [
+    "postgresql"
    ]
   }
  }

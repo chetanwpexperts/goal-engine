@@ -78,6 +78,9 @@ PG = {  # PostgreSQL: (sqlstate, message, detail)
     "standby_query_conflict": lambda r: ("40001", "canceling statement due to conflict with recovery", "User query might have needed to see row versions that must be removed."),
     "source_log_purged": lambda r: ("58P01", "could not receive data from WAL stream: ERROR:  requested WAL segment 00000001000000000000000F has already been removed", ""),
     "write_on_replica": lambda r: ("25006", "cannot execute UPDATE in a read-only transaction", ""),
+    # WAL and disk (formats seen on a real PostgreSQL 16 with a failing archive_command and a small max_wal_size)
+    "wal_archive_failing": lambda r: ("00000", "archive command failed with exit code 1", "The failed archive command was: cp pg_wal/00000001000000000000001B /mnt/backup/wal/00000001000000000000001B"),
+    "checkpoints_too_frequent": lambda r: ("00000", "checkpoints are occurring too frequently (12 seconds apart)", ""),
     "replication_stopped": lambda r: ("23505", f"duplicate key value violates unique constraint \"{r['t']}_pkey\"\nCONTEXT:  processing remote data for replication origin \"pg_16393\" during message type \"INSERT\" for replication target relation \"public.{r['t']}\"", f"Key (id)=({r['v']}) already exists."),
 }
 MY_WRAP = [
@@ -109,6 +112,8 @@ PLAIN = {  # descriptions without any error text -> the likely causes must inclu
     "full_scan": ["database bahut slow ho gaya hai pages load nahi hote", "queries are very slow since the data grew"],
     "access_denied": ["app database se connect nahi ho rahi, password change kiya tha", "login to mysql fails after password change"],
     "replica_lag": ["replica pe data der se aata hai, replica peeche chal raha hai", "our read replica is lagging behind and shows old data"],
+    "wal_retained_by_slot": ["postgres ka pg_wal folder bahut bada ho gaya hai, disk bhar rahi hai", "pg_wal keeps growing on our postgres server"],
+    "binlog_not_expiring": ["mysql binlog files bahut jagah le rahi hain", "binary logs are filling the disk on our mysql server"],
 }
 
 

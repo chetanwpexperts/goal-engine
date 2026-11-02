@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS wp_posts (ID BIGINT AUTO_INCREMENT PRIMARY KEY, post_
   post_status VARCHAR(20) DEFAULT 'publish', post_type VARCHAR(20) DEFAULT 'post', post_modified DATETIME);"
 su postgres -c "psql -q -tc \"SELECT 1 FROM pg_roles WHERE rolname='shopapp'\" | grep -q 1 || psql -q -c \"CREATE USER shopapp PASSWORD 'app pass';\""
 su postgres -c "psql -q -tc \"SELECT 1 FROM pg_database WHERE datname='shop_pg'\" | grep -q 1 || psql -q -c \"CREATE DATABASE shop_pg OWNER shopapp;\""
+su postgres -c "psql -q -c 'ALTER ROLE shopapp REPLICATION;'"   # tests create (and drop) a replication slot, as CI's superuser can
 PGPASSWORD='app pass' psql -h 127.0.0.1 -U shopapp shop_pg -q -c "
 CREATE TABLE IF NOT EXISTS orders(id serial primary key, amount numeric(10,2), created timestamptz default now());
 INSERT INTO orders(amount) SELECT 100 WHERE (SELECT count(*) FROM orders) = 0;

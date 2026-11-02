@@ -311,6 +311,38 @@
    "cancellation",
    "aborted",
    "terminated"
+  ],
+  "wal": [
+   "wal",
+   "pg_wal",
+   "xlog",
+   "pg_xlog",
+   "binlog",
+   "binlogs",
+   "binlog_files",
+   "archive",
+   "archiving",
+   "archive_command",
+   "slot",
+   "slots"
+  ],
+  "big": [
+   "big",
+   "bada",
+   "badi",
+   "bade",
+   "huge",
+   "growing",
+   "grows",
+   "grew",
+   "grown",
+   "size",
+   "badh",
+   "badhta",
+   "badhti",
+   "increasing",
+   "gb",
+   "jagah"
   ]
  },
  "multiword": {
@@ -326,7 +358,13 @@
   "read replica": "replica",
   "out of sync": "sync",
   "not in sync": "sync",
-  "peeche hai": "behind"
+  "peeche hai": "behind",
+  "binary log": "binlog",
+  "binary logs": "binlog",
+  "mysql-bin": "binlog",
+  "replication slot": "slot",
+  "write ahead log": "wal",
+  "write-ahead log": "wal"
  },
  "complaints": {
   "query_error": [
@@ -572,6 +610,28 @@
      ]
     ]
    }
+  ],
+  "disk_space": [
+   {
+    "all": [
+     [
+      "disk"
+     ]
+    ]
+   }
+  ],
+  "logs_growing": [
+   {
+    "all": [
+     [
+      "wal"
+     ],
+     [
+      "big",
+      "disk"
+     ]
+    ]
+   }
   ]
  },
  "outranks": {
@@ -597,6 +657,12 @@
    "replication_problem",
    "query_error",
    "wont_run"
+  ],
+  "logs_growing": [
+   "server_down",
+   "slow",
+   "query_error",
+   "save_fails"
   ]
  }
 }

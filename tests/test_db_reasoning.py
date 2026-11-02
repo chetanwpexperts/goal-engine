@@ -199,3 +199,79 @@ def test_connected_check_proves_a_read_only_server():
     my = RE.mariadb()
     my_plan = R.live_plan(R.diagnose(REPLICATION_REAL[3][0]))
     assert not R.run_live(my_plan, runner(my))["write_on_replica"]["seen"]
+
+
+# WAL / binary log / disk: messages captured on a lab PostgreSQL 16 (archive_command failing, max_wal_size 32MB) and checks
+# proven on lab servers (an inactive replication slot holding WAL, a MariaDB with binary logging on and no expiry).
+WAL_REAL = [
+    ("2026-11-02 04:06:31.016 UTC [225] LOG:  archive command failed with exit code 1\n"
+     "2026-11-02 04:06:31.016 UTC [225] DETAIL:  The failed archive command was: false", "wal_archive_failing"),
+    ('2026-11-02 04:07:35.086 UTC [225] WARNING:  archiving write-ahead log file "00000001000000000000001B" failed too many times, '
+     "will try again later", "wal_archive_failing"),
+    ("2026-11-01 20:09:57.752 UTC [3077] LOG:  checkpoints are occurring too frequently (0 seconds apart)\n"
+     '2026-11-01 20:09:57.752 UTC [3077] HINT:  Consider increasing the configuration parameter "max_wal_size".', "checkpoints_too_frequent"),
+]
+
+
+@pytest.mark.parametrize("msg,want", WAL_REAL)
+def test_wal_messages_from_a_lab_server(msg, want):
+    res = R.diagnose(msg)
+    assert [x["cause"] for x in res["found"]] == [want] and res["engine"] == "postgresql"
+
+
+def test_wal_and_binlog_fixes_name_the_popular_wrong_fix():
+    rep = R.report(R.diagnose('ERROR:  could not extend file "base/16384/2619": No space left on device'), False)
+    assert "pg_resetwal" in rep and "Common mistake" in rep
+    rep = R.report(R.diagnose(WAL_REAL[0][0]), False)
+    assert "/bin/true" in rep and "pg_stat_archiver" in rep
+    rep = R.report(R.diagnose(WAL_REAL[2][0]), True)
+    assert "lowering max_wal_size" in rep and "Kyun" in rep
+
+
+@pytest.mark.parametrize("text,likely,engine", [
+    ("pg_wal folder bahut bada ho gaya hai, disk bhar gayi", "wal_retained_by_slot", "postgresql"),
+    ("mysql binlog files bahut jagah le rahi hain", "binlog_not_expiring", "mysql"),
+])
+def test_growing_logs_described_without_an_error(text, likely, engine):
+    res = R.diagnose(text)
+    assert not res["found"] and res["engine"] == engine
+    assert likely in [x["cause"] for x in res["open"][:4]], [x["cause"] for x in res["open"][:6]]
+
+
+def test_a_cause_of_one_database_is_never_likely_on_another():
+    for text, wrong in (("mysql binlog files bahut jagah le rahi hain", "wal_retained_by_slot"),
+                        ("pg_wal folder bahut bada ho gaya hai", "binlog_not_expiring")):
+        assert wrong not in [x["cause"] for x in R.diagnose(text)["open"]]
+
+
+@both_dbs
+def test_connected_check_finds_why_the_disk_is_full():
+    """A full disk: the check looks deeper (slots, archiving, binary logs) and proves the slot that holds the WAL."""
+    from tests.dbreal import real_errors as RE
+
+    def runner(conn):
+        def run(sql, params):
+            with conn.cursor() as c:
+                c.execute(sql, params or None)
+                return c.fetchall()
+        return run
+
+    pg = RE.postgres()
+    err = 'ERROR:  could not extend file "base/16384/2619": No space left on device'
+    plan = R.live_plan(R.diagnose(err))
+    assert {p["cause"] for p in plan} >= {"wal_retained_by_slot", "wal_archive_failing"}
+    live = R.run_live(plan, runner(pg))
+    assert not live["wal_retained_by_slot"]["seen"] and not live["wal_archive_failing"]["seen"]
+    pg.execute("SELECT pg_create_physical_replication_slot('dbaba_test_slot', true)")
+    try:
+        live = R.run_live(plan, runner(pg))
+    finally:
+        pg.execute("SELECT pg_drop_replication_slot('dbaba_test_slot')")
+    assert live["wal_retained_by_slot"]["seen"] and "dbaba_test_slot" in live["wal_retained_by_slot"]["live_proof"]
+    res = R.diagnose(err, live)
+    assert {x["cause"] for x in res["found"]} == {"disk_full", "wal_retained_by_slot"}
+    assert "dbaba_test_slot" in R.report(res, False)
+    my = RE.mariadb()                                     # the test MariaDB runs without binary logging: ruled out, not guessed
+    my_plan = R.live_plan(R.diagnose('ERROR 1021 (HY000): Disk full (/tmp/#sql_1f2_0.MAI) MariaDB (errno: 28 "No space left on device")'))
+    assert [p["cause"] for p in my_plan] == ["binlog_not_expiring"]
+    assert R.run_live(my_plan, runner(my))["binlog_not_expiring"]["seen"] is False

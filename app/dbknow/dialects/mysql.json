@@ -8,7 +8,10 @@
   "phpmyadmin",
   "mysqld",
   "my.cnf",
-  "aurora mysql"
+  "aurora mysql",
+  "binlog",
+  "binlogs",
+  "mysql-bin"
  ],
  "codes": {
   "1064": "syntax_error",
@@ -295,7 +298,8 @@
   ],
   "disk_full": [
    "-- See what takes the space:\nSELECT table_schema, ROUND(SUM(data_length+index_length)/1024/1024) AS mb FROM information_schema.tables GROUP BY table_schema ORDER BY mb DESC;\nSHOW BINARY LOGS;",
-   "-- Remove old binary logs safely (keep what replicas still need):\nPURGE BINARY LOGS BEFORE NOW() - INTERVAL 3 DAY;\nSET GLOBAL binlog_expire_logs_seconds = 259200;"
+   "-- Remove old binary logs safely (keep what replicas still need):\nPURGE BINARY LOGS BEFORE NOW() - INTERVAL 3 DAY;\nSET GLOBAL binlog_expire_logs_seconds = 259200;",
+   "-- Common mistake: deleting binary log files with rm. The server's .index list still names them (MySQL then refuses PURGE BINARY LOGS\n-- until the .index file is fixed) and a replica that still needed them breaks. Always remove them with PURGE BINARY LOGS."
   ],
   "out_of_memory": [
    "SHOW VARIABLES LIKE 'innodb_buffer_pool_size';\nSHOW VARIABLES LIKE 'max_connections';",
@@ -384,6 +388,11 @@
    "SELECT @@hostname, @@port, @@read_only, @@super_read_only;   -- read_only = 1: this server is a replica or switched to read-only",
    "-- Send writes to the primary: check the host in the app's database config (or the writer endpoint of your cloud database).\n-- After a failover, restart or recycle the app's connection pool so it stops using connections to the old primary.",
    "-- Common mistake: SET GLOBAL read_only = OFF on a replica to make the error go away; writes there make it drift and stop replication later."
+  ],
+  "binlog_not_expiring": [
+   "SELECT @@log_bin, @@binlog_expire_logs_seconds;\nSHOW BINARY LOGS;   -- how many files and how big (needs REPLICATION CLIENT / BINLOG MONITOR)",
+   "-- First check what every replica still needs: SHOW REPLICA STATUS\\G on each (Source_Log_File; MariaDB: Master_Log_File).\n-- Then remove only older files, and set an expiry that outlasts the slowest replica (here 7 days):\nPURGE BINARY LOGS BEFORE NOW() - INTERVAL 7 DAY;\nSET GLOBAL binlog_expire_logs_seconds = 604800;   -- and the same in my.cnf, or it resets on restart",
+   "-- Common mistake: rm on binary log files, or turning log_bin off to save space.\n-- rm leaves the .index list and replicas out of step; log_bin off breaks replication and point-in-time restore."
   ]
  },
  "settings": {
@@ -477,6 +486,11 @@
    "type": "rows_present",
    "sql": "SELECT @@read_only FROM DUAL WHERE @@read_only = 1",
    "proof": "this server has read_only = ON (it only accepts reads)"
+  },
+  "binlog_not_expiring": {
+   "type": "rows_present",
+   "sql": "SELECT 1 FROM performance_schema.global_variables v WHERE UPPER(v.variable_name) = 'LOG_BIN' AND v.variable_value = 'ON' AND NOT EXISTS (SELECT 1 FROM performance_schema.global_variables e WHERE UPPER(e.variable_name) IN ('BINLOG_EXPIRE_LOGS_SECONDS', 'EXPIRE_LOGS_DAYS') AND e.variable_value + 0 > 0)",
+   "proof": "binary logging is on and no expiry is set, so old binary logs are never removed"
   }
  },
  "style": [

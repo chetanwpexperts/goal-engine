@@ -73,6 +73,32 @@ def _unclosed_quote(q: str) -> int | None:
     return start
 
 
+def _split_tail(q: str) -> tuple[str, str]:
+    """(query, words after it): the text after the last ';' that is outside any quotes, when that text isn't SQL."""
+    last, quote = -1, None
+    for i, ch in enumerate(q):
+        if quote:
+            if ch == quote:
+                quote = None
+        elif ch in "'\"`":
+            quote = ch
+        elif ch == ";":
+            last = i
+    if last < 0:
+        return q, ""                                       # (an apostrophe in the words after it, "don't", doesn't matter)
+    tail = q[last + 1:]
+    if not tail.strip() or re.match(r"\s*(--|#|/\*|select|update|delete|insert|with|set|create|alter|drop|explain|show|begin|commit)\b",
+                                    tail, re.I):
+        return q, ""
+    return q[:last + 1], tail.strip()
+
+
+def request_words(query: str) -> str:
+    """What the person wrote around the query ('...; Assume you want the highest stock within each category'): what they
+    want it to do. Read for intent only, never run."""
+    return _split_tail((query or "").strip())[1]
+
+
 def unwrap(query: str) -> str:
     """A query pasted straight from code: $sql = "SELECT ...";  ->  SELECT ...  (and the indentation tidied).
     Also PHP heredoc (<<<SQL ... SQL;), JS template strings, Python strings and calls like cursor.execute(\"\"\"...\"\"\")."""
@@ -98,10 +124,7 @@ def unwrap(query: str) -> str:
         cut = _unclosed_quote(q)
         if cut is not None and re.fullmatch(r"[\"'`]*\s*(?:,[^\"'`]*)?\)?\s*;?\s*", q[cut:]):
             q = q[:cut]
-    tail = re.search(r";([^;'\"`]*)$", q)                 # "...); correct this": the request after the query is not SQL
-    if tail and tail.group(1).strip() and not re.match(
-            r"\s*(--|#|/\*|select|update|delete|insert|with|set|create|alter|drop|explain|show|begin|commit)\b", tail.group(1), re.I):
-        q = q[:tail.start() + 1]
+    q = _split_tail(q)[0]                              # "...); correct this": the request after the query is not SQL
     lines = [ln.rstrip() for ln in q.splitlines()]
     while lines and not lines[0].strip():
         lines.pop(0)
@@ -162,6 +185,7 @@ def _owner(col: str, tables: list[Table]) -> tuple[Table | None, str]:
 def analyze_sql(query: str, extra: str = "") -> dict:
     """query: the SQL. extra: optional EXPLAIN output and/or CREATE TABLE statements."""
     original = unwrap(query)
+    said = request_words(query)
     if not original:
         return {"ok": False, "error": "No query given", "findings": []}
     if not re.match(r"^\s*(\(|with\b|select\b|update\b|delete\b)", _strip_comments(original), re.I):
@@ -381,19 +405,19 @@ def analyze_sql(query: str, extra: str = "") -> dict:
     out = {"ok": True, "findings": [f.as_dict() for f in findings], "indexes": indexes, "check_query": check_query,
            "indexes_verified": bool(seen_structure), "assumed_primary": skipped, "notes": notes,
            "rewritten": rewritten if rewritten != original else None, "tables": [t.name for t in tables]}
-    return _with_correctness(original, out)
+    return _with_correctness(original, out, said)
 
 
 SEVERITY = {"error": 5, "wrong": 4, "check": 3}
 
 
-def _with_correctness(original: str, out: dict) -> dict:
+def _with_correctness(original: str, out: dict, said: str = "") -> dict:
     """Is it right before is it fast: mistakes come first, and while the query is wrong there's no speed advice
     (indexes for a query that doesn't run, or returns wrong rows, help nobody). Speed comes when it's right, or on asking."""
     from app.agents import sqlcorrect
 
     try:
-        c = sqlcorrect.check(original)
+        c = sqlcorrect.check(original, intent=said)
     except Exception:  # noqa: BLE001 - never let the correctness reader break the speed check
         c = {"findings": [], "corrected": None, "guesses": []}
     out["correct"] = c

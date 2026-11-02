@@ -295,3 +295,58 @@ def test_a_total_named_like_its_column_is_not_a_select_name_in_where():
     assert not [f for f in sqlcorrect.check(ok)["findings"] if f["kind"] in ("error", "wrong")]
     bad = sqlcorrect.check("SELECT price * qty AS total FROM items WHERE total > 100")["findings"]
     assert any("a name made in SELECT" in f["title_en"] for f in bad)
+
+
+PER_GROUP = ("UPDATE products\nSET price = price * 0.90\nWHERE category_id IN (\n   SELECT category_id\n   FROM categories\n"
+             "   WHERE is_active = 1\n)\nAND stock_quantity = (\n   SELECT MAX(stock_quantity)\n   FROM products\n);\n\n"
+             "Assume you want to give a 10% discount to all products in active categories that have the highest stock within their "
+             "own category. Don't touch the others.\n\nThis query does not correctly do that. Correct it.")
+
+
+def test_what_the_person_said_they_want_is_checked(client, ml_mode):
+    """Seen on the live site: the person said 'the highest stock within their own category'; MAX() over the whole table was
+    not reported. Lab (MariaDB and PostgreSQL): the original discounts nothing when the overall maximum sits in an inactive
+    category; the rewrite discounts each active category's top-stock products, ties included."""
+    from tests.test_ml import say
+
+    c = analyze_sql(PER_GROUP)["correct"]
+    assert [(f["kind"], f["topic"]) for f in c["findings"]] == [("wrong", "per_group")]
+    assert ("(SELECT v FROM (SELECT category_id, MAX(stock_quantity) AS v FROM products GROUP BY category_id) AS products_copy "
+            "WHERE products_copy.category_id = products.category_id)") in c["corrected"]
+    assert sqlcorrect.check(c["corrected"])["findings"] == []
+    hinglish = analyze_sql(PER_GROUP.split(";")[0] + "; har category mein sabse zyada stock wale products")["correct"]
+    assert [f["topic"] for f in hinglish["findings"]] == ["per_group"]
+    plain = analyze_sql(PER_GROUP.split(";")[0] + ";")["correct"]               # nothing said about groups: no guessing
+    assert [f["topic"] for f in plain["findings"]] == ["same_table"]
+    r = say(client, "check the query I have")
+    r = client.post("/api/message", json={"text": PER_GROUP, "goal_id": r["goal"]["id"]}).json()
+    assert "not within each category" in r["reply"] and "Fixed 1 mistake" in r["reply"]
+
+
+def test_the_per_group_rewrite_on_the_test_databases():
+    import socket
+
+    for port in (3306, 5432):
+        try:
+            socket.create_connection(("127.0.0.1", port), timeout=0.5).close()
+        except OSError:
+            pytest.skip("needs the local MariaDB and PostgreSQL test databases")
+    from tests.dbreal import real_errors as RE
+
+    q = PER_GROUP.replace("products", "pg_products").replace("categories", "pg_categories")
+    fixed = analyze_sql(q)["correct"]["corrected"].split(";")[0]
+    setup = ["CREATE TEMPORARY TABLE pg_categories (category_id INT PRIMARY KEY, is_active INT)",
+             "CREATE TEMPORARY TABLE pg_products (id INT PRIMARY KEY, category_id INT, price DECIMAL(10,2), stock_quantity INT)",
+             "INSERT INTO pg_categories VALUES (1,1),(2,1),(3,0)",
+             "INSERT INTO pg_products VALUES (1,1,100,50),(2,1,100,10),(3,2,100,20),(4,2,100,20),(5,2,100,5),(6,3,100,90)"]
+    for conn in (RE.mariadb(), RE.postgres()):
+        with conn.cursor() as c:
+            for st in setup:
+                c.execute(st)
+            c.execute(q.split(";")[0])
+            c.execute("SELECT id FROM pg_products WHERE price < 100 ORDER BY id")
+            assert c.fetchall() in ((), [])                               # the original: nothing discounted
+            c.execute("UPDATE pg_products SET price = 100")
+            c.execute(fixed)
+            c.execute("SELECT id FROM pg_products WHERE price < 100 ORDER BY id")
+            assert [r[0] for r in c.fetchall()] == [1, 3, 4]               # each active category's top stock, ties included

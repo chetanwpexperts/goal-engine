@@ -304,21 +304,110 @@ def _singular(name: str) -> str:
     return n
 
 
+# words that are almost always a value, never a column, and columns that almost always hold a word value
+VALUE_WORDS = set("""active inactive pending paid unpaid approved rejected completed complete cancelled canceled yes no male female
+admin open closed draft published new done failed success successful enabled disabled blocked deleted expired valid
+invalid present absent pass fail hold shipped delivered processing refunded verified unverified""".split())
+VALUE_COLUMNS = set("""status state type role gender category level mode kind department dept grade method payment_method
+currency plan tier priority stage city country""".split())
+_DATE = re.compile(r"(?<![\w'\".:-])(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?(?![\w'\".:-])")
+_BARE_VALUE = re.compile(r"([`\"]?[A-Za-z_][\w$]*[`\"]?(?:\.[`\"]?[A-Za-z_][\w$]*[`\"]?)?)\s*(=|!=|<>)\s*([A-Za-z_][\w$]*)\b(?!\s*[.(])")
+
+
+def _value_slips(sql: str, s: str, known: set) -> tuple[list, list]:
+    """Values written without quotes, in any statement: a date (MySQL reads 2024-01-01 as 2024 minus 1 minus 1 = 2022)
+    and a word (status = active: MySQL looks for a column called active). Checked on MariaDB and PostgreSQL."""
+    F, edits = [], []
+    for m in _DATE.finditer(s):
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if not (1000 <= y <= 9999 and 1 <= mo <= 12 and 1 <= d <= 31):
+            continue
+        lit = sql[m.start():m.end()]
+        if m.group(4) is None:
+            sum_ = y - mo - d
+            F.append(Finding("wrong", "value", f"{lit} needs quotes: MySQL reads it as {y} - {mo} - {d} = {sum_}",
+                             f"{lit} ko quotes chahiye: MySQL ise {y} - {mo} - {d} = {sum_} padhta hai", lit,
+                             f"Without quotes it's arithmetic, not a date: MySQL compares the column with the number {sum_}, so a SELECT "
+                             f"silently returns wrong rows (often none) and an UPDATE/DELETE stops with error 1292; PostgreSQL refuses it "
+                             f"(operator does not exist: date < integer). Write '{lit}'.",
+                             f"Bina quotes ke ye date nahi, hisaab hai: MySQL column ko number {sum_} se compare karta hai, isliye SELECT "
+                             f"chupchaap galat rows deta hai (aksar koi nahi) aur UPDATE/DELETE error 1292 deta hai; PostgreSQL mana karta hai. "
+                             f"'{lit}' likho."))
+        else:
+            F.append(Finding("error", "value", f"{lit} needs quotes", f"{lit} ko quotes chahiye", lit,
+                             f"A date and time without quotes is a syntax error (MySQL 1064, PostgreSQL 42601). Write '{lit}'.",
+                             f"Bina quotes ke date aur time syntax error hai (MySQL 1064, PostgreSQL 42601). '{lit}' likho."))
+        edits.append((m.start(), m.end(), f"'{lit}'"))
+    low = s.lower()
+    for m in _BARE_VALUE.finditer(s):
+        left, w = m.group(1).strip('`"'), m.group(3)
+        wl, col = w.lower(), left.split(".")[-1].strip('`"').lower()
+        if wl in KW or wl in known or col in KW or wl in ("default", "current_user", "session_user", "user"):
+            continue
+        if wl not in VALUE_WORDS and col not in VALUE_COLUMNS:
+            continue
+        if len(re.findall(rf"(?<![\w$.]){re.escape(wl)}(?![\w$])", low)) > 1 or re.search(rf"\.\s*[`\"]?{re.escape(wl)}\b", low):
+            continue                                       # used elsewhere as a name: probably a real column
+        sure = wl in VALUE_WORDS
+        ev = sql[m.start():m.end()]
+        F.append(Finding("error" if sure else "check", "value",
+                         f"{w} needs quotes: without them it's read as a column name" if sure else f"{w}: a value or a column?",
+                         f"{w} ko quotes chahiye: bina quotes ke ise column ka naam samjha jata hai" if sure else f"{w}: value hai ya column?",
+                         ev,
+                         f"{left} = {w} makes the database look for a column called {w} (MySQL error 1054 Unknown column '{w}', "
+                         f"PostgreSQL: column \"{w}\" does not exist). For the text value write {left} = '{w}'.",
+                         f"{left} = {w} se database {w} naam ka column dhoondhta hai (MySQL error 1054, PostgreSQL: column does not exist). "
+                         f"Text value ke liye {left} = '{w}' likho."))
+        if sure:
+            edits.append((m.start(3), m.end(3), f"'{w}'"))
+    return F, edits
+
+
+def _apply_plain(sql: str, edits: list) -> str | None:
+    if not edits:
+        return None
+    out = sql
+    for a, b, new in sorted(edits, reverse=True):
+        out = out[:a] + new + out[b:]
+    return out
+
+
 def check(sql: str, _again: bool = False) -> dict:
-    """Returns {'findings': [...], 'corrected': str|None, 'guesses': [...] }. Only plain SELECTs are read in depth."""
+    """Returns {'findings': [...], 'corrected': str|None, 'guesses': [...] }. Values without quotes are checked in any
+    statement; plain SELECTs are read in depth."""
     s = _mask(sql)
+    known = {w.lower() for w in re.findall(r"\b(?:from|join|update|into)\s+[`\"]?([\w$]+)", s, re.I)}
+    known |= {w.lower() for w in re.findall(r"\b(?:from|join|update)\s+[`\"]?[\w$.]+[`\"]?\s+(?:as\s+)?([A-Za-z_]\w*)", s, re.I)}
+    slips, slip_edits = _value_slips(sql, s, known)
+    out = _check_select(sql, s, slip_edits, _again)
+    if out is None:                                   # not a plain SELECT: only the value checks apply
+        order = {"error": 0, "wrong": 1, "check": 2}
+        slips.sort(key=lambda f: order[f.kind])
+        return {"findings": [f.as_dict() for f in slips], "corrected": _apply_plain(sql, slip_edits), "guesses": []}
+    if slips:
+        have = {f["evidence"] for f in out["findings"]}
+        out["findings"] = [f.as_dict() for f in slips if f.evidence not in have] + out["findings"]
+        order = {"error": 0, "wrong": 1, "check": 2}
+        out["findings"].sort(key=lambda f: order[f["kind"]])
+        if not out.get("corrected"):
+            out["corrected"] = _apply_plain(sql, slip_edits)
+    return out
+
+
+def _check_select(sql: str, s: str, slip_edits: list, _again: bool) -> dict | None:
     dep = _depths(s)
     low = s.lower()
     if not re.match(r"\s*(with\b|select\b|\()", low):
-        return {"findings": [], "corrected": None, "guesses": []}
+        return None
     cl = _clauses(s, dep)
     if "from" not in cl or "select" not in cl:
-        return {"findings": [], "corrected": None, "guesses": []}
+        return None
     srcs = _sources(s, dep, *cl["from"])
     if not srcs:
-        return {"findings": [], "corrected": None, "guesses": []}
+        return None
     F: list[Finding] = []
-    edits: list[tuple[int, int, str]] = []          # (start, end, new text) on the original query
+    edits: list[tuple[int, int, str]] = list(slip_edits)   # (start, end, new text) on the original query
+    value_at = {a for a, _b, _n in slip_edits}
     notes: dict[int, str] = {}                       # line start -> '-- check: ...' note
     guesses: list[str] = []
 
@@ -699,6 +788,8 @@ def check(sql: str, _again: bool = False) -> dict:
                 if clause == "select" and any(i["alias"].lower() == wl for i in items):
                     continue
                 if wl in by_alias or wl in names or wl in bare_seen or wl in nested_aliases or re.match(r"^\d", w):
+                    continue
+                if a0 + m.start() in value_at:                # a value written without quotes, already reported
                     continue
                 bare_seen.add(wl)
                 owners = sorted({q for q, c, _p in all_refs if c.lower() == wl})

@@ -104,3 +104,36 @@ def test_the_recognisers_are_ready_before_the_first_message():
     from app.officeknow import brain as ofb
 
     assert dbb._train() is dbb._train() and ofb._train() is ofb._train()
+
+
+def test_in_subquery_is_not_a_problem_and_nothing_is_promised(client, ml_mode):
+    """Seen on the live site: an IN (SELECT ...) query got '1 problem found' and 'the rewritten query and index commands are in
+    the card' while the card had neither. IN (SELECT ...) runs as a semi-join on MySQL 5.6+, MariaDB and PostgreSQL (checked on
+    the test databases), and the JOIN rewrite people suggest returns duplicate rows."""
+    from tests.test_ml import say
+
+    q = "SELECT name, email FROM users WHERE id IN (SELECT user_id FROM orders WHERE amount > 100)"
+    res = analyze_sql(q)
+    assert not res["findings"] and "semi-join" in res["notes"][0]["en"] and "Don't rewrite it as a plain JOIN" in res["notes"][0]["en"]
+    r = say(client, "I have query correct this")
+    r = client.post("/api/message", json={"text": q, "goal_id": r["goal"]["id"]}).json()
+    assert "no problems found" in r["reply"] and "ready to copy" not in r["reply"]
+    assert analyze_sql("DELETE FROM users WHERE id IN (SELECT user_id FROM bans)")["findings"]   # older MySQL: no semi-join for these
+
+
+def test_the_join_rewrite_really_duplicates_rows():
+    import socket
+
+    try:
+        socket.create_connection(("127.0.0.1", 5432), timeout=0.5).close()
+    except OSError:
+        pytest.skip("needs the local PostgreSQL test database")
+    from tests.dbreal import real_errors as RE
+
+    pg = RE.postgres()
+    with pg.cursor() as c:
+        c.execute("CREATE TEMP TABLE semi_p(id int primary key); CREATE TEMP TABLE semi_c(pid int);"
+                  "INSERT INTO semi_p VALUES (1),(2); INSERT INTO semi_c VALUES (1),(1),(1);")
+        c.execute("SELECT (SELECT count(*) FROM semi_p WHERE id IN (SELECT pid FROM semi_c)),"
+                  " (SELECT count(*) FROM semi_p JOIN semi_c ON semi_c.pid = semi_p.id)")
+        assert c.fetchone() == (1, 3)

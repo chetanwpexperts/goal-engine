@@ -379,7 +379,7 @@ def _value_slips(sql: str, s: str, known: set) -> tuple[list, list]:
 UNIQUE_COL = re.compile(r"^(id|\w+_id|uuid|guid|email|code|slug|username|user_name|sku|\w+_no|\w+_number|\w+_code|pk)$", re.I)
 
 
-def _statement_slips(sql: str, s: str, is_select: bool) -> tuple[list, list]:
+def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tuple[list, list]:
     """Mistakes any statement can have (SELECT, UPDATE, DELETE), worked out from the query alone. Each one was reproduced on
     MariaDB and PostgreSQL: what MySQL does silently (wrong rows) is 'wrong', what a database refuses is 'error', and what
     depends on data or engine the query can't show is 'check'."""
@@ -399,6 +399,14 @@ def _statement_slips(sql: str, s: str, is_select: bool) -> tuple[list, list]:
             one = sub[dm.start(1) + 1:_close(sub, dm.start(1))]   # SELECT v FROM (SELECT MAX(x) AS v ...) AS copy: the inner one decides
         if AGG.search(_no_subqueries(one)) and not re.search(r"\bgroup\s+by\b", one.lower()):
             continue                                       # MAX(...) / COUNT(*) without GROUP BY: always one row
+        if dm:                                             # ... GROUP BY g) AS copy WHERE copy.g = outer.g: one group, one row
+            after = sub[_close(sub, dm.start(1)) + 1:]
+            inner = sub[dm.start(1) + 1:_close(sub, dm.start(1))]
+            wm = re.fullmatch(r"\s*(?:as\s+)?([`\"]?\w+[`\"]?)\s+where\s+\1\.([`\"]?\w+[`\"]?)\s*=\s*[`\"]?\w+[`\"]?\.[`\"]?\w+[`\"]?\s*",
+                              after, re.I)
+            gm = re.search(r"\bgroup\s+by\s+([`\"]?\w+[`\"]?)\s*$", inner, re.I)
+            if wm and gm and wm.group(2).strip('`"').lower() == gm.group(1).strip('`"').lower() and AGG.search(inner):
+                continue
         if re.search(r"\blimit\s+1\b|\bfetch\s+first\s+(1\s+)?rows?\s+only\b", subl):
             continue
         keyed = any(UNIQUE_COL.match(c.split(".")[-1].strip('`"')) for c in
@@ -509,6 +517,13 @@ def _statement_slips(sql: str, s: str, is_select: bool) -> tuple[list, list]:
                              f"WHERE ek-ek row dekhta hai, totals se pehle: MySQL error 1111, PostgreSQL 'aggregate functions are not allowed "
                              f"in WHERE'. Total pe condition GROUP BY ke baad HAVING mein; UPDATE/DELETE mein subquery se compare karo."))
 
+    # 8. what the person said they want: "the highest within their own category" vs MAX() over the whole table
+    handled = set()
+    for fnd, edit, span in _per_group(sql, s, intent):
+        F.append(fnd)
+        edits.append(edit)
+        handled.add(span)
+
     # 7. UPDATE/DELETE t ... (SELECT ... FROM t): MySQL refuses (1093); MariaDB 10.3+ and PostgreSQL allow it
     tm = re.match(r"\s*(?:update\s+(?:low_priority\s+)?(?:ignore\s+)?|delete\s+from\s+)[`\"]?([\w$]+)[`\"]?", low)
     if tm:
@@ -517,8 +532,8 @@ def _statement_slips(sql: str, s: str, is_select: bool) -> tuple[list, list]:
             a = m.start()
             b = _close(s, a)
             sub = s[a:b + 1]
-            if re.search(r"\bfrom\s*$", s[:a], re.I):
-                continue                                   # a derived table: MySQL builds it first, so it's allowed
+            if re.search(r"\bfrom\s*$", s[:a], re.I) or any(x <= a <= y for x, y in handled):
+                continue                                   # a derived table (built first, allowed), or already rewritten above
             if re.search(rf"\bfrom\s+[`\"]?{re.escape(t)}[`\"]?\b", sub, re.I) and \
                     not re.search(r"\bfrom\s*\(\s*select\b", sub, re.I):
                 wrapped = _wrap_derived(sql, s, a, b, t)
@@ -533,6 +548,89 @@ def _statement_slips(sql: str, s: str, is_select: bool) -> tuple[list, list]:
                                  f"ek aur baar lapeto: (SELECT x FROM (SELECT ... FROM {t} ...) AS t2), ya JOIN wala UPDATE/DELETE."))
                 break
     return F, edits
+
+
+_GROUP_SAID = [r"\b(?:within|in|for|inside|of)\s+(?:their|its|his|her|each|every|the\s+same|that|own)\s+(?:own\s+)?([a-z_]+)",
+               r"\bper\s+([a-z_]+)", r"\beach\s+([a-z_]+)", r"\bevery\s+([a-z_]+)", r"\bhar\s+([a-z_]+)",
+               r"\bapn[ieaā]\s+([a-z_]+)", r"\b([a-z_]+)[\s-]?wise\b", r"\bby\s+([a-z_]+)\b(?!\s*(?:\d|%))"]
+_NOT_GROUPS = {"row", "rows", "record", "records", "one", "time", "case", "own", "the", "a", "an", "query", "table", "value", "day",
+               "percent", "discount", "update", "change", "way"}
+
+
+def _said_groups(intent: str) -> list[str]:
+    """The groups the person said the totals belong to: 'within their own category' -> ['category']."""
+    out = []
+    for rx in _GROUP_SAID:
+        for m in re.finditer(rx, (intent or "").lower()):
+            w = m.group(1)
+            if w not in _NOT_GROUPS and len(w) > 2:
+                out.append(w)
+    return list(dict.fromkeys(out))
+
+
+def _group_column(noun: str, names: list[str]) -> str | None:
+    stems = {noun, noun[:-3] + "y" if noun.endswith("ies") else noun.rstrip("s")}
+    for n in names:
+        nl = n.lower()
+        if any(nl == st or nl in (st + "_id", st + "id", st + "_code", st + "_name") for st in stems):
+            return n
+    return None
+
+
+def _per_group(sql: str, s: str, intent: str) -> list:
+    """col op (SELECT MAX(x) FROM t) compares with ONE number for the whole table. When the person said the highest/lowest/
+    average is meant within each group (category, class, department...), each row must be compared with its own group's
+    value. Rewritten as (SELECT v FROM (SELECT g, MAX(x) AS v FROM t GROUP BY g) AS t_copy WHERE t_copy.g = outer.g): the
+    same on MySQL, MariaDB and PostgreSQL, and MySQL builds the copy first (no error 1093). Checked on MariaDB and PostgreSQL."""
+    groups = _said_groups(intent)
+    if not groups:
+        return []
+    low = s.lower()
+    tm = re.match(r"\s*(?:update\s+(?:low_priority\s+)?(?:ignore\s+)?|delete\s+from\s+)[`\"]?([\w$]+)[`\"]?(?:\s+(?:as\s+)?([a-z_]\w*))?", low) or \
+        re.search(r"\bfrom\s+[`\"]?([\w$]+)[`\"]?(?:\s+(?:as\s+)?([a-z_]\w*))?", low)
+    if not tm:
+        return []
+    table = tm.group(1)
+    outer = tm.group(2) if tm.group(2) and tm.group(2) not in KW else table
+    names = [w for w in re.findall(r"(?<![\w$])([A-Za-z_][\w$]*)", s) if w.lower() not in KW]
+    out = []
+    for m in re.finditer(r"([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s*(=|!=|<>|<=|>=|<|>)\s*\(\s*select\b", s, re.I):
+        a = s.index("(", m.end(2))
+        b = _close(s, a)
+        sub, sub_o = s[a + 1:b], sql[a + 1:b]
+        sm = re.match(r"\s*select\s+((max|min|avg|sum|count)\s*\(([^()]*)\))\s+from\s+[`\"]?([\w$]+)[`\"]?(?:\s+(?:as\s+)?[a-z_]\w*)?"
+                      r"(\s+where\s+(?P<w>[\s\S]*?))?\s*$", sub, re.I)
+        if not sm or sm.group(4).lower() != table or re.search(r"\bgroup\s+by\b", sub, re.I):
+            continue
+        for noun in groups:
+            g = _group_column(noun, names)
+            guessed = g is None
+            if guessed:                                    # not in the query: the usual name for it, in the query's own style
+                base = noun[:-3] + "y" if noun.endswith("ies") else noun
+                if any(re.match(r"[A-Z][a-z]+(?:[A-Z]|$)", n) for n in names):
+                    g = base[:1].upper() + base[1:] + "Id"
+                elif any(re.match(r"[a-z]+[A-Z]", n) for n in names):
+                    g = base + "Id"
+                else:
+                    g = base + "_id"
+            if re.search(rf"(?<![\w$]){re.escape(g)}(?![\w$])", sub, re.I):
+                continue                                   # the subquery already uses it
+            fn, x = sm.group(2).upper(), sub_o[sm.start(3):sm.end(3)].strip()
+            where = f" WHERE {sub_o[sm.start('w'):sm.end('w')].strip()}" if sm.group("w") else ""
+            new = (f"(SELECT v FROM (SELECT {g}, {fn}({x}) AS v FROM {table}{where} GROUP BY {g}) AS {table}_copy "
+                   f"WHERE {table}_copy.{g} = {outer}.{g})" + (f" /* check: {g} is the column that holds the {noun} */" if guessed else ""))
+            col = m.group(1)
+            ev = re.sub(r"\s+", " ", sql[m.start():b + 1])
+            out.append((Finding("wrong", "per_group", f"{fn}({x}) is taken over all of {table}, not within each {noun}",
+                                f"{fn}({x}) poori {table} table ka hai, har {noun} ka alag nahi", ev[:90],
+                                f"You want each row compared with its own {noun}'s {fn}, but this subquery has no link to the row, so it "
+                                f"returns one {fn}({x}) for the whole table: only rows equal to that single value are touched (often none, "
+                                f"if that value sits in a {noun} the rest of the WHERE excludes). Group it by {g} and match the row's {g}.",
+                                f"Aap har row ko uske apne {noun} ke {fn} se compare karna chahte ho, par subquery row se judi nahi hai, isliye "
+                                f"poori table ka ek hi {fn}({x}) aata hai. {g} se GROUP BY karo aur row ka {g} match karo."),
+                        (a, b + 1, new), (a, b)))
+            break
+    return out
 
 
 def _wrap_derived(sql: str, s: str, a: int, b: int, table: str) -> str | None:
@@ -570,7 +668,7 @@ def _apply_plain(sql: str, edits: list) -> str | None:
     return out
 
 
-def check(sql: str, _again: bool = False) -> dict:
+def check(sql: str, _again: bool = False, intent: str = "") -> dict:
     """Returns {'findings': [...], 'corrected': str|None, 'guesses': [...] }. Values without quotes are checked in any
     statement; plain SELECTs are read in depth."""
     s = _mask(sql)
@@ -578,7 +676,7 @@ def check(sql: str, _again: bool = False) -> dict:
     known |= {w.lower() for w in re.findall(r"\b(?:from|join|update)\s+[`\"]?[\w$.]+[`\"]?\s+(?:as\s+)?([A-Za-z_]\w*)", s, re.I)
               if w.lower() not in KW}
     slips, slip_edits = _value_slips(sql, s, known)
-    more, more_edits = _statement_slips(sql, s, bool(re.match(r"[\s(]*(select|with)\b", s.lower())))
+    more, more_edits = _statement_slips(sql, s, bool(re.match(r"[\s(]*(select|with)\b", s.lower())), intent)
     slips, slip_edits = slips + more, slip_edits + more_edits
     out = _check_select(sql, s, slip_edits, _again)
     if out is None:                                   # not a plain SELECT: only the value checks apply
@@ -628,6 +726,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool) -> dict | No
     names = {x.name.split(".")[-1].lower(): x for x in srcs if x.name}
     nested_aliases = {m.group(2).lower() for m in re.finditer(r"\b(from|join)\s+[`\"]?[\w$.]+[`\"]?\s+(?:as\s+)?([A-Za-z_]\w*)", s, re.I)
                       if m.group(2).lower() not in KW}
+    nested_aliases |= {m.group(1).lower() for m in re.finditer(r"\)\s*(?:as\s+)?([A-Za-z_]\w*)", s, re.I) if m.group(1).lower() not in KW}
     has_sub = bool(re.search(r"\(\s*select\b", low))
     sel_a, sel_b = cl["select"]
     items = []

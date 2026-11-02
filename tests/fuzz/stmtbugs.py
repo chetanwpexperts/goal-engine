@@ -13,9 +13,9 @@ from collections import Counter
 from tests.fuzz.db import engines_up, make_schema
 
 BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_value", "between_reversed", "agg_in_where", "eq_null_dml",
-        "same_table"]
+        "same_table", "per_group"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
-         "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table"}
+         "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group"}
 NO_FIX = {"agg_in_where"}                    # there is no single right rewrite: found is enough
 FIX_THE_CHECK = {"same_table"}               # a 'check' (fine on MariaDB/PostgreSQL) whose rewrite must still do the same
 
@@ -119,6 +119,21 @@ def make(seed: int):
         sub = rnd.choice([f"(SELECT MAX({c}) FROM {t['name']})", f"(SELECT AVG({c}) FROM {t['name']})"])
         op = rnd.choice(["=", "<", ">="])
         truth = broken = wrap(f"{c} {op} {sub}", f"{c} = {c}")
+    elif bug == "per_group":                  # the person says "within each <group>", the subquery takes the whole table
+        fks = _cols(t, "fk")
+        if not fks or not nums:
+            return None
+        g = rnd.choice(fks)["name"]
+        noun = g[:-3] if g.lower().endswith("_id") else (g[:-2] if g.lower().endswith("id") else g)
+        c = rnd.choice(nums)["name"]
+        fn, op = rnd.choice([("MAX", "="), ("MIN", "="), ("AVG", ">"), ("AVG", "<")])
+        word = {"MAX": "highest", "MIN": "lowest", "AVG": "average"}[fn]
+        intent = rnd.choice([f"the {word} {c} within their own {noun.lower()}", f"{word} {c} per {noun.lower()}",
+                             f"har {noun.lower()} mein {word} {c}", f"{noun.lower()}-wise {word} {c}"])
+        named = f"{g} IS NOT NULL AND " if rnd.random() < 0.6 else ""     # the group column written in the query, or not
+        broken = wrap(f"{named}{c} {op} (SELECT {fn}({c}) FROM {t['name']})", f"{c} = {c}") + ";\n\n" + intent
+        truth = wrap(f"{named}{c} {op} (SELECT {fn}(i2.{c}) FROM {t['name']} i2 WHERE i2.{g} = {t['name']}.{g})", f"{c} = {c}")
+        return {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": t["name"], "broken": broken, "truth": truth}
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -146,7 +161,9 @@ def _effect(eng, sql, table, pk):
 def check(item, engines: dict) -> list[str]:
     from app.agents import sqlcorrect
 
-    res = sqlcorrect.check(item["broken"])
+    from app.agents.sql import request_words, unwrap
+
+    res = sqlcorrect.check(unwrap(item["broken"]), intent=request_words(item["broken"]))
     tag = f"{item['bug']} ({item['stmt']}) seed {item['seed']}"
     topics = {f["topic"] for f in res["findings"]}
     bad = []
@@ -168,6 +185,8 @@ def check(item, engines: dict) -> list[str]:
     if again:
         bad.append(f"{tag}: the corrected statement still has mistakes {again}\n{fixed}")
     pk = item["schema"]["tables"][item["table"]]["pk"]
+    if "/* check:" in fixed:
+        return bad                                     # a column name the query doesn't show: the person confirms it
     for name, eng in engines.items():
         try:
             if _effect(eng, fixed, item["table"], pk) != _effect(eng, item["truth"], item["table"], pk):

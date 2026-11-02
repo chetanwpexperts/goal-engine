@@ -214,6 +214,11 @@ def diagnose(text: str, live: dict | None = None) -> dict:
         if cid not in {x["cause"] for x in result["found"]}:
             result["found"].append({"cause": cid, "relevance": 1.0, "score": 0.99, "fact": all_facts[cid], "state": "seen"})
     result["also"] = [x for x in result["also"] if x["cause"] not in seen_any]
+    if engine:                                            # a cause only one kind of database has is not "likely" on another
+        own = lambda x: engine in k["causes"][x["cause"]].get("engines", [engine]) or \
+            (engine == "mariadb" and "mysql" in k["causes"][x["cause"]].get("engines", []))
+        for key in ("open", "ruled_out"):
+            result[key] = [x for x in result[key] if own(x)]
     result.update({"engine": engine, "complaints": said, "live": bool(live)})
     return result
 
@@ -333,7 +338,12 @@ def live_plan(result: dict) -> list[dict]:
     eng = result.get("engine") or "mysql"
     d = dialect(eng)
     plan = []
-    candidates = result["found"] if result["found"] else result["open"][:3]   # checks for what was found, or else the likely causes
+    candidates = list(result["found"] if result["found"] else result["open"][:3])   # checks for what was found, or else the likely causes
+    causes = fundamentals()["causes"]
+    for x in list(result["found"]):                   # a found cause can have deeper reasons only the database can show ("why is the disk full?")
+        for deeper in causes.get(x["cause"], {}).get("deeper", []):
+            if deeper not in {c["cause"] for c in candidates}:
+                candidates.append({"cause": deeper, "fact": None})
     for x in candidates:
         spec = d.get("live", {}).get(x["cause"])
         if not spec:
@@ -415,6 +425,7 @@ def run_live(plan: list[dict], run) -> dict:
             n = int(rows[0][0] or 0) if rows else 0
             out[p["cause"]] = {"seen": n > 0, "weight": 3, "live_proof": f"{n} deadlocks recorded on this database" if n else ""}
         elif t == "rows_present":
-            proof = spec.get("proof") or f"{len(rows)} transaction(s) found waiting or holding locks now"
+            proof = (spec.get("proof") or f"{len(rows)} transaction(s) found waiting or holding locks now").replace(
+                "{rows}", ", ".join(str(r[0]) for r in rows[:5]))
             out[p["cause"]] = {"seen": bool(rows), "weight": 3, "live_proof": proof if rows else ""}
     return out

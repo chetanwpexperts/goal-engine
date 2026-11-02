@@ -12,7 +12,9 @@
   "neon",
   "pg_hba",
   "libpq",
-  "psycopg"
+  "psycopg",
+  "pg_wal",
+  "pg_xlog"
  ],
  "codes": {
   "42601": "syntax_error",
@@ -56,6 +58,14 @@
   "ERRCODE[_ ]?\\w*:?\\s*([0-9A-Z]{5})"
  ],
  "messages": [
+  {
+   "cause": "wal_archive_failing",
+   "re": "archive command failed with exit code (?P<code>\\d+)|archiving write-ahead log file \\\"(?P<wal>[0-9A-F]{24})\\\" failed too many times|archive command (?:was terminated|failed) by signal"
+  },
+  {
+   "cause": "checkpoints_too_frequent",
+   "re": "checkpoints are occurring too frequently \\((?P<seconds>\\d+) seconds? apart\\)"
+  },
   {
    "cause": "standby_query_conflict",
    "re": "canceling statement due to conflict with recovery"
@@ -260,7 +270,9 @@
   ],
   "disk_full": [
    "SELECT pg_size_pretty(pg_database_size(current_database()));\nSELECT relname, pg_size_pretty(pg_total_relation_size(relid)) FROM pg_catalog.pg_statio_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 10;",
-   "-- Check WAL: a stuck replication slot or failing archive_command keeps WAL forever:\nSELECT slot_name, active FROM pg_replication_slots;"
+   "-- Check WAL: a stuck replication slot or failing archive_command keeps WAL forever:\nSELECT slot_name, active FROM pg_replication_slots;",
+   "-- How big is pg_wal, and why is it kept? (WAL kept for a slot or a failing archive can't be removed by PostgreSQL)\nSELECT count(*) AS files, pg_size_pretty(sum(size)) AS total FROM pg_ls_waldir();\nSELECT last_failed_wal, last_failed_time, last_archived_time FROM pg_stat_archiver;",
+   "-- Common mistake: deleting files in pg_wal by hand, or running pg_resetwal to 'free space'.\n-- Those files are needed to recover after a crash; removing them can leave the database unable to start or with silently inconsistent data.\n-- Free space elsewhere (old logs, backups) first, fix why WAL is kept, and let PostgreSQL remove it at the next CHECKPOINT."
   ],
   "out_of_memory": [
    "SHOW shared_buffers; SHOW work_mem; SHOW max_connections;",
@@ -347,6 +359,21 @@
    "-- On the standby: which kind of conflict keeps cancelling queries\nSELECT datname, confl_snapshot, confl_lock, confl_bufferpin, confl_deadlock FROM pg_stat_database_conflicts;",
    "-- Retry short queries. For long reports on the standby pick one trade-off (postgresql.conf on the standby, then reload):\n-- hot_standby_feedback = on             -> queries aren't cancelled for old row versions, but the primary keeps dead rows longer (bloat)\n-- max_standby_streaming_delay = 5min    -> queries get more time, but this standby falls further behind",
    "-- 'User was holding a relation lock for too long' = the primary ran TRUNCATE/DROP/ALTER on a table the query was reading: schedule those outside report hours."
+  ],
+  "wal_retained_by_slot": [
+   "SELECT slot_name, slot_type, active, wal_status,\n       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS wal_kept\nFROM pg_replication_slots ORDER BY pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) DESC NULLS LAST;",
+   "-- A slot with active = false whose standby / CDC tool no longer exists: drop it (the consumer then can't resume and must be rebuilt):\nSELECT pg_drop_replication_slot('<slot name>');\nCHECKPOINT;   -- old WAL is removed at the next checkpoint",
+   "-- If the consumer is still needed, fix it so it catches up instead of dropping its slot. Add a safety limit (postgresql.conf, then reload):\n-- max_slot_wal_keep_size = 50GB   -- a slot further behind than this is invalidated instead of filling the disk"
+  ],
+  "wal_archive_failing": [
+   "SELECT archived_count, last_archived_wal, last_archived_time, failed_count, last_failed_wal, last_failed_time FROM pg_stat_archiver;\nSHOW archive_command;",
+   "-- Read the server log line after 'archive command failed' (DETAIL shows the command), then run that command by hand as the postgres user\n-- with one waiting file to see the real error: full or unmounted backup disk, wrong path, permissions, an expired cloud key.",
+   "-- Once the command works again, PostgreSQL archives the backlog by itself and removes the old files.\n-- Common mistake: archive_command = '/bin/true' (or deleting .ready files) to make it 'pass'. WAL is then thrown away unarchived\n-- and your backups can no longer restore past that point; if you must stop archiving, turn archive_mode off and take a new base backup later."
+  ],
+  "checkpoints_too_frequent": [
+   "SHOW max_wal_size; SHOW checkpoint_timeout;\n-- PostgreSQL 17+: SELECT num_timed, num_requested FROM pg_stat_checkpointer;\n-- PostgreSQL 16 and older: SELECT checkpoints_timed, checkpoints_req FROM pg_stat_bgwriter;   -- many 'requested' = max_wal_size too small",
+   "ALTER SYSTEM SET max_wal_size = '4GB';   -- size it for your busiest hour; needs that much free disk headroom\nSELECT pg_reload_conf();",
+   "-- Common mistake: lowering max_wal_size to save disk. It makes checkpoints even more frequent and usually writes MORE WAL (full-page writes after each checkpoint)."
   ]
  },
  "settings": {
@@ -439,6 +466,16 @@
    "type": "rows_present",
    "sql": "SELECT 1 WHERE pg_is_in_recovery() OR current_setting('default_transaction_read_only') = 'on'",
    "proof": "this server only accepts reads (a standby, or read-only is the default)"
+  },
+  "wal_retained_by_slot": {
+   "type": "rows_present",
+   "sql": "SELECT slot_name, active, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) FROM pg_replication_slots WHERE restart_lsn IS NOT NULL AND (NOT active OR pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) > 1073741824)",
+   "proof": "replication slot(s) holding WAL with no reader or more than 1 GB behind: {rows}"
+  },
+  "wal_archive_failing": {
+   "type": "rows_present",
+   "sql": "SELECT last_failed_wal FROM pg_stat_archiver WHERE last_failed_time IS NOT NULL AND (last_archived_time IS NULL OR last_failed_time > last_archived_time)",
+   "proof": "WAL archiving is failing now (last failed file: {rows})"
   }
  },
  "style": [
@@ -454,6 +491,9 @@
   "\\bbase/\\d+/\\d+",
   "\\bWAL segment\\b",
   "conflict with recovery",
-  "replication origin \\\""
+  "replication origin \\\"",
+  "\\barchive command\\b",
+  "checkpoints are occurring",
+  "\\bpg_wal\\b"
  ]
 }

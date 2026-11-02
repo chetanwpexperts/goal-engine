@@ -405,3 +405,28 @@ def test_two_child_tables_multiply_a_parent_total():
     assert any("SUM(o.total_amount) is multiplied" in t for t in titles), titles
     one_child = "SELECT o.id, SUM(o.total_amount) FROM orders o JOIN order_items oi ON oi.order_id = o.id GROUP BY o.id"
     assert not [f for f in sqlcorrect.check(one_child)["findings"] if "multiplied" in f["title_en"]]
+
+
+def test_a_wrong_answer_is_kept_to_learn_from_with_values_hidden(client, ml_mode):
+    """'Still not right' after a check: the query is kept for the nightly learning, every value hidden, one row per miss."""
+    from app import learning
+    from app.db import _SessionLocal
+    from app.models import LearnMiss
+    from tests.test_ml import say
+
+    q = "SELECT name FROM customers WHERE email = 'ravi@example.in' AND phone = '9876543210' AND city = 'Delhi' AND id = 1234567"
+    r = say(client, "check the query I have")
+    g = r["goal"]["id"]
+    client.post("/api/message", json={"text": q, "goal_id": g})
+    r = client.post("/api/message", json={"text": "this is wrong, it should only show active customers", "goal_id": g}).json()
+    assert "kept this query" in r["reply"] and "what result it should give" in r["reply"]
+    client.post("/api/message", json={"text": "still not right", "goal_id": g})
+    with _SessionLocal() as db:
+        rows = db.query(LearnMiss).all()
+        assert len(rows) == 1 and rows[0].count == 2 and rows[0].brain == "database"
+        d = rows[0].detail
+        assert "ravi" not in d and "9876543210" not in d and "Delhi" not in d and "1234567" not in d
+        assert "customers" in d and "city = '?'" in d
+        feed = learning.feed(db)
+        item = next(x for x in feed if x.get("kind") == "said_wrong")
+        assert item["brain"] == "database" and item["detail"] == d and item["asked"] == 2

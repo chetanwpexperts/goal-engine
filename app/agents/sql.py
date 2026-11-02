@@ -93,6 +93,19 @@ def _split_tail(q: str) -> tuple[str, str]:
     return q[:last + 1], tail.strip()
 
 
+def mask_values(query: str) -> str:
+    """A query with its values hidden, for learning from a miss: every quoted text becomes '?' (dates and short numbers
+    stay: they carry the pattern, not a person), long numbers become 0, comments go. Table and column names stay."""
+    out = re.sub(r"/\*.*?\*/|--[^\n]*|#[^\n]*", " ", query or "", flags=re.S)
+
+    def text(m):
+        v = m.group(1)
+        return m.group(0) if re.fullmatch(r"\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?|-?\d{1,4}(?:\.\d+)?", v) else "'?'"
+    out = re.sub(r"'((?:[^'\\]|\\.|'')*)'", text, out)
+    out = re.sub(r"(?<![\w.])\d{5,}(?:\.\d+)?(?![\w])", "0", out)
+    return "\n".join(ln.rstrip() for ln in out.splitlines() if ln.strip())[:4000]
+
+
 def request_words(query: str) -> str:
     """What the person wrote around the query ('...; Assume you want the highest stock within each category'): what they
     want it to do. Read for intent only, never run."""

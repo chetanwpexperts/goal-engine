@@ -195,11 +195,43 @@ def set_status(db: Session, kind: str, item_id: int, status: str) -> bool:
     return True
 
 
+def report_miss(db: Session, brain: str, said: str, detail: str, answer: str = "") -> None:
+    """The user said an answer was wrong. 'detail' comes already masked by the agent's pack; the general scrub runs on
+    everything again (emails, links, keys, long numbers). One row per distinct miss; a repeat only counts up."""
+    from app.models import LearnMiss
+
+    if brain not in BRAINS:
+        raise ValueError("unknown brain")
+    d = (detail or "").strip()[:4000]
+    for rx, rep in _SCRUB[:-1]:                     # every scrub except quoted values (the pack already hid those)
+        d = rx.sub(rep, d)
+    if len(normalize(d)) < 3:
+        raise ValueError("too short")
+    fp = _fp(brain, d)
+    row = db.scalar(select(LearnMiss).where(LearnMiss.fingerprint == fp))
+    if row:
+        row.count += 1
+        row.last_seen = utcnow()
+        row.said = scrub(said) or row.said
+        if row.status == "learned":
+            row.status = "new"
+    else:
+        db.add(LearnMiss(brain=brain, fingerprint=fp, said=scrub(said), detail=d, answer=scrub(answer)))
+    db.commit()
+
+
 def feed(db: Session, limit: int = 50) -> list[dict]:
-    """For the nightly learning: the most-asked problems no brain understood yet."""
+    """For the nightly learning: the most-asked problems no brain understood yet, then answers people said were wrong."""
+    from app.models import LearnMiss
+
     rows = db.scalars(select(LearnRequest).where(LearnRequest.status == "new")
                       .order_by(LearnRequest.count.desc(), LearnRequest.last_seen.desc()).limit(limit))
-    return [{"id": r.id, "brain": r.brain, "text": r.text, "asked": r.count, "best_guess": r.guess} for r in rows]
+    out = [{"id": r.id, "brain": r.brain, "text": r.text, "asked": r.count, "best_guess": r.guess} for r in rows]
+    misses = db.scalars(select(LearnMiss).where(LearnMiss.status == "new")
+                        .order_by(LearnMiss.count.desc(), LearnMiss.last_seen.desc()).limit(limit))
+    out += [{"id": f"miss-{m.id}", "brain": m.brain, "text": m.said, "detail": m.detail, "answer": m.answer,
+             "asked": m.count, "best_guess": "", "kind": "said_wrong"} for m in misses]
+    return out
 
 
 def maintain(db: Session, now=None) -> dict:
@@ -208,6 +240,9 @@ def maintain(db: Session, now=None) -> dict:
         "learn_votes": db.execute(delete(LearnVote).where(LearnVote.created_at < now - VOTE_TTL)).rowcount,
         "learn_requests": db.execute(delete(LearnRequest).where(LearnRequest.last_seen < now - REQUEST_TTL)).rowcount,
     }
+    from app.models import LearnMiss
+
+    done["learn_misses"] = db.execute(delete(LearnMiss).where(LearnMiss.last_seen < now - REQUEST_TTL)).rowcount
     return done
 
 

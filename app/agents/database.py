@@ -759,13 +759,16 @@ def holds_conversation(db, goal, text: str, any_text: bool = False):
     if (text or "").strip().startswith(("Why: ", "Kyun: ")) and not any_text:
         a, run = _sql_agent(db, goal)
         return a if run is not None and run.status == "done" else None
-    if any_text or NEW_SQL_RE.search(text or "") or not (SQL_FOLLOW_RE.search(text or "") or DIFF_RE.search(text or "")
+    if any_text or NEW_SQL_RE.search(text or "") or not (SQL_FOLLOW_RE.search(text or "") or DIFF_RE.search(text or "") or FEEDBACK_RE.search(text or "")
                                                          or WHY_RE.search(text or "") or DEV_FOLLOW_RE.search(text or "")):
         return None
     a, run = _sql_agent(db, goal)
     return a if run is not None and run.status == "done" else None
 
 
+FEEDBACK_RE = re.compile(r"\b(wrong|incorrect|not (correct|right|working|resolved|solved|fixed|giving|the result|what i)|still (not|wrong|same)|"
+                         r"does ?n.?t (do|work|fix|give)|did ?n.?t (do|work|fix|catch|find)|not able to (find|detect)|missed|"
+                         r"galat|sahi nahi|theek nahi|kaam nahi|nahi hua|nahi pakda)\b", re.I)
 DIFF_RE = re.compile(r"\b(what (did )?you change|what changed|what is the diff\w*|diff\w*|compare|original|kya badla|kya change|"
                      r"farak|fark|antar|same (hi )?hai|any change)\b", re.I)
 WHY_RE = re.compile(r"\b(why|kyun|kyu|reason|wajah|explain|samjhao|kaise slow|what makes)\b|क्यों|क्यूं|वजह|कारण|समझा", re.I)
@@ -775,6 +778,43 @@ INDEX_RE = re.compile(r"\b(which|what|kaun\w*|konsa|kaunsa)\b[^?]*\bindex(es)?\b
 
 
 def continue_turn(db, goal, agent, text: str):
+    """The answer about the checked query; when the person says it was wrong, the miss is also kept to learn from."""
+    from app.agents.sql import mask_values
+    from app.ml.normalize import detect_language
+
+    if not FEEDBACK_RE.search(text or ""):
+        return _continue_turn(db, goal, agent, text)
+    inputs = loads(agent.inputs, {}) or {}
+    raw = inputs.get("query", "")
+    _a, last_run = _sql_agent(db, goal)
+    saved = False
+    if raw.strip():
+        try:
+            from app import learning
+
+            learning.report_miss(db, "database", text, mask_values(raw), (last_run.summary if last_run is not None else "") or "")
+            saved = True
+        except Exception:  # noqa: BLE001 - learning is an extra; it never breaks the answer
+            db.rollback()
+    hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
+    from app.agents.sql import analyze_sql
+
+    res = analyze_sql(raw, inputs.get("explain", ""))
+    broken = [f for f in (res.get("correct") or {}).get("findings") or [] if f["kind"] in ("error", "wrong")]
+    if broken:
+        reply, options, hi = _continue_turn(db, goal, agent, text)
+    else:
+        reply, options = (("Is query ke text se mujhe pakki galti nahi mili. Batao isse kya result aana chahiye (ya ye kya karni chahiye), "
+                           "main usi ke hisaab se check karunga." if hi else
+                           "From the query text alone I couldn't find a definite mistake. Tell me what result it should give (or what it "
+                           "should do), and I'll check it against that."), [])
+    if saved:
+        reply += ("\n\nMaine ye query (values chhupa ke) seekhne ke liye rakh li hai, taaki aise sawaal aage behtar samjhun." if hi else
+                  "\n\nI've kept this query (with its values hidden) to learn from, so questions like it get a better answer.")
+    return reply, options, hi
+
+
+def _continue_turn(db, goal, agent, text: str):
     """Answers about the query that was checked: the optimised version, what changed, or why it's slow.
     Worked out again from the query itself, so it's never a stale or repeated answer."""
     from app.agents.sql import analyze_sql, rewrite, unwrap

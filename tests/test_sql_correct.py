@@ -350,3 +350,58 @@ def test_the_per_group_rewrite_on_the_test_databases():
             c.execute(fixed)
             c.execute("SELECT id FROM pg_products WHERE price < 100 ORDER BY id")
             assert [r[0] for r in c.fetchall()] == [1, 3, 4]               # each active category's top stock, ties included
+
+
+# Traps from an SQL practice workbook (customers / orders / products), each reproduced on MariaDB and PostgreSQL: the original
+# gives the wrong rows, DBaba's rewrite gives the right ones on both.
+TRAP_SETUP = ["CREATE TEMPORARY TABLE wc (id INT PRIMARY KEY, name VARCHAR(20))",
+              "CREATE TEMPORARY TABLE wo (id INT PRIMARY KEY, customer_id INT, order_date TIMESTAMP)",
+              "CREATE TEMPORARY TABLE wp (id INT PRIMARY KEY, category_id INT, price INT)",
+              "INSERT INTO wc VALUES (1,'a'),(2,'b'),(3,'c')",
+              "INSERT INTO wo VALUES (1,1,'2026-01-31 10:00:00'),(2,1,'2026-01-05 00:00:00'),(3,NULL,'2026-01-10 00:00:00')",
+              "INSERT INTO wp VALUES (1,1,100),(2,1,100),(3,1,50),(4,2,70),(5,2,60),(6,2,10)"]
+TRAPS = [  # (query + what the person said, topic, kind, wrong rows, right rows)
+    ("SELECT c.id, COUNT(*) AS orders FROM wc c LEFT JOIN wo o ON o.customer_id = c.id GROUP BY c.id ORDER BY c.id",
+     "count", "check", [(1, 2), (2, 1), (3, 1)], [(1, 2), (2, 0), (3, 0)]),
+    ("SELECT id FROM wc WHERE id NOT IN (SELECT customer_id FROM wo) ORDER BY id", "not_in", "check", [], [(2,), (3,)]),
+    ("SELECT COUNT(*) FROM wo WHERE order_date BETWEEN '2026-01-01' AND '2026-01-31'", "date_range", "check", [(2,)], [(3,)]),
+    ("SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY category_id ORDER BY price DESC) AS rn FROM wp) x "
+     "WHERE rn <= 1 ORDER BY id; the most expensive product per category, ties must share rank", "ties", "wrong",
+     [(1,), (4,)], [(1,), (2,), (4,)]),
+    ("SELECT id, category_id, price FROM wp ORDER BY price DESC LIMIT 2; top 2 products per category", "top_n", "wrong",
+     [(1, 1, 100), (2, 1, 100)], [(1, 1, 100, 1), (2, 1, 100, 2), (4, 2, 70, 1), (5, 2, 60, 2)]),
+]
+
+
+@pytest.mark.parametrize("q,topic,kind,wrong_rows,right_rows", TRAPS)
+def test_workbook_traps_are_found_and_the_rewrite_gives_the_right_rows(q, topic, kind, wrong_rows, right_rows):
+    import socket
+
+    c = analyze_sql(q)["correct"]
+    hit = [f for f in c["findings"] if f["topic"] == topic]
+    assert hit and hit[0]["kind"] == kind and c["corrected"], c
+    for port in (3306, 5432):
+        try:
+            socket.create_connection(("127.0.0.1", port), timeout=0.5).close()
+        except OSError:
+            pytest.skip("needs the local MariaDB and PostgreSQL test databases")
+    from tests.dbreal import real_errors as RE
+
+    for conn in (RE.mariadb(), RE.postgres()):
+        with conn.cursor() as cur:
+            for st in TRAP_SETUP:
+                cur.execute(st)
+            cur.execute(q.split(";")[0])
+            assert sorted(map(tuple, cur.fetchall())) == sorted(wrong_rows), "the trap really gives the wrong rows"
+            cur.execute(c["corrected"].rstrip().rstrip(";"))
+            assert sorted(tuple(int(v) for v in r) for r in cur.fetchall()) == sorted(right_rows), c["corrected"]
+
+
+def test_two_child_tables_multiply_a_parent_total():
+    drill = ("SELECT DISTINCT c.*, SUM(o.total_amount) AS sales FROM customers c LEFT JOIN orders o ON o.customer_id = c.id "
+             "LEFT JOIN order_items oi ON oi.order_id = o.id LEFT JOIN payments p ON p.order_id = o.id "
+             "WHERE YEAR(o.order_date) = 2026 AND p.status = 'success' GROUP BY c.id ORDER BY sales DESC")
+    titles = [f["title_en"] for f in sqlcorrect.check(drill)["findings"]]
+    assert any("SUM(o.total_amount) is multiplied" in t for t in titles), titles
+    one_child = "SELECT o.id, SUM(o.total_amount) FROM orders o JOIN order_items oi ON oi.order_id = o.id GROUP BY o.id"
+    assert not [f for f in sqlcorrect.check(one_child)["findings"] if "multiplied" in f["title_en"]]

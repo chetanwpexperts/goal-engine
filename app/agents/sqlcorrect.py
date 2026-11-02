@@ -517,6 +517,12 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
                              f"WHERE ek-ek row dekhta hai, totals se pehle: MySQL error 1111, PostgreSQL 'aggregate functions are not allowed "
                              f"in WHERE'. Total pe condition GROUP BY ke baad HAVING mein; UPDATE/DELETE mein subquery se compare karo."))
 
+    # 9-13: traps from SQL practice (LEFT JOIN counts, NOT IN with NULLs, BETWEEN on timestamps, ties, top N per group)
+    for fnd, edit in _workbook_traps(sql, s, is_select, intent):
+        F.append(fnd)
+        if edit:
+            edits.append(edit)
+
     # 8. what the person said they want: "the highest within their own category" vs MAX() over the whole table
     handled = set()
     for fnd, edit, span in _per_group(sql, s, intent):
@@ -629,6 +635,131 @@ def _per_group(sql: str, s: str, intent: str) -> list:
                                 f"Aap har row ko uske apne {noun} ke {fn} se compare karna chahte ho, par subquery row se judi nahi hai, isliye "
                                 f"poori table ka ek hi {fn}({x}) aata hai. {g} se GROUP BY karo aur row ka {g} match karo."),
                         (a, b + 1, new), (a, b)))
+            break
+    return out
+
+
+TIME_COL = re.compile(r"(date|_at$|at$|time|created|updated|_on$|timestamp|_dt$|^dt$)", re.I)
+
+
+def _workbook_traps(sql: str, s: str, is_select: bool, intent: str) -> list:
+    """Each one reproduced on MariaDB and PostgreSQL (tests/test_sql_correct.py, the lab test of each rewrite)."""
+    import datetime as _dt
+
+    out = []
+    low = s.lower()
+    said = (intent or "").lower()
+
+    # 9. COUNT(*) with a LEFT JOIN: a row with no match is still one row, so 'no orders' counts as 1
+    lj = list(re.finditer(r"\bleft\s+(?:outer\s+)?join\s+[`\"]?([\w$.]+)[`\"]?\s+(?:as\s+)?([a-z_]\w*)?\s*\bon\b", s, re.I))
+    if is_select and len(lj) == 1 and re.search(r"\bgroup\s+by\b", low) and not re.search(r"\bjoin\b", low[:lj[0].start()] + low[lj[0].end():]):
+        right = (lj[0].group(2) if lj[0].group(2) and lj[0].group(2).lower() not in KW else lj[0].group(1)).strip('`"')
+        rname = lj[0].group(1).split(".")[-1].strip('`"')
+        on = s[lj[0].end():]
+        stop = re.search(r"\bwhere\b|\bgroup\s+by\b|\border\s+by\b|\blimit\b|\bhaving\b|;", on, re.I)
+        on = on[:stop.start()] if stop else on
+        rc = None                                          # only a child table (orders of a customer), never a lookup (a student's class)
+        for em in re.finditer(r"[`\"]?(\w+)[`\"]?\.[`\"]?(\w+)[`\"]?\s*=\s*[`\"]?(\w+)[`\"]?\.[`\"]?(\w+)[`\"]?", on):
+            pairs = [(em.group(1), em.group(2), em.group(3), em.group(4)), (em.group(3), em.group(4), em.group(1), em.group(2))]
+            for ra, rcol, la, lcol in pairs:
+                if ra.lower() != right.lower() or rcol.lower() == "id":
+                    continue
+                fm = re.search(rf"\bfrom\s+[`\"]?([\w$.]+)[`\"]?\s+(?:as\s+)?{re.escape(la)}\b|\bfrom\s+[`\"]?({re.escape(la)})[`\"]?\b", s, re.I)
+                ltab = (fm.group(1) or fm.group(2)).split(".")[-1].split("_", 1)[-1] if fm else la
+                key = lcol.lower().replace("_", "")
+                if key == "id" or key == _singular(ltab).lower().replace("_", "") + "id" or key == _singular(la).lower() + "id":
+                    rc = re.match(r"(.*)", rcol)
+                    break
+            if rc:
+                break
+        for m in re.finditer(r"\bcount\s*\(\s*\*\s*\)", s, re.I):
+            if not rc or _depths(s)[m.start()] != _depths(s)[lj[0].start()]:
+                continue
+            col = f"{right}.{rc.group(1)}"
+            out.append((Finding("check", "count", f"COUNT(*) counts 1 for rows with no {rname} match",
+                                f"COUNT(*) bina {rname} wali row ko bhi 1 ginta hai", sql[m.start():m.end()],
+                                f"With a LEFT JOIN, a row that has no match is still one row (its {rname} columns are NULL), so COUNT(*) "
+                                f"shows 1 instead of 0 for it. To count the matches, count a {rname} column: COUNT({col}).",
+                                f"LEFT JOIN mein bina match wali row bhi ek row hai, isliye COUNT(*) 0 ki jagah 1 dikhata hai. Match ginne ke "
+                                f"liye {right} ka column gino: COUNT({col})."), (m.start(), m.end(), f"COUNT({col})")))
+
+    # 10. x NOT IN (SELECT col ...): one NULL in col and nothing is returned
+    for m in re.finditer(r"([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s+not\s+in\s*\(\s*select\s+([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s+from\s+"
+                         r"[`\"]?([\w$]+)[`\"]?(?:\s+(?:as\s+)?([a-z_]\w*))?\s*(?:where\s+(?P<w>[^()]*?))?\s*\)", s, re.I):
+        x, col, t = m.group(1), m.group(2).split(".")[-1].strip('`"'), m.group(3)
+        if col.lower() in ("id",) or (m.group(4) and m.group(4).lower() in KW):
+            continue                                       # its own key can't be NULL
+        ia = m.group(4) or "n1"
+        outer_q = x
+        if "." not in x:
+            fm = re.search(r"\b(?:from|update|delete\s+from)\s+[`\"]?([\w$]+)[`\"]?(?:\s+(?:as\s+)?([a-z_]\w*))?", low)
+            if fm:
+                oa = fm.group(2) if fm.group(2) and fm.group(2) not in KW else fm.group(1)
+                outer_q = f"{oa}.{x}"
+        w = f" AND ({sql[m.start('w'):m.end('w')].strip()})" if m.group("w") else ""
+        new = f"NOT EXISTS (SELECT 1 FROM {t} {ia} WHERE {ia}.{col} = {outer_q}{w})"
+        out.append((Finding("check", "not_in", f"NOT IN (SELECT {col} ...) returns nothing if {col} has a NULL",
+                            f"{col} mein ek bhi NULL ho to NOT IN (SELECT {col} ...) kuch nahi deta", sql[m.start():m.end()][:90],
+                            f"x NOT IN (list) is true only when x differs from every value, and 'differs from NULL' is unknown, so one NULL "
+                            f"in {t}.{col} makes the whole result empty, with no error (MySQL and PostgreSQL). NOT EXISTS ignores NULLs "
+                            f"and returns the same rows otherwise: {new}.",
+                            f"Ek NULL hone par NOT IN poora result khaali kar deta hai, bina error. NOT EXISTS NULL ko chhod deta hai: {new}."),
+                    (m.start(), m.end(), new)))
+
+    # 11. BETWEEN 'day1' AND 'day2' on a date-time column misses everything after 00:00 on day2
+    for m in re.finditer(r"([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s+between\s+'(\d{4}-\d{2}-\d{2})'\s+and\s+'(\d{4}-\d{2}-\d{2})'", sql, re.I):
+        col = m.group(1).split(".")[-1].strip('`"')
+        if not TIME_COL.search(col):
+            continue
+        try:
+            nxt = (_dt.date.fromisoformat(m.group(3)) + _dt.timedelta(days=1)).isoformat()
+        except ValueError:
+            continue
+        new = f"{m.group(1)} >= '{m.group(2)}' AND {m.group(1)} < '{nxt}'"
+        out.append((Finding("check", "date_range", f"BETWEEN ... AND '{m.group(3)}' stops at 00:00 on {m.group(3)}",
+                            f"BETWEEN ... AND '{m.group(3)}' {m.group(3)} ko 00:00 pe ruk jata hai", sql[m.start():m.end()],
+                            f"If {col} stores a time too, '{m.group(3)}' means {m.group(3)} 00:00:00, so the rest of that day is left out. "
+                            f"{new} covers the whole last day, and gives the same rows if {col} is a plain DATE.",
+                            f"Agar {col} mein time bhi hai to aakhri din ka baaki hissa chhoot jata hai. {new} poora din leta hai."),
+                    (m.start(), m.end(), new)))
+
+    # 12. 'ties must share rank' but ROW_NUMBER() gives tied rows different numbers
+    if re.search(r"\bties?\b|\btied\b|same rank|share (?:the )?rank|barabar", said):
+        dense = re.search(r"\bdense\b|no gaps?|without gaps|consecutive", said)
+        for m in re.finditer(r"\brow_number\s*\(\s*\)", s, re.I):
+            fn = "DENSE_RANK()" if dense else "RANK()"
+            out.append((Finding("wrong", "ties", f"ROW_NUMBER() splits ties; you asked for tied rows to share a rank",
+                                f"ROW_NUMBER() barabar rows ko alag number deta hai; aapko same rank chahiye", sql[m.start():m.end()],
+                                f"ROW_NUMBER() numbers every row 1, 2, 3... even when the values are equal, so a tie at the cut-off drops "
+                                f"one of the tied rows at random. {fn} gives equal values the same rank"
+                                + (" with no gaps (1, 1, 2)." if dense else " (1, 1, 3), so every tied row is kept."),
+                                f"ROW_NUMBER() barabar values ko bhi alag number deta hai. {fn} barabar values ko same rank deta hai."),
+                        (m.start(), m.end(), fn)))
+
+    # 13. 'top N per category' written as ORDER BY ... LIMIT N: the top N overall
+    tn = re.search(r"\b(?:top|first|best|highest|lowest|bottom|last)\s+(\d+)\b", said)
+    lm = re.search(r"\border\s+by\s+([`\"]?\w+[`\"]?)(\s+(?:asc|desc))?\s+limit\s+(\d+)\s*;?\s*$", s, re.I)
+    if is_select and tn and lm and "partition by" not in low and tn.group(1) == lm.group(3):
+        names = [w for w in re.findall(r"(?<![\w$])([A-Za-z_][\w$]*)", s) if w.lower() not in KW]
+        for noun in _said_groups(said):
+            g = _group_column(noun, names)
+            if not g:
+                continue
+            rank = "RANK()" if re.search(r"\bties?\b|same rank|share", said) else "ROW_NUMBER()"
+            base = sql[:lm.start()].rstrip()
+            key, direction = lm.group(1).strip('`"'), (lm.group(2) or "").strip().upper()
+            g_name = g.split(".")[-1]
+            new = (f"SELECT * FROM (\n  SELECT x.*, {rank} OVER (PARTITION BY x.{g_name} ORDER BY x.{key}{' ' + direction if direction else ''}) "
+                   f"AS rnk\n  FROM (\n{base}\n  ) AS x\n) AS ranked\nWHERE rnk <= {lm.group(3)}\nORDER BY {g_name}, rnk;")
+            out.append((Finding("wrong", "top_n", f"LIMIT {lm.group(3)} gives the top {lm.group(3)} overall, not per {noun}",
+                                f"LIMIT {lm.group(3)} poore result ke top {lm.group(3)} deta hai, har {noun} ke nahi", sql[lm.start():lm.end()].strip(),
+                                f"LIMIT cuts the whole sorted result once, so most {noun}s get nothing. Number the rows inside each {g_name} "
+                                f"with {rank} OVER (PARTITION BY {g_name} ORDER BY {key}{' ' + direction if direction else ''}) and keep "
+                                f"rnk <= {lm.group(3)} (MySQL 8+, MariaDB 10.2+, PostgreSQL)."
+                                + (" Ties: RANK() keeps every tied row." if rank == "RANK()" else " If tied rows must all be kept, use RANK()."),
+                                f"LIMIT poore sorted result ko ek baar kaat-ta hai. Har {g_name} ke andar {rank} OVER (PARTITION BY {g_name} ...) "
+                                f"se number do aur rnk <= {lm.group(3)} rakho."),
+                        (0, len(sql), new)))
             break
     return out
 
@@ -1198,6 +1329,9 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool) -> dict | No
                 continue
             mine = to_one_from({A})
             others = [y for y in live if y not in single and y not in mine and y != A and A not in to_one_from({y})]
+            kids = [y for y in live if y not in single and y != A and A in to_one_from({y}) and y not in mine]
+            if not others and len(kids) >= 2:
+                others = kids          # two child tables of A (items AND payments): every A row repeats items x payments times
             if others:
                 o = by_alias[others[0]]
                 add("wrong", "group", f"{fm.group(1).upper()}({fm.group(3)}.{fm.group(4)}) is multiplied by the {o.name} rows",

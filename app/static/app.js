@@ -354,11 +354,13 @@
           const d = el("details");
           d.append(el("summary", "t", hi ? f.title_hi : f.title_en));
           if (fix) d.append(el("div", "f", fix));
+          if (f.basis) d.append(el("div", "e", T(hi, "Buniyaad: ", "Fundamental: ") + (hi ? f.basis.hi : f.basis.en)));
           if (f.evidence) d.append(el("div", "e", f.evidence));
           li.append(d);
         } else {
           li.append(el("div", "t", hi ? f.title_hi : f.title_en));
           if (fix) li.append(el("div", "f", fix));
+          if (f.basis) li.append(el("div", "e", T(hi, "Buniyaad: ", "Fundamental: ") + (hi ? f.basis.hi : f.basis.en)));
           if (f.evidence) li.append(el("div", "e", f.evidence));
         }
         ul.append(li);
@@ -367,6 +369,12 @@
     }
     if (r.rewritten && !corr) wrap.append(codeBox(w.rewritten, r.rewritten, w));
     if (r.suggested) wrap.append(codeBox(T(hi, "Agar aapka matlab yahi tha", "If that's what you meant"), r.suggested, w));
+    if (r.reading && (hi ? r.reading.hi : r.reading.en)) {                 // the query read stage by stage
+      const d = el("details", "reading");
+      d.append(el("summary", null, T(hi, "DBaba ne query aise padhi", "How DBaba read this query")));
+      d.append(el("pre", "reading-body", hi ? r.reading.hi : r.reading.en));
+      wrap.append(d);
+    }
     if (r.check_query) wrap.append(codeBox(w.check, r.check_query, w));
     if (r.indexes && r.indexes.length) wrap.append(codeBox(r.indexes_verified === false ? w.maybe : w.indexes, r.indexes.join("\n"), w));
     if (r.note) wrap.append(el("p", "note", r.note));

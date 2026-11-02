@@ -111,3 +111,91 @@ def test_lowercase_code_and_title_follows_the_new_error(client, ml_mode):
     second = say(client, "ERROR 1040 (HY000): Too many connections")
     assert "connections" in second["goal"]["title"].lower() and "duplicate" not in second["goal"]["title"].lower()
     assert "The value that value" not in second["reply"] + first["reply"]
+
+
+# Replication: messages captured on lab replicas (a MariaDB 10.11 source + replica, a PostgreSQL 16 primary with a hot standby and
+# a logical subscriber), each produced by doing the real thing: writing on the replica, skipping an error, purging logs the replica
+# still needed, VACUUM / TRUNCATE on the primary under a long standby query, inserting on the standby.
+REPLICATION_REAL = [
+    ("             Slave_SQL_Running: No\n         Seconds_Behind_Master: NULL\n                Last_SQL_Errno: 1062\n"
+     "                Last_SQL_Error: Error 'Duplicate entry '2' for key 'PRIMARY'' on query. Default database: ''. "
+     "Query: 'INSERT INTO app.users VALUES (2,'c@d.com')'", "replication_stopped", "mysql"),
+    ("Last_SQL_Error: Could not execute Update_rows_v1 event on table app.users; Can't find record in 'users', Error_code: 1032; "
+     "handler error HA_ERR_KEY_NOT_FOUND; the event's master log bin.000003, end_log_pos 1124", "replication_stopped", "mysql"),
+    ("Last_IO_Errno: 1236\nLast_IO_Error: Got fatal error 1236 from master when reading data from binary log: "
+     "'Could not find first log file name in binary log index file'", "source_log_purged", "mysql"),
+    ("ERROR 1290: The MariaDB server is running with the --read-only option so it cannot execute this statement", "write_on_replica", "mariadb"),
+    ("FATAL:  could not receive data from WAL stream: ERROR:  requested WAL segment 00000001000000000000000F has already been removed",
+     "source_log_purged", "postgresql"),
+    ("ERROR:  canceling statement due to conflict with recovery\nDETAIL:  User query might have needed to see row versions that must be removed.",
+     "standby_query_conflict", "postgresql"),
+    ("ERROR:  canceling statement due to conflict with recovery\nDETAIL:  User was holding a relation lock for too long.\nSQLSTATE: 40001",
+     "standby_query_conflict", "postgresql"),
+    ("ERROR:  duplicate key value violates unique constraint \"users_pkey\"\nDETAIL:  Key (id)=(2) already exists.\n"
+     "CONTEXT:  processing remote data for replication origin \"pg_16393\" during message type \"INSERT\" for replication target relation "
+     "\"public.users\" in transaction 731, finished at 0/302B020", "replication_stopped", "postgresql"),
+    ("ERROR:  cannot execute INSERT in a read-only transaction", "write_on_replica", "postgresql"),
+]
+
+
+@pytest.mark.parametrize("msg,want,engine", REPLICATION_REAL)
+def test_replication_errors_from_lab_replicas(msg, want, engine):
+    res = R.diagnose(msg)
+    assert [x["cause"] for x in res["found"]][:1] == [want], (msg, [x["cause"] for x in res["found"]])
+    assert res["engine"] == engine
+    assert len(res["found"]) == 1, "the replica's own duplicate / the shared SQLSTATE 40001 must not be claimed as a second cause"
+
+
+def test_replication_fixes_name_the_popular_wrong_fix():
+    rep = R.report(R.diagnose(REPLICATION_REAL[0][0]), False)
+    assert "Common mistake" in rep and "sql_replica_skip_counter" in rep and "drift" in rep
+    rep = R.report(R.diagnose(REPLICATION_REAL[2][0]), False)
+    assert "fresh" in rep and "backup" in rep and "silently missing" in rep
+    rep = R.report(R.diagnose(REPLICATION_REAL[5][0]), True)
+    assert "hot_standby_feedback" in rep and "max_standby_streaming_delay" in rep and "Kyun" in rep
+
+
+@pytest.mark.parametrize("text,likely", [
+    ("hamara replica 2 ghante peeche chal raha hai, data purana dikhta hai", "replica_lag"),
+    ("read replica shows old data right after saving", "replica_lag"),
+    ("slave pe replication ruk gayi", "replication_stopped"),
+    ("standby pe report query beech mein cancel ho jaati hai", "standby_query_conflict"),
+])
+def test_replication_described_without_an_error_is_never_claimed(text, likely):
+    res = R.diagnose(text)
+    assert not res["found"]
+    assert likely in [x["cause"] for x in res["open"][:4]], [x["cause"] for x in res["open"][:6]]
+    assert "paste the full error" in R.report(res, False)
+
+
+def test_other_read_only_options_are_not_a_replica():
+    """1290 is the code for any option that blocks a statement; only the read-only ones mean a replica."""
+    res = R.diagnose("ERROR 1290 (HY000): The MySQL server is running with the --secure-file-priv option so it cannot execute this statement")
+    assert "write_on_replica" not in [x["cause"] for x in res["found"]]
+
+
+@both_dbs
+def test_connected_check_proves_a_read_only_server():
+    from tests.dbreal import real_errors as RE
+
+    def runner(conn):
+        def run(sql, params):
+            with conn.cursor() as c:
+                c.execute(sql, params or None)
+                return c.fetchall()
+        return run
+
+    pg = RE.postgres()
+    RE.setup_pg(pg)
+    err = RE.pg_error(pg, "BEGIN READ ONLY; INSERT INTO t_parent VALUES (7,'r@o.com')")
+    plan = R.live_plan(R.diagnose(err))
+    assert not R.run_live(plan, runner(pg))["write_on_replica"]["seen"]      # this server accepts writes: ruled out
+    pg.execute("SET default_transaction_read_only = on")
+    try:
+        live = R.run_live(plan, runner(pg))
+    finally:
+        pg.execute("RESET default_transaction_read_only")
+    assert live["write_on_replica"]["seen"] and "only accepts reads" in live["write_on_replica"]["live_proof"]
+    my = RE.mariadb()
+    my_plan = R.live_plan(R.diagnose(REPLICATION_REAL[3][0]))
+    assert not R.run_live(my_plan, runner(my))["write_on_replica"]["seen"]

@@ -35,6 +35,8 @@ def pg_error(pg, sql):
         with pg.cursor() as c:
             c.execute(sql)
     except Exception as e:  # noqa: BLE001
+        if pg.info.transaction_status == 3:              # a case that opened its own transaction: leave the connection clean
+            pg.execute("ROLLBACK")
         return f"ERROR:  {e}\nSQLSTATE: {e.sqlstate}"
     return None
 
@@ -61,6 +63,7 @@ PG_CASES = [
     ("SELECT * FROM t_parent WHERE id = 'abc'", "bad_value_type"),
     ("SELECT id FROM t_parent JOIN t_child ON true", "ambiguous_column"),
     ("SELECT group_concat(email) FROM t_parent", "unknown_function"),
+    ("BEGIN READ ONLY; INSERT INTO t_parent VALUES (7,'r@o.com')", "write_on_replica"),   # what a hot standby / read-only server answers
 ]
 
 

@@ -135,6 +135,13 @@ def evidence(text: str) -> dict:
         facts.pop("bad_value_type", None)
     if "ssl_required" in facts:
         facts.pop("host_not_allowed", None)
+    if "replication_stopped" in facts:                    # the replica's own copy broke a rule: not the app's insert
+        for cid in ("duplicate_key", "fk_missing_parent", "fk_has_children"):
+            facts.pop(cid, None)
+    if "source_log_purged" in facts:
+        facts.pop("replication_stopped", None)
+    if "standby_query_conflict" in facts:                 # same SQLSTATE 40001, a different reason
+        facts.pop("serialization_failure", None)
     if "fk_has_children" in facts and "fk_missing_parent" in facts and "is still referenced" in (text or "") or \
             ("fk_has_children" in facts and re.search(r"Cannot delete or update a parent row|update or delete on table", text or "", re.I)):
         facts.pop("fk_missing_parent", None)
@@ -169,7 +176,13 @@ def complaints(text: str) -> dict[str, float]:
 
     r = M.Reading(text, lex_path=LEXICON)
     lex = M.lexicon(LEXICON)
-    return {cid: 1.0 for cid, recs in lex["complaints"].items() if any(M.satisfied(r, rec) for rec in recs)}
+    said = {cid: 1.0 for cid, recs in lex["complaints"].items() if any(M.satisfied(r, rec) for rec in recs)}
+    for specific, loose in (lex.get("outranks") or {}).items():
+        if specific in said and isinstance(loose, list):
+            for cid in loose:
+                if cid in said:
+                    said[cid] = 0.3
+    return said
 
 
 # ------------------------------------------------------------------ the reasoning
@@ -402,5 +415,6 @@ def run_live(plan: list[dict], run) -> dict:
             n = int(rows[0][0] or 0) if rows else 0
             out[p["cause"]] = {"seen": n > 0, "weight": 3, "live_proof": f"{n} deadlocks recorded on this database" if n else ""}
         elif t == "rows_present":
-            out[p["cause"]] = {"seen": bool(rows), "weight": 3, "live_proof": f"{len(rows)} transaction(s) found waiting or holding locks now" if rows else ""}
+            proof = spec.get("proof") or f"{len(rows)} transaction(s) found waiting or holding locks now"
+            out[p["cause"]] = {"seen": bool(rows), "weight": 3, "live_proof": proof if rows else ""}
     return out

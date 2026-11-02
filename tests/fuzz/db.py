@@ -864,6 +864,9 @@ def _make_client():
     init_db()
     s = get_settings()
     s.engine_mode, s.visitor_daily_cap, s.ai_daily_cap = "ml", 100000, 100000
+    from app import limits
+
+    limits.BURST.update(visitor=10**6, ip=10**6, all=10**6)   # flood limits off, like tests/conftest.py
     import logging
 
     logging.getLogger("httpx").setLevel(logging.WARNING)

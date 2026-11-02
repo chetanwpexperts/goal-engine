@@ -118,7 +118,8 @@ def test_in_subquery_is_not_a_problem_and_nothing_is_promised(client, ml_mode):
     r = say(client, "I have query correct this")
     r = client.post("/api/message", json={"text": q, "goal_id": r["goal"]["id"]}).json()
     assert "no problems found" in r["reply"] and "ready to copy" not in r["reply"]
-    assert analyze_sql("DELETE FROM users WHERE id IN (SELECT user_id FROM bans)")["findings"]   # older MySQL: no semi-join for these
+    d = analyze_sql("DELETE FROM users WHERE id IN (SELECT user_id FROM bans)")       # older MySQL/MariaDB: no semi-join for these
+    assert not d["findings"] and "8.0.21" in d["notes"][0]["en"] and "JOIN" in d["notes"][0]["en"]
 
 
 def test_the_join_rewrite_really_duplicates_rows():
@@ -210,3 +211,60 @@ def test_what_the_databases_really_do_with_unquoted_values():
     pg.execute("CREATE TEMP TABLE q_emp (id int, hire_date date, status text)")
     assert "operator does not exist: date < integer" in RE.pg_error(pg, "SELECT count(*) FROM q_emp WHERE hire_date < 2024-01-01")
     assert 'column "active" does not exist' in RE.pg_error(pg, "SELECT count(*) FROM q_emp WHERE status = active")
+
+
+SCALAR_SUB = ("UPDATE employees\nSET salary = salary * 1.10\nWHERE department_id = (\n    SELECT id\n    FROM departments\n"
+              "    WHERE location = 'Delhi'\n);")
+
+
+@pytest.mark.parametrize("q,topic,kind,fixed", [
+    (SCALAR_SUB, "subquery", "error", "department_id IN ("),                              # seen on the live site
+    ("UPDATE employees SET manager_id = NULL WHERE manager_id = NULL", "null", "wrong", "SET manager_id = NULL WHERE manager_id IS NULL"),
+    ("UPDATE employees SET bonus = 50 AND salary = 999 WHERE id = 1", "set", "wrong", "SET bonus = 50, salary = 999"),
+    ("SELECT name FROM employees WHERE status = 'active' OR 'pending'", "or", "wrong", "status IN ('active', 'pending')"),
+    ("DELETE FROM orders WHERE amount BETWEEN 1000 AND 10", "between", "wrong", "BETWEEN 10 AND 1000"),
+    ("SELECT dept, COUNT(*) FROM employees WHERE SUM(salary) > 10 GROUP BY dept", "where", "error", None),
+    ("DELETE FROM employees WHERE salary < (SELECT AVG(salary) FROM employees)", "same_table", "check", None),
+    ("SELECT id FROM doctors WHERE speciality = Child", "value", "error", "speciality = 'Child'"),
+    ("SELECT id FROM staff WHERE shift = day", "value", "error", "shift = 'day'"),
+])
+def test_statement_mistakes_in_any_query(q, topic, kind, fixed):
+    c = analyze_sql(q)["correct"]
+    hit = [f for f in c["findings"] if f["topic"] == topic]
+    assert hit and hit[0]["kind"] == kind, c["findings"]
+    if fixed:
+        assert fixed in c["corrected"], c["corrected"]
+
+
+@pytest.mark.parametrize("q", ["UPDATE employees SET x = 1 WHERE dept_id = (SELECT id FROM departments WHERE id = 5)",
+                               "SELECT * FROM t WHERE a = (SELECT MAX(b) FROM u)", "SELECT * FROM t WHERE a = (SELECT b FROM u LIMIT 1)",
+                               "UPDATE t SET a = 1, b = 2 WHERE c IN (1, 2)", "UPDATE t SET flag = (a = 1 AND b = 2) WHERE id = 3",
+                               "SELECT id FROM t WHERE x BETWEEN 1 AND 10", "SELECT id FROM t WHERE status = 'a' OR kind = 'b'",
+                               "SELECT dept FROM e GROUP BY dept HAVING SUM(salary) > 10",
+                               "SELECT id FROM e WHERE salary > (SELECT AVG(salary) FROM e)", "UPDATE t SET a = NULL WHERE id = 4"])
+def test_correct_statements_are_left_alone(q):
+    c = analyze_sql(q).get("correct") or {}
+    assert not [f for f in c.get("findings", []) if f["kind"] in ("error", "wrong")], c.get("findings")
+
+
+@pytest.mark.parametrize("seed", [1, 3001])
+def test_statement_mistakes_generator(seed):
+    """Random tables, random statement mistakes: found, corrected, and (with the test databases up) the corrected statement does
+    on MariaDB and PostgreSQL exactly what the intended one does."""
+    from tests.fuzz import stmtbugs
+
+    made, fails, _by, _eng = stmtbugs.run(60, seed)
+    assert made >= 50 and not fails, "\n\n".join(fails[:5])
+
+
+def test_check_another_query_asks_for_it(client, ml_mode):
+    """Seen on the live site: the 'Check another query' tap answered 'I've covered this above...'."""
+    from tests.test_ml import say
+
+    r = say(client, "check the query I have")
+    g = r["goal"]["id"]
+    client.post("/api/message", json={"text": "SELECT name FROM employees WHERE status = 'active' OR 'pending'", "goal_id": g})
+    r = client.post("/api/message", json={"text": "Check another query", "goal_id": g}).json()
+    assert "Paste the next SQL query" in r["reply"] and "covered this above" not in r["reply"]
+    r = client.post("/api/message", json={"text": SCALAR_SUB, "goal_id": g}).json()
+    assert "more than one row" in r["reply"]

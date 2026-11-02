@@ -609,8 +609,15 @@ def mind_state(db: Session, agent: Agent) -> dict:
 
 
 # ------------------------------------------------------------------ hooks the brain calls (named in the database pack)
+ANOTHER_RE = re.compile(r"\b(check|test|review|fix|see)\s+(an)?other\s+(sql\s+)?query\b|\b(an)?other\s+(sql\s+)?query\b|\bnew\s+query\b|"
+                        r"\bek\s+aur\s+query\b|\b(dusri|doosri|agli)\s+query\b|\bnext\s+query\b", re.I)
+
+
 def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) -> bool:
     from app.agents.core import query_in
+
+    if ANOTHER_RE.search(text or "") and not query_in(text):
+        return True                       # the 'Check another query' tap: ask for it, don't repeat the last answer
 
     if relation in ("howto", "chit_chat") and query_in(text):
         return True                       # a pasted query read as a how-to ("this one is slow: SELECT ..."): check the query
@@ -654,6 +661,12 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
 
     from app.agents.core import query_in as _query_in
 
+    if ANOTHER_RE.search(text or "") and not _query_in(text):
+        goal.intent = "slow_db_query"
+        goal.missing_info, goal.pending = "[]", None
+        db.commit()
+        return (("Agli SQL query paste karo, main use check karunga: pehle sahi hai ya nahi, phir speed." if turn.hi else
+                 "Paste the next SQL query and I'll check it: first whether it's right, then its speed."), [], "agent_plan")
     described = bool(reasoning.complaints(text)) and not _query_in(text)   # 'cannot connect', 'connect nahi ho raha'
     if described and not reasoning.evidence(text) and not reasoning.report(reasoning.diagnose(text), turn.hi):
         described = False                 # the core has no likely causes for it: the usual reply below

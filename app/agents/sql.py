@@ -98,6 +98,10 @@ def unwrap(query: str) -> str:
         cut = _unclosed_quote(q)
         if cut is not None and re.fullmatch(r"[\"'`]*\s*(?:,[^\"'`]*)?\)?\s*;?\s*", q[cut:]):
             q = q[:cut]
+    tail = re.search(r";([^;'\"`]*)$", q)                 # "...); correct this": the request after the query is not SQL
+    if tail and tail.group(1).strip() and not re.match(
+            r"\s*(--|#|/\*|select|update|delete|insert|with|set|create|alter|drop|explain|show|begin|commit)\b", tail.group(1), re.I):
+        q = q[:tail.start() + 1]
     lines = [ln.rstrip() for ln in q.splitlines()]
     while lines and not lines[0].strip():
         lines.pop(0)

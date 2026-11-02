@@ -137,3 +137,15 @@ def test_the_join_rewrite_really_duplicates_rows():
         c.execute("SELECT (SELECT count(*) FROM semi_p WHERE id IN (SELECT pid FROM semi_c)),"
                   " (SELECT count(*) FROM semi_p JOIN semi_c ON semi_c.pid = semi_p.id)")
         assert c.fetchone() == (1, 3)
+
+
+@pytest.mark.parametrize("before", ["-- my query\n", "-- report\n-- by month\n\n", "/* list */\n", "# note\n", "(\n"])
+def test_a_select_after_a_comment_is_still_a_select(before):
+    """Seen on the live site: a query starting with a comment line was read as UPDATE/DELETE ('IN (SELECT ...) inside
+    UPDATE/DELETE'), because the removed comment left a newline in front of SELECT."""
+    q = before + "SELECT name FROM users WHERE id IN (SELECT user_id FROM orders)" + (")" if before.startswith("(") else "")
+    res = analyze_sql(q)
+    assert not [f for f in res["findings"] if "UPDATE/DELETE" in f["title_en"]], res["findings"]
+    assert any("semi-join" in n["en"] for n in res["notes"])
+    plain = analyze_sql(before.replace("(", "") + "SELECT id FROM users")
+    assert any("No WHERE and no LIMIT" in f["title_en"] for f in plain["findings"])     # read-query rules apply too

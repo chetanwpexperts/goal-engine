@@ -176,7 +176,7 @@ def analyze_sql(query: str, extra: str = "") -> dict:
             "Sirf wahi columns lo jo chahiye; data kam padha jaata hai aur covering index kaam aata hai.")
 
     where = _clause(sql, "where", ("group by", "order by", "limit", "having", "union"))
-    is_select = low.lstrip("( ").startswith(("select", "with"))
+    is_select = _is_select(low)
     if is_select and not where and not re.search(r"\blimit\b", low) and tables:
         add(3, "No WHERE and no LIMIT: reads the whole table", "WHERE aur LIMIT dono nahi: poori table padhi jaati hai",
             f"FROM {tables[0].name} without a filter",
@@ -415,6 +415,11 @@ def _with_correctness(original: str, out: dict) -> dict:
     return out
 
 
+def _is_select(low: str) -> bool:
+    """A read query, however it starts: a comment line removed before it leaves a newline, brackets, spaces."""
+    return re.match(r"[\s(]*(select|with)\b", low) is not None
+
+
 def _notes(sql: str, tables, original: str = "") -> list[dict]:
     """What this query's own shape means for speed, beyond rules that rewrite it (plain words, both languages)."""
     out = []
@@ -432,7 +437,7 @@ def _notes(sql: str, tables, original: str = "") -> list[dict]:
                     "hi": "LIMIT nahi hai, isliye saari rows aati hain. Page pe list hai to page-wise dikhao (LIMIT 50 OFFSET ...) "
                           "ya filter lagao (center, batch, date): aksar sabse bada fayda yahi hota hai."})
     if re.search(r"\bin\s*\(\s*select\b", low) and not re.search(r"\bnot\s+in\s*\(\s*select\b", low) and \
-            low.lstrip("( ").startswith(("select", "with")):
+            _is_select(low):
         # checked on MariaDB (materialized semi-join) and PostgreSQL (semi-join / HashAggregate): a plain JOIN returned duplicates
         out.append({"en": "WHERE ... IN (SELECT ...) is fine as it is: MySQL 5.6+, MariaDB and PostgreSQL run it as a semi-join, not once "
                           "per row. Don't rewrite it as a plain JOIN: when the inner table has several matching rows, a JOIN returns "

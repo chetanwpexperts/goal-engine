@@ -759,13 +759,16 @@ def holds_conversation(db, goal, text: str, any_text: bool = False):
     if (text or "").strip().startswith(("Why: ", "Kyun: ")) and not any_text:
         a, run = _sql_agent(db, goal)
         return a if run is not None and run.status == "done" else None
-    if any_text or NEW_SQL_RE.search(text or "") or not (SQL_FOLLOW_RE.search(text or "") or DIFF_RE.search(text or "")
+    if any_text or NEW_SQL_RE.search(text or "") or not (SQL_FOLLOW_RE.search(text or "") or DIFF_RE.search(text or "") or READ_RE.search(text or "")
                                                          or WHY_RE.search(text or "") or DEV_FOLLOW_RE.search(text or "")):
         return None
     a, run = _sql_agent(db, goal)
     return a if run is not None and run.status == "done" else None
 
 
+READ_RE = re.compile(r"\bwhat (does|is) (this|my|the) query (do|doing)\b|\bexplain (this|my|the) query\b(?!.*\b(slow|fast|speed)\b)|"
+                     r"\bbreak (it|this|the query) down\b|\bstep by step\b|\bhow does (this|my|the) query work\b|\bread (this|my|the) query\b|"
+                     r"\bquery (samjhao|samjha do|kya karti hai|kya karegi|kaise kaam karti)\b|\b(ye|yeh) query kya\b|\bfundamentals?\b|\bgrain\b", re.I)
 DIFF_RE = re.compile(r"\b(what (did )?you change|what changed|what is the diff\w*|diff\w*|compare|original|kya badla|kya change|"
                      r"farak|fark|antar|same (hi )?hai|any change)\b", re.I)
 WHY_RE = re.compile(r"\b(why|kyun|kyu|reason|wajah|explain|samjhao|kaise slow|what makes)\b|क्यों|क्यूं|वजह|कारण|समझा", re.I)
@@ -784,7 +787,7 @@ def continue_turn(db, goal, agent, text: str):
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
     inputs = loads(agent.inputs, {}) or {}
     query = unwrap(inputs.get("query", ""))
-    res = analyze_sql(query, inputs.get("explain", ""))
+    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""))      # the raw text: what they said they want counts too
     better = res.get("rewritten") or rewrite(query)
     changed = _norm(better) != _norm(query)
     last = db.scalars(select(Message).where(Message.goal_id == goal.id, Message.role == "assistant")
@@ -795,6 +798,20 @@ def continue_turn(db, goal, agent, text: str):
     from app.agents.core import why_label
 
     tapped = next((f for f in corr.get("findings") or [] if text.strip() in (why_label(f, False), why_label(f, True))), None)
+    if tapped is None and READ_RE.search(text or ""):              # 'what does this query do': read it stage by stage
+        reading = (res.get("reading") or {}).get("hi" if hi else "en") or ""
+        lines = [("Query aise padhi (stage by stage):" if hi else "How the query reads, stage by stage:"), reading]
+        seen = []
+        for f in (corr.get("findings") or []):
+            b = f.get("basis")
+            if b and b["id"] not in seen and f["kind"] in ("error", "wrong", "check"):
+                seen.append(b["id"])
+                lines.append(f"\n{b['hi' if hi else 'en']}: {b['rule_hi' if hi else 'rule_en']}")
+        if seen:
+            lines.insert(2, "\n" + ("Galtiyon ki buniyaad:" if hi else "The fundamentals behind what's wrong:"))
+        inputs["last_ask"] = "read"
+        agent.inputs = dumps(inputs)
+        return "\n".join(lines).strip(), [], hi
     if tapped is not None:                                   # 'Why: ...' tapped: that one mistake, nothing else
         h = text.strip().startswith("Kyun:")
         fix = tapped["fix_hi" if h else "fix_en"]

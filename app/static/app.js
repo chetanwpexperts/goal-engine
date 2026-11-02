@@ -366,6 +366,7 @@
       wrap.append(ul);
     }
     if (r.rewritten && !corr) wrap.append(codeBox(w.rewritten, r.rewritten, w));
+    if (r.suggested) wrap.append(codeBox(T(hi, "Agar aapka matlab yahi tha", "If that's what you meant"), r.suggested, w));
     if (r.check_query) wrap.append(codeBox(w.check, r.check_query, w));
     if (r.indexes && r.indexes.length) wrap.append(codeBox(r.indexes_verified === false ? w.maybe : w.indexes, r.indexes.join("\n"), w));
     if (r.note) wrap.append(el("p", "note", r.note));

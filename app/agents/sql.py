@@ -434,8 +434,15 @@ def _with_correctness(original: str, out: dict, said: str = "") -> dict:
     else:
         out["findings"] = mine + speed
     if c.get("corrected"):
-        out["rewritten"] = c["corrected"]
+        if broken or not any(f["topic"] in MEANING_CHECKS for f in c["findings"]):
+            out["rewritten"] = c["corrected"]
+        else:                                      # only 'check' items that change the result: offered, never applied as the fix
+            out["suggested"] = c["corrected"]
     return out
+
+
+# 'check' findings whose rewrite gives different rows when the query was right as written (COUNT(*) vs COUNT(col) ...)
+MEANING_CHECKS = {"count", "not_in", "date_range"}
 
 
 def _is_select(low: str) -> bool:

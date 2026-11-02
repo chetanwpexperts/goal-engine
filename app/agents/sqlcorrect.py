@@ -309,7 +309,13 @@ VALUE_WORDS = set("""active inactive pending paid unpaid approved rejected compl
 admin open closed draft published new done failed success successful enabled disabled blocked deleted expired valid
 invalid present absent pass fail hold shipped delivered processing refunded verified unverified""".split())
 VALUE_COLUMNS = set("""status state type role gender category level mode kind department dept grade method payment_method
-currency plan tier priority stage city country""".split())
+currency plan tier priority stage city country speciality specialty designation source shift section title name label
+season tag colour color size brand unit location place branch zone region area district""".split())
+# after "col =", only these words can start a real expression; any other keyword-looking word (day, second, left, open) is a value
+EXPR_WORDS = set("""null true false unknown default not case exists select interval binary any some all date time timestamp row
+values current_date current_time current_timestamp localtime localtimestamp current_user session_user user""".split())
+VALUE_COLUMN_END = re.compile(r"(_type|_status|_mode|_name|_category|_level|_kind|_group|_class|_code)$|"
+                              r"[a-z](Type|Status|Mode|Name|Category|Level|Kind|Group|Class|Code)$")
 _DATE = re.compile(r"(?<![\w'\".:-])(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?(?![\w'\".:-])")
 _BARE_VALUE = re.compile(r"([`\"]?[A-Za-z_][\w$]*[`\"]?(?:\.[`\"]?[A-Za-z_][\w$]*[`\"]?)?)\s*(=|!=|<>)\s*([A-Za-z_][\w$]*)\b(?!\s*[.(])")
 
@@ -342,13 +348,20 @@ def _value_slips(sql: str, s: str, known: set) -> tuple[list, list]:
     for m in _BARE_VALUE.finditer(s):
         left, w = m.group(1).strip('`"'), m.group(3)
         wl, col = w.lower(), left.split(".")[-1].strip('`"').lower()
-        if wl in KW or wl in known or col in KW or wl in ("default", "current_user", "session_user", "user"):
+        if wl in EXPR_WORDS or wl in known or col in KW:
             continue
-        if wl not in VALUE_WORDS and col not in VALUE_COLUMNS:
-            continue
+        raw_col = left.split(".")[-1].strip('`"')
+        valueish_col = col in VALUE_COLUMNS or bool(VALUE_COLUMN_END.search(raw_col)) or bool(VALUE_COLUMN_END.search(col))
         if len(re.findall(rf"(?<![\w$.]){re.escape(wl)}(?![\w$])", low)) > 1 or re.search(rf"\.\s*[`\"]?{re.escape(wl)}\b", low):
             continue                                       # used elsewhere as a name: probably a real column
-        sure = wl in VALUE_WORDS
+        plain_word = re.fullmatch(r"[A-Za-z]+", w) is not None   # no _ or digits: reads like a value, not a column name
+        one_table = len(known) <= 1 and not re.search(r"\bjoin\b|\(\s*select\b", low)
+        if wl in VALUE_WORDS or (valueish_col and plain_word):
+            sure = True
+        elif valueish_col or (one_table and plain_word):
+            sure = False                                   # comparing two columns of the same row is rare, but possible
+        else:
+            continue
         ev = sql[m.start():m.end()]
         F.append(Finding("error" if sure else "check", "value",
                          f"{w} needs quotes: without them it's read as a column name" if sure else f"{w}: a value or a column?",
@@ -360,6 +373,155 @@ def _value_slips(sql: str, s: str, known: set) -> tuple[list, list]:
                          f"Text value ke liye {left} = '{w}' likho."))
         if sure:
             edits.append((m.start(3), m.end(3), f"'{w}'"))
+    return F, edits
+
+
+UNIQUE_COL = re.compile(r"^(id|\w+_id|uuid|guid|email|code|slug|username|user_name|sku|\w+_no|\w+_number|\w+_code|pk)$", re.I)
+
+
+def _statement_slips(sql: str, s: str, is_select: bool) -> tuple[list, list]:
+    """Mistakes any statement can have (SELECT, UPDATE, DELETE), worked out from the query alone. Each one was reproduced on
+    MariaDB and PostgreSQL: what MySQL does silently (wrong rows) is 'wrong', what a database refuses is 'error', and what
+    depends on data or engine the query can't show is 'check'."""
+    F, edits = [], []
+    low = s.lower()
+    dep = _depths(s)
+
+    # 1. column = (SELECT ...) that can return several rows: error 1242 / 'more than one row returned by a subquery'
+    for m in re.finditer(r"([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s*(=|!=|<>|<=|>=|<|>)\s*\(\s*select\b", s, re.I):
+        a = s.index("(", m.end(2))
+        b = _close(s, a)
+        sub = s[a + 1:b]
+        subl = sub.lower()
+        if AGG.search(_no_subqueries(sub)) and not re.search(r"\bgroup\s+by\b", subl):
+            continue                                       # MAX(...) / COUNT(*) without GROUP BY: always one row
+        if re.search(r"\blimit\s+1\b|\bfetch\s+first\s+(1\s+)?rows?\s+only\b", subl):
+            continue
+        keyed = any(UNIQUE_COL.match(c.split(".")[-1].strip('`"')) for c in
+                    re.findall(r"([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s*=\s*(?:'|\d|:|\?|%s|@)", sub))
+        col, op = m.group(1), m.group(2)
+        ev = re.sub(r"\s+", " ", sql[m.start():b + 1])
+        ev = ev if len(ev) <= 90 else ev[:87] + "..."
+        fix_in = op == "="
+        F.append(Finding("check" if keyed else "error", "subquery",
+                         f"{col} {op} (SELECT ...) breaks when the subquery returns more than one row",
+                         f"{col} {op} (SELECT ...) tab toot-ta hai jab subquery ek se zyada row de", ev,
+                         ("It filters on a key, so it probably returns one row; if it can return more, " if keyed else
+                          "Its WHERE can match several rows (for example several departments in one city), and then ")
+                         + f"MySQL stops with error 1242 (Subquery returns more than 1 row) and PostgreSQL with 'more than one row returned "
+                         f"by a subquery used as an expression'. "
+                         + (f"Use {col} IN (SELECT ...): the same result for one row, and right for many."
+                            if fix_in else f"Decide which row you mean: {op} ANY (...) / {op} ALL (...), or MIN()/MAX() inside the subquery."),
+                         ("Ye key pe filter karti hai, to shayad ek hi row deti hai; zyada de sakti hai to " if keyed else
+                          "Iska WHERE kai rows match kar sakta hai (jaise ek shehar mein kai departments), aur tab ")
+                         + "MySQL error 1242 deta hai aur PostgreSQL 'more than one row returned by a subquery'. "
+                         + (f"{col} IN (SELECT ...) likho: ek row pe same result, kai rows pe bhi sahi."
+                            if fix_in else f"Batao kaunsi row chahiye: {op} ANY (...) / {op} ALL (...), ya subquery mein MIN()/MAX().")))
+        if fix_in and not keyed:
+            edits.append((m.start(2), m.end(2), "IN"))
+
+    # 2. = NULL in UPDATE/DELETE conditions (SELECTs are read in depth below); SET x = NULL is an assignment, not a test
+    if not is_select:
+        wm = re.search(r"\bwhere\b", low)
+        if wm:
+            for m in re.finditer(r"(!=|<>|=)\s*null\b", s[wm.end():], re.I):
+                op, at = m.group(1), wm.end() + m.start()
+                right = "IS NOT NULL" if op in ("!=", "<>") else "IS NULL"
+                F.append(Finding("wrong", "null", f"'{op} NULL' is never true", f"'{op} NULL' kabhi true nahi hota",
+                                 re.sub(r"\s+", " ", sql[max(0, at - 30):at + len(m.group(0))]).strip(),
+                                 f"Nothing equals NULL, not even NULL, so this condition matches no row and the statement changes nothing. "
+                                 f"Write {right}.", f"NULL kisi ke barabar nahi hota, isliye ye kisi row ko nahi badlega. {right} likho."))
+                edits.append((at, at + len(m.group(0)), right))
+
+    # 3. UPDATE ... SET a = 1 AND b = 2: MySQL sets a = (1 AND b = 2), i.e. 0 or 1, and never touches b
+    sm = re.search(r"\bset\b", low) if re.match(r"\s*update\b", low) else None
+    if sm:
+        end = re.search(r"\bwhere\b|\border\s+by\b|\blimit\b|;|$", low[sm.end():])
+        set_end = sm.end() + (end.start() if end else len(low) - sm.end())
+        for m in re.finditer(r"\band\s+([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s*=(?!=)", s[sm.end():set_end], re.I):
+            at = sm.end() + m.start()
+            if dep[at] != dep[sm.start()]:
+                continue                                   # inside brackets: a real condition
+            ev = re.sub(r"\s+", " ", sql[sm.start():set_end]).strip()
+            F.append(Finding("wrong", "set", "SET ... AND ...: the AND must be a comma", "SET ... AND ...: AND ki jagah comma",
+                             ev[:90], "MySQL reads SET a = 50 AND b = 999 as a = (50 AND b = 999): a becomes 0 or 1 and b is never "
+                             "changed, with no error. PostgreSQL refuses it (argument of AND must be type boolean). Separate the "
+                             "columns with commas: SET a = 50, b = 999.",
+                             "MySQL SET a = 50 AND b = 999 ko a = (50 AND b = 999) padhta hai: a 0 ya 1 ban jata hai aur b badalta hi "
+                             "nahi, bina error. Columns ko comma se alag karo: SET a = 50, b = 999."))
+            edits.append((at, at + 3, ","))
+            pre = sql[at - 1:at]
+            if pre == " ":
+                edits[-1] = (at - 1, at + 3, ",")
+
+    # 4. status = 'a' OR 'b': the OR side is just the text 'b', not status = 'b'
+    for m in re.finditer(r"([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s*=\s*('[^']*'|-?\d+(?:\.\d+)?)((?:\s+or\s+(?:'[^']*'|-?\d+(?:\.\d+)?)(?![\w.]|\s*[=<>!]))+)",
+                         s, re.I):
+        col = m.group(1)
+        vals = [sql[m.start(2):m.end(2)]] + [sql[m.start(3) + x.start(1):m.start(3) + x.end(1)]
+                                             for x in re.finditer(r"or\s+('[^']*'|-?\d+(?:\.\d+)?)", s[m.start(3):m.end(3)], re.I)]
+        fixed = f"{col} IN ({', '.join(vals)})"
+        F.append(Finding("wrong", "or", f"{sql[m.start():m.end()].strip()}: OR needs the column again",
+                         f"{sql[m.start():m.end()].strip()}: OR ke baad column dobara chahiye", sql[m.start():m.end()].strip(),
+                         f"OR {vals[1]} doesn't compare {col}: MySQL turns {vals[1]} into a number (0 for text) and silently keeps only "
+                         f"{col} = {vals[0]}; PostgreSQL refuses it. Write {fixed}.",
+                         f"OR {vals[1]} {col} se compare nahi karta: MySQL use number (text ke liye 0) bana deta hai aur chupchaap sirf "
+                         f"{col} = {vals[0]} rakhta hai; PostgreSQL mana karta hai. {fixed} likho."))
+        edits.append((m.start(), m.end(), fixed))
+
+    # 5. BETWEEN high AND low: never true
+    for m in re.finditer(r"\bbetween\s+(-?\d+(?:\.\d+)?|'[^']*')\s+and\s+(-?\d+(?:\.\d+)?|'[^']*')", s, re.I):
+        lo, hi_ = sql[m.start(1):m.end(1)], sql[m.start(2):m.end(2)]
+        try:
+            bad = float(lo) > float(hi_)
+        except ValueError:
+            bad = lo.startswith("'") and hi_.startswith("'") and re.fullmatch(r"'\d{4}-\d{2}-\d{2}[^']*'", lo) is not None and \
+                re.fullmatch(r"'\d{4}-\d{2}-\d{2}[^']*'", hi_) is not None and lo > hi_
+        if bad:
+            F.append(Finding("wrong", "between", f"BETWEEN {lo} AND {hi_}: the smaller value must come first",
+                             f"BETWEEN {lo} AND {hi_}: chhoti value pehle aati hai", sql[m.start():m.end()],
+                             f"BETWEEN a AND b means >= a AND <= b, so with {lo} first nothing can match: no rows, no error "
+                             f"(MySQL and PostgreSQL). Write BETWEEN {hi_} AND {lo}.",
+                             f"BETWEEN a AND b ka matlab >= a aur <= b, isliye {lo} pehle ho to kuch match nahi hota: koi row nahi, "
+                             f"koi error nahi. BETWEEN {hi_} AND {lo} likho."))
+            edits.append((m.start(1), m.end(1), hi_))
+            edits.append((m.start(2), m.end(2), lo))
+
+    # 6. an aggregate in WHERE (outside any subquery): error 1111 / 'aggregate functions are not allowed in WHERE'
+    flat = _no_subqueries(s)
+    wm = re.search(r"\bwhere\b", flat, re.I)
+    if wm:
+        rest = flat[wm.end():]
+        stop = re.search(r"\bgroup\s+by\b|\border\s+by\b|\bhaving\b|\blimit\b|\bunion\b|;", rest, re.I)
+        wtext = rest[:stop.start()] if stop else rest
+        am = AGG.search(wtext)
+        if am:
+            fn = am.group(1).upper()
+            F.append(Finding("error", "where", f"{fn}() can't be used in WHERE", f"WHERE mein {fn}() nahi chalta",
+                             re.sub(r"\s+", " ", sql[wm.end() + am.start():wm.end() + am.start() + 60]).strip(),
+                             f"WHERE looks at one row at a time, before any totals exist: MySQL stops with error 1111 (Invalid use of "
+                             f"group function), PostgreSQL with 'aggregate functions are not allowed in WHERE'. A condition on a total goes "
+                             f"in HAVING after GROUP BY; in UPDATE/DELETE, compare with a subquery, e.g. salary < (SELECT AVG(salary) FROM ...).",
+                             f"WHERE ek-ek row dekhta hai, totals se pehle: MySQL error 1111, PostgreSQL 'aggregate functions are not allowed "
+                             f"in WHERE'. Total pe condition GROUP BY ke baad HAVING mein; UPDATE/DELETE mein subquery se compare karo."))
+
+    # 7. UPDATE/DELETE t ... (SELECT ... FROM t): MySQL refuses (1093); MariaDB 10.3+ and PostgreSQL allow it
+    tm = re.match(r"\s*(?:update\s+(?:low_priority\s+)?(?:ignore\s+)?|delete\s+from\s+)[`\"]?([\w$]+)[`\"]?", low)
+    if tm:
+        t = tm.group(1)
+        for m in re.finditer(r"\(\s*select\b", s, re.I):
+            a = m.start()
+            sub = s[a:_close(s, a) + 1]
+            if re.search(rf"\bfrom\s+[`\"]?{re.escape(t)}[`\"]?\b", sub, re.I) and \
+                    not re.search(r"\bfrom\s*\(\s*select\b", sub, re.I):
+                F.append(Finding("check", "same_table", f"The subquery reads {t}, the table being changed",
+                                 f"Subquery wahi table {t} padhti hai jo badal rahi hai", re.sub(r"\s+", " ", sql[a:a + 70]).strip(),
+                                 f"MySQL refuses this with error 1093 (You can't specify target table '{t}' for update in FROM clause); "
+                                 f"MariaDB 10.3+ and PostgreSQL allow it. On MySQL, wrap the subquery once more: "
+                                 f"... IN (SELECT x FROM (SELECT ... FROM {t} ...) AS t2), or use a multi-table UPDATE/DELETE with a JOIN.",
+                                 f"MySQL ise error 1093 se mana karta hai; MariaDB 10.3+ aur PostgreSQL chala dete hain. MySQL pe subquery ko "
+                                 f"ek aur baar lapeto: (SELECT x FROM (SELECT ... FROM {t} ...) AS t2), ya JOIN wala UPDATE/DELETE."))
+                break
     return F, edits
 
 
@@ -377,8 +539,11 @@ def check(sql: str, _again: bool = False) -> dict:
     statement; plain SELECTs are read in depth."""
     s = _mask(sql)
     known = {w.lower() for w in re.findall(r"\b(?:from|join|update|into)\s+[`\"]?([\w$]+)", s, re.I)}
-    known |= {w.lower() for w in re.findall(r"\b(?:from|join|update)\s+[`\"]?[\w$.]+[`\"]?\s+(?:as\s+)?([A-Za-z_]\w*)", s, re.I)}
+    known |= {w.lower() for w in re.findall(r"\b(?:from|join|update)\s+[`\"]?[\w$.]+[`\"]?\s+(?:as\s+)?([A-Za-z_]\w*)", s, re.I)
+              if w.lower() not in KW}
     slips, slip_edits = _value_slips(sql, s, known)
+    more, more_edits = _statement_slips(sql, s, bool(re.match(r"[\s(]*(select|with)\b", s.lower())))
+    slips, slip_edits = slips + more, slip_edits + more_edits
     out = _check_select(sql, s, slip_edits, _again)
     if out is None:                                   # not a plain SELECT: only the value checks apply
         order = {"error": 0, "wrong": 1, "check": 2}

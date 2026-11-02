@@ -228,11 +228,6 @@ def analyze_sql(query: str, extra: str = "") -> dict:
     if re.search(r"\bnot\s+in\s*\(\s*select\b", low):
         add(2, "NOT IN (SELECT ...) is slow and breaks on NULLs", "NOT IN (SELECT ...) slow hai aur NULL pe galat",
             "NOT IN subquery", "Use NOT EXISTS (or LEFT JOIN ... WHERE x IS NULL).", "NOT EXISTS (ya LEFT JOIN ... WHERE x IS NULL) use karo.")
-    elif re.search(r"\bin\s*\(\s*select\b", low) and not is_select:
-        # UPDATE/DELETE ... IN (SELECT): older MySQL (before 8.0.21) doesn't turn these into a semi-join
-        add(1, "IN (SELECT ...) inside UPDATE/DELETE", "UPDATE/DELETE ke andar IN (SELECT ...)", "IN subquery",
-            "On older MySQL this can run once per row: if it's slow, use a multi-table UPDATE/DELETE with a JOIN.",
-            "Purane MySQL pe ye har row ke liye chal sakta hai: slow ho to JOIN wala multi-table UPDATE/DELETE use karo.")
     select_list = _clause(sql, "select", ("from",))
     if re.search(r"\(\s*select\b", select_list, re.I):
         add(3, "Subquery inside SELECT runs once per row", "SELECT ke andar subquery har row ke liye chalti hai",
@@ -445,6 +440,14 @@ def _notes(sql: str, tables, original: str = "") -> list[dict]:
                     "hi": "WHERE ... IN (SELECT ...) jaisa hai theek hai: MySQL 5.6+, MariaDB aur PostgreSQL ise semi-join ki tarah chalate "
                           "hain, har row ke liye nahi. Ise seedha JOIN mat banao: andar wali table mein ek se zyada matching rows hon "
                           "to JOIN har bahar wali row baar baar deta hai. Slow ho to subquery wale column pe index lagao."})
+    elif re.search(r"\bin\s*\(\s*select\b", low) and not re.search(r"\bnot\s+in\s*\(\s*select\b", low) and \
+            re.match(r"[\s(]*(update|delete)\b", low):
+        out.append({"en": "UPDATE/DELETE ... IN (SELECT ...) is fine on MySQL 8.0.21+ and PostgreSQL. Older MySQL and MariaDB versions can "
+                          "run the subquery once per row of the table being changed: if it's slow there, use a multi-table UPDATE/DELETE "
+                          "with a JOIN, or index the subquery's column.",
+                    "hi": "UPDATE/DELETE ... IN (SELECT ...) MySQL 8.0.21+ aur PostgreSQL pe theek hai. Purane MySQL/MariaDB subquery ko "
+                          "har row ke liye chala sakte hain: wahan slow ho to JOIN wala multi-table UPDATE/DELETE use karo, ya subquery "
+                          "wale column pe index lagao."})
     if re.search(r"\bcase\s+when\b[^;]*\blike\s+'%", (original or sql).lower()):
         out.append({"en": "The LIKE '%...%' checks inside CASE run on rows already found; they don't search the table, so they "
                           "don't need an index and aren't what makes it slow.",

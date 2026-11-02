@@ -523,6 +523,16 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
         if edit:
             edits.append(edit)
 
+    # 14. basic SELECT mistakes (app/agents/sqlbasics.py): text joining, NULL in sums, LIKE, AND/OR, division, sorted LIMIT
+    from app.agents import sqlbasics
+
+    for fnd, edit in sqlbasics.basics(sql, s, is_select, intent, Finding):
+        if any(f.evidence == fnd.evidence and f.topic == fnd.topic for f in F):
+            continue
+        F.append(fnd)
+        if edit and not any(a < edit[1] and edit[0] < b or (a == b == edit[0]) for a, b, _n in edits):
+            edits.append(edit)
+
     # 8. what the person said they want: "the highest within their own category" vs MAX() over the whole table
     handled = set()
     for fnd, edit, span in _per_group(sql, s, intent):

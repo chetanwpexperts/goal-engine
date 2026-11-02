@@ -473,7 +473,7 @@ def _with_reading(original: str, out: dict) -> dict:
 
 
 # 'check' findings whose rewrite gives different rows when the query was right as written (COUNT(*) vs COUNT(col) ...)
-MEANING_CHECKS = {"count", "not_in", "date_range"}
+MEANING_CHECKS = {"count", "not_in", "date_range", "concat", "like", "and_or", "null_math", "division", "nulls_order", "stable_order"}
 
 
 def _is_select(low: str) -> bool:

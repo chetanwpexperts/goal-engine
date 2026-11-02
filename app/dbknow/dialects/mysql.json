@@ -509,5 +509,27 @@
   "\\b(?:Slave|Replica)_(?:SQL|IO)_Running\\b",
   "Seconds_Behind_(?:Master|Source)",
   "binary log index file"
+ ],
+ "query_marks": [
+  "`[^`]+`",
+  "\\blimit\\s+\\d+\\s*,\\s*\\d+",
+  "\\b(ifnull|curdate|date_format|str_to_date|group_concat|unix_timestamp)\\s*\\(",
+  "\\bauto_increment\\b",
+  "\\bstraight_join\\b"
+ ],
+ "query_rules": {
+  "pipes": "or",
+  "plus_on_text": "number",
+  "int_division": "decimal",
+  "nulls_in_desc": "last",
+  "isnull_args": 1,
+  "ifnull": true,
+  "nvl": false,
+  "double_quotes": "string",
+  "concat_null": "null",
+  "like_case": "insensitive"
+ },
+ "proven": [
+  "mariadb 10.11 (MySQL-compatible behaviour of these rules)"
  ]
 }

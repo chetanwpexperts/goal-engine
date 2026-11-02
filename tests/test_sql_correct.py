@@ -149,3 +149,64 @@ def test_a_select_after_a_comment_is_still_a_select(before):
     assert any("semi-join" in n["en"] for n in res["notes"])
     plain = analyze_sql(before.replace("(", "") + "SELECT id FROM users")
     assert any("No WHERE and no LIMIT" in f["title_en"] for f in plain["findings"])     # read-query rules apply too
+
+
+QUOTES_UPDATE = ("UPDATE employees SET salary = salary * 1.1\nWHERE id IN (SELECT emp_id FROM reviews)\n"
+                 "  AND hire_date < 2024-01-01\n  AND status = active")
+
+
+@pytest.mark.parametrize("q", [QUOTES_UPDATE, "SELECT name, salary FROM employees WHERE hire_date < 2024-01-01 AND status = active",
+                               "SELECT e.name FROM employees e JOIN depts d ON d.id = e.dept_id\nWHERE e.hire_date < 2024-01-01 AND e.status = active"])
+def test_values_without_quotes_are_found_and_quoted(q):
+    """Seen on the live site: hire_date < 2024-01-01 and status = active went unnoticed."""
+    c = analyze_sql(q)["correct"]
+    kinds = {f["evidence"].split()[-1].strip("'"): f["kind"] for f in c["findings"] if f["topic"] == "value"}
+    assert kinds.get("2024-01-01") == "wrong" and kinds.get("active") == "error", c["findings"]
+    assert "< '2024-01-01'" in c["corrected"] and "= 'active'" in c["corrected"]
+    assert not [f for f in c["findings"] if f["topic"] == "column" and "active" in f["title_en"]]   # not also "which table is active from"
+    assert "2022" in next(f for f in c["findings"] if f["topic"] == "value" and "2024" in f["title_en"])["title_en"]
+
+
+@pytest.mark.parametrize("q", ["SELECT id FROM users WHERE status = 'active' AND created > '2024-01-01'",
+                               "SELECT a.id FROM a JOIN b ON a.type = b.type", "UPDATE users SET mode = DEFAULT WHERE id = 7",
+                               "SELECT id FROM orders WHERE status = old_status", "SELECT id FROM t WHERE a = b AND b > 3",
+                               "SELECT id FROM users WHERE owner = current_user", "SELECT id FROM t WHERE created > NOW() - INTERVAL 7 DAY"])
+def test_quoted_values_and_real_columns_are_left_alone(q):
+    c = analyze_sql(q).get("correct") or {}
+    assert not [f for f in c.get("findings", []) if f["topic"] == "value" and f["kind"] in ("error", "wrong")], c.get("findings")
+
+
+def test_unquoted_values_in_the_chat(client, ml_mode):
+    from tests.test_ml import say
+
+    r = say(client, "i have another query issue can you solve it?")
+    r = client.post("/api/message", json={"text": QUOTES_UPDATE, "goal_id": r["goal"]["id"]}).json()
+    assert "needs quotes" in r["reply"] and "problem found" not in r["reply"]
+
+
+def test_what_the_databases_really_do_with_unquoted_values():
+    """The lab proof behind the findings: MySQL/MariaDB read 2024-01-01 as 2022 (wrong rows, no error) and 'active' as a column."""
+    import socket
+
+    for port in (3306, 5432):
+        try:
+            socket.create_connection(("127.0.0.1", port), timeout=0.5).close()
+        except OSError:
+            pytest.skip("needs the local MariaDB and PostgreSQL test databases")
+    from tests.dbreal import real_errors as RE
+
+    my = RE.mariadb()
+    with my.cursor() as c:
+        c.execute("CREATE TEMPORARY TABLE q_emp (id INT, hire_date DATE, status VARCHAR(10))")
+        c.execute("INSERT INTO q_emp VALUES (1, '2023-05-01', 'active'), (2, '2025-02-01', 'active')")
+        c.execute("SELECT 2024-01-01")
+        assert c.fetchone()[0] == 2022
+        c.execute("SELECT count(*) FROM q_emp WHERE hire_date < 2024-01-01")
+        assert c.fetchone()[0] == 0                                      # silently wrong
+        c.execute(analyze_sql("SELECT count(*) FROM q_emp WHERE hire_date < 2024-01-01 AND status = active")["correct"]["corrected"])
+        assert c.fetchone()[0] == 1                                      # the corrected query is right
+    assert "1054" in RE.my_error(my, "SELECT count(*) FROM q_emp WHERE status = active")
+    pg = RE.postgres()
+    pg.execute("CREATE TEMP TABLE q_emp (id int, hire_date date, status text)")
+    assert "operator does not exist: date < integer" in RE.pg_error(pg, "SELECT count(*) FROM q_emp WHERE hire_date < 2024-01-01")
+    assert 'column "active" does not exist' in RE.pg_error(pg, "SELECT count(*) FROM q_emp WHERE status = active")

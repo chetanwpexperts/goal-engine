@@ -229,7 +229,7 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
             op = sql[pos:end]
             new = f"COALESCE({op}, 0)"
             out.append((F("check", "null_math", f"If {op} is NULL, the whole calculation is NULL", f"{op} NULL ho to poora hisaab NULL",
-                          _expr_around(sql, pos, end)[:90],
+                          f"{op} in: " + _expr_around(sql, pos, end)[:80],
                           f"Arithmetic with NULL gives NULL on every database, so a row with no {name} gets NULL instead of a number "
                           f"(and SUM/AVG then skip that row). If a missing {name} means 0, write {new}.",
                           f"NULL ke saath hisaab NULL deta hai, isliye bina {name} wali row ka result NULL. Agar khaali ka matlab 0 hai to {new}."),

@@ -753,8 +753,8 @@ def _workbook_traps(sql: str, s: str, is_select: bool, intent: str) -> list:
         names = [w for w in re.findall(r"(?<![\w$])([A-Za-z_][\w$]*)", s) if w.lower() not in KW]
         for noun in _said_groups(said):
             g = _group_column(noun, names)
-            if not g:
-                continue
+            if not g or g.split(".")[-1].strip('`"').lower() == lm.group(1).strip('`"').lower():
+                continue                                   # 'top 3 employees by commission': ranked BY it, not per it
             rank = "RANK()" if re.search(r"\bties?\b|same rank|share", said) else "ROW_NUMBER()"
             base = sql[:lm.start()].rstrip()
             key, direction = lm.group(1).strip('`"'), (lm.group(2) or "").strip().upper()

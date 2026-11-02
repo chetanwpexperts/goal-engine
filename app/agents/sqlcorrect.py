@@ -393,7 +393,11 @@ def _statement_slips(sql: str, s: str, is_select: bool) -> tuple[list, list]:
         b = _close(s, a)
         sub = s[a + 1:b]
         subl = sub.lower()
-        if AGG.search(_no_subqueries(sub)) and not re.search(r"\bgroup\s+by\b", subl):
+        one = sub
+        dm = re.match(r"\s*select\s+[`\"]?\w+[`\"]?\s+from\s*(\()\s*select\b", sub, re.I)
+        if dm and re.fullmatch(r"\s*(as\s+)?[`\"]?\w+[`\"]?\s*", sub[_close(sub, dm.start(1)) + 1:], re.I):
+            one = sub[dm.start(1) + 1:_close(sub, dm.start(1))]   # SELECT v FROM (SELECT MAX(x) AS v ...) AS copy: the inner one decides
+        if AGG.search(_no_subqueries(one)) and not re.search(r"\bgroup\s+by\b", one.lower()):
             continue                                       # MAX(...) / COUNT(*) without GROUP BY: always one row
         if re.search(r"\blimit\s+1\b|\bfetch\s+first\s+(1\s+)?rows?\s+only\b", subl):
             continue
@@ -511,9 +515,15 @@ def _statement_slips(sql: str, s: str, is_select: bool) -> tuple[list, list]:
         t = tm.group(1)
         for m in re.finditer(r"\(\s*select\b", s, re.I):
             a = m.start()
-            sub = s[a:_close(s, a) + 1]
+            b = _close(s, a)
+            sub = s[a:b + 1]
+            if re.search(r"\bfrom\s*$", s[:a], re.I):
+                continue                                   # a derived table: MySQL builds it first, so it's allowed
             if re.search(rf"\bfrom\s+[`\"]?{re.escape(t)}[`\"]?\b", sub, re.I) and \
                     not re.search(r"\bfrom\s*\(\s*select\b", sub, re.I):
+                wrapped = _wrap_derived(sql, s, a, b, t)
+                if wrapped:
+                    edits.append((a, b + 1, wrapped))
                 F.append(Finding("check", "same_table", f"The subquery reads {t}, the table being changed",
                                  f"Subquery wahi table {t} padhti hai jo badal rahi hai", re.sub(r"\s+", " ", sql[a:a + 70]).strip(),
                                  f"MySQL refuses this with error 1093 (You can't specify target table '{t}' for update in FROM clause); "
@@ -523,6 +533,32 @@ def _statement_slips(sql: str, s: str, is_select: bool) -> tuple[list, list]:
                                  f"ek aur baar lapeto: (SELECT x FROM (SELECT ... FROM {t} ...) AS t2), ya JOIN wala UPDATE/DELETE."))
                 break
     return F, edits
+
+
+def _wrap_derived(sql: str, s: str, a: int, b: int, table: str) -> str | None:
+    """(SELECT x FROM t ...) -> (SELECT v FROM (SELECT x AS v FROM t ...) AS t_copy): the same rows on every database, and
+    MySQL builds the inner copy first, so it no longer refuses an UPDATE/DELETE of t (error 1093)."""
+    inner_m, inner_o = s[a + 1:b], sql[a + 1:b]
+    sm = re.match(r"\s*select\s+(distinct\s+)?", inner_m, re.I)
+    fm = None
+    d = 0
+    for k in range(sm.end(), len(inner_m)):
+        ch = inner_m[k]
+        d += ch == "("
+        d -= ch == ")"
+        if d == 0 and re.match(r"\bfrom\b", inner_m[k:], re.I) and (k == 0 or not (inner_m[k - 1].isalnum() or inner_m[k - 1] == "_")):
+            fm = k
+            break
+        if d == 0 and ch == ",":
+            return None                                    # several columns: there's no single safe rewrite
+    if fm is None:
+        return None
+    item = inner_o[sm.end():fm].rstrip()
+    am = re.search(r"\s+as\s+([`\"]?\w+[`\"]?)\s*$", item, re.I)
+    name = am.group(1) if am else "v"
+    body = inner_o if am else inner_o[:sm.end()] + item + " AS v " + inner_o[fm:].lstrip()
+    lead = re.match(r"\s*", inner_o).group(0)
+    return f"({lead}SELECT {name} FROM ({body.strip()}) AS {table}_copy{lead.rstrip(' ') if chr(10) in lead else ''})"
 
 
 def _apply_plain(sql: str, edits: list) -> str | None:
@@ -814,7 +850,9 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool) -> dict | No
         for m in WORD.finditer(wtext):
             w = m.group(1)
             if w.lower() in sel_aliases and not any(w.lower() == (x.alias or "").lower() for x in srcs) and \
-                    not re.match(r"\s*\.", wtext[m.end():]) and not any(w.lower() == c.lower() for _q, c, _p in all_refs):
+                    not re.match(r"\s*\.", wtext[m.end():]) and not any(w.lower() == c.lower() for _q, c, _p in all_refs) and \
+                    not re.search(rf"(?<![\w.]){re.escape(w)}(?!\w)", re.sub(r"\s+as\s+\S+\s*$", "", sel_aliases[w.lower()]["text"], flags=re.I), re.I):
+                # SUM(total) AS total: 'total' is also a real column, and WHERE total means that column (MySQL and PostgreSQL)
                 add("error", "alias", f"WHERE uses {w}, a name made in SELECT", f"WHERE mein {w}, jo SELECT mein banaya naam hai",
                     line_of(where[0] + m.start()), "WHERE runs before SELECT, so it can't see SELECT's names (error 1054). Repeat the "
                     "expression itself in WHERE.", "WHERE, SELECT se pehle chalta hai, use SELECT ke naam nahi dikhte (error 1054). "

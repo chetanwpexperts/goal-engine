@@ -12,10 +12,12 @@ from collections import Counter
 
 from tests.fuzz.db import engines_up, make_schema
 
-BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_value", "between_reversed", "agg_in_where", "eq_null_dml"]
+BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_value", "between_reversed", "agg_in_where", "eq_null_dml",
+        "same_table"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
-         "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null"}
+         "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table"}
 NO_FIX = {"agg_in_where"}                    # there is no single right rewrite: found is enough
+FIX_THE_CHECK = {"same_table"}               # a 'check' (fine on MariaDB/PostgreSQL) whose rewrite must still do the same
 
 
 def _cols(t, *kinds):
@@ -109,6 +111,14 @@ def make(seed: int):
         truth = None
         broken = (f"SELECT {pk}, {c}\nFROM {t['name']}\nWHERE {fn}({c}) > 10" if stmt == "select" else
                   wrap(f"{c} > 0 AND {fn}({c}) > 10"))
+    elif bug == "same_table":                 # valid on MariaDB and PostgreSQL, refused by MySQL (1093): the rewrite must do the same
+        if not nums:
+            return None
+        stmt = rnd.choice(["update", "delete"])
+        c = rnd.choice(nums)["name"]
+        sub = rnd.choice([f"(SELECT MAX({c}) FROM {t['name']})", f"(SELECT AVG({c}) FROM {t['name']})"])
+        op = rnd.choice(["=", "<", ">="])
+        truth = broken = wrap(f"{c} {op} {sub}", f"{c} = {c}")
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -147,6 +157,8 @@ def check(item, engines: dict) -> list[str]:
     if extra:
         bad.append(f"{tag}: extra findings {extra}\n{item['broken']}")
     sure = any(f["topic"] == want and f["kind"] in ("error", "wrong") for f in res["findings"])
+    if item["bug"] in FIX_THE_CHECK:
+        sure = True
     if item["bug"] in NO_FIX or not sure:
         return bad
     fixed = res["corrected"]

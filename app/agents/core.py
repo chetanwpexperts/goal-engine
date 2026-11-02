@@ -99,7 +99,7 @@ def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up:
                     f"{n_err + n_wrong} mistake{'s' if n_err + n_wrong != 1 else ''}" + (f" ({n_err} stop it running)" if n_err else ""))
     if n_check:
         bits.append(f"{n_check} check karne layak" if hi else f"{n_check} to check")
-    if not follow_up and result["correct"].get("corrected"):   # the fix, and at most 3 short notes: the card has the rest
+    if not follow_up and result["correct"].get("corrected") and n_err + n_wrong:   # the fix, and at most 3 short notes
         left_t = {x["title_en"] for x in result["correct"].get("left") or []}
         fixed = [f for f in sorted(fs, key=lambda f: "ewc".index(f["kind"][0])) if f["kind"] != "check" and f["title_en"] not in left_t]
         top, n = fixed[:3], len(fixed)
@@ -114,12 +114,17 @@ def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up:
     tag = {"error": "✗", "wrong": "!", "check": "?"}
     for k, f in enumerate(sorted(fs, key=lambda f: "ewc".index(f["kind"][0])), 1):
         out.append(f"{k}. {tag[f['kind']]} {f['title_hi' if hi else 'title_en']}")
+        if not n_err + n_wrong and not follow_up and len(fs) <= 2 and f.get("fix_hi" if hi else "fix_en"):
+            out.append("   " + f["fix_hi" if hi else "fix_en"])          # only things to check: say why right here
     left = result["correct"].get("left") or []
     if left and not follow_up:
         out.append(("Aapka faisla: " if hi else "Your call: ") + "; ".join(f["title_hi" if hi else "title_en"] for f in left) + ".")
     if result["correct"].get("corrected") and not follow_up:
-        out.append("Theek ki hui query card mein hai ('-- check' wale naam andaze se)." if hi else
-                   "Corrected query is in the card ('-- check' marks names I guessed).")
+        out.append(("Har database pe chalne wali query card mein hai." if hi else
+                    "A version that runs on every database is in the card.") if not n_err + n_wrong and
+                   all(f["topic"] == "same_table" for f in fs) else
+                   ("Theek ki hui query card mein hai ('-- check' wale naam andaze se)." if hi else
+                    "Corrected query is in the card ('-- check' marks names I guessed)."))
     return "\n".join(out)
 
 

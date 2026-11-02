@@ -268,3 +268,30 @@ def test_check_another_query_asks_for_it(client, ml_mode):
     assert "Paste the next SQL query" in r["reply"] and "covered this above" not in r["reply"]
     r = client.post("/api/message", json={"text": SCALAR_SUB, "goal_id": g}).json()
     assert "more than one row" in r["reply"]
+
+
+SAME_TABLE = ("UPDATE products\nSET price = price * 0.90\nWHERE category_id IN (\n   SELECT category_id\n   FROM categories\n"
+              "   WHERE is_active = 1\n)\nAND stock_quantity = (\n   SELECT MAX(stock_quantity)\n   FROM products\n); correct this")
+
+
+def test_same_table_subquery_gets_a_version_for_every_database(client, ml_mode):
+    """Seen on the live site: the finding was right (MySQL error 1093) but the reply had no why and no corrected query,
+    and the request typed after the query ('; correct this') was read as part of it."""
+    from tests.test_ml import say
+
+    c = analyze_sql(SAME_TABLE)["correct"]
+    assert [f["topic"] for f in c["findings"]] == ["same_table"] and "correct this" not in c["findings"][0]["evidence"]
+    assert "SELECT v FROM (SELECT MAX(stock_quantity) AS v FROM products) AS products_copy" in c["corrected"]
+    assert sqlcorrect.check(c["corrected"])["findings"] == []                  # the rewrite is clean, not a new 'more than one row'
+    r = say(client, "check the query I have")
+    r = client.post("/api/message", json={"text": SAME_TABLE, "goal_id": r["goal"]["id"]}).json()
+    assert "1093" in r["reply"] and "runs on every database" in r["reply"]
+
+
+def test_a_total_named_like_its_column_is_not_a_select_name_in_where():
+    """SUM(total) AS total: WHERE total means the real column (found by the valid-query sweep), while a name that exists only
+    in SELECT (price * qty AS total) is still reported."""
+    ok = "SELECT customer_id, SUM(total) AS total FROM orders WHERE total BETWEEN 10 AND 50 GROUP BY customer_id"
+    assert not [f for f in sqlcorrect.check(ok)["findings"] if f["kind"] in ("error", "wrong")]
+    bad = sqlcorrect.check("SELECT price * qty AS total FROM items WHERE total > 100")["findings"]
+    assert any("a name made in SELECT" in f["title_en"] for f in bad)

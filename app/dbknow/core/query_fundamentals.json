@@ -1,0 +1,201 @@
+{
+ "about": "How DBaba reasons about a query, in our own words: read it as stages (output, tables, links, row filters, totals, group filters, windows, final cut), state what one result row stands for, then check each stage against the fundamentals below. Every finding of the SQL checker names the fundamental it breaks. Learned from the official manuals first; practice problems only point at what to check.",
+ "checklist": [
+  {
+   "id": "output",
+   "en": "What must each result row show?",
+   "hi": "Har result row mein kya dikhna chahiye?"
+  },
+  {
+   "id": "tables",
+   "en": "Which tables hold those values?",
+   "hi": "Ye values kin tables mein hain?"
+  },
+  {
+   "id": "links",
+   "en": "How are the tables linked, and is each link one-to-one or one-to-many?",
+   "hi": "Tables kaise jude hain, aur har link ek-se-ek hai ya ek-se-kai?"
+  },
+  {
+   "id": "row_filters",
+   "en": "Which raw rows are kept (WHERE), and does a filter on an outer-joined table undo the outer join?",
+   "hi": "Kaunsi rows rakhi jaati hain (WHERE), aur kya outer-join wali table ka filter outer join ko khatam karta hai?"
+  },
+  {
+   "id": "totals",
+   "en": "What is totalled (COUNT/SUM/AVG/MIN/MAX), and at which level?",
+   "hi": "Kya total hota hai (COUNT/SUM/AVG/MIN/MAX), aur kis level pe?"
+  },
+  {
+   "id": "grain",
+   "en": "What does one result row stand for (the grain)?",
+   "hi": "Ek result row kis cheez ki hai (grain)?"
+  },
+  {
+   "id": "group_filters",
+   "en": "Is a condition on a total in HAVING, not WHERE?",
+   "hi": "Total wali condition HAVING mein hai, WHERE mein nahi?"
+  },
+  {
+   "id": "stages",
+   "en": "Should it be split into stages (subqueries / CTEs), each at one grain?",
+   "hi": "Kya ise stages mein todna chahiye (subquery / CTE), har stage ek grain pe?"
+  },
+  {
+   "id": "windows",
+   "en": "Is ranking, a running total or a previous-row comparison needed (window functions)?",
+   "hi": "Ranking, running total ya pichhli row se compare chahiye (window functions)?"
+  },
+  {
+   "id": "final_cut",
+   "en": "Which rows survive at the end (HAVING, rank filter, LIMIT), and is the order deterministic?",
+   "hi": "Aakhir mein kaunsi rows bachti hain (HAVING, rank filter, LIMIT), aur order pakka hai?"
+  },
+  {
+   "id": "speed",
+   "en": "Which filters and joins need an index, and does a function on a column stop the index?",
+   "hi": "Kin filters aur joins ko index chahiye, aur kya column pe function index rok deta hai?"
+  }
+ ],
+ "fundamentals": {
+  "grain": {
+   "title_en": "Grain: what one row stands for",
+   "title_hi": "Grain: ek row kis cheez ki hai",
+   "rule_en": "Every stage of a query has a grain (one row per order, per customer, per category). Totals, comparisons and ranks are only right when they are taken at the grain the question asks for; mixing two grains in one step is the most common silent mistake.",
+   "rule_hi": "Query ke har stage ka ek grain hota hai (har order, har customer, har category ki ek row). Total, compare aur rank tabhi sahi hain jab sawaal wale grain pe liye jaayein; ek step mein do grain milana sabse aam chhupi galti hai.",
+   "topics": [
+    "group",
+    "per_group",
+    "top_n",
+    "distinct"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/group-by-handling.html"
+  },
+  "cardinality": {
+   "title_en": "Cardinality: one-to-many links multiply rows",
+   "title_hi": "Cardinality: ek-se-kai link rows ko guna karte hain",
+   "rule_en": "Joining a table with many rows per key repeats the other side once per match. Two such joins on the same parent multiply each other, so totals of either side grow; total each child at its own grain first, then join the totals.",
+   "rule_hi": "Kai rows wali table join karne se doosri taraf har match pe dohraati hai. Ek parent pe do aise join ek doosre ko guna karte hain; pehle har child ka total uske apne grain pe nikaalo, phir join karo.",
+   "topics": [
+    "join"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html"
+  },
+  "outer_join": {
+   "title_en": "Outer joins keep unmatched rows, with NULLs",
+   "title_hi": "Outer join bina match wali rows rakhta hai, NULL ke saath",
+   "rule_en": "A LEFT JOIN keeps every left row; where nothing matches, the right-side columns are NULL. A WHERE condition on those columns removes the unmatched rows again (put it in ON instead), and COUNT(*) counts the unmatched row as 1 (count a right-side column instead).",
+   "rule_hi": "LEFT JOIN har left row rakhta hai; match na ho to right ke columns NULL hote hain. Un columns pe WHERE condition bina match wali rows hata deti hai (ON mein likho), aur COUNT(*) unhe 1 ginta hai (right ka column gino).",
+   "topics": [
+    "count"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/outer-join-simplification.html"
+  },
+  "null_logic": {
+   "title_en": "NULL means unknown",
+   "title_hi": "NULL ka matlab anjaan",
+   "rule_en": "Any comparison with NULL is unknown, not true or false: = NULL never matches (use IS NULL), and NOT IN over a list that contains a NULL matches nothing (use NOT EXISTS). Arithmetic with NULL is NULL (COALESCE(x, 0) when missing means zero), and where NULLs sort differs: first in ASC on MySQL/MariaDB, first in DESC on PostgreSQL.",
+   "rule_hi": "NULL se har comparison anjaan hota hai, na true na false: = NULL kabhi match nahi karta (IS NULL likho), aur NULL wali list pe NOT IN kuch match nahi karta (NOT EXISTS likho). NULL ke saath hisaab NULL hota hai (khaali ka matlab zero ho to COALESCE(x, 0)), aur sort mein NULL MySQL/MariaDB pe ASC mein pehle, PostgreSQL pe DESC mein pehle aate hain.",
+   "topics": [
+    "null",
+    "not_in",
+    "null_fn",
+    "null_math",
+    "nulls_order"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-comparison.html"
+  },
+  "filter_level": {
+   "title_en": "WHERE filters rows, HAVING filters groups",
+   "title_hi": "WHERE rows filter karta hai, HAVING groups",
+   "rule_en": "WHERE runs on single rows before any totals exist, so it can't use SUM()/COUNT() or names made in SELECT. A condition on a total belongs in HAVING after GROUP BY.",
+   "rule_hi": "WHERE totals banne se pehle ek-ek row pe chalta hai, isliye SUM()/COUNT() ya SELECT ke naam use nahi kar sakta. Total wali condition GROUP BY ke baad HAVING mein.",
+   "topics": [
+    "where",
+    "having"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/select.html"
+  },
+  "subquery_shape": {
+   "title_en": "A subquery is one value or a set",
+   "title_hi": "Subquery ek value hai ya ek set",
+   "rule_en": "After = < > a subquery must return exactly one row (one value); after IN / EXISTS it may return many. A subquery is evaluated against the data as it was when the statement started, and MySQL won't let it read the table an UPDATE/DELETE is changing unless it is wrapped as a derived table.",
+   "rule_hi": "= < > ke baad subquery ko ek hi row deni chahiye; IN / EXISTS ke baad kai de sakti hai. MySQL UPDATE/DELETE ki apni table ko subquery mein tabhi padhne deta hai jab use derived table mein lapeta jaaye.",
+   "topics": [
+    "subquery",
+    "same_table"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/subquery-errors.html"
+  },
+  "values_types": {
+   "title_en": "Values have types: text in quotes, dates in quotes",
+   "title_hi": "Values ke type hote hain: text aur date quotes mein",
+   "rule_en": "A word without quotes is a column name and a date without quotes is arithmetic (2024-01-01 is 2022). Each side of a condition must be a whole comparison: status = 'a' OR 'b' compares nothing on the OR side; write IN ('a', 'b'). BETWEEN needs the smaller value first. Operators depend on the type and the engine: + adds numbers (text joins with CONCAT; || joins text only on PostgreSQL), integer / integer drops the fraction on PostgreSQL, in LIKE % and _ are wildcards, and double quotes mean a name on PostgreSQL.",
+   "rule_hi": "Bina quotes ka shabd column ka naam hai aur bina quotes ki date hisaab hai (2024-01-01 = 2022). OR ke dono taraf poora comparison chahiye: IN ('a', 'b') likho. BETWEEN mein chhoti value pehle. Operator type aur database pe nirbhar hain: + number jodta hai (text CONCAT se; || sirf PostgreSQL pe text jodta hai), PostgreSQL pe integer / integer decimal kaat deta hai, LIKE mein % aur _ wildcard hain, aur PostgreSQL pe double quotes naam hote hain.",
+   "topics": [
+    "value",
+    "or",
+    "between",
+    "concat",
+    "like",
+    "division",
+    "quotes"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/type-conversion.html"
+  },
+  "names_scope": {
+   "title_en": "Names belong to a scope",
+   "title_hi": "Naam ek scope ke hote hain",
+   "rule_en": "Once a table has an alias, only the alias works; a column with no table in front is ambiguous when two joined tables have it; a name made in SELECT exists only for ORDER BY (and HAVING in MySQL), never for WHERE.",
+   "rule_hi": "Table ko alias dene ke baad sirf alias chalta hai; do tables mein same column ho to bina table ke naam ambiguous hai; SELECT mein banaya naam WHERE mein nahi chalta.",
+   "topics": [
+    "alias",
+    "column",
+    "order"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-alias.html"
+  },
+  "ranking": {
+   "title_en": "Ranking: windows, partitions and ties",
+   "title_hi": "Ranking: window, partition aur ties",
+   "rule_en": "LIMIT cuts the whole result once; 'top N per group' needs a window function partitioned by the group. ROW_NUMBER() gives tied rows different numbers, RANK() gives them the same rank with gaps, DENSE_RANK() without gaps. ORDER BY gives one exact order only when its last column is unique; otherwise ties (and a LIMIT without ORDER BY) return rows in no promised order.",
+   "rule_hi": "LIMIT poore result ko ek baar kaat-ta hai; 'har group ke top N' ke liye group se PARTITION wala window function chahiye. ROW_NUMBER() barabar rows ko alag number deta hai, RANK() same rank (gaps ke saath), DENSE_RANK() bina gaps. ORDER BY tabhi pakka kram deta hai jab aakhri column unique ho; warna barabari (aur bina ORDER BY ka LIMIT) koi tay kram nahi deta.",
+   "topics": [
+    "ties",
+    "top_n",
+    "stable_order"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/window-function-descriptions.html"
+  },
+  "time_ranges": {
+   "title_en": "Time ranges are half-open",
+   "title_hi": "Time range half-open hoti hai",
+   "rule_en": "'2026-01-31' on a column with time means midnight at the start of that day. Write ranges as >= start AND < next period start: right for DATE and DATETIME alike, and a plain column comparison can still use an index (a function like YEAR(col) can't).",
+   "rule_hi": "Time wale column pe '2026-01-31' ka matlab us din ki shuruaat (00:00). Range >= start AND < agla period likho: DATE aur DATETIME dono pe sahi, aur index bhi chalta hai (YEAR(col) jaisa function nahi).",
+   "topics": [
+    "date_range"
+   ],
+   "source": "https://www.postgresql.org/docs/current/datatype-datetime.html"
+  },
+  "changes_safety": {
+   "title_en": "UPDATE/DELETE: preview, separate assignments, small batches",
+   "title_hi": "UPDATE/DELETE: pehle dekho, alag assignments, chhote batches",
+   "rule_en": "Run the same WHERE as a SELECT first to see which rows change. In SET, assignments are separated by commas (AND makes one boolean expression). Change very large sets in batches so locks and undo stay small.",
+   "rule_hi": "Pehle wahi WHERE SELECT mein chala ke dekho kaunsi rows badlengi. SET mein assignments comma se alag (AND ek hi boolean ban jata hai). Bahut badi rows chhote batches mein badlo.",
+   "topics": [
+    "set"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/update.html"
+  },
+  "precedence": {
+   "title_en": "Conditions combine in a fixed order: NOT, then AND, then OR",
+   "title_hi": "Conditions ek tay kram mein judti hain: NOT, phir AND, phir OR",
+   "rule_en": "AND binds tighter than OR, like multiplication before addition, so a OR b AND c is a OR (b AND c). Bracket every OR that is one choice among several.",
+   "rule_hi": "AND OR se pehle lagta hai, jaise jod se pehle guna, isliye a OR b AND c ka matlab a OR (b AND c). Jo OR ek hi chunav hai uspe bracket lagao.",
+   "topics": [
+    "and_or"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/operator-precedence.html"
+  }
+ }
+}

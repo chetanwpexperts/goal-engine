@@ -64,5 +64,26 @@
    "sql": "SELECT 1 FROM information_schema.GLOBAL_VARIABLES v WHERE v.VARIABLE_NAME = 'LOG_BIN' AND v.VARIABLE_VALUE = 'ON' AND NOT EXISTS (SELECT 1 FROM information_schema.GLOBAL_VARIABLES e WHERE e.VARIABLE_NAME IN ('BINLOG_EXPIRE_LOGS_SECONDS', 'EXPIRE_LOGS_DAYS', 'MAX_BINLOG_TOTAL_SIZE') AND e.VARIABLE_VALUE + 0 > 0)",
    "proof": "binary logging is on and no expiry or size limit is set, so old binary logs are never removed"
   }
- }
+ },
+ "query_marks": [
+  "`[^`]+`",
+  "\\blimit\\s+\\d+\\s*,\\s*\\d+",
+  "\\b(ifnull|curdate|date_format|str_to_date|group_concat|unix_timestamp)\\s*\\(",
+  "\\bauto_increment\\b"
+ ],
+ "query_rules": {
+  "pipes": "or",
+  "plus_on_text": "number",
+  "int_division": "decimal",
+  "nulls_in_desc": "last",
+  "isnull_args": 1,
+  "ifnull": true,
+  "nvl": true,
+  "double_quotes": "string",
+  "concat_null": "null",
+  "like_case": "insensitive"
+ },
+ "proven": [
+  "mariadb"
+ ]
 }

@@ -1,0 +1,3829 @@
+{
+ "about": "Basic and concept questions (what is / kya hota hai / X vs Y / how to), in our own words from the official manuals. Each concept: the words that pick it (terms: groups of patterns that must all appear), phrasings in English, Hinglish and Hindi, the answer, examples run on MariaDB and PostgreSQL on the practice schema (tests/practice/schema.py) with their result, the common mistake, per-engine notes, the fundamentals it rests on (query_fundamentals.json), source = official page, seen_at = where people ask about it, proven = engines the examples were run on. Results are filled by tests/practice/concepts/lab.py.",
+ "concepts": [
+  {
+   "id": "sql_intro",
+   "kind": "concept",
+   "title": {
+    "en": "SQL",
+    "hinglish": "SQL",
+    "hindi": "SQL"
+   },
+   "terms": [
+    [
+     "(?<=^what is )sql$"
+    ],
+    [
+     "(?<=^whats )sql$"
+    ],
+    [
+     "(?<=^define )sql$"
+    ],
+    [
+     "^sql (kya|matlab)\\b.*"
+    ],
+    [
+     "^sql क्या.*"
+    ],
+    [
+     "(?<=^what does )sql stand for"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is sql",
+     "what does sql stand for"
+    ],
+    "hinglish": [
+     "sql kya hai",
+     "sql kya hota hai"
+    ],
+    "hindi": [
+     "SQL क्या है",
+     "SQL क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "SQL (Structured Query Language) is the language you use to ask a relational database for data and to change it: SELECT reads rows, INSERT/UPDATE/DELETE change them, CREATE/ALTER define tables. SQL is the language; MySQL, MariaDB, PostgreSQL, SQL Server and Oracle are databases that speak it, each with its own extras.",
+    "hinglish": "SQL (Structured Query Language) wo bhasha hai jisse database se data maanga aur badla jaata hai: SELECT rows padhta hai, INSERT/UPDATE/DELETE badalte hain, CREATE/ALTER tables banate hain. SQL bhasha hai; MySQL, MariaDB, PostgreSQL, SQL Server, Oracle databases hain jo ise bolte hain, har ek ke apne extra features ke saath.",
+    "hindi": "SQL (Structured Query Language) वह भाषा है जिससे डेटाबेस से डेटा माँगा और बदला जाता है: SELECT rows पढ़ता है, INSERT/UPDATE/DELETE उन्हें बदलते हैं, CREATE/ALTER tables बनाते हैं। SQL भाषा है; MySQL, MariaDB, PostgreSQL, SQL Server, Oracle डेटाबेस हैं जो इसे बोलते हैं।"
+   },
+   "mistake": {
+    "en": "Thinking a query that works on one database works the same on all: LIMIT, string joining, quotes and date functions differ.",
+    "hinglish": "Ye sochna ki ek database pe chalne wali query har database pe waise hi chalegi: LIMIT, text jodna, quotes aur date functions alag hote hain.",
+    "hindi": "यह सोचना कि एक डेटाबेस पर चलने वाली query हर डेटाबेस पर वैसे ही चलेगी: LIMIT, text जोड़ना, quotes और date functions अलग होते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT first_name, city FROM customers WHERE city = 'Pune' ORDER BY id"
+     },
+     "result": [
+      [
+       "Aarav",
+       "Pune"
+      ],
+      [
+       "Aarav",
+       "Pune"
+      ]
+     ],
+     "columns": [
+      "first_name",
+      "city"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Backticks quote names (`order`); LIMIT n; || is OR unless PIPES_AS_CONCAT is set.",
+    "mariadb": "Close to MySQL; also accepts some Oracle syntax in SQL_MODE=ORACLE.",
+    "postgresql": "Double quotes quote names (\"order\"); strings only in single quotes; stricter about types.",
+    "sqlserver": "T-SQL dialect: TOP n instead of LIMIT, [brackets] for names, + joins strings.",
+    "oracle": "PL/SQL dialect: FETCH FIRST n ROWS ONLY (or ROWNUM), NVL, the DUAL table.",
+    "sqlite": "A small file database; types are loose (a column can hold any type)."
+   },
+   "related": [
+    "select",
+    "where",
+    "join"
+   ],
+   "fundamentals": [
+    "output",
+    "tables"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/select.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "select",
+   "kind": "concept",
+   "title": {
+    "en": "SELECT",
+    "hinglish": "SELECT",
+    "hindi": "SELECT"
+   },
+   "terms": [
+    [
+     "select"
+    ],
+    [
+     "select statement"
+    ],
+    [
+     "सेलेक्ट"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is select in sql",
+     "what does SELECT do",
+     "explain the select statement"
+    ],
+    "hinglish": [
+     "select kya hota hai",
+     "select statement kya hai"
+    ],
+    "hindi": [
+     "SELECT क्या होता है",
+     "सेलेक्ट क्या है"
+    ]
+   },
+   "answer": {
+    "en": "SELECT reads data: you list the columns (or expressions) you want, FROM says which table, and optional parts narrow and shape it, in this order of writing: WHERE (which rows), GROUP BY (make groups), HAVING (which groups), ORDER BY (sort), LIMIT (how many). It never changes data.",
+    "hinglish": "SELECT data padhta hai: jo columns (ya calculations) chahiye wo likho, FROM batata hai kaunsi table, aur baaki hisse data ko chhaant-te aur sajate hain, likhne ke is kram mein: WHERE (kaunsi rows), GROUP BY (groups), HAVING (kaunse groups), ORDER BY (sort), LIMIT (kitni). Ye data kabhi nahi badalta.",
+    "hindi": "SELECT डेटा पढ़ता है: जो columns चाहिए वो लिखिए, FROM बताता है कौन-सी table, और बाकी हिस्से डेटा को छाँटते हैं, इस क्रम में: WHERE (कौन-सी rows), GROUP BY (समूह), HAVING (कौन-से समूह), ORDER BY (क्रम), LIMIT (कितनी)। यह डेटा कभी नहीं बदलता।"
+   },
+   "mistake": {
+    "en": "SELECT * in real code: it pulls columns you don't need, breaks when a column is added, and makes joins return clashing names. List the columns.",
+    "hinglish": "Asli code mein SELECT *: faltu columns aate hain, naya column judne pe code toot-ta hai, aur join mein same naam ke columns takraate hain. Columns ke naam likho.",
+    "hindi": "असली code में SELECT *: बेकार columns आते हैं, नया column जुड़ने पर code टूटता है, और join में एक जैसे नाम टकराते हैं। Columns के नाम लिखिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT first_name, last_name, city FROM customers WHERE city = 'Delhi' ORDER BY first_name"
+     },
+     "result": [
+      [
+       "Dev",
+       "Joshi",
+       "Delhi"
+      ],
+      [
+       "Diya",
+       "Patel",
+       "Delhi"
+      ]
+     ],
+     "columns": [
+      "first_name",
+      "last_name",
+      "city"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Allows SELECT without FROM (SELECT 1+1) and FROM DUAL.",
+    "mariadb": "Same as MySQL here.",
+    "postgresql": "Allows SELECT without FROM; no DUAL table.",
+    "oracle": "Needs FROM DUAL for a SELECT without a table.",
+    "sqlserver": "SELECT TOP n instead of LIMIT n."
+   },
+   "related": [
+    "where",
+    "order_by",
+    "limit"
+   ],
+   "fundamentals": [
+    "output",
+    "tables"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/select.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "where",
+   "kind": "concept",
+   "title": {
+    "en": "WHERE",
+    "hinglish": "WHERE",
+    "hindi": "WHERE"
+   },
+   "terms": [
+    [
+     "where(?! (to|should|can|is|are|does|did|we|i|you))"
+    ],
+    [
+     "where clause"
+    ],
+    [
+     "वेयर"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the where clause",
+     "what does WHERE do in sql"
+    ],
+    "hinglish": [
+     "where clause kya hota hai",
+     "where kya karta hai"
+    ],
+    "hindi": [
+     "WHERE clause क्या है"
+    ]
+   },
+   "answer": {
+    "en": "WHERE keeps only the rows that make its condition TRUE, before any grouping. Conditions join with AND / OR / NOT; a condition that is NULL (unknown) drops the row just like FALSE. It works in SELECT, UPDATE and DELETE.",
+    "hinglish": "WHERE sirf wo rows rakhta hai jinke liye condition TRUE ho, grouping se pehle. Conditions AND / OR / NOT se judti hain; jo condition NULL (pata nahi) ho, wo bhi row hata deti hai, FALSE ki tarah. Ye SELECT, UPDATE aur DELETE teeno mein chalta hai.",
+    "hindi": "WHERE सिर्फ़ वे rows रखता है जिनके लिए condition TRUE हो, grouping से पहले। Conditions AND / OR / NOT से जुड़ती हैं; जो condition NULL हो, वह भी row हटा देती है, FALSE की तरह। यह SELECT, UPDATE और DELETE तीनों में चलता है।"
+   },
+   "mistake": {
+    "en": "Writing city = NULL (always unknown, so no rows) instead of city IS NULL; and mixing AND with OR without brackets.",
+    "hinglish": "city IS NULL ki jagah city = NULL likhna (hamesha unknown, koi row nahi); aur AND ke saath OR bina brackets ke milana.",
+    "hindi": "city IS NULL की जगह city = NULL लिखना (हमेशा unknown, कोई row नहीं); और AND के साथ OR बिना brackets के मिलाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, status, amount FROM orders WHERE status = 'paid' AND amount > 1000 ORDER BY id"
+     },
+     "result": [
+      [
+       "1",
+       "paid",
+       "25500"
+      ],
+      [
+       "3",
+       "paid",
+       "80000"
+      ]
+     ],
+     "columns": [
+      "id",
+      "status",
+      "amount"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Text comparison is usually case-insensitive (default collation), so 'pune' = 'Pune'.",
+    "mariadb": "Same as MySQL: case-insensitive with the default collations.",
+    "postgresql": "Text comparison is case-sensitive; use ILIKE or lower(col) = 'pune' for a case-blind match."
+   },
+   "related": [
+    "having",
+    "where_vs_having",
+    "null",
+    "and_or"
+   ],
+   "fundamentals": [
+    "row_filters",
+    "null_logic"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/select.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "order_by",
+   "kind": "concept",
+   "title": {
+    "en": "ORDER BY",
+    "hinglish": "ORDER BY",
+    "hindi": "ORDER BY"
+   },
+   "terms": [
+    [
+     "order by"
+    ],
+    [
+     "sort\\w*"
+    ],
+    [
+     "ascending"
+    ],
+    [
+     "descending"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is order by",
+     "how to sort results in sql"
+    ],
+    "hinglish": [
+     "order by kya hota hai",
+     "sql mein sort kaise kare"
+    ],
+    "hindi": [
+     "ORDER BY क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "ORDER BY sorts the result: ASC (smallest first, the default) or DESC, by one or more columns; later columns break ties of earlier ones. Without ORDER BY the database may return rows in any order, and that order can change.",
+    "hinglish": "ORDER BY result ko sort karta hai: ASC (chhota pehle, default) ya DESC, ek ya zyada columns se; baad wale columns pehle wale ki barabari todte hain. ORDER BY ke bina database rows kisi bhi kram mein de sakta hai, aur wo kram badal sakta hai.",
+    "hindi": "ORDER BY नतीजे को क्रम में लगाता है: ASC (छोटा पहले, default) या DESC, एक या ज़्यादा columns से; बाद वाले columns बराबरी तोड़ते हैं। ORDER BY के बिना डेटाबेस rows किसी भी क्रम में दे सकता है।"
+   },
+   "mistake": {
+    "en": "Sorting by a column with ties (salary) and then cutting with LIMIT: which tied row you get is not fixed. Add a unique column last: ORDER BY salary DESC, id.",
+    "hinglish": "Barabari wale column (salary) se sort karke LIMIT lagana: barabar wali kaunsi row aayegi, tay nahi. Aakhir mein unique column jodo: ORDER BY salary DESC, id.",
+    "hindi": "बराबरी वाले column (salary) से sort करके LIMIT लगाना: बराबर वाली कौन-सी row आएगी, तय नहीं। आख़िर में unique column जोड़िए: ORDER BY salary DESC, id।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT first_name, salary FROM employees ORDER BY salary DESC, id"
+     },
+     "result": [
+      [
+       "Asha",
+       "90000"
+      ],
+      [
+       "Kabir",
+       "75000"
+      ],
+      [
+       "Vikram",
+       "60000"
+      ],
+      [
+       "Neha",
+       "60000"
+      ],
+      [
+       "Meera",
+       "50000"
+      ],
+      [
+       "Rohan",
+       "45000"
+      ],
+      [
+       "Isha",
+       "42000"
+      ]
+     ],
+     "columns": [
+      "first_name",
+      "salary"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "NULLs sort first in ASC and last in DESC; no NULLS FIRST/LAST (use ORDER BY col IS NULL, col).",
+    "mariadb": "Same as MySQL for NULLs.",
+    "postgresql": "NULLs sort last in ASC and FIRST in DESC; supports NULLS FIRST / NULLS LAST.",
+    "sqlserver": "NULLs sort first in ASC.",
+    "oracle": "NULLs last in ASC, first in DESC; NULLS FIRST/LAST supported."
+   },
+   "related": [
+    "limit",
+    "order_limit_ties"
+   ],
+   "fundamentals": [
+    "final_cut",
+    "ranking"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/sorting-rows.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "limit",
+   "kind": "concept",
+   "title": {
+    "en": "LIMIT",
+    "hinglish": "LIMIT",
+    "hindi": "LIMIT"
+   },
+   "terms": [
+    [
+     "limit"
+    ],
+    [
+     "offset"
+    ],
+    [
+     "(first|top) \\d+ rows"
+    ],
+    [
+     "लिमिट"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is limit in sql",
+     "what does LIMIT and OFFSET do"
+    ],
+    "hinglish": [
+     "limit kya hota hai",
+     "limit offset kya hai"
+    ],
+    "hindi": [
+     "LIMIT क्या है"
+    ]
+   },
+   "answer": {
+    "en": "LIMIT n returns at most n rows; OFFSET k skips the first k. It is applied last, after ORDER BY, so it only makes sense with an ORDER BY that gives one exact order. Good for 'top 5' and for pages.",
+    "hinglish": "LIMIT n zyada se zyada n rows deta hai; OFFSET k pehli k chhod deta hai. Ye sabse aakhir mein lagta hai, ORDER BY ke baad, isliye tabhi matlab rakhta hai jab ORDER BY ek pakka kram de. 'Top 5' aur pages ke liye.",
+    "hindi": "LIMIT n ज़्यादा से ज़्यादा n rows देता है; OFFSET k पहली k छोड़ देता है। यह सबसे आख़िर में लगता है, ORDER BY के बाद, इसलिए तभी सही है जब ORDER BY एक पक्का क्रम दे।"
+   },
+   "mistake": {
+    "en": "LIMIT without ORDER BY ('first 10 customers') gives whatever rows come first, which can differ between runs. Big OFFSETs also get slow: the skipped rows are still read.",
+    "hinglish": "ORDER BY ke bina LIMIT ('pehle 10 customers') jo rows pehle mil jaayein wahi deta hai, jo har baar alag ho sakti hain. Bada OFFSET slow bhi hota hai: chhodi gayi rows bhi padhi jaati hain.",
+    "hindi": "ORDER BY के बिना LIMIT जो rows पहले मिलें वही देता है, जो हर बार अलग हो सकती हैं। बड़ा OFFSET धीमा भी होता है: छोड़ी गई rows भी पढ़ी जाती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount FROM orders ORDER BY amount DESC, id LIMIT 3 OFFSET 1"
+     },
+     "result": [
+      [
+       "6",
+       "65000"
+      ],
+      [
+       "1",
+       "25500"
+      ],
+      [
+       "4",
+       "12000"
+      ]
+     ],
+     "columns": [
+      "id",
+      "amount"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Also LIMIT offset, count (LIMIT 1, 3); no FETCH FIRST before 8.0... use LIMIT.",
+    "mariadb": "LIMIT offset, count and LIMIT ... OFFSET; OFFSET ... FETCH FIRST also works in 10.6+.",
+    "postgresql": "LIMIT n OFFSET k or the standard OFFSET k ROWS FETCH FIRST n ROWS ONLY; LIMIT 1, 3 is an error.",
+    "sqlserver": "TOP n, or ORDER BY ... OFFSET k ROWS FETCH NEXT n ROWS ONLY.",
+    "oracle": "FETCH FIRST n ROWS ONLY (12c+), or ROWNUM.",
+    "sqlite": "LIMIT n OFFSET k."
+   },
+   "related": [
+    "order_by",
+    "order_limit_ties"
+   ],
+   "fundamentals": [
+    "final_cut"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-limit.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://use-the-index-luke.com/sql/partial-results/fetch-next-page"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "distinct",
+   "kind": "concept",
+   "title": {
+    "en": "DISTINCT",
+    "hinglish": "DISTINCT",
+    "hindi": "DISTINCT"
+   },
+   "terms": [
+    [
+     "distinct"
+    ],
+    [
+     "unique values"
+    ],
+    [
+     "डिस्टिंक्ट"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is distinct in sql",
+     "how to get unique values in sql"
+    ],
+    "hinglish": [
+     "distinct kya hota hai",
+     "unique values kaise nikale"
+    ],
+    "hindi": [
+     "DISTINCT क्या है"
+    ]
+   },
+   "answer": {
+    "en": "SELECT DISTINCT removes duplicate result rows: two rows count as the same only when EVERY selected column is equal (NULLs count as equal here). It is not a function of one column: DISTINCT(city), name still means distinct (city, name) pairs.",
+    "hinglish": "SELECT DISTINCT dohraayi gayi result rows hata deta hai: do rows tabhi same maani jaati hain jab HAR chuna hua column barabar ho (yahan NULL barabar gine jaate hain). Ye ek column ka function nahi hai: DISTINCT(city), name ka matlab ab bhi alag (city, name) jode hain.",
+    "hindi": "SELECT DISTINCT दोहराई गई result rows हटा देता है: दो rows तभी एक जैसी मानी जाती हैं जब हर चुना हुआ column बराबर हो। यह एक column का function नहीं है: DISTINCT(city), name का मतलब अब भी अलग (city, name) जोड़े हैं।"
+   },
+   "mistake": {
+    "en": "Using DISTINCT to hide duplicate rows that a wrong JOIN created; the totals underneath are still multiplied. Fix the join instead.",
+    "hinglish": "Galat JOIN se bani duplicate rows chhupane ke liye DISTINCT lagana; neeche ke totals ab bhi guna ho rahe hote hain. Join theek karo.",
+    "hindi": "गलत JOIN से बनी duplicate rows छिपाने के लिए DISTINCT लगाना; नीचे के totals अब भी गुणा हो रहे होते हैं। Join ठीक कीजिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT DISTINCT city FROM customers WHERE city IS NOT NULL ORDER BY city"
+     },
+     "result": [
+      [
+       "Chennai"
+      ],
+      [
+       "Delhi"
+      ],
+      [
+       "Mumbai"
+      ],
+      [
+       "Pune"
+      ]
+     ],
+     "columns": [
+      "city"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "COUNT(DISTINCT a, b) works (several columns).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "COUNT(DISTINCT a, b) is an error: use COUNT(DISTINCT (a, b)); also has DISTINCT ON (col) to keep one row per value."
+   },
+   "related": [
+    "distinct_vs_group_by",
+    "group_by",
+    "find_duplicates"
+   ],
+   "fundamentals": [
+    "grain",
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-select-lists.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "null",
+   "kind": "concept",
+   "title": {
+    "en": "NULL",
+    "hinglish": "NULL",
+    "hindi": "NULL"
+   },
+   "terms": [
+    [
+     "null"
+    ],
+    [
+     "nulls"
+    ],
+    [
+     "is null"
+    ],
+    [
+     "नल"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is null in sql",
+     "what does IS NULL mean",
+     "why does = NULL not work"
+    ],
+    "hinglish": [
+     "null kya hota hai",
+     "is null aur = null mein farak"
+    ],
+    "hindi": [
+     "NULL क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "NULL means 'no value / unknown', not zero and not an empty string. Any comparison with NULL (=, <>, >) is unknown, so WHERE drops the row; test it with IS NULL / IS NOT NULL. Arithmetic with NULL gives NULL; COUNT(col), SUM, AVG skip NULLs.",
+    "hinglish": "NULL ka matlab 'koi value nahi / pata nahi' hai, na zero, na khaali text. NULL se koi bhi tulna (=, <>, >) unknown hoti hai, isliye WHERE row hata deta hai; IS NULL / IS NOT NULL se jaancho. NULL ke saath hisaab NULL deta hai; COUNT(col), SUM, AVG NULL chhod dete hain.",
+    "hindi": "NULL का मतलब 'कोई value नहीं / पता नहीं' है, न ज़ीरो, न खाली text। NULL से कोई भी तुलना (=, <>, >) unknown होती है, इसलिए WHERE row हटा देता है; IS NULL / IS NOT NULL से जाँचिए। NULL के साथ हिसाब NULL देता है; COUNT(col), SUM, AVG NULL छोड़ देते हैं।"
+   },
+   "mistake": {
+    "en": "Writing col = NULL or col != NULL (never true); and forgetting that city <> 'Pune' also drops the rows where city is NULL.",
+    "hinglish": "col = NULL ya col != NULL likhna (kabhi true nahi); aur bhoolna ki city <> 'Pune' un rows ko bhi hata deta hai jahan city NULL hai.",
+    "hindi": "col = NULL या col != NULL लिखना (कभी true नहीं); और भूलना कि city <> 'Pune' उन rows को भी हटा देता है जहाँ city NULL है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT first_name, phone FROM customers WHERE phone IS NULL ORDER BY id"
+     },
+     "result": [
+      [
+       "Diya",
+       "NULL"
+      ],
+      [
+       "Aarav",
+       "NULL"
+      ],
+      [
+       "Dev",
+       "NULL"
+      ]
+     ],
+     "columns": [
+      "first_name",
+      "phone"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Also has the NULL-safe equal a <=> b; NULLs sort first in ASC.",
+    "mariadb": "Same as MySQL (<=> works).",
+    "postgresql": "NULL-safe equal is a IS NOT DISTINCT FROM b; NULLs sort last in ASC.",
+    "oracle": "An empty string '' is stored as NULL.",
+    "sqlserver": "ISNULL(a, b) replaces NULL (2 arguments)."
+   },
+   "related": [
+    "coalesce",
+    "empty_vs_null",
+    "where"
+   ],
+   "fundamentals": [
+    "null_logic"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/working-with-null.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "like",
+   "kind": "concept",
+   "title": {
+    "en": "LIKE",
+    "hinglish": "LIKE",
+    "hindi": "LIKE"
+   },
+   "terms": [
+    [
+     "like (operator|clause|keyword|query|in sql|kya|क्या)"
+    ],
+    [
+     "like"
+    ],
+    [
+     "pattern match\\w*"
+    ],
+    [
+     "लाइक"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is like in sql",
+     "how to search text with like"
+    ],
+    "hinglish": [
+     "like operator kya hai",
+     "like kaise use kare"
+    ],
+    "hindi": [
+     "LIKE क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "LIKE matches text against a pattern: % means any run of characters (also none), _ means exactly one character. '%ar%' = contains 'ar', 'Ph%' = starts with 'Ph'. Without % or _ it behaves like =.",
+    "hinglish": "LIKE text ko pattern se milata hai: % yaani kitne bhi akshar (zero bhi), _ yaani theek ek akshar. '%ar%' = jisme 'ar' ho, 'Ph%' = jo 'Ph' se shuru ho. % ya _ ke bina ye = jaisa hi hai.",
+    "hindi": "LIKE text को pattern से मिलाता है: % यानी कितने भी अक्षर (शून्य भी), _ यानी ठीक एक अक्षर। '%ar%' = जिसमें 'ar' हो, 'Ph%' = जो 'Ph' से शुरू हो। % या _ के बिना यह = जैसा ही है।"
+   },
+   "mistake": {
+    "en": "Using * or ? as wildcards (that's file/Access style: SQL treats them as plain characters, so LIKE '*ar*' finds nothing); and a leading % can't use a normal index.",
+    "hinglish": "* ya ? ko wildcard samajhna (ye file/Access ka tareeka hai; SQL inhe saadharan akshar maanta hai, isliye LIKE '*ar*' kuch nahi deta); aur shuru ka % normal index use nahi kar paata.",
+    "hindi": "* या ? को wildcard समझना (SQL इन्हें साधारण अक्षर मानता है, इसलिए LIKE '*ar*' कुछ नहीं देता); और शुरू का % सामान्य index इस्तेमाल नहीं कर पाता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT first_name FROM customers WHERE first_name LIKE '%ar%' ORDER BY id"
+     },
+     "result": [
+      [
+       "Aarav"
+      ],
+      [
+       "Aarav"
+      ],
+      [
+       "Tara"
+      ],
+      [
+       "Sara"
+      ]
+     ],
+     "columns": [
+      "first_name"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Case-insensitive with the default collation ('aarav' LIKE 'Aarav' is true).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "LIKE is case-sensitive; ILIKE is the case-blind version (PostgreSQL only).",
+    "sqlserver": "Also supports [abc] character sets in patterns."
+   },
+   "related": [
+    "like_wildcards",
+    "where"
+   ],
+   "fundamentals": [
+    "values_types"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/string-comparison-functions.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "like_wildcards",
+   "kind": "concept",
+   "title": {
+    "en": "LIKE wildcards and escaping",
+    "hinglish": "LIKE ke wildcards aur escape",
+    "hindi": "LIKE के wildcards और escape"
+   },
+   "terms": [
+    [
+     "like",
+     "escap\\w*"
+    ],
+    [
+     "like",
+     "underscore"
+    ],
+    [
+     "wildcards?"
+    ],
+    [
+     "escape",
+     "(underscore|percent|%|_)"
+    ],
+    [
+     "like",
+     "(percent|%) sign"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to escape underscore in like",
+     "what are wildcards in sql",
+     "how to search for a % sign with like"
+    ],
+    "hinglish": [
+     "like mein underscore escape kaise kare",
+     "wildcard kya hota hai sql mein"
+    ],
+    "hindi": [
+     "LIKE में underscore escape कैसे करें",
+     "wildcard क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "In LIKE, % and _ are wildcards, so a value that really contains them (sku PH_100, '100%') needs escaping: put an escape character before it and name it with ESCAPE, e.g. sku LIKE 'PH!_1%' ESCAPE '!'. That form works the same on every database.",
+    "hinglish": "LIKE mein % aur _ wildcard hain, isliye jis value mein sach mein ye hon (sku PH_100, '100%') unhe escape karna padta hai: unke aage ek escape character lagao aur ESCAPE se batao, jaise sku LIKE 'PH!_1%' ESCAPE '!'. Ye tareeka har database pe same chalta hai.",
+    "hindi": "LIKE में % और _ wildcard हैं, इसलिए जिस value में सच में ये हों (sku PH_100, '100%') उन्हें escape करना पड़ता है: उनके आगे एक escape character लगाइए और ESCAPE से बताइए, जैसे sku LIKE 'PH!_1%' ESCAPE '!'। यह हर डेटाबेस पर एक जैसा चलता है।"
+   },
+   "mistake": {
+    "en": "LIKE 'PH_1%' also matches 'PH1000' (the _ matched the '1'), so an un-escaped underscore quietly finds extra rows.",
+    "hinglish": "LIKE 'PH_1%' 'PH1000' ko bhi pakadta hai (_ ne '1' ko mila liya), yaani bina escape ka underscore chupchaap faltu rows laata hai.",
+    "hindi": "LIKE 'PH_1%' 'PH1000' को भी पकड़ता है (_ ने '1' को मिला लिया), यानी बिना escape का underscore चुपचाप फ़ालतू rows लाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT sku FROM products WHERE sku LIKE 'PH!_1%' ESCAPE '!' ORDER BY sku"
+     },
+     "result": [
+      [
+       "PH_100"
+      ]
+     ],
+     "columns": [
+      "sku"
+     ]
+    },
+    {
+     "sql": {
+      "all": "SELECT name FROM products WHERE name LIKE '%100!%%' ESCAPE '!' ORDER BY id"
+     },
+     "result": [
+      [
+       "100% Cotton Bear"
+      ]
+     ],
+     "columns": [
+      "name"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Backslash is also the default escape: LIKE 'PH\\_1%' (inside a normal string you may need two backslashes in code).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Backslash is the default escape too; ESCAPE '' turns escaping off.",
+    "sqlserver": "Can also write [_] to match a literal underscore."
+   },
+   "related": [
+    "like",
+    "where"
+   ],
+   "fundamentals": [
+    "values_types"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-matching.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "group_by",
+   "kind": "concept",
+   "title": {
+    "en": "GROUP BY",
+    "hinglish": "GROUP BY",
+    "hindi": "GROUP BY"
+   },
+   "terms": [
+    [
+     "group by"
+    ],
+    [
+     "grouping"
+    ],
+    [
+     "ग्रुप बाय"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is group by",
+     "what does GROUP BY do in sql",
+     "when to use group by"
+    ],
+    "hinglish": [
+     "group by kya hota hai",
+     "group by kab use karte hain"
+    ],
+    "hindi": [
+     "GROUP BY क्या होता है",
+     "ग्रुप बाय क्या है"
+    ]
+   },
+   "answer": {
+    "en": "GROUP BY puts rows with the same values in the listed columns into one group, and returns ONE row per group. Use it with totals (COUNT, SUM, AVG, MIN, MAX) per customer, per city, per month. Every selected column must be grouped or totalled.",
+    "hinglish": "GROUP BY un rows ko ek group mein daalta hai jinke listed columns ki values same hon, aur HAR group ki EK row deta hai. Ise totals (COUNT, SUM, AVG, MIN, MAX) ke saath use karo: har customer, har city, har mahine ka. Har chuna hua column ya to group mein ho ya total mein.",
+    "hindi": "GROUP BY उन rows को एक समूह में डालता है जिनके listed columns की values एक जैसी हों, और हर समूह की एक row देता है। इसे totals (COUNT, SUM, AVG, MIN, MAX) के साथ इस्तेमाल कीजिए। हर चुना हुआ column या तो group में हो या total में।"
+   },
+   "mistake": {
+    "en": "Selecting a column that is neither grouped nor totalled: MySQL with ONLY_FULL_GROUP_BY off returns a random value from the group, PostgreSQL refuses.",
+    "hinglish": "Aisa column chunna jo na group mein hai na total mein: ONLY_FULL_GROUP_BY band ho to MySQL group ki koi bhi value de deta hai, PostgreSQL mana kar deta hai.",
+    "hindi": "ऐसा column चुनना जो न group में है न total में: ONLY_FULL_GROUP_BY बंद हो तो MySQL समूह की कोई भी value दे देता है, PostgreSQL मना कर देता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT city, COUNT(*) AS customers FROM customers WHERE city IS NOT NULL GROUP BY city ORDER BY city"
+     },
+     "result": [
+      [
+       "Chennai",
+       "1"
+      ],
+      [
+       "Delhi",
+       "2"
+      ],
+      [
+       "Mumbai",
+       "2"
+      ],
+      [
+       "Pune",
+       "2"
+      ]
+     ],
+     "columns": [
+      "city",
+      "customers"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "With ONLY_FULL_GROUP_BY (default in 5.7+) a loose column is error 1055; without it, any value from the group.",
+    "mariadb": "ONLY_FULL_GROUP_BY is NOT on by default, so loose columns silently return any value.",
+    "postgresql": "A loose column is an error, unless you group by the table's primary key (then its other columns are allowed)."
+   },
+   "related": [
+    "having",
+    "where_vs_having",
+    "distinct_vs_group_by"
+   ],
+   "fundamentals": [
+    "grain"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/group-by-handling.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "having",
+   "kind": "concept",
+   "title": {
+    "en": "HAVING",
+    "hinglish": "HAVING",
+    "hindi": "HAVING"
+   },
+   "terms": [
+    [
+     "having"
+    ],
+    [
+     "हैविंग"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is having in sql",
+     "what does HAVING do"
+    ],
+    "hinglish": [
+     "having kya hota hai",
+     "having clause kya hai"
+    ],
+    "hindi": [
+     "HAVING क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "HAVING filters GROUPS after GROUP BY, so it can use totals: HAVING COUNT(*) > 1 keeps groups with more than one row. Conditions on plain columns belong in WHERE (earlier and cheaper).",
+    "hinglish": "HAVING GROUP BY ke baad GROUPS ko filter karta hai, isliye isme totals use ho sakte hain: HAVING COUNT(*) > 1 sirf ek se zyada row wale groups rakhta hai. Saadharan columns ki condition WHERE mein jaati hai (pehle aur sasti).",
+    "hindi": "HAVING GROUP BY के बाद समूहों को छाँटता है, इसलिए इसमें totals इस्तेमाल हो सकते हैं: HAVING COUNT(*) > 1 सिर्फ़ एक से ज़्यादा row वाले समूह रखता है। साधारण columns की condition WHERE में जाती है।"
+   },
+   "mistake": {
+    "en": "Putting an aggregate in WHERE (WHERE COUNT(*) > 1) is an error on every database; it must go in HAVING.",
+    "hinglish": "Aggregate ko WHERE mein daalna (WHERE COUNT(*) > 1) har database pe error hai; ye HAVING mein jaata hai.",
+    "hindi": "Aggregate को WHERE में डालना (WHERE COUNT(*) > 1) हर डेटाबेस पर error है; यह HAVING में जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT customer_id, COUNT(*) AS orders FROM orders GROUP BY customer_id HAVING COUNT(*) > 1 ORDER BY customer_id"
+     },
+     "result": [
+      [
+       "1",
+       "2"
+      ],
+      [
+       "2",
+       "2"
+      ],
+      [
+       "3",
+       "2"
+      ]
+     ],
+     "columns": [
+      "customer_id",
+      "orders"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Allows a SELECT alias in HAVING (HAVING orders > 1).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Does not allow a SELECT alias in HAVING: repeat the expression (HAVING COUNT(*) > 1)."
+   },
+   "related": [
+    "where_vs_having",
+    "group_by",
+    "find_duplicates"
+   ],
+   "fundamentals": [
+    "filter_level"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-agg.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "where_vs_having",
+   "kind": "compare",
+   "title": {
+    "en": "WHERE vs HAVING",
+    "hinglish": "WHERE aur HAVING ka farak",
+    "hindi": "WHERE और HAVING का अंतर"
+   },
+   "terms": [
+    [
+     "where",
+     "having"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "difference between where and having",
+     "where vs having",
+     "when to use having instead of where"
+    ],
+    "hinglish": [
+     "where aur having mein kya farak hai",
+     "where vs having samjhao"
+    ],
+    "hindi": [
+     "WHERE और HAVING में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "WHERE filters single rows BEFORE grouping and cannot use totals; HAVING filters groups AFTER GROUP BY and can use totals like COUNT(*) or SUM(amount). Put plain-column conditions in WHERE and total conditions in HAVING.",
+    "hinglish": "WHERE grouping se PEHLE ek-ek row filter karta hai aur totals use nahi kar sakta; HAVING GROUP BY ke BAAD groups filter karta hai aur COUNT(*) ya SUM(amount) jaise totals use kar sakta hai. Saadharan column ki condition WHERE mein, total ki HAVING mein.",
+    "hindi": "WHERE grouping से पहले एक-एक row छाँटता है और totals इस्तेमाल नहीं कर सकता; HAVING GROUP BY के बाद समूह छाँटता है और COUNT(*) या SUM(amount) जैसे totals इस्तेमाल कर सकता है।"
+   },
+   "mistake": {
+    "en": "Putting a plain condition in HAVING (HAVING status = 'paid') works on MySQL only in some cases and filters too late; and an aggregate in WHERE is an error.",
+    "hinglish": "Saadharan condition HAVING mein daalna (HAVING status = 'paid') MySQL pe kabhi-kabhi chalta hai par der se filter karta hai; aur aggregate WHERE mein error hai.",
+    "hindi": "साधारण condition HAVING में डालना देर से छाँटता है; और aggregate WHERE में error है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT customer_id, SUM(amount) AS paid_total FROM orders WHERE status = 'paid' GROUP BY customer_id HAVING SUM(amount) > 1000 ORDER BY customer_id"
+     },
+     "result": [
+      [
+       "1",
+       "25500"
+      ],
+      [
+       "2",
+       "80500"
+      ]
+     ],
+     "columns": [
+      "customer_id",
+      "paid_total"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Allows aliases in HAVING; also allows HAVING on a non-grouped column (risky).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "No aliases in HAVING; HAVING may only use grouped columns and aggregates."
+   },
+   "related": [
+    "having",
+    "group_by",
+    "where"
+   ],
+   "fundamentals": [
+    "filter_level"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-agg.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/postgresql"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "join",
+   "kind": "concept",
+   "title": {
+    "en": "JOIN",
+    "hinglish": "JOIN",
+    "hindi": "JOIN"
+   },
+   "terms": [
+    [
+     "joins?"
+    ],
+    [
+     "जॉइन"
+    ],
+    [
+     "combine (two )?tables"
+    ],
+    [
+     "(tables|table) (ko )?jod\\w*"
+    ],
+    [
+     "joins?",
+     "(duplicat\\w*|extra|more) rows"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a join in sql",
+     "what are joins",
+     "how do joins work"
+    ],
+    "hinglish": [
+     "join kya hota hai",
+     "sql mein join kya hai"
+    ],
+    "hindi": [
+     "JOIN क्या होता है",
+     "जॉइन क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A JOIN puts rows of two tables side by side where a condition links them, usually a key: orders JOIN customers ON customers.id = orders.customer_id. INNER JOIN keeps only matching pairs; LEFT JOIN also keeps left rows with no match (NULLs on the right); one customer with 3 orders gives 3 rows.",
+    "hinglish": "JOIN do tables ki rows ko saath rakhta hai jahan ek condition unhe jodti hai, aksar ek key: orders JOIN customers ON customers.id = orders.customer_id. INNER JOIN sirf milne wale jode rakhta hai; LEFT JOIN bina match wali left rows bhi rakhta hai (right mein NULL); 3 orders wala ek customer 3 rows deta hai.",
+    "hindi": "JOIN दो tables की rows को साथ रखता है जहाँ एक condition उन्हें जोड़ती है, अक्सर एक key: orders JOIN customers ON customers.id = orders.customer_id। INNER JOIN सिर्फ़ मिलने वाले जोड़े रखता है; LEFT JOIN बिना match वाली left rows भी रखता है; 3 orders वाला एक customer 3 rows देता है।"
+   },
+   "mistake": {
+    "en": "Forgetting or mistyping the ON condition: every row pairs with every row (a cartesian product) and totals explode.",
+    "hinglish": "ON condition bhoolna ya galat likhna: har row har row se jud jaati hai (cartesian product) aur totals phool jaate hain.",
+    "hindi": "ON condition भूलना या गलत लिखना: हर row हर row से जुड़ जाती है (cartesian product) और totals बहुत बढ़ जाते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, c.first_name, o.amount FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.amount > 20000 ORDER BY o.id"
+     },
+     "result": [
+      [
+       "1",
+       "Aarav",
+       "25500"
+      ],
+      [
+       "3",
+       "Diya",
+       "80000"
+      ],
+      [
+       "6",
+       "Tara",
+       "65000"
+      ]
+     ],
+     "columns": [
+      "id",
+      "first_name",
+      "amount"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "No FULL OUTER JOIN (emulate with LEFT JOIN UNION RIGHT JOIN); JOIN without ON is allowed and acts as CROSS JOIN.",
+    "mariadb": "Same as MySQL: no FULL OUTER JOIN.",
+    "postgresql": "Has FULL OUTER JOIN; an INNER JOIN must have ON/USING (a bare JOIN is a syntax error)."
+   },
+   "related": [
+    "inner_join",
+    "left_join",
+    "left_vs_inner",
+    "self_join"
+   ],
+   "fundamentals": [
+    "cardinality",
+    "outer_join"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/join.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://stackoverflow.com/questions/38549/what-is-the-difference-between-inner-join-and-outer-join"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "inner_join",
+   "kind": "concept",
+   "title": {
+    "en": "INNER JOIN",
+    "hinglish": "INNER JOIN",
+    "hindi": "INNER JOIN"
+   },
+   "terms": [
+    [
+     "inner joins?"
+    ],
+    [
+     "इनर जॉइन"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is an inner join",
+     "how does inner join work"
+    ],
+    "hinglish": [
+     "inner join kya hota hai"
+    ],
+    "hindi": [
+     "INNER JOIN क्या है"
+    ]
+   },
+   "answer": {
+    "en": "INNER JOIN (plain JOIN) returns only the row pairs that satisfy the ON condition; rows with no partner on the other side disappear. Use it when you only want records that exist in both tables.",
+    "hinglish": "INNER JOIN (saadharan JOIN) sirf wo jode deta hai jo ON condition poori karein; jinka doosri taraf koi jodidar nahi, wo gayab ho jaati hain. Jab sirf dono tables mein maujood records chahiye tab use karo.",
+    "hindi": "INNER JOIN (साधारण JOIN) सिर्फ़ वे जोड़े देता है जो ON condition पूरी करें; जिनका दूसरी तरफ़ कोई जोड़ीदार नहीं, वे ग़ायब हो जाती हैं।"
+   },
+   "mistake": {
+    "en": "Using INNER JOIN for 'all customers with their order count': customers with no orders vanish. That needs LEFT JOIN.",
+    "hinglish": "'Saare customers aur unke orders ki ginti' ke liye INNER JOIN lagana: bina order wale customers gayab ho jaate hain. Uske liye LEFT JOIN chahiye.",
+    "hindi": "'सारे customers और उनके orders की गिनती' के लिए INNER JOIN लगाना: बिना order वाले customers ग़ायब हो जाते हैं। उसके लिए LEFT JOIN चाहिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.first_name, o.id AS order_id FROM customers c INNER JOIN orders o ON o.customer_id = c.id WHERE c.city = 'Mumbai' ORDER BY o.id"
+     },
+     "result": [
+      [
+       "Kabir",
+       "4"
+      ],
+      [
+       "Kabir",
+       "5"
+      ],
+      [
+       "Sara",
+       "8"
+      ]
+     ],
+     "columns": [
+      "first_name",
+      "order_id"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "JOIN, INNER JOIN and CROSS JOIN are the same thing in MySQL syntax (ON decides).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "INNER JOIN needs ON or USING; for no condition write CROSS JOIN."
+   },
+   "related": [
+    "left_join",
+    "left_vs_inner",
+    "join"
+   ],
+   "fundamentals": [
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "left_join",
+   "kind": "concept",
+   "title": {
+    "en": "LEFT JOIN",
+    "hinglish": "LEFT JOIN",
+    "hindi": "LEFT JOIN"
+   },
+   "terms": [
+    [
+     "left (outer )?joins?"
+    ],
+    [
+     "लेफ्ट जॉइन"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a left join",
+     "what does left outer join do"
+    ],
+    "hinglish": [
+     "left join kya hota hai"
+    ],
+    "hindi": [
+     "LEFT JOIN क्या है"
+    ]
+   },
+   "answer": {
+    "en": "LEFT JOIN keeps EVERY row of the left table; where the right table has a match the columns are filled, where it has none they are NULL. Use it for 'all customers, with their orders if any' and for finding rows with no match (WHERE right.id IS NULL).",
+    "hinglish": "LEFT JOIN left table ki HAR row rakhta hai; jahan right table mein match hai wahan columns bhare hote hain, jahan nahi wahan NULL. 'Saare customers, orders ho to unke saath' aur bina match wali rows dhoondhne (WHERE right.id IS NULL) ke liye.",
+    "hindi": "LEFT JOIN left table की हर row रखता है; जहाँ right table में match है वहाँ columns भरे होते हैं, जहाँ नहीं वहाँ NULL।"
+   },
+   "mistake": {
+    "en": "Filtering the right table in WHERE (WHERE o.status = 'paid'): the NULL rows fail it, so the LEFT JOIN quietly becomes an INNER JOIN. Put that condition in ON.",
+    "hinglish": "Right table ko WHERE mein filter karna (WHERE o.status = 'paid'): NULL wali rows fail ho jaati hain, aur LEFT JOIN chupchaap INNER JOIN ban jaata hai. Wo condition ON mein daalo.",
+    "hindi": "Right table को WHERE में छाँटना (WHERE o.status = 'paid'): NULL वाली rows हट जाती हैं, और LEFT JOIN चुपचाप INNER JOIN बन जाता है। वह condition ON में डालिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.first_name, COUNT(o.id) AS orders FROM customers c LEFT JOIN orders o ON o.customer_id = c.id GROUP BY c.id, c.first_name ORDER BY c.id"
+     },
+     "result": [
+      [
+       "Aarav",
+       "2"
+      ],
+      [
+       "Diya",
+       "2"
+      ],
+      [
+       "Kabir",
+       "2"
+      ],
+      [
+       "Riya",
+       "0"
+      ],
+      [
+       "Aarav",
+       "0"
+      ],
+      [
+       "Tara",
+       "1"
+      ],
+      [
+       "Dev",
+       "0"
+      ],
+      [
+       "Sara",
+       "1"
+      ]
+     ],
+     "columns": [
+      "first_name",
+      "orders"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same meaning; RIGHT JOIN is LEFT JOIN with the tables swapped.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same meaning; also FULL OUTER JOIN keeps unmatched rows of both sides."
+   },
+   "related": [
+    "left_vs_inner",
+    "inner_join",
+    "right_join"
+   ],
+   "fundamentals": [
+    "outer_join"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-join.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "right_join",
+   "kind": "concept",
+   "title": {
+    "en": "RIGHT JOIN",
+    "hinglish": "RIGHT JOIN",
+    "hindi": "RIGHT JOIN"
+   },
+   "terms": [
+    [
+     "right (outer )?joins?"
+    ],
+    [
+     "राइट जॉइन"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a right join",
+     "right outer join meaning"
+    ],
+    "hinglish": [
+     "right join kya hota hai"
+    ],
+    "hindi": [
+     "RIGHT JOIN क्या है"
+    ]
+   },
+   "answer": {
+    "en": "RIGHT JOIN keeps every row of the RIGHT table and fills the left side where it matches (NULLs where not). It is a LEFT JOIN written the other way round, so most people swap the tables and use LEFT JOIN, which reads easier.",
+    "hinglish": "RIGHT JOIN RIGHT table ki har row rakhta hai aur left side match hone pe bharta hai (warna NULL). Ye ulta likha LEFT JOIN hai, isliye zyada log tables palat kar LEFT JOIN likhte hain, jo padhne mein aasaan hai.",
+    "hindi": "RIGHT JOIN RIGHT table की हर row रखता है और left side match होने पर भरता है (वरना NULL)। यह उल्टा लिखा LEFT JOIN है।"
+   },
+   "mistake": {
+    "en": "Mixing LEFT and RIGHT joins in one query: hard to see which table must keep all its rows.",
+    "hinglish": "Ek query mein LEFT aur RIGHT join milana: samajhna mushkil ki kis table ki saari rows rehni chahiye.",
+    "hindi": "एक query में LEFT और RIGHT join मिलाना: समझना मुश्किल कि किस table की सारी rows रहनी चाहिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT d.name AS department, e.first_name FROM employees e RIGHT JOIN departments d ON d.id = e.department_id ORDER BY d.id, e.id"
+     },
+     "result": [
+      [
+       "Sales",
+       "Asha"
+      ],
+      [
+       "Sales",
+       "Vikram"
+      ],
+      [
+       "Sales",
+       "Neha"
+      ],
+      [
+       "Support",
+       "Rohan"
+      ],
+      [
+       "Support",
+       "Isha"
+      ],
+      [
+       "Finance",
+       "Kabir"
+      ],
+      [
+       "Research",
+       "NULL"
+      ]
+     ],
+     "columns": [
+      "department",
+      "first_name"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Supported.",
+    "mariadb": "Supported.",
+    "postgresql": "Supported.",
+    "sqlite": "Supported only from 3.39."
+   },
+   "related": [
+    "left_join",
+    "full_join"
+   ],
+   "fundamentals": [
+    "outer_join"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/join.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "full_join",
+   "kind": "concept",
+   "title": {
+    "en": "FULL OUTER JOIN",
+    "hinglish": "FULL OUTER JOIN",
+    "hindi": "FULL OUTER JOIN"
+   },
+   "terms": [
+    [
+     "full (outer )?joins?"
+    ],
+    [
+     "outer joins?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a full outer join",
+     "what is an outer join"
+    ],
+    "hinglish": [
+     "full outer join kya hai"
+    ],
+    "hindi": [
+     "FULL OUTER JOIN क्या है"
+    ]
+   },
+   "answer": {
+    "en": "FULL OUTER JOIN keeps the matches plus the unmatched rows of BOTH tables, with NULLs on the missing side. 'Outer join' is the family name for LEFT, RIGHT and FULL joins: they keep rows that have no match.",
+    "hinglish": "FULL OUTER JOIN milne wali rows ke saath DONO tables ki bina match wali rows bhi rakhta hai, khaali side pe NULL. 'Outer join' LEFT, RIGHT aur FULL ka parivaar naam hai: ye bina match wali rows bhi rakhte hain.",
+    "hindi": "FULL OUTER JOIN मिलने वाली rows के साथ दोनों tables की बिना match वाली rows भी रखता है। 'Outer join' LEFT, RIGHT और FULL का परिवार नाम है।"
+   },
+   "mistake": {
+    "en": "Writing FULL OUTER JOIN on MySQL/MariaDB: it isn't supported (the word FULL is even read as a table alias). Use LEFT JOIN ... UNION ... RIGHT JOIN.",
+    "hinglish": "MySQL/MariaDB pe FULL OUTER JOIN likhna: support nahi hai (FULL ko alias bhi samjha ja sakta hai). LEFT JOIN ... UNION ... RIGHT JOIN use karo.",
+    "hindi": "MySQL/MariaDB पर FULL OUTER JOIN लिखना: support नहीं है। LEFT JOIN ... UNION ... RIGHT JOIN इस्तेमाल कीजिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT d.name, e.first_name FROM departments d LEFT JOIN employees e ON e.department_id = d.id\nUNION\nSELECT d.name, e.first_name FROM departments d RIGHT JOIN employees e ON e.department_id = d.id\nORDER BY name IS NULL, name, first_name",
+      "postgresql": "SELECT d.name, e.first_name FROM departments d FULL OUTER JOIN employees e ON e.department_id = d.id ORDER BY d.name IS NULL, d.name, e.first_name"
+     },
+     "result": [
+      [
+       "Finance",
+       "Kabir"
+      ],
+      [
+       "Research",
+       "NULL"
+      ],
+      [
+       "Sales",
+       "Asha"
+      ],
+      [
+       "Sales",
+       "Neha"
+      ],
+      [
+       "Sales",
+       "Vikram"
+      ],
+      [
+       "Support",
+       "Isha"
+      ],
+      [
+       "Support",
+       "Rohan"
+      ],
+      [
+       "NULL",
+       "Meera"
+      ]
+     ],
+     "columns": [
+      "name",
+      "first_name"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "No FULL OUTER JOIN: LEFT JOIN UNION RIGHT JOIN (UNION also removes exact duplicate rows).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "FULL OUTER JOIN supported.",
+    "sqlserver": "FULL OUTER JOIN supported.",
+    "oracle": "FULL OUTER JOIN supported."
+   },
+   "related": [
+    "left_join",
+    "right_join"
+   ],
+   "fundamentals": [
+    "outer_join"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cross_join",
+   "kind": "concept",
+   "title": {
+    "en": "CROSS JOIN",
+    "hinglish": "CROSS JOIN",
+    "hindi": "CROSS JOIN"
+   },
+   "terms": [
+    [
+     "cross joins?"
+    ],
+    [
+     "cartesian( product)?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a cross join",
+     "what is a cartesian product"
+    ],
+    "hinglish": [
+     "cross join kya hota hai"
+    ],
+    "hindi": [
+     "CROSS JOIN क्या है"
+    ]
+   },
+   "answer": {
+    "en": "CROSS JOIN pairs every row of one table with every row of the other: 4 departments x 7 employees = 28 rows. It's useful on purpose (every product with every size, a calendar), and a disaster by accident (a join with its condition missing).",
+    "hinglish": "CROSS JOIN ek table ki har row ko doosri ki har row se jodta hai: 4 departments x 7 employees = 28 rows. Jaan-boojhkar kaam ka hai (har product har size ke saath), galti se ho to museebat (join ki condition chhoot gayi).",
+    "hindi": "CROSS JOIN एक table की हर row को दूसरी की हर row से जोड़ता है: 4 x 7 = 28 rows। जानबूझकर काम का है, गलती से हो तो मुसीबत।"
+   },
+   "mistake": {
+    "en": "Listing tables with commas (FROM a, b) and forgetting the WHERE link: that is a cross join, and every total is multiplied.",
+    "hinglish": "Tables comma se likhna (FROM a, b) aur WHERE ka jod bhoolna: ye cross join hai, aur har total guna ho jaata hai.",
+    "hindi": "Tables comma से लिखना (FROM a, b) और WHERE का जोड़ भूलना: यह cross join है, और हर total गुणा हो जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS pairs FROM departments CROSS JOIN employees"
+     },
+     "result": [
+      [
+       "28"
+      ]
+     ],
+     "columns": [
+      "pairs"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "JOIN without ON also acts as a cross join.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Must be written CROSS JOIN (or FROM a, b)."
+   },
+   "related": [
+    "join",
+    "inner_join"
+   ],
+   "fundamentals": [
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "self_join",
+   "kind": "concept",
+   "title": {
+    "en": "Self join",
+    "hinglish": "Self join",
+    "hindi": "Self join"
+   },
+   "terms": [
+    [
+     "self joins?"
+    ],
+    [
+     "join (a )?table (to|with) itself"
+    ],
+    [
+     "सेल्फ जॉइन"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a self join",
+     "how to join a table with itself"
+    ],
+    "hinglish": [
+     "self join kya hota hai"
+    ],
+    "hindi": [
+     "SELF JOIN क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A self join joins a table to itself under two aliases, to compare rows of the same table: an employee with their manager (e.manager_id = m.id), or two customers sharing an email.",
+    "hinglish": "Self join ek table ko do alag aliases ke saath khud se jodta hai, taaki usi table ki rows ki tulna ho: employee aur uska manager (e.manager_id = m.id), ya ek hi email wale do customers.",
+    "hindi": "Self join एक table को दो अलग aliases के साथ ख़ुद से जोड़ता है, ताकि उसी table की rows की तुलना हो: employee और उसका manager।"
+   },
+   "mistake": {
+    "en": "Using the same alias twice, or comparing a.id <> b.id when you want each pair once (use a.id < b.id).",
+    "hinglish": "Do baar same alias lagana, ya har joda ek baar chahiye tab a.id <> b.id likhna (a.id < b.id likho).",
+    "hindi": "दो बार एक ही alias लगाना, या हर जोड़ा एक बार चाहिए तब a.id <> b.id लिखना (a.id < b.id लिखिए)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT e.first_name AS employee, m.first_name AS manager FROM employees e LEFT JOIN employees m ON m.id = e.manager_id ORDER BY e.id"
+     },
+     "result": [
+      [
+       "Asha",
+       "NULL"
+      ],
+      [
+       "Vikram",
+       "Asha"
+      ],
+      [
+       "Neha",
+       "Asha"
+      ],
+      [
+       "Rohan",
+       "Asha"
+      ],
+      [
+       "Isha",
+       "Rohan"
+      ],
+      [
+       "Kabir",
+       "Asha"
+      ],
+      [
+       "Meera",
+       "Asha"
+      ]
+     ],
+     "columns": [
+      "employee",
+      "manager"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Works; a TEMPORARY table can't be opened twice in one query on MySQL (MariaDB allows it).",
+    "mariadb": "Works.",
+    "postgresql": "Works."
+   },
+   "related": [
+    "join",
+    "left_join",
+    "find_duplicates"
+   ],
+   "fundamentals": [
+    "cardinality",
+    "names_scope"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/join.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "left_vs_inner",
+   "kind": "compare",
+   "title": {
+    "en": "LEFT JOIN vs INNER JOIN",
+    "hinglish": "LEFT JOIN aur INNER JOIN ka farak",
+    "hindi": "LEFT JOIN और INNER JOIN का अंतर"
+   },
+   "terms": [
+    [
+     "left (outer )?joins?",
+     "inner joins?"
+    ],
+    [
+     "left (outer )?joins?",
+     "(vs|versus|aur|and) joins?"
+    ],
+    [
+     "inner",
+     "outer",
+     "joins?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "left join vs inner join",
+     "difference between inner join and left join",
+     "inner join vs outer join"
+    ],
+    "hinglish": [
+     "left join aur inner join mein kya farak hai",
+     "inner join vs left join samjhao"
+    ],
+    "hindi": [
+     "LEFT JOIN और INNER JOIN में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "INNER JOIN returns only rows that match on both sides; LEFT JOIN returns every left row, with NULLs where the right side has no match. Same data: customers who never ordered appear with LEFT JOIN (order columns NULL) and vanish with INNER JOIN.",
+    "hinglish": "INNER JOIN sirf wo rows deta hai jo dono taraf match karein; LEFT JOIN har left row deta hai, jahan right mein match nahi wahan NULL. Wahi data: jinhone kabhi order nahi kiya wo customers LEFT JOIN mein dikhte hain (order columns NULL), INNER JOIN mein gayab.",
+    "hindi": "INNER JOIN सिर्फ़ वे rows देता है जो दोनों तरफ़ match करें; LEFT JOIN हर left row देता है, जहाँ right में match नहीं वहाँ NULL।"
+   },
+   "mistake": {
+    "en": "Writing LEFT JOIN and then filtering the right table in WHERE, which turns it back into an INNER JOIN; and COUNT(*) with LEFT JOIN counts 1 for a customer with no orders (count o.id).",
+    "hinglish": "LEFT JOIN likh kar right table ko WHERE mein filter karna, jo use wapas INNER JOIN bana deta hai; aur LEFT JOIN ke saath COUNT(*) bina order wale customer ko 1 ginta hai (o.id gino).",
+    "hindi": "LEFT JOIN लिखकर right table को WHERE में छाँटना, जो उसे वापस INNER JOIN बना देता है; और LEFT JOIN के साथ COUNT(*) बिना order वाले customer को 1 गिनता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, c.first_name, o.id AS order_id FROM customers c LEFT JOIN orders o ON o.customer_id = c.id WHERE c.id IN (4, 5, 6) ORDER BY c.id, o.id"
+     },
+     "result": [
+      [
+       "4",
+       "Riya",
+       "NULL"
+      ],
+      [
+       "5",
+       "Aarav",
+       "NULL"
+      ],
+      [
+       "6",
+       "Tara",
+       "6"
+      ]
+     ],
+     "columns": [
+      "id",
+      "first_name",
+      "order_id"
+     ]
+    },
+    {
+     "sql": {
+      "all": "SELECT c.id, c.first_name, o.id AS order_id FROM customers c INNER JOIN orders o ON o.customer_id = c.id WHERE c.id IN (4, 5, 6) ORDER BY c.id, o.id"
+     },
+     "result": [
+      [
+       "6",
+       "Tara",
+       "6"
+      ]
+     ],
+     "columns": [
+      "id",
+      "first_name",
+      "order_id"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same meaning.",
+    "mariadb": "Same meaning.",
+    "postgresql": "Same meaning."
+   },
+   "related": [
+    "left_join",
+    "inner_join",
+    "join"
+   ],
+   "fundamentals": [
+    "outer_join",
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-join.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://stackoverflow.com/questions/38549/what-is-the-difference-between-inner-join-and-outer-join"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "primary_key",
+   "kind": "concept",
+   "title": {
+    "en": "Primary key",
+    "hinglish": "Primary key",
+    "hindi": "Primary key"
+   },
+   "terms": [
+    [
+     "primary keys?"
+    ],
+    [
+     "प्राइमरी (की|key)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a primary key",
+     "why do we need a primary key"
+    ],
+    "hinglish": [
+     "primary key kya hota hai",
+     "primary key kya hai"
+    ],
+    "hindi": [
+     "प्राइमरी की क्या होती है",
+     "primary key क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A primary key is the column (or columns) that identifies each row uniquely: no two rows share it and it can never be NULL. A table has one primary key; other tables point to it with foreign keys, and the database indexes it automatically.",
+    "hinglish": "Primary key wo column (ya columns) hai jo har row ko alag pehchaan deta hai: do rows mein same nahi ho sakta aur kabhi NULL nahi hota. Table ki ek hi primary key hoti hai; doosri tables foreign key se ise point karti hain, aur database iska index khud bana deta hai.",
+    "hindi": "Primary key वह column (या columns) है जो हर row को अलग पहचान देता है: दो rows में एक जैसा नहीं हो सकता और कभी NULL नहीं होता। Table की एक ही primary key होती है; दूसरी tables foreign key से इसे point करती हैं।"
+   },
+   "mistake": {
+    "en": "Using a value that can change or repeat (email, phone, name) as the primary key; prefer a stable id and put UNIQUE on the email.",
+    "hinglish": "Badal sakne ya dohraane wali value (email, phone, naam) ko primary key banana; ek stable id rakho aur email pe UNIQUE lagao.",
+    "hindi": "बदल सकने या दोहराने वाली value (email, phone, नाम) को primary key बनाना; एक स्थिर id रखिए और email पर UNIQUE लगाइए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE demo_pk (id INT AUTO_INCREMENT PRIMARY KEY, email VARCHAR(80) UNIQUE)",
+      "postgresql": "CREATE TABLE demo_pk (id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, email VARCHAR(80) UNIQUE)"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "mysql": "AUTO_INCREMENT for generated ids; InnoDB stores rows in primary key order (no key = a hidden one).",
+    "mariadb": "Same as MySQL; sequences also exist (CREATE SEQUENCE).",
+    "postgresql": "GENERATED ... AS IDENTITY (or the older SERIAL) for generated ids.",
+    "sqlserver": "IDENTITY(1,1).",
+    "oracle": "GENERATED AS IDENTITY (12c+) or a sequence.",
+    "sqlite": "INTEGER PRIMARY KEY is the rowid."
+   },
+   "related": [
+    "foreign_key",
+    "pk_vs_fk",
+    "unique",
+    "index"
+   ],
+   "fundamentals": [
+    "cardinality"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/create-table.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "foreign_key",
+   "kind": "concept",
+   "title": {
+    "en": "Foreign key",
+    "hinglish": "Foreign key",
+    "hindi": "Foreign key"
+   },
+   "terms": [
+    [
+     "foreign keys?"
+    ],
+    [
+     "फॉरेन (की|key)"
+    ],
+    [
+     "referential integrity"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a foreign key",
+     "why use foreign keys"
+    ],
+    "hinglish": [
+     "foreign key kya hai",
+     "foreign key kya hota hai"
+    ],
+    "hindi": [
+     "फॉरेन की क्या होती है",
+     "foreign key क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A foreign key is a column that must hold a value existing in another table's key: orders.customer_id must be a real customers.id. The database then refuses orphans (an order for a missing customer) and can CASCADE or block deletes of the parent.",
+    "hinglish": "Foreign key wo column hai jisme doosri table ki key mein maujood value hi ho sakti hai: orders.customer_id ek asli customers.id hona chahiye. Database phir anaath rows (gayab customer ka order) mana kar deta hai, aur parent delete hone pe CASCADE ya rok sakta hai.",
+    "hindi": "Foreign key वह column है जिसमें दूसरी table की key में मौजूद value ही हो सकती है: orders.customer_id एक असली customers.id होना चाहिए।"
+   },
+   "mistake": {
+    "en": "Not indexing the foreign key column (PostgreSQL doesn't do it for you), so joins and parent deletes get slow; and MyISAM tables in MySQL silently ignore foreign keys.",
+    "hinglish": "Foreign key column pe index na lagana (PostgreSQL khud nahi lagata), isse joins aur parent delete slow hote hain; aur MySQL ki MyISAM tables foreign key chupchaap ignore karti hain.",
+    "hindi": "Foreign key column पर index न लगाना (PostgreSQL ख़ुद नहीं लगाता), इससे joins धीमे होते हैं; और MySQL की MyISAM tables foreign key चुपचाप ignore करती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT, FOREIGN KEY (parent_id) REFERENCES demo_parent (id))"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "mysql": "InnoDB only; it creates an index on the foreign key column automatically if none exists.",
+    "mariadb": "Same as MySQL (InnoDB).",
+    "postgresql": "Does NOT create an index on the referencing column; add one yourself.",
+    "sqlite": "Enforced only after PRAGMA foreign_keys = ON."
+   },
+   "related": [
+    "primary_key",
+    "pk_vs_fk",
+    "join"
+   ],
+   "fundamentals": [
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "pk_vs_fk",
+   "kind": "compare",
+   "title": {
+    "en": "Primary key vs foreign key",
+    "hinglish": "Primary key aur foreign key ka farak",
+    "hindi": "Primary key और foreign key का अंतर"
+   },
+   "terms": [
+    [
+     "primary keys?",
+     "foreign keys?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "difference between primary key and foreign key",
+     "primary key vs foreign key"
+    ],
+    "hinglish": [
+     "primary key aur foreign key mein kya farak hai"
+    ],
+    "hindi": [
+     "primary key और foreign key में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "A primary key identifies rows in its own table (unique, never NULL, one per table). A foreign key lives in another table and points to a key: it can repeat (one customer, many orders) and can be NULL unless you forbid it.",
+    "hinglish": "Primary key apni table ki rows pehchanti hai (unique, kabhi NULL nahi, ek table mein ek). Foreign key doosri table mein hoti hai aur kisi key ko point karti hai: ye dohra sakti hai (ek customer, kai orders) aur NULL bhi ho sakti hai jab tak mana na karo.",
+    "hindi": "Primary key अपनी table की rows पहचानती है (unique, कभी NULL नहीं)। Foreign key दूसरी table में होती है और किसी key को point करती है: यह दोहरा सकती है।"
+   },
+   "mistake": {
+    "en": "Expecting a foreign key to be unique: orders.customer_id repeats by design; joining on it multiplies rows.",
+    "hinglish": "Foreign key ko unique samajhna: orders.customer_id jaan-boojhkar dohraata hai; us pe join rows ko guna karta hai.",
+    "hindi": "Foreign key को unique समझना: orders.customer_id जानबूझकर दोहराता है; उस पर join rows को गुणा करता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT customer_id, COUNT(*) AS orders FROM orders GROUP BY customer_id ORDER BY customer_id"
+     },
+     "result": [
+      [
+       "1",
+       "2"
+      ],
+      [
+       "2",
+       "2"
+      ],
+      [
+       "3",
+       "2"
+      ],
+      [
+       "6",
+       "1"
+      ],
+      [
+       "8",
+       "1"
+      ]
+     ],
+     "columns": [
+      "customer_id",
+      "orders"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same idea.",
+    "mariadb": "Same idea.",
+    "postgresql": "Same idea."
+   },
+   "related": [
+    "primary_key",
+    "foreign_key"
+   ],
+   "fundamentals": [
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "unique",
+   "kind": "concept",
+   "title": {
+    "en": "UNIQUE constraint",
+    "hinglish": "UNIQUE constraint",
+    "hindi": "UNIQUE constraint"
+   },
+   "terms": [
+    [
+     "unique (key|constraint|index)s?"
+    ],
+    [
+     "unique"
+    ],
+    [
+     "यूनिक"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a unique constraint",
+     "what is a unique key"
+    ],
+    "hinglish": [
+     "unique key kya hota hai"
+    ],
+    "hindi": [
+     "UNIQUE constraint क्या है"
+    ]
+   },
+   "answer": {
+    "en": "UNIQUE makes the database refuse a second row with the same value (an email, a SKU). Unlike a primary key, a table can have many UNIQUE constraints and they allow NULLs (several NULLs are allowed, since NULL never equals NULL).",
+    "hinglish": "UNIQUE database se same value wali doosri row mana karwata hai (email, SKU). Primary key se alag, ek table mein kai UNIQUE ho sakte hain aur ye NULL allow karte hain (kai NULL chal jaate hain, kyunki NULL kabhi NULL ke barabar nahi).",
+    "hindi": "UNIQUE डेटाबेस से एक जैसी value वाली दूसरी row मना करवाता है। Primary key से अलग, एक table में कई UNIQUE हो सकते हैं और ये NULL allow करते हैं।"
+   },
+   "mistake": {
+    "en": "Adding UNIQUE to a column that already has duplicates (it fails: find and clean them first); and forgetting case: 'A@x' and 'a@x' differ on PostgreSQL.",
+    "hinglish": "Jis column mein pehle se duplicates hain us pe UNIQUE lagana (fail hoga: pehle dhoondh kar saaf karo); aur case bhoolna: PostgreSQL pe 'A@x' aur 'a@x' alag hain.",
+    "hindi": "जिस column में पहले से duplicates हैं उस पर UNIQUE लगाना (fail होगा: पहले ढूँढकर साफ़ कीजिए)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT LOWER(email) AS email, COUNT(*) AS copies FROM customers GROUP BY LOWER(email) HAVING COUNT(*) > 1 ORDER BY 1"
+     },
+     "result": [
+      [
+       "aarav@mail.test",
+       "2"
+      ],
+      [
+       "diya@mail.test",
+       "2"
+      ]
+     ],
+     "columns": [
+      "email",
+      "copies"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Case-insensitive collations make 'A@x' and 'a@x' duplicates for UNIQUE.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Case-sensitive: use a unique index on lower(email) to block case variants; NULLS NOT DISTINCT (15+) treats NULLs as equal."
+   },
+   "related": [
+    "primary_key",
+    "index",
+    "find_duplicates"
+   ],
+   "fundamentals": [
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "index",
+   "kind": "concept",
+   "title": {
+    "en": "Index",
+    "hinglish": "Index",
+    "hindi": "Index"
+   },
+   "terms": [
+    [
+     "index(es)?"
+    ],
+    [
+     "indices"
+    ],
+    [
+     "indexing"
+    ],
+    [
+     "इंडेक्स"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is an index",
+     "why do we use indexes in a database",
+     "how does an index work"
+    ],
+    "hinglish": [
+     "index kya hota hai",
+     "index kyun lagate hain"
+    ],
+    "hindi": [
+     "इंडेक्स क्या होता है",
+     "डेटाबेस में index क्या है"
+    ]
+   },
+   "answer": {
+    "en": "An index is a sorted lookup structure (usually a B-tree) on one or more columns, like a book's index: the database can jump to matching rows instead of reading the whole table. It speeds up WHERE, JOIN and ORDER BY on those columns, and costs space plus a little time on every write.",
+    "hinglish": "Index ek sorted lookup dhaancha hai (aksar B-tree) ek ya zyada columns pe, kitaab ki index jaisa: database poori table padhne ki jagah seedha milti rows pe pahunch jaata hai. Un columns pe WHERE, JOIN, ORDER BY tez hote hain; badle mein jagah aur har write pe thoda samay lagta hai.",
+    "hindi": "Index एक sorted lookup ढाँचा है (अक्सर B-tree), किताब की index जैसा: डेटाबेस पूरी table पढ़ने की जगह सीधे मिलती rows पर पहुँच जाता है। WHERE, JOIN, ORDER BY तेज़ होते हैं; बदले में जगह और हर write पर थोड़ा समय लगता है।"
+   },
+   "mistake": {
+    "en": "Wrapping the indexed column in a function (WHERE YEAR(created_at) = 2024) or starting LIKE with %: the index can't be used. And a composite index (a, b) doesn't help a filter on b alone.",
+    "hinglish": "Index wale column ko function mein lapetna (WHERE YEAR(created_at) = 2024) ya LIKE ko % se shuru karna: index use nahi hota. Aur composite index (a, b) sirf b ke filter mein madad nahi karta.",
+    "hindi": "Index वाले column को function में लपेटना (WHERE YEAR(created_at) = 2024) या LIKE को % से शुरू करना: index इस्तेमाल नहीं होता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE INDEX ix_orders_customer ON orders (customer_id)"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "mysql": "EXPLAIN shows key = the index used; InnoDB secondary indexes also carry the primary key.",
+    "mariadb": "Same as MySQL; ANALYZE statement shows real row counts.",
+    "postgresql": "EXPLAIN (ANALYZE) shows Index Scan vs Seq Scan; CREATE INDEX CONCURRENTLY avoids blocking writes."
+   },
+   "related": [
+    "primary_key",
+    "unique",
+    "where"
+   ],
+   "fundamentals": [
+    "names_scope"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/mysql-indexes.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "normalization",
+   "kind": "concept",
+   "title": {
+    "en": "Normalization",
+    "hinglish": "Normalization",
+    "hindi": "Normalization"
+   },
+   "terms": [
+    [
+     "normali[sz]\\w*"
+    ],
+    [
+     "normal forms?"
+    ],
+    [
+     "[123]nf"
+    ],
+    [
+     "denormali[sz]\\w*"
+    ],
+    [
+     "नॉर्मल\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is normalization",
+     "what are normal forms in a database"
+    ],
+    "hinglish": [
+     "normalization kya hai",
+     "normalization kya hota hai"
+    ],
+    "hindi": [
+     "नॉर्मलाइज़ेशन क्या है",
+     "normalization क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Normalization means storing each fact once, in the table where it belongs, and linking tables with keys. 1NF: one value per cell, no repeating columns; 2NF: every column depends on the whole key; 3NF: no column depends on another non-key column (a customer's city lives in customers, not copied into every order).",
+    "hinglish": "Normalization yaani har baat ek hi jagah rakhna, usi table mein jahan wo belong karti hai, aur tables ko keys se jodna. 1NF: har cell mein ek value, dohraaye columns nahi; 2NF: har column poori key pe nirbhar; 3NF: koi column kisi non-key column pe nirbhar nahi (customer ki city customers mein, har order mein copy nahi).",
+    "hindi": "Normalization यानी हर बात एक ही जगह रखना, उसी table में जहाँ वह belong करती है, और tables को keys से जोड़ना। 1NF: हर cell में एक value; 2NF: हर column पूरी key पर निर्भर; 3NF: कोई column किसी non-key column पर निर्भर नहीं।"
+   },
+   "mistake": {
+    "en": "Storing lists in one column ('1,4,7') or copying names into many tables: updates go out of sync. Some denormalization for speed is fine when done on purpose.",
+    "hinglish": "Ek column mein list rakhna ('1,4,7') ya naam kai tables mein copy karna: update karte hi data bemel ho jaata hai. Speed ke liye jaan-boojhkar thoda denormalization theek hai.",
+    "hindi": "एक column में list रखना ('1,4,7') या नाम कई tables में copy करना: update करते ही डेटा बेमेल हो जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, c.city FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.id <= 3 ORDER BY o.id"
+     },
+     "result": [
+      [
+       "1",
+       "Pune"
+      ],
+      [
+       "2",
+       "Pune"
+      ],
+      [
+       "3",
+       "Delhi"
+      ]
+     ],
+     "columns": [
+      "id",
+      "city"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same theory.",
+    "mariadb": "Same theory.",
+    "postgresql": "Same theory; arrays/JSON columns exist but are best for data you don't join on."
+   },
+   "related": [
+    "primary_key",
+    "foreign_key",
+    "join"
+   ],
+   "fundamentals": [
+    "grain",
+    "cardinality"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/glossary.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "delete_truncate_drop",
+   "kind": "compare",
+   "title": {
+    "en": "DELETE vs TRUNCATE vs DROP",
+    "hinglish": "DELETE, TRUNCATE aur DROP ka farak",
+    "hindi": "DELETE, TRUNCATE और DROP का अंतर"
+   },
+   "terms": [
+    [
+     "delete",
+     "truncate"
+    ],
+    [
+     "truncate",
+     "drop"
+    ],
+    [
+     "delete",
+     "drop"
+    ],
+    [
+     "truncate"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the difference between delete and truncate",
+     "delete vs truncate vs drop",
+     "what does truncate do"
+    ],
+    "hinglish": [
+     "delete aur truncate mein kya farak hai",
+     "truncate kya hota hai"
+    ],
+    "hindi": [
+     "DELETE और TRUNCATE में क्या अंतर है",
+     "TRUNCATE क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "DELETE removes the rows you pick (WHERE), one by one, fires triggers and can be rolled back. TRUNCATE empties the whole table at once, much faster, resets the auto-increment counter, takes no WHERE. DROP removes the table itself (structure, data, indexes).",
+    "hinglish": "DELETE chuni hui rows (WHERE) ek-ek karke hataata hai, triggers chalata hai aur rollback ho sakta hai. TRUNCATE poori table ek baar mein khaali karta hai, bahut tez, auto-increment counter reset karta hai, WHERE nahi leta. DROP table hi hata deta hai (dhaancha, data, indexes).",
+    "hindi": "DELETE चुनी हुई rows (WHERE) एक-एक करके हटाता है, triggers चलाता है और rollback हो सकता है। TRUNCATE पूरी table एक बार में खाली करता है, बहुत तेज़, auto-increment reset करता है। DROP table ही हटा देता है।"
+   },
+   "mistake": {
+    "en": "Running DELETE without WHERE when you meant a few rows (always SELECT with the same WHERE first), or assuming TRUNCATE can be undone on MySQL (it commits immediately).",
+    "hinglish": "Kuch rows hataani thi aur bina WHERE ke DELETE chala diya (pehle usi WHERE ke saath SELECT chalao), ya ye maan lena ki MySQL pe TRUNCATE undo ho sakta hai (wo turant commit hota hai).",
+    "hindi": "कुछ rows हटानी थीं और बिना WHERE के DELETE चला दिया (पहले उसी WHERE के साथ SELECT चलाइए), या मान लेना कि MySQL पर TRUNCATE undo हो सकता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "DELETE FROM payments WHERE method IS NULL"
+     },
+     "preview": {
+      "all": "SELECT id, order_id, amount FROM payments WHERE method IS NULL"
+     },
+     "changed": 1,
+     "preview_result": [
+      [
+       "6",
+       "2",
+       "450"
+      ]
+     ],
+     "preview_columns": [
+      "id",
+      "order_id",
+      "amount"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "TRUNCATE is DDL: implicit commit, no rollback; refused if another table's foreign key references it.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "TRUNCATE is transactional (can be rolled back inside BEGIN); RESTART IDENTITY resets sequences; CASCADE truncates referencing tables.",
+    "sqlserver": "TRUNCATE can be rolled back inside a transaction.",
+    "oracle": "TRUNCATE is DDL (commits)."
+   },
+   "related": [
+    "transaction",
+    "delete_duplicates"
+   ],
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/truncate-table.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/postgresql"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "transaction",
+   "kind": "concept",
+   "title": {
+    "en": "Transaction",
+    "hinglish": "Transaction",
+    "hindi": "Transaction"
+   },
+   "terms": [
+    [
+     "transactions?"
+    ],
+    [
+     "commit"
+    ],
+    [
+     "rollback"
+    ],
+    [
+     "acid"
+    ],
+    [
+     "ट्रांजैक्शन"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a transaction in sql",
+     "what does commit and rollback mean",
+     "what is acid"
+    ],
+    "hinglish": [
+     "transaction kya hota hai",
+     "commit rollback kya hai"
+    ],
+    "hindi": [
+     "ट्रांजैक्शन क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A transaction groups statements so they succeed or fail together: START TRANSACTION (BEGIN), the changes, then COMMIT to keep them or ROLLBACK to undo them all. ACID: all-or-nothing, rules kept, others don't see half-done work, committed work survives a crash.",
+    "hinglish": "Transaction kai statements ko ek saath jodta hai taaki sab saath mein safal ya fail hon: START TRANSACTION (BEGIN), badlaav, phir rakhne ke liye COMMIT ya sab undo karne ke liye ROLLBACK. ACID: sab ya kuch nahi, niyam bane rahein, doosre adhoora kaam na dekhein, commit hua kaam crash ke baad bhi bache.",
+    "hindi": "Transaction कई statements को जोड़ता है ताकि सब साथ में सफल या असफल हों: START TRANSACTION (BEGIN), बदलाव, फिर रखने के लिए COMMIT या सब undo करने के लिए ROLLBACK।"
+   },
+   "mistake": {
+    "en": "Leaving a transaction open (no COMMIT/ROLLBACK): it holds locks, blocks other users and on PostgreSQL stops cleanup; and DDL like ALTER/TRUNCATE commits by itself on MySQL.",
+    "hinglish": "Transaction khula chhod dena (na COMMIT na ROLLBACK): wo locks pakde rehta hai, doosron ko rokta hai aur PostgreSQL pe safai rok deta hai; aur MySQL pe ALTER/TRUNCATE jaise DDL khud commit kar dete hain.",
+    "hindi": "Transaction खुला छोड़ देना: वह locks पकड़े रहता है और दूसरों को रोकता है; और MySQL पर ALTER/TRUNCATE जैसे DDL ख़ुद commit कर देते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "START TRANSACTION;\nUPDATE products SET stock = stock - 1 WHERE id = 1;\nINSERT INTO payments VALUES (7, 1, '2024-06-02', 100, 'card');\nCOMMIT;\nSELECT id, stock FROM products WHERE id = 1",
+      "postgresql": "BEGIN;\nUPDATE products SET stock = stock - 1 WHERE id = 1;\nINSERT INTO payments VALUES (7, 1, '2024-06-02', 100, 'card');\nCOMMIT;\nSELECT id, stock FROM products WHERE id = 1"
+     },
+     "result": [
+      [
+       "1",
+       "11"
+      ]
+     ],
+     "columns": [
+      "id",
+      "stock"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "autocommit is ON by default; InnoDB tables only (MyISAM ignores transactions); DDL commits implicitly.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "DDL (CREATE/ALTER/DROP) is transactional too; an error inside a transaction aborts it until ROLLBACK.",
+    "sqlserver": "BEGIN TRAN / COMMIT.",
+    "oracle": "A transaction starts automatically; DDL commits."
+   },
+   "related": [
+    "delete_truncate_drop",
+    "delete_duplicates"
+   ],
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-transactions.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "view",
+   "kind": "concept",
+   "title": {
+    "en": "View",
+    "hinglish": "View",
+    "hindi": "View"
+   },
+   "terms": [
+    [
+     "views"
+    ],
+    [
+     "(a|sql|database|db) view"
+    ],
+    [
+     "view (in|kya|ka|ki|hota|hoti)"
+    ],
+    [
+     "create view"
+    ],
+    [
+     "materiali[sz]ed views?"
+    ],
+    [
+     "व्यू"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a view in sql",
+     "what is a materialized view"
+    ],
+    "hinglish": [
+     "view kya hota hai sql mein",
+     "sql view kya hai"
+    ],
+    "hindi": [
+     "SQL में व्यू क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A view is a saved SELECT with a name: you query it like a table, and each time it runs the underlying query on the current data. Use it to hide complex joins or to give users only some columns. A materialized view (PostgreSQL) stores the result and needs REFRESH.",
+    "hinglish": "View ek naam wala save kiya SELECT hai: ise table ki tarah query karte ho, aur har baar ye current data pe apni query chalata hai. Mushkil joins chhupane ya users ko sirf kuch columns dene ke liye. Materialized view (PostgreSQL) result rakh leta hai aur REFRESH maangta hai.",
+    "hindi": "View एक नाम वाला save किया SELECT है: इसे table की तरह query करते हैं, और हर बार यह current डेटा पर अपनी query चलाता है।"
+   },
+   "mistake": {
+    "en": "Expecting a view to make a slow query fast: a normal view stores nothing, it runs the same query each time.",
+    "hinglish": "Ye sochna ki view slow query ko tez kar dega: normal view kuch store nahi karta, har baar wahi query chalata hai.",
+    "hindi": "यह सोचना कि view धीमी query को तेज़ कर देगा: normal view कुछ store नहीं करता, हर बार वही query चलाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE VIEW paid_orders AS SELECT id, customer_id, amount FROM orders WHERE status = 'paid'"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "mysql": "No materialized views; a view with GROUP BY/DISTINCT can't be updated.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "CREATE MATERIALIZED VIEW + REFRESH MATERIALIZED VIEW; simple views are auto-updatable."
+   },
+   "related": [
+    "select",
+    "join"
+   ],
+   "fundamentals": [
+    "output"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-views.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "find_duplicates",
+   "kind": "howto",
+   "title": {
+    "en": "Find duplicate rows",
+    "hinglish": "Duplicate rows dhoondhna",
+    "hindi": "Duplicate rows ढूँढना"
+   },
+   "terms": [
+    [
+     "duplicat\\w*"
+    ],
+    [
+     "dupes?"
+    ],
+    [
+     "repeated (rows|values|emails|records|entries)"
+    ],
+    [
+     "same email"
+    ],
+    [
+     "डुप्लिकेट"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to find duplicate emails",
+     "how to find duplicate rows in sql",
+     "query to find duplicate records"
+    ],
+    "hinglish": [
+     "duplicate email kaise nikale",
+     "duplicate rows kaise dhoondhe"
+    ],
+    "hindi": [
+     "डुप्लिकेट email कैसे ढूँढें",
+     "डुप्लिकेट rows कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "Group by the column(s) that should be unique and keep the groups with more than one row: GROUP BY email HAVING COUNT(*) > 1. To see the full duplicate rows, join that list back to the table. Decide first what 'same' means (case, spaces): LOWER(TRIM(email)).",
+    "hinglish": "Jo column(s) unique hone chahiye unse GROUP BY karo aur ek se zyada row wale groups rakho: GROUP BY email HAVING COUNT(*) > 1. Poori duplicate rows dekhni hon to us list ko table se wapas join karo. Pehle tay karo 'same' ka matlab (case, spaces): LOWER(TRIM(email)).",
+    "hindi": "जो column(s) unique होने चाहिए उनसे GROUP BY कीजिए और एक से ज़्यादा row वाले समूह रखिए: GROUP BY email HAVING COUNT(*) > 1। पहले तय कीजिए 'same' का मतलब (case, spaces)।"
+   },
+   "mistake": {
+    "en": "Using DISTINCT (it hides duplicates instead of showing them), or forgetting case: on PostgreSQL 'AARAV@x' and 'aarav@x' are different values.",
+    "hinglish": "DISTINCT lagana (ye duplicates dikhata nahi, chhupa deta hai), ya case bhoolna: PostgreSQL pe 'AARAV@x' aur 'aarav@x' alag values hain.",
+    "hindi": "DISTINCT लगाना (यह duplicates दिखाता नहीं, छिपा देता है), या case भूलना: PostgreSQL पर 'AARAV@x' और 'aarav@x' अलग values हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT LOWER(email) AS email, COUNT(*) AS copies FROM customers GROUP BY LOWER(email) HAVING COUNT(*) > 1 ORDER BY 1"
+     },
+     "result": [
+      [
+       "aarav@mail.test",
+       "2"
+      ],
+      [
+       "diya@mail.test",
+       "2"
+      ]
+     ],
+     "columns": [
+      "email",
+      "copies"
+     ]
+    },
+    {
+     "sql": {
+      "all": "SELECT c.id, c.first_name, c.email FROM customers c JOIN (SELECT LOWER(email) AS e FROM customers GROUP BY LOWER(email) HAVING COUNT(*) > 1) d ON LOWER(c.email) = d.e ORDER BY LOWER(c.email), c.id"
+     },
+     "result": [
+      [
+       "1",
+       "Aarav",
+       "aarav@mail.test"
+      ],
+      [
+       "5",
+       "Aarav",
+       "AARAV@mail.test"
+      ],
+      [
+       "2",
+       "Diya",
+       "diya@mail.test"
+      ],
+      [
+       "7",
+       "Dev",
+       "diya@mail.test"
+      ]
+     ],
+     "columns": [
+      "id",
+      "first_name",
+      "email"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "With the default case-insensitive collation, GROUP BY email already treats 'A@x' and 'a@x' as the same.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Case-sensitive: group by LOWER(email) to catch case variants."
+   },
+   "related": [
+    "delete_duplicates",
+    "group_by",
+    "having",
+    "unique"
+   ],
+   "fundamentals": [
+    "grain",
+    "filter_level"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/group-by-handling.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "delete_duplicates",
+   "kind": "howto",
+   "title": {
+    "en": "Delete duplicate rows (keep one)",
+    "hinglish": "Duplicate rows hataana (ek rakhna)",
+    "hindi": "Duplicate rows हटाना (एक रखना)"
+   },
+   "terms": [
+    [
+     "duplicat\\w*",
+     "(delete|remove|hata\\w*|clean\\w*|mita\\w*|get rid|drop|deduplicat\\w*)"
+    ],
+    [
+     "dedup\\w*"
+    ],
+    [
+     "डुप्लिकेट",
+     "(हटा\\w*|मिटा\\w*|डिलीट)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to delete duplicate rows in mysql",
+     "remove duplicate records but keep one",
+     "how to delete duplicates in postgresql"
+    ],
+    "hinglish": [
+     "duplicate rows kaise delete kare",
+     "duplicate hatana hai kaise kare"
+    ],
+    "hindi": [
+     "डुप्लिकेट rows कैसे हटाएँ"
+    ]
+   },
+   "answer": {
+    "en": "Keep one row per duplicate group (usually the smallest id) and delete the others by joining the table to itself on the duplicate column where the other copy has a smaller id. Look at the rows first with the same condition as a SELECT, run the DELETE inside a transaction, and add a UNIQUE constraint afterwards so duplicates can't come back.",
+    "hinglish": "Har duplicate group ki ek row rakho (aksar sabse chhoti id) aur baaki hatao: table ko khud se duplicate column pe jodo jahan doosri copy ki id chhoti ho. Pehle wahi condition SELECT mein chala kar rows dekho, DELETE transaction ke andar chalao, aur baad mein UNIQUE lagao taaki duplicates wapas na aayein.",
+    "hindi": "हर duplicate समूह की एक row रखिए (अक्सर सबसे छोटी id) और बाकी हटाइए: table को ख़ुद से duplicate column पर जोड़िए जहाँ दूसरी copy की id छोटी हो। पहले वही condition SELECT में चलाकर rows देखिए, DELETE transaction में चलाइए, और बाद में UNIQUE लगाइए।"
+   },
+   "mistake": {
+    "en": "Deleting with a.id <> b.id instead of a.id > b.id: that removes EVERY copy, the one you meant to keep as well. And on MySQL you can't DELETE ... WHERE id IN (SELECT ... FROM the same table) (error 1093).",
+    "hinglish": "a.id > b.id ki jagah a.id <> b.id se delete karna: ye HAR copy hata deta hai, jo rakhni thi wo bhi. Aur MySQL pe DELETE ... WHERE id IN (SELECT ... usi table se) nahi chalta (error 1093).",
+    "hindi": "a.id > b.id की जगह a.id <> b.id से delete करना: यह हर copy हटा देता है, जो रखनी थी वह भी। और MySQL पर DELETE ... WHERE id IN (उसी table से SELECT) नहीं चलता (error 1093)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "DELETE a FROM customers a JOIN customers b ON LOWER(a.email) = LOWER(b.email) AND a.id > b.id",
+      "postgresql": "DELETE FROM customers a USING customers b WHERE LOWER(a.email) = LOWER(b.email) AND a.id > b.id"
+     },
+     "preview": {
+      "all": "SELECT a.id, a.email, b.id AS kept_id FROM customers a JOIN customers b ON LOWER(a.email) = LOWER(b.email) AND a.id > b.id ORDER BY a.id"
+     },
+     "changed": 2,
+     "preview_result": [
+      [
+       "5",
+       "AARAV@mail.test",
+       "1"
+      ],
+      [
+       "7",
+       "diya@mail.test",
+       "2"
+      ]
+     ],
+     "preview_columns": [
+      "id",
+      "email",
+      "kept_id"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "DELETE alias FROM t alias JOIN t other ...; a subquery on the same table in DELETE ... WHERE id IN (...) gives error 1093.",
+    "mariadb": "DELETE ... JOIN works; MariaDB 10.3+ also allows the same table in the subquery.",
+    "postgresql": "DELETE FROM t a USING t b WHERE ...; or keep the first row per group with ROW_NUMBER() in a CTE.",
+    "sqlserver": "Often done with a CTE and ROW_NUMBER(), then DELETE FROM cte WHERE rn > 1."
+   },
+   "related": [
+    "find_duplicates",
+    "unique",
+    "transaction"
+   ],
+   "fundamentals": [
+    "changes_safety",
+    "names_scope"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/delete.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/postgresql"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "coalesce",
+   "kind": "concept",
+   "title": {
+    "en": "NULL in calculations, COALESCE",
+    "hinglish": "Hisaab mein NULL, COALESCE",
+    "hindi": "हिसाब में NULL, COALESCE"
+   },
+   "terms": [
+    [
+     "coalesce"
+    ],
+    [
+     "ifnull"
+    ],
+    [
+     "nvl"
+    ],
+    [
+     "isnull"
+    ],
+    [
+     "null",
+     "(math|arithmetic|calculation\\w*|sum|add\\w*|plus|total|zero|0)"
+    ],
+    [
+     "replace null"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is coalesce in sql",
+     "how to replace null with 0",
+     "why does adding a null give null"
+    ],
+    "hinglish": [
+     "coalesce kya hai",
+     "null ko 0 kaise banaye"
+    ],
+    "hindi": [
+     "COALESCE क्या है",
+     "NULL को 0 कैसे बनाएँ"
+    ]
+   },
+   "answer": {
+    "en": "Any arithmetic with NULL gives NULL: amount + shipping is NULL when shipping is NULL. COALESCE(a, b, ...) returns the first value that isn't NULL, so amount + COALESCE(shipping, 0) treats a missing shipping as 0. COALESCE is standard and works on every database.",
+    "hinglish": "NULL ke saath koi bhi hisaab NULL deta hai: shipping NULL ho to amount + shipping NULL. COALESCE(a, b, ...) pehli non-NULL value deta hai, isliye amount + COALESCE(shipping, 0) gayab shipping ko 0 maanta hai. COALESCE standard hai, har database pe chalta hai.",
+    "hindi": "NULL के साथ कोई भी हिसाब NULL देता है: shipping NULL हो तो amount + shipping NULL। COALESCE(a, b, ...) पहली non-NULL value देता है, इसलिए amount + COALESCE(shipping, 0) ग़ायब shipping को 0 मानता है।"
+   },
+   "mistake": {
+    "en": "Using ISNULL(a, 0) (SQL Server) or IFNULL/NVL: ISNULL with two arguments fails on MySQL and PostgreSQL, IFNULL fails on PostgreSQL. COALESCE works everywhere.",
+    "hinglish": "ISNULL(a, 0) (SQL Server) ya IFNULL/NVL lagana: do arguments wala ISNULL MySQL aur PostgreSQL pe fail hota hai, IFNULL PostgreSQL pe fail. COALESCE har jagah chalta hai.",
+    "hindi": "ISNULL(a, 0) (SQL Server) या IFNULL/NVL लगाना: दो arguments वाला ISNULL MySQL और PostgreSQL पर fail होता है, IFNULL PostgreSQL पर। COALESCE हर जगह चलता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount, shipping, amount + shipping AS plain_sum, amount + COALESCE(shipping, 0) AS with_coalesce FROM orders WHERE id IN (1, 2) ORDER BY id"
+     },
+     "result": [
+      [
+       "1",
+       "25500",
+       "100",
+       "25600",
+       "25600"
+      ],
+      [
+       "2",
+       "500",
+       "NULL",
+       "NULL",
+       "500"
+      ]
+     ],
+     "columns": [
+      "id",
+      "amount",
+      "shipping",
+      "plain_sum",
+      "with_coalesce"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "IFNULL(a, b) works; ISNULL(a) is a 1-argument test (returns 1/0).",
+    "mariadb": "IFNULL and NVL work; ISNULL(a) tests only.",
+    "postgresql": "Only COALESCE (no IFNULL, NVL or ISNULL).",
+    "sqlserver": "ISNULL(a, b) or COALESCE.",
+    "oracle": "NVL(a, b) or COALESCE."
+   },
+   "related": [
+    "null",
+    "concat"
+   ],
+   "fundamentals": [
+    "null_logic"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/comparison-operators.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "concat",
+   "kind": "howto",
+   "title": {
+    "en": "Joining text (CONCAT)",
+    "hinglish": "Text jodna (CONCAT)",
+    "hindi": "Text जोड़ना (CONCAT)"
+   },
+   "terms": [
+    [
+     "concat\\w*"
+    ],
+    [
+     "(join|combine|merge|jod\\w*) (two |the )?(strings|columns|names|text|first name)"
+    ],
+    [
+     "\\|\\|"
+    ],
+    [
+     "full name"
+    ],
+    [
+     "(two|do|2|दो) (columns?|strings|text)",
+     "(jod\\w*|jud\\w*|combine|merge|concat\\w*|जोड़\\w*|मिला\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to concatenate strings in sql",
+     "how to combine first name and last name in sql"
+    ],
+    "hinglish": [
+     "sql mein do column kaise jode",
+     "concat kya hai"
+    ],
+    "hindi": [
+     "SQL में दो column कैसे जोड़ें"
+    ]
+   },
+   "answer": {
+    "en": "CONCAT(a, ' ', b) joins text and works on MySQL, MariaDB and PostgreSQL. The || operator is the SQL standard and joins text on PostgreSQL, but on MySQL/MariaDB it means OR (the result is 0 or 1). CONCAT_WS(' ', a, b, c) puts a separator between parts and skips NULLs on all three.",
+    "hinglish": "CONCAT(a, ' ', b) text jodta hai aur MySQL, MariaDB, PostgreSQL teeno pe chalta hai. || SQL standard hai aur PostgreSQL pe text jodta hai, par MySQL/MariaDB pe iska matlab OR hai (result 0 ya 1). CONCAT_WS(' ', a, b, c) hisson ke beech separator lagata hai aur teeno pe NULL chhod deta hai.",
+    "hindi": "CONCAT(a, ' ', b) text जोड़ता है और MySQL, MariaDB, PostgreSQL तीनों पर चलता है। || PostgreSQL पर text जोड़ता है, पर MySQL/MariaDB पर इसका मतलब OR है। CONCAT_WS(' ', a, b, c) separator लगाता है और NULL छोड़ देता है।"
+   },
+   "mistake": {
+    "en": "first_name + ' ' + last_name (SQL Server style): MySQL turns both into numbers and returns 0, PostgreSQL refuses. And on MySQL, CONCAT with one NULL part returns NULL.",
+    "hinglish": "first_name + ' ' + last_name (SQL Server ka tareeka): MySQL dono ko number bana ke 0 deta hai, PostgreSQL mana kar deta hai. Aur MySQL pe CONCAT ka ek hissa NULL ho to poora NULL.",
+    "hindi": "first_name + ' ' + last_name (SQL Server का तरीका): MySQL 0 देता है, PostgreSQL मना कर देता है। और MySQL पर CONCAT का एक हिस्सा NULL हो तो पूरा NULL।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, CONCAT(first_name, ' ', last_name) AS full_name, CONCAT_WS(' ', first_name, middle_name, last_name) AS with_middle FROM customers WHERE id IN (1, 2) ORDER BY id"
+     },
+     "result": [
+      [
+       "1",
+       "Aarav Shah",
+       "Aarav Shah"
+      ],
+      [
+       "2",
+       "Diya Patel",
+       "Diya K Patel"
+      ]
+     ],
+     "columns": [
+      "id",
+      "full_name",
+      "with_middle"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "CONCAT returns NULL if any argument is NULL; || is logical OR unless sql_mode has PIPES_AS_CONCAT.",
+    "mariadb": "Same as MySQL (|| is OR by default; CONCAT with a NULL part gives NULL).",
+    "postgresql": "CONCAT ignores NULL parts; || returns NULL if a part is NULL.",
+    "sqlserver": "+ or CONCAT (CONCAT treats NULL as '').",
+    "oracle": "|| treats NULL as an empty string; CONCAT takes only two arguments."
+   },
+   "related": [
+    "coalesce",
+    "null"
+   ],
+   "fundamentals": [
+    "values_types",
+    "null_logic"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/string-functions.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "and_or",
+   "kind": "concept",
+   "title": {
+    "en": "AND / OR precedence",
+    "hinglish": "AND / OR ka kram",
+    "hindi": "AND / OR का क्रम"
+   },
+   "terms": [
+    [
+     "precedence"
+    ],
+    [
+     "and",
+     "or",
+     "(bracket\\w*|parenthes\\w*|together|mix\\w*|order|first|pehle|saath|एक साथ|ब्रैकेट)"
+    ],
+    [
+     "operator (priority|order)"
+    ],
+    [
+     "where",
+     "brackets?"
+    ],
+    [
+     "AND",
+     "OR",
+     "साथ"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is operator precedence in sql",
+     "how do and and or work together in where"
+    ],
+    "hinglish": [
+     "and or ek saath kaise kaam karte hain",
+     "where mein brackets kyun zaroori"
+    ],
+    "hindi": [
+     "AND और OR एक साथ कैसे काम करते हैं"
+    ]
+   },
+   "answer": {
+    "en": "AND binds tighter than OR, like multiplication before addition: a OR b AND c means a OR (b AND c). So status = 'paid' OR status = 'shipped' AND amount > 1000 keeps every paid order whatever its amount. Put brackets around the OR part: (a OR b) AND c.",
+    "hinglish": "AND OR se pehle lagta hai, jaise jod se pehle guna: a OR b AND c ka matlab a OR (b AND c). Isliye status = 'paid' OR status = 'shipped' AND amount > 1000 har paid order rakhta hai, amount kuch bhi ho. OR wale hisse pe bracket lagao: (a OR b) AND c.",
+    "hindi": "AND, OR से पहले लगता है, जैसे जोड़ से पहले गुणा: a OR b AND c का मतलब a OR (b AND c)। OR वाले हिस्से पर bracket लगाइए: (a OR b) AND c।"
+   },
+   "mistake": {
+    "en": "Mixing AND and OR without brackets and trusting the reading order; in an UPDATE/DELETE that changes far more rows than intended.",
+    "hinglish": "AND aur OR bina brackets ke milana aur padhne ke kram pe bharosa karna; UPDATE/DELETE mein ye soche se kahin zyada rows badal deta hai.",
+    "hindi": "AND और OR बिना brackets के मिलाना; UPDATE/DELETE में यह सोचे से कहीं ज़्यादा rows बदल देता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, status, amount FROM orders WHERE (status = 'paid' OR status = 'shipped') AND amount > 1000 ORDER BY id"
+     },
+     "result": [
+      [
+       "1",
+       "paid",
+       "25500"
+      ],
+      [
+       "3",
+       "paid",
+       "80000"
+      ]
+     ],
+     "columns": [
+      "id",
+      "status",
+      "amount"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same order (NOT, then AND, then OR); also && and || as AND/OR.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same order."
+   },
+   "related": [
+    "where",
+    "in_operator"
+   ],
+   "fundamentals": [
+    "row_filters"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/operator-precedence.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "distinct_vs_group_by",
+   "kind": "compare",
+   "title": {
+    "en": "DISTINCT vs GROUP BY",
+    "hinglish": "DISTINCT aur GROUP BY ka farak",
+    "hindi": "DISTINCT और GROUP BY का अंतर"
+   },
+   "terms": [
+    [
+     "distinct",
+     "group by"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "distinct vs group by",
+     "difference between distinct and group by"
+    ],
+    "hinglish": [
+     "distinct aur group by mein kya farak hai"
+    ],
+    "hindi": [
+     "DISTINCT और GROUP BY में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "Without totals they give the same rows: SELECT DISTINCT city and SELECT city ... GROUP BY city both list each city once. GROUP BY is for when you also want totals per group (COUNT, SUM); DISTINCT is for 'just the unique combinations'.",
+    "hinglish": "Totals ke bina dono same rows dete hain: SELECT DISTINCT city aur SELECT city ... GROUP BY city dono har city ek baar dikhate hain. GROUP BY tab jab har group ka total bhi chahiye (COUNT, SUM); DISTINCT tab jab 'sirf alag jode' chahiye.",
+    "hindi": "Totals के बिना दोनों एक जैसी rows देते हैं। GROUP BY तब जब हर समूह का total भी चाहिए (COUNT, SUM); DISTINCT तब जब 'सिर्फ़ अलग जोड़े' चाहिए।"
+   },
+   "mistake": {
+    "en": "Adding DISTINCT next to GROUP BY (it does nothing extra), or using DISTINCT on several columns expecting it to work on the first one only.",
+    "hinglish": "GROUP BY ke saath DISTINCT lagana (kuch extra nahi karta), ya kai columns pe DISTINCT lagakar sochna ki ye sirf pehle column pe lagega.",
+    "hindi": "GROUP BY के साथ DISTINCT लगाना (कुछ extra नहीं करता), या कई columns पर DISTINCT लगाकर सोचना कि यह सिर्फ़ पहले column पर लगेगा।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT DISTINCT city FROM customers WHERE city IS NOT NULL ORDER BY city"
+     },
+     "result": [
+      [
+       "Chennai"
+      ],
+      [
+       "Delhi"
+      ],
+      [
+       "Mumbai"
+      ],
+      [
+       "Pune"
+      ]
+     ],
+     "columns": [
+      "city"
+     ]
+    },
+    {
+     "sql": {
+      "all": "SELECT city, COUNT(*) AS customers FROM customers WHERE city IS NOT NULL GROUP BY city ORDER BY city"
+     },
+     "result": [
+      [
+       "Chennai",
+       "1"
+      ],
+      [
+       "Delhi",
+       "2"
+      ],
+      [
+       "Mumbai",
+       "2"
+      ],
+      [
+       "Pune",
+       "2"
+      ]
+     ],
+     "columns": [
+      "city",
+      "customers"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same result; the optimizer often runs both the same way.",
+    "mariadb": "Same.",
+    "postgresql": "Same result; DISTINCT ON (col) is a PostgreSQL extra."
+   },
+   "related": [
+    "distinct",
+    "group_by"
+   ],
+   "fundamentals": [
+    "grain"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/distinct-optimization.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "order_limit_ties",
+   "kind": "concept",
+   "title": {
+    "en": "Stable order for LIMIT and pages",
+    "hinglish": "LIMIT aur pages ke liye pakka order",
+    "hindi": "LIMIT और pages के लिए पक्का order"
+   },
+   "terms": [
+    [
+     "paginat\\w*"
+    ],
+    [
+     "limit",
+     "(same|random|different|tie\\w*|changes?|repeat\\w*|missing|duplicate|alag|badal\\w*|अलग|बदल\\w*)"
+    ],
+    [
+     "order by",
+     "limit"
+    ],
+    [
+     "top \\d+",
+     "(tie\\w*|same)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why does limit return different rows",
+     "how to do pagination in sql",
+     "order by with limit gives random rows"
+    ],
+    "hinglish": [
+     "limit har baar alag rows kyun deta hai",
+     "pagination kaise kare sql mein"
+    ],
+    "hindi": [
+     "LIMIT हर बार अलग rows क्यों देता है"
+    ]
+   },
+   "answer": {
+    "en": "LIMIT takes the first n rows of whatever order ORDER BY gives. If the ORDER BY columns have ties (two employees with the same salary), the database may put the tied rows in any order, so a page or a 'top 3' can change between runs. End the ORDER BY with a unique column (id) so the order is total.",
+    "hinglish": "LIMIT ORDER BY ke diye kram ki pehli n rows leta hai. Agar ORDER BY columns mein barabari ho (do employees ki same salary), database barabar rows kisi bhi kram mein rakh sakta hai, isliye page ya 'top 3' har baar badal sakta hai. ORDER BY ke aakhir mein unique column (id) lagao taaki kram pakka ho.",
+    "hindi": "LIMIT, ORDER BY के दिए क्रम की पहली n rows लेता है। ORDER BY columns में बराबरी हो तो बराबर rows किसी भी क्रम में आ सकती हैं, इसलिए page बदल सकता है। ORDER BY के आख़िर में unique column (id) लगाइए।"
+   },
+   "mistake": {
+    "en": "Paging with ORDER BY created_at LIMIT 20 OFFSET 40 when many rows share a timestamp: rows repeat or go missing between pages.",
+    "hinglish": "ORDER BY created_at LIMIT 20 OFFSET 40 se page banana jab kai rows ka timestamp same ho: pages ke beech rows dohraati ya gayab hoti hain.",
+    "hindi": "ORDER BY created_at LIMIT 20 OFFSET 40 से page बनाना जब कई rows का timestamp एक हो: pages के बीच rows दोहराती या ग़ायब होती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, first_name, salary FROM employees ORDER BY salary DESC, id LIMIT 3"
+     },
+     "result": [
+      [
+       "1",
+       "Asha",
+       "90000"
+      ],
+      [
+       "6",
+       "Kabir",
+       "75000"
+      ],
+      [
+       "2",
+       "Vikram",
+       "60000"
+      ]
+     ],
+     "columns": [
+      "id",
+      "first_name",
+      "salary"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "With ties, LIMIT may return different rows with and without an index (documented in 'LIMIT Query Optimization').",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same: ties come back in no promised order; keyset pages (WHERE (salary, id) < (..)) avoid big OFFSETs."
+   },
+   "related": [
+    "order_by",
+    "limit"
+   ],
+   "fundamentals": [
+    "ranking",
+    "final_cut"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/limit-optimization.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://use-the-index-luke.com/sql/partial-results/fetch-next-page"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "alias",
+   "kind": "concept",
+   "title": {
+    "en": "Alias (AS)",
+    "hinglish": "Alias (AS)",
+    "hindi": "Alias (AS)"
+   },
+   "terms": [
+    [
+     "alias(es)?"
+    ],
+    [
+     "as keyword"
+    ],
+    [
+     "एलियस"
+    ],
+    [
+     "alias(es)?",
+     "where"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is an alias in sql",
+     "why can't I use a column alias in where"
+    ],
+    "hinglish": [
+     "alias kya hota hai sql mein"
+    ],
+    "hindi": [
+     "SQL में alias क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "An alias is a short or nicer name: for a table (FROM customers c, then c.city) or for a result column (amount * 2 AS doubled). A column alias exists only in the output, so WHERE can't use it (WHERE runs before SELECT); ORDER BY can.",
+    "hinglish": "Alias ek chhota ya behtar naam hai: table ke liye (FROM customers c, phir c.city) ya result column ke liye (amount * 2 AS doubled). Column alias sirf output mein hota hai, isliye WHERE use nahi kar sakta (WHERE SELECT se pehle chalta hai); ORDER BY kar sakta hai.",
+    "hindi": "Alias एक छोटा या बेहतर नाम है: table के लिए (FROM customers c) या result column के लिए (amount * 2 AS doubled)। Column alias सिर्फ़ output में होता है, इसलिए WHERE इसे इस्तेमाल नहीं कर सकता; ORDER BY कर सकता है।"
+   },
+   "mistake": {
+    "en": "WHERE doubled > 1000 using a SELECT alias: unknown column on both MySQL and PostgreSQL. Repeat the expression, or wrap the query.",
+    "hinglish": "SELECT ke alias ko WHERE mein use karna (WHERE doubled > 1000): MySQL aur PostgreSQL dono pe unknown column. Expression dohraao, ya query ko lapeto.",
+    "hindi": "SELECT के alias को WHERE में इस्तेमाल करना: MySQL और PostgreSQL दोनों पर unknown column। Expression दोहराइए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount * 2 AS doubled FROM orders WHERE amount * 2 > 100000 ORDER BY doubled DESC"
+     },
+     "result": [
+      [
+       "3",
+       "160000"
+      ],
+      [
+       "6",
+       "130000"
+      ]
+     ],
+     "columns": [
+      "id",
+      "doubled"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Aliases allowed in GROUP BY, HAVING and ORDER BY, not WHERE.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Aliases allowed in ORDER BY and GROUP BY (output names), not in WHERE or HAVING."
+   },
+   "related": [
+    "select",
+    "where"
+   ],
+   "fundamentals": [
+    "names_scope"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-select-lists.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "in_operator",
+   "kind": "concept",
+   "title": {
+    "en": "IN",
+    "hinglish": "IN",
+    "hindi": "IN"
+   },
+   "terms": [
+    [
+     "in (operator|clause|keyword|list)"
+    ],
+    [
+     "not in"
+    ],
+    [
+     "\\bin\\b \\(\\)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the in operator in sql",
+     "what does not in do"
+    ],
+    "hinglish": [
+     "in operator kya hai",
+     "not in kya karta hai"
+    ],
+    "hindi": [
+     "IN operator क्या है"
+    ]
+   },
+   "answer": {
+    "en": "col IN ('a', 'b') is a short way to write col = 'a' OR col = 'b'; it also takes a subquery (customer_id IN (SELECT id FROM ...)). NOT IN keeps rows matching none of the values.",
+    "hinglish": "col IN ('a', 'b') col = 'a' OR col = 'b' ka chhota roop hai; isme subquery bhi de sakte ho (customer_id IN (SELECT id FROM ...)). NOT IN wo rows rakhta hai jo kisi value se match na karein.",
+    "hindi": "col IN ('a', 'b'), col = 'a' OR col = 'b' का छोटा रूप है; इसमें subquery भी दे सकते हैं। NOT IN वे rows रखता है जो किसी value से match न करें।"
+   },
+   "mistake": {
+    "en": "NOT IN with a list or subquery that contains a NULL returns no rows at all (x <> NULL is unknown). Use NOT EXISTS for subqueries.",
+    "hinglish": "NOT IN ki list ya subquery mein ek bhi NULL ho to koi row nahi aati (x <> NULL unknown). Subquery ke liye NOT EXISTS lagao.",
+    "hindi": "NOT IN की list या subquery में एक भी NULL हो तो कोई row नहीं आती। Subquery के लिए NOT EXISTS लगाइए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, status FROM orders WHERE status IN ('paid', 'shipped') ORDER BY id"
+     },
+     "result": [
+      [
+       "1",
+       "paid"
+      ],
+      [
+       "2",
+       "shipped"
+      ],
+      [
+       "3",
+       "paid"
+      ],
+      [
+       "5",
+       "paid"
+      ],
+      [
+       "7",
+       "paid"
+      ],
+      [
+       "8",
+       "shipped"
+      ]
+     ],
+     "columns": [
+      "id",
+      "status"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same meaning.",
+    "mariadb": "Same meaning.",
+    "postgresql": "Same meaning; also = ANY(array)."
+   },
+   "related": [
+    "where",
+    "and_or",
+    "null"
+   ],
+   "fundamentals": [
+    "null_logic",
+    "subquery_shape"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-comparisons.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "empty_vs_null",
+   "kind": "compare",
+   "title": {
+    "en": "Empty string vs NULL",
+    "hinglish": "Khaali text aur NULL ka farak",
+    "hindi": "खाली text और NULL का अंतर"
+   },
+   "terms": [
+    [
+     "empty (string|text|value)",
+     "null"
+    ],
+    [
+     "blank",
+     "null"
+    ],
+    [
+     "(khaali|khali|खाली) (string|text|value)",
+     "null"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "difference between null and empty string",
+     "empty string vs null"
+    ],
+    "hinglish": [
+     "null aur khaali string mein farak"
+    ],
+    "hindi": [
+     "NULL और खाली string में अंतर"
+    ]
+   },
+   "answer": {
+    "en": "'' is a known value: text with zero characters. NULL means no value at all. WHERE middle_name = '' doesn't find NULLs and IS NULL doesn't find ''; to catch both: WHERE middle_name IS NULL OR middle_name = '' (or COALESCE(middle_name, '') = '').",
+    "hinglish": "'' ek pata value hai: zero akshar wala text. NULL ka matlab koi value hi nahi. WHERE middle_name = '' NULL nahi pakadta aur IS NULL '' nahi pakadta; dono ke liye: WHERE middle_name IS NULL OR middle_name = ''.",
+    "hindi": "'' एक ज्ञात value है: शून्य अक्षर वाला text। NULL का मतलब कोई value ही नहीं। दोनों पकड़ने के लिए: WHERE middle_name IS NULL OR middle_name = ''।"
+   },
+   "mistake": {
+    "en": "Mixing both in one column (some blanks saved as '', some as NULL) and then counting only one kind.",
+    "hinglish": "Ek hi column mein dono milana (kuch khaali '' se, kuch NULL se) aur phir sirf ek tarah ko ginna.",
+    "hindi": "एक ही column में दोनों मिलाना और फिर सिर्फ़ एक तरह को गिनना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS no_middle_name FROM customers WHERE middle_name IS NULL OR middle_name = ''"
+     },
+     "result": [
+      [
+       "6"
+      ]
+     ],
+     "columns": [
+      "no_middle_name"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "'' and NULL are different.",
+    "mariadb": "Different (except in SQL_MODE=ORACLE where '' can act as NULL).",
+    "postgresql": "'' and NULL are different.",
+    "oracle": "Oracle stores '' as NULL."
+   },
+   "related": [
+    "null",
+    "coalesce"
+   ],
+   "fundamentals": [
+    "null_logic"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/problems-with-null.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "aggregates",
+   "kind": "concept",
+   "title": {
+    "en": "Aggregate functions (COUNT, SUM, AVG)",
+    "hinglish": "Aggregate functions (COUNT, SUM, AVG)",
+    "hindi": "Aggregate functions (COUNT, SUM, AVG)"
+   },
+   "terms": [
+    [
+     "aggregate( functions?)?"
+    ],
+    [
+     "count ?\\*"
+    ],
+    [
+     "count ?\\*",
+     "count (col|column)\\w*"
+    ],
+    [
+     "count",
+     "(sum|avg|min|max)"
+    ],
+    [
+     "count (star|function)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what are aggregate functions in sql",
+     "what is the difference between count(*) and count(column)"
+    ],
+    "hinglish": [
+     "aggregate function kya hota hai",
+     "count(*) aur count(col) mein farak"
+    ],
+    "hindi": [
+     "aggregate function क्या होते हैं"
+    ]
+   },
+   "answer": {
+    "en": "Aggregates turn many rows into one value: COUNT(*) counts rows, COUNT(col) counts non-NULL values, COUNT(DISTINCT col) counts different values, SUM/AVG/MIN/MAX skip NULLs. Without GROUP BY they give one row for the whole table; with GROUP BY one row per group.",
+    "hinglish": "Aggregates kai rows ko ek value bana dete hain: COUNT(*) rows ginta hai, COUNT(col) non-NULL values, COUNT(DISTINCT col) alag values; SUM/AVG/MIN/MAX NULL chhod dete hain. GROUP BY ke bina poori table ki ek row; GROUP BY ke saath har group ki ek row.",
+    "hindi": "Aggregates कई rows को एक value बना देते हैं: COUNT(*) rows गिनता है, COUNT(col) non-NULL values, SUM/AVG/MIN/MAX NULL छोड़ देते हैं।"
+   },
+   "mistake": {
+    "en": "AVG(commission) ignores NULLs, so it's the average of those who have one, not of everyone; COALESCE(commission, 0) inside AVG if NULL means zero.",
+    "hinglish": "AVG(commission) NULL chhod deta hai, yaani jinke paas hai unka average, sabka nahi; NULL ka matlab zero ho to AVG ke andar COALESCE(commission, 0).",
+    "hindi": "AVG(commission) NULL छोड़ देता है, यानी जिनके पास है उनका average, सबका नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS all_rows, COUNT(phone) AS with_phone, COUNT(DISTINCT city) AS cities FROM customers"
+     },
+     "result": [
+      [
+       "8",
+       "5",
+       "4"
+      ]
+     ],
+     "columns": [
+      "all_rows",
+      "with_phone",
+      "cities"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Integer / integer gives a decimal (7/2 = 3.5).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Integer / integer truncates (7/2 = 3): COUNT(x) * 100.0 / COUNT(*) for percentages."
+   },
+   "related": [
+    "group_by",
+    "having",
+    "null"
+   ],
+   "fundamentals": [
+    "grain",
+    "null_logic"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  }
+ ]
+}

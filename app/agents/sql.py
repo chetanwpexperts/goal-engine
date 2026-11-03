@@ -418,7 +418,7 @@ def analyze_sql(query: str, extra: str = "") -> dict:
     out = {"ok": True, "findings": [f.as_dict() for f in findings], "indexes": indexes, "check_query": check_query,
            "indexes_verified": bool(seen_structure), "assumed_primary": skipped, "notes": notes,
            "rewritten": rewritten if rewritten != original else None, "tables": [t.name for t in tables]}
-    return _with_correctness(original, out, said)
+    return _with_reading(original, _with_correctness(original, out, said))
 
 
 SEVERITY = {"error": 5, "wrong": 4, "check": 3}
@@ -454,8 +454,26 @@ def _with_correctness(original: str, out: dict, said: str = "") -> dict:
     return out
 
 
+def _with_reading(original: str, out: dict) -> dict:
+    """The query read stage by stage (app/agents/sqlread.py), and the fundamental behind each mistake found."""
+    from app.agents import sqlread
+
+    try:
+        r = sqlread.read_query(original)
+        out["reading"] = {"en": sqlread.render(r, False), "hi": sqlread.render(r, True), "grain": r["grain"]}
+    except Exception:  # noqa: BLE001 - the reading is an extra; never let it break the check
+        return out
+    funds = sqlread.fundamentals()["fundamentals"]
+    for f in list(out.get("findings") or []) + list((out.get("correct") or {}).get("findings") or []):
+        fid = sqlread.fundamental_of(f)
+        if fid and "basis" not in f:
+            f["basis"] = {"id": fid, "en": funds[fid]["title_en"], "hi": funds[fid]["title_hi"],
+                          "rule_en": funds[fid]["rule_en"], "rule_hi": funds[fid]["rule_hi"]}
+    return out
+
+
 # 'check' findings whose rewrite gives different rows when the query was right as written (COUNT(*) vs COUNT(col) ...)
-MEANING_CHECKS = {"count", "not_in", "date_range"}
+MEANING_CHECKS = {"count", "not_in", "date_range", "concat", "like", "and_or", "null_math", "division", "nulls_order", "stable_order"}
 
 
 def _is_select(low: str) -> bool:

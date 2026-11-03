@@ -7,17 +7,24 @@ Run: python -m tests.fuzz.stmtbugs [count] [seed]
 """
 
 import random
+import re
 import sys
 from collections import Counter
 
 from tests.fuzz.db import engines_up, make_schema
 
 BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_value", "between_reversed", "agg_in_where", "eq_null_dml",
-        "same_table", "per_group"]
+        "same_table", "per_group",
+        # night 1: basics (text joining, NULL functions, LIKE, AND/OR order, division, quotes, LIMIT order, DISTINCT)
+        "plus_concat", "pipes_mysql", "isnull_two", "like_star", "like_contains", "and_or", "division", "double_quotes",
+        "limit_no_order", "distinct_paren"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
-         "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group"}
-NO_FIX = {"agg_in_where"}                    # there is no single right rewrite: found is enough
-FIX_THE_CHECK = {"same_table"}               # a 'check' (fine on MariaDB/PostgreSQL) whose rewrite must still do the same
+         "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
+         "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
+         "and_or": "and_or", "division": "division", "double_quotes": "quotes", "limit_no_order": "stable_order", "distinct_paren": "distinct"}
+NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren"}   # there is no single right rewrite: found is enough
+# a 'check' (depends on engine, data or intent) whose suggested rewrite must do exactly what the person meant
+FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes"}
 
 
 def _cols(t, *kinds):
@@ -134,6 +141,92 @@ def make(seed: int):
         broken = wrap(f"{named}{c} {op} (SELECT {fn}({c}) FROM {t['name']})", f"{c} = {c}") + ";\n\n" + intent
         truth = wrap(f"{named}{c} {op} (SELECT {fn}(i2.{c}) FROM {t['name']} i2 WHERE i2.{g} = {t['name']}.{g})", f"{c} = {c}")
         return {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": t["name"], "broken": broken, "truth": truth}
+    elif bug in ("plus_concat", "pipes_mysql"):   # first_name + ' ' + last_name / first_name || ' ' || last_name
+        texts = [c for c in t["cols"] if c["kind"] in ("cat", "name", "text", "email", "phone", "sku")]
+        if len(texts) < 2:
+            return None
+        a, b = rnd.sample(texts, 2)
+        sep = rnd.choice(["' '", "' - '", "', '"])
+        op = " + " if bug == "plus_concat" else " || "
+        tname = f"`{t['name']}`" if bug == "pipes_mysql" else t["name"]        # backticks: the query shows it is MySQL/MariaDB
+        truth = f"SELECT {pk}, CONCAT({a['name']}, {sep}, {b['name']}) AS label\nFROM {tname}\nORDER BY {pk}"
+        broken = f"SELECT {pk}, {a['name']}{op}{sep}{op}{b['name']} AS label\nFROM {tname}\nORDER BY {pk}"
+        stmt = "select"
+        item = {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": t["name"], "broken": broken, "truth": truth}
+        if bug == "pipes_mysql":
+            item["only"] = ["mysql"]
+        return item
+    elif bug == "isnull_two":                 # SQL Server's ISNULL(x, 0)
+        if not nums:
+            return None
+        c = rnd.choice(nums)["name"]
+        dflt = rnd.choice(["0", "-1", "100"])
+        truth = f"SELECT {pk}, COALESCE({c}, {dflt}) AS v\nFROM {t['name']}\nORDER BY {pk}"
+        broken = f"SELECT {pk}, ISNULL({c}, {dflt}) AS v\nFROM {t['name']}\nORDER BY {pk}"
+        stmt = "select"
+    elif bug in ("like_star", "like_contains"):  # LIKE '*abc*' (file wildcards) / LIKE 'abc' meaning 'contains abc'
+        cats = [c for c in _cols(t, "cat", "name") if c["params"] or c["kind"] == "name"]
+        vals = [v for c in cats for v in ([_pick_value(t, c, rnd)] if c["kind"] == "name" else c["params"]) if isinstance(v, str) and len(v) >= 4
+                and not re.search(r"[*%_'?\\]", v)]
+        if not vals:
+            return None
+        v = rnd.choice(vals)
+        c = next(c for c in cats if (c["kind"] == "name" or v in c["params"]))
+        sub = v[1:-1]
+        truth = wrap(f"{c['name']} LIKE '%{sub}%'")
+        if bug == "like_star":
+            broken = wrap(f"{c['name']} LIKE '*{sub}*'")
+        else:
+            broken = wrap(f"{c['name']} LIKE '{sub}'") + f";\n\n{rnd.choice(['the ones whose', 'rows where', 'jinke'])} {c['name']} " \
+                     + rnd.choice([f"contains {sub}", f"contain '{sub}' anywhere", f"mein {sub} wala ho"])
+    elif bug == "and_or":                     # a = 1 OR a = 2 AND b > 3: the AND part only applies to the last OR
+        cats = [c for c in _cols(t, "cat") if len(c["params"]) >= 2]
+        if not cats or not nums:
+            return None
+        c = rnd.choice(cats)
+        v1, v2 = rnd.sample(c["params"], 2)
+        n = rnd.choice(nums)
+        k = _pick_value(t, n, rnd)
+        if k is None:
+            return None
+        first = rnd.random() < 0.5
+        cond = f"{c['name']} = '{v1}' OR {c['name']} = '{v2}'"
+        if first:
+            truth, broken = wrap(f"({cond}) AND {n['name']} > {k}"), wrap(f"{cond} AND {n['name']} > {k}")
+        else:
+            truth, broken = wrap(f"{n['name']} > {k} AND ({cond})"), wrap(f"{n['name']} > {k} AND {cond}")
+    elif bug == "division":                   # share of rows: integer division on PostgreSQL
+        cats = [c for c in _cols(t, "cat") if c["params"]]
+        if not cats:
+            return None
+        c = rnd.choice(cats)
+        v = rnd.choice(c["params"])
+        part = f"COUNT(CASE WHEN {c['name']} = '{v}' THEN 1 END) / COUNT(*)"
+        scale = rnd.choice(["", " * 100"])
+        truth = f"SELECT 1.0 * {part}{scale} AS share\nFROM {t['name']}"
+        broken = f"SELECT {part}{scale} AS share\nFROM {t['name']}"
+        stmt = "select"
+    elif bug == "double_quotes":              # col = "value": text on MySQL, a column name on PostgreSQL
+        cats = [c for c in _cols(t, "cat") if c["params"]]
+        if not cats:
+            return None
+        c = rnd.choice(cats)
+        v = rnd.choice(c["params"])
+        truth, broken = wrap(f"{c['name']} = '{v}'"), wrap(f'{c["name"]} = "{v}"')
+    elif bug == "limit_no_order":
+        truth = None
+        broken = f"SELECT {pk}\nFROM {t['name']}\nLIMIT {rnd.randint(2, 20)}"
+        stmt = "select"
+    elif bug == "distinct_paren":
+        others = [c for c in t["cols"] if c["kind"] not in ("pk",)]
+        cats = _cols(t, "cat", "fk")
+        if not cats or len(others) < 2:
+            return None
+        c = rnd.choice(cats)
+        o = rnd.choice([x for x in others if x is not c])
+        truth = None
+        broken = f"SELECT DISTINCT({c['name']}), {o['name']}\nFROM {t['name']}"
+        stmt = "select"
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -188,6 +281,8 @@ def check(item, engines: dict) -> list[str]:
     if "/* check:" in fixed:
         return bad                                     # a column name the query doesn't show: the person confirms it
     for name, eng in engines.items():
+        if item.get("only") and name not in item["only"]:
+            continue                                   # the query shows its database (backticks): run it only there
         try:
             if _effect(eng, fixed, item["table"], pk) != _effect(eng, item["truth"], item["table"], pk):
                 bad.append(f"{tag}: on {name} the corrected statement does something else\n{fixed}")

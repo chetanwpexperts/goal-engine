@@ -613,8 +613,42 @@ ANOTHER_RE = re.compile(r"\b(check|test|review|fix|see)\s+(an)?other\s+(sql\s+)?
                         r"\bek\s+aur\s+query\b|\b(dusri|doosri|agli)\s+query\b|\bnext\s+query\b", re.I)
 
 
+def concept_question(text: str):
+    """A basic/concept question ('what is a JOIN', 'group by kya hota hai', 'DELETE vs TRUNCATE', 'how to find duplicate
+    emails'): answered from the concepts pack, before the query checker, the error diagnoser or the connect step."""
+    from app.dbknow import concepts
+
+    try:
+        return concepts.match(text)
+    except Exception:  # noqa: BLE001 - a broken pack must never break the chat
+        log.exception("concepts")
+        return None
+
+
+def _concept_turn(db: Session, goal: Goal, text: str, hi: bool, m: dict):
+    from app.dbknow import concepts
+
+    reply, taps = concepts.answer(m, text)
+    c = m["concept"]
+    if c is None:                         # a database concept we don't know yet: said honestly, and kept to learn
+        try:
+            from app import learning
+
+            learning.ask_to_learn(db, "database", text, guess="concept")
+        except Exception:  # noqa: BLE001 - learning is an extra
+            db.rollback()
+    title = (c["title"]["en"] if c else "SQL question")
+    goal.title = (("SQL: " + title) if not title.upper().startswith("SQL") else title)[:200]
+    goal.missing_info, goal.pending = "[]", None
+    db.commit()
+    return reply, taps, "concept"
+
+
 def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) -> bool:
     from app.agents.core import query_in
+
+    if relation != "safety" and concept_question(text) is not None:
+        return True                       # 'what is a JOIN': the concepts pack, whatever the reader guessed
 
     if ANOTHER_RE.search(text or "") and not query_in(text):
         return True                       # the 'Check another query' tap: ask for it, don't repeat the last answer
@@ -656,6 +690,10 @@ def _sure(rec: dict) -> bool:
 def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     """Database work: the agent works through a connector on the user's own server."""
     from app.agents.core import query_in
+
+    m = concept_question(text)
+    if m is not None:                     # a basic question gets its answer, never 'paste a query' / 'connect your database'
+        return _concept_turn(db, goal, text, turn.hi, m)
     from app.dbknow import brain as dbbrain
     from app.dbknow import reasoning
 
@@ -756,10 +794,13 @@ def _sql_agent(db, goal):
 
 def holds_conversation(db, goal, text: str, any_text: bool = False):
     """A query was checked in this conversation and the person asks about it: answer about THAT query."""
+    if text and not any_text and concept_question(text) is not None:
+        return None                       # 'what is a LEFT JOIN' after a check: a concept question, not about that query
     if (text or "").strip().startswith(("Why: ", "Kyun: ")) and not any_text:
         a, run = _sql_agent(db, goal)
         return a if run is not None and run.status == "done" else None
     if any_text or NEW_SQL_RE.search(text or "") or not (SQL_FOLLOW_RE.search(text or "") or DIFF_RE.search(text or "") or FEEDBACK_RE.search(text or "")
+                                                         or READ_RE.search(text or "")
                                                          or WHY_RE.search(text or "") or DEV_FOLLOW_RE.search(text or "")):
         return None
     a, run = _sql_agent(db, goal)
@@ -769,6 +810,9 @@ def holds_conversation(db, goal, text: str, any_text: bool = False):
 FEEDBACK_RE = re.compile(r"\b(wrong|incorrect|not (correct|right|working|resolved|solved|fixed|giving|the result|what i)|still (not|wrong|same)|"
                          r"does ?n.?t (do|work|fix|give)|did ?n.?t (do|work|fix|catch|find)|not able to (find|detect)|missed|"
                          r"galat|sahi nahi|theek nahi|kaam nahi|nahi hua|nahi pakda)\b", re.I)
+READ_RE = re.compile(r"\bwhat (does|is) (this|my|the) query (do|doing)\b|\bexplain (this|my|the) query\b(?!.*\b(slow|fast|speed)\b)|"
+                     r"\bbreak (it|this|the query) down\b|\bstep by step\b|\bhow does (this|my|the) query work\b|\bread (this|my|the) query\b|"
+                     r"\bquery (samjhao|samjha do|kya karti hai|kya karegi|kaise kaam karti)\b|\b(ye|yeh) query kya\b|\bfundamentals?\b|\bgrain\b", re.I)
 DIFF_RE = re.compile(r"\b(what (did )?you change|what changed|what is the diff\w*|diff\w*|compare|original|kya badla|kya change|"
                      r"farak|fark|antar|same (hi )?hai|any change)\b", re.I)
 WHY_RE = re.compile(r"\b(why|kyun|kyu|reason|wajah|explain|samjhao|kaise slow|what makes)\b|क्यों|क्यूं|वजह|कारण|समझा", re.I)
@@ -815,6 +859,38 @@ def continue_turn(db, goal, agent, text: str):
 
 
 def _continue_turn(db, goal, agent, text: str):
+    """'What does this query do': the query read stage by stage, with the fundamentals behind what's wrong. When the words
+    also ask why ('explain this query' after a slow query), the usual answer follows the reading."""
+    from app.agents.core import why_label
+    from app.agents.sql import analyze_sql
+    from app.ml.normalize import detect_language
+
+    if not READ_RE.search(text or "") or text.strip().startswith(("Why: ", "Kyun: ")):
+        return _answer_turn(db, goal, agent, text)
+    hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
+    inputs = loads(agent.inputs, {}) or {}
+    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""))
+    corr = res.get("correct") or {}
+    reading = (res.get("reading") or {}).get("hi" if hi else "en") or ""
+    lines = [("Query aise padhi (stage by stage):" if hi else "How DBaba read this query, stage by stage:"), reading]
+    seen = []
+    for f in (corr.get("findings") or []):
+        b = f.get("basis")
+        if b and b["id"] not in seen and f["kind"] in ("error", "wrong", "check"):
+            seen.append(b["id"])
+            lines.append(f"- {b['hi' if hi else 'en']}: {b['rule_hi' if hi else 'rule_en']}")
+    if seen:
+        lines.insert(2, "\n" + ("Galtiyon ki buniyaad:" if hi else "The fundamentals behind what's wrong:"))
+    read_text = "\n".join(lines).strip()
+    if WHY_RE.search(text or "") or DEV_FOLLOW_RE.search(text or ""):     # 'explain this query': the reading, then the why
+        reply, options, hi2 = _answer_turn(db, goal, agent, text)
+        return read_text + "\n\n" + reply, options, hi2
+    inputs["last_ask"] = "read"
+    agent.inputs = dumps(inputs)
+    return read_text, [why_label(f, hi) for f in corr.get("findings") or [] if f["kind"] in ("error", "wrong")][:3], hi
+
+
+def _answer_turn(db, goal, agent, text: str):
     """Answers about the query that was checked: the optimised version, what changed, or why it's slow.
     Worked out again from the query itself, so it's never a stale or repeated answer."""
     from app.agents.sql import analyze_sql, rewrite, unwrap
@@ -824,7 +900,7 @@ def _continue_turn(db, goal, agent, text: str):
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
     inputs = loads(agent.inputs, {}) or {}
     query = unwrap(inputs.get("query", ""))
-    res = analyze_sql(query, inputs.get("explain", ""))
+    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""))      # the raw text: what they said they want counts too
     better = res.get("rewritten") or rewrite(query)
     changed = _norm(better) != _norm(query)
     last = db.scalars(select(Message).where(Message.goal_id == goal.id, Message.role == "assistant")

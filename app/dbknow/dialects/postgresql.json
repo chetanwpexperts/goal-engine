@@ -495,5 +495,30 @@
   "\\barchive command\\b",
   "checkpoints are occurring",
   "\\bpg_wal\\b"
+ ],
+ "query_marks": [
+  "::\\s*[a-z]",
+  "\\bilike\\b",
+  "\\breturning\\b",
+  "\\$\\d+\\b",
+  "\\bdistinct\\s+on\\s*\\(",
+  "\\bnulls\\s+(first|last)\\b",
+  "\\bserial\\b",
+  "\\bstring_agg\\s*\\("
+ ],
+ "query_rules": {
+  "pipes": "concat",
+  "plus_on_text": "error",
+  "int_division": "truncates",
+  "nulls_in_desc": "first",
+  "isnull_args": 0,
+  "ifnull": false,
+  "nvl": false,
+  "double_quotes": "identifier",
+  "concat_null": "ignored",
+  "like_case": "sensitive"
+ },
+ "proven": [
+  "postgresql"
  ]
 }

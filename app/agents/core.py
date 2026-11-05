@@ -66,6 +66,23 @@ def _website_summary(result: dict, hi: bool) -> str:
 
 
 def _sql_summary(result: dict, hi: bool) -> str:
+    text = _sql_summary_text(result, hi)
+    rec = result.get("engine_rule") or {}
+    if rec and result.get("ok"):
+        from app.dbknow import engines
+
+        lang = rec.get("lang") or ("hinglish" if hi else "en")
+        extra = engines.detected_line(rec, lang)[0] or engines.notes_line(rec["id"], lang)   # 'not sure': each finding names its engines
+        if rec.get("how") in ("named", "chosen", "remembered") and rec["id"] != engines.NOT_SURE and not extra:
+            extra = (f"Checked for {engines.label(rec['id'])}." if lang == "en" else f"{engines.label(rec['id'])} ke liye check kiya.")
+        elif engines.notes_only(rec["id"]) and rec.get("how") == "detected":
+            extra = engines.detected_line(rec, lang)[0] + "\n" + engines.notes_line(rec["id"], lang)
+        if extra:
+            text = f"{text}\n\n{extra}"
+    return text
+
+
+def _sql_summary_text(result: dict, hi: bool) -> str:
     if not result.get("ok"):
         return (f"Query check nahi ho payi: {result.get('error')}" if hi else f"Couldn't check the query: {result.get('error')}")
     if (result.get("correct") or {}).get("findings"):
@@ -158,7 +175,14 @@ def _run_website(inputs: dict) -> dict:
 
 
 def _run_sql(inputs: dict) -> dict:
-    return analyze_sql(inputs.get("query", ""), inputs.get("explain", ""))
+    rec = inputs.get("engine_rule") or {}
+    out = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=rec.get("id") or None)
+    if rec:
+        out["engine_rule"] = rec
+        from app.dbknow import engines
+
+        out["taps"] = engines.detected_line(rec, rec.get("lang", "en"))[1]
+    return out
 
 
 RECIPES: dict[str, Recipe] = {
@@ -322,6 +346,7 @@ def inputs_from_text(recipe: Recipe, text: str, slots: dict) -> dict:
             m = SQL_RE.search(text)
             if m:                                  # pasted from code: keep the code around it, the checker unwraps it
                 found[inp.key] = (query_in(text) or text[m.start():]).strip()[:20000]
+                found["said"] = text.replace(found[inp.key], " ").strip()[:300]   # 'this is a postgres query:' (rule A)
     return found
 
 
@@ -378,6 +403,14 @@ class AgentError(RuntimeError):
     pass
 
 
+class AgentAsks(AgentError):
+    """The agent needs one choice before it can answer (e.g. which database the query is for): the question and its taps."""
+
+    def __init__(self, text: str, options: list[str]):
+        super().__init__(text)
+        self.options = options
+
+
 def run_agent(db: Session, agent: Agent, hi: bool, scheduled: bool = False) -> AgentRun:
     """Run now. Scheduled runs also post their summary into the goal's conversation."""
     recipe = RECIPES[agent.recipe]
@@ -389,6 +422,10 @@ def run_agent(db: Session, agent: Agent, hi: bool, scheduled: bool = False) -> A
         raise AgentError(f"Missing: {', '.join(missing)}")
     if not scheduled and runs_today(db, agent.visitor_id) >= RUNS_PER_VISITOR_PER_DAY:
         raise AgentError("Today's limit for agent runs is reached. Please try again tomorrow.")
+    if recipe.key == "sql_review" and not scheduled:
+        from app.agents.database import engine_gate
+
+        inputs = engine_gate(db, agent, inputs, hi)       # rule A: which database decides the answer (may ask first)
 
     run = AgentRun(agent_id=agent.id, status="running")
     db.add(run)

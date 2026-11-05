@@ -134,10 +134,10 @@ def test_rewrite_runs_on_postgres_with_the_same_rows():
 
 
 def test_follow_ups_in_every_language_stay_on_the_query(client, ml_mode):
-    from tests.test_ml import say
+    from tests.test_ml import say, say_sql
 
     say(client, "db bahut dhima hai bhai")                                     # the database agent took the chat
-    r = say(client, "-- used on dashboard\nselect *  from fz139_staff s  order by s.staff_name, s.staff_id")
+    r = say_sql(client, "-- used on dashboard\nselect *  from fz139_staff s  order by s.staff_name, s.staff_id")
     assert r["relation"] == "agent_run", r["reply"]                             # a pasted query is checked at once (was 'hiring staff')
     for text in ("how do I speed this up", "iski wajah kya hai", "क्वेरी धीमी क्यों चल रही है", "कौनसा इंडेक्स चाहिए", "क्या बदला?"):
         r = say(client, text)
@@ -146,7 +146,7 @@ def test_follow_ups_in_every_language_stay_on_the_query(client, ml_mode):
     client.cookies.clear()
     r = say(client, "मेरा डेटाबेस बहुत धीरे चल रहा है")
     assert any(a["recipe"] in ("sql_review", "database") for a in r["agents"]), r["reply"]
-    r = say(client, "$sql = \"SELECT id FROM fz1_rooms WHERE id = 5\";")
+    r = say_sql(client, "$sql = \"SELECT id FROM fz1_rooms WHERE id = 5\";")
     assert r["relation"] == "agent_run"
     r = say(client, "which indexes should I add")
     assert "koi naya index nahi chahiye" in r["reply"] and "Speed index aur" not in r["reply"], r["reply"]   # Hindi chat: Hinglish answer

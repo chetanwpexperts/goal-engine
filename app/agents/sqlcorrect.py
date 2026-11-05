@@ -809,9 +809,17 @@ def _apply_plain(sql: str, edits: list) -> str | None:
     return out
 
 
-def check(sql: str, _again: bool = False, intent: str = "") -> dict:
+def check(sql: str, _again: bool = False, intent: str = "", engine: str | None = None) -> dict:
     """Returns {'findings': [...], 'corrected': str|None, 'guesses': [...] }. Values without quotes are checked in any
-    statement; plain SELECTs are read in depth."""
+    statement; plain SELECTs are read in depth. engine: the database the answer is for (rule A), when known."""
+    if engine is not None:
+        from app.agents.sqlbasics import CHOSEN
+
+        token = CHOSEN.set(engine)
+        try:
+            return check(sql, _again, intent)
+        finally:
+            CHOSEN.reset(token)
     s = _mask(sql)
     known = {w.lower() for w in re.findall(r"\b(?:from|join|update|into)\s+[`\"]?([\w$]+)", s, re.I)}
     known |= {w.lower() for w in re.findall(r"\b(?:from|join|update)\s+[`\"]?[\w$.]+[`\"]?\s+(?:as\s+)?([A-Za-z_]\w*)", s, re.I)
@@ -819,7 +827,7 @@ def check(sql: str, _again: bool = False, intent: str = "") -> dict:
     slips, slip_edits = _value_slips(sql, s, known)
     more, more_edits = _statement_slips(sql, s, bool(re.match(r"[\s(]*(select|with)\b", s.lower())), intent)
     slips, slip_edits = slips + more, slip_edits + more_edits
-    out = _check_select(sql, s, slip_edits, _again)
+    out = _check_select(sql, s, slip_edits, _again, intent)
     if out is None:                                   # not a plain SELECT: only the value checks apply
         order = {"error": 0, "wrong": 1, "check": 2}
         slips.sort(key=lambda f: order[f.kind])
@@ -834,7 +842,7 @@ def check(sql: str, _again: bool = False, intent: str = "") -> dict:
     return out
 
 
-def _check_select(sql: str, s: str, slip_edits: list, _again: bool) -> dict | None:
+def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str = "") -> dict | None:
     dep = _depths(s)
     low = s.lower()
     if not re.match(r"\s*(with\b|select\b|\()", low):
@@ -996,6 +1004,20 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool) -> dict | No
             if not firm_aliases & set(seen_aliases):
                 nullable |= set(seen_aliases)
         seen_aliases.append(a)              # (FULL OUTER JOIN is an error in MySQL anyway: it doesn't change what's nullable)
+
+    # join and relationship reasoning (app/agents/sqljoins.py): cartesian links, wrong key columns, anti-joins, self-join
+    # pairs, NATURAL JOIN / USING (id), DISTINCT hiding a join's copies
+    from app.agents import sqljoins
+
+    whole = None                                     # a rewrite of the whole query (DISTINCT over a join -> EXISTS)
+    for fnd, edit in sqljoins.joins(sql, s, cl, srcs, alias_of, items, intent, Finding, all_refs):
+        if any(f.title_en == fnd.title_en and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        if edit and edit[2] is not None and (edit[0], edit[1]) == (0, len(sql)):
+            whole = edit[2]
+        elif edit and edit[2] is not None and not any(a < edit[1] and edit[0] < b for a, b, _n in edits):
+            edits.append(edit)
 
     # self joins: the same table twice, joined parent.id = child.fk -> the children, not the parent
     for i, x in enumerate(srcs):
@@ -1405,6 +1427,8 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool) -> dict | No
         add("error" if everywhere else "check", "learned", title, title, ev, f"{said}.{example}", f"{said}.{example}")
     F = [f for f in F if not (f.title_en.startswith("CROSS JOIN") and f.title_en.split()[3].lower() in removed)]
     corrected = _apply(sql, s, cl, items, edits, notes, drop_grouping, sel_aliases, removed, srcs)
+    if whole and (not corrected or re.sub(r"\s+", " ", corrected).strip() == re.sub(r"\s+", " ", sql).strip()):
+        corrected = whole
     order = {"error": 0, "wrong": 1, "check": 2}
     F.sort(key=lambda f: order[f.kind])
     left = []

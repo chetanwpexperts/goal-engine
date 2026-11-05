@@ -1,0 +1,17 @@
+{
+  "name": "SQLite",
+  "notes_only": true,
+  "family": "relational",
+  "about": "No lab-tested knowledge yet: DBaba recognises SQLite from its words or error format and answers with general SQL reasoning plus the notes below.",
+  "named": ["\\bsqlite3?\\b", "एसक्यूलाइट"],
+  "query_marks": ["\\bautoincrement\\b", "\\bpragma\\s+\\w+", "\\bglob\\s+'", "\\bsqlite_master\\b"],
+  "weak_marks": [],
+  "error_marks": ["\\bsqlite3\\.\\w+Error\\b", "\\bSQLITE_[A-Z]+\\b", "\\bno such (table|column):"],
+  "notes": {
+    "limit": "LIMIT n OFFSET m works as on MySQL/PostgreSQL.",
+    "concat": "|| joins text on SQLite; CONCAT() exists only from 3.44.",
+    "full_join": "RIGHT and FULL OUTER JOIN exist only from SQLite 3.39."
+  },
+  "source": "https://www.sqlite.org/lang.html",
+  "proven": []
+}

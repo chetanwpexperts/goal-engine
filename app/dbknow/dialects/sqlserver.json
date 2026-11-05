@@ -1,0 +1,19 @@
+{
+  "name": "SQL Server",
+  "notes_only": true,
+  "family": "relational",
+  "about": "No lab-tested knowledge yet: DBaba recognises SQL Server from its syntax or error format and answers with general SQL reasoning plus the notes below. These are notes from the official docs, not lab-proven rules.",
+  "named": ["\\bsql\\s?server\\b", "\\bms\\s?sql\\b", "\\bmssql\\b", "\\bt-?sql\\b", "\\bazure sql\\b", "एसक्यूएल सर्वर"],
+  "query_marks": ["\\bselect\\s+(distinct\\s+)?top\\s*\\(?\\s*\\d", "\\[[A-Za-z_][\\w ]*\\]\\.\\[|\\bfrom\\s+\\[[A-Za-z_][\\w ]*\\]", "\\bgetdate\\s*\\(\\s*\\)", "\\bnvarchar\\b", "@@identity\\b", "\\bscope_identity\\s*\\(", "\\bwith\\s*\\(\\s*nolock\\s*\\)", "\\boffset\\s+\\d+\\s+rows\\s+fetch\\s+next\\b"],
+  "weak_marks": [],
+  "error_marks": ["\\bMsg \\d{3,5}, Level \\d+, State \\d+", "\\bSqlException\\b", "\\[SQL Server\\]", "\\bInvalid object name '"],
+  "notes": {
+    "limit": "SQL Server has no LIMIT: use SELECT TOP (n) ... ORDER BY ..., or ORDER BY ... OFFSET n ROWS FETCH NEXT m ROWS ONLY.",
+    "concat": "+ joins text on SQL Server (NULL makes the whole result NULL); CONCAT() skips NULL parts.",
+    "null_fn": "ISNULL(x, 0) is SQL Server's two-argument null replacement; COALESCE works too and is portable.",
+    "quotes": "Names are quoted with [brackets] (or \"double quotes\" with QUOTED_IDENTIFIER on); text values use 'single quotes'.",
+    "full_join": "FULL OUTER JOIN is supported."
+  },
+  "source": "https://learn.microsoft.com/en-us/sql/t-sql/language-reference",
+  "proven": []
+}

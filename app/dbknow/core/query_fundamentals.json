@@ -77,7 +77,8 @@
    "rule_en": "Joining a table with many rows per key repeats the other side once per match. Two such joins on the same parent multiply each other, so totals of either side grow; total each child at its own grain first, then join the totals.",
    "rule_hi": "Kai rows wali table join karne se doosri taraf har match pe dohraati hai. Ek parent pe do aise join ek doosre ko guna karte hain; pehle har child ka total uske apne grain pe nikaalo, phir join karo.",
    "topics": [
-    "join"
+    "join",
+    "distinct_join"
    ],
    "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html"
   },
@@ -87,7 +88,8 @@
    "rule_en": "A LEFT JOIN keeps every left row; where nothing matches, the right-side columns are NULL. A WHERE condition on those columns removes the unmatched rows again (put it in ON instead), and COUNT(*) counts the unmatched row as 1 (count a right-side column instead).",
    "rule_hi": "LEFT JOIN har left row rakhta hai; match na ho to right ke columns NULL hote hain. Un columns pe WHERE condition bina match wali rows hata deti hai (ON mein likho), aur COUNT(*) unhe 1 ginta hai (right ka column gino).",
    "topics": [
-    "count"
+    "count",
+    "anti_join"
    ],
    "source": "https://dev.mysql.com/doc/refman/8.4/en/outer-join-simplification.html"
   },
@@ -196,6 +198,37 @@
     "and_or"
    ],
    "source": "https://dev.mysql.com/doc/refman/8.0/en/operator-precedence.html"
+  },
+  "join_condition": {
+   "title_en": "A join condition must connect the right rows",
+   "title_hi": "Join condition sahi rows ko jodni chahiye",
+   "rule_en": "Every joined table needs a condition that ties it to a table already in the query, usually child.foreign_key = parent.primary_key. A join with no condition, or with one that mentions only one of the two tables, pairs every row with every row (a cartesian product). Comparing two primary keys (o.id = c.id), a key the wrong way round, or a column that isn't unique on the parent side (a name) pairs rows that don't belong together. NATURAL JOIN and USING pick the columns by name, so a shared column like id or created_at joins things that aren't related. In a self join the same row also meets itself, and every pair appears twice unless one side is kept smaller (a.id < b.id).",
+   "rule_hi": "Har judi table ko ek condition chahiye jo use pehle se maujood table se jode, aam taur pe child.foreign_key = parent.primary_key. Bina condition ka join, ya aisi condition jo sirf ek table ka naam leti hai, har row ko har row se jodta hai (cartesian product). Do primary keys ko milana (o.id = c.id), ulti key, ya parent ki aisi column jo unique nahi (naam), galat rows jodti hai. NATURAL JOIN aur USING naam se column chunte hain, isliye id ya created_at jaisi common column bekaar rishta bana deti hai. Self join mein row khud se bhi milti hai, aur har jodi do baar aati hai jab tak ek taraf chhoti na rakho (a.id < b.id).",
+   "topics": [
+    "join_key",
+    "cartesian",
+    "natural_join",
+    "self_join"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/join.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "engine_syntax": {
+   "title_en": "Each database has its own syntax beyond standard SQL",
+   "title_hi": "Har database ka standard SQL ke alawa apna syntax hai",
+   "rule_en": "SQL is the shared language, but each database adds its own words: MySQL/MariaDB have backtick names, LIMIT offset,count, IFNULL, GROUP_CONCAT, DATE_FORMAT; PostgreSQL has :: casts, ILIKE, DISTINCT ON, NULLS FIRST/LAST, string_agg; SQL Server has TOP n, [brackets], GETDATE(). A database refuses another one's words, so the answer depends on which database runs the query: name it, or DBaba reads it from the query.",
+   "rule_hi": "SQL sabki common language hai, par har database apne shabd jodta hai: MySQL/MariaDB mein backtick naam, LIMIT offset,count, IFNULL, GROUP_CONCAT; PostgreSQL mein :: cast, ILIKE, DISTINCT ON, NULLS FIRST/LAST; SQL Server mein TOP n, [brackets], GETDATE(). Ek database doosre ke shabd mana kar deta hai, isliye jawab is baat pe tika hai ki query kaunsa database chalayega.",
+   "topics": [
+    "dialect"
+   ],
+   "source": "https://www.postgresql.org/docs/current/features.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  }
 }

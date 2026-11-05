@@ -1,7 +1,7 @@
 """The browser never learns how the brain read a message; and after a query check, 'optimize it' gets the optimised query."""
 
 from app.config import get_settings  # noqa: F401
-from tests.test_ml import say
+from tests.test_ml import say, say_sql
 
 QUERY = ("SELECT s.*, c.course_name, f.amount FROM Students s JOIN courses c ON c.course_id = s.course_id "
          "JOIN fee_structure f ON f.course_id = s.course_id AND f.scheme_id = s.scheme_id "
@@ -23,7 +23,7 @@ def test_live_site_sends_no_brain_internals(client, ml_mode, monkeypatch):
 
 def test_optimize_after_a_query_check(client, ml_mode):
     say(client, "My database is very slow, please check it and fix it")
-    r = say(client, QUERY)
+    r = say_sql(client, QUERY)
     assert r["relation"] == "agent_run"
     r = say(client, "can you optimize this query")
     assert "s.created_at >= '2026-10-01'" in r["reply"] and "ADD INDEX" in r["reply"], r["reply"]
@@ -41,7 +41,7 @@ def test_real_conversation_optimize_then_what_changed(client, ml_mode):
     """A real one: a report query pasted from PHP code, then 'optimize it', then 'what did you change?'."""
     q = open("tests/data/student_fee_query.txt", encoding="utf-8").read()
     say(client, "My database is very slow, please check it and fix it")
-    r = say(client, q)
+    r = say_sql(client, q)
     assert r["relation"] == "agent_run"
     res = r["agents"][0]["runs"][0]["result"]
     assert len(res["indexes"]) == 2 and "centers.id" in res["assumed_primary"]          # not 11

@@ -18,6 +18,23 @@ def say(client, text, goal_id=None):
     return res.json()
 
 
+ENGINE_TAPS = (["MySQL", "MariaDB", "PostgreSQL", "SQL Server", "Oracle", "Not sure"],
+               ["MySQL", "MariaDB", "PostgreSQL", "SQL Server", "Oracle", "Pata nahi"])
+
+
+def say_sql(client, text, engine="Not sure", goal_id=None):
+    """A query pasted in the chat. When it doesn't show its database and none was named (standing rule A), DBaba first asks
+    which database it is for, with the six taps: that question is checked, then `engine` is tapped and the check's answer
+    returned. 'Not sure' gives the answer that labels each engine where they differ (what these tests were written for)."""
+    r = say(client, text, goal_id)
+    if r.get("options") in [list(t) for t in ENGINE_TAPS]:
+        assert r["relation"] == "agent_plan" and "database" in r["reply"].lower() or "डेटाबेस" in r["reply"] or "database" in r["reply"]
+        if engine == "Not sure" and r["options"][-1] == "Pata nahi":
+            engine = "Pata nahi"
+        r = say(client, engine, goal_id)
+    return r
+
+
 def test_normalizer_and_language():
     assert normalize("mera business acha nai chal rha hai") == "mera business accha nahi chal raha hai"
     assert detect_language("mera business acha nai chal rha hai") == "Hinglish"

@@ -627,7 +627,15 @@ def concept_question(text: str):
 
 def _concept_turn(db: Session, goal: Goal, text: str, hi: bool, m: dict):
     from app.dbknow import concepts
+    from app.dbknow import engines as E
 
+    if E.named(text):                     # 'how to delete duplicate rows in mysql': remembered for the conversation (rule A)
+        E.remember(goal, E.named(text), "named")
+        m = {**m, "engine": E.named(text)}
+    elif not m.get("engine"):
+        rec = E.remembered(goal)
+        if rec and rec.get("id") != E.NOT_SURE:
+            m = {**m, "engine": rec["id"]}
     reply, taps = concepts.answer(m, text)
     c = m["concept"]
     if c is None:                         # a database concept we don't know yet: said honestly, and kept to learn
@@ -675,10 +683,89 @@ def _check_pasted_query(db: Session, goal: Goal, text: str, hi: bool):
     db.flush()
     try:
         run = run_agent(db, agent, hi)
-        reply, _ = _after_run(agent, run, hi)
+        reply, options = _after_run(agent, run, hi)
+    except AgentError as exc:             # 'which database is this for?' (rule A) comes with its taps
+        return str(exc), list(getattr(exc, "options", [])), "agent_plan"
+    return reply, [t for t in options if t in _engine_taps(run)], "agent_run"
+
+
+def _eng(inputs: dict) -> str | None:
+    return (inputs.get("engine_rule") or {}).get("id") or None
+
+
+def _engine_taps(run) -> list[str]:
+    r = loads(run.result, {}) if isinstance(run.result, str) else (run.result or {})
+    return (r or {}).get("taps") or []
+
+
+def _goal_lang(goal: Goal | None, hi: bool) -> str:
+    lang = (goal.detected_language if goal is not None else "") or ""
+    return "hindi" if lang == "Hindi" else "hinglish" if hi or lang == "Hinglish" else "en"
+
+
+def engine_gate(db: Session, agent: Agent, inputs: dict, hi: bool) -> dict:
+    """Standing rule A, before a query is checked: the database named in the message (or earlier in the conversation, or
+    chosen from the taps) decides the answer; else the one the query's syntax shows (said, with a tap to correct it); else
+    ask first. Returns the inputs with 'engine_rule' set, or raises AgentAsks with the question and its taps."""
+    from app.agents.core import AgentAsks
+    from app.dbknow import engines as E
+
+    goal = db.get(Goal, agent.goal_id)
+    text = inputs.get("query", "")
+    said = inputs.get("said") or ""
+    lang = E.lang_of(said) if len(re.findall(r"\w+", said)) >= 2 else "en"
+    if lang == "en":
+        lang = _goal_lang(goal, hi)
+    rec = E.resolve(goal, (inputs.get("said") or "") + "\n" + E._strip_strings(text))
+    if rec is None and (inputs.get("engine_rule") or {}).get("id"):
+        rec = inputs["engine_rule"]
+    if rec is None:
+        if goal is not None:
+            goal.pending = E.PENDING
+        inputs["await_engine"] = True
+        agent.inputs = dumps(inputs)
+        agent.status = "proposed"
+        db.commit()
+        question, taps = E.ask(lang)
+        raise AgentAsks(question, taps)
+    inputs.pop("await_engine", None)
+    inputs["engine_rule"] = {"id": rec["id"], "how": rec.get("how", ""), "why": rec.get("why", ""), "lang": lang}
+    agent.inputs = dumps(inputs)
+    if goal is not None and goal.pending == E.PENDING:
+        goal.pending = None
+    return inputs
+
+
+def _engine_reply(db, goal, agent, eid: str, how: str, hi: bool, again: bool):
+    """The person chose (or corrected) the database: remember it and answer what was waiting, for that database only."""
+    from app.agents.core import AgentError, run_agent
+    from app.dbknow import engines as E
+    from app.engine import _after_run
+
+    E.remember(goal, eid, how)
+    goal.pending = None
+    data = loads(goal.slots, {}) or {}
+    waiting = data.pop("_db_wait", None)
+    goal.slots = dumps(data)
+    lang = _goal_lang(goal, hi)
+    if waiting:                            # an error message was waiting for its database
+        db.commit()
+        reply, _o, _r = _error_turn(db, goal, waiting, hi, goal.visitor_id)
+        return reply, [], hi
+    inputs = loads(agent.inputs, {}) or {}
+    inputs.pop("engine_rule", None)
+    agent.inputs = dumps(inputs)
+    db.commit()
+    try:
+        run = run_agent(db, agent, hi)
+        reply, options = _after_run(agent, run, hi)
     except AgentError as exc:
-        return str(exc), [], "agent_plan"
-    return reply, [], "agent_run"
+        return str(exc), list(getattr(exc, "options", [])), hi
+    if again:
+        name = E.label(eid)
+        reply = ((f"Theek hai, {name}. Query dobara {name} ke liye check ki:" if lang != "en" else
+                  f"Got it, {name}. I checked the query again for {name}:") + "\n\n" + reply)
+    return reply, options, hi
 
 
 def _sure(rec: dict) -> bool:
@@ -709,30 +796,7 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     if described and not reasoning.evidence(text) and not reasoning.report(reasoning.diagnose(text), turn.hi):
         described = False                 # the core has no likely causes for it: the usual reply below
     if reasoning.evidence(text) or described:   # an error / EXPLAIN / lock report, or a problem put in words
-        from app import mind
-
-        result = reasoning.diagnose(text)
-        mind.set_pattern("diagnose")
-        agent = goal_agent(db, goal) or create_agent(db, goal, detect_mode(text))     # the card stays: connect to prove it
-        user = account_for(db, visitor_id)
-        live = live_checks(db, user, agent, visitor_id, result) if user is not None else None
-        if live:
-            result = reasoning.diagnose(text, live)          # proved (or ruled out) on their own database
-        rec = dbbrain.recognize(text)
-        if rec["kind"] in ("error", "issue"):
-            inputs = loads(agent.inputs, {}) or {}
-            inputs["brain"] = {**rec, "sql": ""}
-            agent.inputs = dumps(inputs)
-        # the title follows what this message is about (an earlier, different problem must not stay on it)
-        goal.title = (reasoning.headline(result, turn.hi) or (("Database ki dikkat ki wajah" if turn.hi else "Database problem: likely causes")
-                                                              if not reasoning.evidence(text) else
-                                                              ("Database error ki wajah" if turn.hi else "Database error: cause and fix")))[:200]
-        goal.intent = goal.intent or "db_error"
-        goal.missing_info, goal.pending = "[]", None
-        db.commit()
-        from app import dbarea
-
-        return reasoning.report(result, turn.hi, signed_in=user is not None, can_connect=dbarea.connect_open(user)), [], "agent_plan"
+        return _error_turn(db, goal, text, turn.hi, visitor_id)
     if query_in(text):                    # a pasted query is for the SQL checker, whatever else the message says
         return _check_pasted_query(db, goal, text, turn.hi)
 
@@ -770,6 +834,76 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     return reply, [], "agent_plan"
 
 
+def _error_turn(db: Session, goal: Goal, text: str, hi: bool, visitor_id: str):
+    """An error / EXPLAIN / lock report, or a problem put in words: its likely causes, for the person's database (rule A:
+    named in the words, remembered from earlier, or shown by the error's own format; for an error that shows none of
+    them, ask first)."""
+    from app import mind
+    from app.dbknow import brain as dbbrain
+    from app.dbknow import engines as E
+    from app.dbknow import reasoning
+
+    lang = E.lang_of(text) if E.lang_of(text) != "en" or not hi else "hinglish"
+    named = E.named(text)
+    if named:
+        E.remember(goal, named, "named")
+    rec = E.remembered(goal)
+    hint = rec["id"] if rec and rec.get("how") in ("named", "chosen") else None
+    result = reasoning.diagnose(text, engine=hint)
+    if result.get("found") and not result.get("engine") and not rec and not E.shown(text)[0]:
+        agent = goal_agent(db, goal) or create_agent(db, goal, detect_mode(text))   # an error that doesn't show its database
+        brec = dbbrain.recognize(text)
+        if brec["kind"] in ("error", "issue"):
+            inputs = loads(agent.inputs, {}) or {}
+            inputs["brain"] = {**brec, "sql": ""}
+            agent.inputs = dumps(inputs)
+        data = loads(goal.slots, {}) or {}       # ask which one, then answer it for that database
+        data["_db_wait"] = text[:4000]
+        goal.slots = dumps(data)
+        goal.pending = E.PENDING
+        head = reasoning.headline(result, hi) or ""
+        goal.title = (head or ("Database error ki wajah" if hi else "Database error: cause and fix"))[:200]
+        goal.intent = goal.intent or "db_error"
+        db.commit()
+        question, taps = E.ask(lang)
+        question = ((f"Samjha: {head}. " if head and lang != "en" else f"Understood: {head}. " if head else "")
+                    + ("Ye error kai databases mein aata hai, aur fix har ek ka alag hai. " if lang != "en" else
+                       "This error can come from more than one database, and the fix differs. ") + question)
+        return question, taps, "agent_plan"
+    detected = None
+    if result.get("engine") and not named and not (rec and rec.get("how") in ("named", "chosen")):
+        detected = E.remember(goal, result["engine"], "detected", "the error message's format" if lang == "en" else "error ke format")
+    mind.set_pattern("diagnose")
+    agent = goal_agent(db, goal) or create_agent(db, goal, detect_mode(text))     # the card stays: connect to prove it
+    user = account_for(db, visitor_id)
+    live = live_checks(db, user, agent, visitor_id, result) if user is not None else None
+    if live:
+        result = reasoning.diagnose(text, live, engine=hint)  # proved (or ruled out) on their own database
+    brec = dbbrain.recognize(text)
+    if brec["kind"] in ("error", "issue"):
+        inputs = loads(agent.inputs, {}) or {}
+        inputs["brain"] = {**brec, "sql": ""}
+        agent.inputs = dumps(inputs)
+    # the title follows what this message is about (an earlier, different problem must not stay on it)
+    goal.title = (reasoning.headline(result, hi) or (("Database ki dikkat ki wajah" if hi else "Database problem: likely causes")
+                                                     if not reasoning.evidence(text) else
+                                                     ("Database error ki wajah" if hi else "Database error: cause and fix")))[:200]
+    goal.intent = goal.intent or "db_error"
+    goal.missing_info, goal.pending = "[]", None
+    db.commit()
+    from app import dbarea
+
+    reply = reasoning.report(result, hi, signed_in=user is not None, can_connect=dbarea.connect_open(user))
+    taps = []
+    eid = named or (rec or {}).get("id")
+    if detected and result.get("found"):
+        line, taps = E.detected_line(detected, lang)
+        reply += "\n\n" + line
+    elif eid and E.notes_only(eid):
+        reply += "\n\n" + E.notes_line(eid, lang)
+    return reply, taps, "agent_plan"
+
+
 # ------------------------------------------------------------------ after a query check: "optimize it", "why slow", "kya karu"
 SQL_FOLLOW_RE = re.compile(r"\b(optimi[sz]\w*|faster|speed( (it|this|that))? up|improve|better|rewrite|re-write|fix (it|this|the query)|tune|slow|fast|"
                            r"index(es)?|why|explain|kaise|kya karu|kya karna|theek karo|tez|jaldi|behtar|sudharo|samjhao|"
@@ -793,7 +927,18 @@ def _sql_agent(db, goal):
 
 
 def holds_conversation(db, goal, text: str, any_text: bool = False):
-    """A query was checked in this conversation and the person asks about it: answer about THAT query."""
+    """A query was checked in this conversation and the person asks about it: answer about THAT query. Also: the answer to
+    'which database is this for?', and a short 'it's PostgreSQL' correcting the database DBaba detected (rule A)."""
+    from app.dbknow import engines as E
+
+    if goal is not None and text and not any_text and goal.pending == E.PENDING and E.choice(text) and concept_question(text) is None:
+        a, _run = _sql_agent(db, goal)
+        waiting = (loads(goal.slots, {}) or {}).get("_db_wait")
+        return goal_agent(db, goal) if waiting else (a or goal_agent(db, goal))
+    if goal is not None and text and not any_text and E.correction(text, goal) and concept_question(text) is None:
+        a, run = _sql_agent(db, goal)
+        if run is not None and run.status == "done":
+            return a
     if text and not any_text and concept_question(text) is not None:
         return None                       # 'what is a LEFT JOIN' after a check: a concept question, not about that query
     if (text or "").strip().startswith(("Why: ", "Kyun: ")) and not any_text:
@@ -824,7 +969,14 @@ INDEX_RE = re.compile(r"\b(which|what|kaun\w*|konsa|kaunsa)\b[^?]*\bindex(es)?\b
 def continue_turn(db, goal, agent, text: str):
     """The answer about the checked query; when the person says it was wrong, the miss is also kept to learn from."""
     from app.agents.sql import mask_values
+    from app.dbknow import engines as E
     from app.ml.normalize import detect_language
+
+    hi0 = detect_language(text) in ("Hinglish", "Hindi") or goal.detected_language in ("Hinglish", "Hindi")
+    if goal.pending == E.PENDING and E.choice(text):          # the tap that answers 'which database?': the waiting check runs
+        return (*_engine_reply(db, goal, agent, E.choice(text), "chosen", hi0, again=False), "agent_run")
+    if agent.recipe == "sql_review" and E.correction(text, goal):   # 'it's PostgreSQL': check it again for that one
+        return _engine_reply(db, goal, agent, E.correction(text, goal), "named", hi0, again=True)
 
     if not FEEDBACK_RE.search(text or ""):
         return _continue_turn(db, goal, agent, text)
@@ -843,7 +995,7 @@ def continue_turn(db, goal, agent, text: str):
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
     from app.agents.sql import analyze_sql
 
-    res = analyze_sql(raw, inputs.get("explain", ""))
+    res = analyze_sql(raw, inputs.get("explain", ""), engine=_eng(inputs))
     broken = [f for f in (res.get("correct") or {}).get("findings") or [] if f["kind"] in ("error", "wrong")]
     if broken:
         reply, options, hi = _continue_turn(db, goal, agent, text)
@@ -869,7 +1021,7 @@ def _continue_turn(db, goal, agent, text: str):
         return _answer_turn(db, goal, agent, text)
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
     inputs = loads(agent.inputs, {}) or {}
-    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""))
+    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=_eng(inputs))
     corr = res.get("correct") or {}
     reading = (res.get("reading") or {}).get("hi" if hi else "en") or ""
     lines = [("Query aise padhi (stage by stage):" if hi else "How DBaba read this query, stage by stage:"), reading]
@@ -900,7 +1052,7 @@ def _answer_turn(db, goal, agent, text: str):
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
     inputs = loads(agent.inputs, {}) or {}
     query = unwrap(inputs.get("query", ""))
-    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""))      # the raw text: what they said they want counts too
+    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=_eng(inputs))      # the raw text: what they said they want counts too
     better = res.get("rewritten") or rewrite(query)
     changed = _norm(better) != _norm(query)
     last = db.scalars(select(Message).where(Message.goal_id == goal.id, Message.role == "assistant")
@@ -946,7 +1098,7 @@ def _answer_turn(db, goal, agent, text: str):
         return reply, [], hi
     if broken and corr.get("corrected"):
         query = corr["corrected"]                                    # speed advice is for the corrected query
-        res = analyze_sql(query, inputs.get("explain", ""))
+        res = analyze_sql(query, inputs.get("explain", ""), engine=_eng(inputs))
         better = res.get("rewritten") or rewrite(query)
         changed = _norm(better) != _norm(query)
     ask = ("diff" if DIFF_RE.search(text or "") or DIFF_DEV_RE.search(text or "") else "why" if WHY_RE.search(text or "")

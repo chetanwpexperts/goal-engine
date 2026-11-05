@@ -669,6 +669,12 @@ def start_agent(agent_id: int, body: StartIn, db: Session = Depends(get_db), vis
     try:
         run = run_agent(db, agent, hi)
     except AgentError as exc:
+        if getattr(exc, "options", None):              # one choice first (e.g. which database): asked in the chat, with taps
+            db.add(Message(visitor_id=visitor, goal_id=agent.goal_id, role="assistant", text=str(exc), relation="agent_plan", provider="agent"))
+            db.commit()
+            return public({"reply": str(exc), "options": exc.options, "relation": "agent_plan",
+                           "goal": goal.as_dict() if goal else None, "goals": [g.summary() for g in all_goals(db, visitor)],
+                           "agents": [agent_dict(a, db, hi) for a in goal_agents(db, agent.goal_id)]})
         return JSONResponse({"error": str(exc)}, status_code=400)
     reply, options = _after_run(agent, run, hi)
     db.add(Message(visitor_id=visitor, goal_id=agent.goal_id, role="assistant", text=reply, relation="agent_run", provider="agent"))

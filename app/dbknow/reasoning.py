@@ -65,7 +65,8 @@ def dialect(name: str) -> dict:
 
 
 def engines() -> list[str]:
-    return sorted(p.stem for p in DIALECTS.glob("*.json"))
+    """The databases with lab-tested error knowledge (notes-only dialects, like SQL Server for now, are left out)."""
+    return sorted(p.stem for p in DIALECTS.glob("*.json") if not _raw(p.stem).get("notes_only"))
 
 
 # ------------------------------------------------------------------ reading what was pasted
@@ -186,12 +187,14 @@ def complaints(text: str) -> dict[str, float]:
 
 
 # ------------------------------------------------------------------ the reasoning
-def diagnose(text: str, live: dict | None = None) -> dict:
-    """live: facts from read-only checks on the connected database (cause -> fact), proving or ruling out causes."""
+def diagnose(text: str, live: dict | None = None, engine: str | None = None) -> dict:
+    """live: facts from read-only checks on the connected database (cause -> fact), proving or ruling out causes.
+    engine: the database the person named or chose earlier in the conversation (rule A), used when the text doesn't show one."""
     k = fundamentals()
     facts = evidence(text)
     found_in = sorted({e for f in facts.values() for e in f.get("engines", ())})
-    engine = which_engine(text, found_in, facts)
+    hint = engine if engine in engines() else None
+    engine = which_engine(text, found_in, facts) or hint
     said = complaints(text)
     if facts and not said:
         said = {c: 1.0 for f in facts for c in k["causes"][f]["explains"]}    # the error itself says what kind of problem it is

@@ -53,12 +53,12 @@ def test_valid_queries_get_no_false_mistakes():
 
 
 def test_the_conversation(client, ml_mode):
-    from tests.test_ml import say
+    from tests.test_ml import say, say_sql
 
     r = say(client, "I have query make joins correct in this")
     assert [a["recipe"] for a in r["agents"]] == ["sql_review"]
     goal = r["goal"]["id"]
-    r = client.post("/api/message", json={"text": BROKEN, "goal_id": goal}).json()
+    r = say_sql(client, BROKEN, goal_id=goal)
     assert "in the card" in r["reply"] and "ALTER TABLE" not in r["reply"]
     assert len(r["reply"].splitlines()) <= 5 and "Fixed" in r["reply"]
     assert r["options"] == ["Optimize it"] and r["next"] == []                                  # no quiz buttons
@@ -110,13 +110,13 @@ def test_in_subquery_is_not_a_problem_and_nothing_is_promised(client, ml_mode):
     """Seen on the live site: an IN (SELECT ...) query got '1 problem found' and 'the rewritten query and index commands are in
     the card' while the card had neither. IN (SELECT ...) runs as a semi-join on MySQL 5.6+, MariaDB and PostgreSQL (checked on
     the test databases), and the JOIN rewrite people suggest returns duplicate rows."""
-    from tests.test_ml import say
+    from tests.test_ml import say, say_sql
 
     q = "SELECT name, email FROM users WHERE id IN (SELECT user_id FROM orders WHERE amount > 100)"
     res = analyze_sql(q)
     assert not res["findings"] and "semi-join" in res["notes"][0]["en"] and "Don't rewrite it as a plain JOIN" in res["notes"][0]["en"]
     r = say(client, "I have query correct this")
-    r = client.post("/api/message", json={"text": q, "goal_id": r["goal"]["id"]}).json()
+    r = say_sql(client, q, goal_id=r["goal"]["id"])
     assert "no problems found" in r["reply"] and "ready to copy" not in r["reply"]
     d = analyze_sql("DELETE FROM users WHERE id IN (SELECT user_id FROM bans)")       # older MySQL/MariaDB: no semi-join for these
     assert not d["findings"] and "8.0.21" in d["notes"][0]["en"] and "JOIN" in d["notes"][0]["en"]
@@ -178,10 +178,10 @@ def test_quoted_values_and_real_columns_are_left_alone(q):
 
 
 def test_unquoted_values_in_the_chat(client, ml_mode):
-    from tests.test_ml import say
+    from tests.test_ml import say, say_sql
 
     r = say(client, "i have another query issue can you solve it?")
-    r = client.post("/api/message", json={"text": QUOTES_UPDATE, "goal_id": r["goal"]["id"]}).json()
+    r = say_sql(client, QUOTES_UPDATE, goal_id=r["goal"]["id"])
     assert "needs quotes" in r["reply"] and "problem found" not in r["reply"]
 
 
@@ -259,11 +259,11 @@ def test_statement_mistakes_generator(seed):
 
 def test_check_another_query_asks_for_it(client, ml_mode):
     """Seen on the live site: the 'Check another query' tap answered 'I've covered this above...'."""
-    from tests.test_ml import say
+    from tests.test_ml import say, say_sql
 
     r = say(client, "check the query I have")
     g = r["goal"]["id"]
-    client.post("/api/message", json={"text": "SELECT name FROM employees WHERE status = 'active' OR 'pending'", "goal_id": g})
+    say_sql(client, "SELECT name FROM employees WHERE status = 'active' OR 'pending'", goal_id=g)
     r = client.post("/api/message", json={"text": "Check another query", "goal_id": g}).json()
     assert "Paste the next SQL query" in r["reply"] and "covered this above" not in r["reply"]
     r = client.post("/api/message", json={"text": SCALAR_SUB, "goal_id": g}).json()
@@ -277,14 +277,14 @@ SAME_TABLE = ("UPDATE products\nSET price = price * 0.90\nWHERE category_id IN (
 def test_same_table_subquery_gets_a_version_for_every_database(client, ml_mode):
     """Seen on the live site: the finding was right (MySQL error 1093) but the reply had no why and no corrected query,
     and the request typed after the query ('; correct this') was read as part of it."""
-    from tests.test_ml import say
+    from tests.test_ml import say, say_sql
 
     c = analyze_sql(SAME_TABLE)["correct"]
     assert [f["topic"] for f in c["findings"]] == ["same_table"] and "correct this" not in c["findings"][0]["evidence"]
     assert "SELECT v FROM (SELECT MAX(stock_quantity) AS v FROM products) AS products_copy" in c["corrected"]
     assert sqlcorrect.check(c["corrected"])["findings"] == []                  # the rewrite is clean, not a new 'more than one row'
     r = say(client, "check the query I have")
-    r = client.post("/api/message", json={"text": SAME_TABLE, "goal_id": r["goal"]["id"]}).json()
+    r = say_sql(client, SAME_TABLE, goal_id=r["goal"]["id"])
     assert "1093" in r["reply"] and "runs on every database" in r["reply"]
 
 
@@ -307,7 +307,7 @@ def test_what_the_person_said_they_want_is_checked(client, ml_mode):
     """Seen on the live site: the person said 'the highest stock within their own category'; MAX() over the whole table was
     not reported. Lab (MariaDB and PostgreSQL): the original discounts nothing when the overall maximum sits in an inactive
     category; the rewrite discounts each active category's top-stock products, ties included."""
-    from tests.test_ml import say
+    from tests.test_ml import say, say_sql
 
     c = analyze_sql(PER_GROUP)["correct"]
     assert [(f["kind"], f["topic"]) for f in c["findings"]] == [("wrong", "per_group")]
@@ -319,7 +319,7 @@ def test_what_the_person_said_they_want_is_checked(client, ml_mode):
     plain = analyze_sql(PER_GROUP.split(";")[0] + ";")["correct"]               # nothing said about groups: no guessing
     assert [f["topic"] for f in plain["findings"]] == ["same_table"]
     r = say(client, "check the query I have")
-    r = client.post("/api/message", json={"text": PER_GROUP, "goal_id": r["goal"]["id"]}).json()
+    r = say_sql(client, PER_GROUP, goal_id=r["goal"]["id"])
     assert "not within each category" in r["reply"] and "Fixed 1 mistake" in r["reply"]
 
 
@@ -412,12 +412,12 @@ def test_a_wrong_answer_is_kept_to_learn_from_with_values_hidden(client, ml_mode
     from app import learning
     from app.db import _SessionLocal
     from app.models import LearnMiss
-    from tests.test_ml import say
+    from tests.test_ml import say, say_sql
 
     q = "SELECT name FROM customers WHERE email = 'ravi@example.in' AND phone = '9876543210' AND city = 'Delhi' AND id = 1234567"
     r = say(client, "check the query I have")
     g = r["goal"]["id"]
-    client.post("/api/message", json={"text": q, "goal_id": g})
+    say_sql(client, q, goal_id=g)
     r = client.post("/api/message", json={"text": "this is wrong, it should only show active customers", "goal_id": g}).json()
     assert "kept this query" in r["reply"] and "what result it should give" in r["reply"]
     client.post("/api/message", json={"text": "still not right", "goal_id": g})

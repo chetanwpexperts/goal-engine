@@ -9,6 +9,7 @@ Sure = 'error'/'wrong' (refused, or wrong rows whatever the data). Depends on th
 Returns [(Finding, edit or None)], edit = (start, end, new text) on the original query.
 """
 
+import contextvars
 import json
 import re
 from functools import lru_cache
@@ -44,8 +45,18 @@ def _marks(engine: str) -> list:
     return [re.compile(p, re.I) for p in data.get("query_marks", [])]
 
 
+# the database the person named / chose / that was detected for this check (standing rule A), set by analyze_sql
+CHOSEN: contextvars.ContextVar = contextvars.ContextVar("dbaba_engine", default=None)
+
+
 def engine_seen(sql: str) -> str | None:
-    """'mysql' or 'postgresql' when the query's own syntax shows its database, else None."""
+    """'mysql' or 'postgresql': the database the person named or chose (rule A), else the one the query's own syntax shows,
+    else None (then each rule says what happens on each)."""
+    from app.dbknow import engines as E
+
+    chosen = CHOSEN.get()
+    if chosen:
+        return E.family(chosen)              # notes-only (SQL Server, Oracle, SQLite) and 'not sure': no single family
     my = any(rx.search(sql) for rx in _marks("mysql"))
     pg = any(rx.search(sql) for rx in _marks("postgresql"))
     return "mysql" if my and not pg else "postgresql" if pg and not my else None
@@ -72,6 +83,8 @@ def _inside_null_fn(sql: str, pos: int) -> bool:
 
 
 def _sql_server(s: str) -> bool:
+    if CHOSEN.get() == "sqlserver":
+        return True
     return bool(re.search(r"\bselect\s+top\s+\d|\[[A-Za-z_][\w ]*\]|\bgetdate\s*\(|\bnvarchar\b", s, re.I))
 
 
@@ -85,6 +98,9 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
     from app.agents.sqlcorrect import _clauses, _depths
 
     dep = _depths(s)
+
+    # 0. syntax the chosen database doesn't have (rule A): PostgreSQL's ::cast on MariaDB, backticks on PostgreSQL ...
+    out += _foreign_syntax(sql, s, F)
 
     # 1. 'text' + 'text': + is arithmetic on MySQL/MariaDB (text -> 0, silently) and refused for text on PostgreSQL
     for m in re.finditer(rf"{OPER}(?:\s*\+\s*{OPER})+", s):
@@ -323,7 +339,10 @@ def _order_limit(sql, s, dep, eng, F) -> list:
     srcs = _sources(s, dep, *cl["from"]) if "from" in cl else []
     if len(srcs) == 1 and srcs[0].name and "group by" not in cl and "distinct" not in s[cl["select"][0]:cl["select"][1]].lower()[:12]:
         names = [_col(re.split(r"\s+", t.strip())[0]) for _p, t in keys]
-        if names and not any(n in ("id", "uuid", "email", "sku", "code") or n == _id_of(srcs[0].name) for n in names) \
+        from app.agents.sqljoins import key_names
+
+        own = {k.replace("_", "") for k in key_names(srcs[0].name)}
+        if names and not any(n in ("id", "uuid", "email", "sku", "code") or n.replace("_", "") in own for n in names) \
                 and not any(re.search(r"\(", t) for _p, t in keys):
             q = (srcs[0].alias + ".") if srcs[0].alias and srcs[0].alias.lower() != srcs[0].name.split(".")[-1].lower() else ""
             end = oa + len(s[oa:ob].rstrip().rstrip(";").rstrip())
@@ -338,9 +357,10 @@ def _order_limit(sql, s, dep, eng, F) -> list:
 
 
 def _id_of(table: str) -> str:
-    from app.agents.sqlcorrect import _singular
+    """The table's usual key name: customers -> customer_id (a prefix like wp_ or fz12_ is not part of it)."""
+    from app.agents.sqljoins import _fk
 
-    return _singular(table.split(".")[-1].strip('`"')).lower() + "_id"
+    return _fk(table)
 
 
 def _double_quoted(sql, s, eng, F) -> list:
@@ -455,3 +475,54 @@ def _expr_around(sql: str, a: int, b: int) -> str:
     y = sql.find(",", b)
     y = len(sql) if y < 0 else y
     return re.sub(r"\s+", " ", sql[x + 1:y]).strip()
+
+
+@lru_cache(maxsize=4)
+def _refuses(fam: str) -> list:
+    data = json.loads((DIALECTS / f"{fam}.json").read_text(encoding="utf-8"))
+    return [{**r, "_re": re.compile(r["re"], re.I)} for r in data.get("refuses", [])]
+
+
+def _foreign_syntax(sql: str, s: str, F) -> list:
+    """The person named (or chose) a database, and the query uses syntax that database doesn't have: it refuses the query.
+    What each database refuses, its own error, and the rewrite are in its dialect file ('refuses'), proven in the lab."""
+    from app.dbknow import engines as E
+
+    chosen = CHOSEN.get()
+    fam = E.family(chosen)
+    if not fam:
+        return []
+    name = E.label(chosen)
+    out = []
+    for r in _refuses(fam):
+        for m in r["_re"].finditer(s):
+            if r.get("not_inside_function") and _inside_null_fn(sql, m.start()):
+                continue
+            ev = sql[m.start():m.end()]
+            new = _bare_ident(m.group(1)) if r.get("to") == "@bare" else m.expand(r["to"]) if r.get("to") is not None else None
+            fen = r["fix_en"].replace("{db}", name) + (f" Here: {ev.strip()} -> {new.strip()}." if new is not None and new.strip() else "")
+            fhi = r["fix_hi"].replace("{db}", name) + (f" Yahan: {ev.strip()} -> {new.strip()}." if new is not None and new.strip() else "")
+            seen_ev = {f.evidence for f, _e in out}
+            shown = ev.strip()[:80]
+            if shown in seen_ev:                     # the same word twice (SELECT `id` ... ORDER BY `id`): say where
+                shown = re.sub(r"\s+", " ", sql[max(0, m.start() - 12):m.end()]).strip()[:80]
+            out.append((F("error", "dialect", r["title_en"].replace("{db}", name), r["title_hi"].replace("{db}", name), shown,
+                          f"{name} refuses it ({r['error']}). " + fen, f"{name} ise mana karta hai ({r['error']}). " + fhi),
+                        (m.start(), m.end(), new) if new is not None else None))
+            if r.get("once"):
+                break
+    return out
+
+
+RESERVED = set("""all and any as asc between both by case check column constraint create cross current_date current_time current_user
+default desc distinct do else end except false fetch for foreign from full grant group having in inner into is join leading left
+like limit natural not null offset on only or order outer primary references right select table then to trailing true union unique
+user using when where window with""".split())
+
+
+def _bare_ident(name: str) -> str:
+    """A backticked name for PostgreSQL: bare when it is a plain name (unquoted names match however the table was written
+    without quotes), in double quotes when it is a reserved word or has spaces or signs."""
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) and name.lower() not in RESERVED:
+        return name
+    return '"' + name.replace('"', '""') + '"'

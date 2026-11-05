@@ -1160,10 +1160,6 @@
     ],
     [
      "(tables|table) (ko )?jod\\w*"
-    ],
-    [
-     "joins?",
-     "(duplicat\\w*|extra|more) rows"
     ]
    ],
    "phrasings": {
@@ -3818,6 +3814,1988 @@
    "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
    "seen_at": [
     "https://stackoverflow.com/questions/tagged/sql",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "anti_join",
+   "kind": "howto",
+   "title": {
+    "en": "Anti-join: rows with no match",
+    "hinglish": "Anti-join: bina match wali rows",
+    "hindi": "Anti-join: बिना match वाली rows"
+   },
+   "terms": [
+    [
+     "anti[ -]?joins?"
+    ],
+    [
+     "(without|no|never|zero)",
+     "(orders?|match\\w*|payments?|sales?)"
+    ],
+    [
+     "(bina|binaa)",
+     "(order|match|payment)\\w*"
+    ],
+    [
+     "बिना",
+     "(ऑर्डर|match|पेमेंट)\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is an anti join",
+     "how to find customers without orders",
+     "how to get rows that have no match in another table"
+    ],
+    "hinglish": [
+     "anti join kya hota hai",
+     "bina order wale customers kaise nikale"
+    ],
+    "hindi": [
+     "anti join क्या है",
+     "बिना ऑर्डर वाले ग्राहक कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "An anti-join keeps the rows of one table that have NO matching row in another: customers who never ordered, products never sold. Two safe ways: NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id), or LEFT JOIN orders o ... WHERE o.id IS NULL, testing a column that is never NULL in a real match (the key or the join column).",
+    "hinglish": "Anti-join ek table ki wo rows rakhta hai jinka doosri table mein KOI match nahi: jinhone kabhi order nahi kiya, jo product kabhi nahi bika. Do surakshit tareeke: NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id), ya LEFT JOIN ... WHERE o.id IS NULL (aisi column dekho jo asli match mein kabhi NULL na ho: key ya join column).",
+    "hindi": "Anti-join एक table की वो rows रखता है जिनका दूसरी table में कोई match नहीं: जिन्होंने कभी order नहीं किया। दो सुरक्षित तरीके: NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id), या LEFT JOIN ... WHERE o.id IS NULL (key या join column जाँचिए)।"
+   },
+   "mistake": {
+    "en": "Testing a column that can be empty in a real row (WHERE o.discount IS NULL): matched orders without a discount pass too. And NOT IN (SELECT customer_id FROM orders) returns nothing at all if any customer_id there is NULL; NOT EXISTS has no such trap.",
+    "hinglish": "Aisi column jaanchna jo asli row mein bhi khali ho sakti hai (WHERE o.discount IS NULL): bina discount wale matched orders bhi aa jaate hain. Aur NOT IN (SELECT customer_id ...) mein ek bhi NULL ho to kuch nahi aata; NOT EXISTS mein ye jaal nahi.",
+    "hindi": "ऐसी column जाँचना जो असली row में भी खाली हो सकती है (WHERE o.discount IS NULL): बिना discount वाले matched orders भी आ जाते हैं। NOT IN में एक भी NULL हो तो कुछ नहीं आता; NOT EXISTS में यह समस्या नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, c.first_name FROM customers c WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id) ORDER BY c.id"
+     },
+     "label": {
+      "en": "customers with no orders",
+      "hinglish": "bina order wale customers",
+      "hindi": "बिना order वाले ग्राहक"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "4",
+       "Riya"
+      ],
+      [
+       "5",
+       "Aarav"
+      ],
+      [
+       "7",
+       "Dev"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "all": "SELECT c.id, c.first_name FROM customers c LEFT JOIN orders o ON o.customer_id = c.id WHERE o.id IS NULL ORDER BY c.id"
+     },
+     "label": {
+      "en": "the same with LEFT JOIN",
+      "hinglish": "wahi LEFT JOIN se",
+      "hindi": "वही LEFT JOIN से"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "4",
+       "Riya"
+      ],
+      [
+       "5",
+       "Aarav"
+      ],
+      [
+       "7",
+       "Dev"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "NOT EXISTS and LEFT JOIN ... IS NULL both work; MySQL 8.0.17+ runs NOT EXISTS as a real anti-join.",
+    "mariadb": "Same as MySQL; both forms are planned as an anti-join.",
+    "postgresql": "NOT EXISTS is planned as a Hash/Merge Anti Join; prefer it over NOT IN when the column can be NULL."
+   },
+   "related": [
+    "left_join",
+    "in_operator",
+    "semi_join"
+   ],
+   "fundamentals": [
+    "outer_join",
+    "null_logic"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "semi_join",
+   "kind": "compare",
+   "title": {
+    "en": "EXISTS vs JOIN (rows that have a match)",
+    "hinglish": "EXISTS vs JOIN",
+    "hindi": "EXISTS बनाम JOIN"
+   },
+   "terms": [
+    [
+     "exists",
+     "joins?"
+    ],
+    [
+     "semi[ -]?joins?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "exists vs join",
+     "what is a semi join",
+     "difference between exists and join"
+    ],
+    "hinglish": [
+     "exists aur join mein kya farak hai",
+     "semi join kya hai"
+    ],
+    "hindi": [
+     "EXISTS और JOIN में क्या अंतर है",
+     "semi join क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Both find rows that have a match, but a JOIN returns one row per MATCH (a customer with 3 orders comes back 3 times), while EXISTS returns each row ONCE if at least one match exists (a semi-join). Use EXISTS for 'customers who have ordered'; use JOIN when you need columns from the other table.",
+    "hinglish": "Dono match wali rows dhoondhte hain, par JOIN har MATCH pe ek row deta hai (3 order wala customer 3 baar), jabki EXISTS har row EK baar deta hai agar kam se kam ek match ho (semi-join). 'Jinhone order kiya' ke liye EXISTS; doosri table ki columns chahiye to JOIN.",
+    "hindi": "दोनों match वाली rows ढूँढते हैं, पर JOIN हर match पर एक row देता है (3 order वाला ग्राहक 3 बार), जबकि EXISTS हर row एक बार देता है (semi-join)। 'जिन्होंने order किया' के लिए EXISTS; दूसरी table की columns चाहिए तो JOIN।"
+   },
+   "mistake": {
+    "en": "Writing JOIN and then DISTINCT to remove the copies: it builds all the copies first and hides a join that multiplies rows.",
+    "hinglish": "JOIN likh ke DISTINCT se copies hatana: pehle saari copies banti hain, aur rows guna karne wala join chhup jaata hai.",
+    "hindi": "JOIN लिखकर DISTINCT से copies हटाना: पहले सारी copies बनती हैं और rows गुणा करने वाला join छिप जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, c.first_name FROM customers c WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id) ORDER BY c.id"
+     },
+     "label": {
+      "en": "each customer once",
+      "hinglish": "har customer ek baar",
+      "hindi": "हर ग्राहक एक बार"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "1",
+       "Aarav"
+      ],
+      [
+       "2",
+       "Diya"
+      ],
+      [
+       "3",
+       "Kabir"
+      ],
+      [
+       "6",
+       "Tara"
+      ],
+      [
+       "8",
+       "Sara"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "all": "SELECT c.id, c.first_name FROM customers c JOIN orders o ON o.customer_id = c.id ORDER BY c.id, o.id"
+     },
+     "label": {
+      "en": "JOIN: once per order",
+      "hinglish": "JOIN: har order pe ek baar",
+      "hindi": "JOIN: हर order पर एक बार"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "1",
+       "Aarav"
+      ],
+      [
+       "1",
+       "Aarav"
+      ],
+      [
+       "2",
+       "Diya"
+      ],
+      [
+       "2",
+       "Diya"
+      ],
+      [
+       "3",
+       "Kabir"
+      ],
+      [
+       "3",
+       "Kabir"
+      ],
+      [
+       "6",
+       "Tara"
+      ],
+      [
+       "8",
+       "Sara"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "MySQL turns EXISTS / IN subqueries into semi-joins (8.0.16+ for EXISTS).",
+    "mariadb": "MariaDB also plans IN/EXISTS subqueries as semi-joins.",
+    "postgresql": "EXISTS becomes a Semi Join in the plan."
+   },
+   "related": [
+    "anti_join",
+    "inner_join",
+    "distinct"
+   ],
+   "fundamentals": [
+    "cardinality"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/semijoins.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "natural_join",
+   "kind": "concept",
+   "title": {
+    "en": "NATURAL JOIN",
+    "hinglish": "NATURAL JOIN",
+    "hindi": "NATURAL JOIN"
+   },
+   "terms": [
+    [
+     "natural joins?"
+    ],
+    [
+     "नेचुरल जॉइन"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a natural join",
+     "should i use natural join"
+    ],
+    "hinglish": [
+     "natural join kya hota hai",
+     "natural join use karna chahiye kya"
+    ],
+    "hindi": [
+     "NATURAL JOIN क्या है",
+     "नेचुरल जॉइन क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "NATURAL JOIN joins two tables on EVERY column they share by name, without you writing ON. Tables with id, created_at or status in both get joined on those too, so orders NATURAL JOIN customers matches order 5 with customer 5. Write JOIN ... ON with the real key instead.",
+    "hinglish": "NATURAL JOIN do tables ko har us column pe jodta hai jo dono mein same naam ki ho, bina ON likhe. Dono mein id, created_at ya status ho to unpe bhi judta hai, isliye orders NATURAL JOIN customers order 5 ko customer 5 se jod deta hai. Asli key ke saath JOIN ... ON likho.",
+    "hindi": "NATURAL JOIN दो tables को हर उस column पर जोड़ता है जो दोनों में एक ही नाम की हो। दोनों में id हो तो order 5 ग्राहक 5 से जुड़ जाता है। असली key के साथ JOIN ... ON लिखिए।"
+   },
+   "mistake": {
+    "en": "Using it because it is short: adding a same-named column to either table later silently changes the join.",
+    "hinglish": "Chhota hai isliye use karna: baad mein kisi table mein same naam ki column judi to join chupchaap badal jaata hai.",
+    "hindi": "छोटा है इसलिए उपयोग करना: बाद में किसी table में same नाम की column जुड़ी तो join चुपचाप बदल जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS paired FROM orders NATURAL JOIN customers"
+     },
+     "label": {
+      "en": "pairs order N with customer N (both have id)",
+      "hinglish": "order N ko customer N se jodta hai",
+      "hindi": "order N को ग्राहक N से जोड़ता है"
+     },
+     "columns": [
+      "paired"
+     ],
+     "result": [
+      [
+       "8"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS paired FROM orders o JOIN customers c ON o.customer_id = c.id"
+     },
+     "label": {
+      "en": "the real link",
+      "hinglish": "asli link",
+      "hindi": "असली link"
+     },
+     "columns": [
+      "paired"
+     ],
+     "result": [
+      [
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Supported; picks all same-named columns.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Supported; same rule."
+   },
+   "related": [
+    "join_using",
+    "join",
+    "inner_join"
+   ],
+   "fundamentals": [
+    "join_condition"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "join_using",
+   "kind": "compare",
+   "title": {
+    "en": "JOIN ... USING vs ON",
+    "hinglish": "JOIN ... USING vs ON",
+    "hindi": "JOIN ... USING vs ON"
+   },
+   "terms": [
+    [
+     "joins?",
+     "using"
+    ],
+    [
+     "using",
+     "\\bon\\b"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is join using",
+     "difference between using and on in join"
+    ],
+    "hinglish": [
+     "join using kya hota hai",
+     "using aur on mein kya farak hai"
+    ],
+    "hindi": [
+     "JOIN USING क्या है",
+     "USING और ON में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "JOIN orders USING (customer_id) is short for ON a.customer_id = b.customer_id, and it works only when the column has the SAME name in both tables; the shared column then appears once in SELECT *. ON can match any columns (o.customer_id = c.id) and any condition.",
+    "hinglish": "JOIN orders USING (customer_id) ka matlab ON a.customer_id = b.customer_id; ye tabhi chalta hai jab column ka naam dono tables mein SAME ho. ON koi bhi columns mila sakta hai (o.customer_id = c.id).",
+    "hindi": "JOIN ... USING (customer_id) का मतलब ON a.customer_id = b.customer_id; यह तभी चलता है जब column का नाम दोनों tables में same हो। ON कोई भी columns मिला सकता है।"
+   },
+   "mistake": {
+    "en": "USING (id) between two different tables: it matches their primary keys (order 5 with customer 5), not the real link.",
+    "hinglish": "Do alag tables ke beech USING (id): ye unki primary keys milata hai (order 5 ko customer 5), asli link nahi.",
+    "hindi": "दो अलग tables के बीच USING (id): यह primary keys मिलाता है, असली link नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, p.amount FROM orders o JOIN payments p ON p.order_id = o.id ORDER BY p.id"
+     },
+     "label": {
+      "en": "ON: different column names",
+      "hinglish": "ON: alag naam ki columns",
+      "hindi": "ON: अलग नाम की columns"
+     },
+     "columns": [
+      "id",
+      "amount"
+     ],
+     "result": [
+      [
+       "1",
+       "25500"
+      ],
+      [
+       "3",
+       "40000"
+      ],
+      [
+       "3",
+       "39000"
+      ],
+      [
+       "5",
+       "800"
+      ],
+      [
+       "7",
+       "500"
+      ],
+      [
+       "2",
+       "450"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "all": "SELECT oi.order_id, oi.product_id, r.reason FROM order_items oi JOIN (SELECT order_item_id AS id, reason FROM returns) r USING (id) ORDER BY oi.id"
+     },
+     "label": {
+      "en": "USING: the same name on both sides",
+      "hinglish": "USING: dono taraf same naam",
+      "hindi": "USING: दोनों तरफ same नाम"
+     },
+     "columns": [
+      "order_id",
+      "product_id",
+      "reason"
+     ],
+     "result": [
+      [
+       "2",
+       "4",
+       "damaged"
+      ],
+      [
+       "5",
+       "5",
+       "NULL"
+      ],
+      [
+       "1",
+       "4",
+       "wrong size"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Supported.",
+    "mariadb": "Supported.",
+    "postgresql": "Supported; with USING the shared column can be named without a table prefix."
+   },
+   "related": [
+    "natural_join",
+    "join"
+   ],
+   "fundamentals": [
+    "join_condition"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/join.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "on_vs_where",
+   "kind": "compare",
+   "title": {
+    "en": "ON vs WHERE in a LEFT JOIN",
+    "hinglish": "ON vs WHERE in a LEFT JOIN",
+    "hindi": "ON vs WHERE in a LEFT JOIN"
+   },
+   "terms": [
+    [
+     "\\bon\\b",
+     "where",
+     "joins?"
+    ],
+    [
+     "on clause",
+     "where clause"
+    ],
+    [
+     "\\bon\\b (or|ya|या|vs|aur|और) where"
+    ],
+    [
+     "where (or|ya|या|vs|aur|और) \\bon\\b"
+    ],
+    [
+     "\\bon\\b (mein|me|में)",
+     "where"
+    ],
+    [
+     "\\bon\\b",
+     "where",
+     "(go|goes|put|likh\\w*|लिख\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "difference between on and where in a left join",
+     "should a condition go in on or where"
+    ],
+    "hinglish": [
+     "left join mein on aur where ka farak kya hai",
+     "condition on mein likhe ya where mein"
+    ],
+    "hindi": [
+     "LEFT JOIN में ON और WHERE में क्या अंतर है",
+     "condition ON में लिखें या WHERE में"
+    ]
+   },
+   "answer": {
+    "en": "For an INNER JOIN it doesn't change the result. For a LEFT JOIN it does: a condition in ON decides which right-side rows MATCH (the left rows all stay, with NULLs where nothing matched); the same condition in WHERE runs after the join and throws away the left rows that got NULLs, turning it into an inner join.",
+    "hinglish": "INNER JOIN mein result nahi badalta. LEFT JOIN mein badalta hai: ON ki condition tay karti hai right side ki kaunsi rows MATCH hongi (left ki saari rows rehti hain, NULL ke saath); wahi condition WHERE mein join ke baad chalti hai aur NULL wali left rows hata deti hai, jisse ye inner join ban jaata hai.",
+    "hindi": "INNER JOIN में नतीजा नहीं बदलता। LEFT JOIN में बदलता है: ON की condition तय करती है कौन सी right rows match होंगी (left की सब rows रहती हैं); वही condition WHERE में join के बाद चलती है और NULL वाली left rows हटा देती है।"
+   },
+   "mistake": {
+    "en": "WHERE o.status = 'paid' after LEFT JOIN orders: customers with no paid order vanish instead of showing NULL.",
+    "hinglish": "LEFT JOIN orders ke baad WHERE o.status = 'paid': bina paid order wale customers NULL dikhne ki jagah gayab ho jaate hain.",
+    "hindi": "LEFT JOIN orders के बाद WHERE o.status = 'paid': बिना paid order वाले ग्राहक गायब हो जाते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, o.id AS paid_order FROM customers c LEFT JOIN orders o ON o.customer_id = c.id AND o.status = 'paid' ORDER BY c.id, o.id"
+     },
+     "label": {
+      "en": "in ON: every customer stays",
+      "hinglish": "ON mein: har customer rehta hai",
+      "hindi": "ON में: हर ग्राहक रहता है"
+     },
+     "columns": [
+      "id",
+      "paid_order"
+     ],
+     "result": [
+      [
+       "1",
+       "1"
+      ],
+      [
+       "2",
+       "3"
+      ],
+      [
+       "2",
+       "7"
+      ],
+      [
+       "3",
+       "5"
+      ],
+      [
+       "4",
+       "NULL"
+      ],
+      [
+       "5",
+       "NULL"
+      ],
+      [
+       "6",
+       "NULL"
+      ],
+      [
+       "7",
+       "NULL"
+      ],
+      [
+       "8",
+       "NULL"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "all": "SELECT c.id, o.id AS paid_order FROM customers c LEFT JOIN orders o ON o.customer_id = c.id WHERE o.status = 'paid' ORDER BY c.id, o.id"
+     },
+     "label": {
+      "en": "in WHERE: only customers with a paid order",
+      "hinglish": "WHERE mein: sirf paid order wale",
+      "hindi": "WHERE में: सिर्फ़ paid order वाले"
+     },
+     "columns": [
+      "id",
+      "paid_order"
+     ],
+     "result": [
+      [
+       "1",
+       "1"
+      ],
+      [
+       "2",
+       "3"
+      ],
+      [
+       "2",
+       "7"
+      ],
+      [
+       "3",
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same on every engine: the optimizer even turns such a LEFT JOIN into an inner join (outer join simplification).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same meaning."
+   },
+   "related": [
+    "left_join",
+    "left_vs_inner",
+    "where"
+   ],
+   "fundamentals": [
+    "outer_join"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/outer-join-simplification.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "join_duplicates",
+   "kind": "concept",
+   "title": {
+    "en": "Why a JOIN returns duplicate rows",
+    "hinglish": "JOIN se duplicate rows kyun aati hain",
+    "hindi": "JOIN से duplicate rows क्यों आती हैं"
+   },
+   "terms": [
+    [
+     "joins?",
+     "duplicat\\w*"
+    ],
+    [
+     "joins?",
+     "(repeat\\w*|more rows|extra rows|zyada rows|jyada rows|rows multipl\\w*|row explosion)"
+    ],
+    [
+     "row explosion"
+    ],
+    [
+     "जॉइन",
+     "डुप्लिकेट"
+    ],
+    [
+     "joins?",
+     "more rows"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why does a join return duplicate rows",
+     "why does a join give more rows than the table has",
+     "what is row explosion in a join"
+    ],
+    "hinglish": [
+     "join ke baad duplicate rows kyun aati hai",
+     "join se zyada rows kyun aati hain"
+    ],
+    "hindi": [
+     "join के बाद duplicate rows क्यों आती हैं",
+     "जॉइन से डुप्लिकेट rows क्यों आती हैं"
+    ]
+   },
+   "answer": {
+    "en": "A join returns one row per matching PAIR. Joining customers to orders gives a customer once per order; joining two child tables (orders and payments) to the same customer multiplies them (2 orders x 2 payments = 4 rows), and a missing or wrong ON pairs every row with every row. Decide what one result row should be (one customer? one order?) and join or total to that.",
+    "hinglish": "Join har match hone wali JODI pe ek row deta hai. customers ko orders se jodo to customer har order pe ek baar aata hai; do child tables (orders aur payments) jodo to guna ho jaata hai (2 x 2 = 4 rows), aur galat/missing ON har row ko har row se jod deta hai. Tay karo ek result row kya hai (ek customer? ek order?) aur usi hisaab se jodo ya total karo.",
+    "hindi": "Join हर match होने वाली जोड़ी पर एक row देता है। दो child tables जोड़ो तो rows गुणा हो जाती हैं (2 x 2 = 4), और गलत ON हर row को हर row से जोड़ देता है। तय कीजिए एक result row क्या है, फिर उसी हिसाब से जोड़िए।"
+   },
+   "mistake": {
+    "en": "Hiding the copies with DISTINCT: SUM/COUNT computed on the multiplied rows stay wrong.",
+    "hinglish": "DISTINCT se copies chhupana: guna hui rows pe SUM/COUNT galat hi rehte hain.",
+    "hindi": "DISTINCT से copies छिपाना: गुणा हुई rows पर SUM/COUNT गलत ही रहते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, COUNT(*) AS joined_rows FROM customers c JOIN orders o ON o.customer_id = c.id JOIN payments p ON p.order_id = o.id GROUP BY c.id ORDER BY c.id"
+     },
+     "label": {
+      "en": "rows per customer after two joins",
+      "hinglish": "do join ke baad har customer ki rows",
+      "hindi": "दो join के बाद हर ग्राहक की rows"
+     },
+     "columns": [
+      "id",
+      "joined_rows"
+     ],
+     "result": [
+      [
+       "1",
+       "2"
+      ],
+      [
+       "2",
+       "3"
+      ],
+      [
+       "3",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same on every engine.",
+    "mariadb": "Same.",
+    "postgresql": "Same."
+   },
+   "related": [
+    "semi_join",
+    "inner_join",
+    "distinct"
+   ],
+   "fundamentals": [
+    "cardinality",
+    "grain"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-join.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "join_three_tables",
+   "kind": "howto",
+   "title": {
+    "en": "Join three or more tables",
+    "hinglish": "Teen ya zyada tables jodna",
+    "hindi": "तीन या ज़्यादा tables जोड़ना"
+   },
+   "terms": [
+    [
+     "joins?",
+     "(three|3|multiple|many|more than two|several|teen|tin|kai) tables?"
+    ],
+    [
+     "(तीन|कई)",
+     "टेबल"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to join three tables",
+     "how do i join multiple tables in sql"
+    ],
+    "hinglish": [
+     "teen tables kaise join kare",
+     "multiple tables join kaise karte hain"
+    ],
+    "hindi": [
+     "तीन टेबल कैसे जोड़ें",
+     "कई टेबल join कैसे करते हैं"
+    ]
+   },
+   "answer": {
+    "en": "Add one JOIN per table, each with its own ON that ties it to a table already joined: FROM orders o JOIN customers c ON c.id = o.customer_id JOIN payments p ON p.order_id = o.id. Read it as a chain of links; every table needs one.",
+    "hinglish": "Har table ke liye ek JOIN, har ek ka apna ON jo use pehle se judi table se jode: FROM orders o JOIN customers c ON c.id = o.customer_id JOIN payments p ON p.order_id = o.id. Ise links ki chain ki tarah padho; har table ko ek link chahiye.",
+    "hindi": "हर table के लिए एक JOIN, हर एक का अपना ON जो उसे पहले से जुड़ी table से जोड़े। हर table को एक link चाहिए।"
+   },
+   "mistake": {
+    "en": "Forgetting the ON of one table (or writing it about the wrong pair): that table multiplies every row.",
+    "hinglish": "Ek table ka ON bhool jaana (ya galat jodi pe likhna): wo table har row ko guna kar deti hai.",
+    "hindi": "एक table का ON भूल जाना: वह table हर row को गुणा कर देती है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, c.first_name, p.amount FROM orders o JOIN customers c ON c.id = o.customer_id JOIN payments p ON p.order_id = o.id ORDER BY p.id"
+     },
+     "columns": [
+      "id",
+      "first_name",
+      "amount"
+     ],
+     "result": [
+      [
+       "1",
+       "Aarav",
+       "25500"
+      ],
+      [
+       "3",
+       "Diya",
+       "40000"
+      ],
+      [
+       "3",
+       "Diya",
+       "39000"
+      ],
+      [
+       "5",
+       "Kabir",
+       "800"
+      ],
+      [
+       "7",
+       "Diya",
+       "500"
+      ],
+      [
+       "2",
+       "Aarav",
+       "450"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same.",
+    "mariadb": "Same.",
+    "postgresql": "Same; the planner may join them in another order, the result is the same for inner joins."
+   },
+   "related": [
+    "join",
+    "join_order",
+    "join_duplicates"
+   ],
+   "fundamentals": [
+    "join_condition",
+    "cardinality"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/join.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "join_two_columns",
+   "kind": "howto",
+   "title": {
+    "en": "Join on two columns",
+    "hinglish": "Do columns pe join",
+    "hindi": "दो columns पर join"
+   },
+   "terms": [
+    [
+     "joins?",
+     "(two|2|multiple|more|do|composite) (columns?|keys?|conditions?)"
+    ],
+    [
+     "composite key",
+     "joins?"
+    ],
+    [
+     "(दो|कई)",
+     "(columns?|conditions?|कॉलम)",
+     "(joins?|जॉइन)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to join on two columns",
+     "can i join on multiple columns"
+    ],
+    "hinglish": [
+     "do columns pe join kaise kare",
+     "multiple conditions se join kaise karte hain"
+    ],
+    "hindi": [
+     "दो columns पर join कैसे करें",
+     "कई conditions से join कैसे करते हैं"
+    ]
+   },
+   "answer": {
+    "en": "Put both conditions in ON with AND: ON a.order_id = b.order_id AND a.product_id = b.product_id. Each pair of rows must match on both. This is how tables with a two-column key are linked.",
+    "hinglish": "Dono conditions ON mein AND ke saath: ON a.order_id = b.order_id AND a.product_id = b.product_id. Har jodi ko dono pe match karna hoga. Do-column key wali tables aise judti hain.",
+    "hindi": "दोनों conditions ON में AND के साथ: ON a.order_id = b.order_id AND a.product_id = b.product_id।"
+   },
+   "mistake": {
+    "en": "Joining on only one of the two key columns: every row matches all rows that share that one value (rows multiply).",
+    "hinglish": "Do key columns mein se sirf ek pe jodna: har row us value wali saari rows se judti hai (rows guna).",
+    "hindi": "दो key columns में से सिर्फ़ एक पर जोड़ना: rows गुणा हो जाती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT a.id AS line, b.id AS same_order_and_product FROM order_items a JOIN order_items b ON b.order_id = a.order_id AND b.product_id = a.product_id AND b.id <> a.id ORDER BY a.id"
+     },
+     "columns": [
+      "line",
+      "same_order_and_product"
+     ],
+     "result": [
+      [
+       "2",
+       "10"
+      ],
+      [
+       "10",
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same; (a, b) = (c, d) row comparison works too.",
+    "mariadb": "Same.",
+    "postgresql": "Same; row comparison (a, b) = (c, d) works too."
+   },
+   "related": [
+    "join",
+    "join_three_tables"
+   ],
+   "fundamentals": [
+    "join_condition"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "non_equi_join",
+   "kind": "concept",
+   "title": {
+    "en": "Non-equi join (range join)",
+    "hinglish": "Non-equi join (range join)",
+    "hindi": "Non-equi join (range join)"
+   },
+   "terms": [
+    [
+     "non[- ]?equi"
+    ],
+    [
+     "range joins?"
+    ],
+    [
+     "joins?",
+     "between"
+    ],
+    [
+     "joins?",
+     "(range|band|slab)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a non equi join",
+     "how to join with between"
+    ],
+    "hinglish": [
+     "non equi join kya hota hai",
+     "between se join kaise kare"
+    ],
+    "hindi": [
+     "non equi join क्या है",
+     "between से join कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "A join whose ON isn't a plain equality: amount BETWEEN band.lo AND band.hi, o.order_date >= p.start_date. Use it to put rows into ranges (price bands, tax slabs, which price list was active on a date).",
+    "hinglish": "Aisa join jiska ON seedha barabari nahi: amount BETWEEN band.lo AND band.hi. Rows ko range mein daalne ke liye (price band, tax slab).",
+    "hindi": "ऐसा join जिसका ON सीधी बराबरी नहीं: amount BETWEEN band.lo AND band.hi। rows को range में डालने के लिए।"
+   },
+   "mistake": {
+    "en": "Ranges that overlap or leave gaps (0-1000 and 1000-5000): a value on the edge matches two bands, or none.",
+    "hinglish": "Ranges jo overlap karein ya beech mein gap chhodein: kinare wali value do band se judti hai, ya kisi se nahi.",
+    "hindi": "Ranges जो overlap करें या gap छोड़ें: किनारे की value दो band से जुड़ती है, या किसी से नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, b.band FROM orders o JOIN (SELECT 0 AS lo, 999.99 AS hi, 'small' AS band UNION ALL SELECT 1000, 49999.99, 'medium' UNION ALL SELECT 50000, 9999999, 'large') b ON o.amount BETWEEN b.lo AND b.hi ORDER BY o.id"
+     },
+     "columns": [
+      "id",
+      "band"
+     ],
+     "result": [
+      [
+       "1",
+       "medium"
+      ],
+      [
+       "2",
+       "small"
+      ],
+      [
+       "3",
+       "large"
+      ],
+      [
+       "4",
+       "medium"
+      ],
+      [
+       "5",
+       "small"
+      ],
+      [
+       "6",
+       "large"
+      ],
+      [
+       "7",
+       "small"
+      ],
+      [
+       "8",
+       "small"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same.",
+    "mariadb": "Same.",
+    "postgresql": "Same; range types (numrange) can also hold the bands."
+   },
+   "related": [
+    "join",
+    "self_join"
+   ],
+   "fundamentals": [
+    "join_condition"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-join.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "self_join_pairs",
+   "kind": "howto",
+   "title": {
+    "en": "Pairs from the same table, each once",
+    "hinglish": "Ek hi table se jodiyan, har ek baar",
+    "hindi": "एक ही table से जोड़ियाँ, हर एक बार"
+   },
+   "terms": [
+    [
+     "self[ -]?joins?",
+     "(duplicat\\w*|twice|repeat\\w*|pairs?|same row|itself)"
+    ],
+    [
+     "pairs?",
+     "(same|self)"
+    ],
+    [
+     "(jodi|jodiyan|pair)",
+     "(same|ek hi)"
+    ],
+    [
+     "जोड़ि\\w*",
+     "(same|एक ही)"
+    ],
+    [
+     "self[ -]?joins?",
+     "(दो बार|जोड़ी)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to find pairs of employees in the same department",
+     "self join gives each pair twice"
+    ],
+    "hinglish": [
+     "same department wale employees ki jodi kaise nikale",
+     "self join mein pair do baar kyun aata hai"
+    ],
+    "hindi": [
+     "एक ही department के employees की जोड़ियाँ कैसे निकालें",
+     "self join में जोड़ी दो बार क्यों आती है"
+    ]
+   },
+   "answer": {
+    "en": "Join the table to itself on the shared value and keep one side smaller: ON a.department_id = b.department_id AND a.id < b.id. Without the id condition every row also pairs with itself; with <> each pair appears twice ((A, B) and (B, A)).",
+    "hinglish": "Table ko khud se shared value pe jodo aur ek taraf chhoti rakho: ON a.department_id = b.department_id AND a.id < b.id. Id wali condition ke bina har row khud se judti hai; <> se har jodi do baar aati hai.",
+    "hindi": "Table को खुद से जोड़िए और एक तरफ़ छोटी रखिए: ON a.department_id = b.department_id AND a.id < b.id।"
+   },
+   "mistake": {
+    "en": "Using a.id <> b.id when each pair is wanted once, or no id condition at all.",
+    "hinglish": "Har jodi ek baar chahiye tab a.id <> b.id lagana, ya id ki condition hi na lagana.",
+    "hindi": "हर जोड़ी एक बार चाहिए तब a.id <> b.id लगाना, या id की condition ही न लगाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT a.first_name, b.first_name AS colleague FROM employees a JOIN employees b ON a.department_id = b.department_id AND a.id < b.id ORDER BY a.id, b.id"
+     },
+     "columns": [
+      "first_name",
+      "colleague"
+     ],
+     "result": [
+      [
+       "Asha",
+       "Vikram"
+      ],
+      [
+       "Asha",
+       "Neha"
+      ],
+      [
+       "Vikram",
+       "Neha"
+      ],
+      [
+       "Rohan",
+       "Isha"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same.",
+    "mariadb": "Same.",
+    "postgresql": "Same."
+   },
+   "related": [
+    "self_join",
+    "join_duplicates"
+   ],
+   "fundamentals": [
+    "join_condition"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-join.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "full_join_mysql",
+   "kind": "howto",
+   "title": {
+    "en": "FULL OUTER JOIN on MySQL / MariaDB",
+    "hinglish": "MySQL mein FULL OUTER JOIN",
+    "hindi": "MySQL में FULL OUTER JOIN"
+   },
+   "terms": [
+    [
+     "full (outer )?joins?",
+     "(mysql|maria\\s?db|mysql mein|mysql me)"
+    ],
+    [
+     "full (outer )?joins?",
+     "(how|kaise|कैसे)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to do a full outer join in mysql",
+     "full outer join in mariadb"
+    ],
+    "hinglish": [
+     "mysql mein full outer join kaise kare",
+     "full join kaise likhe mysql me"
+    ],
+    "hindi": [
+     "MySQL में FULL OUTER JOIN कैसे करें",
+     "full join कैसे लिखें"
+    ]
+   },
+   "answer": {
+    "en": "MySQL and MariaDB have no FULL OUTER JOIN. Take the LEFT JOIN, then add the right-side rows that had no match, with UNION ALL: SELECT ... FROM a LEFT JOIN b ON ... UNION ALL SELECT ... FROM a RIGHT JOIN b ON ... WHERE a.id IS NULL. PostgreSQL has FULL JOIN.",
+    "hinglish": "MySQL aur MariaDB mein FULL OUTER JOIN nahi hai. LEFT JOIN lo, phir UNION ALL se right side ki bina match wali rows jodo: ... LEFT JOIN ... UNION ALL ... RIGHT JOIN ... WHERE a.id IS NULL. PostgreSQL mein FULL JOIN hai.",
+    "hindi": "MySQL और MariaDB में FULL OUTER JOIN नहीं है। LEFT JOIN लीजिए, फिर UNION ALL से right side की बिना match वाली rows जोड़िए। PostgreSQL में FULL JOIN है।"
+   },
+   "mistake": {
+    "en": "Using UNION (not UNION ALL) of a LEFT and a RIGHT JOIN: it also removes rows that are really duplicated in the data.",
+    "hinglish": "LEFT aur RIGHT JOIN ka UNION (UNION ALL nahi): ye data mein asli duplicate rows bhi hata deta hai.",
+    "hindi": "LEFT और RIGHT JOIN का UNION (UNION ALL नहीं): यह असली duplicate rows भी हटा देता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT p.id AS product, s.id AS supplier FROM products p LEFT JOIN suppliers s ON s.id = p.supplier_id UNION ALL SELECT p.id, s.id FROM products p RIGHT JOIN suppliers s ON s.id = p.supplier_id WHERE p.id IS NULL ORDER BY 1, 2",
+      "postgresql": "SELECT p.id AS product, s.id AS supplier FROM products p FULL JOIN suppliers s ON s.id = p.supplier_id ORDER BY 1, 2"
+     },
+     "columns": [
+      "product",
+      "supplier"
+     ],
+     "result": [
+      [
+       "1",
+       "1"
+      ],
+      [
+       "2",
+       "1"
+      ],
+      [
+       "3",
+       "2"
+      ],
+      [
+       "4",
+       "3"
+      ],
+      [
+       "5",
+       "NULL"
+      ],
+      [
+       "6",
+       "2"
+      ],
+      [
+       "7",
+       "NULL"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "No FULL OUTER JOIN: use the LEFT JOIN + UNION ALL + RIGHT JOIN ... IS NULL form.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "FULL [OUTER] JOIN is built in.",
+    "sqlserver": "FULL OUTER JOIN is supported.",
+    "oracle": "FULL OUTER JOIN is supported."
+   },
+   "related": [
+    "full_join",
+    "left_join",
+    "right_join"
+   ],
+   "fundamentals": [
+    "outer_join",
+    "engine_syntax"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/join.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "join_order",
+   "kind": "concept",
+   "title": {
+    "en": "Does the order of tables in a JOIN matter?",
+    "hinglish": "JOIN mein tables ka order matter karta hai?",
+    "hindi": "JOIN में tables का क्रम मायने रखता है?"
+   },
+   "terms": [
+    [
+     "(order|sequence|kram)",
+     "tables?",
+     "joins?"
+    ],
+    [
+     "join order"
+    ],
+    [
+     "क्रम",
+     "(joins?|जॉइन)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does the order of tables in a join matter",
+     "what is join order"
+    ],
+    "hinglish": [
+     "join mein tables ka order matter karta hai kya",
+     "join order kya hota hai"
+    ],
+    "hindi": [
+     "JOIN में tables का क्रम मायने रखता है क्या",
+     "join order क्या है"
+    ]
+   },
+   "answer": {
+    "en": "For INNER JOINs, no: A JOIN B and B JOIN A give the same rows, and the database picks its own order to run them. For outer joins, yes: A LEFT JOIN B keeps all of A, B LEFT JOIN A keeps all of B. Also a table must be joined before its columns are used in a later ON.",
+    "hinglish": "INNER JOIN mein nahi: A JOIN B aur B JOIN A same rows dete hain, aur database khud tay karta hai kis kram mein chalaye. Outer join mein haan: A LEFT JOIN B saari A rakhta hai, B LEFT JOIN A saari B. Aur kisi table ki column agle ON mein tabhi use ho sakti hai jab wo pehle judi ho.",
+    "hindi": "INNER JOIN में नहीं: दोनों क्रम में same rows। Outer join में हाँ: A LEFT JOIN B पूरी A रखता है, B LEFT JOIN A पूरी B।"
+   },
+   "mistake": {
+    "en": "Swapping the tables of a LEFT JOIN to 'tidy up' the query: it changes which side keeps its unmatched rows.",
+    "hinglish": "Query 'saaf' karne ke liye LEFT JOIN ki tables badal dena: isse badalta hai kaunsi taraf ki bina match rows rehti hain.",
+    "hindi": "LEFT JOIN की tables बदल देना: इससे बदलता है कि किस तरफ़ की rows रहती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM customers c LEFT JOIN orders o ON o.customer_id = c.id) AS customers_left, (SELECT COUNT(*) FROM orders o LEFT JOIN customers c ON o.customer_id = c.id) AS orders_left"
+     },
+     "columns": [
+      "customers_left",
+      "orders_left"
+     ],
+     "result": [
+      [
+       "11",
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "The optimizer reorders inner joins; STRAIGHT_JOIN forces the written order.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "The planner reorders inner joins (up to join_collapse_limit tables)."
+   },
+   "related": [
+    "left_join",
+    "inner_join",
+    "join_three_tables"
+   ],
+   "fundamentals": [
+    "outer_join"
+   ],
+   "source": "https://www.postgresql.org/docs/current/explicit-joins.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "join_vs_subquery",
+   "kind": "compare",
+   "title": {
+    "en": "JOIN vs subquery",
+    "hinglish": "JOIN vs subquery",
+    "hindi": "JOIN vs subquery"
+   },
+   "terms": [
+    [
+     "joins?",
+     "subquer\\w*"
+    ],
+    [
+     "joins?",
+     "sub quer\\w*"
+    ],
+    [
+     "जॉइन",
+     "सबक्वेरी"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "join vs subquery",
+     "which is better join or subquery"
+    ],
+    "hinglish": [
+     "join aur subquery mein kya farak hai",
+     "join better hai ya subquery"
+    ],
+    "hindi": [
+     "JOIN और subquery में क्या अंतर है",
+     "join बेहतर है या subquery"
+    ]
+   },
+   "answer": {
+    "en": "A JOIN puts columns of both tables side by side (one row per matching pair). A subquery answers a question inside the query: IN / EXISTS for 'has a match', a scalar subquery for one value. For 'rows that have a match' EXISTS avoids the copies a JOIN makes; when you need the other table's columns, JOIN. Modern engines often run both the same way, so pick the one that says what you mean.",
+    "hinglish": "JOIN dono tables ki columns saath rakhta hai (har match pe ek row). Subquery query ke andar ek sawaal ka jawab hai: 'match hai?' ke liye IN / EXISTS, ek value ke liye scalar subquery. Doosri table ki columns chahiye to JOIN; sirf 'match hai' ke liye EXISTS.",
+    "hindi": "JOIN दोनों tables की columns साथ रखता है; subquery query के अंदर एक सवाल का जवाब है। दूसरी table की columns चाहिए तो JOIN, सिर्फ़ 'match है' के लिए EXISTS।"
+   },
+   "mistake": {
+    "en": "Rewriting IN (subquery) as a JOIN without thinking: when the other side has several matches, rows multiply.",
+    "hinglish": "IN (subquery) ko bina soche JOIN bana dena: doosri taraf kai match ho to rows guna ho jaati hain.",
+    "hindi": "IN (subquery) को बिना सोचे JOIN बना देना: rows गुणा हो जाती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM customers c WHERE c.id IN (SELECT customer_id FROM orders)) AS with_in, (SELECT COUNT(*) FROM customers c JOIN orders o ON o.customer_id = c.id) AS with_join"
+     },
+     "columns": [
+      "with_in",
+      "with_join"
+     ],
+     "result": [
+      [
+       "5",
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "IN/EXISTS subqueries become semi-joins; old versions (5.5) ran them row by row.",
+    "mariadb": "Semi-join optimisation since 5.3.",
+    "postgresql": "IN/EXISTS are planned as semi-joins; a scalar subquery in SELECT runs per row."
+   },
+   "related": [
+    "semi_join",
+    "anti_join",
+    "in_operator"
+   ],
+   "fundamentals": [
+    "cardinality",
+    "subquery_shape"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/subquery-optimization.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "left_join_count",
+   "kind": "concept",
+   "title": {
+    "en": "COUNT with LEFT JOIN shows 1 instead of 0",
+    "hinglish": "LEFT JOIN ke saath COUNT 0 ki jagah 1",
+    "hindi": "LEFT JOIN के साथ COUNT 0 की जगह 1"
+   },
+   "terms": [
+    [
+     "count\\w*",
+     "left (outer )?joins?"
+    ],
+    [
+     "count\\w*",
+     "(zero|0)",
+     "joins?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why does count with left join show 1 instead of 0",
+     "how to count with a left join"
+    ],
+    "hinglish": [
+     "left join ke saath count 0 ki jagah 1 kyun aata hai",
+     "left join mein count kaise kare"
+    ],
+    "hindi": [
+     "left join के साथ count 0 की जगह 1 क्यों आता है",
+     "left join में count कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "COUNT(*) counts rows, and a LEFT JOIN keeps one row (with NULLs) for a customer with no orders, so it counts 1. COUNT(o.id) counts only non-NULL values, so it gives 0 for them.",
+    "hinglish": "COUNT(*) rows ginta hai, aur LEFT JOIN bina order wale customer ki ek row (NULL ke saath) rakhta hai, isliye 1 aata hai. COUNT(o.id) sirf non-NULL values ginta hai, isliye 0 deta hai.",
+    "hindi": "COUNT(*) rows गिनता है, और LEFT JOIN बिना order वाले ग्राहक की एक row रखता है, इसलिए 1 आता है। COUNT(o.id) 0 देता है।"
+   },
+   "mistake": {
+    "en": "COUNT(*) after a LEFT JOIN, or COUNT of a left-side column.",
+    "hinglish": "LEFT JOIN ke baad COUNT(*), ya left side ki column ka COUNT.",
+    "hindi": "LEFT JOIN के बाद COUNT(*), या left side की column का COUNT।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, COUNT(*) AS wrong_count, COUNT(o.id) AS right_count FROM customers c LEFT JOIN orders o ON o.customer_id = c.id GROUP BY c.id ORDER BY c.id"
+     },
+     "columns": [
+      "id",
+      "wrong_count",
+      "right_count"
+     ],
+     "result": [
+      [
+       "1",
+       "2",
+       "2"
+      ],
+      [
+       "2",
+       "2",
+       "2"
+      ],
+      [
+       "3",
+       "2",
+       "2"
+      ],
+      [
+       "4",
+       "1",
+       "0"
+      ],
+      [
+       "5",
+       "1",
+       "0"
+      ],
+      [
+       "6",
+       "1",
+       "1"
+      ],
+      [
+       "7",
+       "1",
+       "0"
+      ],
+      [
+       "8",
+       "1",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same.",
+    "mariadb": "Same.",
+    "postgresql": "Same."
+   },
+   "related": [
+    "left_join",
+    "aggregates"
+   ],
+   "fundamentals": [
+    "outer_join"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/counting-rows.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "sql_vs_database",
+   "kind": "compare",
+   "title": {
+    "en": "SQL vs MySQL / PostgreSQL",
+    "hinglish": "SQL vs MySQL / PostgreSQL",
+    "hindi": "SQL बनाम MySQL / PostgreSQL"
+   },
+   "terms": [
+    [
+     "sql",
+     "(mysql|postgre\\w*|maria\\s?db|sql server|oracle)"
+    ],
+    [
+     "(एसक्यूएल|sql)",
+     "(माय\\s?एसक्यूएल|mysql)"
+    ],
+    [
+     "^is sql an? (database|language)"
+    ],
+    [
+     "^sql (ek )?(database|language) (hai|h|है)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "sql vs mysql",
+     "difference between sql and postgresql",
+     "is sql a database"
+    ],
+    "hinglish": [
+     "sql aur mysql mein kya farak hai",
+     "sql database hai kya"
+    ],
+    "hindi": [
+     "SQL और MySQL में क्या अंतर है",
+     "SQL database है क्या"
+    ]
+   },
+   "answer": {
+    "en": "SQL is the LANGUAGE (SELECT, JOIN, GROUP BY). MySQL, MariaDB, PostgreSQL, SQL Server, Oracle and SQLite are DATABASES that run it. The core is the same everywhere, but each adds its own syntax, functions and error codes, so an answer about a query or an error depends on which database runs it. That's why DBaba asks which one you use.",
+    "hinglish": "SQL ek LANGUAGE hai (SELECT, JOIN, GROUP BY). MySQL, MariaDB, PostgreSQL, SQL Server, Oracle, SQLite DATABASES hain jo ise chalate hain. Buniyaad sab jagah same hai, par har ek ka apna syntax, functions aur error codes hai, isliye query ya error ka jawab database pe tika hai. Isiliye DBaba poochta hai aap kaunsa use karte ho.",
+    "hindi": "SQL एक भाषा है (SELECT, JOIN, GROUP BY)। MySQL, MariaDB, PostgreSQL, SQL Server, Oracle, SQLite databases हैं जो इसे चलाते हैं। हर एक का अपना syntax और error codes है, इसलिए जवाब database पर निर्भर है।"
+   },
+   "mistake": {
+    "en": "Copying a query from one database to another unchanged: LIMIT, IFNULL, backticks, :: casts and TOP are not shared.",
+    "hinglish": "Ek database ki query doosre mein bina badle chala dena: LIMIT, IFNULL, backticks, :: cast, TOP sab jagah nahi chalte.",
+    "hindi": "एक database की query दूसरे में बिना बदले चलाना: LIMIT, IFNULL, backticks, :: cast, TOP हर जगह नहीं चलते।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT IFNULL(NULL, 'shared core, own functions') AS note",
+      "postgresql": "SELECT COALESCE(NULL, 'shared core, own functions') AS note"
+     },
+     "columns": [
+      "note"
+     ],
+     "result": [
+      [
+       "shared core, own functions"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Backtick names, LIMIT offset,count, IFNULL, GROUP_CONCAT.",
+    "mariadb": "MySQL's syntax plus its own extras (RETURNING, sequences).",
+    "postgresql": ":: casts, ILIKE, DISTINCT ON, RETURNING, string_agg.",
+    "sqlserver": "TOP n, [brackets], GETDATE(), ISNULL.",
+    "oracle": "ROWNUM / FETCH FIRST, NVL, sequences with NEXTVAL, DUAL."
+   },
+   "related": [
+    "sql_intro",
+    "mysql_vs_mariadb",
+    "mysql_vs_postgresql"
+   ],
+   "fundamentals": [
+    "engine_syntax"
+   ],
+   "source": "https://www.postgresql.org/docs/current/features.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "mysql_vs_mariadb",
+   "kind": "compare",
+   "title": {
+    "en": "MySQL vs MariaDB",
+    "hinglish": "MySQL vs MariaDB",
+    "hindi": "MySQL vs MariaDB"
+   },
+   "terms": [
+    [
+     "mysql",
+     "maria\\s?db"
+    ],
+    [
+     "माय\\s?एसक्यूएल",
+     "मारिया"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "mysql vs mariadb",
+     "difference between mysql and mariadb"
+    ],
+    "hinglish": [
+     "mysql aur mariadb mein kya farak hai",
+     "mariadb aur mysql same hai kya"
+    ],
+    "hindi": [
+     "MySQL और MariaDB में क्या अंतर है",
+     "MariaDB और MySQL एक ही हैं क्या"
+    ]
+   },
+   "answer": {
+    "en": "MariaDB began as a copy (fork) of MySQL, so most SQL, the client, the error codes (1062, 1064 ...) and the port are the same. They have drifted apart since: different optimizers and versions, MariaDB-only features (RETURNING on INSERT/DELETE, sequences, NVL) and MySQL-only ones (some JSON functions, the 8.x data dictionary). Treat them as close cousins, not the same database.",
+    "hinglish": "MariaDB MySQL ki copy (fork) se shuru hua, isliye zyadatar SQL, error codes (1062, 1064 ...) aur port same hain. Ab dono alag ho gaye hain: alag optimizer aur versions, MariaDB ke apne features (INSERT/DELETE ... RETURNING, sequences, NVL) aur MySQL ke apne. Kareebi rishtedaar, ek hi database nahi.",
+    "hindi": "MariaDB MySQL की copy (fork) से शुरू हुआ, इसलिए ज़्यादातर SQL और error codes same हैं। अब दोनों अलग हो गए हैं: MariaDB के अपने features (RETURNING, sequences, NVL) और MySQL के अपने।"
+   },
+   "mistake": {
+    "en": "Assuming a MySQL 8 feature or setting exists on MariaDB (or the other way round) because the names match.",
+    "hinglish": "Naam same hai isliye maan lena ki MySQL 8 ka feature MariaDB mein bhi hai (ya ulta).",
+    "hindi": "नाम same है इसलिए मान लेना कि MySQL 8 का feature MariaDB में भी है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COALESCE(NULL, 'same SQL core') AS shared"
+     },
+     "columns": [
+      "shared"
+     ],
+     "result": [
+      [
+       "same SQL core"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "SELECT VERSION() shows e.g. 8.4.x.",
+    "mariadb": "SELECT VERSION() includes 'MariaDB' (e.g. 10.11.x-MariaDB).",
+    "postgresql": "Not related: PostgreSQL is a separate database."
+   },
+   "related": [
+    "sql_vs_database",
+    "mysql_vs_postgresql",
+    "which_database"
+   ],
+   "fundamentals": [
+    "engine_syntax"
+   ],
+   "source": "https://mariadb.com/kb/en/mariadb-vs-mysql-compatibility/",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "mysql_vs_postgresql",
+   "kind": "compare",
+   "title": {
+    "en": "MySQL vs PostgreSQL",
+    "hinglish": "MySQL vs PostgreSQL",
+    "hindi": "MySQL vs PostgreSQL"
+   },
+   "terms": [
+    [
+     "mysql",
+     "postgre\\w*"
+    ],
+    [
+     "maria\\s?db",
+     "postgre\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "mysql vs postgresql",
+     "difference between mysql and postgres"
+    ],
+    "hinglish": [
+     "mysql aur postgres mein kya farak hai",
+     "postgresql better hai ya mysql"
+    ],
+    "hindi": [
+     "MySQL और PostgreSQL में क्या अंतर है",
+     "PostgreSQL बेहतर है या MySQL"
+    ]
+   },
+   "answer": {
+    "en": "Both are free relational databases that run standard SQL, with real differences: PostgreSQL is stricter (it refuses '5' + 'a', compares text case-sensitively, does integer division, puts NULLs last in ASC order) and has richer types (arrays, JSONB, ranges) and FULL JOIN; MySQL/MariaDB are looser by default, compare text case-blind with the usual collation, and use backticks, LIMIT a,b, IFNULL. Queries often need small changes to move between them.",
+    "hinglish": "Dono free relational databases hain jo standard SQL chalate hain, par farak asli hai: PostgreSQL zyada sakht hai (text + number mana, text case-sensitive compare, integer division, ASC mein NULL aakhir mein) aur types zyada (arrays, JSONB, ranges) aur FULL JOIN; MySQL/MariaDB default mein dheele hain, text case-blind compare karte hain, backticks, LIMIT a,b, IFNULL use karte hain.",
+    "hindi": "दोनों free relational databases हैं, पर PostgreSQL ज़्यादा सख़्त है (text case-sensitive, integer division) और types ज़्यादा हैं; MySQL/MariaDB default में ढीले हैं और backticks, LIMIT a,b, IFNULL use करते हैं।"
+   },
+   "mistake": {
+    "en": "Expecting the same results from the same query: sorting of NULLs and text, division and string comparison differ.",
+    "hinglish": "Same query se same result ki ummeed: NULL aur text ki sorting, division aur text compare alag hain.",
+    "hindi": "Same query से same नतीजे की उम्मीद: NULL और text की sorting, division अलग हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS customers_named_aarav FROM customers WHERE LOWER(first_name) = 'aarav'"
+     },
+     "columns": [
+      "customers_named_aarav"
+     ],
+     "result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Text compares case-blind with the default _ci collation; 7/2 = 3.5000; NULLs first in ASC.",
+    "mariadb": "Same as MySQL here.",
+    "postgresql": "Text compares case-sensitively; 7/2 = 3 (integer division); NULLs last in ASC."
+   },
+   "related": [
+    "sql_vs_database",
+    "mysql_vs_mariadb"
+   ],
+   "fundamentals": [
+    "engine_syntax",
+    "values_types"
+   ],
+   "source": "https://www.postgresql.org/docs/current/features.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "which_database",
+   "kind": "howto",
+   "title": {
+    "en": "Which database am I using? (and its version)",
+    "hinglish": "Main kaunsa database use kar raha hoon?",
+    "hindi": "मैं कौन सा database इस्तेमाल कर रहा हूँ?"
+   },
+   "terms": [
+    [
+     "(which|what|kaunsa|konsa|kaun sa|kon sa)",
+     "(database|db)",
+     "(using|use|running|chal\\w*|hai)"
+    ],
+    [
+     "(check|find|know|pata|dekh\\w*)",
+     "(database|mysql|postgre\\w*|maria\\s?db|db) version"
+    ],
+    [
+     "select version"
+    ],
+    [
+     "कौन सा",
+     "database"
+    ],
+    [
+     "version",
+     "(कैसे|kaise|how|check|देख\\w*|pata|पता)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to check which database i am using",
+     "how to find the database version"
+    ],
+    "hinglish": [
+     "kaunsa database use ho raha hai kaise pata kare",
+     "database version kaise check kare"
+    ],
+    "hindi": [
+     "कौन सा database चल रहा है कैसे पता करें",
+     "database version कैसे देखें"
+    ]
+   },
+   "answer": {
+    "en": "Run SELECT VERSION(); in the tool you query with (phpMyAdmin, the mysql / psql client, your app). MySQL shows a number like 8.4.2, MariaDB adds '-MariaDB' (10.11.6-MariaDB), PostgreSQL starts with 'PostgreSQL 16.x'. SQL Server answers SELECT @@VERSION, Oracle SELECT banner FROM v$version. Tell DBaba the result and it answers for that database.",
+    "hinglish": "Jis tool se query chalate ho (phpMyAdmin, mysql / psql client, app) usme SELECT VERSION(); chalao. MySQL 8.4.2 jaisa number dikhata hai, MariaDB '-MariaDB' jodta hai (10.11.6-MariaDB), PostgreSQL 'PostgreSQL 16.x' se shuru hota hai. SQL Server: SELECT @@VERSION, Oracle: SELECT banner FROM v$version. DBaba ko batao, wo usi database ke liye jawab dega.",
+    "hindi": "अपने tool में SELECT VERSION(); चलाइए। MySQL 8.4.2 जैसा number दिखाता है, MariaDB '-MariaDB' जोड़ता है, PostgreSQL 'PostgreSQL 16.x' से शुरू होता है। DBaba को बताइए, वह उसी database के लिए जवाब देगा।"
+   },
+   "mistake": {
+    "en": "Going by the hosting panel's label: many 'MySQL' hosts actually run MariaDB.",
+    "hinglish": "Hosting panel ke label pe bharosa: kai 'MySQL' hosting asal mein MariaDB chalati hain.",
+    "hindi": "Hosting panel के label पर भरोसा: कई 'MySQL' hosting असल में MariaDB चलाती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT VERSION() LIKE '%MariaDB%' AS says_mariadb",
+      "postgresql": "SELECT version() LIKE 'PostgreSQL%' AS says_postgresql"
+     },
+     "columns": [
+      "says_mariadb"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "SELECT VERSION(); or the mysql client's STATUS command.",
+    "mariadb": "SELECT VERSION(); the text contains MariaDB.",
+    "postgresql": "SELECT version(); or SHOW server_version;",
+    "sqlserver": "SELECT @@VERSION;",
+    "oracle": "SELECT banner FROM v$version;",
+    "sqlite": "SELECT sqlite_version();"
+   },
+   "related": [
+    "sql_vs_database",
+    "mysql_vs_mariadb"
+   ],
+   "fundamentals": [
+    "engine_syntax"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/information-functions.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/join",
+    "https://dba.stackexchange.com/questions/tagged/join",
     "https://www.reddit.com/r/SQL/"
    ],
    "proven": [

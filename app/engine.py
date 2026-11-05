@@ -160,6 +160,7 @@ def _after_run(agent, run, hi: bool) -> tuple[str, list[str]]:
     elif agent.recipe == "sql_review" and run.status == "done" and any(_sql_res(run).get(k) for k in ("rewritten", "indexes", "check_query")):
         reply += "\n\n" + ("Fixes (rewritten query aur index commands) goal card mein hai, copy kar lo." if hi
                             else "The fixes (rewritten query and index commands) are in the goal card, ready to copy.")
+    options += [t for t in (_sql_res(run).get("taps") or []) if t not in options]    # e.g. one tap to correct a guess
     return reply, options
 
 
@@ -203,9 +204,10 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
         held = route.holder(db, focus, text)
         if held is not None:
             name, agent = held
-            reply, options, hi = route.continue_turn(name, db, focus, agent, text)
-            db.commit()
-            return _respond(db, visitor_id, text, focus, reply, "agent_reply", options=options, hi=hi)
+            out = route.continue_turn(name, db, focus, agent, text)
+            reply, options, hi = out[:3]
+            db.commit()                    # an agent may say what this turn was (e.g. it ran the check the person was asked about)
+            return _respond(db, visitor_id, text, focus, reply, out[3] if len(out) > 3 else "agent_reply", options=options, hi=hi)
 
     # A data link for a waiting automation agent: save it and show the preview straight away.
     if focus is not None:
@@ -235,12 +237,14 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
                 waiting.status == "proposed" and YES_RE.search(text))):
             agent, _override, run_now = assign(db, focus, text, hi_focus, asking=False)
             if run_now:
+                rel = "agent_run"
                 try:
                     run = run_agent(db, agent, hi_focus)
                     reply, options = _after_run(agent, run, hi_focus)
-                except AgentError as exc:
-                    reply, options = str(exc), []
-                return _respond(db, visitor_id, text, focus, reply, "agent_run", options=options, hi=hi_focus)
+                except AgentError as exc:              # an agent asking one choice first carries its taps
+                    reply, options = str(exc), list(getattr(exc, "options", []))
+                    rel = "agent_plan" if options else rel
+                return _respond(db, visitor_id, text, focus, reply, rel, options=options, hi=hi_focus)
 
     turn = brain.handle(visitor_id, text, focus)
     goal = turn.goal
@@ -277,7 +281,8 @@ def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | No
                 reply, options = _after_run(agent, run, turn.hi)
                 relation = "agent_run"
             except AgentError as exc:
-                reply = str(exc)
+                reply, options = str(exc), list(getattr(exc, "options", []))
+                relation = "agent_plan" if options else relation
         elif override:
             # The system does the work: show the plan instead of a to-do list for the user.
             reply = override

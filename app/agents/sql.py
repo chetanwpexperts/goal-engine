@@ -195,8 +195,23 @@ def _owner(col: str, tables: list[Table]) -> tuple[Table | None, str]:
     return (tables[0] if len(tables) == 1 else None), col
 
 
-def analyze_sql(query: str, extra: str = "") -> dict:
-    """query: the SQL. extra: optional EXPLAIN output and/or CREATE TABLE statements."""
+def analyze_sql(query: str, extra: str = "", engine: str | None = None) -> dict:
+    """query: the SQL. extra: optional EXPLAIN output and/or CREATE TABLE statements. engine: the database the person named,
+    chose or that was detected (standing rule A: app/dbknow/engines.py); None = not known, each engine's behaviour is said."""
+    from app.agents.sqlbasics import CHOSEN
+
+    if engine is None:
+        return _analyze_sql(query, extra)
+    token = CHOSEN.set(engine)
+    try:
+        out = _analyze_sql(query, extra)
+        out["engine"] = engine
+        return out
+    finally:
+        CHOSEN.reset(token)
+
+
+def _analyze_sql(query: str, extra: str = "") -> dict:
     original = unwrap(query)
     said = request_words(query)
     if not original:
@@ -473,7 +488,8 @@ def _with_reading(original: str, out: dict) -> dict:
 
 
 # 'check' findings whose rewrite gives different rows when the query was right as written (COUNT(*) vs COUNT(col) ...)
-MEANING_CHECKS = {"count", "not_in", "date_range", "concat", "like", "and_or", "null_math", "division", "nulls_order", "stable_order"}
+MEANING_CHECKS = {"count", "not_in", "date_range", "concat", "like", "and_or", "null_math", "division", "nulls_order", "stable_order",
+                  "join_key", "anti_join", "self_join", "distinct_join", "natural_join"}
 
 
 def _is_select(low: str) -> bool:

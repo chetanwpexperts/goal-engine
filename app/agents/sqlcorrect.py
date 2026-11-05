@@ -759,7 +759,9 @@ def _workbook_traps(sql: str, s: str, is_select: bool, intent: str) -> list:
             base = sql[:lm.start()].rstrip()
             key, direction = lm.group(1).strip('`"'), (lm.group(2) or "").strip().upper()
             g_name = g.split(".")[-1]
-            new = (f"SELECT * FROM (\n  SELECT x.*, {rank} OVER (PARTITION BY x.{g_name} ORDER BY x.{key}{' ' + direction if direction else ''}) "
+            # ROW_NUMBER over tied values numbers them in any order: end with the row's key so the same rows are kept every run
+            tie = ", x.id" if rank == "ROW_NUMBER()" and key.lower() != "id" and re.search(r"(?<![\w.])(?:\w+\.)?id\b", base, re.I) else ""
+            new = (f"SELECT * FROM (\n  SELECT x.*, {rank} OVER (PARTITION BY x.{g_name} ORDER BY x.{key}{' ' + direction if direction else ''}{tie}) "
                    f"AS rnk\n  FROM (\n{base}\n  ) AS x\n) AS ranked\nWHERE rnk <= {lm.group(3)}\nORDER BY {g_name}, rnk;")
             out.append((Finding("wrong", "top_n", f"LIMIT {lm.group(3)} gives the top {lm.group(3)} overall, not per {noun}",
                                 f"LIMIT {lm.group(3)} poore result ke top {lm.group(3)} deta hai, har {noun} ke nahi", sql[lm.start():lm.end()].strip(),

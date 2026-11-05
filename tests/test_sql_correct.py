@@ -367,7 +367,7 @@ TRAPS = [  # (query + what the person said, topic, kind, wrong rows, right rows)
     ("SELECT COUNT(*) FROM wo WHERE order_date BETWEEN '2026-01-01' AND '2026-01-31'", "date_range", "check", [(2,)], [(3,)]),
     ("SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY category_id ORDER BY price DESC) AS rn FROM wp) x "
      "WHERE rn <= 1 ORDER BY id; the most expensive product per category, ties must share rank", "ties", "wrong",
-     [(1,), (4,)], [(1,), (2,), (4,)]),
+     ([(1,), (4,)], [(2,), (4,)]), [(1,), (2,), (4,)]),         # ROW_NUMBER keeps ONE of the tied 1 and 2, either one
     ("SELECT id, category_id, price FROM wp ORDER BY price DESC LIMIT 2; top 2 products per category", "top_n", "wrong",
      [(1, 1, 100), (2, 1, 100)], [(1, 1, 100, 1), (2, 1, 100, 2), (4, 2, 70, 1), (5, 2, 60, 2)]),
 ]
@@ -392,7 +392,10 @@ def test_workbook_traps_are_found_and_the_rewrite_gives_the_right_rows(q, topic,
             for st in TRAP_SETUP:
                 cur.execute(st)
             cur.execute(q.split(";")[0])
-            assert sorted(map(tuple, cur.fetchall())) == sorted(wrong_rows), "the trap really gives the wrong rows"
+            got = sorted(map(tuple, cur.fetchall()))
+            options = wrong_rows if isinstance(wrong_rows, tuple) else (wrong_rows,)   # tied rows: the engine may keep either
+            assert any(got == sorted(w) for w in options), ("the trap really gives the wrong rows", got)
+            assert got != sorted(right_rows), "the trap gives other rows than the right ones"
             cur.execute(c["corrected"].rstrip().rstrip(";"))
             assert sorted(tuple(int(v) for v in r) for r in cur.fetchall()) == sorted(right_rows), c["corrected"]
 

@@ -814,14 +814,20 @@ def _apply_plain(sql: str, edits: list) -> str | None:
 def check(sql: str, _again: bool = False, intent: str = "", engine: str | None = None) -> dict:
     """Returns {'findings': [...], 'corrected': str|None, 'guesses': [...] }. Values without quotes are checked in any
     statement; plain SELECTs are read in depth. engine: the database the answer is for (rule A), when known."""
-    if engine is not None:
-        from app.agents.sqlbasics import CHOSEN
+    from app.agents.sqlbasics import CHOSEN
 
+    if engine is not None:
         token = CHOSEN.set(engine)
         try:
             return check(sql, _again, intent)
         finally:
             CHOSEN.reset(token)
+    if not _again and CHOSEN.get():
+        return _in_engine_words(_check(sql, _again, intent), CHOSEN.get())
+    return _check(sql, _again, intent)
+
+
+def _check(sql: str, _again: bool = False, intent: str = "") -> dict:
     s = _mask(sql)
     known = {w.lower() for w in re.findall(r"\b(?:from|join|update|into)\s+[`\"]?([\w$]+)", s, re.I)}
     known |= {w.lower() for w in re.findall(r"\b(?:from|join|update)\s+[`\"]?[\w$.]+[`\"]?\s+(?:as\s+)?([A-Za-z_]\w*)", s, re.I)
@@ -1421,10 +1427,18 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
         if any(ev in h for h in have):
             continue                                          # already said, in our own words
         # the engine's own words are the reason (proved); the drafted title and fix are only a pointer, with the example
-        said = "; ".join(f"{_ENGINE_NAME[k]} error {e['code']}: {e.get('message', '')}".strip() for k, e in r["engines"].items())
+        from app.agents.sqlbasics import CHOSEN
+        from app.dbknow import engines as _E
+
+        mine = {"postgresql": ["postgres"], "mysql": [_x for _x in ("mariadb", "mysql") if CHOSEN.get() == _x] or ["mysql", "mariadb"]}.get(
+            _E.family(CHOSEN.get()) or "", [])
+        shown = {k: e for k, e in r["engines"].items() if k in mine} or r["engines"]   # the person's database speaks first
+        if mine and not set(mine) & set(r["engines"]):
+            continue                                          # proven on other databases only: not said for this one
+        said = "; ".join(f"{_ENGINE_NAME[k]} error {e['code']}: {e.get('message', '')}".strip() for k, e in shown.items())
         everywhere = set(r["engines"]) >= {"mysql", "mariadb", "postgres"}
-        head = next(iter(r["engines"].values())).get("message") or r["title"]
-        title = f"{_ENGINE_NAME[next(iter(r['engines']))]} refuses this: {head[:90]}"
+        head = next(iter(shown.values())).get("message") or r["title"]
+        title = f"{_ENGINE_NAME[next(iter(shown))]} refuses this: {head[:90]}"
         example = f" Works: {r['fixed_sql'][:160]}" if r.get("fixed_sql") else ""
         add("error" if everywhere else "check", "learned", title, title, ev, f"{said}.{example}", f"{said}.{example}")
     F = [f for f in F if not (f.title_en.startswith("CROSS JOIN") and f.title_en.split()[3].lower() in removed)]
@@ -1595,3 +1609,34 @@ def _shares(a: str, b: str) -> bool:
     wa = set(re.findall(r"\w+", a.lower()))
     wb = set(re.findall(r"\w+", b.lower()))
     return len(wa & wb) >= max(1, min(len(wb), 3) - 1)
+
+
+def _in_engine_words(out: dict, engine: str) -> dict:
+    """Rule A: when the person's database is known, findings speak its language. A finding written with MySQL's error
+    numbers gets that database's own (the dialect file's 'wording', lab-checked), and a finding that doesn't apply there
+    at all ('not_here', e.g. 'MySQL has no FULL OUTER JOIN' on PostgreSQL) is left out."""
+    import json
+    from pathlib import Path
+
+    from app.dbknow import engines as E
+
+    fam = E.family(engine)
+    if fam != "postgresql":
+        return out
+    d = json.loads((Path(__file__).resolve().parents[1] / "dbknow" / "dialects" / f"{fam}.json").read_text(encoding="utf-8"))
+    words = [(re.compile(w["re"]), w["to"]) for w in d.get("wording", [])]
+    drop = [re.compile(x) for x in d.get("not_here", [])]
+    kept = []
+    for f in out.get("findings", []):
+        if any(rx.search(f.get("title_en", "")) for rx in drop):
+            continue
+        for k in ("title_en", "title_hi", "fix_en", "fix_hi"):
+            for rx, to in words:
+                if f.get(k):
+                    f[k] = rx.sub(to, f[k])
+        kept.append(f)
+    if len(kept) != len(out.get("findings", [])):
+        out = {**out, "findings": kept}
+        if not kept:
+            out["corrected"] = None               # nothing left to fix on this database
+    return out

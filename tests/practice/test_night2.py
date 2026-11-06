@@ -9,6 +9,8 @@ enough (there is no single right rewrite, e.g. which column links two tables whe
 LAB below is what each engine really does with the wrong query (reproduced on MariaDB 10.11 and PostgreSQL 16).
 """
 
+import re
+
 import pytest
 
 from app.agents.sql import analyze_sql
@@ -274,3 +276,27 @@ def test_every_rule_says_where_it_was_proven():
         assert refuses and all(eng in r["proven"] for r in refuses), fam
     for notes in ("sqlserver", "oracle", "sqlite"):
         assert json.loads((d / f"{notes}.json").read_text(encoding="utf-8"))["notes_only"] is True
+
+
+def test_postgresql_findings_use_its_own_error_codes():
+    """Rule A: with PostgreSQL named, findings first written with MySQL's error numbers say PostgreSQL's own (lab-checked on
+    PostgreSQL 16: 42703, 42702, 42803, 21000), and findings that don't apply there are left out."""
+    cases = {
+        "SELECT o.id FROM orders o WHERE orders.status = 1": "error 42703",
+        "SELECT id, COUNT(*) FROM orders GROUP BY status": "error 42803",
+        "SELECT name, COUNT(*) FROM customers": "error 42803",
+        "SELECT id FROM orders WHERE COUNT(*) > 1": "error 42803",
+        "SELECT id FROM customers WHERE city = Pune": "error 42703",
+        "SELECT name FROM employees WHERE salary > (SELECT salary FROM employees WHERE department_id = 1)": "error 21000",
+    }
+    for q, code in cases.items():
+        fs = analyze_sql(q, engine="postgresql")["correct"]["findings"]
+        text = " ".join(f["title_en"] + " " + f["fix_en"] for f in fs)
+        assert code in text and not re.search(r"\b(1054|1052|1055|1140|1111|1242)\b", text), (q, text)
+        mysql = " ".join(f["fix_en"] for f in analyze_sql(q, engine="mysql")["correct"]["findings"])
+        assert re.search(r"\b(1054|1055|1140|1111|1242)\b", mysql), (q, mysql)     # MySQL keeps its own numbers
+    full = "SELECT c.id, o.id FROM customers c FULL OUTER JOIN orders o ON o.customer_id = c.id"
+    assert not analyze_sql(full, engine="postgresql")["correct"]["findings"]            # PostgreSQL has FULL JOIN
+    assert any(f["kind"] == "error" for f in analyze_sql(full, engine="mysql")["correct"]["findings"])
+    same = "UPDATE products SET price = 1 WHERE id IN (SELECT id FROM products WHERE stock = 0)"
+    assert not [f for f in analyze_sql(same, engine="postgresql")["correct"]["findings"] if f["topic"] == "same_table"]

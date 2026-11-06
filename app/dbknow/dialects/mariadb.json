@@ -65,6 +65,8 @@
    "proof": "binary logging is on and no expiry or size limit is set, so old binary logs are never removed"
   }
  },
+ "named": ["\\bmaria\\s?db\\b", "\\bmariadbd\\b", "मारिया\\s?डीबी"],
+ "error_marks": ["your MariaDB server version"],
  "query_marks": [
   "`[^`]+`",
   "\\blimit\\s+\\d+\\s*,\\s*\\d+",

@@ -17,14 +17,21 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         "same_table", "per_group",
         # night 1: basics (text joining, NULL functions, LIKE, AND/OR order, division, quotes, LIMIT order, DISTINCT)
         "plus_concat", "pipes_mysql", "isnull_two", "like_star", "like_contains", "and_or", "division", "double_quotes",
-        "limit_no_order", "distinct_paren"]
+        "limit_no_order", "distinct_paren",
+        # night 2: joins and relationships, and syntax the named database doesn't have (rule A)
+        "comma_cartesian", "on_one_side", "pk_pk", "anti_nullable", "self_pairs", "distinct_join", "natural_join",
+        "dialect_limit_pg", "dialect_backticks_pg", "dialect_nulls_mariadb", "dialect_cast_mariadb"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
-         "and_or": "and_or", "division": "division", "double_quotes": "quotes", "limit_no_order": "stable_order", "distinct_paren": "distinct"}
-NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren"}   # there is no single right rewrite: found is enough
+         "and_or": "and_or", "division": "division", "double_quotes": "quotes", "limit_no_order": "stable_order", "distinct_paren": "distinct",
+         "comma_cartesian": "cartesian", "on_one_side": "cartesian", "pk_pk": "join_key", "anti_nullable": "anti_join",
+         "self_pairs": "self_join", "distinct_join": "distinct_join", "natural_join": "natural_join", "dialect_limit_pg": "dialect",
+         "dialect_backticks_pg": "dialect", "dialect_nulls_mariadb": "dialect", "dialect_cast_mariadb": "dialect"}
+NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join"}   # found is enough
 # a 'check' (depends on engine, data or intent) whose suggested rewrite must do exactly what the person meant
-FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes"}
+FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes", "pk_pk", "anti_nullable", "self_pairs",
+                 "distinct_join"}
 
 
 def _cols(t, *kinds):
@@ -227,6 +234,99 @@ def make(seed: int):
         truth = None
         broken = f"SELECT DISTINCT({c['name']}), {o['name']}\nFROM {t['name']}"
         stmt = "select"
+    elif bug in ("comma_cartesian", "on_one_side", "pk_pk", "anti_nullable", "distinct_join", "natural_join"):
+        kids = [(c, x) for x in tables for c in _cols(x, "fk")]
+        if not kids:
+            return None
+        fk, child = rnd.choice(kids)
+        parent = schema["tables"][fk["ref"]]
+        ca, pa = rnd.choice([("c", "p"), ("ch", "pr"), ("x", "y")])
+        cpk, ppk = child["pk"], parent["pk"]
+        shown = [c for c in parent["cols"] if c["kind"] in ("cat", "name")]
+        if not shown:
+            return None
+        sc = rnd.choice(shown)["name"]
+        stmt = "select"
+        truth = None
+        if bug == "comma_cartesian":
+            cats = _cols(child, "cat")
+            cond = f"\nWHERE {ca}.{cats[0]['name']} = '{rnd.choice(cats[0]['params'])}'" if cats and cats[0]["params"] and rnd.random() < 0.5 else ""
+            broken = f"SELECT {ca}.{cpk}, {pa}.{sc}\nFROM {child['name']} {ca}, {parent['name']} {pa}{cond}"
+        elif bug == "on_one_side":
+            cats = [c for c in _cols(parent, "cat") if c["params"]]
+            if not cats:
+                return None
+            cc = rnd.choice(cats)
+            broken = (f"SELECT {ca}.{cpk}, {pa}.{sc}\nFROM {child['name']} {ca}\nJOIN {parent['name']} {pa} ON {pa}.{cc['name']} = "
+                      f"'{rnd.choice(cc['params'])}'")
+        elif bug == "pk_pk":
+            if cpk.lower() != "id" or ppk.lower() != "id":
+                return None                               # o.id = c.id: both keys must be called id
+            truth = f"SELECT {ca}.{cpk}, {ca}.{fk['name']}, {pa}.{sc}\nFROM {child['name']} {ca}\nJOIN {parent['name']} {pa} ON {ca}.{fk['name']} = {pa}.{ppk}\nORDER BY {ca}.{cpk}"
+            broken = truth.replace(f"ON {ca}.{fk['name']} = {pa}.{ppk}", rnd.choice([f"ON {ca}.id = {pa}.id", f"ON {pa}.id = {ca}.id"]))
+        elif bug == "anti_nullable":
+            opt = [c for c in child["cols"] if c["kind"] not in ("pk", "fk")]
+            if not opt:
+                return None
+            oc = rnd.choice(opt)["name"]
+            base = (f"SELECT {pa}.{ppk}\nFROM {parent['name']} {pa}\nLEFT JOIN {child['name']} {ca} ON {ca}.{fk['name']} = {pa}.{ppk}\n"
+                    f"WHERE {{}} IS NULL\nORDER BY {pa}.{ppk}")
+            truth, broken = base.format(f"{ca}.{fk['name']}"), base.format(f"{ca}.{oc}")
+        elif bug == "distinct_join":
+            cats = [c for c in _cols(child, "cat") if c["params"]]
+            w = f"\nWHERE {ca}.{cats[0]['name']} = '{rnd.choice(cats[0]['params'])}'" if cats and rnd.random() < 0.5 else ""
+            keep_id = rnd.random() < 0.5
+            cols = f"{pa}.{ppk}, {pa}.{sc}" if keep_id else f"{pa}.{sc}"
+            broken = (f"SELECT DISTINCT {cols}\nFROM {parent['name']} {pa}\nJOIN {child['name']} {ca} ON {ca}.{fk['name']} = {pa}.{ppk}{w}")
+            inner = f"SELECT 1 FROM {child['name']} {ca} WHERE {ca}.{fk['name']} = {pa}.{ppk}" + (f" AND {w.strip()[6:]}" if w else "")
+            truth = f"SELECT {'DISTINCT ' if not keep_id else ''}{cols} FROM {parent['name']} {pa} WHERE EXISTS ({inner})"
+        else:                                             # natural_join
+            broken = f"SELECT *\nFROM {child['name']}\nNATURAL JOIN {parent['name']}"
+    elif bug == "self_pairs":
+        cats = [c for c in _cols(t, "cat") if c["params"]]
+        if not cats:
+            return None
+        c = rnd.choice(cats)["name"]
+        stmt = "select"
+        twice = rnd.random() < 0.4
+        on = f"a.{c} = b.{c}" + (f" AND a.{pk} <> b.{pk}" if twice else "")
+        words = "\n\npairs of rows with the same " + c if twice else ""
+        truth = f"SELECT a.{pk}, b.{pk}\nFROM {t['name']} a\nJOIN {t['name']} b ON a.{c} = b.{c} AND a.{pk} < b.{pk}"
+        broken = f"SELECT a.{pk}, b.{pk}\nFROM {t['name']} a\nJOIN {t['name']} b ON {on}" + (";" + words if twice else "")
+    elif bug.startswith("dialect_"):
+        stmt = "select"
+        if bug == "dialect_limit_pg":
+            a, b = rnd.randint(0, 10), rnd.randint(1, 10)
+            truth = f"SELECT {pk}\nFROM {t['name']}\nORDER BY {pk}\nLIMIT {b} OFFSET {a}"
+            broken = f"SELECT {pk}\nFROM {t['name']}\nORDER BY {pk}\nLIMIT {a}, {b}"
+            engine = "postgresql"
+        elif bug == "dialect_backticks_pg":
+            cols = [c["name"] for c in t["cols"] if c["kind"] != "pk"][:2]
+            truth = f"SELECT {pk}, {', '.join(cols)}\nFROM {t['name']}\nORDER BY {pk}"
+            broken = f"SELECT `{pk}`, {', '.join('`' + x + '`' for x in cols)}\nFROM `{t['name']}`\nORDER BY `{pk}`"
+            engine = "postgresql"
+        elif bug == "dialect_nulls_mariadb":
+            opt = [c["name"] for c in t["cols"] if c["kind"] in ("int", "money", "date", "datetime")]
+            if not opt:
+                return None
+            c = rnd.choice(opt)
+            d = rnd.choice(["", " DESC"])
+            truth = f"SELECT {pk}, {c}\nFROM {t['name']}\nORDER BY {c} IS NULL, {c}{d}, {pk}"
+            broken = f"SELECT {pk}, {c}\nFROM {t['name']}\nORDER BY {c}{d} NULLS LAST, {pk}"
+            engine = rnd.choice(["mariadb", "mysql"])
+        else:                                             # dialect_cast_mariadb
+            ints = [c["name"] for c in t["cols"] if c["kind"] in ("int",)]
+            if not ints:
+                return None
+            c = rnd.choice(ints)
+            truth = f"SELECT {pk}, CAST({c} AS SIGNED) AS v\nFROM {t['name']}\nORDER BY {pk}"
+            broken = f"SELECT {pk}, {c}::int AS v\nFROM {t['name']}\nORDER BY {pk}"
+            engine = rnd.choice(["mariadb", "mysql"])
+        item = {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": t["name"], "broken": broken, "truth": truth,
+                "engine": engine}
+        if bug == "dialect_cast_mariadb" or bug == "dialect_backticks_pg":
+            item["only"] = ["mysql"] if engine != "postgresql" else ["postgres"]
+        return item
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -256,7 +356,7 @@ def check(item, engines: dict) -> list[str]:
 
     from app.agents.sql import request_words, unwrap
 
-    res = sqlcorrect.check(unwrap(item["broken"]), intent=request_words(item["broken"]))
+    res = sqlcorrect.check(unwrap(item["broken"]), intent=request_words(item["broken"]), engine=item.get("engine"))
     tag = f"{item['bug']} ({item['stmt']}) seed {item['seed']}"
     topics = {f["topic"] for f in res["findings"]}
     bad = []
@@ -274,7 +374,7 @@ def check(item, engines: dict) -> list[str]:
     fixed = res["corrected"]
     if not fixed:
         return bad + [f"{tag}: no corrected statement\n{item['broken']}"]
-    again = [f["title_en"] for f in sqlcorrect.check(fixed)["findings"] if f["kind"] in ("error", "wrong")]
+    again = [f["title_en"] for f in sqlcorrect.check(fixed, engine=item.get("engine"))["findings"] if f["kind"] in ("error", "wrong")]
     if again:
         bad.append(f"{tag}: the corrected statement still has mistakes {again}\n{fixed}")
     pk = item["schema"]["tables"][item["table"]]["pk"]

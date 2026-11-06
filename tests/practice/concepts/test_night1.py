@@ -7,7 +7,7 @@ import re
 import pytest
 
 from app.dbknow import concepts as K
-from tests.test_ml import say
+from tests.test_ml import say, say_sql
 
 WRONG_PLACES = re.compile(r"I don't have a specific answer|paste (the|your|a) (sql )?query|query paste karo|Just tell me where your database is|"
                           r"connect your database|This usually comes from one of these|Bas batao database kahan hai|Samjha: GROUP BY", re.I)
@@ -127,14 +127,16 @@ def test_real_work_is_not_taken_as_a_concept(text):
 def test_a_pasted_error_still_goes_to_the_diagnoser(client, ml_mode):
     r = ask(client, "ERROR 1062 (23000): Duplicate entry 'a@b.c' for key 'email'")
     assert r["relation"] != "concept"
-    r = ask(client, "SELECT name FROM customers WHERE city = NULL")
+    client.post("/api/new-chat")
+    client.cookies.clear()
+    r = say_sql(client, "SELECT name FROM customers WHERE city = NULL")
     assert r["relation"] == "agent_run"
 
 
 def test_a_concept_question_after_a_checked_query(client, ml_mode):
     client.post("/api/new-chat")
     client.cookies.clear()
-    r = say(client, "SELECT c.name, COUNT(*) FROM customers c LEFT JOIN orders o ON o.customer_id = c.id GROUP BY c.name")
+    r = say_sql(client, "SELECT c.name, COUNT(*) FROM customers c LEFT JOIN orders o ON o.customer_id = c.id GROUP BY c.name")
     assert r["relation"] == "agent_run"
     r = say(client, "what is a left join")
     assert _is_answer(r, "left_join"), r["reply"][:200]

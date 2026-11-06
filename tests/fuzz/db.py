@@ -893,6 +893,11 @@ def followups(client, seed: int, sql_items: list[dict], rnd: random.Random) -> l
     post(rnd.choice(SLOW[lang]))
     lead = rnd.choice(["", "", "", "here is my query:\n", "ye meri query hai\n", "this one is slow:\n\n"])
     r = post(lead + item["wrapped"])
+    if r.get("options") and r["options"][-1] in ("Not sure", "Pata nahi") and len(r["options"]) == 6:
+        # the query shows no database and none was named: DBaba asks first (standing rule A); answer it like a person would
+        if r.get("relation") != "agent_plan" or not re.search(r"database|डेटाबेस", r.get("reply", ""), re.I):
+            return [{"seed": seed, "family": "followups", "q": item["wrapped"][:120], "why": f"engine question malformed: {r.get('reply', '')[:160]!r}"}]
+        r = post(r["options"][-1])
     if r.get("relation") != "agent_run":
         return [{"seed": seed, "family": "followups", "q": item["wrapped"][:120], "why": f"query not checked: {r.get('relation')} {r.get('reply', '')[:160]!r}"}]
     res = analyze_sql(unwrap(item["wrapped"]))

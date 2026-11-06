@@ -1461,7 +1461,7 @@
   "fix": "Use a regular JOIN with an appropriate ON clause.",
   "bad_sql": "SELECT * FROM customers USING (name);",
   "fixed_sql": "SELECT * FROM customers JOIN products ON customers.name = products.name;",
-  "detect": "\\bUSING\\b\\s+\\([^\\s,]+\\)",
+  "detect": "\\bFROM\\s+[`\"]?[\\w$.]+[`\"]?\\s+USING\\s*\\(",
   "engines": {
    "mysql": {
     "code": 1064,

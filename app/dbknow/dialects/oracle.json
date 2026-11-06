@@ -1,0 +1,19 @@
+{
+  "name": "Oracle",
+  "notes_only": true,
+  "family": "relational",
+  "about": "No lab-tested knowledge yet: DBaba recognises Oracle from its syntax or error format and answers with general SQL reasoning plus the notes below. These are notes from the official docs, not lab-proven rules.",
+  "named": ["\\boracle\\b", "\\bpl/?sql\\b", "ओरेकल"],
+  "query_marks": ["\\brownum\\b", "\\b\\w+\\.nextval\\b", "\\b\\w+\\.currval\\b", "\\bvarchar2\\b", "\\bconnect\\s+by\\b", "\\(\\+\\)", "\\bsysdate\\b(?!\\s*\\()", "\\bto_date\\s*\\(", "\\bfetch\\s+first\\s+\\d+\\s+rows\\b(?![\\s\\S]*\\blimit\\b)"],
+  "weak_marks": ["\\bnvl\\s*\\(", "\\bfrom\\s+dual\\b", "\\bdecode\\s*\\("],
+  "weak_why": "NVL, DUAL and DECODE also work on MariaDB (and DUAL on MySQL), so alone they don't show Oracle.",
+  "error_marks": ["\\bORA-\\d{5}\\b"],
+  "notes": {
+    "limit": "Oracle has no LIMIT: use FETCH FIRST n ROWS ONLY (12c and later) or ROWNUM in an outer query.",
+    "concat": "|| joins text on Oracle; an empty string is NULL on Oracle, so || skips it.",
+    "null_fn": "NVL(x, 0) is Oracle's null replacement; COALESCE works too and is portable.",
+    "full_join": "FULL OUTER JOIN is supported; the old (+) outer-join marker is still accepted but the JOIN syntax is clearer."
+  },
+  "source": "https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/",
+  "proven": []
+}

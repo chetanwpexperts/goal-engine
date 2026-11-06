@@ -9,7 +9,7 @@ from app.agents import core
 from app.agents.safety import Page, UnsafeURL, normalize_url
 from app.agents.sql import analyze_sql
 from app.agents.website import check_website
-from tests.test_ml import say
+from tests.test_ml import say, say_sql
 
 GOOD_HTML = ("<html><head><title>Bakery</title><meta name='viewport' content='width=device-width'>"
              "<meta name='description' content='Fresh cakes'></head><body>" + "x" * 400 +
@@ -120,7 +120,7 @@ def test_sql_agent_flow_with_pasted_query(client, ml_mode):
     first = say(client, "mere database ki query bahut slow hai")
     assert first["agents"][0]["recipe"] == "sql_review"
     assert "query" in first["reply"].lower()
-    second = say(client, "SELECT * FROM orders WHERE YEAR(created_at) = 2026 AND status = 'paid' OR customer_id = 5")
+    second = say_sql(client, "SELECT * FROM orders WHERE YEAR(created_at) = 2026 AND status = 'paid' OR customer_id = 5")
     assert second["relation"] == "agent_run"
     result = second["agents"][0]["runs"][0]["result"]
     assert result["indexes"] and result["rewritten"]
@@ -131,7 +131,10 @@ def test_start_endpoint_with_inputs(client, ml_mode):
     agent_id = first["agents"][0]["id"]
     res = client.post(f"/api/agents/{agent_id}/start", json={"inputs": {"query": "select * from users where lower(email) = 'a@b.com'"}})
     assert res.status_code == 200
-    assert res.json()["agents"][0]["runs"][0]["status"] == "done"
+    asked = res.json()                      # the query shows no database: asked first (rule A), with the six taps
+    assert asked["relation"] == "agent_plan" and asked["options"][-1] in ("Not sure", "Pata nahi")
+    done = say(client, asked["options"][2])  # PostgreSQL
+    assert done["relation"] == "agent_run" and done["agents"][0]["runs"][0]["status"] == "done"
     client.cookies.clear()
     assert client.post(f"/api/agents/{agent_id}/start", json={}).status_code == 404   # someone else's agent
 

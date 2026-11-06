@@ -7,7 +7,7 @@ from pathlib import Path
 
 from app.agents import sqlread
 from app.agents.sql import analyze_sql
-from tests.test_ml import say
+from tests.test_ml import say, say_sql
 
 ROOT = Path(__file__).resolve().parents[1] / "app"
 
@@ -62,7 +62,7 @@ def test_findings_name_their_fundamental_and_the_card_has_the_reading():
 def test_chat_reads_the_query_in_english_and_hinglish(client, ml_mode):
     client.post("/api/new-chat")
     client.cookies.clear()
-    r = say(client, "SELECT c.name, COUNT(*) FROM customers c LEFT JOIN orders o ON o.customer_id = c.id GROUP BY c.name")
+    r = say_sql(client, "SELECT c.name, COUNT(*) FROM customers c LEFT JOIN orders o ON o.customer_id = c.id GROUP BY c.name")
     assert r["relation"] == "agent_run"
     r = say(client, "what does this query do?")
     assert r["relation"] == "agent_reply" and "stage by stage" in r["reply"] and "many orders rows" in r["reply"]
@@ -75,7 +75,7 @@ def test_explain_after_a_slow_query_still_says_why(client, ml_mode):
     client.post("/api/new-chat")
     client.cookies.clear()
     say(client, "my database is slow")
-    r = say(client, "SELECT * FROM orders WHERE YEAR(created) = 2024 ORDER BY created")
+    r = say_sql(client, "SELECT * FROM orders WHERE YEAR(created) = 2024 ORDER BY created")
     assert r["relation"] == "agent_run"
     r = say(client, "explain this query")
     assert "stage by stage" in r["reply"] and ("Why this query can be slow" in r["reply"] or "already written well" in r["reply"]
@@ -89,7 +89,7 @@ def test_saying_it_was_wrong_is_still_kept_to_learn(client, ml_mode):
 
     client.post("/api/new-chat")
     client.cookies.clear()
-    say(client, "SELECT name FROM customers WHERE city = 'Pune'")
+    say_sql(client, "SELECT name FROM customers WHERE city = 'Pune'")
     r = say(client, "this answer is wrong, not what i wanted")
     assert "values hidden" in r["reply"]
     with _SessionLocal() as db:

@@ -58,7 +58,7 @@ feed.
   pack, routing before the checker. Seed concepts (SELECT, WHERE, ORDER BY, LIMIT, DISTINCT, NULL, LIKE, GROUP BY, HAVING,
   WHERE vs HAVING, every join type, keys, UNIQUE, index, normalization, DELETE/TRUNCATE/DROP, transaction, view, duplicates).
   Basics: NULL in arithmetic and CONCAT, LIKE wildcards and escaping, ties before LIMIT, DISTINCT vs GROUP BY, AND/OR order.
-- [ ] **2. Rule A, then joins.** Named / detected / ask, in three languages, including a switch mid-conversation. Then every
+- [x] **2. Rule A, then joins.** Named / detected / ask, in three languages, including a switch mid-conversation. Then every
   join type, anti-join, self-join, missing or wrong join condition (row explosion), joining on the wrong column, duplicates
   hidden by DISTINCT.
 - [ ] **3. Aggregation.** COUNT(*) vs COUNT(col) vs COUNT(DISTINCT), AVG/SUM with NULLs, SUM(CASE ...), totals at the wrong
@@ -110,3 +110,15 @@ statistics. Every night still adds 15+ concepts from its area. A new guide docum
   practice bank, 10 new generator families. Lab lessons worth keeping: NULLs sort first in ASC on MariaDB and first in DESC on
   PostgreSQL; text sorts case-blind on MariaDB and case-sensitive on PostgreSQL; `ORDER BY 1 IS NULL` is a constant, not
   column 1; `||` is OR on MariaDB; integer division truncates on PostgreSQL.
+- **Night 2 (5 Nov 2026).** Rule A in `app/dbknow/engines.py`: the database named in the words is remembered on the goal and
+  switched when another is named; one shown by the query's syntax or the error's format is detected, said, and correctable with
+  one tap; otherwise DBaba asks first (MySQL / MariaDB / PostgreSQL / SQL Server / Oracle / Not sure), for queries and for errors.
+  How each database is named, its syntax marks, its error format and what it refuses live in its dialect file (`named`,
+  `query_marks`, `weak_marks`, `error_marks`, `refuses`); SQL Server, Oracle and SQLite are `notes_only`. Joins in
+  `app/agents/sqljoins.py` (fundamental `join_condition`): cartesian comma joins, an ON that names one side, two primary keys
+  compared, a key the wrong way round or pointing at another parent, names instead of keys, NATURAL JOIN / USING (id), anti-joins
+  testing a nullable column, self-join pairs, DISTINCT hiding a join's copies (rewritten to EXISTS). 18 concepts, 42-problem
+  practice bank, 11 generator families. Lab lessons worth keeping: `JOIN t` with no ON is a cross join on MariaDB but a syntax
+  error on PostgreSQL; NATURAL JOIN of two tables with `id` pairs row N with row N; a `-uses` plural is not always `-us`
+  (warehouses, not warehous); a backticked name on PostgreSQL is safest bare (unquoted names fold to lower case).
+

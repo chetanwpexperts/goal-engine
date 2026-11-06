@@ -187,6 +187,10 @@
       b.addEventListener("click", () => sendMessage(label));
       optionsEl.append(b);
     }
+    // the tap row floats above the input box: keep that much room under the conversation, so it never covers the last answer
+    const room = optionsEl.hidden ? 0 : optionsEl.offsetHeight + 16;
+    document.documentElement.style.setProperty("--opts", `${room}px`);
+    if (room) window.scrollTo({ top: document.scrollingElement.scrollHeight, behavior: reduceMotion ? "auto" : "smooth" });
   }
 
   // ---------------------------------------------------------------- thread

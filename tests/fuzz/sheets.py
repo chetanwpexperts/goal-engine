@@ -106,7 +106,8 @@ FIELDS = {
                       ("phone", ["Mobile", "Phone No"], "phone", {}, None)]},
 }
 
-MESS = ["title_row", "blank_rows", "totals_row", "date_text", "money_text", "upper_headers", "trailing_spaces", "empty_col"]
+MESS = ["title_row", "blank_rows", "totals_row", "date_text", "money_text", "upper_headers", "trailing_spaces", "empty_col", "date_serial"]
+EXCEL_EPOCH = dt.date(1899, 12, 30)
 
 
 # ---------------------------------------------------------------- making a file
@@ -151,6 +152,8 @@ def make_book(seed: int, folder: str) -> dict:
                 r[key] = f"98{rnd.randint(10000000, 99999999)}"
         rows.append(r)
     mess = [m for m in MESS if rnd.random() < 0.35]
+    if "date_text" in mess and "date_serial" in mess:
+        mess.remove(rnd.choice(["date_text", "date_serial"]))
     path = f"{folder}/fuzz_{seed}.xlsx"
     wb = Workbook()
     ws = wb.active
@@ -172,6 +175,8 @@ def make_book(seed: int, folder: str) -> dict:
             v = r[key]
             if kind == "date" and "date_text" in mess:
                 v = v.strftime("%d-%m-%Y")
+            if kind == "date" and "date_serial" in mess:
+                v = (v - EXCEL_EPOCH).days                # pasted / exported dates left as Excel's day numbers (46023)
             if kind == "amount" and "money_text" in mess:
                 v = f"₹ {v:,}"
             vals.append(v)

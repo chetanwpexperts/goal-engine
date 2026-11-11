@@ -91,7 +91,7 @@ def _load_tables(path: str) -> list[Table]:
         rows = list(office._csv_rows(path))
         header = [str(h).strip() for h in rows[0]] if rows else []
         data = _without_totals([[_value(v) for v in r] for r in rows[1:MAX_ROWS + 1] if any(x not in (None, "") for x in r)])
-        return [Table("CSV", header, data, 1, len(rows) - 1 > MAX_ROWS)]
+        return [Table("CSV", header, _day_numbers(header, data), 1, len(rows) - 1 > MAX_ROWS)]
     big = __import__("os").path.getsize(path) > office.FULL_MODE_MAX
     wb_v = load_workbook(path, read_only=True, data_only=True)
     wb_f = None if big else load_workbook(path, read_only=True, data_only=False)
@@ -122,7 +122,7 @@ def _load_tables(path: str) -> list[Table]:
                         row[c_i] = ev.cell(name, r_i, c_i)
             if any(v not in (None, "") for v in row):
                 rows.append([_value(v) for v in row])
-        rows = _without_totals(rows)
+        rows = _day_numbers(header, _without_totals(rows))
         tables.append(Table(name, header, rows[:MAX_ROWS], h + 1, len(rows) > MAX_ROWS))
     return tables
 
@@ -163,6 +163,27 @@ def _value(v):
         return n
     d = date_text(v)
     return d if d is not None else v
+
+
+def _day_numbers(header, rows):
+    """Dates saved as Excel's day numbers (46023 instead of 01-01-2026: pasted, exported, or the cell lost its date
+    format) are read as the dates they are - only in a column whose heading names a date ('Check In', 'Joined On')
+    and not an amount ('Due Amount'), and only when nearly every value in it is such a number."""
+    from datetime import timedelta
+
+    from app.office.quality import EXCEL_EPOCH, is_day_number, serial_date_heading
+
+    for i, h in enumerate(header):
+        if not serial_date_heading(h):
+            continue
+        vals = [r[i] for r in rows if i < len(r) and r[i] not in (None, "")]
+        days = sum(1 for v in vals if is_day_number(v))
+        if not days or days + sum(1 for v in vals if isinstance(v, (datetime, date))) < 0.9 * len(vals):
+            continue
+        for r in rows:
+            if i < len(r) and is_day_number(r[i]):
+                r[i] = EXCEL_EPOCH + timedelta(days=float(r[i]))
+    return rows
 
 
 def _without_totals(rows):

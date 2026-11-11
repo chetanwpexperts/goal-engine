@@ -984,5 +984,192 @@
       "https://www.mrexcel.com/board/",
       "https://forum.chandoo.org/"
     ]
+  },
+  {
+    "id": "dates-show-as-numbers",
+    "apps": [
+      "excel",
+      "csv",
+      "google_sheets"
+    ],
+    "category": "dates_numbers",
+    "title_en": "Dates show as numbers like 45678 instead of a date",
+    "title_hi": "Date ki jagah 45678 jaise number dikh rahe hain",
+    "symptoms": [
+      "date column shows numbers like 45000",
+      "dates are showing as 5 digit numbers",
+      "paste karne ke baad date number ban gayi",
+      "csv export mein date 46023 jaisi dikh rahi",
+      "excel changed my dates into numbers",
+      "dates turned into serial numbers",
+      "date format chala gaya sirf number bache",
+      "डेट की जगह नंबर दिख रहा है",
+      "तारीख की जगह 45000 जैसे अंक आ रहे हैं",
+      "my dates became numbers after copying",
+      "check in column shows numbers like 46000",
+      "date ki jagah 45000 jaisa number",
+      "dob ki jagah 5 ank ka number",
+      "तारीखें नंबर में बदल गईं",
+      "डेट अब सिर्फ नंबर बन गई"
+    ],
+    "causes": [
+      {
+        "id": "general_format",
+        "title_en": "The cells lost their date format (General), so Excel shows the day number behind each date",
+        "title_hi": "Cells ka date format hat gaya (General), isliye Excel date ke peeche ka din-number dikhata hai"
+      },
+      {
+        "id": "pasted_values",
+        "title_en": "The dates were pasted or exported as plain values from another file or software",
+        "title_hi": "Dates doosri file ya software se sirf value ki tarah paste/export hui"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "general_format",
+        "action": "auto",
+        "auto": "fix_dates",
+        "steps_en": "In a column whose heading names a date (Date, DOJ, Check In, Paid On), I turn every day number back into a real date, show you some before and after, and keep Undo. Columns like 'Due Amount' are never touched.",
+        "steps_hi": "Jis column ki heading date batati hai (Date, DOJ, Check In, Paid On), usme har din-number ko asli date bana deta hoon, pehle-baad ka sample dikhata hoon, Undo rehta hai. 'Due Amount' jaise column ko haath nahi lagata."
+      },
+      {
+        "cause": "pasted_values",
+        "action": "steps",
+        "steps_en": "1. Select the column. 2. Home > Number format box > Short Date. 3. Next time paste with Paste Special > Values and number formats.",
+        "steps_hi": "1. Column select karo. 2. Home > Number format box > Short Date. 3. Agli baar Paste Special > Values and number formats se paste karo."
+      }
+    ],
+    "verify": {
+      "en": "The column shows dates again and sorting by it goes oldest to newest.",
+      "hi": "Column mein phir se date dikhti hai aur sort karne par purani se nayi aati hai."
+    },
+    "test_phrases": [
+      "my joining dates are showing as big numbers like 45231",
+      "date wale column mein 46000 jaise number aa rahe hain",
+      "मेरी तारीखें नंबर बन गई हैं"
+    ],
+    "source": "https://learn.microsoft.com/en-us/answers/questions/5089507/excel-changes-dates-to-numbers-automatically",
+    "seen_at": [
+      "https://answers.microsoft.com/en-us/msoffice/forum/all/excel-changed-all-my-dates-and-times-to-serial/847ecf49-477a-406e-b4fc-33551416bf81",
+      "https://techcommunity.microsoft.com/discussions/excelgeneral/excel-changes-dates-to-numbers/4260663"
+    ]
+  },
+  {
+    "id": "dates-day-month-swapped",
+    "apps": [
+      "excel",
+      "csv",
+      "google_sheets"
+    ],
+    "category": "dates_numbers",
+    "title_en": "Day and month swapped (DD/MM vs MM/DD), some dates stay as text",
+    "title_hi": "Din aur mahina ulte ho gaye (DD/MM vs MM/DD), kuch dates text hi reh gayi",
+    "symptoms": [
+      "5 march became 3 may",
+      "day and month swapped after opening csv",
+      "date ulti ho gayi din mahina badal gaya",
+      "some dates are right aligned some left aligned",
+      "dates after 12th of month not converting",
+      "csv open karte hi dates gadbad",
+      "dd mm yyyy ko mm dd samajh raha hai",
+      "sorting by date goes wrong after import",
+      "american date format aa gaya",
+      "दिन और महीना उलट गए",
+      "सीएसवी खोलने पर तारीख गलत हो गई",
+      "13 se upar wali dates text ban gayi",
+      "date filter mein kuch dates hi nahi aa rahi"
+    ],
+    "causes": [
+      {
+        "id": "text_left",
+        "title_en": "Dates that don't fit the computer's date order (day above 12) stayed as text",
+        "title_hi": "Jo dates computer ke order mein fit nahi hui (din 12 se upar) woh text hi reh gayi"
+      },
+      {
+        "id": "region",
+        "title_en": "The file writes day first but the computer reads month first (or the other way)",
+        "title_hi": "File mein din pehle hai par computer mahina pehle padhta hai (ya ulta)"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "text_left",
+        "action": "auto",
+        "auto": "fix_dates",
+        "steps_en": "I work out the column's order from its own values (any date with a first part above 12 means day first), turn every text date into a real date in that order, and flag dates no calendar has. Undo stays.",
+        "steps_hi": "Column ki apni values se order samajhta hoon (pehla hissa 12 se upar ho to din pehle), har text date ko usi order mein asli date banata hoon, aur jo date calendar mein hai hi nahi use flag karta hoon. Undo rehta hai."
+      },
+      {
+        "cause": "region",
+        "action": "steps",
+        "steps_en": "Dates Excel already converted the wrong way can't be told apart afterwards, so import again: 1. Data > From Text/CSV > Transform Data. 2. Right-click the date column > Change Type > Using Locale. 3. Pick Date and the file's country, then Close & Load.",
+        "steps_hi": "Jo dates Excel pehle hi ulti bana chuka, unhe baad mein pehchana nahi ja sakta, isliye dobara import karo: 1. Data > From Text/CSV > Transform Data. 2. Date column par right-click > Change Type > Using Locale. 3. Date aur file ka desh chuno, phir Close & Load."
+      }
+    ],
+    "verify": {
+      "en": "Every date is right-aligned, none is left as text, and sorting puts them in calendar order.",
+      "hi": "Har date right side hai, koi text nahi bachi, aur sort karne par calendar order aata hai."
+    },
+    "test_phrases": [
+      "after opening the bank csv the 4th of june shows as 6th april",
+      "csv kholte hi din aur mahina aapas mein badal gaye",
+      "सीएसवी में तारीख का दिन और महीना उल्टा हो गया"
+    ],
+    "source": "https://support.microsoft.com/en-us/excel/convert-dates-stored-as-text-to-dates",
+    "seen_at": [
+      "https://www.accountingweb.co.uk/node/68806",
+      "https://www.excelforum.com/excel-general/1067837-changing-dates-around-from-imported-csv-file.html"
+    ]
+  },
+  {
+    "id": "dates-wrong-century",
+    "apps": [
+      "excel",
+      "csv"
+    ],
+    "category": "dates_numbers",
+    "title_en": "Two-digit years land in the wrong century (35 becomes 1935, 28 becomes 2028)",
+    "title_hi": "Do ank wala saal galat sadi mein ja raha (35 ka 1935, 28 ka 2028)",
+    "symptoms": [
+      "year 2035 showing as 1935",
+      "date of birth shows 2028 instead of 1928",
+      "two digit year wrong century",
+      "saal 19 ki jagah 20 se shuru ho raha",
+      "dates going into 1900s",
+      "purani dob 2000s mein chali gayi",
+      "expiry date 1940 dikha rahi",
+      "दो अंकों वाला साल गलत सदी में",
+      "जन्म तिथि 2028 दिख रही है",
+      "yy wale dates ka saal galat aa raha"
+    ],
+    "causes": [
+      {
+        "id": "cutoff",
+        "title_en": "Excel reads 00-29 as 2000-2029 and 30-99 as 1930-1999 when only two digits are given",
+        "title_hi": "Sirf do ank dene par Excel 00-29 ko 2000-2029 aur 30-99 ko 1930-1999 padhta hai"
+      }
+    ],
+    "fixes": [
+      {
+        "cause": "cutoff",
+        "action": "steps",
+        "steps_en": "1. Type or export years with four digits (15/08/2035). 2. For dates already wrong: =DATE(YEAR(A2)+100,MONTH(A2),DAY(A2)) in a helper column, then paste as values. 3. To change the rule for typing: Windows Control Panel > Region > Additional settings > Date > two-digit year range.",
+        "steps_hi": "1. Saal chaar ank mein likho/export karo (15/08/2035). 2. Jo dates pehle se galat hain: helper column mein =DATE(YEAR(A2)+100,MONTH(A2),DAY(A2)), phir values paste karo. 3. Typing ka rule badalna ho: Windows Control Panel > Region > Additional settings > Date > two-digit year range."
+      }
+    ],
+    "verify": {
+      "en": "Every year shows four digits and sits in the right century.",
+      "hi": "Har saal chaar ank mein hai aur sahi sadi mein hai."
+    },
+    "test_phrases": [
+      "birth years like 28 are coming as 2028 not 1928",
+      "dob mein saal galat sadi ka aa raha hai 2028 jaisa",
+      "साल वाली तारीख गलत सदी में चली गई"
+    ],
+    "source": "https://learn.microsoft.com/en-us/troubleshoot/office/excel/two-digit-year-numbers",
+    "seen_at": [
+      "https://support.microsoft.com/en-us/Excel/change-the-date-system-format-or-two-digit-year-interpretation",
+      "https://techcommunity.microsoft.com/discussions/excelgeneral/2-digit-year-when-importing/65676/replies/67870"
+    ]
   }
 ]

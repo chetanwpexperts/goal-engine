@@ -521,7 +521,11 @@
   "nvl": false,
   "double_quotes": "identifier",
   "concat_null": "ignored",
-  "like_case": "sensitive"
+  "like_case": "sensitive",
+  "sum_boolean": {"behaviour": "error", "code": "42883", "says": "PostgreSQL refuses it (42883, function sum(boolean) does not exist): a comparison is a boolean there, not a number.", "proven": ["postgresql"]},
+  "having_alias": {"behaviour": "error", "code": "42703", "says": "PostgreSQL refuses it (42703, column does not exist; or 42803 if the name is also a real column): HAVING is worked out before SELECT names exist.", "proven": ["postgresql"]},
+  "count_distinct_multi": {"behaviour": "error", "code": "42883", "says": "PostgreSQL refuses it (42883, function count(...) does not exist): COUNT takes one argument there.", "proven": ["postgresql"]},
+  "window_over_ungrouped": {"behaviour": "error", "code": "42803", "says": "PostgreSQL refuses it (42803, must appear in the GROUP BY clause or be used in an aggregate function).", "proven": ["postgresql"]}
  },
  "proven": [
   "postgresql"

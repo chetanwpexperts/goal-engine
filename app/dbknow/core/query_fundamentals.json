@@ -67,7 +67,8 @@
     "group",
     "per_group",
     "top_n",
-    "distinct"
+    "distinct",
+    "count_said"
    ],
    "source": "https://dev.mysql.com/doc/refman/8.4/en/group-by-handling.html"
   },
@@ -153,7 +154,8 @@
    "topics": [
     "alias",
     "column",
-    "order"
+    "order",
+    "having_alias"
    ],
    "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-alias.html"
   },
@@ -225,6 +227,30 @@
     "dialect"
    ],
    "source": "https://www.postgresql.org/docs/current/features.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "aggregation": {
+   "title_en": "A total sees only the rows and values that reach it",
+   "title_hi": "Total sirf unhi rows aur values ko dekhta hai jo us tak pahunchti hain",
+   "rule_en": "An aggregate works on the rows left after WHERE and the joins, and of those only on the values that are not NULL; COUNT(*) is the one that counts rows. So COUNT(x) counts filled values, not true ones (a 0 or a false is counted); SUM and AVG skip NULLs, so AVG is the average of the rows that have a value, and SUM of no rows or of only NULLs is NULL, not 0; DISTINCT inside a total works on values, so equal amounts of different rows count once. Totals are made once per group: a total can't hold another total at the same level (do it in two stages), and in a grouped query a window function sees one row per group, so its argument must itself be a total. An average of per-group averages weighs every group the same, and a share is only right when its total covers the same rows as its part.",
+   "rule_hi": "Aggregate WHERE aur joins ke baad bachi rows par chalta hai, aur unme bhi sirf un values par jo NULL nahi; sirf COUNT(*) rows ginta hai. Isliye COUNT(x) bhari values ginta hai, true wali nahi (0 ya false bhi gina jaata hai); SUM aur AVG NULL chhod dete hain, to AVG sirf value wali rows ka average hai, aur khaali ya sirf-NULL ka SUM NULL hai, 0 nahi; total ke andar DISTINCT values par chalta hai, to alag rows ki barabar raqam ek baar gini jaati hai. Total har group ka ek baar banta hai: total ke andar total ek hi level par nahi chalta (do stage mein karo), aur grouped query mein window har group ki ek row dekhta hai, to uska argument bhi total hona chahiye. Group averages ka average har group ko barabar wazan deta hai, aur share tabhi sahi hai jab total un hi rows ka ho jinka hissa hai.",
+   "topics": [
+    "count_case",
+    "count_bool",
+    "sum_bool",
+    "nested_agg",
+    "window_agg",
+    "sum_null",
+    "sum_distinct",
+    "avg_null",
+    "avg_avg",
+    "count_multi",
+    "pct_total"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-aggregate.html",
    "proven": [
     "mariadb",
     "postgresql"

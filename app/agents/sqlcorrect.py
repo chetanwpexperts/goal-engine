@@ -1027,6 +1027,28 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
         elif edit and edit[2] is not None and not any(a < edit[1] and edit[0] < b for a, b, _n in edits):
             edits.append(edit)
 
+    # aggregation reasoning (app/agents/sqlaggs.py): COUNT of a comparison or of CASE ... ELSE 0, totals inside totals,
+    # windows in a grouped query, SUM over a LEFT JOIN, AVG with NULLs, averages of averages, shares, what was asked to count
+    from app.agents import sqlaggs
+
+    groups = []                                      # a finding and its edits ((None, edit) = one more edit of the one before)
+    for fnd, edit in sqlaggs.aggs(sql, s, cl, srcs, alias_of, items, intent, Finding):
+        if fnd is None and groups:
+            groups[-1][1].append(edit)
+        elif fnd is not None:
+            groups.append((fnd, [edit] if edit else []))
+    agg_edits = []
+    for fnd, ges in groups:
+        if any(f.title_en == fnd.title_en and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        ges = [e for e in ges if e and e[2] is not None]
+        if len(ges) == 1 and (ges[0][0], ges[0][1]) == (0, len(sql)):
+            whole = whole or ges[0][2]
+        elif ges and not any(a < e[1] and e[0] < b for e in ges for a, b, _n in edits + agg_edits):
+            agg_edits += ges                         # all of a finding's edits, or none of them
+    edits += agg_edits
+
     # self joins: the same table twice, joined parent.id = child.fk -> the children, not the parent
     for i, x in enumerate(srcs):
         if not x.on or not x.name:
@@ -1325,6 +1347,8 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                         changed = True
         loose = []
         for i in plain:
+            if re.search(r"\bover\s*\(", i["text"], re.I):
+                continue                                 # a window: judged with its own rule (app/agents/sqlaggs.py, window_agg)
             for q, c, _p in _qrefs(i["text"]):
                 if (alias_of(q), c.lower()) not in gref and alias_of(q) not in single:
                     loose.append(f"{q}.{c}")

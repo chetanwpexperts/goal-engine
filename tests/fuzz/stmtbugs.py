@@ -20,18 +20,24 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         "limit_no_order", "distinct_paren",
         # night 2: joins and relationships, and syntax the named database doesn't have (rule A)
         "comma_cartesian", "on_one_side", "pk_pk", "anti_nullable", "self_pairs", "distinct_join", "natural_join",
-        "dialect_limit_pg", "dialect_backticks_pg", "dialect_nulls_mariadb", "dialect_cast_mariadb"]
+        "dialect_limit_pg", "dialect_backticks_pg", "dialect_nulls_mariadb", "dialect_cast_mariadb",
+        # night 3: aggregation (what a total sees: non-NULL values of the rows that reach it, once per group)
+        "count_case", "count_bool", "sum_bool_pg", "nested_agg", "window_agg", "having_alias_pg", "count_multi_pg", "sum_null",
+        "avg_avg", "count_said", "pct_total", "sum_distinct"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
          "and_or": "and_or", "division": "division", "double_quotes": "quotes", "limit_no_order": "stable_order", "distinct_paren": "distinct",
          "comma_cartesian": "cartesian", "on_one_side": "cartesian", "pk_pk": "join_key", "anti_nullable": "anti_join",
          "self_pairs": "self_join", "distinct_join": "distinct_join", "natural_join": "natural_join", "dialect_limit_pg": "dialect",
-         "dialect_backticks_pg": "dialect", "dialect_nulls_mariadb": "dialect", "dialect_cast_mariadb": "dialect"}
-NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join"}   # found is enough
+         "dialect_backticks_pg": "dialect", "dialect_nulls_mariadb": "dialect", "dialect_cast_mariadb": "dialect",
+         "count_case": "count_case", "count_bool": "count_bool", "sum_bool_pg": "sum_bool", "nested_agg": "nested_agg",
+         "window_agg": "window_agg", "having_alias_pg": "having_alias", "count_multi_pg": "count_multi", "sum_null": "sum_null",
+         "avg_avg": "avg_avg", "count_said": "count_said", "pct_total": "pct_total", "sum_distinct": "sum_distinct"}
+NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join", "sum_distinct"}   # found is enough
 # a 'check' (depends on engine, data or intent) whose suggested rewrite must do exactly what the person meant
 FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes", "pk_pk", "anti_nullable", "self_pairs",
-                 "distinct_join"}
+                 "distinct_join", "sum_null", "avg_avg", "pct_total"}
 
 
 def _cols(t, *kinds):
@@ -327,6 +333,8 @@ def make(seed: int):
         if bug == "dialect_cast_mariadb" or bug == "dialect_backticks_pg":
             item["only"] = ["mysql"] if engine != "postgresql" else ["postgres"]
         return item
+    elif bug in AGG_BUGS:
+        return _agg_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -337,12 +345,155 @@ def make(seed: int):
     return {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": t["name"], "broken": broken, "truth": truth}
 
 
+
+AGG_BUGS = {"count_case", "count_bool", "sum_bool_pg", "nested_agg", "window_agg", "having_alias_pg", "count_multi_pg", "sum_null",
+            "avg_avg", "count_said", "pct_total", "sum_distinct"}
+
+
+def _plural_words(base: str) -> str:
+    return base.replace("_", " ")
+
+
+def _agg_bug(seed, bug, rnd, schema, tables, t):
+    """Night 3: aggregation mistakes on a random real table. truth = the statement the person meant."""
+    pk, name = t["pk"], t["name"]
+    groups = [c for c in t["cols"] if c["kind"] in ("fk", "cat")]
+    nums = [c["name"] for c in t["cols"] if c["kind"] in ("int", "money")]
+    cats = [c for c in t["cols"] if c["kind"] == "cat" and c["params"]]
+    engine, words = None, ""
+    if bug in ("count_case", "count_bool", "sum_bool_pg", "pct_total") and not cats:
+        return None
+    if bug in ("nested_agg", "window_agg", "having_alias_pg", "count_case", "pct_total") and not groups:
+        return None
+    g = rnd.choice(groups)["name"] if groups else None
+    if bug == "count_case":
+        c = rnd.choice(cats)
+        v = rnd.choice(c["params"])
+        cond = f"{c['name']} = '{v}'"
+        els = rnd.choice(["0", "0", "'no'", "-1"])
+        then = "1" if els != "'no'" else "'yes'"
+        truth = f"SELECT {g}, COUNT(CASE WHEN {cond} THEN 1 END) AS n\nFROM {name}\nGROUP BY {g}\nORDER BY {g}"
+        broken = f"SELECT {g}, COUNT(CASE WHEN {cond} THEN {then} ELSE {els} END) AS n\nFROM {name}\nGROUP BY {g}\nORDER BY {g}"
+    elif bug == "count_bool":
+        if nums and rnd.random() < 0.4:
+            col = rnd.choice(nums)
+            cond = f"{col} > {rnd.randint(1, 50)}"
+        else:
+            c = rnd.choice(cats)
+            cond = f"{c['name']} = '{rnd.choice(c['params'])}'"
+        truth = f"SELECT COUNT(*)\nFROM {name}\nWHERE {cond}"
+        broken = f"SELECT COUNT({cond})\nFROM {name}"
+    elif bug == "sum_bool_pg":
+        c = rnd.choice(cats)
+        cond = f"{c['name']} = '{rnd.choice(c['params'])}'"
+        truth = f"SELECT COUNT(*)\nFROM {name}\nWHERE {cond}"
+        broken = f"SELECT SUM({cond})\nFROM {name}"
+        engine = "postgresql"
+    elif bug == "nested_agg":
+        if nums and rnd.random() < 0.5:
+            outer, inner = rnd.choice(["AVG", "MAX", "MIN"]), f"SUM({rnd.choice(nums)})"
+        else:
+            outer, inner = rnd.choice(["MAX", "MIN", "AVG"]), "COUNT(*)"
+        truth = f"SELECT {outer}(v)\nFROM (SELECT {inner} AS v FROM {name} GROUP BY {g}) AS x"
+        broken = f"SELECT {outer}({inner})\nFROM {name}\nGROUP BY {g}"
+    elif bug == "window_agg":
+        if not nums:
+            return None
+        m = rnd.choice(nums)
+        fn = rnd.choice(["SUM", "MAX", "MIN"])
+        truth = f"SELECT {g}, {fn}({m}) AS v, {fn}({fn}({m})) OVER () AS whole\nFROM {name}\nGROUP BY {g}\nORDER BY {g}"
+        broken = f"SELECT {g}, {fn}({m}) AS v, {fn}({m}) OVER () AS whole\nFROM {name}\nGROUP BY {g}\nORDER BY {g}"
+    elif bug == "having_alias_pg":
+        k = rnd.randint(1, 4)
+        if nums and rnd.random() < 0.5:
+            m = rnd.choice(nums)
+            agg, lim = f"SUM({m})", rnd.randint(10, 500)
+        else:
+            agg, lim = "COUNT(*)", k
+        alias = rnd.choice(["total", "cnt", "n_rows", "how_many"])
+        truth = f"SELECT {g}, {agg} AS {alias}\nFROM {name}\nGROUP BY {g}\nHAVING {agg} > {lim}\nORDER BY {g}"
+        broken = f"SELECT {g}, {agg} AS {alias}\nFROM {name}\nGROUP BY {g}\nHAVING {alias} > {lim}\nORDER BY {g}"
+        engine = "postgresql"
+    elif bug == "count_multi_pg":
+        plain = [c["name"] for c in t["cols"] if c["kind"] in ("cat", "fk", "int")]
+        if len(plain) < 2:
+            return None
+        a, b = rnd.sample(plain, 2)
+        truth = f"SELECT COUNT(*)\nFROM (SELECT DISTINCT {a}, {b} FROM {name} WHERE {a} IS NOT NULL AND {b} IS NOT NULL) AS d"
+        broken = f"SELECT COUNT(DISTINCT {a}, {b})\nFROM {name}"
+        engine = "postgresql"
+    elif bug in ("sum_null", "count_said"):
+        kids = [(c, x) for x in tables for c in x["cols"] if c["kind"] == "fk"]
+        if not kids:
+            return None
+        fk, child = rnd.choice(kids)
+        parent = schema["tables"][fk["ref"]]
+        t = child
+        cn = [c["name"] for c in child["cols"] if c["kind"] in ("int", "money")]
+        if bug == "sum_null":
+            if not cn:
+                return None
+            m = rnd.choice(cn)
+            ppk = parent["pk"]
+            base = (f"SELECT p.{ppk}, {{}} AS total\nFROM {parent['name']} p\nLEFT JOIN {child['name']} c ON c.{fk['name']} = p.{ppk}\n"
+                    f"GROUP BY p.{ppk}\nORDER BY p.{ppk}")
+            truth, broken = base.format(f"COALESCE(SUM(c.{m}), 0)"), base.format(f"SUM(c.{m})")
+            words = f"total {m} for every {parent['base']} row, 0 when it has none"
+        else:
+            from app.agents.sqljoins import _fk
+
+            if _fk(parent["name"]).replace("_", "") != fk["name"].lower().replace("_", ""):
+                return None                               # the words name the parent; its key column must follow the usual name
+            cond = ""
+            ccats = [c for c in child["cols"] if c["kind"] == "cat" and c["params"]]
+            if ccats and rnd.random() < 0.5:
+                cc = rnd.choice(ccats)
+                cond = f"\nWHERE {cc['name']} = '{rnd.choice(cc['params'])}'"
+            counted = rnd.choice(["*", fk["name"]])
+            truth = f"SELECT COUNT(DISTINCT {fk['name']})\nFROM {child['name']}{cond}"
+            broken = f"SELECT COUNT({counted})\nFROM {child['name']}{cond}"
+            noun = _plural_words(parent["base"])
+            words = rnd.choice([f"how many {noun} have a {_plural_words(child['base'])} row", f"number of {noun} with {_plural_words(child['base'])}",
+                                f"kitne {noun} ke {_plural_words(child['base'])} hain"])
+    elif bug == "avg_avg":
+        if not nums or not groups:
+            return None
+        m = rnd.choice(nums)
+        truth = f"SELECT 1.0 * SUM({m}) / COUNT({m})\nFROM {name}"
+        broken = f"SELECT AVG(a)\nFROM (SELECT {g}, AVG({m}) AS a FROM {name} GROUP BY {g}) AS x"
+        words = "the average over all rows"
+    elif bug == "pct_total":
+        c = rnd.choice(cats)
+        v = rnd.choice(c["params"])
+        if g == c["name"]:
+            others = [x["name"] for x in groups if x["name"] != c["name"]]
+            if not others:
+                return None
+            g = rnd.choice(others)
+        truth = (f"SELECT {g}, 100.0 * COUNT(*) / (SELECT COUNT(*) FROM {name} WHERE {c['name']} = '{v}') AS pct\nFROM {name}\n"
+                 f"WHERE {c['name']} = '{v}'\nGROUP BY {g}\nORDER BY {g}")
+        broken = (f"SELECT {g}, 100.0 * COUNT(*) / (SELECT COUNT(*) FROM {name}) AS pct\nFROM {name}\n"
+                  f"WHERE {c['name']} = '{v}'\nGROUP BY {g}\nORDER BY {g}")
+        words = f"each {g}'s share of the {v} rows"
+    else:                                                 # sum_distinct
+        if not nums:
+            return None
+        truth = None
+        broken = f"SELECT SUM(DISTINCT {rnd.choice(nums)})\nFROM {name}"
+    if words:
+        broken += ";\n\n" + words
+    item = {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": t["name"], "broken": broken, "truth": truth}
+    if engine:
+        item["engine"] = engine
+    return item
+
+
 def _effect(eng, sql, table, pk):
     """What a statement does: the rows a SELECT returns, or the table after an UPDATE/DELETE (rolled back afterwards)."""
     eng.begin()
     try:
         out = eng.run(sql)
-        if not isinstance(out, list):
+        if not isinstance(out, (list, tuple)):            # a SELECT's rows (a tuple on MySQL/MariaDB), else the changed table
             out = eng.run(f"SELECT * FROM {table} ORDER BY {pk}")
         return Counter(tuple(str(x) for x in r) for r in out)
     except Exception as exc:  # noqa: BLE001 - a refusal the intended statement gets too (a foreign key) is the same effect

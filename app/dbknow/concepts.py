@@ -159,7 +159,9 @@ def _is_work(text: str) -> bool:
     try:
         from app.dbknow import reasoning
 
-        if reasoning.evidence(text):
+        facts = reasoning.evidence(text)
+        # a question that only NAMES a setting ('what is ONLY_FULL_GROUP_BY') is a concept; a pasted message or code is work
+        if facts and not all(re.fullmatch(r"[A-Za-z_]+", f.get("proof", "")) for f in facts.values()):
             return True
     except Exception:  # noqa: BLE001
         pass

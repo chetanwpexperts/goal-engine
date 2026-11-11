@@ -61,7 +61,7 @@ feed.
 - [x] **2. Rule A, then joins.** Named / detected / ask, in three languages, including a switch mid-conversation. Then every
   join type, anti-join, self-join, missing or wrong join condition (row explosion), joining on the wrong column, duplicates
   hidden by DISTINCT.
-- [ ] **3. Aggregation.** COUNT(*) vs COUNT(col) vs COUNT(DISTINCT), AVG/SUM with NULLs, SUM(CASE ...), totals at the wrong
+- [x] **3. Aggregation.** COUNT(*) vs COUNT(col) vs COUNT(DISTINCT), AVG/SUM with NULLs, SUM(CASE ...), totals at the wrong
   grain, fan-out through two child tables, percent of total.
 - [ ] **4. Subqueries.** IN vs EXISTS vs JOIN (same rows or not), correlated subqueries in SELECT, latest/first row per
   group, anti-joins with NULLs.
@@ -121,4 +121,14 @@ statistics. Every night still adds 15+ concepts from its area. A new guide docum
   practice bank, 11 generator families. Lab lessons worth keeping: `JOIN t` with no ON is a cross join on MariaDB but a syntax
   error on PostgreSQL; NATURAL JOIN of two tables with `id` pairs row N with row N; a `-uses` plural is not always `-us`
   (warehouses, not warehous); a backticked name on PostgreSQL is safest bare (unquoted names fold to lower case).
-
+- **Night 3 (11 Nov 2026).** Aggregation in `app/agents/sqlaggs.py` (new fundamental `aggregation`: a total sees only the rows
+  and the non-NULL values that reach it, once per group): COUNT of CASE ... ELSE 0 / IF(c, 1, 0) / a comparison counts every
+  row; a total inside a total (MAX(COUNT(*))); a plain column inside a window of a grouped query; SUM over a LEFT JOIN is NULL,
+  not 0; AVG skips NULLs; SUM(DISTINCT x); an average of averages (rewritten to total / count); a share whose total ignores the
+  outer WHERE; 'how many customers' while the query counts order rows (request words). Per-engine facts in the dialect files'
+  query_rules (`sum_boolean`, `having_alias`, `count_distinct_multi`, `window_over_ungrouped`). 21 concepts, 40-problem practice
+  bank, 12 generator families. The statement generator now really compares a SELECT's rows on MariaDB (pymysql returns a
+  tuple, which was being read as "not a SELECT"). Lab lessons worth keeping: MariaDB runs `SUM(amount) OVER ()` in a grouped
+  query and sums one arbitrary row per group (silently wrong; PostgreSQL 42803); `COUNT(DISTINCT a, b)` skips NULL pairs on
+  MariaDB but `COUNT(DISTINCT (a, b))` counts them on PostgreSQL; a HAVING name that is also a real column means the column on
+  PostgreSQL; MariaDB 10.11 has only `WITH ROLLUP` (no `ROLLUP (...)`, no `GROUPING()`, no `FILTER`).

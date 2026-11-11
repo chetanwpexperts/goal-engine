@@ -83,7 +83,11 @@
   "nvl": true,
   "double_quotes": "string",
   "concat_null": "null",
-  "like_case": "insensitive"
+  "like_case": "insensitive",
+  "sum_boolean": {"behaviour": "works", "says": "MySQL and MariaDB treat true as 1 and false as 0, so SUM(condition) counts the matches there.", "proven": ["mariadb"]},
+  "having_alias": {"behaviour": "works", "says": "MySQL and MariaDB let HAVING use a name made in SELECT.", "proven": ["mariadb"]},
+  "count_distinct_multi": {"behaviour": "works", "says": "MySQL and MariaDB accept COUNT(DISTINCT a, b) and skip a combination that has a NULL in it.", "proven": ["mariadb"]},
+  "window_over_ungrouped": {"behaviour": "arbitrary", "says": "MariaDB runs it and takes the plain column from one row of each group (silently wrong); MySQL refuses it when ONLY_FULL_GROUP_BY is on (its default).", "proven": ["mariadb"]}
  },
  "proven": [
   "mariadb"

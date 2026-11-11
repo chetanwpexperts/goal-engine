@@ -556,5 +556,196 @@
  },
  "proven": [
   "mariadb 10.11 (MySQL-compatible behaviour of these rules)"
- ]
+ ],
+ "schema_rules": {
+  "about": "How MySQL/MariaDB take a CREATE TABLE (night 6): what they refuse, what they silently change, and their limits. Lab: MariaDB 10.11.",
+  "marks": [
+   "\\bengine\\s*=\\s*\\w+",
+   "\\bauto_increment\\b",
+   "`[^`]+`",
+   "\\bunsigned\\b",
+   "\\b(?:default\\s+)?(?:charset|character\\s+set)\\s*=",
+   "\\b(tinyint|mediumint|longtext|mediumtext|tinytext|longblob|mediumblob|tinyblob|datetime)\\b",
+   "\\bcomment\\s+'",
+   "\\bon\\s+update\\s+current_timestamp\\b",
+   "\\benum\\s*\\("
+  ],
+  "fk_auto_index": {
+   "behaviour": "made",
+   "says": "InnoDB makes an index on a foreign key column by itself when none leads with it.",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "utf8": {
+   "behaviour": "utf8mb3",
+   "code": "1366",
+   "says": "'utf8' is utf8mb3 (3 bytes): a 4-byte character (emoji) is refused in strict mode (1366 Incorrect string value).",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "myisam_fk": {
+   "behaviour": "ignored",
+   "says": "ENGINE=MyISAM accepts FOREIGN KEY / REFERENCES with no warning and never checks them.",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "inline_references": {
+   "behaviour": "enforced",
+   "says": "MariaDB 10.5+ keeps a column's inline REFERENCES as a real foreign key (lab: MariaDB 10.11 refused a missing parent, 1452). MySQL before 9.0 parsed it and ignored it (documented; not lab-tested here): write FOREIGN KEY (col) REFERENCES t (id) as its own line.",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "fk_same_type": {
+   "behaviour": "error",
+   "code": "1005 errno 150",
+   "says": "Both ends of a foreign key need the same integer size and signedness; INT -> BIGINT, INT -> INT UNSIGNED and INT -> VARCHAR are refused (errno 150).",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "fk_target": {
+   "behaviour": "index",
+   "says": "A foreign key may point at any indexed parent column (a non-unique one is accepted, against the SQL standard); a parent column with no index is refused (errno 150).",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "max_row_bytes": {
+   "value": 65535,
+   "code": "1118",
+   "says": "All VARCHARs of a row together may use at most 65,535 bytes (characters x 4 in utf8mb4); one VARCHAR over 16,383 utf8mb4 characters is 1074.",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "text_primary_key": {
+   "behaviour": "error",
+   "code": "1170",
+   "says": "A TEXT / BLOB column can't be a primary key without a prefix length (1170). MariaDB 10.4+ accepts TEXT in UNIQUE (a hidden hash); MySQL refuses it there too (documented).",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "timestamp_range": {
+   "value": [
+    "1970-01-01 00:00:01",
+    "2038-01-19 03:14:07"
+   ],
+   "code": "1292",
+   "says": "TIMESTAMP holds 1970-01-01 to 2038-01-19 UTC (2106 on MariaDB 11.5+; 1292 outside it); DATETIME holds years 1000-9999.",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "varchar_needs_length": {
+   "behaviour": "error",
+   "code": "1064",
+   "says": "VARCHAR without a length is a syntax error.",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "reserved": [
+   "all",
+   "analyze",
+   "binary",
+   "both",
+   "change",
+   "check",
+   "column",
+   "condition",
+   "constraint",
+   "create",
+   "current_date",
+   "current_user",
+   "default",
+   "desc",
+   "distinct",
+   "div",
+   "else",
+   "except",
+   "false",
+   "fetch",
+   "for",
+   "foreign",
+   "from",
+   "grant",
+   "group",
+   "having",
+   "in",
+   "index",
+   "intersect",
+   "interval",
+   "into",
+   "key",
+   "leading",
+   "limit",
+   "localtime",
+   "lock",
+   "mod",
+   "natural",
+   "not",
+   "null",
+   "offset",
+   "on",
+   "or",
+   "order",
+   "primary",
+   "range",
+   "read",
+   "references",
+   "release",
+   "returning",
+   "rows",
+   "select",
+   "table",
+   "to",
+   "trailing",
+   "true",
+   "union",
+   "unique",
+   "usage",
+   "using",
+   "values",
+   "when",
+   "where",
+   "with",
+   "write"
+  ],
+  "reserved_note": "Lab-tested on MariaDB 10.11 as bare table and column names. MySQL 8 also reserves rank, groups, window, lateral, row_number, lead, lag (documented, not lab-tested here).",
+  "foreign_types": {
+   "timestamptz": "DATETIME",
+   "timestamp with time zone": "DATETIME",
+   "timestamp without time zone": "DATETIME",
+   "jsonb": "JSON",
+   "bytea": "LONGBLOB",
+   "bigserial": "BIGINT AUTO_INCREMENT",
+   "smallserial": "SMALLINT AUTO_INCREMENT",
+   "inet": "VARCHAR(45)",
+   "cidr": "VARCHAR(45)",
+   "money": "DECIMAL(19,2)",
+   "citext": "VARCHAR(255)",
+   "array": "JSON"
+  },
+  "foreign_attrs": [
+   [
+    "\\bgenerated\\s+(?:always|by\\s+default)\\s+as\\s+identity(?:\\s*\\([^()]*\\))?",
+    "AUTO_INCREMENT",
+    "GENERATED ... AS IDENTITY"
+   ],
+   [
+    "::\\s*[a-z]\\w*(?:\\s*\\[\\s*\\])?",
+    "",
+    ":: casts"
+   ]
+  ],
+  "foreign_options": [],
+  "proven": [
+   "mariadb"
+  ]
+ }
 }

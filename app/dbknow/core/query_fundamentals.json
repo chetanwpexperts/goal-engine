@@ -60,6 +60,11 @@
    "id": "subqueries",
    "en": "For each subquery: where does it stand (one value, a set, EXISTS), and which names tie it to the outer row?",
    "hi": "Har subquery ke liye: wo kahan khadi hai (ek value, set, EXISTS), aur kaunse naam use bahar ki row se jodte hain?"
+  },
+  {
+   "id": "design",
+   "en": "For a table design: does each table name its rows (primary key), does each link point at a key of the same type with an index, does each column's type match its values, and is each fact kept once?",
+   "hi": "Table design ke liye: har table apni rows ko naam deti hai (primary key), har link same type ki key pe index ke saath, har column ka type uski values se mel khata hai, aur har baat ek hi baar?"
   }
  ],
  "fundamentals": {
@@ -271,7 +276,12 @@
     "trigger_body_pg",
     "no_language",
     "cursor_handler",
-    "declare_order"
+    "declare_order",
+    "ddl_dialect",
+    "reserved_name",
+    "varchar_length",
+    "text_key",
+    "row_too_big"
    ],
    "source": "https://www.postgresql.org/docs/current/features.html",
    "proven": [
@@ -334,6 +344,62 @@
     "trigger_return"
    ],
    "source": "https://www.postgresql.org/docs/current/plpgsql-trigger.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "table_keys": {
+   "title_en": "Every table names its rows; every link points at a key",
+   "title_hi": "Har table apni rows ko naam deti hai; har link kisi key pe point karta hai",
+   "rule_en": "A primary key says what one row is, so a table has exactly one (it may span several columns). A foreign key points at a parent's primary key or UNIQUE column, in a table that already exists, and both ends hold the same type (MySQL/MariaDB: same integer size and signedness). The link is read from the child's side (joins from the parent, a parent's DELETE), so the child column wants an index: MySQL/MariaDB InnoDB make one, PostgreSQL does not. MyISAM tables keep no foreign keys at all.",
+   "rule_hi": "Primary key batati hai ek row kya hai, isliye table mein ek hi hoti hai (kai columns ki bhi ho sakti hai). Foreign key parent ki primary key ya UNIQUE column pe point karti hai, pehle se bani table mein, aur dono sire same type ke hon. Link child ki taraf se padha jaata hai, isliye child column pe index chahiye: InnoDB khud banata hai, PostgreSQL nahi. MyISAM foreign key rakhta hi nahi.",
+   "topics": [
+    "no_primary_key",
+    "two_primary_keys",
+    "fk_order",
+    "fk_target",
+    "fk_type",
+    "fk_no_index",
+    "myisam_fk"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "column_types": {
+   "title_en": "A column's type is a promise about its values",
+   "title_hi": "Column ka type uski values ka vaada hai",
+   "rule_en": "Pick the type by what the value is and what will be done with it. Money is exact: DECIMAL / NUMERIC, never FLOAT / DOUBLE / REAL (binary guesses). Days and moments are DATE / DATETIME / TIMESTAMP, never text (text sorts letter by letter and accepts 30 February). Quantities are numbers; codes made of digits (phone, PIN code, account number) are text (numbers drop the leading 0 and overflow). On MySQL/MariaDB, text needs utf8mb4 (their 'utf8' is the 3-byte utf8mb3), TIMESTAMP only covers 1970-2038, and VARCHARs share a 65,535-byte row. A length is also a check: make it fit real values.",
+   "rule_hi": "Type value ke hisaab se chuno. Paisa exact: DECIMAL / NUMERIC, FLOAT / DOUBLE / REAL kabhi nahi. Din aur samay DATE / DATETIME / TIMESTAMP, text nahi (text akshar se sort hota hai aur 30 February le leta hai). Quantity number; digits wale code (phone, PIN) text (number aage ka 0 hata deta hai). MySQL/MariaDB pe text ke liye utf8mb4, TIMESTAMP sirf 1970-2038, aur VARCHARs ek 65,535-byte row baant-te hain.",
+   "topics": [
+    "money_float",
+    "date_as_text",
+    "number_as_text",
+    "code_as_number",
+    "utf8mb3",
+    "timestamp_range",
+    "over_wide"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-float.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "one_fact_one_place": {
+   "title_en": "One fact in one place",
+   "title_hi": "Ek baat ek hi jagah",
+   "rule_en": "Each fact is stored once, in the table it belongs to (normalization). A list inside one value ('3,7,12'), numbered copies of a column (phone1, phone2) and a parent's details copied next to its id (customer_id with customer_name) all let one fact be written twice and disagree. Lists and repeats become rows of a child or link table; a parent's details are read with a JOIN, unless the copy is a deliberate snapshot.",
+   "rule_hi": "Har baat ek baar, apni table mein (normalization). Ek value mein list ('3,7,12'), numbered columns (phone1, phone2) aur id ke saath parent ki details ki copy, sab ek baat ko do jagah likhte hain jo baad mein alag ho jaati hai. List aur repeat child/link table ki rows bante hain; parent ki details JOIN se padho.",
+   "topics": [
+    "list_in_column",
+    "repeating_group",
+    "parent_copy"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-FK",
    "proven": [
     "mariadb",
     "postgresql"

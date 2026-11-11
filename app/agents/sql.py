@@ -233,11 +233,13 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
     if not original:
         return {"ok": False, "error": "No query given", "findings": []}
     head = _strip_comments(original)
-    if re.match(r"^\s*(insert|replace)\b", head, re.I) or ROUTINE_RE.match(head):
+    from app.agents import sqlschema
+
+    if re.match(r"^\s*(insert|replace)\b", head, re.I) or ROUTINE_RE.match(head) or sqlschema.is_schema(head):
         return _analyze_other(original, said)        # INSERT / REPLACE / CREATE PROCEDURE, FUNCTION, TRIGGER: correctness only
     if not re.match(r"^\s*(\(|with\b|select\b|update\b|delete\b)", head, re.I):
-        return {"ok": False, "error": "This checker works on SELECT, UPDATE, DELETE, INSERT queries and on procedures, functions "
-                                      "and triggers", "findings": []}
+        return {"ok": False, "error": "This checker works on SELECT, UPDATE, DELETE, INSERT queries, on procedures, functions "
+                                      "and triggers, and on CREATE TABLE designs", "findings": []}
     sql = _mask_strings(_strip_comments(original))
     low = sql.lower()
     findings: list[SqlFinding] = []
@@ -466,7 +468,8 @@ ROUTINE_RE = re.compile(r"^\s*(delimiter\s+\S+\s+)?(create\s+(or\s+replace\s+)?(
 
 
 def _analyze_other(original: str, said: str = "") -> dict:
-    """INSERT / REPLACE and stored routines: no speed advice (there is no read to speed up), the correctness reading only."""
+    """INSERT / REPLACE, stored routines and CREATE TABLE designs: no speed advice (there is no read to speed up), the correctness
+    reading only."""
     out = {"ok": True, "findings": [], "indexes": [], "check_query": None, "indexes_verified": False, "assumed_primary": [],
            "notes": [], "rewritten": None, "tables": []}
     return _with_reading(original, _with_correctness(original, out, said))
@@ -507,11 +510,17 @@ def _with_correctness(original: str, out: dict, said: str = "") -> dict:
 
 def _with_reading(original: str, out: dict) -> dict:
     """The query read stage by stage (app/agents/sqlread.py), and the fundamental behind each mistake found."""
-    from app.agents import sqlread
+    from app.agents import sqlread, sqlschema
 
     try:
-        r = sqlread.read_query(original)
-        out["reading"] = {"en": sqlread.render(r, False), "hi": sqlread.render(r, True), "grain": r["grain"]}
+        if sqlschema.is_schema(original):            # a table design: its tables, what names a row, and the links
+            en, hi = sqlschema.reading(original), sqlschema.reading(original, True)
+            r = None
+            out["reading"] = {"en": en["text"], "hi": hi["text"], "grain": en["grain"]}
+        else:
+            r = sqlread.read_query(original)
+        if r is not None:
+            out["reading"] = {"en": sqlread.render(r, False), "hi": sqlread.render(r, True), "grain": r["grain"]}
     except Exception:  # noqa: BLE001 - the reading is an extra; never let it break the check
         return out
     funds = sqlread.fundamentals()["fundamentals"]
@@ -527,7 +536,10 @@ def _with_reading(original: str, out: dict) -> dict:
 MEANING_CHECKS = {"count", "not_in", "date_range", "concat", "like", "and_or", "null_math", "division", "nulls_order", "stable_order",
                   "join_key", "anti_join", "self_join", "distinct_join", "natural_join", "sum_null", "avg_null", "avg_avg", "pct_total",
                   # night 4: subqueries
-                  "sub_key", "scalar_rows", "sub_sum_null", "all_null", "not_in_outer", "in_list_null", "semi_join"}
+                  "sub_key", "scalar_rows", "sub_sum_null", "all_null", "not_in_outer", "in_list_null", "semi_join",
+                  # night 6: table design advice changes what the table accepts (offered, never applied as the fix)
+                  "no_primary_key", "date_as_text", "number_as_text", "code_as_number", "over_wide", "timestamp_range",
+                  "fk_no_index", "reserved_name", "varchar_length", "text_key", "row_too_big", "fk_type", "fk_target"}
 
 
 def _is_select(low: str) -> bool:

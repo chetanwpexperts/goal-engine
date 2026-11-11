@@ -68,7 +68,7 @@ feed.
 - [x] **5. Changing data.** UPDATE/DELETE with JOIN per engine, upsert, INSERT ... SELECT column order, preview before
   change, batching, isolation basics; procedures, functions and triggers (DELIMITER, endless loops, missing handlers,
   trigger recursion).
-- [ ] **6. Schema design.** Reading CREATE TABLE: missing primary key, unindexed foreign key, money as FLOAT, dates or
+- [x] **6. Schema design.** Reading CREATE TABLE: missing primary key, unindexed foreign key, money as FLOAT, dates or
   numbers stored as text, utf8 vs utf8mb4, over-wide types; advising a better structure.
 - [ ] **7. CASE, CTEs, windows.** CASE order and missing ELSE, recursive CTEs that must stop, window frames and ties in
   running totals, LAG/LEAD, NTILE, gaps and islands, versions without window functions.
@@ -168,3 +168,23 @@ statistics. Every night still adds 15+ concepts from its area. A new guide docum
   error); RETURN NULL from a BEFORE row trigger skips the row with no error; MariaDB compares emails case-blind, so a self-join
   dedupe removes more rows there than on PostgreSQL; MariaDB fires 1442 / 1362 / 1329 / 1337 / 1338 / 1321 exactly as the docs
   say; DELIMITER is only the mysql client's (the CLI cuts an undelimited CREATE PROCEDURE at the first ';', 1064 near '').
+- **Night 6 (11 Nov 2026).** Table designs in `app/agents/sqlschema.py` (new fundamentals `table_keys`: every table names its rows
+  and every link points at a key of the same type, with an index on the child side; `column_types`: a column's type is a promise
+  about its values; `one_fact_one_place`). The checker and the chat now take CREATE TABLE scripts (with the CREATE INDEX / ALTER
+  TABLE after them), show "How DBaba read this design" (tables, what names a row, each link) and offer a corrected design. Rules:
+  money in FLOAT / DOUBLE / REAL; dates and numbers kept as text; phone / PIN codes kept as numbers; no primary key (PRIMARY KEY on
+  the id that is there, both columns of a link table, or a new id in the engine's own words); two primary keys; a foreign key to
+  a table made later (reordered), to a column that is not a key, or of another type; PostgreSQL's unindexed foreign keys; utf8
+  (utf8mb3) and MyISAM on MySQL/MariaDB; TIMESTAMP for birth dates and expiries (1970-2038); VARCHAR without a length; TEXT as a
+  primary key; the 65,535-byte row; over-wide VARCHAR / CHAR; reserved words as names; lists in a column, numbered columns, a
+  parent's details copied next to its id; and a design written for the other database, rewritten in the named one's words (rule
+  A). Engine facts (marks, reserved words, foreign types and options, limits) in the dialect files' `schema_rules`. 22 concepts,
+  49-problem practice bank, 21 generator families. Question shapes now also cover "what data type for X", "kaunsa data type",
+  "X use kare ya Y" and general yes/no questions ("is mysql case sensitive"; never one about the person's own work). Lab lessons
+  worth keeping: MariaDB 10.11 enforces an inline column REFERENCES (MySQL before 9.0 ignores it, per its docs); MyISAM accepts a
+  FOREIGN KEY with no warning and never checks it; INT -> BIGINT, INT -> INT UNSIGNED and INT -> MariaDB SERIAL foreign keys are
+  errno 150 on MariaDB but INT -> BIGINT is fine on PostgreSQL; MariaDB accepts a foreign key to a non-unique indexed column
+  (PostgreSQL 42830); MariaDB 10.11 TIMESTAMP refused both 1965 and 2040; MariaDB's BOOLEAN stored 5; ADD COLUMN ... NOT NULL
+  with no DEFAULT fills '' on MariaDB and is refused by PostgreSQL; MariaDB accepts TEXT in UNIQUE (hidden hash) but not as a
+  PRIMARY KEY (1170); `key`, `range`, `rows`, `index`, `values` are reserved on MariaDB only, `user`, `end`, `window`, `do` on
+  PostgreSQL only.

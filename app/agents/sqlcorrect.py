@@ -892,6 +892,20 @@ def _check_once(sql: str, _again: bool = False, intent: str = "") -> dict:
         if any(f.topic == "delimiter" for f in fs) and len(sqlroutine.split_script(sql, blocks=True)) == 1:
             fixed = sqlroutine.with_delimiter(fixed or sql)
         return {"findings": [f.as_dict() for f in fs], "corrected": fixed, "guesses": []}
+    from app.agents import sqlschema
+
+    if sqlschema.is_schema(sql):                     # CREATE TABLE: a table design, read for keys, types and facts (night 6)
+        order = {"error": 0, "wrong": 1, "check": 2}
+        found = sorted(sqlschema.schema(sql, intent, Finding), key=lambda fe: order[fe[0].kind])
+        sure = any(f.kind in ("error", "wrong") for f, _e in found)
+        edits = []
+        for f, e in found:
+            if sure and f.kind == "check":
+                continue                             # a definite mistake is fixed alone; design advice is offered on its own
+            if e and not any(a < x[1] and x[0] < b or (a == b == x[0]) for x in e for a, b, _n in edits):
+                edits += e
+        fixed = sqlschema.apply(sql, edits) if edits else None
+        return {"findings": [f.as_dict() for f, _e in found], "corrected": fixed if fixed != sql else None, "guesses": []}
     s = _mask(sql)
     known = {w.lower() for w in re.findall(r"\b(?:from|join|update|into)\s+[`\"]?([\w$]+)", s, re.I)}
     known |= {w.lower() for w in re.findall(r"\b(?:from|join|update)\s+[`\"]?[\w$.]+[`\"]?\s+(?:as\s+)?([A-Za-z_]\w*)", s, re.I)

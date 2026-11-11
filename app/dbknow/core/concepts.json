@@ -11261,6 +11261,1985 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "data_types",
+   "kind": "concept",
+   "title": {
+    "en": "Choosing column data types",
+    "hinglish": "Column ka data type chunna",
+    "hindi": "Column का data type चुनना"
+   },
+   "terms": [
+    [
+     "data ?types?"
+    ],
+    [
+     "datatypes?"
+    ],
+    [
+     "column types?"
+    ],
+    [
+     "डेटा टाइप"
+    ],
+    [
+     "(which|what|kaunsa|konsa) types?",
+     "(column|store|rakh\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what data type should i use for a column",
+     "what are data types in sql"
+    ],
+    "hinglish": [
+     "column ka data type kaise choose kare",
+     "data type kya hota hai sql mein"
+    ],
+    "hindi": [
+     "डेटा टाइप क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A column's type says what values it may hold and how they compare, sort and add up. Pick it by what the value is: whole numbers INT / BIGINT, money DECIMAL(p,s), text VARCHAR(n) or TEXT, a day DATE, a moment DATETIME (MySQL/MariaDB) or TIMESTAMP (PostgreSQL), yes/no BOOLEAN. Codes made of digits (phone, PIN code) are text, because nobody adds them.",
+    "hinglish": "Column ka type batata hai usme kaunsi values aa sakti hain aur wo kaise compare, sort aur total hongi. Value dekh ke chuno: poore number INT / BIGINT, paisa DECIMAL(p,s), text VARCHAR(n) ya TEXT, din DATE, samay DATETIME (MySQL/MariaDB) ya TIMESTAMP (PostgreSQL), haan/na BOOLEAN. Digits wale code (phone, PIN) text hain, kyunki unhe koi jodta nahi.",
+    "hindi": "Column का type बताता है उसमें कौनसी values आ सकती हैं और वे कैसे compare, sort और जोड़ी जाएँगी। पूरे नंबर INT, पैसा DECIMAL, text VARCHAR/TEXT, दिन DATE, समय DATETIME/TIMESTAMP, हाँ/ना BOOLEAN; phone और PIN text में।"
+   },
+   "mistake": {
+    "en": "Keeping everything in VARCHAR 'to be safe': dates then sort as text, numbers can't be added, and bad values get in.",
+    "hinglish": "Sab kuch VARCHAR mein rakhna 'safe rehne ke liye': phir dates text ki tarah sort hoti hain, number jud nahi paate, galat values aa jaati hain.",
+    "hindi": "सब कुछ VARCHAR में रखना: फिर dates text की तरह sort होती हैं और गलत values आ जाती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE type_demo (id INT PRIMARY KEY, name VARCHAR(50), price DECIMAL(10,2), born DATE, active BOOLEAN);\nINSERT INTO type_demo VALUES (1, 'Asha', 99.50, '1990-05-01', TRUE);\nSELECT name, price, born FROM type_demo"
+     },
+     "columns": [
+      "name",
+      "price",
+      "born"
+     ],
+     "result": [
+      [
+       "Asha",
+       "99.5",
+       "1990-05-01"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "DATETIME for moments (TIMESTAMP only covers 1970-2038); BOOLEAN is TINYINT(1); 'utf8' is 3-byte, use utf8mb4.",
+    "mariadb": "Same as MySQL (lab: a BOOLEAN column on MariaDB 10.11 stored 5).",
+    "postgresql": "TIMESTAMP / TIMESTAMPTZ for moments; a real BOOLEAN (refuses 5); TEXT and VARCHAR are stored the same way."
+   },
+   "related": [
+    "decimal_vs_float",
+    "varchar_vs_text",
+    "datetime_vs_timestamp"
+   ],
+   "fundamentals": [
+    "column_types"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/data-types.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "decimal_vs_float",
+   "kind": "compare",
+   "title": {
+    "en": "DECIMAL vs FLOAT (storing money)",
+    "hinglish": "DECIMAL vs FLOAT (paisa kaise rakhe)",
+    "hindi": "DECIMAL बनाम FLOAT (पैसा कैसे रखें)"
+   },
+   "terms": [
+    [
+     "decimal",
+     "float"
+    ],
+    [
+     "decimal",
+     "double"
+    ],
+    [
+     "numeric",
+     "float"
+    ],
+    [
+     "numeric",
+     "real"
+    ],
+    [
+     "money",
+     "(type|datatype|data type|store|column|save)"
+    ],
+    [
+     "(price|amount|currency|paisa|paise|rupees?|salary)",
+     "(data ?type|type|store|column|save|rakh\\w*)"
+    ],
+    [
+     "float",
+     "(money|price|amount|paisa)"
+    ],
+    [
+     "पैसा",
+     "(type|टाइप)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "decimal vs float in mysql",
+     "what data type should i use for money",
+     "how to store price in database"
+    ],
+    "hinglish": [
+     "price ke liye kaunsa data type use kare",
+     "decimal aur float mein kya farak hai"
+    ],
+    "hindi": [
+     "DECIMAL और FLOAT में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "DECIMAL (NUMERIC in PostgreSQL, the same thing) stores the exact digits you give it: DECIMAL(12,2) keeps 10 digits before the point and 2 after. FLOAT, DOUBLE and REAL store a close binary guess, which is fine for measurements but not for money: 0.10 can't be stored exactly, so totals drift and = comparisons fail. Money is always DECIMAL / NUMERIC.",
+    "hinglish": "DECIMAL (PostgreSQL mein NUMERIC, wahi cheez) aapke diye exact digits rakhta hai: DECIMAL(12,2) point se pehle 10 aur baad mein 2 digits. FLOAT, DOUBLE, REAL ek binary andaaza rakhte hain, naap-tol ke liye theek par paise ke liye nahi: 0.10 exact nahi rehta, total khisakta hai aur = compare fail hota hai. Paisa hamesha DECIMAL / NUMERIC.",
+    "hindi": "DECIMAL ठीक वही अंक रखता है जो आप देते हैं; FLOAT/DOUBLE/REAL अंदाज़ा रखते हैं, इसलिए पैसे का total खिसकता है। पैसा हमेशा DECIMAL / NUMERIC।"
+   },
+   "mistake": {
+    "en": "FLOAT(10,2) looks like 'two decimals' but is still binary (lab: MariaDB stored 1234567.89 as 1234567.88).",
+    "hinglish": "FLOAT(10,2) 'do decimal' jaisa dikhta hai par binary hi hai (lab: MariaDB ne 1234567.89 ko 1234567.88 rakha).",
+    "hindi": "FLOAT(10,2) दो decimal जैसा दिखता है पर binary ही है (lab: 1234567.89 बना 1234567.88)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE price_test (id INT PRIMARY KEY, f REAL, d DECIMAL(12,2));\nINSERT INTO price_test VALUES (1, 0.1, 0.1), (2, 0.1, 0.1), (3, 0.1, 0.1), (4, 0.1, 0.1), (5, 0.1, 0.1), (6, 0.1, 0.1), (7, 0.1, 0.1), (8, 0.1, 0.1), (9, 0.1, 0.1), (10, 0.1, 0.1);\nSELECT SUM(f) = 1 AS float_is_exact, SUM(d) = 1 AS decimal_is_exact FROM price_test"
+     },
+     "columns": [
+      "float_is_exact",
+      "decimal_is_exact"
+     ],
+     "result": [
+      [
+       "0",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "DECIMAL(p,s), p up to 65; FLOAT(p,s) is deprecated.",
+    "mariadb": "Same as MySQL (lab: ten 0.1 in FLOAT summed to 1.0000000149).",
+    "postgresql": "NUMERIC(p,s) = DECIMAL(p,s); REAL / DOUBLE PRECISION are binary; avoid the MONEY type (tied to a locale)."
+   },
+   "related": [
+    "data_types",
+    "sum_function"
+   ],
+   "fundamentals": [
+    "column_types"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-float.html",
+   "seen_at": [
+    "https://wiki.postgresql.org/wiki/Don't_Do_This",
+    "https://stackoverflow.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "varchar_vs_char",
+   "kind": "compare",
+   "title": {
+    "en": "VARCHAR vs CHAR",
+    "hinglish": "VARCHAR vs CHAR",
+    "hindi": "VARCHAR बनाम CHAR"
+   },
+   "terms": [
+    [
+     "varchar",
+     "char"
+    ],
+    [
+     "nvarchar",
+     "varchar"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "varchar vs char",
+     "what is the difference between char and varchar"
+    ],
+    "hinglish": [
+     "char aur varchar mein kya farak hai",
+     "varchar ya char kaunsa better hai"
+    ],
+    "hindi": [
+     "VARCHAR और CHAR में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "CHAR(n) is fixed width: shorter values are padded with spaces to n (and the spaces are dropped again when compared or read back). VARCHAR(n) stores just the characters given, up to n. Use CHAR only for codes that always have the same length (a 2-letter country code); everything else is VARCHAR.",
+    "hinglish": "CHAR(n) fixed width hai: chhoti value spaces se n tak bhari jaati hai (compare/read pe spaces hat jaate hain). VARCHAR(n) utne hi characters rakhta hai jitne diye, n tak. CHAR sirf same length wale code ke liye (2 akshar ka country code); baaki sab VARCHAR.",
+    "hindi": "CHAR(n) fixed width है (spaces से भरा जाता है); VARCHAR(n) उतने ही अक्षर रखता है। CHAR सिर्फ़ एक जैसी length वाले code के लिए।"
+   },
+   "mistake": {
+    "en": "CHAR(255) for names or emails: every row carries the padding.",
+    "hinglish": "Naam ya email ke liye CHAR(255): har row padding dhoti hai.",
+    "hindi": "नाम या email के लिए CHAR(255): हर row padding ढोती है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE char_demo (c CHAR(5), v VARCHAR(5));\nINSERT INTO char_demo VALUES ('ab', 'ab');\nSELECT CHAR_LENGTH(c) AS c_len, CHAR_LENGTH(v) AS v_len FROM char_demo"
+     },
+     "columns": [
+      "c_len",
+      "v_len"
+     ],
+     "result": [
+      [
+       "2",
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "CHAR max 255; trailing spaces are removed when read.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "char(n) is padded; PostgreSQL's docs advise text or varchar instead (no speed gain from char)."
+   },
+   "related": [
+    "varchar_vs_text",
+    "data_types"
+   ],
+   "fundamentals": [
+    "column_types"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/char.html",
+   "seen_at": [
+    "https://wiki.postgresql.org/wiki/Don't_Do_This",
+    "https://stackoverflow.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "varchar_vs_text",
+   "kind": "compare",
+   "title": {
+    "en": "VARCHAR vs TEXT",
+    "hinglish": "VARCHAR vs TEXT",
+    "hindi": "VARCHAR बनाम TEXT"
+   },
+   "terms": [
+    [
+     "varchar",
+     "text"
+    ],
+    [
+     "longtext"
+    ],
+    [
+     "mediumtext"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "varchar vs text",
+     "should i use text or varchar"
+    ],
+    "hinglish": [
+     "varchar aur text mein kya fark hai",
+     "text ya varchar kab use kare"
+    ],
+    "hindi": [
+     "VARCHAR और TEXT में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "Both hold text. VARCHAR(n) has a maximum length you choose, which is also a check on the data (a name can't be a whole page). TEXT is for long free text (descriptions, comments). On MySQL/MariaDB a VARCHAR counts against the 65,535-byte row and can be fully indexed; TEXT is stored apart from the row and is indexed by a prefix only. On PostgreSQL they are stored the same way; varchar(n) just adds the length check.",
+    "hinglish": "Dono text rakhte hain. VARCHAR(n) ki ek max length hoti hai jo data ki jaanch bhi hai (naam poora page nahi ho sakta). TEXT lambe free text ke liye (description, comment). MySQL/MariaDB pe VARCHAR 65,535-byte row mein ginta hai aur poora index hota hai; TEXT row se alag rakha jaata hai aur sirf prefix index. PostgreSQL pe dono same tarah rakhe jaate hain.",
+    "hindi": "दोनों text रखते हैं। VARCHAR(n) की max length जाँच भी है; TEXT लंबे text के लिए। MySQL में VARCHAR row limit में गिना जाता है।"
+   },
+   "mistake": {
+    "en": "VARCHAR(5000) everywhere: on MySQL/MariaDB two of them already break the row limit (lab: two VARCHAR(10000) in utf8mb4 -> 1118).",
+    "hinglish": "Har jagah VARCHAR(5000): MySQL/MariaDB pe do hi row limit tod dete hain (lab: do VARCHAR(10000) -> 1118).",
+    "hindi": "हर जगह VARCHAR(5000): MySQL में दो ही row limit तोड़ देते हैं (1118)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE note_demo (id INT PRIMARY KEY, title VARCHAR(20), body TEXT);\nINSERT INTO note_demo VALUES (1, 'Short title', 'A long body can go on and on without a limit you pick.');\nSELECT CHAR_LENGTH(title) AS title_len, CHAR_LENGTH(body) AS body_len FROM note_demo"
+     },
+     "columns": [
+      "title_len",
+      "body_len"
+     ],
+     "result": [
+      [
+       "11",
+       "54"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "VARCHAR max 65,535 bytes per row in total (16,383 characters in utf8mb4); TEXT up to 64 KB, MEDIUMTEXT 16 MB, LONGTEXT 4 GB.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "text and varchar are the same type underneath; no MEDIUMTEXT / LONGTEXT (just text)."
+   },
+   "related": [
+    "varchar_vs_char",
+    "data_types"
+   ],
+   "fundamentals": [
+    "column_types"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/blob.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "utf8mb4",
+   "kind": "compare",
+   "title": {
+    "en": "utf8 vs utf8mb4",
+    "hinglish": "utf8 vs utf8mb4",
+    "hindi": "utf8 बनाम utf8mb4"
+   },
+   "terms": [
+    [
+     "utf8mb4"
+    ],
+    [
+     "utf8mb3"
+    ],
+    [
+     "utf-?8"
+    ],
+    [
+     "emojis?"
+    ],
+    [
+     "(store|save|rakh\\w*)",
+     "(hindi|unicode)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "utf8 vs utf8mb4",
+     "how to store emoji in mysql",
+     "what is utf8mb4"
+    ],
+    "hinglish": [
+     "utf8 aur utf8mb4 mein kya farak hai",
+     "mysql mein emoji kaise save kare"
+    ],
+    "hindi": [
+     "utf8mb4 क्या है"
+    ]
+   },
+   "answer": {
+    "en": "On MySQL and MariaDB 'utf8' is an old name for utf8mb3: at most 3 bytes per character, so emoji and some rarer scripts (4-byte characters) are refused or cut off. utf8mb4 is real UTF-8 and stores every character, Hindi and emoji included. Use CHARSET=utf8mb4 for tables (and the connection). PostgreSQL's UTF8 is already full UTF-8.",
+    "hinglish": "MySQL aur MariaDB pe 'utf8' purane utf8mb3 ka naam hai: 3 byte tak, isliye emoji aur kuch scripts (4-byte characters) refuse ya kat jaate hain. utf8mb4 asli UTF-8 hai, Hindi aur emoji sab rakhta hai. Tables (aur connection) ke liye CHARSET=utf8mb4. PostgreSQL ka UTF8 pehle se poora UTF-8 hai.",
+    "hindi": "MySQL/MariaDB में 'utf8' असल में utf8mb3 है (3 byte, emoji नहीं)। utf8mb4 पूरा UTF-8 है, हिंदी और emoji सब। CHARSET=utf8mb4 रखें।"
+   },
+   "mistake": {
+    "en": "Changing the table to utf8mb4 but not the connection: the app still sends 3-byte text (set charset=utf8mb4 in the connection too).",
+    "hinglish": "Table utf8mb4 kar di par connection nahi: app ab bhi 3-byte bhejta hai (connection mein bhi charset=utf8mb4).",
+    "hindi": "Table utf8mb4 कर दी पर connection नहीं: connection में भी charset=utf8mb4 रखें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE emoji_demo (id INT PRIMARY KEY, note VARCHAR(20)) DEFAULT CHARSET=utf8mb4;\nINSERT INTO emoji_demo VALUES (1, 'hi 😀');\nSELECT CHAR_LENGTH(note) AS chars FROM emoji_demo",
+      "postgresql": "CREATE TABLE emoji_demo (id INT PRIMARY KEY, note VARCHAR(20));\nINSERT INTO emoji_demo VALUES (1, 'hi 😀');\nSELECT CHAR_LENGTH(note) AS chars FROM emoji_demo"
+     },
+     "columns": [
+      "chars"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "utf8mb4 is the default since MySQL 8.0; 'utf8' (utf8mb3) is deprecated.",
+    "mariadb": "utf8 = utf8mb3 (lab: MariaDB 10.11 refused an emoji with 1366); recent versions default to utf8mb4.",
+    "postgresql": "No CHARSET clause on tables: the database's encoding (usually UTF8) covers everything."
+   },
+   "related": [
+    "collation",
+    "data_types"
+   ],
+   "fundamentals": [
+    "column_types"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/charset-unicode-utf8mb4.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "collation",
+   "kind": "concept",
+   "title": {
+    "en": "Collation and character set",
+    "hinglish": "Collation aur character set",
+    "hindi": "Collation और character set"
+   },
+   "terms": [
+    [
+     "collations?"
+    ],
+    [
+     "collate"
+    ],
+    [
+     "charsets?"
+    ],
+    [
+     "character sets?"
+    ],
+    [
+     "कोलेशन"
+    ],
+    [
+     "case[- ]?(in)?sensitive"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is collation in mysql",
+     "what is a character set",
+     "is mysql case sensitive"
+    ],
+    "hinglish": [
+     "collation kya hota hai",
+     "charset kya hai mysql mein"
+    ],
+    "hindi": [
+     "collation क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A character set says how text is stored as bytes (utf8mb4, latin1). A collation says how text is compared and sorted: whether 'Pune' = 'PUNE' (case-insensitive, _ci) or not (_bin, _cs), and in which order letters sort.",
+    "hinglish": "Character set batata hai text bytes mein kaise rakha jaata hai (utf8mb4, latin1). Collation batata hai text compare aur sort kaise hota hai: 'Pune' = 'PUNE' hoga (case-insensitive, _ci) ya nahi (_bin, _cs), aur akshar kis order mein.",
+    "hindi": "Character set बताता है text bytes में कैसे रखा जाता है; collation बताता है text compare और sort कैसे होता है ('Pune' = 'PUNE' या नहीं)।"
+   },
+   "mistake": {
+    "en": "Expecting the same comparison everywhere: MySQL/MariaDB's default collations ignore case, PostgreSQL's = does not.",
+    "hinglish": "Har jagah same compare ki ummeed: MySQL/MariaDB ka default case ignore karta hai, PostgreSQL ka = nahi.",
+    "hindi": "हर जगह एक जैसी तुलना की उम्मीद: MySQL case ignore करता है, PostgreSQL नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT 'Pune' = 'PUNE' AS same_text",
+      "postgresql": "SELECT 'Pune' ILIKE 'PUNE' AS same_text"
+     },
+     "columns": [
+      "same_text"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Default utf8mb4_0900_ai_ci: case- and accent-insensitive. COLLATE utf8mb4_bin for exact.",
+    "mariadb": "Default utf8mb4_general_ci (case-insensitive).",
+    "postgresql": "= is case-sensitive; use ILIKE, lower(), the citext extension, or a nondeterministic ICU collation."
+   },
+   "related": [
+    "utf8mb4",
+    "like"
+   ],
+   "fundamentals": [
+    "column_types"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/charset-general.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "auto_increment",
+   "kind": "concept",
+   "title": {
+    "en": "AUTO_INCREMENT, SERIAL and IDENTITY",
+    "hinglish": "AUTO_INCREMENT, SERIAL aur IDENTITY",
+    "hindi": "AUTO_INCREMENT, SERIAL और IDENTITY"
+   },
+   "terms": [
+    [
+     "auto[_ ]?increment\\w*"
+    ],
+    [
+     "(big|small)?serial"
+    ],
+    [
+     "identity( column)?"
+    ],
+    [
+     "auto (id|number|generated id)"
+    ],
+    [
+     "(id|number) apne aap"
+    ],
+    [
+     "ऑटो इंक्रीमेंट"
+    ],
+    [
+     "sequences?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is auto increment",
+     "how to make an auto increment id in postgresql",
+     "serial vs identity"
+    ],
+    "hinglish": [
+     "auto increment kya hota hai",
+     "id apne aap kaise badhe"
+    ],
+    "hindi": [
+     "ऑटो इंक्रीमेंट क्या है"
+    ]
+   },
+   "answer": {
+    "en": "An auto-increment column gives each new row the next number by itself, so the id doesn't have to be sent with the INSERT. MySQL/MariaDB write it INT AUTO_INCREMENT (the column must be a key); PostgreSQL writes GENERATED BY DEFAULT AS IDENTITY (or the older SERIAL). The numbers are for naming rows, not counting them: gaps after a failed insert or a delete are normal.",
+    "hinglish": "Auto-increment column har nayi row ko agla number khud deta hai, INSERT mein id bhejni nahi padti. MySQL/MariaDB: INT AUTO_INCREMENT (column key honi chahiye); PostgreSQL: GENERATED BY DEFAULT AS IDENTITY (ya purana SERIAL). Number row ka naam hai, ginti nahi: failed insert ya delete ke baad gap normal hai.",
+    "hindi": "Auto-increment column हर नई row को अगला नंबर खुद देता है। MySQL: AUTO_INCREMENT; PostgreSQL: GENERATED ... AS IDENTITY या SERIAL। gaps सामान्य हैं।"
+   },
+   "mistake": {
+    "en": "Writing AUTO_INCREMENT on PostgreSQL (syntax error) or GENERATED ... AS IDENTITY on MariaDB (1064); or treating the ids as a count with no gaps.",
+    "hinglish": "PostgreSQL pe AUTO_INCREMENT (syntax error) ya MariaDB pe GENERATED ... AS IDENTITY (1064) likhna; ya id ko bina gap ki ginti samajhna.",
+    "hindi": "PostgreSQL पर AUTO_INCREMENT या MariaDB पर IDENTITY लिखना (error); या id को बिना gap की गिनती समझना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE ai_demo (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(20));\nINSERT INTO ai_demo (name) VALUES ('a'), ('b');\nSELECT id, name FROM ai_demo ORDER BY id",
+      "postgresql": "CREATE TABLE ai_demo (id INT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, name VARCHAR(20));\nINSERT INTO ai_demo (name) VALUES ('a'), ('b');\nSELECT id, name FROM ai_demo ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "name"
+     ],
+     "result": [
+      [
+       "1",
+       "a"
+      ],
+      [
+       "2",
+       "b"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "INT / BIGINT AUTO_INCREMENT on a key column; LAST_INSERT_ID() gives the new id.",
+    "mariadb": "Same as MySQL; MariaDB also has SEQUENCE objects. SERIAL there means BIGINT UNSIGNED AUTO_INCREMENT (lab: an INT foreign key to it was refused, errno 150).",
+    "postgresql": "GENERATED BY DEFAULT / ALWAYS AS IDENTITY (standard) or SERIAL; INSERT ... RETURNING id gives the new id."
+   },
+   "related": [
+    "primary_key",
+    "surrogate_natural_key",
+    "uuid_vs_auto_increment"
+   ],
+   "fundamentals": [
+    "table_keys"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-identity-columns.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "not_null_default",
+   "kind": "concept",
+   "title": {
+    "en": "NOT NULL and DEFAULT",
+    "hinglish": "NOT NULL aur DEFAULT",
+    "hindi": "NOT NULL और DEFAULT"
+   },
+   "terms": [
+    [
+     "(?<!is )not null"
+    ],
+    [
+     "not null constraints?"
+    ],
+    [
+     "default values?"
+    ],
+    [
+     "default constraints?"
+    ],
+    [
+     "column",
+     "default"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is not null constraint",
+     "how to set a default value for a column"
+    ],
+    "hinglish": [
+     "not null kya hota hai",
+     "column ki default value kaise set kare"
+    ],
+    "hindi": [
+     "NOT NULL क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "NOT NULL makes a value required: an INSERT without it, or with NULL, is refused. DEFAULT gives the value used when an INSERT doesn't name the column. Together, NOT NULL DEFAULT 'new' means 'always has a value, and new rows start as new'.",
+    "hinglish": "NOT NULL value ko zaroori bana deta hai: bina value ya NULL wala INSERT refuse. DEFAULT wo value hai jo tab lagti hai jab INSERT column ka naam na le. Saath mein NOT NULL DEFAULT 'new' = hamesha value hogi, nayi rows 'new' se shuru.",
+    "hindi": "NOT NULL value ज़रूरी बनाता है; DEFAULT वह value है जो column न देने पर लगती है।"
+   },
+   "mistake": {
+    "en": "Adding a NOT NULL column without a DEFAULT to a table that has rows: PostgreSQL refuses (column contains null values); MariaDB fills '' silently (lab).",
+    "hinglish": "Rows wali table mein bina DEFAULT ke NOT NULL column jodna: PostgreSQL refuse; MariaDB chup-chaap '' bhar deta hai (lab).",
+    "hindi": "Rows वाली table में बिना DEFAULT के NOT NULL column जोड़ना: PostgreSQL मना करता है, MariaDB '' भर देता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE nn_demo (id INT PRIMARY KEY, status VARCHAR(10) NOT NULL DEFAULT 'new');\nINSERT INTO nn_demo (id) VALUES (1);\nSELECT id, status FROM nn_demo"
+     },
+     "columns": [
+      "id",
+      "status"
+     ],
+     "result": [
+      [
+       "1",
+       "new"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Without strict mode a missing NOT NULL value becomes '' / 0 with a warning.",
+    "mariadb": "Strict by default (STRICT_TRANS_TABLES); ALTER TABLE ADD ... NOT NULL fills existing rows with '' / 0.",
+    "postgresql": "Always strict; ADD COLUMN ... NOT NULL needs a DEFAULT when the table has rows."
+   },
+   "related": [
+    "null",
+    "check_constraint",
+    "alter_table"
+   ],
+   "fundamentals": [
+    "table_keys",
+    "null_logic"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "check_constraint",
+   "kind": "concept",
+   "title": {
+    "en": "CHECK constraint",
+    "hinglish": "CHECK constraint",
+    "hindi": "CHECK constraint"
+   },
+   "terms": [
+    [
+     "check constraints?"
+    ],
+    [
+     "constraint",
+     "check"
+    ],
+    [
+     "(only|sirf) (allow|positive)",
+     "(column|values?)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a check constraint",
+     "how to allow only positive values in a column"
+    ],
+    "hinglish": [
+     "check constraint kya hai",
+     "column mein sirf positive value kaise allow kare"
+    ],
+    "hindi": [
+     "CHECK constraint क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A CHECK constraint is a rule every row must pass, written as a condition: CHECK (qty > 0), CHECK (status IN ('new', 'paid')). An INSERT or UPDATE that breaks it is refused, so bad values never get in, whichever app writes them.",
+    "hinglish": "CHECK constraint ek niyam hai jo har row ko paas karna hai, condition ki tarah: CHECK (qty > 0), CHECK (status IN ('new', 'paid')). Isse todne wala INSERT/UPDATE refuse hota hai, chahe koi bhi app likhe.",
+    "hindi": "CHECK constraint एक नियम है जो हर row को पास करना है, जैसे CHECK (qty > 0); तोड़ने वाला INSERT/UPDATE मना होता है।"
+   },
+   "mistake": {
+    "en": "Relying on it on old MySQL: before 8.0.16 CHECK was parsed and ignored.",
+    "hinglish": "Purane MySQL pe bharosa: 8.0.16 se pehle CHECK padha jaata tha par ignore.",
+    "hindi": "पुराने MySQL (8.0.16 से पहले) में CHECK ignore होता था।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE ck_demo (id INT PRIMARY KEY, qty INT CHECK (qty > 0));\nINSERT INTO ck_demo VALUES (1, 5);\nSELECT id, qty FROM ck_demo"
+     },
+     "columns": [
+      "id",
+      "qty"
+     ],
+     "result": [
+      [
+       "1",
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Enforced from 8.0.16 (ignored before).",
+    "mariadb": "Enforced from 10.2 (lab: qty 0 refused with 4025).",
+    "postgresql": "Enforced (lab: qty 0 refused, violates check constraint)."
+   },
+   "related": [
+    "not_null_default",
+    "enum_vs_lookup"
+   ],
+   "fundamentals": [
+    "column_types"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "composite_key",
+   "kind": "concept",
+   "title": {
+    "en": "Composite primary key",
+    "hinglish": "Composite primary key",
+    "hindi": "Composite primary key"
+   },
+   "terms": [
+    [
+     "composite (primary )?keys?"
+    ],
+    [
+     "compound keys?"
+    ],
+    [
+     "primary keys?",
+     "(two|2|multiple|several|do|teen) columns?"
+    ],
+    [
+     "multi[- ]column (primary )?keys?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a composite primary key",
+     "can a primary key have two columns"
+    ],
+    "hinglish": [
+     "composite key kya hota hai",
+     "do columns ki primary key kaise banaye"
+    ],
+    "hindi": [
+     "composite key क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A composite primary key is one key made of several columns: together they name the row. It fits link tables, where a student may take a course once: PRIMARY KEY (student_id, course_id) allows (1, 10) and (1, 11) but refuses a second (1, 10).",
+    "hinglish": "Composite primary key kai columns se bani ek key hai: saath milkar row ko naam dete hain. Link table ke liye sahi: ek student ek course ek baar: PRIMARY KEY (student_id, course_id) (1, 10) aur (1, 11) le leti hai par doosra (1, 10) nahi.",
+    "hindi": "Composite primary key कई columns से बनी एक key है; link table में जैसे PRIMARY KEY (student_id, course_id)।"
+   },
+   "mistake": {
+    "en": "Writing PRIMARY KEY on two columns separately: that is two primary keys and is refused (1068 / 42P16).",
+    "hinglish": "Do columns pe alag-alag PRIMARY KEY likhna: wo do primary keys hain, refuse (1068 / 42P16).",
+    "hindi": "दो columns पर अलग-अलग PRIMARY KEY लिखना: refuse होता है (1068 / 42P16)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE enroll_demo (student_id INT, course_id INT, PRIMARY KEY (student_id, course_id));\nINSERT INTO enroll_demo VALUES (1, 10), (1, 11), (2, 10);\nSELECT COUNT(*) AS enrolments FROM enroll_demo"
+     },
+     "columns": [
+      "enrolments"
+     ],
+     "result": [
+      [
+       "3"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Order matters for the index: (a, b) also serves lookups on a alone.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same as MySQL/MariaDB."
+   },
+   "related": [
+    "primary_key",
+    "relationships"
+   ],
+   "fundamentals": [
+    "table_keys"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-PRIMARY-KEYS",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "surrogate_natural_key",
+   "kind": "compare",
+   "title": {
+    "en": "Surrogate key vs natural key",
+    "hinglish": "Surrogate key vs natural key",
+    "hindi": "Surrogate key बनाम natural key"
+   },
+   "terms": [
+    [
+     "surrogate"
+    ],
+    [
+     "natural keys?"
+    ],
+    [
+     "business keys?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "surrogate key vs natural key",
+     "what is a surrogate key"
+    ],
+    "hinglish": [
+     "surrogate key kya hai",
+     "natural key aur surrogate key mein farak"
+    ],
+    "hindi": [
+     "surrogate key क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A natural key is a value from the real world that is already unique (an email, a country code). A surrogate key is a number made only to name the row (an auto-increment id). Real-world values change (people change email), so most tables use a surrogate id as the primary key and keep the natural value UNIQUE.",
+    "hinglish": "Natural key asli duniya ki value hai jo pehle se unique hai (email, country code). Surrogate key sirf row ko naam dene ke liye bana number hai (auto-increment id). Asli values badalti hain (log email badalte hain), isliye zyada tables surrogate id ko primary key aur natural value ko UNIQUE rakhti hain.",
+    "hindi": "Natural key असली दुनिया की unique value है (email); surrogate key सिर्फ़ row को नाम देने वाला नंबर। अक्सर id primary key और email UNIQUE।"
+   },
+   "mistake": {
+    "en": "Using a value that can change (email, phone) as the primary key: every child row must change with it.",
+    "hinglish": "Badal sakne wali value (email, phone) ko primary key banana: har child row ko saath badalna padta hai.",
+    "hindi": "बदल सकने वाली value (email) को primary key बनाना: हर child row बदलनी पड़ती है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE country_demo (id INT PRIMARY KEY, iso_code CHAR(2) NOT NULL UNIQUE, name VARCHAR(50));\nINSERT INTO country_demo VALUES (1, 'IN', 'India'), (2, 'AE', 'United Arab Emirates');\nSELECT id, iso_code FROM country_demo ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "iso_code"
+     ],
+     "result": [
+      [
+       "1",
+       "IN"
+      ],
+      [
+       "2",
+       "AE"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "InnoDB stores rows in primary-key order: a short, growing id keeps inserts cheap.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Rows are not stored in key order; a short key still keeps indexes and links small."
+   },
+   "related": [
+    "primary_key",
+    "auto_increment",
+    "uuid_vs_auto_increment"
+   ],
+   "fundamentals": [
+    "table_keys"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/glossary.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "on_delete_cascade",
+   "kind": "concept",
+   "title": {
+    "en": "ON DELETE CASCADE (foreign key actions)",
+    "hinglish": "ON DELETE CASCADE",
+    "hindi": "ON DELETE CASCADE"
+   },
+   "terms": [
+    [
+     "on delete"
+    ],
+    [
+     "cascade"
+    ],
+    [
+     "on update cascade"
+    ],
+    [
+     "(delete|hata\\w*)",
+     "(child|related) (rows?|records?)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is on delete cascade",
+     "how to delete child rows automatically when the parent is deleted"
+    ],
+    "hinglish": [
+     "on delete cascade kya hai",
+     "parent delete karne pe child rows kaise delete ho"
+    ],
+    "hindi": [
+     "ON DELETE CASCADE क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A foreign key says what happens to child rows when their parent is deleted: RESTRICT / NO ACTION (the default) refuses the delete while children exist, CASCADE deletes the children too, SET NULL empties their link. Pick per link: order lines go with their order (CASCADE); orders should not vanish with a customer (keep the default).",
+    "hinglish": "Foreign key batati hai parent delete hone pe child rows ka kya ho: RESTRICT / NO ACTION (default) children rehte delete refuse karta hai, CASCADE children bhi delete karta hai, SET NULL unka link khaali karta hai. Har link ke liye socho: order lines order ke saath jaayein (CASCADE); orders customer ke saath gayab na hon (default).",
+    "hindi": "Foreign key बताती है parent delete होने पर child rows का क्या हो: default मना करता है, CASCADE उन्हें भी delete करता है, SET NULL link खाली करता है।"
+   },
+   "mistake": {
+    "en": "CASCADE everywhere: one DELETE can wipe out far more than expected. Without it, the default refuses the parent's delete (lab: 1451 / violates foreign key).",
+    "hinglish": "Har jagah CASCADE: ek DELETE ummeed se kahin zyada mita sakta hai. Iske bina default parent ka delete refuse karta hai (lab: 1451).",
+    "hindi": "हर जगह CASCADE: एक DELETE बहुत ज़्यादा मिटा सकता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE cat_demo (id INT PRIMARY KEY);\nCREATE TABLE item_demo (id INT PRIMARY KEY, cat_id INT, FOREIGN KEY (cat_id) REFERENCES cat_demo (id) ON DELETE CASCADE);\nINSERT INTO cat_demo VALUES (1), (2);\nINSERT INTO item_demo VALUES (1, 1), (2, 1), (3, 2);\nDELETE FROM cat_demo WHERE id = 1;\nSELECT id FROM item_demo"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "3"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "InnoDB only (MyISAM ignores foreign keys); cascaded deletes don't fire triggers on the child.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same actions; cascades fire the child's triggers; an index on the child column keeps the cascade fast."
+   },
+   "related": [
+    "foreign_key",
+    "delete_truncate_drop"
+   ],
+   "fundamentals": [
+    "table_keys",
+    "changes_safety"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-FK",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "relationships",
+   "kind": "concept",
+   "title": {
+    "en": "One-to-many and many-to-many relationships",
+    "hinglish": "One-to-many aur many-to-many",
+    "hindi": "One-to-many और many-to-many"
+   },
+   "terms": [
+    [
+     "one[- ]to[- ]many"
+    ],
+    [
+     "many[- ]to[- ]many"
+    ],
+    [
+     "one[- ]to[- ]one"
+    ],
+    [
+     "junction tables?"
+    ],
+    [
+     "link tables?"
+    ],
+    [
+     "bridge tables?"
+    ],
+    [
+     "relationships?"
+    ],
+    [
+     "mapping tables?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a many to many relationship",
+     "one to many vs many to many",
+     "what is a junction table"
+    ],
+    "hinglish": [
+     "many to many relationship kaise banaye",
+     "one to many kya hota hai"
+    ],
+    "hindi": [
+     "many to many relationship क्या है"
+    ]
+   },
+   "answer": {
+    "en": "One-to-many: one customer has many orders, so orders carries customer_id (a foreign key). Many-to-many: an order has many products and a product is in many orders; neither table can hold a list of the other, so a link table (order_items) holds one row per pair, with a foreign key to each side. One-to-one is a one-to-many whose foreign key is also UNIQUE.",
+    "hinglish": "One-to-many: ek customer ke kai orders, isliye orders mein customer_id (foreign key). Many-to-many: ek order mein kai products aur ek product kai orders mein; koi table doosre ki list nahi rakh sakti, isliye link table (order_items) har jodi ki ek row rakhti hai, dono taraf foreign key ke saath. One-to-one = one-to-many jiski foreign key UNIQUE bhi ho.",
+    "hindi": "One-to-many: child table में parent की foreign key। Many-to-many: बीच में link table, हर जोड़ी की एक row।"
+   },
+   "mistake": {
+    "en": "Keeping product ids as a list in the order row ('3,7,12'): it can't be joined, checked or indexed.",
+    "hinglish": "Order ki row mein product ids ki list ('3,7,12') rakhna: na join, na check, na index.",
+    "hindi": "Order row में product ids की list ('3,7,12') रखना: join, check, index कुछ नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id AS order_id, p.name AS product FROM orders o JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id WHERE o.id = 1 ORDER BY p.name"
+     },
+     "columns": [
+      "order_id",
+      "product"
+     ],
+     "result": [
+      [
+       "1",
+       "Phone X"
+      ],
+      [
+       "1",
+       "SQL Basics"
+      ],
+      [
+       "1",
+       "SQL Basics"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same design on every engine.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Arrays exist, but a link table is still what joins, foreign keys and indexes work with."
+   },
+   "related": [
+    "foreign_key",
+    "composite_key",
+    "normalization"
+   ],
+   "fundamentals": [
+    "one_fact_one_place",
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-FK",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "datetime_vs_timestamp",
+   "kind": "compare",
+   "title": {
+    "en": "DATETIME vs TIMESTAMP",
+    "hinglish": "DATETIME vs TIMESTAMP",
+    "hindi": "DATETIME बनाम TIMESTAMP"
+   },
+   "terms": [
+    [
+     "datetime",
+     "timestamp"
+    ],
+    [
+     "timestamptz"
+    ],
+    [
+     "timestamp with(out)? time zone"
+    ],
+    [
+     "time ?zones?",
+     "(column|store|save|type)"
+    ],
+    [
+     "year 2038"
+    ],
+    [
+     "2038"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "datetime vs timestamp in mysql",
+     "what is timestamptz in postgresql"
+    ],
+    "hinglish": [
+     "datetime aur timestamp mein kya farak hai",
+     "time zone ke saath date kaise save kare"
+    ],
+    "hindi": [
+     "DATETIME और TIMESTAMP में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "On MySQL/MariaDB, DATETIME stores the date and time as written (years 1000-9999); TIMESTAMP stores a moment in UTC, shows it in the session's time zone, and only covers 1970 to 2038-01-19. On PostgreSQL, timestamp is a plain date and time and timestamptz is a moment (stored in UTC, shown in the session's zone); both cover any year you need.",
+    "hinglish": "MySQL/MariaDB pe DATETIME date-time waise hi rakhta hai jaise likha (saal 1000-9999); TIMESTAMP UTC mein moment rakhta hai, session ke time zone mein dikhata hai, aur sirf 1970 se 2038-01-19 tak. PostgreSQL pe timestamp seedha date-time hai aur timestamptz ek moment (UTC mein, session zone mein dikhe); dono har saal le lete hain.",
+    "hindi": "MySQL में DATETIME जैसा लिखा वैसा रखता है; TIMESTAMP UTC में और सिर्फ़ 1970-2038। PostgreSQL में timestamp और timestamptz।"
+   },
+   "mistake": {
+    "en": "A birth date or an expiry in a MySQL/MariaDB TIMESTAMP: 1965 and 2040 are refused (lab: 1292).",
+    "hinglish": "Janam tithi ya expiry MySQL/MariaDB TIMESTAMP mein: 1965 aur 2040 refuse (lab: 1292).",
+    "hindi": "जन्मतिथि या expiry MySQL TIMESTAMP में: 1965 और 2040 मना (1292)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE ts_demo (id INT PRIMARY KEY, happened DATETIME);\nINSERT INTO ts_demo VALUES (1, '2040-01-01 10:00:00');\nSELECT happened FROM ts_demo",
+      "postgresql": "CREATE TABLE ts_demo (id INT PRIMARY KEY, happened TIMESTAMP);\nINSERT INTO ts_demo VALUES (1, '2040-01-01 10:00:00');\nSELECT happened FROM ts_demo"
+     },
+     "columns": [
+      "happened"
+     ],
+     "result": [
+      [
+       "2040-01-01 10:00:00"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "TIMESTAMP 1970-2038 UTC, DATETIME 1000-9999.",
+    "mariadb": "Same as MySQL in 10.11 (lab); 11.5+ stretches TIMESTAMP to 2106.",
+    "postgresql": "timestamp / timestamptz cover 4713 BC to 294276 AD; prefer timestamptz for moments."
+   },
+   "related": [
+    "data_types",
+    "dates_as_text"
+   ],
+   "fundamentals": [
+    "column_types",
+    "time_ranges"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/datetime.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "dates_as_text",
+   "kind": "concept",
+   "title": {
+    "en": "Storing dates as text (and why not)",
+    "hinglish": "Date ko text mein rakhna (kyun nahi)",
+    "hindi": "Date को text में रखना (क्यों नहीं)"
+   },
+   "terms": [
+    [
+     "dates?",
+     "(varchar|text|string)"
+    ],
+    [
+     "dates?",
+     "(as|in) (varchar|text|string)"
+    ],
+    [
+     "तारीख",
+     "(text|varchar)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "should i store dates as varchar",
+     "can i save date as text in mysql"
+    ],
+    "hinglish": [
+     "date ko varchar mein save kar sakte hai kya",
+     "date text mein rakhna sahi hai kya"
+    ],
+    "hindi": [
+     "तारीख को text में रखना सही है क्या"
+    ]
+   },
+   "answer": {
+    "en": "No: keep days in DATE and moments in DATETIME / TIMESTAMP. Text compares letter by letter, so '10/1/2024' sorts before '9/1/2024' and MAX picks the wrong day; any spelling is accepted ('2024-02-30'); and every date function needs a conversion first. A DATE column refuses impossible dates and sorts by time.",
+    "hinglish": "Nahi: din DATE mein aur samay DATETIME / TIMESTAMP mein. Text akshar se akshar compare hota hai, isliye '10/1/2024' '9/1/2024' se pehle aata hai aur MAX galat din chunta hai; koi bhi spelling chal jaati hai ('2024-02-30'); aur har date function se pehle conversion. DATE column galat date refuse karta hai aur samay se sort karta hai.",
+    "hindi": "नहीं: दिन DATE में रखें। Text में '10/1/2024' पहले आता है और '2024-02-30' भी चल जाता है।"
+   },
+   "mistake": {
+    "en": "Keeping dates as 'DD/MM/YYYY' text and fixing the sort in every query; convert once (STR_TO_DATE / to_date) into a DATE column.",
+    "hinglish": "Dates 'DD/MM/YYYY' text mein rakhna aur har query mein sort theek karna; ek baar convert karo (STR_TO_DATE / to_date) DATE column mein.",
+    "hindi": "Dates को text में रखकर हर query में sort ठीक करना; एक बार DATE में बदलें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE dt_demo (id INT PRIMARY KEY, d_text VARCHAR(10), d DATE);\nINSERT INTO dt_demo VALUES (1, '9/1/2024', '2024-01-09'), (2, '10/1/2024', '2024-01-10');\nSELECT id, d_text FROM dt_demo ORDER BY d_text"
+     },
+     "columns": [
+      "id",
+      "d_text"
+     ],
+     "result": [
+      [
+       "2",
+       "10/1/2024"
+      ],
+      [
+       "1",
+       "9/1/2024"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "STR_TO_DATE(text, '%d/%m/%Y') converts old text.",
+    "mariadb": "Same as MySQL (lab: DATE refused 2024-02-30 with 1292).",
+    "postgresql": "to_date(text, 'DD/MM/YYYY') converts; a DATE refuses 2024-02-30 (date/time field value out of range)."
+   },
+   "related": [
+    "datetime_vs_timestamp",
+    "data_types"
+   ],
+   "fundamentals": [
+    "column_types"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/date-and-time-types.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "enum_vs_lookup",
+   "kind": "compare",
+   "title": {
+    "en": "ENUM vs a lookup table",
+    "hinglish": "ENUM vs lookup table",
+    "hindi": "ENUM बनाम lookup table"
+   },
+   "terms": [
+    [
+     "enum"
+    ],
+    [
+     "enums"
+    ],
+    [
+     "lookup tables?"
+    ],
+    [
+     "reference tables?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is enum in mysql",
+     "enum vs lookup table"
+    ],
+    "hinglish": [
+     "enum kya hota hai",
+     "status ke liye enum use kare ya alag table"
+    ],
+    "hindi": [
+     "ENUM क्या है"
+    ]
+   },
+   "answer": {
+    "en": "ENUM('new','paid','shipped') is a MySQL/MariaDB column type that only takes the listed words. A lookup table (statuses) holds the allowed values as rows, and the column is a foreign key to it. ENUM is compact but changing the list needs an ALTER TABLE, and it sorts by list position; a lookup table can grow, carry labels, and works on every database. A CHECK (status IN (...)) is the light, portable middle way.",
+    "hinglish": "ENUM('new','paid','shipped') MySQL/MariaDB ka type hai jo sirf list wale shabd leta hai. Lookup table (statuses) allowed values ko rows mein rakhti hai, aur column uski foreign key hai. ENUM chhota hai par list badalne ke liye ALTER TABLE, aur sort list ke order se; lookup table badh sakti hai aur har database pe chalti hai. CHECK (status IN (...)) halka beech ka raasta.",
+    "hindi": "ENUM सिर्फ़ list वाले शब्द लेता है (MySQL/MariaDB); lookup table allowed values को rows में रखती है और हर database पर चलती है।"
+   },
+   "mistake": {
+    "en": "Copying a MySQL ENUM to PostgreSQL as is: type \"enum\" does not exist there (it needs CREATE TYPE ... AS ENUM, or a CHECK).",
+    "hinglish": "MySQL ENUM ko waise hi PostgreSQL pe le jaana: wahan type \"enum\" nahi hai (CREATE TYPE ... AS ENUM ya CHECK chahiye).",
+    "hindi": "MySQL ENUM को वैसे ही PostgreSQL पर ले जाना: वहाँ type enum नहीं है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE status_demo (code VARCHAR(10) PRIMARY KEY);\nCREATE TABLE order_demo (id INT PRIMARY KEY, status VARCHAR(10), FOREIGN KEY (status) REFERENCES status_demo (code));\nINSERT INTO status_demo VALUES ('new'), ('paid');\nINSERT INTO order_demo VALUES (1, 'paid');\nSELECT id, status FROM order_demo"
+     },
+     "columns": [
+      "id",
+      "status"
+     ],
+     "result": [
+      [
+       "1",
+       "paid"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "ENUM is a column type; a value not in the list is refused in strict mode.",
+    "mariadb": "Same as MySQL (lab: 'lost' refused with 1265).",
+    "postgresql": "No ENUM column type: CREATE TYPE status AS ENUM (...), a CHECK, or a lookup table."
+   },
+   "related": [
+    "check_constraint",
+    "foreign_key"
+   ],
+   "fundamentals": [
+    "column_types",
+    "one_fact_one_place"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/enum.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "alter_table",
+   "kind": "concept",
+   "title": {
+    "en": "ALTER TABLE: changing a table",
+    "hinglish": "ALTER TABLE: table badalna",
+    "hindi": "ALTER TABLE: table बदलना"
+   },
+   "terms": [
+    [
+     "alter table"
+    ],
+    [
+     "add (a |new )?column"
+    ],
+    [
+     "rename (a )?column"
+    ],
+    [
+     "change (the )?(column|data) ?type"
+    ],
+    [
+     "(drop|remove|delete) (a )?column"
+    ],
+    [
+     "column",
+     "(naam|name) (kaise )?badl\\w*"
+    ],
+    [
+     "column",
+     "rename"
+    ],
+    [
+     "column",
+     "add"
+    ],
+    [
+     "(naya|new|nayi|नया)",
+     "column",
+     "(jod\\w*|जोड़\\w*)"
+    ],
+    [
+     "(table|टेबल)",
+     "column",
+     "(jod\\w*|जोड़\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to add a column in mysql",
+     "what is alter table",
+     "how to rename a column"
+    ],
+    "hinglish": [
+     "table mein naya column kaise add kare",
+     "column ka naam kaise badle"
+    ],
+    "hindi": [
+     "table में column कैसे जोड़ें"
+    ]
+   },
+   "answer": {
+    "en": "ALTER TABLE changes a table that already has data: ADD COLUMN, DROP COLUMN, RENAME COLUMN, change a type, add a key or an index. Existing rows get the new column's DEFAULT (or NULL). On a big table some changes rewrite every row, so try it on a copy and run it when traffic is low.",
+    "hinglish": "ALTER TABLE data wali table ko badalta hai: ADD COLUMN, DROP COLUMN, RENAME COLUMN, type badalna, key ya index jodna. Purani rows ko naye column ka DEFAULT (ya NULL) milta hai. Badi table pe kuch badlaav har row dobara likhte hain, isliye pehle copy pe try karo aur kam traffic mein chalao.",
+    "hindi": "ALTER TABLE data वाली table को बदलता है: ADD / DROP / RENAME COLUMN, type बदलना, key जोड़ना। बड़ी table पर पहले copy पर आज़माएँ।"
+   },
+   "mistake": {
+    "en": "ADD COLUMN ... NOT NULL with no DEFAULT on a table with rows: PostgreSQL refuses it; MariaDB fills '' (lab).",
+    "hinglish": "Rows wali table pe bina DEFAULT ke ADD COLUMN ... NOT NULL: PostgreSQL refuse; MariaDB '' bhar deta hai (lab).",
+    "hindi": "Rows वाली table पर बिना DEFAULT के NOT NULL column: PostgreSQL मना, MariaDB '' भरता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE alt_demo (id INT PRIMARY KEY);\nINSERT INTO alt_demo VALUES (1);\nALTER TABLE alt_demo ADD COLUMN phone VARCHAR(20);\nUPDATE alt_demo SET phone = '98100' WHERE id = 1;\nSELECT id, phone FROM alt_demo"
+     },
+     "columns": [
+      "id",
+      "phone"
+     ],
+     "result": [
+      [
+       "1",
+       "98100"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "MODIFY / CHANGE COLUMN to change a type; many changes run ONLINE (ALGORITHM=INPLACE / INSTANT).",
+    "mariadb": "Same as MySQL; RENAME COLUMN from 10.5.",
+    "postgresql": "ALTER COLUMN ... TYPE ... USING expr; ADD COLUMN with a constant DEFAULT is instant."
+   },
+   "related": [
+    "create_table",
+    "not_null_default"
+   ],
+   "fundamentals": [
+    "column_types"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/alter-table.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "boolean_type",
+   "kind": "concept",
+   "title": {
+    "en": "BOOLEAN columns",
+    "hinglish": "BOOLEAN column",
+    "hindi": "BOOLEAN column"
+   },
+   "terms": [
+    [
+     "boolean"
+    ],
+    [
+     "bool"
+    ],
+    [
+     "true ?/? ?false"
+    ],
+    [
+     "yes ?/? ?no",
+     "column"
+    ],
+    [
+     "tinyint 1"
+    ],
+    [
+     "haan ?/? ?na"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is boolean in mysql",
+     "how to store true false in a column"
+    ],
+    "hinglish": [
+     "boolean column kaise banaye",
+     "true false kaise save kare"
+    ],
+    "hindi": [
+     "BOOLEAN क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A BOOLEAN column holds true or false (or NULL). Use it for yes/no facts (active, paid), not 'Y'/'N' text. In MySQL/MariaDB BOOLEAN is really TINYINT(1): TRUE is 1 and FALSE is 0, and other numbers get in too. PostgreSQL has a real boolean.",
+    "hinglish": "BOOLEAN column true ya false (ya NULL) rakhta hai. Haan/na ke liye (active, paid), 'Y'/'N' text nahi. MySQL/MariaDB mein BOOLEAN asal mein TINYINT(1) hai: TRUE = 1, FALSE = 0, aur doosre number bhi aa jaate hain. PostgreSQL mein asli boolean.",
+    "hindi": "BOOLEAN true/false रखता है। MySQL में यह TINYINT(1) है (दूसरे नंबर भी आ जाते हैं); PostgreSQL में असली boolean।"
+   },
+   "mistake": {
+    "en": "Writing DEFAULT 0 / 1 for a boolean on PostgreSQL (refused: boolean vs integer) or trusting MariaDB to keep only 0 and 1 (lab: it stored 5).",
+    "hinglish": "PostgreSQL pe boolean ka DEFAULT 0 / 1 (refuse) ya MariaDB pe sirf 0/1 ka bharosa (lab: 5 bhi rakh liya).",
+    "hindi": "PostgreSQL पर boolean का DEFAULT 0/1 (मना) या MariaDB पर सिर्फ़ 0/1 का भरोसा (5 भी रखा)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE bool_demo (id INT PRIMARY KEY, active BOOLEAN NOT NULL DEFAULT TRUE);\nINSERT INTO bool_demo (id) VALUES (1);\nINSERT INTO bool_demo VALUES (2, FALSE);\nSELECT id FROM bool_demo WHERE active"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "BOOLEAN = TINYINT(1); add CHECK (col IN (0, 1)) to keep it honest.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "boolean; accepts true/false, 't'/'f', 'yes'/'no', not 0/1 numbers."
+   },
+   "related": [
+    "data_types",
+    "check_constraint"
+   ],
+   "fundamentals": [
+    "column_types"
+   ],
+   "source": "https://www.postgresql.org/docs/current/datatype-boolean.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "uuid_vs_auto_increment",
+   "kind": "compare",
+   "title": {
+    "en": "UUID vs auto-increment id",
+    "hinglish": "UUID vs auto-increment id",
+    "hindi": "UUID बनाम auto-increment id"
+   },
+   "terms": [
+    [
+     "uuids?"
+    ],
+    [
+     "guids?"
+    ],
+    [
+     "uuid",
+     "(auto|serial|int)"
+    ],
+    [
+     "uuid",
+     "primary keys?"
+    ],
+    [
+     "uuid",
+     "auto[_ ]?increment"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "uuid vs auto increment",
+     "should i use uuid as primary key"
+    ],
+    "hinglish": [
+     "uuid kya hota hai",
+     "primary key ke liye uuid use kare ya auto increment"
+    ],
+    "hindi": [
+     "UUID क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A UUID is a 128-bit random-looking id that any machine can make without asking the database, so ids can be created offline or merged from many servers and can't be guessed. An auto-increment id is short, ordered and cheap to index. Use UUIDs when ids are made outside one database or shown publicly; otherwise an integer is simpler. Time-ordered UUIDs (v7) index better than random ones (v4).",
+    "hinglish": "UUID 128-bit ka id hai jo koi bhi machine database se pooche bina bana sakti hai: offline ya kai servers se bane ids mil sakte hain aur guess nahi hote. Auto-increment id chhota, kram mein aur index ke liye sasta. Ids database ke bahar bante hon ya public dikhte hon to UUID; warna integer aasaan. Time-ordered UUID (v7) random (v4) se behtar index hote hain.",
+    "hindi": "UUID कोई भी machine बिना database के बना सकती है; auto-increment छोटा और क्रम में। बाहर बनें या public दिखें तो UUID।"
+   },
+   "mistake": {
+    "en": "Storing UUIDs as VARCHAR(255): use the UUID type (PostgreSQL, MariaDB 10.7+) or BINARY(16) on MySQL.",
+    "hinglish": "UUID ko VARCHAR(255) mein rakhna: UUID type (PostgreSQL, MariaDB 10.7+) ya MySQL pe BINARY(16).",
+    "hindi": "UUID को VARCHAR(255) में रखना: UUID type या BINARY(16) रखें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT CHAR_LENGTH(UUID()) AS uuid_length",
+      "postgresql": "SELECT char_length(gen_random_uuid()::text) AS uuid_length"
+     },
+     "columns": [
+      "uuid_length"
+     ],
+     "result": [
+      [
+       "36"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "UUID() makes v1; no UUID column type: BINARY(16) with UUID_TO_BIN().",
+    "mariadb": "UUID column type from 10.7; UUID() makes v1, UUID_v7() from 11.7.",
+    "postgresql": "uuid type; gen_random_uuid() (v4) built in from 13; uuidv7() from 18."
+   },
+   "related": [
+    "auto_increment",
+    "surrogate_natural_key"
+   ],
+   "fundamentals": [
+    "table_keys"
+   ],
+   "source": "https://www.postgresql.org/docs/current/datatype-uuid.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "fk_index",
+   "kind": "concept",
+   "title": {
+    "en": "Should a foreign key have an index?",
+    "hinglish": "Foreign key pe index chahiye?",
+    "hindi": "Foreign key पर index चाहिए?"
+   },
+   "terms": [
+    [
+     "foreign keys?",
+     "index\\w*"
+    ],
+    [
+     "फॉरेन (की|key)",
+     "इंडेक्स"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "should foreign keys be indexed",
+     "does a foreign key create an index"
+    ],
+    "hinglish": [
+     "foreign key pe index lagana chahiye kya",
+     "foreign key index banati hai kya"
+    ],
+    "hindi": [
+     "foreign key पर index क्यों चाहिए"
+    ]
+   },
+   "answer": {
+    "en": "Yes, almost always. The link is read from the child's side: joining a parent to its children, and checking for children when a parent is deleted or its key changes. MySQL/MariaDB (InnoDB) make that index by themselves; PostgreSQL does not, so add CREATE INDEX on the child column yourself.",
+    "hinglish": "Haan, lagbhag hamesha. Link child ki taraf se padha jaata hai: parent ko children se jodna, aur parent delete hone pe children check karna. MySQL/MariaDB (InnoDB) ye index khud banate hain; PostgreSQL nahi, isliye child column pe CREATE INDEX khud karo.",
+    "hindi": "हाँ। MySQL/MariaDB यह index खुद बनाते हैं; PostgreSQL नहीं, इसलिए child column पर CREATE INDEX खुद करें।"
+   },
+   "mistake": {
+    "en": "Assuming PostgreSQL indexed the foreign key: then every parent DELETE scans the whole child table.",
+    "hinglish": "Maan lena ki PostgreSQL ne foreign key pe index bana diya: phir har parent DELETE poori child table padhta hai.",
+    "hindi": "मान लेना कि PostgreSQL ने index बना दिया: फिर हर parent DELETE पूरी child table पढ़ता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE fk_parent_demo (id INT PRIMARY KEY);\nCREATE TABLE fk_child_demo (id INT PRIMARY KEY, parent_id INT, FOREIGN KEY (parent_id) REFERENCES fk_parent_demo (id));\nSELECT COUNT(*) AS indexes FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'fk_child_demo'",
+      "postgresql": "CREATE TABLE fk_parent_demo (id INT PRIMARY KEY);\nCREATE TABLE fk_child_demo (id INT PRIMARY KEY, parent_id INT, FOREIGN KEY (parent_id) REFERENCES fk_parent_demo (id));\nCREATE INDEX ix_fk_child_demo_parent ON fk_child_demo (parent_id);\nSELECT COUNT(*) AS indexes FROM pg_indexes WHERE tablename = 'fk_child_demo'"
+     },
+     "columns": [
+      "indexes"
+     ],
+     "result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "InnoDB makes the index when none leads with the column (lab on MariaDB: the example shows 2 indexes without a CREATE INDEX).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "No automatic index on the referencing column (lab: only the primary key's index until CREATE INDEX)."
+   },
+   "related": [
+    "foreign_key",
+    "index",
+    "on_delete_cascade"
+   ],
+   "fundamentals": [
+    "table_keys"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-FK",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "create_table",
+   "kind": "howto",
+   "title": {
+    "en": "Creating a table",
+    "hinglish": "Table banana",
+    "hindi": "Table बनाना"
+   },
+   "terms": [
+    [
+     "create (a )?(new )?table"
+    ],
+    [
+     "(make|build) (a )?table"
+    ],
+    [
+     "table",
+     "(banaye|banate|banana|banaen|banau|banaun|bana)\\w*"
+    ],
+    [
+     "टेबल",
+     "बना\\w*"
+    ],
+    [
+     "create table"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to create a table in mysql",
+     "what is create table"
+    ],
+    "hinglish": [
+     "table kaise banaye",
+     "mysql mein table kaise banate hai"
+    ],
+    "hindi": [
+     "टेबल कैसे बनाते हैं"
+    ]
+   },
+   "answer": {
+    "en": "CREATE TABLE names the table and lists its columns, each with a type and its rules, then the keys. A good start: an id primary key, NOT NULL on what is required, UNIQUE on what must not repeat, a foreign key for each link, money in DECIMAL, dates in DATE, and (MySQL/MariaDB) utf8mb4.",
+    "hinglish": "CREATE TABLE table ka naam aur uske columns likhta hai, har ek ka type aur niyam, phir keys. Accha shuru: id primary key, zaroori pe NOT NULL, na dohraane wale pe UNIQUE, har link ki foreign key, paisa DECIMAL, date DATE, aur (MySQL/MariaDB) utf8mb4.",
+    "hindi": "CREATE TABLE table का नाम और columns (type और नियम के साथ) लिखता है, फिर keys। id primary key, NOT NULL, UNIQUE, foreign key।"
+   },
+   "mistake": {
+    "en": "A table with no primary key, money in FLOAT and dates in VARCHAR: paste your CREATE TABLE and DBaba checks it.",
+    "hinglish": "Primary key ke bina table, FLOAT mein paisa, VARCHAR mein date: apna CREATE TABLE paste karo, DBaba check karega.",
+    "hindi": "बिना primary key, FLOAT में पैसा, VARCHAR में date: अपना CREATE TABLE paste करें, DBaba जाँचेगा।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE customers_demo (id INT PRIMARY KEY, name VARCHAR(100) NOT NULL, email VARCHAR(254) UNIQUE, joined_on DATE);\nINSERT INTO customers_demo VALUES (1, 'Asha Rao', 'asha@mail.test', '2024-01-05');\nSELECT id, name, joined_on FROM customers_demo"
+     },
+     "columns": [
+      "id",
+      "name",
+      "joined_on"
+     ],
+     "result": [
+      [
+       "1",
+       "Asha Rao",
+       "2024-01-05"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Add ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 (the defaults on MySQL 8); id INT AUTO_INCREMENT PRIMARY KEY.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "No ENGINE / CHARSET; id INT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY; index foreign key columns yourself."
+   },
+   "related": [
+    "data_types",
+    "primary_key",
+    "alter_table"
+   ],
+   "fundamentals": [
+    "table_keys",
+    "column_types"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/create-table.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "phone_number_type",
+   "kind": "howto",
+   "title": {
+    "en": "Data type for phone numbers and PIN codes",
+    "hinglish": "Phone number aur PIN code ka data type",
+    "hindi": "Phone number और PIN code का data type"
+   },
+   "terms": [
+    [
+     "phone( numbers?)?",
+     "(type|datatype|data type|store|column|int|varchar|save|rakh\\w*)"
+    ],
+    [
+     "mobile( numbers?)?",
+     "(type|datatype|data type|store|column|save)"
+    ],
+    [
+     "(pin ?code|zip ?code|postal code)",
+     "(type|datatype|data type|store|column|save)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what data type for phone number",
+     "should i store phone numbers as int"
+    ],
+    "hinglish": [
+     "phone number ke liye kaunsa data type use kare",
+     "mobile number int mein save kare ya varchar mein"
+    ],
+    "hindi": [
+     "phone number का data type क्या रखें"
+    ]
+   },
+   "answer": {
+    "en": "Text: VARCHAR(20). Phone numbers and PIN codes are labels made of digits, not quantities. As numbers they lose a leading 0, a 10-digit mobile doesn't fit in INT, and '+91' or spaces can't be kept.",
+    "hinglish": "Text: VARCHAR(20). Phone number aur PIN code digits wale label hain, quantity nahi. Number mein aage ka 0 chala jaata hai, 10 digit mobile INT mein nahi aata, aur '+91' ya space nahi rakh sakte.",
+    "hindi": "Text: VARCHAR(20)। Number में आगे का 0 चला जाता है और 10 अंक का mobile INT में नहीं आता।"
+   },
+   "mistake": {
+    "en": "INT for phones: 9810012345 is out of range (lab: 1264 / integer out of range) and 012345 comes back as 12345.",
+    "hinglish": "Phone ke liye INT: 9810012345 range se bahar (lab: 1264) aur 012345 wapas 12345 aata hai.",
+    "hindi": "Phone के लिए INT: 9810012345 range से बाहर और 012345 बनता है 12345।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE phone_demo (id INT PRIMARY KEY, phone VARCHAR(20), pincode VARCHAR(10));\nINSERT INTO phone_demo VALUES (1, '09810012345', '012345');\nSELECT phone, pincode FROM phone_demo"
+     },
+     "columns": [
+      "phone",
+      "pincode"
+     ],
+     "result": [
+      [
+       "09810012345",
+       "012345"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "VARCHAR(20); INT tops out at 2,147,483,647.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "varchar(20) or text with a CHECK on the pattern."
+   },
+   "related": [
+    "data_types",
+    "create_table"
+   ],
+   "fundamentals": [
+    "column_types"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/integer-types.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/database-design",
+    "https://dba.stackexchange.com/questions/tagged/database-design"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

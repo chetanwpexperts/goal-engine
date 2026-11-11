@@ -55,12 +55,20 @@ SHAPES = [                                     # (shape, pattern) in the order t
                r"better|quicker)\b|"
                r"^(is|are) \w+( \w+)? (a|an)\b|^(is|are|does|do)\b.*\bby default\b|\b(hai|h|hain|karta hai|karti hai) kya\s*$|(है|हैं|करता है) क्या\s*$|मायने रखता"),
     ("define", r"^[\w\s-]{2,40}\b(in|on|for|with|mein|me|में) (sql|mysql|maria ?db|postgre\w*|sql server|oracle|sqlite)$"),
+    ("define", r"^(what|which) (\w+ ){0,2}(data ?)?types? (should|shall|for|to use|is best|are best|is better|do i|to)\b|"   # 'what data type for X'
+               r"\b(kaunsa|konsa|kaun sa|kaunsi|konsi|kaun si|kaun se)\b.*\b(data ?types?|types?)\b|\bkya (rakhe|rakhein|rakhen|rakhna)\b|"
+               r"क्या (रखें|रखे|रखना)|(कौनसा|कौन सा|कौनसी|कौन सी).*(टाइप|type)"),
+    ("compare", r"\b(kare|karein|karen|karu|karun|rakhe|rakhein|lagaye|lagayein) ya\b|\bya\b.*\b(kare|karein|rakhe|rakhein)\s*$"),
     ("puzzle", r"\b(gives?|returns?|shows?|giving|returning) (random|different|wrong|duplicate|extra|null|zero|0|same)\b|"
                r"\b(gives?|returns?|shows?|comes?) .*\b(twice|two times|double)\b"),
     ("task", r"^(find|remove|delete|get rid of|show|list|count|get|write|make|combine|merge|replace|join|sort|search)\b"),
     ("when", r"\b(when (to|should i|do we|do i|would you) use|where (to|should i) use|why (use|do we use|should i use|would i use|is .* used)|"
              r"what is .* used for|use of|uses of|kab use|kab (karte|karna|lagate|lagana)|kyun use|kyu use|kis liye)\b|कब (इस्तेमाल|उपयोग)|क्यों (इस्तेमाल|उपयोग)"),
 ]
+# a general yes/no question ('is mysql case sensitive', 'does a foreign key create an index'): answered when its words name a
+# known concept; never when it is about their own work ('should I add an index' after a query is a follow-up), and never a
+# reason to call an unknown question a concept question
+SHAPES.append(("yesno", r"^(is|are|does|do|can|could|should|will|would)\b(?!.*\b(i|we|my|our|me|us|this|these|it|its|mera|meri|hamara)\b)"))
 SHAPE_RE = [(n, re.compile(p, re.I)) for n, p in SHAPES]
 
 # a question about the person's own query, error or database is real work for the checker / diagnoser, not a concept

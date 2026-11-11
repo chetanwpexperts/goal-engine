@@ -242,7 +242,8 @@ URL_RE = re.compile(r"\b((?:https?://)?(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-
 SQL_RE = re.compile(r"\b(select\b[\s\S]+?\bfrom\b|update\s+[`\w.]+\s+set\b|delete\s+from\b|update\s+[`\w.]+(?:\s+(?:as\s+)?\w+)?\s+"
                     r"(?:inner\s+|left\s+)?join\b|delete\s+[`\w]+(?:\s*,\s*[`\w]+)*\s+from\b|"
                     r"(?:insert|replace)\s+(?:ignore\s+)?into\s+[`\"\w.]+[\s\S]*?\b(?:values?|select|set)\b|"
-                    r"create\s+(?:or\s+replace\s+)?(?:definer\s*=\s*\S+\s+)?(?:procedure|function|trigger)\s+[`\"\w.]+|do\s+\$)", re.I)
+                    r"create\s+(?:or\s+replace\s+)?(?:definer\s*=\s*\S+\s+)?(?:procedure|function|trigger)\s+[`\"\w.]+|do\s+\$|"
+                    r"create\s+(?:temp(?:orary)?\s+)?table\s+(?:if\s+not\s+exists\s+)?[`\"\w.]+\s*\()", re.I)
 YES_RE = re.compile(r"^\s*(haan|ha|haa|han|yes|yep|ok|okay|theek hai|thik hai|kar do|karo|start|go|chalu karo|shuru karo|please do)\b", re.I)
 
 RUNS_PER_VISITOR_PER_DAY = 30

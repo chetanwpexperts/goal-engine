@@ -53,7 +53,7 @@ SHAPES = [                                     # (shape, pattern) in the order t
     ("howto", r"^can (i|we|you|one)\b|^is (it|there a way) (possible )?to\b"),
     ("define", r"^(does|do|is|are|will)\b.*\b(matter|matters|same|different|allowed|possible|a database|a language|faster|slower|"
                r"better|quicker)\b|"
-               r"^(is|are) \w+( \w+)? (a|an)\b|\b(hai|h|hain|karta hai|karti hai) kya\s*$|(है|हैं|करता है) क्या\s*$|मायने रखता"),
+               r"^(is|are) \w+( \w+)? (a|an)\b|^(is|are|does|do)\b.*\bby default\b|\b(hai|h|hain|karta hai|karti hai) kya\s*$|(है|हैं|करता है) क्या\s*$|मायने रखता"),
     ("define", r"^[\w\s-]{2,40}\b(in|on|for|with|mein|me|में) (sql|mysql|maria ?db|postgre\w*|sql server|oracle|sqlite)$"),
     ("puzzle", r"\b(gives?|returns?|shows?|giving|returning) (random|different|wrong|duplicate|extra|null|zero|0|same)\b|"
                r"\b(gives?|returns?|shows?|comes?) .*\b(twice|two times|double)\b"),

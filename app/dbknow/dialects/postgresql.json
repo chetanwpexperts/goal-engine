@@ -509,7 +509,13 @@
   "\\bdistinct\\s+on\\s*\\(",
   "\\bnulls\\s+(first|last)\\b",
   "\\bserial\\b",
-  "\\bstring_agg\\s*\\("
+  "\\bstring_agg\\s*\\(",
+  "\\bon\\s+conflict\\b",
+  "\\blanguage\\s+plpgsql\\b",
+  "\\$\\$",
+  "\\bexecute\\s+(?:function|procedure)\\b",
+  "\\bdelete\\s+from\\s+[\\w\\\".]+(?:\\s+(?:as\\s+)?\\w+)?\\s+using\\b",
+  "\\bupdate\\s+[\\w\\\".]+(?:\\s+(?:as\\s+)?\\w+)?\\s+set\\b[^;(]*\\bfrom\\b"
  ],
  "query_rules": {
   "pipes": "concat",
@@ -527,7 +533,17 @@
   "sum_boolean": {"behaviour": "error", "code": "42883", "says": "PostgreSQL refuses it (42883, function sum(boolean) does not exist): a comparison is a boolean there, not a number.", "proven": ["postgresql"]},
   "having_alias": {"behaviour": "error", "code": "42703", "says": "PostgreSQL refuses it (42703, column does not exist; or 42803 if the name is also a real column): HAVING is worked out before SELECT names exist.", "proven": ["postgresql"]},
   "count_distinct_multi": {"behaviour": "error", "code": "42883", "says": "PostgreSQL refuses it (42883, function count(...) does not exist): COUNT takes one argument there.", "proven": ["postgresql"]},
-  "window_over_ungrouped": {"behaviour": "error", "code": "42803", "says": "PostgreSQL refuses it (42803, must appear in the GROUP BY clause or be used in an aggregate function).", "proven": ["postgresql"]}
+  "window_over_ungrouped": {"behaviour": "error", "code": "42803", "says": "PostgreSQL refuses it (42803, must appear in the GROUP BY clause or be used in an aggregate function).", "proven": ["postgresql"]},
+  "update_join": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no JOIN directly after UPDATE: 'syntax error at or near JOIN'. It writes UPDATE a SET col = ... FROM b WHERE a.x = b.y.", "proven": ["postgresql"]},
+  "update_from": {"behaviour": "works", "says": "PostgreSQL joins in an UPDATE with UPDATE a SET col = ... FROM b WHERE a.x = b.y.", "proven": ["postgresql"]},
+  "set_qualified": {"behaviour": "error", "code": "42703", "says": "PostgreSQL refuses a table name on the column being set (42703: column \"o\" of relation ... does not exist).", "proven": ["postgresql"]},
+  "delete_join": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no DELETE a FROM a JOIN b ('syntax error'); it writes DELETE FROM a USING b WHERE a.x = b.y.", "proven": ["postgresql"]},
+  "delete_using": {"behaviour": "works", "says": "PostgreSQL deletes through another table with DELETE FROM a USING b WHERE a.x = b.y.", "proven": ["postgresql"]},
+  "on_duplicate_key": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no ON DUPLICATE KEY UPDATE ('syntax error at or near DUPLICATE').", "proven": ["postgresql"]},
+  "on_conflict": {"behaviour": "works", "says": "PostgreSQL upserts with INSERT ... ON CONFLICT (key) DO UPDATE SET col = EXCLUDED.col (9.5+).", "proven": ["postgresql"]},
+  "change_limit": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no LIMIT (or ORDER BY) on UPDATE/DELETE ('syntax error at or near LIMIT').", "proven": ["postgresql"]},
+  "insert_ignore": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no INSERT IGNORE ('syntax error at or near IGNORE'); ON CONFLICT DO NOTHING skips duplicates.", "proven": ["postgresql"]},
+  "replace_into": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no REPLACE INTO ('syntax error at or near REPLACE').", "proven": ["postgresql"]}
  },
  "proven": [
   "postgresql"

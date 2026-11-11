@@ -9562,6 +9562,1705 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "insert_into",
+   "kind": "concept",
+   "title": {
+    "en": "INSERT INTO",
+    "hinglish": "INSERT INTO",
+    "hindi": "INSERT INTO"
+   },
+   "terms": [
+    [
+     "insert\\s+into"
+    ],
+    [
+     "insert",
+     "(rows?|data|record|statement|query|values?)"
+    ],
+    [
+     "(इन्सर्ट|इंसर्ट)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is insert into in sql",
+     "how to insert data into a table",
+     "how to insert multiple rows at once"
+    ],
+    "hinglish": [
+     "insert into kya hota hai",
+     "table mein data kaise insert kare"
+    ],
+    "hindi": [
+     "INSERT INTO क्या होता है",
+     "टेबल में डेटा कैसे इंसर्ट करें"
+    ]
+   },
+   "answer": {
+    "en": "INSERT INTO adds new rows: name the table, list the columns you fill, then give one bracket of values per row (several rows in one statement are separated by commas). Columns you leave out get their default (often NULL). Always write the column list: the values are matched to it by position.",
+    "hinglish": "INSERT INTO nayi rows jodta hai: table ka naam, jo columns bharne hain unki list, phir har row ke liye ek bracket values (kai rows comma se). Jo columns chhod do unhe default (aksar NULL) milta hai. Column list hamesha likho: values position se milti hain.",
+    "hindi": "INSERT INTO नई rows जोड़ता है: table, columns की list, फिर हर row के लिए values का एक bracket। छोड़े गए columns को default (अक्सर NULL) मिलता है।"
+   },
+   "mistake": {
+    "en": "Leaving out the column list: the values then go into every column in the table's current order, and the statement breaks (or fills the wrong columns) the day a column is added.",
+    "hinglish": "Column list chhod dena: tab values table ke abhi ke order mein har column mein jaati hain, aur column judte hi statement toot-ta hai ya galat column bharta hai.",
+    "hindi": "Column list छोड़ देना: नया column जुड़ते ही statement टूटता है या गलत column भरता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "INSERT INTO categories (id, name) VALUES (6, 'Games'), (7, 'Garden');\nSELECT id, name, parent_id FROM categories WHERE id >= 6 ORDER BY id"
+     },
+     "result": [
+      [
+       "6",
+       "Games",
+       "NULL"
+      ],
+      [
+       "7",
+       "Garden",
+       "NULL"
+      ]
+     ],
+     "columns": [
+      "id",
+      "name",
+      "parent_id"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "INSERT ... VALUES (...), (...) for many rows; INSERT IGNORE skips errors (careful); auto-increment ids via LAST_INSERT_ID().",
+    "mariadb": "Same as MySQL; RETURNING id is supported from 10.5.",
+    "postgresql": "Same INSERT; RETURNING id gives back the new ids; serial / identity columns fill themselves."
+   },
+   "related": [
+    "insert_select",
+    "upsert",
+    "primary_key"
+   ],
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/insert.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql-update",
+    "https://dba.stackexchange.com/questions/tagged/update"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "insert_select",
+   "kind": "howto",
+   "title": {
+    "en": "INSERT ... SELECT (copy rows)",
+    "hinglish": "INSERT ... SELECT (rows copy karna)",
+    "hindi": "INSERT ... SELECT (rows कॉपी करना)"
+   },
+   "terms": [
+    [
+     "insert",
+     "select"
+    ],
+    [
+     "copy",
+     "(rows?|data|records?)",
+     "(table|another)"
+    ],
+    [
+     "(rows?|data)",
+     "(copy|copies)",
+     "(dusri|doosri|another|other)"
+    ],
+    [
+     "कॉपी",
+     "(टेबल|rows)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to copy rows from one table to another",
+     "what is insert into select",
+     "how does insert into select work"
+    ],
+    "hinglish": [
+     "ek table se doosri table mein data kaise copy kare",
+     "insert select kaise use kare"
+    ],
+    "hindi": [
+     "एक टेबल से दूसरी टेबल में rows कैसे कॉपी करें"
+    ]
+   },
+   "answer": {
+    "en": "INSERT INTO target (a, b, c) SELECT x, y, z FROM source WHERE ... inserts every row the SELECT returns. The columns are matched by POSITION: the first SELECT item goes into a, the second into b, whatever their names; the counts must be equal. Run the SELECT alone first to see the rows that will be added.",
+    "hinglish": "INSERT INTO target (a, b, c) SELECT x, y, z FROM source WHERE ... SELECT ki har row daal deta hai. Columns POSITION se milte hain: pehla item a mein, doosra b mein, naam kuch bhi ho; ginti barabar honi chahiye. Pehle sirf SELECT chala ke dekho.",
+    "hindi": "INSERT INTO target (a, b, c) SELECT x, y, z FROM source ... — columns position से मिलते हैं, नाम से नहीं। पहले SELECT अकेले चलाकर देखें।"
+   },
+   "mistake": {
+    "en": "Writing the SELECT columns in a different order than the INSERT list (SELECT name, country into (country, name)): the values swap silently when the types allow it.",
+    "hinglish": "SELECT ke columns INSERT list se alag order mein likhna: types mil jaayein to values chupchaap ulat jaati hain.",
+    "hindi": "SELECT के columns अलग order में लिखना: values चुपचाप उलट जाती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "INSERT INTO categories (id, name, parent_id) SELECT id + 10, country, NULL FROM suppliers WHERE country = 'India';\nSELECT id, name, parent_id FROM categories WHERE id > 10 ORDER BY id"
+     },
+     "result": [
+      [
+       "11",
+       "India",
+       "NULL"
+      ],
+      [
+       "13",
+       "India",
+       "NULL"
+      ]
+     ],
+     "columns": [
+      "id",
+      "name",
+      "parent_id"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Reading and writing the same table in INSERT ... SELECT works (MySQL buffers the rows).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same; add RETURNING to see the inserted rows."
+   },
+   "related": [
+    "insert_into",
+    "upsert"
+   ],
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/insert-select.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql-update",
+    "https://dba.stackexchange.com/questions/tagged/update"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "update_statement",
+   "kind": "concept",
+   "title": {
+    "en": "UPDATE",
+    "hinglish": "UPDATE",
+    "hindi": "UPDATE"
+   },
+   "terms": [
+    [
+     "update",
+     "(statement|query|command|syntax)"
+    ],
+    [
+     "update",
+     "(column|value|values)"
+    ],
+    [
+     "update"
+    ],
+    [
+     "अपडेट"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is update in sql",
+     "how to update a column value",
+     "how to update multiple columns"
+    ],
+    "hinglish": [
+     "update query kaise likhe",
+     "ek column ki value kaise update kare"
+    ],
+    "hindi": [
+     "UPDATE query क्या होती है"
+    ]
+   },
+   "answer": {
+    "en": "UPDATE table SET col = value, col2 = value2 WHERE condition changes the rows the WHERE lets through, all of them, at once. Without WHERE every row changes. Separate the assignments with commas, never AND. Run the same WHERE as a SELECT first to see the rows.",
+    "hinglish": "UPDATE table SET col = value, col2 = value2 WHERE condition un sab rows ko badalta hai jo WHERE se guzarti hain. WHERE nahi to har row badlegi. Assignments comma se alag, AND se nahi. Pehle wahi WHERE SELECT mein chala ke rows dekho.",
+    "hindi": "UPDATE ... SET ... WHERE ... — WHERE से गुज़रने वाली हर row बदलती है; WHERE न हो तो सारी। पहले वही WHERE SELECT में चलाएँ।"
+   },
+   "mistake": {
+    "en": "SET a = 1 AND b = 2: MySQL reads it as a = (1 AND b = 2), sets a to 0 or 1 and never touches b.",
+    "hinglish": "SET a = 1 AND b = 2: MySQL ise a = (1 AND b = 2) padhta hai, a 0 ya 1 ban jaata hai aur b badalta hi nahi.",
+    "hindi": "SET a = 1 AND b = 2: b कभी नहीं बदलता; comma लगाइए।"
+   },
+   "examples": [
+    {
+     "preview": {
+      "all": "SELECT id, status, amount FROM orders WHERE status = 'pending'"
+     },
+     "sql": {
+      "all": "UPDATE orders SET status = 'paid', discount = 0 WHERE status = 'pending'"
+     },
+     "changed": 1,
+     "preview_columns": [
+      "id",
+      "status",
+      "amount"
+     ],
+     "preview_result": [
+      [
+       "6",
+       "pending",
+       "65000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "UPDATE ... ORDER BY ... LIMIT n is allowed; safe-updates mode (MySQL clients) refuses an UPDATE without a key in WHERE (1175).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "No LIMIT on UPDATE; RETURNING shows the changed rows."
+   },
+   "related": [
+    "update_join",
+    "preview_before_change",
+    "transaction"
+   ],
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/update.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql-update",
+    "https://dba.stackexchange.com/questions/tagged/update"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "update_join",
+   "kind": "howto",
+   "title": {
+    "en": "UPDATE with a JOIN (from another table)",
+    "hinglish": "Doosri table se UPDATE (JOIN ke saath)",
+    "hindi": "दूसरी टेबल से UPDATE (JOIN के साथ)"
+   },
+   "terms": [
+    [
+     "update",
+     "join"
+    ],
+    [
+     "update",
+     "(another|other|second|dusri|doosri) table"
+    ],
+    [
+     "update",
+     "from",
+     "table"
+    ],
+    [
+     "अपडेट",
+     "(जॉइन|दूसरी)"
+    ],
+    [
+     "update",
+     "(दूसरी|जॉइन)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to update with a join",
+     "how to update a table from another table",
+     "update join in postgresql"
+    ],
+    "hinglish": [
+     "dusri table se update kaise kare",
+     "update join kaise likhe"
+    ],
+    "hindi": [
+     "दूसरी टेबल से UPDATE कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "Each engine writes it its own way. MySQL/MariaDB: UPDATE a JOIN b ON a.x = b.y SET a.col = b.val WHERE ... . PostgreSQL: UPDATE a SET col = b.val FROM b WHERE a.x = b.y AND ... (no table name before the column being set, and never the target table again in FROM). Each target row is changed at most once: if it matches several rows of b, total them first.",
+    "hinglish": "Har engine apne tareeke se likhta hai. MySQL/MariaDB: UPDATE a JOIN b ON a.x = b.y SET a.col = b.val WHERE ... . PostgreSQL: UPDATE a SET col = b.val FROM b WHERE a.x = b.y AND ... (SET mein table ka naam nahi, aur FROM mein target table dobara nahi). Har target row ek hi baar badalti hai: b mein kai rows hon to pehle total banao.",
+    "hindi": "MySQL/MariaDB: UPDATE a JOIN b ON ... SET a.col = ...; PostgreSQL: UPDATE a SET col = ... FROM b WHERE ...। हर row एक ही बार बदलती है।"
+   },
+   "mistake": {
+    "en": "Joining a child table with several rows per target row and adding them (SET total = total + p.amount): only one of them is added.",
+    "hinglish": "Kai rows wali child table join karke jodna (SET total = total + p.amount): sirf ek hi judti hai.",
+    "hindi": "कई rows वाली child table से जोड़ना: सिर्फ़ एक ही जुड़ती है।"
+   },
+   "examples": [
+    {
+     "preview": {
+      "all": "SELECT o.id, o.amount, c.city FROM orders o JOIN customers c ON c.id = o.customer_id WHERE c.city = 'Delhi' ORDER BY o.id"
+     },
+     "sql": {
+      "mysql": "UPDATE orders o JOIN customers c ON c.id = o.customer_id SET o.discount = 0 WHERE c.city = 'Delhi'",
+      "postgresql": "UPDATE orders o SET discount = 0 FROM customers c WHERE c.id = o.customer_id AND c.city = 'Delhi'"
+     },
+     "changed": 2,
+     "preview_columns": [
+      "id",
+      "amount",
+      "city"
+     ],
+     "preview_result": [
+      [
+       "3",
+       "80000",
+       "Delhi"
+      ],
+      [
+       "7",
+       "500",
+       "Delhi"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "UPDATE a JOIN b ON ... SET a.col = ... (or UPDATE a, b SET ... WHERE ...); FROM after SET is a syntax error (1064).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "UPDATE a SET col = ... FROM b WHERE ...; JOIN after UPDATE is a syntax error; SET a.col is refused (42703)."
+   },
+   "related": [
+    "update_statement",
+    "delete_join",
+    "join"
+   ],
+   "fundamentals": [
+    "changes_safety",
+    "engine_syntax"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-update.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql-update",
+    "https://dba.stackexchange.com/questions/tagged/update"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "delete_join",
+   "kind": "howto",
+   "title": {
+    "en": "DELETE with a JOIN",
+    "hinglish": "JOIN ke saath DELETE",
+    "hindi": "JOIN के साथ DELETE"
+   },
+   "terms": [
+    [
+     "delete",
+     "join"
+    ],
+    [
+     "delete",
+     "(another|other|dusri|doosri) table"
+    ],
+    [
+     "delete",
+     "using"
+    ],
+    [
+     "डिलीट",
+     "(जॉइन|दूसरी)"
+    ],
+    [
+     "delete",
+     "(दूसरी|जॉइन)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to delete with a join",
+     "delete rows based on another table",
+     "delete using in postgresql"
+    ],
+    "hinglish": [
+     "dusri table ke basis pe delete kaise kare",
+     "delete join kaise likhe"
+    ],
+    "hindi": [
+     "दूसरी टेबल के आधार पर DELETE कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "Say which table loses rows. MySQL/MariaDB: DELETE o FROM orders o JOIN customers c ON c.id = o.customer_id WHERE c.city = 'Pune'. PostgreSQL: DELETE FROM orders o USING customers c WHERE c.id = o.customer_id AND c.city = 'Pune'. Every engine refuses DELETE FROM a JOIN b. A form that works everywhere: DELETE FROM orders WHERE customer_id IN (SELECT id FROM customers WHERE city = 'Pune').",
+    "hinglish": "Batao rows kis table se hatengi. MySQL/MariaDB: DELETE o FROM orders o JOIN customers c ON ... WHERE ... . PostgreSQL: DELETE FROM orders o USING customers c WHERE ... . DELETE FROM a JOIN b koi engine nahi maanta. Har jagah chalne wala: DELETE FROM orders WHERE customer_id IN (SELECT id FROM customers WHERE city = 'Pune').",
+    "hindi": "MySQL: DELETE o FROM orders o JOIN ...; PostgreSQL: DELETE FROM orders o USING ...; हर जगह: WHERE ... IN (SELECT ...)।"
+   },
+   "mistake": {
+    "en": "Writing DELETE FROM orders o JOIN customers c ...: no engine knows which table to delete from (syntax error everywhere).",
+    "hinglish": "DELETE FROM orders o JOIN customers c ... likhna: kisi engine ko nahi pata kis table se hatana hai (har jagah syntax error).",
+    "hindi": "DELETE FROM a JOIN b लिखना: हर जगह syntax error।"
+   },
+   "examples": [
+    {
+     "preview": {
+      "all": "SELECT o.id, o.customer_id FROM orders o JOIN customers c ON c.id = o.customer_id WHERE c.city = 'Pune' ORDER BY o.id"
+     },
+     "sql": {
+      "mysql": "DELETE o FROM orders o JOIN customers c ON c.id = o.customer_id WHERE c.city = 'Pune'",
+      "postgresql": "DELETE FROM orders o USING customers c WHERE c.id = o.customer_id AND c.city = 'Pune'"
+     },
+     "changed": 2,
+     "preview_columns": [
+      "id",
+      "customer_id"
+     ],
+     "preview_result": [
+      [
+       "1",
+       "1"
+      ],
+      [
+       "2",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "DELETE alias FROM a JOIN b ON ...; DELETE a, b FROM ... deletes from both.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "DELETE FROM a USING b WHERE ...; no DELETE alias FROM ... form."
+   },
+   "related": [
+    "update_join",
+    "delete_duplicates",
+    "delete_truncate_drop"
+   ],
+   "fundamentals": [
+    "changes_safety",
+    "engine_syntax"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-delete.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql-update",
+    "https://dba.stackexchange.com/questions/tagged/update"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "upsert",
+   "kind": "howto",
+   "title": {
+    "en": "Upsert: insert, or update when the row exists",
+    "hinglish": "Upsert: insert, ya row ho to update",
+    "hindi": "Upsert: insert, या row हो तो update"
+   },
+   "terms": [
+    [
+     "insert",
+     "update",
+     "(exists?|already|pehle se|present)"
+    ],
+    [
+     "upsert"
+    ],
+    [
+     "on duplicate key"
+    ],
+    [
+     "on conflict"
+    ],
+    [
+     "insert",
+     "(or|ya|nahi to|else) update"
+    ],
+    [
+     "insert",
+     "(already|pehle se) (exists?|hai)"
+    ],
+    [
+     "अपसर्ट"
+    ],
+    [
+     "insert",
+     "अपडेट"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is upsert",
+     "how to insert or update if the row exists",
+     "how to use on conflict do update"
+    ],
+    "hinglish": [
+     "insert karo nahi to update kaise kare",
+     "on duplicate key update kya hai"
+    ],
+    "hindi": [
+     "अपसर्ट क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "An upsert inserts a row, and when a row with the same PRIMARY KEY or UNIQUE value already exists, it updates that row instead, in one statement. MySQL/MariaDB: INSERT ... ON DUPLICATE KEY UPDATE col = VALUES(col). PostgreSQL: INSERT ... ON CONFLICT (key_col) DO UPDATE SET col = EXCLUDED.col, where EXCLUDED is the row you tried to insert; ON CONFLICT DO NOTHING just skips it. It needs a real PRIMARY KEY or UNIQUE constraint on the key.",
+    "hinglish": "Upsert row daalta hai, aur same PRIMARY KEY/UNIQUE value wali row pehle se ho to usi ko update karta hai, ek hi statement mein. MySQL/MariaDB: INSERT ... ON DUPLICATE KEY UPDATE col = VALUES(col). PostgreSQL: INSERT ... ON CONFLICT (key_col) DO UPDATE SET col = EXCLUDED.col (EXCLUDED = jo row daalni thi); DO NOTHING bas chhod deta hai. Key pe PRIMARY KEY ya UNIQUE hona zaroori.",
+    "hindi": "Upsert: row डालो, और वही key पहले से हो तो उसे update करो। MySQL: ON DUPLICATE KEY UPDATE; PostgreSQL: ON CONFLICT (key) DO UPDATE।"
+   },
+   "mistake": {
+    "en": "In PostgreSQL writing SET stock = stock + EXCLUDED.stock: the bare stock is ambiguous (42702), say products.stock. And an upsert on a column with no UNIQUE constraint never sees a conflict.",
+    "hinglish": "PostgreSQL mein SET stock = stock + EXCLUDED.stock likhna: bina naam ka stock ambiguous hai (42702), products.stock likho. Aur bina UNIQUE wale column pe upsert ko conflict kabhi nahi dikhta.",
+    "hindi": "PostgreSQL में बिना table नाम का column ambiguous है; और UNIQUE के बिना conflict कभी नहीं होता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "INSERT INTO products (id, name, stock) VALUES (1, 'Phone X', 5), (8, 'Tablet', 2) ON DUPLICATE KEY UPDATE stock = stock + VALUES(stock);\nSELECT id, name, stock FROM products WHERE id IN (1, 8) ORDER BY id",
+      "postgresql": "INSERT INTO products (id, name, stock) VALUES (1, 'Phone X', 5), (8, 'Tablet', 2) ON CONFLICT (id) DO UPDATE SET stock = products.stock + EXCLUDED.stock;\nSELECT id, name, stock FROM products WHERE id IN (1, 8) ORDER BY id"
+     },
+     "result": [
+      [
+       "1",
+       "Phone X",
+       "17"
+      ],
+      [
+       "8",
+       "Tablet",
+       "2"
+      ]
+     ],
+     "columns": [
+      "id",
+      "name",
+      "stock"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "ON DUPLICATE KEY UPDATE col = VALUES(col) (8.0.19+ also INSERT ... AS new ... col = new.col); reacts to any unique key.",
+    "mariadb": "ON DUPLICATE KEY UPDATE col = VALUES(col).",
+    "postgresql": "ON CONFLICT (cols) DO UPDATE SET col = EXCLUDED.col / DO NOTHING (9.5+); MERGE in 15+."
+   },
+   "related": [
+    "insert_into",
+    "insert_ignore_replace",
+    "unique"
+   ],
+   "fundamentals": [
+    "changes_safety",
+    "engine_syntax"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-insert.html#SQL-ON-CONFLICT",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql-update",
+    "https://dba.stackexchange.com/questions/tagged/update"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "insert_ignore_replace",
+   "kind": "compare",
+   "title": {
+    "en": "INSERT IGNORE vs REPLACE vs ON DUPLICATE KEY UPDATE",
+    "hinglish": "INSERT IGNORE vs REPLACE vs ON DUPLICATE KEY UPDATE",
+    "hindi": "INSERT IGNORE बनाम REPLACE बनाम ON DUPLICATE KEY UPDATE"
+   },
+   "terms": [
+    [
+     "insert ignore"
+    ],
+    [
+     "replace into"
+    ],
+    [
+     "replace",
+     "insert"
+    ],
+    [
+     "ignore",
+     "duplicate"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "insert ignore vs replace into",
+     "what does replace into do",
+     "what does insert ignore do"
+    ],
+    "hinglish": [
+     "insert ignore aur replace mein kya farak hai",
+     "replace into kya karta hai"
+    ],
+    "hindi": [
+     "INSERT IGNORE और REPLACE में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "All three are MySQL/MariaDB ways to handle a row whose key already exists. INSERT IGNORE skips it, but it also turns every other error into a warning (a broken foreign key, a value too long is cut). REPLACE deletes the old row and inserts the new one: columns you didn't list go back to their defaults, ON DELETE CASCADE removes its children, and delete triggers fire. ON DUPLICATE KEY UPDATE changes only the columns you name, which is usually what is meant. PostgreSQL has none of the first two: ON CONFLICT DO NOTHING / DO UPDATE.",
+    "hinglish": "Teeno MySQL/MariaDB ke tareeke hain jab key wali row pehle se ho. INSERT IGNORE use chhod deta hai, par baaki har error ko bhi warning bana deta hai. REPLACE purani row hata ke nayi daalta hai: jo columns list mein nahi wo default ho jaate hain, ON DELETE CASCADE children hata deta hai, delete triggers chalte hain. ON DUPLICATE KEY UPDATE sirf naam wale columns badalta hai, aksar yahi chahiye. PostgreSQL: ON CONFLICT DO NOTHING / DO UPDATE.",
+    "hindi": "IGNORE हर error दबा देता है; REPLACE पुरानी row हटाकर नई डालता है (बाकी columns default); ON DUPLICATE KEY UPDATE सिर्फ़ बताए columns बदलता है।"
+   },
+   "mistake": {
+    "en": "Using REPLACE to change one column: every other column of that row is lost.",
+    "hinglish": "Ek column badalne ke liye REPLACE: us row ke baaki columns chale jaate hain.",
+    "hindi": "एक column बदलने के लिए REPLACE: बाकी columns खो जाते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "INSERT INTO suppliers (id, name, country) VALUES (1, 'Alpha Traders', 'India'), (4, 'Delta Mart', 'Nepal') ON DUPLICATE KEY UPDATE id = id;\nSELECT id, name, country FROM suppliers ORDER BY id",
+      "postgresql": "INSERT INTO suppliers (id, name, country) VALUES (1, 'Alpha Traders', 'India'), (4, 'Delta Mart', 'Nepal') ON CONFLICT DO NOTHING;\nSELECT id, name, country FROM suppliers ORDER BY id"
+     },
+     "result": [
+      [
+       "1",
+       "Alpha Traders",
+       "India"
+      ],
+      [
+       "2",
+       "Beta Goods",
+       "UAE"
+      ],
+      [
+       "3",
+       "Gamma Supply",
+       "India"
+      ],
+      [
+       "4",
+       "Delta Mart",
+       "Nepal"
+      ]
+     ],
+     "columns": [
+      "id",
+      "name",
+      "country"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "All three exist.",
+    "mariadb": "All three exist.",
+    "postgresql": "None of IGNORE / REPLACE: ON CONFLICT DO NOTHING / DO UPDATE."
+   },
+   "related": [
+    "upsert",
+    "insert_into"
+   ],
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/replace.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql-update",
+    "https://dba.stackexchange.com/questions/tagged/update"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "preview_before_change",
+   "kind": "howto",
+   "title": {
+    "en": "Safe UPDATE/DELETE: preview first",
+    "hinglish": "Safe UPDATE/DELETE: pehle dekho",
+    "hindi": "सुरक्षित UPDATE/DELETE: पहले देखें"
+   },
+   "terms": [
+    [
+     "(safe|safely|safest|careful\\w*)",
+     "(update|delete)"
+    ],
+    [
+     "(preview|check|test|see|dekh\\w*)",
+     "(before|pehle)",
+     "(updat\\w*|delet\\w*|chang\\w*|run\\w*)"
+    ],
+    [
+     "(update|delete)",
+     "(se pehle|karne se pehle|before running)"
+    ],
+    [
+     "(अपडेट|डिलीट)",
+     "पहले"
+    ],
+    [
+     "undo",
+     "(update|delete)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to safely update rows",
+     "how to check which rows a delete will change before running it",
+     "how to undo an update"
+    ],
+    "hinglish": [
+     "update karne se pehle kaise check kare",
+     "delete karne se pehle rows kaise dekhe"
+    ],
+    "hindi": [
+     "डिलीट करने से पहले rows कैसे देखें"
+    ]
+   },
+   "answer": {
+    "en": "Three habits: (1) run the same FROM and WHERE as a SELECT and count the rows; (2) run the change inside a transaction (START TRANSACTION / BEGIN), check the result, then COMMIT, or ROLLBACK to undo it; (3) on big tables change in batches. After COMMIT there is no undo except a backup.",
+    "hinglish": "Teen aadatein: (1) wahi FROM aur WHERE SELECT mein chala ke rows gino; (2) change transaction ke andar chalao (START TRANSACTION / BEGIN), result dekho, phir COMMIT, ya undo ke liye ROLLBACK; (3) badi tables pe batches mein. COMMIT ke baad backup ke alawa undo nahi.",
+    "hindi": "(1) वही WHERE पहले SELECT में चलाएँ; (2) transaction में बदलें, जाँचें, फिर COMMIT या ROLLBACK; (3) बड़ी tables पर batches में।"
+   },
+   "mistake": {
+    "en": "Trusting a WHERE you haven't run as a SELECT, or running the change with autocommit on and no backup.",
+    "hinglish": "Jo WHERE SELECT mein chala ke nahi dekha us par bharosa, ya autocommit on aur bina backup change chalana.",
+    "hindi": "बिना SELECT से जाँचे WHERE पर भरोसा करना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "START TRANSACTION;\nUPDATE orders SET amount = 0 WHERE status = 'cancelled';\nSELECT id, status, amount FROM orders WHERE status = 'cancelled';\nROLLBACK",
+      "postgresql": "BEGIN;\nUPDATE orders SET amount = 0 WHERE status = 'cancelled';\nSELECT id, status, amount FROM orders WHERE status = 'cancelled';\nROLLBACK"
+     },
+     "result": [
+      [
+       "4",
+       "cancelled",
+       "0"
+      ]
+     ],
+     "columns": [
+      "id",
+      "status",
+      "amount"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Autocommit is on by default; DDL (ALTER, DROP, TRUNCATE) commits on its own and can't be rolled back.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Each statement commits on its own unless inside BEGIN ... COMMIT; most DDL can be rolled back too."
+   },
+   "related": [
+    "transaction",
+    "update_statement",
+    "batch_delete"
+   ],
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/commit.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql-update",
+    "https://dba.stackexchange.com/questions/tagged/update"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "batch_delete",
+   "kind": "howto",
+   "title": {
+    "en": "Deleting or updating millions of rows in batches",
+    "hinglish": "Lakhon rows batches mein delete/update karna",
+    "hindi": "लाखों rows batches में delete/update करना"
+   },
+   "terms": [
+    [
+     "batch\\w*",
+     "(delet\\w*|updat\\w*)"
+    ],
+    [
+     "(delet\\w*|updat\\w*)",
+     "(million|millions|lakh|lakhs|lakhon|crore|crores|hazaron|thousands|huge|large number|lots of|bahut saari)"
+    ],
+    [
+     "chunk\\w*",
+     "(delet\\w*|updat\\w*)"
+    ],
+    [
+     "(लाखों|बैच)",
+     "(डिलीट|अपडेट)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to delete millions of rows",
+     "delete in batches in mysql",
+     "how to update a huge table in chunks"
+    ],
+    "hinglish": [
+     "lakhon rows kaise delete kare",
+     "batch mein delete kaise kare"
+    ],
+    "hindi": [
+     "लाखों rows कैसे डिलीट करें"
+    ]
+   },
+   "answer": {
+    "en": "One giant DELETE/UPDATE holds its locks and undo log until it ends, can block other work and takes as long to roll back. Change a few thousand rows per statement and repeat until nothing is left: MySQL/MariaDB DELETE ... WHERE ... LIMIT 5000; PostgreSQL has no LIMIT on DELETE, so pick the rows in a subquery: DELETE FROM t WHERE ctid IN (SELECT ctid FROM t WHERE ... LIMIT 5000) (or by key ranges).",
+    "hinglish": "Ek bada DELETE/UPDATE khatam hone tak locks aur undo pakde rehta hai, doosra kaam rok sakta hai. Har statement mein kuch hazaar rows badlo aur tab tak dohraao jab tak kuch na bache: MySQL/MariaDB DELETE ... WHERE ... LIMIT 5000; PostgreSQL mein DELETE pe LIMIT nahi, rows subquery se chuno: DELETE FROM t WHERE ctid IN (SELECT ctid FROM t WHERE ... LIMIT 5000).",
+    "hindi": "एक बड़ा DELETE locks पकड़े रहता है; हर बार कुछ हज़ार rows बदलें। MySQL: LIMIT; PostgreSQL: ctid IN (SELECT ... LIMIT)।"
+   },
+   "mistake": {
+    "en": "Writing DELETE ... LIMIT in PostgreSQL (syntax error), or batching with OFFSET, which skips rows as the table shrinks.",
+    "hinglish": "PostgreSQL mein DELETE ... LIMIT likhna (syntax error), ya OFFSET se batch banana, jo table chhoti hote hi rows chhod deta hai.",
+    "hindi": "PostgreSQL में DELETE ... LIMIT लिखना: syntax error।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "DELETE FROM orders WHERE status IN ('cancelled', 'pending') LIMIT 1",
+      "postgresql": "DELETE FROM orders WHERE ctid IN (SELECT ctid FROM orders WHERE status IN ('cancelled', 'pending') LIMIT 1)"
+     },
+     "preview": {
+      "all": "SELECT COUNT(*) AS left_to_delete FROM orders WHERE status IN ('cancelled', 'pending')"
+     },
+     "changed": 1,
+     "preview_columns": [
+      "left_to_delete"
+     ],
+     "preview_result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "DELETE ... LIMIT n (with ORDER BY when the order matters); ROW_COUNT() tells when nothing was deleted.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "No LIMIT on DELETE/UPDATE: WHERE ctid IN (SELECT ctid ... LIMIT n); VACUUM reclaims the space later."
+   },
+   "related": [
+    "preview_before_change",
+    "delete_truncate_drop",
+    "transaction"
+   ],
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/delete.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql-update",
+    "https://dba.stackexchange.com/questions/tagged/update"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "isolation_levels",
+   "kind": "concept",
+   "title": {
+    "en": "Transaction isolation levels",
+    "hinglish": "Transaction isolation levels",
+    "hindi": "Transaction isolation levels"
+   },
+   "terms": [
+    [
+     "isolation"
+    ],
+    [
+     "read committed"
+    ],
+    [
+     "repeatable read"
+    ],
+    [
+     "serializable"
+    ],
+    [
+     "dirty read\\w*"
+    ],
+    [
+     "phantom read\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what are isolation levels",
+     "read committed vs repeatable read",
+     "what is a dirty read"
+    ],
+    "hinglish": [
+     "isolation level kya hota hai",
+     "read committed aur repeatable read mein kya farak hai"
+    ],
+    "hindi": [
+     "isolation level क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "The isolation level decides what one transaction sees of others running at the same time. READ COMMITTED: every statement sees only committed data, as of that statement (a second read can see new commits). REPEATABLE READ: the whole transaction sees one snapshot. SERIALIZABLE: as if transactions ran one after another (some fail and must be retried). READ UNCOMMITTED may see uncommitted changes (dirty reads). Defaults differ: MySQL/MariaDB REPEATABLE READ, PostgreSQL READ COMMITTED.",
+    "hinglish": "Isolation level tay karta hai ki ek transaction ko saath chal rahe doosre transactions ka kitna dikhta hai. READ COMMITTED: har statement sirf committed data dekhta hai (doosri baar padhne pe naye commits dikh sakte hain). REPEATABLE READ: poora transaction ek snapshot dekhta hai. SERIALIZABLE: jaise ek ke baad ek chale (kuch fail hote hain, dobara chalao). Default: MySQL/MariaDB REPEATABLE READ, PostgreSQL READ COMMITTED.",
+    "hindi": "Isolation level तय करता है कि एक transaction दूसरों का कितना देखता है। Default: MySQL REPEATABLE READ, PostgreSQL READ COMMITTED।"
+   },
+   "mistake": {
+    "en": "Assuming the default is the same everywhere: code that relies on REPEATABLE READ behaves differently on PostgreSQL's READ COMMITTED.",
+    "hinglish": "Maan lena ki default har jagah same hai: REPEATABLE READ pe tiki code PostgreSQL ke READ COMMITTED pe alag chalta hai.",
+    "hindi": "यह मान लेना कि default हर जगह एक है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;\nSTART TRANSACTION;\nSELECT COUNT(*) AS paid FROM orders WHERE status = 'paid';\nCOMMIT",
+      "postgresql": "BEGIN ISOLATION LEVEL SERIALIZABLE;\nSELECT COUNT(*) AS paid FROM orders WHERE status = 'paid';\nCOMMIT"
+     },
+     "result": [
+      [
+       "4"
+      ]
+     ],
+     "columns": [
+      "paid"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Default REPEATABLE READ (InnoDB); SET TRANSACTION ISOLATION LEVEL ... applies to the next transaction.",
+    "mariadb": "Default REPEATABLE READ.",
+    "postgresql": "Default READ COMMITTED; BEGIN ISOLATION LEVEL ...; no dirty reads at any level."
+   },
+   "related": [
+    "transaction",
+    "preview_before_change"
+   ],
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "source": "https://www.postgresql.org/docs/current/transaction-iso.html",
+   "seen_at": [
+    "https://dba.stackexchange.com/questions/tagged/isolation-level",
+    "https://stackoverflow.com/questions/tagged/isolation-level"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "stored_procedure",
+   "kind": "concept",
+   "title": {
+    "en": "Stored procedure",
+    "hinglish": "Stored procedure",
+    "hindi": "Stored procedure"
+   },
+   "terms": [
+    [
+     "stored procedures?"
+    ],
+    [
+     "procedures?"
+    ],
+    [
+     "प्रोसीजर"
+    ],
+    [
+     "create procedure"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a stored procedure",
+     "how to create a stored procedure in mysql",
+     "how to call a procedure"
+    ],
+    "hinglish": [
+     "stored procedure kya hota hai",
+     "procedure kaise banaye"
+    ],
+    "hindi": [
+     "स्टोर्ड प्रोसीजर क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A stored procedure is named SQL code kept inside the database: you create it once and run it with CALL name(arguments). It can hold several statements, variables, IF and loops, and it changes data or returns result sets (MySQL/MariaDB). Use it to keep a multi-step job in one place next to the data. In the mysql client, wrap it in DELIMITER // ... // DELIMITER ; because its body has ';' inside.",
+    "hinglish": "Stored procedure database ke andar rakha naam wala SQL code hai: ek baar banao, CALL name(arguments) se chalao. Isme kai statements, variables, IF aur loops ho sakte hain. Kai steps wala kaam data ke paas ek jagah rakhne ke liye. mysql client mein DELIMITER // ... // DELIMITER ; ke beech likho kyunki body mein ';' hota hai.",
+    "hindi": "Stored procedure डेटाबेस में रखा नाम वाला SQL code है; CALL name() से चलता है।"
+   },
+   "mistake": {
+    "en": "Forgetting DELIMITER in the mysql client (error 1064 near ''), or putting a DECLARE after another statement (DECLAREs come first).",
+    "hinglish": "mysql client mein DELIMITER bhoolna (error 1064 near ''), ya DECLARE ko kisi statement ke baad likhna (DECLARE pehle aate hain).",
+    "hindi": "DELIMITER भूलना, या DECLARE को बाद में लिखना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "DELIMITER //\nCREATE PROCEDURE demo_raise(IN pct DECIMAL(5,2))\nBEGIN\n  UPDATE products SET price = price * (1 + pct / 100) WHERE category_id = 3;\nEND //\nDELIMITER ;\nCALL demo_raise(10);\nSELECT id, price FROM products WHERE category_id = 3 ORDER BY id",
+      "postgresql": "CREATE PROCEDURE demo_raise(pct numeric) LANGUAGE plpgsql AS $$\nBEGIN\n  UPDATE products SET price = price * (1 + pct / 100) WHERE category_id = 3;\nEND $$;\nCALL demo_raise(10);\nSELECT id, price FROM products WHERE category_id = 3 ORDER BY id"
+     },
+     "result": [
+      [
+       "3",
+       "88000"
+      ],
+      [
+       "6",
+       "71500"
+      ]
+     ],
+     "columns": [
+      "id",
+      "price"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "CREATE PROCEDURE ... BEGIN ... END, CALL p(); can return result sets with SELECT.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "CREATE PROCEDURE ... LANGUAGE plpgsql AS $$ ... $$ (11+), CALL p(); can COMMIT inside; returns no result set (use a function)."
+   },
+   "related": [
+    "procedure_vs_function",
+    "delimiter",
+    "trigger"
+   ],
+   "fundamentals": [
+    "routine_flow"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/create-procedure.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/stored-procedures",
+    "https://dba.stackexchange.com/questions/tagged/stored-procedures"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "procedure_vs_function",
+   "kind": "compare",
+   "title": {
+    "en": "Stored procedure vs function",
+    "hinglish": "Procedure vs function",
+    "hindi": "Procedure बनाम function"
+   },
+   "terms": [
+    [
+     "procedure",
+     "function"
+    ],
+    [
+     "(stored|user[- ]defined) functions?"
+    ],
+    [
+     "create function"
+    ],
+    [
+     "प्रोसीजर",
+     "फंक्शन"
+    ],
+    [
+     "functions?",
+     "(banaye|banana|banate|banaen|create|creating|define|likhe|likhna)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the difference between a procedure and a function",
+     "stored procedure vs function",
+     "what is a user defined function in sql"
+    ],
+    "hinglish": [
+     "procedure aur function mein kya farak hai",
+     "function kaise banaye mysql mein"
+    ],
+    "hindi": [
+     "प्रोसीजर और फंक्शन में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "A function RETURNS one value and is used inside a query (SELECT demo_net(amount, discount) ...); it must reach a RETURN on every path. A procedure is run on its own with CALL, returns nothing (or result sets in MySQL/MariaDB, OUT parameters), and is where multi-step changes and transaction control go. Rule of thumb: a calculation -> function; a job -> procedure.",
+    "hinglish": "Function ek value RETURN karta hai aur query ke andar use hota hai (SELECT demo_net(amount, discount) ...); har raaste pe RETURN tak pahunchna zaroori. Procedure CALL se akela chalta hai, value nahi lautata (MySQL mein result sets, OUT parameters), aur kai steps wale changes ke liye hai. Hisaab -> function; kaam -> procedure.",
+    "hindi": "Function एक value लौटाता है और query में चलता है; procedure CALL से चलता है और कई steps वाला काम करता है।"
+   },
+   "mistake": {
+    "en": "A function whose IF has no ELSE: when no branch matches it ends without RETURN (MySQL 1321, PostgreSQL 'control reached end of function').",
+    "hinglish": "Function jiske IF mein ELSE nahi: koi branch na chale to RETURN ke bina khatam (MySQL 1321).",
+    "hindi": "IF बिना ELSE: RETURN के बिना ख़त्म।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "DELIMITER //\nCREATE FUNCTION demo_net(amount DECIMAL(10,2), discount DECIMAL(10,2)) RETURNS DECIMAL(10,2) DETERMINISTIC\nBEGIN\n  RETURN amount - COALESCE(discount, 0);\nEND //\nDELIMITER ;\nSELECT id, demo_net(amount, discount) AS net FROM orders WHERE id IN (2, 3) ORDER BY id",
+      "postgresql": "CREATE FUNCTION demo_net(amount numeric, discount numeric) RETURNS numeric LANGUAGE plpgsql IMMUTABLE AS $$\nBEGIN\n  RETURN amount - COALESCE(discount, 0);\nEND $$;\nSELECT id, demo_net(amount, discount) AS net FROM orders WHERE id IN (2, 3) ORDER BY id"
+     },
+     "result": [
+      [
+       "2",
+       "450"
+      ],
+      [
+       "3",
+       "79000"
+      ]
+     ],
+     "columns": [
+      "id",
+      "net"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "CREATE FUNCTION ... RETURNS type [DETERMINISTIC] BEGIN ... RETURN ...; END; with binary logging on, mark it DETERMINISTIC / READS SQL DATA (else 1418).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "CREATE FUNCTION ... RETURNS type LANGUAGE plpgsql (or sql) AS $$ ... $$; functions can also RETURN TABLE / SETOF."
+   },
+   "related": [
+    "stored_procedure",
+    "trigger"
+   ],
+   "fundamentals": [
+    "routine_flow"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-createfunction.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/stored-functions",
+    "https://dba.stackexchange.com/questions/tagged/functions"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "trigger",
+   "kind": "concept",
+   "title": {
+    "en": "Trigger",
+    "hinglish": "Trigger",
+    "hindi": "Trigger"
+   },
+   "terms": [
+    [
+     "triggers?"
+    ],
+    [
+     "ट्रिगर"
+    ],
+    [
+     "create trigger"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a trigger in sql",
+     "how to create a trigger",
+     "when to use a trigger"
+    ],
+    "hinglish": [
+     "trigger kya hota hai",
+     "trigger kaise banaye mysql mein"
+    ],
+    "hindi": [
+     "ट्रिगर क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A trigger is code the database runs by itself when a row of a table is inserted, updated or deleted, BEFORE or AFTER the change, once per row (FOR EACH ROW). Inside, NEW is the row as it will be saved and OLD the row as it was. Use it for things that must happen however the row is changed (stamping, auditing, keeping a total). MySQL/MariaDB put the code in the trigger; PostgreSQL puts it in a function that RETURNS trigger and the trigger calls it.",
+    "hinglish": "Trigger wo code hai jo database khud chalata hai jab table ki row insert, update ya delete hoti hai, change se pehle (BEFORE) ya baad (AFTER), har row ke liye ek baar. Andar NEW = save hone wali row, OLD = purani row. Jo kaam har haal mein hona chahiye (stamp, audit, total) uske liye. MySQL/MariaDB code trigger mein likhte hain; PostgreSQL ek function (RETURNS trigger) mein, trigger use chalata hai.",
+    "hindi": "Trigger: row बदलने पर database अपने आप चलाने वाला code; NEW नई row, OLD पुरानी।"
+   },
+   "mistake": {
+    "en": "A trigger that runs UPDATE on its own table: MySQL/MariaDB refuse it (1442), PostgreSQL loops until 'stack depth limit exceeded'. Change NEW in a BEFORE trigger instead.",
+    "hinglish": "Apni hi table pe UPDATE chalane wala trigger: MySQL/MariaDB mana (1442), PostgreSQL 'stack depth limit exceeded' tak ghoomta hai. BEFORE trigger mein NEW badlo.",
+    "hindi": "अपनी ही table पर UPDATE: MySQL 1442, PostgreSQL अनंत loop। BEFORE trigger में NEW बदलें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TRIGGER demo_sku BEFORE UPDATE ON products FOR EACH ROW SET NEW.sku = UPPER(NEW.sku);\nUPDATE products SET sku = 'ph_100x' WHERE id = 1;\nSELECT id, sku FROM products WHERE id = 1",
+      "postgresql": "CREATE FUNCTION demo_sku() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.sku := UPPER(NEW.sku); RETURN NEW; END $$;\nCREATE TRIGGER demo_sku BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION demo_sku();\nUPDATE products SET sku = 'ph_100x' WHERE id = 1;\nSELECT id, sku FROM products WHERE id = 1"
+     },
+     "result": [
+      [
+       "1",
+       "PH_100X"
+      ]
+     ],
+     "columns": [
+      "id",
+      "sku"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "CREATE TRIGGER t BEFORE|AFTER INSERT|UPDATE|DELETE ON tbl FOR EACH ROW <statement or BEGIN ... END>; no statement-level triggers; not on temporary tables.",
+    "mariadb": "Same as MySQL; several triggers per event allowed (FOLLOWS / PRECEDES).",
+    "postgresql": "CREATE TRIGGER ... EXECUTE FUNCTION f(); row or statement level; the function must RETURN NEW (or OLD / NULL to skip)."
+   },
+   "related": [
+    "before_after_trigger",
+    "stored_procedure",
+    "procedure_vs_function"
+   ],
+   "fundamentals": [
+    "routine_flow"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/trigger-syntax.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/triggers",
+    "https://dba.stackexchange.com/questions/tagged/trigger"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "before_after_trigger",
+   "kind": "compare",
+   "title": {
+    "en": "BEFORE vs AFTER trigger",
+    "hinglish": "BEFORE vs AFTER trigger",
+    "hindi": "BEFORE बनाम AFTER trigger"
+   },
+   "terms": [
+    [
+     "before",
+     "after",
+     "trigger"
+    ],
+    [
+     "before trigger"
+    ],
+    [
+     "after trigger"
+    ],
+    [
+     "new",
+     "old",
+     "trigger"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "before vs after trigger",
+     "when to use a before trigger",
+     "what is new and old in a trigger"
+    ],
+    "hinglish": [
+     "before aur after trigger mein kya farak hai",
+     "trigger mein new aur old kya hai"
+    ],
+    "hindi": [
+     "BEFORE और AFTER trigger में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "A BEFORE trigger runs while the row can still change: set NEW.col to fix or fill a value, or stop the change. An AFTER trigger runs once the row is saved: use it to write to OTHER tables (an audit log, a counter). Changing NEW in an AFTER trigger is refused by MySQL/MariaDB (1362) and silently ignored by PostgreSQL. NEW is the new row (INSERT, UPDATE), OLD the old one (UPDATE, DELETE).",
+    "hinglish": "BEFORE trigger tab chalta hai jab row abhi badal sakti hai: NEW.col set karke value theek/bharo, ya change roko. AFTER trigger row save hone ke baad: DOOSRI tables mein likhne ke liye (audit log, counter). AFTER mein NEW badalna MySQL/MariaDB mana karte hain (1362), PostgreSQL chupchaap ignore karta hai. NEW = nayi row, OLD = purani.",
+    "hindi": "BEFORE: row बदल सकती है (NEW.col)। AFTER: row save हो चुकी, दूसरी tables में लिखें।"
+   },
+   "mistake": {
+    "en": "Using an AFTER trigger to change the row that was just saved (the change is refused or lost).",
+    "hinglish": "Abhi save hui row badalne ke liye AFTER trigger (change mana ya kho jaata hai).",
+    "hindi": "AFTER trigger से वही row बदलना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TRIGGER demo_sku BEFORE UPDATE ON products FOR EACH ROW SET NEW.sku = UPPER(NEW.sku);\nUPDATE products SET sku = 'ph_100x' WHERE id = 1;\nSELECT id, sku FROM products WHERE id = 1",
+      "postgresql": "CREATE FUNCTION demo_sku() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN NEW.sku := UPPER(NEW.sku); RETURN NEW; END $$;\nCREATE TRIGGER demo_sku BEFORE UPDATE ON products FOR EACH ROW EXECUTE FUNCTION demo_sku();\nUPDATE products SET sku = 'ph_100x' WHERE id = 1;\nSELECT id, sku FROM products WHERE id = 1"
+     },
+     "result": [
+      [
+       "1",
+       "PH_100X"
+      ]
+     ],
+     "columns": [
+      "id",
+      "sku"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "SET NEW.col = ... only in BEFORE triggers (1362 in AFTER).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "NEW.col := ... in a BEFORE row trigger function, then RETURN NEW; in AFTER the return value is ignored."
+   },
+   "related": [
+    "trigger",
+    "stored_procedure"
+   ],
+   "fundamentals": [
+    "routine_flow"
+   ],
+   "source": "https://www.postgresql.org/docs/current/trigger-definition.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/triggers",
+    "https://dba.stackexchange.com/questions/tagged/trigger"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "delimiter",
+   "kind": "concept",
+   "title": {
+    "en": "DELIMITER (MySQL client)",
+    "hinglish": "DELIMITER (MySQL client)",
+    "hindi": "DELIMITER (MySQL client)"
+   },
+   "terms": [
+    [
+     "delimiter"
+    ],
+    [
+     "डिलिमिटर"
+    ],
+    [
+     "delimiter",
+     "(procedure|function|trigger|mysql|use|used|kyu|kyun|why)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is delimiter in mysql",
+     "why do we use delimiter in a stored procedure",
+     "what does delimiter // mean"
+    ],
+    "hinglish": [
+     "delimiter kyu use karte hai",
+     "mysql mein delimiter kya hota hai"
+    ],
+    "hindi": [
+     "MySQL में DELIMITER क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "DELIMITER is not SQL: it is a command of the mysql client (and tools that copy it) that changes the character which ends a statement. A procedure body contains ';' after each statement, so with the normal ';' the client would send the CREATE cut at the first one. DELIMITER // makes // the end mark, you write the CREATE ... END //, and DELIMITER ; switches back. PostgreSQL needs none: its body sits between $$ quotes.",
+    "hinglish": "DELIMITER SQL nahi hai: ye mysql client (aur waise tools) ka command hai jo statement khatam karne wala nishaan badalta hai. Procedure body mein har statement ke baad ';' hota hai, isliye normal ';' ke saath client CREATE ko pehle ';' pe kaat ke bhej deta. DELIMITER // se // end mark ban jaata hai, CREATE ... END // likho, phir DELIMITER ; se wapas. PostgreSQL ko nahi chahiye: body $$ ke beech hoti hai.",
+    "hindi": "DELIMITER mysql client का command है जो statement के अंत का निशान बदलता है; procedure body में ';' होते हैं इसलिए।"
+   },
+   "mistake": {
+    "en": "Forgetting to switch back with DELIMITER ; (every later statement then needs //), or sending DELIMITER through a driver, which doesn't know it.",
+    "hinglish": "DELIMITER ; se wapas na karna, ya driver se DELIMITER bhejna (driver use nahi jaanta).",
+    "hindi": "DELIMITER ; से वापस न करना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "DELIMITER //\nCREATE PROCEDURE demo_count()\nBEGIN\n  SELECT COUNT(*) AS order_count FROM orders;\nEND //\nDELIMITER ;\nCALL demo_count()",
+      "postgresql": "CREATE FUNCTION demo_count() RETURNS bigint LANGUAGE sql AS $$ SELECT COUNT(*) FROM orders $$;\nSELECT demo_count() AS order_count"
+     },
+     "result": [
+      [
+       "8"
+      ]
+     ],
+     "columns": [
+      "order_count"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Needed in the mysql client and scripts it runs; not in drivers (they send one statement at a time).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Not used: the body is quoted with $$ ... $$ (or $tag$ ... $tag$)."
+   },
+   "related": [
+    "stored_procedure",
+    "trigger"
+   ],
+   "fundamentals": [
+    "engine_syntax"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/stored-programs-defining.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/delimiter",
+    "https://dba.stackexchange.com/questions/tagged/stored-procedures"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cursor",
+   "kind": "concept",
+   "title": {
+    "en": "Cursor (row-by-row loop)",
+    "hinglish": "Cursor (row by row loop)",
+    "hindi": "Cursor (एक-एक row का loop)"
+   },
+   "terms": [
+    [
+     "cursors?"
+    ],
+    [
+     "कर्सर"
+    ],
+    [
+     "row by row",
+     "(procedure|loop)"
+    ],
+    [
+     "(loop\\w*|iterat\\w*|go)",
+     "(through|over)",
+     "(rows?|records?|results?)"
+    ],
+    [
+     "(har|each|every) rows?",
+     "loop\\w*",
+     "(procedure|function|routine)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a cursor in sql",
+     "how to loop through rows in a stored procedure",
+     "how to use a cursor in mysql"
+    ],
+    "hinglish": [
+     "cursor kya hota hai",
+     "procedure mein har row pe loop kaise chalaye"
+    ],
+    "hindi": [
+     "कर्सर क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A cursor lets a procedure read a query's rows one at a time. MySQL/MariaDB: DECLARE the variables, then the cursor, then a CONTINUE HANDLER FOR NOT FOUND that sets a done flag; OPEN, loop with FETCH ... INTO, LEAVE when done, CLOSE. PostgreSQL: FOR r IN SELECT ... LOOP ... END LOOP does it all. Before writing one, check whether one set-based statement (UPDATE ... JOIN, INSERT ... SELECT, SUM) does the job: it is usually much faster.",
+    "hinglish": "Cursor se procedure query ki rows ek-ek karke padhta hai. MySQL/MariaDB: pehle variables, phir cursor, phir CONTINUE HANDLER FOR NOT FOUND jo done flag set kare; OPEN, FETCH ... INTO ka loop, done pe LEAVE, CLOSE. PostgreSQL: FOR r IN SELECT ... LOOP ... END LOOP. Likhne se pehle dekho ek hi set-based statement (UPDATE ... JOIN, INSERT ... SELECT, SUM) se kaam ho jaaye: wo aksar kaafi tez hai.",
+    "hindi": "Cursor procedure को rows एक-एक करके पढ़ने देता है; पहले देखें क्या एक ही statement से काम हो सकता है।"
+   },
+   "mistake": {
+    "en": "No NOT FOUND handler: after the last row FETCH fails with 1329 (No data); or a handler but no IF done THEN LEAVE: the loop never ends.",
+    "hinglish": "NOT FOUND handler nahi: aakhri row ke baad FETCH error 1329; ya handler hai par IF done THEN LEAVE nahi: loop kabhi khatam nahi.",
+    "hindi": "NOT FOUND handler न होना (1329), या LEAVE न होना (अनंत loop)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "DELIMITER //\nCREATE PROCEDURE demo_stock_total()\nBEGIN\n  DECLARE done INT DEFAULT 0;\n  DECLARE v INT;\n  DECLARE s INT DEFAULT 0;\n  DECLARE cur CURSOR FOR SELECT stock FROM products;\n  DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;\n  OPEN cur;\n  read_loop: LOOP\n    FETCH cur INTO v;\n    IF done THEN LEAVE read_loop; END IF;\n    SET s = s + v;\n  END LOOP;\n  CLOSE cur;\n  SELECT s AS total_stock;\nEND //\nDELIMITER ;\nCALL demo_stock_total()",
+      "postgresql": "CREATE FUNCTION demo_stock_total() RETURNS bigint LANGUAGE plpgsql AS $$\nDECLARE r record; s bigint := 0;\nBEGIN\n  FOR r IN SELECT stock FROM products LOOP\n    s := s + r.stock;\n  END LOOP;\n  RETURN s;\nEND $$;\nSELECT demo_stock_total() AS total_stock"
+     },
+     "result": [
+      [
+       "75"
+      ]
+     ],
+     "columns": [
+      "total_stock"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Order of DECLAREs: variables, cursors, handlers (else 1337 / 1338).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "FOR r IN query LOOP (implicit cursor), or DECLARE c CURSOR FOR ...; FETCH c INTO ...; EXIT WHEN NOT FOUND."
+   },
+   "related": [
+    "stored_procedure",
+    "loop_in_procedure"
+   ],
+   "fundamentals": [
+    "routine_flow"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/cursors.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/cursor",
+    "https://dba.stackexchange.com/questions/tagged/cursors"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "loop_in_procedure",
+   "kind": "howto",
+   "title": {
+    "en": "Loops in a procedure (WHILE, REPEAT, LOOP)",
+    "hinglish": "Procedure mein loop (WHILE, REPEAT, LOOP)",
+    "hindi": "Procedure में loop"
+   },
+   "terms": [
+    [
+     "(loop|while|repeat)",
+     "(procedure|function|plpgsql|routine|trigger)"
+    ],
+    [
+     "(loop|while)",
+     "(never ends|infinite|endless|forever|band nahi|rukta nahi|khatam nahi)"
+    ],
+    [
+     "infinite loop"
+    ],
+    [
+     "(लूप|loop)",
+     "(प्रोसीजर|procedure)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to write a loop in a stored procedure",
+     "how to write a while loop in a mysql procedure",
+     "why does a while loop in a procedure never end"
+    ],
+    "hinglish": [
+     "procedure mein loop kaise likhe",
+     "while loop khatam kyu nahi hota procedure mein"
+    ],
+    "hindi": [
+     "प्रोसीजर में loop कैसे लिखें"
+    ]
+   },
+   "answer": {
+    "en": "MySQL/MariaDB: WHILE cond DO ... END WHILE, REPEAT ... UNTIL cond END REPEAT, or label: LOOP ... LEAVE label; ... END LOOP. PostgreSQL: WHILE cond LOOP ... END LOOP, LOOP ... EXIT WHEN cond; END LOOP, FOR i IN 1..n LOOP. A loop stops only when its condition reads something the body changes (SET i = i + 1 / i := i + 1) or when it reaches LEAVE / EXIT / RETURN; otherwise it runs until a timeout kills it.",
+    "hinglish": "MySQL/MariaDB: WHILE cond DO ... END WHILE, REPEAT ... UNTIL cond END REPEAT, ya label: LOOP ... LEAVE label; ... END LOOP. PostgreSQL: WHILE cond LOOP ... END LOOP, LOOP ... EXIT WHEN cond; END LOOP, FOR i IN 1..n LOOP. Loop tabhi rukta hai jab condition kuch aisa padhe jo body badalti hai (SET i = i + 1) ya LEAVE / EXIT / RETURN aaye; warna timeout tak chalta hai.",
+    "hindi": "Loop तभी रुकता है जब condition वाला variable body में बदले (SET i = i + 1) या LEAVE/EXIT आए।"
+   },
+   "mistake": {
+    "en": "Forgetting SET i = i + 1 inside WHILE i < n: the condition never changes and the call hangs.",
+    "hinglish": "WHILE i < n ke andar SET i = i + 1 bhoolna: condition kabhi nahi badalti aur call latki rehti hai.",
+    "hindi": "SET i = i + 1 भूलना: loop अनंत।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "DELIMITER //\nCREATE PROCEDURE demo_steps()\nBEGIN\n  DECLARE i INT DEFAULT 0;\n  DECLARE s INT DEFAULT 0;\n  WHILE i < 5 DO\n    SET i = i + 1;\n    SET s = s + i;\n  END WHILE;\n  SELECT s AS total;\nEND //\nDELIMITER ;\nCALL demo_steps()",
+      "postgresql": "CREATE FUNCTION demo_steps() RETURNS int LANGUAGE plpgsql AS $$\nDECLARE i int := 0; s int := 0;\nBEGIN\n  WHILE i < 5 LOOP\n    i := i + 1;\n    s := s + i;\n  END LOOP;\n  RETURN s;\nEND $$;\nSELECT demo_steps() AS total"
+     },
+     "result": [
+      [
+       "15"
+      ]
+     ],
+     "columns": [
+      "total"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "WHILE ... DO ... END WHILE; REPEAT ... UNTIL ... END REPEAT; LOOP with LEAVE; max_statement_time (MariaDB) / max_execution_time (MySQL, SELECT only) can stop runaway work.",
+    "mariadb": "Same as MySQL; max_statement_time stops a runaway call.",
+    "postgresql": "WHILE ... LOOP, LOOP ... EXIT WHEN, FOR ... IN ... LOOP; statement_timeout stops a runaway call."
+   },
+   "related": [
+    "cursor",
+    "stored_procedure"
+   ],
+   "fundamentals": [
+    "routine_flow"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/flow-control-statements.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/stored-procedures",
+    "https://dba.stackexchange.com/questions/tagged/stored-procedures"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "autocommit",
+   "kind": "concept",
+   "title": {
+    "en": "Autocommit",
+    "hinglish": "Autocommit",
+    "hindi": "Autocommit"
+   },
+   "terms": [
+    [
+     "autocommit"
+    ],
+    [
+     "auto commit"
+    ],
+    [
+     "(commit|save)",
+     "(automatic\\w*|apne aap|khud)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is autocommit",
+     "is autocommit on by default",
+     "how to turn off autocommit"
+    ],
+    "hinglish": [
+     "autocommit kya hota hai",
+     "autocommit band kaise kare"
+    ],
+    "hindi": [
+     "autocommit क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "With autocommit on (the default in MySQL, MariaDB and PostgreSQL clients), every statement is its own transaction and is saved the moment it succeeds: there is nothing to roll back. To group changes (and be able to undo them), start a transaction first: START TRANSACTION / BEGIN ... COMMIT or ROLLBACK. SET autocommit = 0 (MySQL/MariaDB) or \\set AUTOCOMMIT off (psql) keeps a transaction open until you COMMIT.",
+    "hinglish": "Autocommit on ho (MySQL, MariaDB aur PostgreSQL clients mein default) to har statement apna transaction hai aur safal hote hi save: rollback ke liye kuch nahi. Changes ko group (aur undo) karna ho to pehle transaction shuru karo: START TRANSACTION / BEGIN ... COMMIT ya ROLLBACK. SET autocommit = 0 (MySQL) ya \\set AUTOCOMMIT off (psql) se transaction COMMIT tak khula rehta hai.",
+    "hindi": "Autocommit on हो तो हर statement तुरंत save; undo के लिए पहले START TRANSACTION / BEGIN करें।"
+   },
+   "mistake": {
+    "en": "Expecting ROLLBACK to undo a statement that ran with autocommit on: it was already saved.",
+    "hinglish": "Autocommit on mein chale statement ko ROLLBACK se undo karne ki ummeed: wo save ho chuka.",
+    "hindi": "Autocommit में ROLLBACK से undo की उम्मीद।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "START TRANSACTION;\nDELETE FROM returns;\nROLLBACK;\nSELECT COUNT(*) AS returns_left FROM returns",
+      "postgresql": "BEGIN;\nDELETE FROM returns;\nROLLBACK;\nSELECT COUNT(*) AS returns_left FROM returns"
+     },
+     "result": [
+      [
+       "3"
+      ]
+     ],
+     "columns": [
+      "returns_left"
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "autocommit = 1 by default; DDL commits implicitly even inside a transaction.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "The server has no autocommit setting: each statement outside BEGIN commits on its own; psql's AUTOCOMMIT variable changes the client."
+   },
+   "related": [
+    "transaction",
+    "preview_before_change",
+    "isolation_levels"
+   ],
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/commit.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/autocommit",
+    "https://dba.stackexchange.com/questions/tagged/transaction"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

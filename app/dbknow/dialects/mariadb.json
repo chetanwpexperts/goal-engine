@@ -71,7 +71,13 @@
   "`[^`]+`",
   "\\blimit\\s+\\d+\\s*,\\s*\\d+",
   "\\b(ifnull|curdate|date_format|str_to_date|group_concat|unix_timestamp)\\s*\\(",
-  "\\bauto_increment\\b"
+  "\\bauto_increment\\b",
+  "\\bupdate\\s+[\\w`.]+(?:\\s+(?:as\\s+)?\\w+)?\\s+(?:inner\\s+|left\\s+(?:outer\\s+)?)?join\\b",
+  "\\bdelete\\s+[\\w`]+(?:\\s*,\\s*[\\w`]+)*\\s+from\\b",
+  "\\bon\\s+duplicate\\s+key\\s+update\\b",
+  "\\binsert\\s+ignore\\b",
+  "\\breplace\\s+into\\b",
+  "(?m)^\\s*delimiter\\s+\\S+"
  ],
  "query_rules": {
   "pipes": "or",
@@ -89,7 +95,17 @@
   "sum_boolean": {"behaviour": "works", "says": "MySQL and MariaDB treat true as 1 and false as 0, so SUM(condition) counts the matches there.", "proven": ["mariadb"]},
   "having_alias": {"behaviour": "works", "says": "MySQL and MariaDB let HAVING use a name made in SELECT.", "proven": ["mariadb"]},
   "count_distinct_multi": {"behaviour": "works", "says": "MySQL and MariaDB accept COUNT(DISTINCT a, b) and skip a combination that has a NULL in it.", "proven": ["mariadb"]},
-  "window_over_ungrouped": {"behaviour": "arbitrary", "says": "MariaDB runs it and takes the plain column from one row of each group (silently wrong); MySQL refuses it when ONLY_FULL_GROUP_BY is on (its default).", "proven": ["mariadb"]}
+  "window_over_ungrouped": {"behaviour": "arbitrary", "says": "MariaDB runs it and takes the plain column from one row of each group (silently wrong); MySQL refuses it when ONLY_FULL_GROUP_BY is on (its default).", "proven": ["mariadb"]},
+  "update_join": {"behaviour": "works", "says": "MySQL and MariaDB write a joined UPDATE as UPDATE a JOIN b ON ... SET a.col = ... (or UPDATE a, b SET ... WHERE ...).", "proven": ["mariadb"]},
+  "update_from": {"behaviour": "error", "code": "1064", "says": "MySQL and MariaDB have no FROM in UPDATE: UPDATE a SET ... FROM b stops with error 1064 (syntax error near 'FROM').", "proven": ["mariadb"]},
+  "set_qualified": {"behaviour": "works", "says": "MySQL and MariaDB accept SET alias.col = ... (in a joined UPDATE they need it).", "proven": ["mariadb"]},
+  "delete_join": {"behaviour": "works", "says": "MySQL and MariaDB delete through a join as DELETE a FROM a JOIN b ON ... WHERE ...", "proven": ["mariadb"]},
+  "delete_using": {"behaviour": "error", "code": "1064", "says": "MySQL and MariaDB read DELETE FROM a USING b differently (the USING list must contain a): it stops with error 1064 when a has an alias, or 1109 (Unknown table in MULTI DELETE).", "proven": ["mariadb"]},
+  "on_duplicate_key": {"behaviour": "works", "says": "MySQL and MariaDB upsert with INSERT ... ON DUPLICATE KEY UPDATE col = VALUES(col).", "proven": ["mariadb"]},
+  "on_conflict": {"behaviour": "error", "code": "1064", "says": "MySQL and MariaDB don't know ON CONFLICT: error 1064 (syntax error near 'CONFLICT').", "proven": ["mariadb"]},
+  "change_limit": {"behaviour": "works", "says": "MySQL and MariaDB accept ORDER BY and LIMIT on a single-table UPDATE or DELETE.", "proven": ["mariadb"]},
+  "insert_ignore": {"behaviour": "works", "says": "MySQL and MariaDB accept INSERT IGNORE.", "proven": ["mariadb"]},
+  "replace_into": {"behaviour": "works", "says": "MySQL and MariaDB accept REPLACE INTO.", "proven": ["mariadb"]}
  },
  "proven": [
   "mariadb"

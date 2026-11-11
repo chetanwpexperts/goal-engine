@@ -202,14 +202,28 @@
    "source": "https://www.postgresql.org/docs/current/datatype-datetime.html"
   },
   "changes_safety": {
-   "title_en": "UPDATE/DELETE: preview, separate assignments, small batches",
-   "title_hi": "UPDATE/DELETE: pehle dekho, alag assignments, chhote batches",
-   "rule_en": "Run the same WHERE as a SELECT first to see which rows change. In SET, assignments are separated by commas (AND makes one boolean expression). Change very large sets in batches so locks and undo stay small.",
-   "rule_hi": "Pehle wahi WHERE SELECT mein chala ke dekho kaunsi rows badlengi. SET mein assignments comma se alag (AND ek hi boolean ban jata hai). Bahut badi rows chhote batches mein badlo.",
+   "title_en": "Changing data: which rows, how often, what value, which column",
+   "title_hi": "Data badalna: kaunsi rows, kitni baar, kya value, kaunsa column",
+   "rule_en": "A change touches exactly the rows its WHERE and joins let through, so run the same FROM and WHERE as a SELECT first. Every joined table must be tied to the target row, or every target row passes; PostgreSQL's FROM in an UPDATE is a separate list, so naming the target table there again adds an unlinked copy. Each target row is changed at most once per statement, so a row with several matching child rows gets one of them (total the children first). SET col = (SELECT ...) gives NULL where the subquery finds nothing. INSERT ... SELECT fills the column list by position, never by name. Deleting duplicates needs a rule for which copy stays (t1.id > t2.id). In SET, assignments are separated by commas (AND makes one boolean expression). Change very large sets in batches.",
+   "rule_hi": "Change wahi rows chhoota hai jo uska WHERE aur joins dete hain, isliye pehle wahi FROM aur WHERE SELECT mein chalao. Har joined table target row se judi honi chahiye, warna har row badalti hai; PostgreSQL ke UPDATE ka FROM alag list hai, wahan target table dobara likhna ek bina-judi copy hai. Har target row ek statement mein ek hi baar badalti hai, isliye kai child rows mein se ek hi lagti hai (pehle total banao). SET col = (SELECT ...) match na mile to NULL deta hai. INSERT ... SELECT position se bharta hai, naam se nahi. Duplicate hatane mein batao kaunsi copy rahe (t1.id > t2.id). SET mein comma, AND nahi. Badi rows batches mein.",
    "topics": [
-    "set"
+    "set",
+    "update_from_self",
+    "change_unlinked",
+    "join_change_many",
+    "set_subquery_null",
+    "insert_order",
+    "insert_count",
+    "insert_no_columns",
+    "dedupe_self",
+    "insert_ignore",
+    "replace_into"
    ],
-   "source": "https://dev.mysql.com/doc/refman/8.4/en/update.html"
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/update.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   },
   "precedence": {
    "title_en": "Conditions combine in a fixed order: NOT, then AND, then OR",
@@ -244,7 +258,20 @@
    "rule_en": "SQL is the shared language, but each database adds its own words: MySQL/MariaDB have backtick names, LIMIT offset,count, IFNULL, GROUP_CONCAT, DATE_FORMAT; PostgreSQL has :: casts, ILIKE, DISTINCT ON, NULLS FIRST/LAST, string_agg; SQL Server has TOP n, [brackets], GETDATE(). A database refuses another one's words, so the answer depends on which database runs the query: name it, or DBaba reads it from the query.",
    "rule_hi": "SQL sabki common language hai, par har database apne shabd jodta hai: MySQL/MariaDB mein backtick naam, LIMIT offset,count, IFNULL, GROUP_CONCAT; PostgreSQL mein :: cast, ILIKE, DISTINCT ON, NULLS FIRST/LAST; SQL Server mein TOP n, [brackets], GETDATE(). Ek database doosre ke shabd mana kar deta hai, isliye jawab is baat pe tika hai ki query kaunsa database chalayega.",
    "topics": [
-    "dialect"
+    "dialect",
+    "update_join_syntax",
+    "delete_join_syntax",
+    "set_qualified",
+    "upsert_syntax",
+    "conflict_ambiguous",
+    "conflict_no_target",
+    "change_limit",
+    "delete_no_target",
+    "delimiter",
+    "trigger_body_pg",
+    "no_language",
+    "cursor_handler",
+    "declare_order"
    ],
    "source": "https://www.postgresql.org/docs/current/features.html",
    "proven": [
@@ -289,6 +316,24 @@
     "sub_key"
    ],
    "source": "https://www.postgresql.org/docs/current/sql-expressions.html#SQL-SYNTAX-SCALAR-SUBQUERIES",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "routine_flow": {
+   "title_en": "A routine must end, answer, and not feed itself",
+   "title_hi": "Routine ko khatam hona, jawab dena, aur khud ko na chalana zaroori hai",
+   "rule_en": "A loop ends only when its condition reads something the body changes, or when it reaches LEAVE / EXIT / RETURN. A function must reach a RETURN on every path; a PostgreSQL trigger function returns the row to save (RETURN NEW), and NULL from a BEFORE row trigger means skip the row. A trigger must not run a statement on its own table: MySQL/MariaDB refuse it (1442), PostgreSQL fires it again until the stack runs out. To change the row being saved, change NEW in a BEFORE trigger; in an AFTER trigger the row is already saved.",
+   "rule_hi": "Loop tabhi rukta hai jab condition kuch aisa padhe jo body badalti hai, ya LEAVE / EXIT / RETURN aaye. Function ko har raaste pe RETURN chahiye; PostgreSQL trigger function save hone wali row lautata hai (RETURN NEW), BEFORE row trigger se NULL ka matlab row chhodo. Trigger apni hi table pe statement na chalaye: MySQL/MariaDB mana (1442), PostgreSQL baar baar chalata hai. Row badalni hai to BEFORE trigger mein NEW badlo; AFTER mein row save ho chuki hoti hai.",
+   "topics": [
+    "endless_loop",
+    "function_return",
+    "trigger_same_table",
+    "after_new",
+    "trigger_return"
+   ],
+   "source": "https://www.postgresql.org/docs/current/plpgsql-trigger.html",
    "proven": [
     "mariadb",
     "postgresql"

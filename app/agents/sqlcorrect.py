@@ -4,6 +4,7 @@ sure it is: 'error' (MySQL refuses to run it), 'wrong' (runs, but the rows are w
 your table structure can say). A corrected query is written with every guessed name marked for the person to check.
 """
 
+import contextvars
 import difflib
 import re
 from dataclasses import dataclass, field
@@ -529,6 +530,17 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
         if sedits and not any(a < e[1] and e[0] < b for e in sedits for a, b, _n in edits):
             edits += sedits
 
+    # changing data (app/agents/sqlchange.py): which rows, how often, what value, which column, engine syntax
+    if not is_select:
+        from app.agents import sqlchange
+
+        for fnd, cedits in sqlchange.changes(sql, s, intent, Finding):
+            if any(f.topic == fnd.topic and f.evidence == fnd.evidence and f.title_en == fnd.title_en for f in F):
+                continue
+            F.append(fnd)
+            if cedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in cedits for a, b, _n in edits):
+                edits += cedits
+
     # 9-13: traps from SQL practice (LEFT JOIN counts, NOT IN with NULLs, BETWEEN on timestamps, ties, top N per group)
     for fnd, edit in _workbook_traps(sql, s, is_select, intent):
         F.append(fnd)
@@ -839,7 +851,47 @@ def check(sql: str, _again: bool = False, intent: str = "", engine: str | None =
     return _check(sql, _again, intent)
 
 
+def _meaning_checks() -> set:
+    from app.agents.sql import MEANING_CHECKS
+
+    return MEANING_CHECKS
+
+
+# set while the corrected query is rebuilt for a query with a definite mistake: 'check' rewrites that change what the query
+# means (AVG over NULLs as 0, ...) are not mixed into the fix of an 'error'/'wrong' one
+_SURE_ONLY = contextvars.ContextVar("dbaba_sure_only", default=False)
+
+
 def _check(sql: str, _again: bool = False, intent: str = "") -> dict:
+    out = _check_once(sql, _again, intent)
+    fs = out.get("findings") or []
+    if out.get("corrected") and any(f["kind"] in ("error", "wrong") for f in fs) and \
+            any(f["kind"] == "check" and f["topic"] in _meaning_checks() for f in fs) and not _SURE_ONLY.get():
+        token = _SURE_ONLY.set(True)
+        try:
+            again = _check_once(sql, _again, intent)
+        finally:
+            _SURE_ONLY.reset(token)
+        if again.get("corrected"):
+            out["corrected"] = again["corrected"]
+    return out
+
+
+def _check_once(sql: str, _again: bool = False, intent: str = "") -> dict:
+    from app.agents import sqlroutine
+
+    if sqlroutine.is_routine(sql):                    # CREATE PROCEDURE / FUNCTION / TRIGGER, DO: read as a routine (night 5)
+        order = {"error": 0, "wrong": 1, "check": 2}
+        found = sqlroutine.routines(sql, intent, Finding)
+        edits = []
+        for _f, e in found:
+            if e and not any(a < x[1] and x[0] < b or (a == b == x[0]) for x in e for a, b, _n in edits):
+                edits += e
+        fs = sorted((f for f, _e in found), key=lambda f: order[f.kind])
+        fixed = _apply_plain(sql, edits)
+        if any(f.topic == "delimiter" for f in fs) and len(sqlroutine.split_script(sql, blocks=True)) == 1:
+            fixed = sqlroutine.with_delimiter(fixed or sql)
+        return {"findings": [f.as_dict() for f in fs], "corrected": fixed, "guesses": []}
     s = _mask(sql)
     known = {w.lower() for w in re.findall(r"\b(?:from|join|update|into)\s+[`\"]?([\w$]+)", s, re.I)}
     known |= {w.lower() for w in re.findall(r"\b(?:from|join|update)\s+[`\"]?[\w$.]+[`\"]?\s+(?:as\s+)?([A-Za-z_]\w*)", s, re.I)
@@ -1057,6 +1109,8 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
         ges = [e for e in ges if e and e[2] is not None]
         if len(ges) == 1 and (ges[0][0], ges[0][1]) == (0, len(sql)):
             whole = whole or ges[0][2]
+        elif fnd.kind == "check" and _SURE_ONLY.get() and fnd.topic in _meaning_checks():
+            continue                                 # a definite mistake is being fixed: a rewrite that changes the meaning waits
         elif ges and not any(a < e[1] and e[0] < b for e in ges for a, b, _n in edits + agg_edits):
             agg_edits += ges                         # all of a finding's edits, or none of them
     edits += agg_edits

@@ -26,7 +26,11 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         "avg_avg", "count_said", "pct_total", "sum_distinct",
         # night 4: subqueries (shape: one value / a set / EXISTS; scope: the inner FROM first; NULLs in IN / NOT IN / ALL)
         "exists_agg", "corr_self", "in_grouped_agg", "sub_columns", "sub_sum_null", "in_limit_mariadb", "derived_alias_mysql",
-        "all_null", "in_list_null", "not_in_outer", "semi_join", "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order"]
+        "all_null", "in_list_null", "not_in_outer", "semi_join", "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order",
+        # night 5: changing data (which rows, how often, what value, which column) and each engine's change syntax
+        "ch_update_join_pg", "ch_update_from_my", "ch_set_qualified_pg", "ch_update_from_self", "ch_join_many_my", "ch_join_many_pg",
+        "ch_set_sub_null", "ch_upsert_pg", "ch_conflict_my", "ch_conflict_amb", "ch_insert_order", "ch_insert_count", "ch_limit_pg",
+        "ch_dedupe", "ch_delete_no_target", "ch_delete_join_pg"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
@@ -40,13 +44,19 @@ TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": 
          "exists_agg": "exists_agg", "corr_self": "corr_self", "in_grouped_agg": "in_grouped_agg", "sub_columns": "sub_columns",
          "sub_sum_null": "sub_sum_null", "in_limit_mariadb": "in_limit", "derived_alias_mysql": "derived_alias", "all_null": "all_null",
          "in_list_null": "in_list_null", "not_in_outer": "not_in_outer", "semi_join": "semi_join", "exists_uncorr": "exists_uncorr",
-         "sub_outer_col": "sub_outer_col", "scalar_rows": "scalar_rows", "sub_limit_order": "sub_limit_order"}
+         "sub_outer_col": "sub_outer_col", "scalar_rows": "scalar_rows", "sub_limit_order": "sub_limit_order",
+         "ch_update_join_pg": "update_join_syntax", "ch_update_from_my": "update_join_syntax", "ch_set_qualified_pg": "set_qualified",
+         "ch_update_from_self": "update_from_self", "ch_join_many_my": "join_change_many", "ch_join_many_pg": "join_change_many",
+         "ch_set_sub_null": "set_subquery_null", "ch_upsert_pg": "upsert_syntax", "ch_conflict_my": "upsert_syntax",
+         "ch_conflict_amb": "conflict_ambiguous", "ch_insert_order": "insert_order", "ch_insert_count": "insert_count",
+         "ch_limit_pg": "change_limit", "ch_dedupe": "dedupe_self", "ch_delete_no_target": "delete_no_target",
+         "ch_delete_join_pg": "delete_join_syntax"}
 NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join", "sum_distinct",
-          "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order"}   # found is enough
+          "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order", "ch_insert_count"}   # found is enough
 # a 'check' (depends on engine, data or intent) whose suggested rewrite must do exactly what the person meant
 FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes", "pk_pk", "anti_nullable", "self_pairs",
                  "distinct_join", "sum_null", "avg_avg", "pct_total", "sub_sum_null", "all_null", "in_list_null", "not_in_outer",
-                 "semi_join"}
+                 "semi_join", "ch_set_sub_null"}
 
 
 def _cols(t, *kinds):
@@ -346,6 +356,8 @@ def make(seed: int):
         return _agg_bug(seed, bug, rnd, schema, tables, t)
     elif bug in SUB_BUGS:
         return _sub_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("ch_"):
+        return _change_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -646,6 +658,130 @@ def _sub_bug(seed, bug, rnd, schema, tables, t):
             "broken": broken, "truth": truth}
     if engine:
         item["engine"] = engine
+    return item
+
+
+def _change_bug(seed, bug, rnd, schema, tables, t):
+    """Night 5: mistakes in UPDATE / DELETE / INSERT on random real tables. truth = the statement the person meant; 'only' = the
+    engine whose syntax it is (the other one refuses both)."""
+    links = [(c, x) for x in tables for c in x["cols"] if c["kind"] == "fk"]       # (fk column, child table)
+    if not links:
+        return None
+    fkc, child = rnd.choice(links)
+    parent = schema["tables"][fkc["ref"]]
+    fk, ppk, cn, pn = fkc["name"], parent["pk"], child["name"], parent["name"]
+    cnums = [c["name"] for c in child["cols"] if c["kind"] in ("int", "money")]
+    pnums = [c["name"] for c in parent["cols"] if c["kind"] in ("int", "money")]
+    pcats = [c for c in parent["cols"] if c["kind"] == "cat" and c["params"]]
+    tnums = [c["name"] for c in t["cols"] if c["kind"] in ("int", "money")]
+    tcats = [c for c in t["cols"] if c["kind"] == "cat" and c["params"]]
+    pk, name = t["pk"], t["name"]
+    engine, only, target = None, None, name
+    k = rnd.randint(1, len(t["rows"]))
+
+    def pcond(alias):
+        c = rnd.choice(pcats)
+        return f"{alias}.{c['name']} = '{rnd.choice(c['params'])}'"
+
+    if bug in ("ch_update_join_pg", "ch_update_from_my", "ch_update_from_self", "ch_delete_no_target", "ch_delete_join_pg"):
+        if not pcats or (bug.startswith("ch_update") and not cnums):
+            return None
+        cond, target = pcond("p"), cn
+        num = cnums[0] if cnums else None
+        my_upd = f"UPDATE {cn} c\nJOIN {pn} p ON p.{ppk} = c.{fk}\nSET c.{num} = 0\nWHERE {cond}"
+        pg_upd = f"UPDATE {cn} c\nSET {num} = 0\nFROM {pn} p\nWHERE p.{ppk} = c.{fk} AND {cond}"
+        my_del = f"DELETE c FROM {cn} c\nJOIN {pn} p ON p.{ppk} = c.{fk}\nWHERE {cond}"
+        pg_del = f"DELETE FROM {cn} c\nUSING {pn} p\nWHERE p.{ppk} = c.{fk} AND {cond}"
+        if bug == "ch_update_join_pg":
+            broken, truth, engine, only = my_upd, pg_upd, "postgresql", ["postgres"]
+        elif bug == "ch_update_from_my":
+            broken, truth, engine, only = pg_upd, my_upd, rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        elif bug == "ch_update_from_self":
+            broken = f"UPDATE {cn}\nSET {num} = 0\nFROM {cn} c\nJOIN {pn} p ON p.{ppk} = c.{fk}\nWHERE {cond}"
+            truth, only = pg_upd, ["postgres"]
+        elif bug == "ch_delete_no_target":
+            broken = f"DELETE FROM {cn} c\nJOIN {pn} p ON p.{ppk} = c.{fk}\nWHERE {cond}"
+            engine = rnd.choice(["mariadb", "postgresql"])
+            truth, only = (my_del, ["mysql"]) if engine == "mariadb" else (pg_del, ["postgres"])
+        else:
+            broken, truth, engine, only = my_del, pg_del, "postgresql", ["postgres"]
+    elif bug == "ch_set_qualified_pg":
+        if not tnums:
+            return None
+        c = rnd.choice(tnums)
+        broken = f"UPDATE {name} x\nSET x.{c} = 7\nWHERE x.{pk} = {k}"
+        truth, engine, only = f"UPDATE {name}\nSET {c} = 7\nWHERE {pk} = {k}", "postgresql", ["postgres"]
+    elif bug in ("ch_join_many_my", "ch_join_many_pg", "ch_set_sub_null"):
+        if not cnums or not pnums:
+            return None
+        pc, cc, target = rnd.choice(pnums), rnd.choice(cnums), pn
+        derived = f"(SELECT {fk}, SUM({cc}) AS {cc} FROM {cn} GROUP BY {fk})"
+        if bug == "ch_join_many_my":
+            broken = f"UPDATE {pn} p\nJOIN {cn} c ON c.{fk} = p.{ppk}\nSET p.{pc} = p.{pc} + c.{cc}"
+            truth = f"UPDATE {pn} p\nJOIN {derived} c ON c.{fk} = p.{ppk}\nSET p.{pc} = p.{pc} + c.{cc}"
+            engine, only = rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        elif bug == "ch_join_many_pg":
+            broken = f"UPDATE {pn} p\nSET {pc} = p.{pc} + c.{cc}\nFROM {cn} c\nWHERE c.{fk} = p.{ppk}"
+            truth = f"UPDATE {pn} p\nSET {pc} = p.{pc} + c.{cc}\nFROM {derived} c\nWHERE c.{fk} = p.{ppk}"
+            engine, only = "postgresql", ["postgres"]
+        else:
+            sub = f"(SELECT MAX(c.{cc}) FROM {cn} c WHERE c.{fk} = p.{ppk})"
+            broken = f"UPDATE {pn} p\nSET {pc} = {sub}"
+            truth = f"UPDATE {pn} p\nSET {pc} = {sub}\nWHERE EXISTS (SELECT 1 FROM {cn} c WHERE c.{fk} = p.{ppk})"
+    elif bug in ("ch_upsert_pg", "ch_conflict_my", "ch_conflict_amb"):
+        if not tnums:
+            return None
+        c = rnd.choice(tnums)
+        k2 = rnd.choice([k, len(t["rows"]) + 50])
+        head = f"INSERT INTO {name} ({pk}, {c})\nVALUES ({k2}, 5)\n"
+        if bug == "ch_upsert_pg":
+            broken = head + f"ON DUPLICATE KEY UPDATE {c} = VALUES({c})"
+            truth, engine, only = head + f"ON CONFLICT ({pk}) DO UPDATE SET {c} = EXCLUDED.{c}", "postgresql", ["postgres"]
+        elif bug == "ch_conflict_my":
+            broken = head + f"ON CONFLICT ({pk}) DO UPDATE SET {c} = EXCLUDED.{c}"
+            truth, engine, only = head + f"ON DUPLICATE KEY UPDATE {c} = VALUES({c})", rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        else:
+            broken = head + f"ON CONFLICT ({pk}) DO UPDATE SET {c} = {c} + EXCLUDED.{c}"
+            truth, only = head + f"ON CONFLICT ({pk}) DO UPDATE SET {c} = {name}.{c} + EXCLUDED.{c}", ["postgres"]
+    elif bug in ("ch_insert_order", "ch_insert_count"):
+        same = [[c["name"] for c in t["cols"] if c["kind"] == kind] for kind in ("cat", "int", "money", "name")]
+        pair = next((g for g in rnd.sample(same, len(same)) if len(g) >= 2), None)
+        if not pair:
+            return None
+        a, b = rnd.sample(pair, 2)
+        if bug == "ch_insert_order":
+            broken = f"INSERT INTO {name} ({pk}, {a}, {b})\nSELECT {pk} + 100000, {b}, {a}\nFROM {name}\nWHERE {pk} = {k}"
+            truth = f"INSERT INTO {name} ({pk}, {a}, {b})\nSELECT {pk} + 100000, {a}, {b}\nFROM {name}\nWHERE {pk} = {k}"
+        else:
+            broken = rnd.choice([f"INSERT INTO {name} ({pk}, {a}, {b})\nVALUES ({len(t['rows']) + 9}, NULL)",
+                                 f"INSERT INTO {name} ({pk}, {a}, {b})\nSELECT {pk} + 100000, {a}\nFROM {name}\nWHERE {pk} = {k}"])
+            truth = None
+    elif bug == "ch_limit_pg":
+        if not tcats:
+            return None
+        c = rnd.choice(tcats)
+        cond = f"{c['name']} = '{rnd.choice(c['params'])}'"
+        verb = rnd.choice(["DELETE", "UPDATE"]) if tnums else "DELETE"
+        n = rnd.randint(1, 3)
+        if verb == "DELETE":
+            broken = f"DELETE FROM {name}\nWHERE {cond}\nORDER BY {pk}\nLIMIT {n}"
+            truth = f"DELETE FROM {name}\nWHERE {pk} IN (SELECT {pk} FROM {name} WHERE {cond} ORDER BY {pk} LIMIT {n})"
+        else:
+            broken = f"UPDATE {name}\nSET {tnums[0]} = 0\nWHERE {cond}\nORDER BY {pk}\nLIMIT {n}"
+            truth = f"UPDATE {name}\nSET {tnums[0]} = 0\nWHERE {pk} IN (SELECT {pk} FROM {name} WHERE {cond} ORDER BY {pk} LIMIT {n})"
+        engine, only = "postgresql", ["postgres"]
+    else:                                                 # ch_dedupe: the key named id, as the rewrite assumes
+        if pk.lower() != "id" or not tcats:
+            return None
+        c = rnd.choice(tcats)["name"]
+        broken = f"DELETE a FROM {name} a\nJOIN {name} b ON a.{c} = b.{c}"
+        truth = f"DELETE a FROM {name} a\nJOIN {name} b ON a.{c} = b.{c} AND a.{pk} > b.{pk}"
+        only = ["mysql"]
+    item = {"seed": seed, "bug": bug, "stmt": "change", "schema": schema, "table": target, "broken": broken, "truth": truth}
+    if engine:
+        item["engine"] = engine
+    if only:
+        item["only"] = only
     return item
 
 

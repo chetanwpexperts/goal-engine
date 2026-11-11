@@ -18,6 +18,7 @@ from app.dbknow import concepts as K
 from tests.practice import schema as S
 
 DDL = re.compile(r"^\s*create\b", re.I)
+ROUTINE = re.compile(r"\bcreate\s+(?:or\s+replace\s+)?(procedure|function|trigger)\s+(\w+)", re.I)
 
 
 def _family(kind: str) -> str:
@@ -30,31 +31,38 @@ def _sql(ex: dict, kind: str, key: str = "sql") -> str | None:
 
 
 def _exec(eng, sql: str):
-    """(columns, rows) for a query, or (None, rowcount) for a change; several statements are run in order."""
+    """(columns, rows) for a query, or (None, rowcount) for a change; several statements are run in order, the way the
+    database's client runs a script (DELIMITER and $$ bodies understood). The last rows read are the result (a COMMIT after
+    the SELECT doesn't hide them)."""
+    from app.agents.sqlroutine import split_script
+
     out = (None, 0)
-    for stmt in [s for s in sql.split(";") if s.strip()]:
+    for stmt in split_script(sql):
         cur = eng.conn.cursor()
         try:
             cur.execute(stmt)
             if cur.description:
                 out = ([d[0] for d in cur.description], [[S.norm(v) for v in r] for r in cur.fetchall()])
-            else:
+            elif out[0] is None:
                 out = (None, cur.rowcount)
         finally:
             cur.close()
     return out
 
 
-def _ddl(eng, sql: str):
-    """Run a CREATE example on real lab_ tables; drop everything afterwards."""
+def _ddl(eng, sql: str, fill: bool = False):
+    """Run a CREATE example on real lab_ tables (with the practice rows when fill: a procedure or trigger works on them);
+    drop everything afterwards, routines included. The result is the rows the example reads last, else 'ok'."""
     names = list(S.TABLES) + ["demo_parent"]
-    made = []
+    made, routines = [], [(k.lower(), n) for k, n in ROUTINE.findall(sql)]
     try:
         for n in S.ORDER:
-            cols, _rows = S.TABLES[n]
-            eng.run(f"DROP TABLE IF EXISTS lab_{n}")
+            cols, rows = S.TABLES[n]
+            eng.run(f"DROP TABLE IF EXISTS lab_{n}" + (" CASCADE" if eng.kind == "postgres" else ""))
             eng.run(f"CREATE TABLE lab_{n} ({', '.join(cols)}, PRIMARY KEY (id))")
             made.append(f"lab_{n}")
+            if fill:
+                eng.run(f"INSERT INTO lab_{n} VALUES ({', '.join(['%s'] * len(cols))})", many=rows)
         eng.run("DROP TABLE IF EXISTS lab_demo_child")
         eng.run("DROP TABLE IF EXISTS lab_demo_pk")
         eng.run("DROP TABLE IF EXISTS lab_demo_parent")
@@ -66,9 +74,16 @@ def _ddl(eng, sql: str):
         text = re.sub(r"\bix_orders_customer\b", "ix_lab_orders_customer", text)
         for obj in re.findall(r"\bcreate\s+(?:table|view)\s+(\w+)", text, re.I):
             made.append(obj)
-        _exec(eng, text)
-        return (None, "ok")
+        res = _exec(eng, text)
+        return res if res[0] else (None, "ok")
     finally:
+        for kind, name in routines:
+            if kind == "trigger" and eng.kind == "postgres":
+                continue                                   # goes with its table
+            try:
+                eng.run(f"DROP {kind.upper()} IF EXISTS {name}" + (" CASCADE" if eng.kind == "postgres" else ""))
+            except Exception:  # noqa: BLE001
+                eng.rollback()
         for obj in reversed(made):
             for what in ("VIEW", "TABLE"):
                 try:
@@ -82,6 +97,9 @@ def run_example(eng, ex: dict) -> dict:
     sql = _sql(ex, eng.kind)
     if sql is None:
         return {"skipped": True}
+    if ROUTINE.search(sql):                                 # a procedure / function / trigger: on filled real lab_ tables
+        out["result"] = _ddl(eng, sql, fill=True)
+        return out
     if DDL.match(sql):
         out["result"] = _ddl(eng, sql)
         return out

@@ -65,7 +65,7 @@ feed.
   grain, fan-out through two child tables, percent of total.
 - [x] **4. Subqueries.** IN vs EXISTS vs JOIN (same rows or not), correlated subqueries in SELECT, latest/first row per
   group, anti-joins with NULLs.
-- [ ] **5. Changing data.** UPDATE/DELETE with JOIN per engine, upsert, INSERT ... SELECT column order, preview before
+- [x] **5. Changing data.** UPDATE/DELETE with JOIN per engine, upsert, INSERT ... SELECT column order, preview before
   change, batching, isolation basics; procedures, functions and triggers (DELIMITER, endless loops, missing handlers,
   trigger recursion).
 - [ ] **6. Schema design.** Reading CREATE TABLE: missing primary key, unindexed foreign key, money as FLOAT, dates or
@@ -147,3 +147,24 @@ statistics. Every night still adds 15+ concepts from its area. A new guide docum
   the inner orders on both engines; MariaDB 10.11 refuses LIMIT inside IN (1235), refuses an unnamed FROM subquery with a plain
   syntax error (1064, MySQL says 1248), has no LATERAL, and reports `id = (SELECT a, b ...)` as 4078 (illegal parameter data
   types) rather than 1241; PostgreSQL 16 accepts an unnamed FROM subquery.
+- **Night 5 (11 Nov 2026).** Changing data in `app/agents/sqlchange.py` (fundamental `changes_safety` widened: which rows a
+  change touches, how often each changes, what value it gets, which column it fills) and stored routines in
+  `app/agents/sqlroutine.py` (new fundamental `routine_flow`: a routine must end, answer, and not feed itself). The checker now
+  reads INSERT / REPLACE and CREATE PROCEDURE / FUNCTION / TRIGGER (and DO blocks), and every UPDATE / DELETE comes with a
+  read-only preview SELECT of the rows it would change. Rules: each engine's UPDATE / DELETE with a join (rewritten both ways);
+  SET alias.col on PostgreSQL; PostgreSQL's FROM reading the target again or a joined table never tied to the target (every row
+  changes); one target row with several joined rows (changed once: totalled first); SET col = (SELECT ...) with no WHERE (NULL
+  for no match); ON DUPLICATE KEY UPDATE / ON CONFLICT rewritten both ways, a bare column in DO UPDATE, DO UPDATE with no target;
+  INSERT ... SELECT filling by position; too few values; no column list; LIMIT on UPDATE/DELETE on PostgreSQL (ctid); deleting
+  duplicates through a self-join with no rule for which copy stays; DELETE FROM a JOIN b; INSERT IGNORE; REPLACE. Routines:
+  WHILE / REPEAT whose condition the body never changes and LOOP with no way out; a function that can end without RETURN; a
+  cursor with no NOT FOUND handler; DECLARE order; DELIMITER for the mysql client; a trigger that changes its own table; NEW
+  changed in an AFTER trigger; a PostgreSQL trigger function with no RETURN or RETURN NULL; a MySQL trigger body on PostgreSQL;
+  SET NEW.x in plpgsql; no LANGUAGE. 18 concepts, 59-problem practice bank (41 statements, 18 routines), 16 generator
+  families. Also fixed: words after a query that start like SQL ('set the amount to 0 ...') were taken as SQL; a meaning-changing
+  'check' rewrite was mixed into the fix of a definite mistake; 'repeatable read' was read as 'repeat' (confused). Lab lessons
+  worth keeping: an UPDATE changes each row at most once on both engines, so a join to two payments adds one of them;
+  PostgreSQL's `SET NEW.note = 'x'` in plpgsql silently sets a custom setting named new.note (with an expression it is a syntax
+  error); RETURN NULL from a BEFORE row trigger skips the row with no error; MariaDB compares emails case-blind, so a self-join
+  dedupe removes more rows there than on PostgreSQL; MariaDB fires 1442 / 1362 / 1329 / 1337 / 1338 / 1321 exactly as the docs
+  say; DELIMITER is only the mysql client's (the CLI cuts an undelimited CREATE PROCEDURE at the first ';', 1064 near '').

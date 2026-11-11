@@ -1040,7 +1040,46 @@ def _plan_question(text, tables) -> dict:
     plan = {"job": "aggregate", "table": t.name, "agg": agg, "measure": measure, "group": group, "filters": filters, "topn": topn}
     if derive and measure == len(t.header):
         plan["derive"] = derive
+    if agg in ("count", "sum") and group is None and not filters and topn is None:
+        w = _unmatched_value(text, t)
+        if w:
+            plan["unmatched"] = w                          # 'how many expenses in Food' with no Food anywhere: 0, said plainly
     return plan
+
+
+# a place, a group or a value the question names ('in Food', 'Food mein') - never these everyday words
+_NAMED_VALUE = [re.compile(r"\b(?:in|with|for|of)\s+([A-Za-z][\w&.'-]*(?:\s+[A-Za-z][\w&.'-]*){0,2})\s*\??\s*$", re.I),
+                re.compile(r"^\s*([A-Za-z][\w&.'-]*(?:\s+[A-Za-z][\w&.'-]*){0,2})\s+(?:mein|me|main|wale|wali|waale|waali)\b", re.I)]
+_EVERYDAY = {"total", "all", "file", "sheet", "data", "list", "records", "record", "rows", "row", "entries", "this", "that", "it", "here",
+             "there", "year", "month", "week", "today", "yesterday", "school", "class", "office", "company", "shop", "store", "hospital",
+             "clinic", "hotel", "gym", "business", "system", "excel", "workbook", "table", "short", "detail", "details", "number", "numbers",
+             "words", "figures", "rupees", "rs", "lakh", "lakhs", "crore", "thousand", "hundred", "inr", "sab", "saare", "sabhi", "kul",
+             "is", "us", "isme", "usme", "kitne", "kitni", "kitna", "how", "many", "much", "the", "my", "our", "your", "a", "an", "and",
+             "mahine", "saal", "aaj", "kal", "hafte", "abhi", "ab", "yahan", "wahan", "jo", "jis", "jin"}
+
+
+def _unmatched_value(text: str, t: Table) -> str | None:
+    """The value the question names, when no row, column or sheet has it: 'how many expenses in Food' in a sheet
+    with no Food anywhere. Counting all rows instead would be confidently wrong."""
+    for rx in _NAMED_VALUE:
+        m = rx.search(text or "")
+        if not m:
+            continue
+        phrase = m.group(1).strip()
+        words = [w for w in re.findall(r"[a-z][\w&.'-]*", phrase.lower()) if w not in STOP and w not in _EVERYDAY]
+        if not words or len(words) != len(phrase.split()) or any(len(w) < 3 for w in words):
+            return None
+        if re.search(r"\bof\s+" + re.escape(phrase), text or "", re.I) and any(w.endswith("s") for w in words):
+            return None                                    # 'total salary of employees': who is counted, not a value
+        if columns_in(phrase, t) or values_in(phrase, t) or any(w in t.name.lower() for w in words):
+            return None
+        if any(_col_score(h, words) > 0 for h in t.header if h):
+            return None
+        cells = {str(v).strip().lower() for i in range(len(t.header)) for v in t.col(i)[:5000] if isinstance(v, str)}
+        if any(w in c.split() or (len(w) >= 4 and _close(w, list(c.split()), 0.8)) for w in words for c in cells):
+            return None                                    # it is in the file after all (a word of a longer value, a slip)
+        return phrase
+    return None
 
 
 _AGG_HI = {"sum": "total", "avg": "average", "max": "sabse zyada", "min": "sabse kam", "count": "kitne"}
@@ -1297,6 +1336,10 @@ def run(plan: dict, path: str, out: str, hi: bool, n: int) -> dict:
         res = {**res, "formula": ""}                     # COUNTIFS/SUMIFS can't compare two columns: no half-true formula
     if info is not None:
         res = {**res, **_derived_note(info, hi, res)}
+    if plan.get("unmatched") and isinstance(res, dict):
+        w, said = plan["unmatched"], res.get("say", "")
+        res = {**res, "formula": "", "say": (f"{plan['table']} mein '{w}' kahin nahi hai, isliye iska jawab 0 hai. '{w}' ke bina poori sheet: {said}" if hi else
+                                             f"'{w}' is not anywhere in {plan['table']}, so the answer for it is 0. Without '{w}', the whole sheet: {said}")}
     if plan.get("pivot"):
         res = {**res, "say": res["say"] + (". (Excel ka asli PivotTable yahan nahi banta; ye wahi numbers wali summary table hai, jo data badalne pe "
                                            "formulas se update hoti hai)" if hi else

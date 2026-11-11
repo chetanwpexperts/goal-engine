@@ -28,6 +28,25 @@ MONTHFIRST_FMTS = ["%m/%d/%Y", "%m-%d-%Y", "%m/%d/%y", "%m-%d-%y"]
 OTHER_FMTS = ["%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%d-%b-%y", "%d-%b-%Y", "%d %b %Y", "%d %b %y", "%d %B %Y", "%d-%B-%Y",
               "%b %d, %Y", "%B %d, %Y", "%b %d %Y", "%d %b, %Y", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y %H:%M"]
 EXCEL_EPOCH = datetime(1899, 12, 30)
+# A heading that names a date ('Check In', 'Joined On', 'Visit Date') - so plain day numbers (46023) in it are dates.
+# Never when the heading also names an amount or a count ('Due Amount', 'Days Overdue', 'No of Nights').
+SERIAL_DATE_HEAD = re.compile(r"(?i)\b(date|dt|dob|doj|birth|joining|joined|due|delivery|dispatch|expiry|expires|check[\s-]?in|"
+                              r"check[\s-]?out|arrival|departure|start|visit|admission|issued?|paid on|on|tarikh|tareekh|तारीख|दिनांक)\b")
+NOT_DATE_HEAD = re.compile(r"(?i)\b(amount|amt|rs|inr|fee|fees|balance|total|price|cost|value|salary|rent|bill|charges?|paid|qty|"
+                           r"quantity|days|nights|count|no|number|id|code|age|km|kms|rate|%|percent|year|years|month|months)\b\.?")
+
+
+def serial_date_heading(h) -> bool:
+    """Can plain numbers under this heading be Excel day numbers? 'Check In', 'DOJ', 'Paid On' yes; 'Due Amount' no."""
+    h = str(h or "")
+    if re.search(r"(?i)\b(paid on|date|dt|dob|doj|tarikh|tareekh)\b|तारीख|दिनांक", h):      # 'Bill Date', 'Paid On'
+        return not re.search(r"(?i)\b(amount|amt|rs|days|count|qty|no\. of|number of)\b", h)
+    return bool(SERIAL_DATE_HEAD.search(h)) and not NOT_DATE_HEAD.search(h)
+
+
+def is_day_number(v) -> bool:
+    """A number in the range Excel uses for dates between 1954 and 2119 (20000 = 4 Oct 1954)."""
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and 20000 <= v <= 80000
 
 
 def _vocab() -> set[str]:
@@ -97,8 +116,8 @@ def parse_date(v, dayfirst=True):
             d = datetime.strptime(s, f)
         except ValueError:
             continue
-        if f.endswith("%y") and d.year > datetime.now().year + 20:
-            d = d.replace(year=d.year - 100)
+        if "%y" in f:                                   # two-digit years the way Excel reads them: 00-29 -> 2000s, 30-99 -> 1900s
+            d = d.replace(year=(2000 if d.year % 100 <= 29 else 1900) + d.year % 100)
         return d, "fixed"
     m = NUM_DATE.match(s)
     if m:                                               # looks like a date, but no calendar has it (31/02/2026)
@@ -158,7 +177,7 @@ def _kind(header: str, vals: list, pct_format: float = 0) -> str:
     df = _dayfirst(plain)
     dates = 0
     for v in plain:
-        if isinstance(v, (int, float)) and not isinstance(v, bool) and not DATE_HINT.search(h):
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and not serial_date_heading(h):
             continue                                    # a plain number is a date only in a column whose heading says so
         d, how = parse_date(v, df)
         dates += d is not None or how == "impossible"

@@ -266,7 +266,7 @@ def aggs(sql: str, s: str, cl: dict, srcs: list, alias_of, items: list, intent: 
         agg_alias = {i["alias"].lower(): i for i in items if i["alias"] and i["agg"]}
         htext = s[having[0]:having[1]]
         hits = [x for x in re.finditer(r"(?<![\w.`\"])[`\"]?([A-Za-z_]\w*)[`\"]?(?![\w.(])", htext)
-                if x.group(1).lower() in agg_alias and C._depths(htext)[x.start()] >= 0]
+                if x.group(1).lower() in agg_alias and not _inside_agg(htext, x.start())]
         if hits:
             kind, says = _refused("having_alias", eng, sql)
             if kind:
@@ -435,6 +435,20 @@ _SAID_COUNT = [r"\bhow many ((?:[a-z_]+ ){0,2}[a-z_]+)", r"\bnumber of ((?:[a-z_
                r"\bkitn[eia] ((?:[a-z_]+ ){0,2}[a-z_]+)", r"\b([a-z_]+) ki (?:ginti|sankhya|count)\b"]
 _NOT_NOUNS = set("""unique different distinct separate total all the a an of active new old paid unpaid open closed rows row records record
 times time entries entry results result lines line ones one values value of with have has had in on for per each every""".split())
+
+
+def _inside_agg(text: str, pos: int) -> bool:
+    """Is this spot inside the brackets of a total (SUM(total)): there the name is the table's column, not the SELECT name."""
+    depth = 0
+    for i in range(pos - 1, -1, -1):
+        if text[i] == ")":
+            depth += 1
+        elif text[i] == "(":
+            if depth == 0:
+                return bool(ANY_AGG.search(text[max(0, i - 20):i + 1]) and re.search(r"\w+\s*\($", text[:i + 1]) and
+                            ANY_AGG.match(re.search(r"(\w+)\s*\($", text[:i + 1]).group(0)))
+            depth -= 1
+    return False
 
 
 def _norm(c: str) -> str:

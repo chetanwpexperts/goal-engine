@@ -55,6 +55,11 @@
    "id": "speed",
    "en": "Which filters and joins need an index, and does a function on a column stop the index?",
    "hi": "Kin filters aur joins ko index chahiye, aur kya column pe function index rok deta hai?"
+  },
+  {
+   "id": "subqueries",
+   "en": "For each subquery: where does it stand (one value, a set, EXISTS), and which names tie it to the outer row?",
+   "hi": "Har subquery ke liye: wo kahan khadi hai (ek value, set, EXISTS), aur kaunse naam use bahar ki row se jodte hain?"
   }
  ],
  "fundamentals": {
@@ -79,7 +84,8 @@
    "rule_hi": "Kai rows wali table join karne se doosri taraf har match pe dohraati hai. Ek parent pe do aise join ek doosre ko guna karte hain; pehle har child ka total uske apne grain pe nikaalo, phir join karo.",
    "topics": [
     "join",
-    "distinct_join"
+    "distinct_join",
+    "semi_join"
    ],
    "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html"
   },
@@ -104,7 +110,11 @@
     "not_in",
     "null_fn",
     "null_math",
-    "nulls_order"
+    "nulls_order",
+    "all_null",
+    "in_list_null",
+    "not_in_outer",
+    "sub_sum_null"
    ],
    "source": "https://www.postgresql.org/docs/current/functions-comparison.html"
   },
@@ -122,13 +132,23 @@
   "subquery_shape": {
    "title_en": "A subquery is one value or a set",
    "title_hi": "Subquery ek value hai ya ek set",
-   "rule_en": "After = < > a subquery must return exactly one row (one value); after IN / EXISTS it may return many. A subquery is evaluated against the data as it was when the statement started, and MySQL won't let it read the table an UPDATE/DELETE is changing unless it is wrapped as a derived table.",
-   "rule_hi": "= < > ke baad subquery ko ek hi row deni chahiye; IN / EXISTS ke baad kai de sakti hai. MySQL UPDATE/DELETE ki apni table ko subquery mein tabhi padhne deta hai jab use derived table mein lapeta jaaye.",
+   "rule_en": "Where a subquery stands decides how much it may return. After = < > or in the SELECT list it must give one row and one column; after IN / NOT IN / ANY / ALL one column and any number of rows; after EXISTS only whether there is at least one row matters, so what it selects doesn't matter, and an aggregate without GROUP BY always gives exactly one row (EXISTS (SELECT COUNT(*) ...) is always true). LIMIT without ORDER BY inside it keeps whichever row came first. A subquery is evaluated against the data as it was when the statement started, and MySQL won't let it read the table an UPDATE/DELETE is changing unless it is wrapped as a derived table; MySQL and MariaDB also refuse LIMIT inside IN and a subquery in FROM without a name.",
+   "rule_hi": "Subquery kahan khadi hai, wahi tay karta hai wo kitna de sakti hai. = < > ke baad ya SELECT list mein ek row aur ek column; IN / NOT IN / ANY / ALL ke baad ek column aur kitni bhi rows; EXISTS ke baad sirf ye ki koi row hai ya nahi, isliye wo kya select karti hai farak nahi padta, aur GROUP BY ke bina aggregate hamesha ek row deta hai (EXISTS (SELECT COUNT(*) ...) hamesha true). Andar ORDER BY ke bina LIMIT jo row pehle mili wahi rakhta hai. MySQL UPDATE/DELETE ki apni table ko subquery mein tabhi padhne deta hai jab use derived table mein lapeta jaaye; MySQL/MariaDB IN ke andar LIMIT aur bina naam ki FROM subquery bhi nahi maante.",
    "topics": [
     "subquery",
-    "same_table"
+    "same_table",
+    "exists_agg",
+    "sub_columns",
+    "scalar_rows",
+    "sub_limit_order",
+    "in_limit",
+    "derived_alias"
    ],
-   "source": "https://dev.mysql.com/doc/refman/8.4/en/subquery-errors.html"
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/subquery-errors.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   },
   "values_types": {
    "title_en": "Values have types: text in quotes, dates in quotes",
@@ -251,6 +271,24 @@
     "pct_total"
    ],
    "source": "https://www.postgresql.org/docs/current/functions-aggregate.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "correlation": {
+   "title_en": "A subquery reads its own FROM first",
+   "title_hi": "Subquery pehle apna FROM padhti hai",
+   "rule_en": "A name inside a subquery is looked up in the subquery's own FROM first and only then in the query around it. A subquery is tied to the outer row (correlated) only through a name that belongs to the outer query; without one it gives the same answer for every row. So when the subquery reads the same table again, orders.customer_id inside it means the inner orders (x = x, always true) unless the inner copy gets a name of its own; a column of the outer row in the subquery's SELECT list just repeats the row's own value; and IN (SELECT MAX(y) ... GROUP BY g) gives values without saying which group they belong to, so a row matches any group's maximum, not its own. Compare the pair ((g, y) IN (SELECT g, MAX(y) ...)) or correlate on g.",
+   "rule_hi": "Subquery ke andar naam pehle uske apne FROM mein dhoondha jaata hai, phir bahar wali query mein. Subquery bahar ki row se tabhi judti hai (correlated) jab usme bahar wali query ka koi naam ho; warna har row ka ek hi jawab. Isliye wahi table dobara padhne par andar orders.customer_id andar wali orders hai (x = x, hamesha true) jab tak andar wali copy ko apna naam na do; SELECT list mein bahar ki row ka column bas usi row ki value dohraata hai; aur IN (SELECT MAX(y) ... GROUP BY g) values deta hai par ye nahi batata kis group ki, isliye row kisi bhi group ke max se match ho jaati hai. Jodi compare karo ((g, y) IN (SELECT g, MAX(y) ...)) ya g par correlate karo.",
+   "topics": [
+    "exists_uncorr",
+    "sub_outer_col",
+    "corr_self",
+    "in_grouped_agg",
+    "sub_key"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-expressions.html#SQL-SYNTAX-SCALAR-SUBQUERIES",
    "proven": [
     "mariadb",
     "postgresql"

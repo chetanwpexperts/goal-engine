@@ -63,7 +63,7 @@ feed.
   hidden by DISTINCT.
 - [x] **3. Aggregation.** COUNT(*) vs COUNT(col) vs COUNT(DISTINCT), AVG/SUM with NULLs, SUM(CASE ...), totals at the wrong
   grain, fan-out through two child tables, percent of total.
-- [ ] **4. Subqueries.** IN vs EXISTS vs JOIN (same rows or not), correlated subqueries in SELECT, latest/first row per
+- [x] **4. Subqueries.** IN vs EXISTS vs JOIN (same rows or not), correlated subqueries in SELECT, latest/first row per
   group, anti-joins with NULLs.
 - [ ] **5. Changing data.** UPDATE/DELETE with JOIN per engine, upsert, INSERT ... SELECT column order, preview before
   change, batching, isolation basics; procedures, functions and triggers (DELIMITER, endless loops, missing handlers,
@@ -132,3 +132,18 @@ statistics. Every night still adds 15+ concepts from its area. A new guide docum
   query and sums one arbitrary row per group (silently wrong; PostgreSQL 42803); `COUNT(DISTINCT a, b)` skips NULL pairs on
   MariaDB but `COUNT(DISTINCT (a, b))` counts them on PostgreSQL; a HAVING name that is also a real column means the column on
   PostgreSQL; MariaDB 10.11 has only `WITH ROLLUP` (no `ROLLUP (...)`, no `GROUPING()`, no `FILTER`).
+- **Night 4 (11 Nov 2026).** Subqueries in `app/agents/sqlsubq.py` (fundamental `subquery_shape` widened: where a subquery stands
+  says how much it may return; new fundamental `correlation`: a subquery reads its own FROM first and is tied to the outer row
+  only through an outer name). Rules: EXISTS (SELECT COUNT(*) ...) is always true; x = x inside a correlated subquery (an alias
+  twice, or the same table name inside and outside); a subquery that returns the outer row's own column; an id compared with
+  another table's id; IN (SELECT MAX(y) ... GROUP BY g) forgetting whose maximum it is (rewritten to `(g, y) IN`); two columns
+  where one is compared; a scalar subquery in SELECT tied on a non-key; a correlated SUM that is NULL for nothing; LIMIT with no
+  ORDER BY in a subquery; > ALL with NULLs or no rows; NOT IN (..., NULL) and IN (..., NULL); NOT IN dropping rows whose own value
+  is NULL; EXISTS with no link to the outer row; a JOIN used only to keep parents that have a child (rewritten to EXISTS).
+  Per-engine facts in the dialect files' query_rules (`limit_in_subquery`, `derived_alias`). The checker no longer crashes on a
+  total inside a scalar subquery in SELECT, `JOIN LATERAL (...) t ON true` is no longer called a join that mentions nothing, and a
+  name inside a WHERE subquery or inside a total in HAVING is no longer taken for a SELECT name. 18 concepts, 41-problem practice
+  bank, 15 generator families. Lab lessons worth keeping: `orders.customer_id` inside a subquery that reads orders again binds to
+  the inner orders on both engines; MariaDB 10.11 refuses LIMIT inside IN (1235), refuses an unnamed FROM subquery with a plain
+  syntax error (1064, MySQL says 1248), has no LATERAL, and reports `id = (SELECT a, b ...)` as 4078 (illegal parameter data
+  types) rather than 1241; PostgreSQL 16 accepts an unnamed FROM subquery.

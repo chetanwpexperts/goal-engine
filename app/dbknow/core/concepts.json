@@ -7799,6 +7799,1769 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "subquery",
+   "kind": "concept",
+   "title": {
+    "en": "Subquery",
+    "hinglish": "Subquery",
+    "hindi": "Subquery (उप-query)"
+   },
+   "terms": [
+    [
+     "subquer\\w*"
+    ],
+    [
+     "sub quer\\w*"
+    ],
+    [
+     "sub-quer\\w*"
+    ],
+    [
+     "nested (quer\\w*|select)"
+    ],
+    [
+     "inner quer\\w*"
+    ],
+    [
+     "सबक्वेरी"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a subquery",
+     "what is a nested query in sql",
+     "explain subqueries"
+    ],
+    "hinglish": [
+     "subquery kya hoti hai",
+     "nested query kya hai"
+    ],
+    "hindi": [
+     "subquery क्या होती है",
+     "सबक्वेरी क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A subquery is a SELECT written inside another statement, in brackets. Where it stands decides what it must return: after = or > (or in the SELECT list) one value; after IN / NOT IN / ANY / ALL one column of any number of rows; after EXISTS just 'is there a row'; in FROM a whole table that needs a name. It is correlated when it uses a column of the outer row, and then it is worked out again for each row.",
+    "hinglish": "Subquery ek SELECT hai jo doosri query ke andar bracket mein likhi jaati hai. Wo kahan khadi hai, wahi tay karta hai use kya dena hai: = ya > ke baad (ya SELECT list mein) ek value; IN / NOT IN / ANY / ALL ke baad ek column, kitni bhi rows; EXISTS ke baad bas 'row hai ya nahi'; FROM mein poori table, jiska naam dena padta hai. Agar wo bahar ki row ka column use kare to correlated hai, aur har row ke liye dobara chalti hai.",
+    "hindi": "Subquery एक SELECT है जो दूसरी query के अंदर bracket में लिखी जाती है। वह कहाँ है, यही तय करता है उसे क्या देना है: = या > के बाद एक value; IN / ANY / ALL के बाद एक column; EXISTS के बाद बस 'row है या नहीं'; FROM में पूरी table जिसका नाम देना होता है।"
+   },
+   "mistake": {
+    "en": "Using = with a subquery that can return several rows: it works on today's data and breaks (error 1242 / 21000) the day a second row appears. Use IN, or make it return one value (MAX, LIMIT 1 with ORDER BY).",
+    "hinglish": "Kai rows de sakne wali subquery ke saath = lagana: aaj chalegi, jis din doosri row aayegi error 1242 / 21000. IN lagao, ya ek value lo (MAX, ORDER BY ke saath LIMIT 1).",
+    "hindi": "कई rows दे सकने वाली subquery के साथ = लगाना: दूसरी row आते ही error 1242 / 21000। IN लगाइए या एक value लीजिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount FROM orders WHERE amount > (SELECT AVG(amount) FROM orders) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "amount"
+     ],
+     "result": [
+      [
+       "1",
+       "25500"
+      ],
+      [
+       "3",
+       "80000"
+      ],
+      [
+       "6",
+       "65000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "All shapes supported; LIMIT inside IN / ANY / ALL is refused (1235) and a subquery in FROM needs a name (1248).",
+    "mariadb": "Same as MySQL: no LIMIT inside IN (1235); a subquery in FROM needs a name.",
+    "postgresql": "All shapes supported, LIMIT inside IN too; from version 16 a subquery in FROM may have no name."
+   },
+   "related": [
+    "correlated_subquery",
+    "scalar_subquery",
+    "join_vs_subquery"
+   ],
+   "fundamentals": [
+    "subquery_shape",
+    "correlation"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/subqueries.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "correlated_subquery",
+   "kind": "concept",
+   "title": {
+    "en": "Correlated subquery",
+    "hinglish": "Correlated subquery",
+    "hindi": "Correlated subquery"
+   },
+   "terms": [
+    [
+     "co-?rr?elated"
+    ],
+    [
+     "correlat\\w*",
+     "subquer\\w*"
+    ],
+    [
+     "non-?correlated"
+    ],
+    [
+     "uncorrelated"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a correlated subquery",
+     "correlated vs non correlated subquery",
+     "how does a correlated subquery work"
+    ],
+    "hinglish": [
+     "correlated subquery kya hai",
+     "correlated subquery kaise kaam karti hai"
+    ],
+    "hindi": [
+     "correlated subquery क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A correlated subquery uses a column of the outer row (WHERE x.customer_id = o.customer_id), so its answer is different for each row: 'orders above THEIR customer's average'. A non-correlated one mentions nothing outside itself and gives one answer for the whole query. Names inside are looked up in the subquery's own FROM first, so give the inner table its own alias when it is the same table as outside.",
+    "hinglish": "Correlated subquery bahar ki row ka column use karti hai (WHERE x.customer_id = o.customer_id), isliye har row ka jawab alag: 'apne customer ke average se bade orders'. Non-correlated bahar ka kuch nahi leti aur poori query ka ek hi jawab deti hai. Andar naam pehle subquery ke apne FROM mein dhoondhe jaate hain, isliye wahi table dobara ho to andar wali ko alag alias do.",
+    "hindi": "Correlated subquery बाहर की row का column इस्तेमाल करती है, इसलिए हर row का जवाब अलग होता है। Non-correlated पूरी query का एक ही जवाब देती है। अंदर नाम पहले subquery के अपने FROM में ढूँढे जाते हैं, इसलिए वही table हो तो अंदर अलग alias दीजिए।"
+   },
+   "mistake": {
+    "en": "Writing WHERE customer_id = orders.customer_id inside a subquery that reads orders again: both names mean the INNER orders, so it is x = x (always true) and you get the overall average, not each customer's.",
+    "hinglish": "Orders dobara padhne wali subquery mein WHERE customer_id = orders.customer_id: dono naam ANDAR wali orders ke hain, to ye x = x hai (hamesha true) aur har customer ki jagah poora average aata hai.",
+    "hindi": "Orders दोबारा पढ़ने वाली subquery में WHERE customer_id = orders.customer_id: दोनों नाम अंदर वाली orders के हैं, यह x = x है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, o.customer_id, o.amount FROM orders o WHERE o.amount > (SELECT AVG(x.amount) FROM orders x WHERE x.customer_id = o.customer_id) ORDER BY o.id"
+     },
+     "columns": [
+      "id",
+      "customer_id",
+      "amount"
+     ],
+     "result": [
+      [
+       "1",
+       "1",
+       "25500"
+      ],
+      [
+       "3",
+       "2",
+       "80000"
+      ],
+      [
+       "4",
+       "3",
+       "12000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Supported; often turned into a join by the optimizer.",
+    "mariadb": "Supported; often turned into a join by the optimizer.",
+    "postgresql": "Supported; a correlated subquery in SELECT runs once per outer row (a JOIN to a grouped table can be faster)."
+   },
+   "related": [
+    "subquery",
+    "latest_per_group",
+    "scalar_subquery"
+   ],
+   "fundamentals": [
+    "correlation"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-expressions.html#SQL-SYNTAX-SCALAR-SUBQUERIES",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "scalar_subquery",
+   "kind": "concept",
+   "title": {
+    "en": "Scalar subquery (one value)",
+    "hinglish": "Scalar subquery (ek value)",
+    "hindi": "Scalar subquery (एक value)"
+   },
+   "terms": [
+    [
+     "scalar",
+     "subquer\\w*"
+    ],
+    [
+     "scalar"
+    ],
+    [
+     "subquer\\w*",
+     "(in|inside|andar) (the )?select"
+    ],
+    [
+     "subquer\\w*",
+     "select (list|clause)"
+    ],
+    [
+     "subquer\\w*",
+     "more than (one|1) rows?"
+    ],
+    [
+     "select (ke )?(andar|mein|me)",
+     "subquer\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a scalar subquery",
+     "what is a subquery in the select clause",
+     "why does my subquery return more than one row"
+    ],
+    "hinglish": [
+     "scalar subquery kya hai",
+     "select ke andar subquery kaise likhe"
+    ],
+    "hindi": [
+     "scalar subquery क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A scalar subquery gives exactly one value (one row, one column), so it can stand wherever a value can: in the SELECT list or after = / >. If it finds no row the value is NULL; if it finds two rows the query stops with an error. Make sure it can only return one row: a total (COUNT, SUM, MAX), a key match, or ORDER BY ... LIMIT 1.",
+    "hinglish": "Scalar subquery theek ek value deti hai (ek row, ek column), isliye jahan value aa sakti hai wahan likh sakte ho: SELECT list mein ya = / > ke baad. Koi row na mile to NULL; do rows milein to error. Pakka karo ki ek hi row aaye: total (COUNT, SUM, MAX), key se match, ya ORDER BY ... LIMIT 1.",
+    "hindi": "Scalar subquery ठीक एक value देती है, इसलिए SELECT list में या = के बाद लिख सकते हैं। Row न मिले तो NULL, दो मिलें तो error। एक ही row पक्की कीजिए: total, key से match, या ORDER BY ... LIMIT 1।"
+   },
+   "mistake": {
+    "en": "(SELECT o.amount FROM orders o WHERE o.customer_id = c.id) in SELECT: fine while every customer has one order, error 1242 / 21000 as soon as one has two. And (SELECT SUM(...)) is NULL, not 0, for a customer with none: wrap it in COALESCE(..., 0).",
+    "hinglish": "SELECT mein (SELECT o.amount FROM orders o WHERE o.customer_id = c.id): jab tak har customer ka ek order hai chalega, do hote hi error 1242 / 21000. Aur (SELECT SUM(...)) bina order wale ke liye 0 nahi NULL hai: COALESCE(..., 0) lagao.",
+    "hindi": "SELECT में एक से ज़्यादा rows देने वाली subquery: error 1242 / 21000। (SELECT SUM(...)) बिना match के NULL है: COALESCE(..., 0)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) AS orders_count, COALESCE((SELECT SUM(o.amount) FROM orders o WHERE o.customer_id = c.id), 0) AS spent FROM customers c ORDER BY c.id"
+     },
+     "columns": [
+      "id",
+      "orders_count",
+      "spent"
+     ],
+     "result": [
+      [
+       "1",
+       "2",
+       "26000"
+      ],
+      [
+       "2",
+       "2",
+       "80500"
+      ],
+      [
+       "3",
+       "2",
+       "12800"
+      ],
+      [
+       "4",
+       "0",
+       "0"
+      ],
+      [
+       "5",
+       "0",
+       "0"
+      ],
+      [
+       "6",
+       "1",
+       "65000"
+      ],
+      [
+       "7",
+       "0",
+       "0"
+      ],
+      [
+       "8",
+       "1",
+       "300"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Error 1242 (Subquery returns more than 1 row) when it finds two rows.",
+    "mariadb": "Error 1242 when it finds two rows.",
+    "postgresql": "Error 21000 (more than one row returned by a subquery used as an expression)."
+   },
+   "related": [
+    "subquery",
+    "correlated_subquery",
+    "sum_null_zero"
+   ],
+   "fundamentals": [
+    "subquery_shape",
+    "null_logic"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/scalar-subqueries.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "derived_table",
+   "kind": "concept",
+   "title": {
+    "en": "Derived table (subquery in FROM)",
+    "hinglish": "Derived table (FROM mein subquery)",
+    "hindi": "Derived table (FROM में subquery)"
+   },
+   "terms": [
+    [
+     "derived tables?"
+    ],
+    [
+     "subquer\\w*",
+     "\\bin from\\b"
+    ],
+    [
+     "subquer\\w*",
+     "from clause"
+    ],
+    [
+     "inline views?"
+    ],
+    [
+     "subquer\\w*",
+     "alias"
+    ],
+    [
+     "from (mein|me|में)",
+     "subquer\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a derived table",
+     "what is a subquery in the from clause",
+     "why does a subquery in from need an alias"
+    ],
+    "hinglish": [
+     "derived table kya hai",
+     "from mein subquery kaise likhe"
+    ],
+    "hindi": [
+     "derived table क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A derived table is a subquery in FROM: its rows are built first and the outer query reads them like a table. It is how you do something in two steps, such as totals per customer and then the biggest of those totals. Give it a name after the bracket: FROM (SELECT ...) AS t.",
+    "hinglish": "Derived table FROM mein likhi subquery hai: pehle uski rows banti hain, phir bahar wali query use table ki tarah padhti hai. Do step ka kaam aise hota hai, jaise har customer ka total aur phir unme sabse bada. Bracket ke baad naam do: FROM (SELECT ...) AS t.",
+    "hindi": "Derived table FROM में लिखी subquery है: पहले उसकी rows बनती हैं, फिर बाहर की query उसे table की तरह पढ़ती है। Bracket के बाद नाम दीजिए: FROM (SELECT ...) AS t।"
+   },
+   "mistake": {
+    "en": "Leaving out the name: MySQL refuses it (1248, Every derived table must have its own alias), MariaDB gives a syntax error, PostgreSQL 15 and older refuse it too.",
+    "hinglish": "Naam chhod dena: MySQL error 1248 (Every derived table must have its own alias), MariaDB syntax error, PostgreSQL 15 tak bhi error.",
+    "hindi": "नाम छोड़ देना: MySQL error 1248, MariaDB syntax error, PostgreSQL 15 तक भी error।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT MAX(t.spent) AS top_spent FROM (SELECT customer_id, SUM(amount) AS spent FROM orders GROUP BY customer_id) AS t"
+     },
+     "columns": [
+      "top_spent"
+     ],
+     "result": [
+      [
+       "80500"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "The name is required (error 1248).",
+    "mariadb": "The name is required (syntax error 1064 without it).",
+    "postgresql": "Optional from version 16; required (42601) in 15 and older."
+   },
+   "related": [
+    "subquery",
+    "cte_vs_subquery",
+    "nested_aggregate"
+   ],
+   "fundamentals": [
+    "subquery_shape",
+    "grain"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/derived-tables.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "exists",
+   "kind": "concept",
+   "title": {
+    "en": "EXISTS",
+    "hinglish": "EXISTS",
+    "hindi": "EXISTS"
+   },
+   "terms": [
+    [
+     "exists"
+    ],
+    [
+     "exist operator"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is exists in sql",
+     "how does exists work",
+     "explain the exists operator"
+    ],
+    "hinglish": [
+     "exists kya hota hai",
+     "exists kaise kaam karta hai"
+    ],
+    "hindi": [
+     "EXISTS क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "EXISTS (subquery) is true when the subquery finds at least one row, and false when it finds none; what it selects doesn't matter. It is the usual way to ask 'does this row have a match': customers WHERE EXISTS (an order of theirs). Each outer row comes out once however many matches it has, and the engine can stop at the first match.",
+    "hinglish": "EXISTS (subquery) tab true hai jab subquery kam se kam ek row paaye, aur koi na mile to false; wo kya select karti hai farak nahi padta. 'Is row ka match hai kya' poochne ka aam tareeka: customers WHERE EXISTS (unka koi order). Har bahar ki row ek hi baar aati hai, chahe kitne match hon.",
+    "hindi": "EXISTS (subquery) तब true है जब subquery कम से कम एक row पाए; वह क्या select करती है फ़र्क नहीं पड़ता। हर बाहर की row एक बार आती है।"
+   },
+   "mistake": {
+    "en": "Putting a total inside: EXISTS (SELECT COUNT(*) ... ) is always true, because a total without GROUP BY always returns one row (COUNT 0 is still a row). Select a constant: EXISTS (SELECT 1 ...). And forgetting to tie it to the outer row makes it the same for every row.",
+    "hinglish": "Andar total rakhna: EXISTS (SELECT COUNT(*) ...) hamesha true hai, kyunki GROUP BY ke bina total hamesha ek row deta hai (COUNT 0 bhi row hai). Constant lo: EXISTS (SELECT 1 ...). Aur bahar ki row se na jodna har row ka ek hi jawab bana deta hai.",
+    "hindi": "EXISTS (SELECT COUNT(*) ...) हमेशा true है क्योंकि total हमेशा एक row देता है। EXISTS (SELECT 1 ...) लिखिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, c.first_name FROM customers c WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id AND o.status = 'paid') ORDER BY c.id"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "1",
+       "Aarav"
+      ],
+      [
+       "2",
+       "Diya"
+      ],
+      [
+       "3",
+       "Kabir"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Runs it as a semi-join when it can.",
+    "mariadb": "Runs it as a semi-join when it can.",
+    "postgresql": "Plans it as a semi-join; stops at the first match."
+   },
+   "related": [
+    "not_exists",
+    "in_vs_exists",
+    "semi_join"
+   ],
+   "fundamentals": [
+    "subquery_shape",
+    "correlation"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html#FUNCTIONS-SUBQUERY-EXISTS",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "not_exists",
+   "kind": "concept",
+   "title": {
+    "en": "NOT EXISTS",
+    "hinglish": "NOT EXISTS",
+    "hindi": "NOT EXISTS"
+   },
+   "terms": [
+    [
+     "not exists?"
+    ],
+    [
+     "exists",
+     "(nahi|na ho|absent|missing)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is not exists",
+     "how to use not exists",
+     "how does not exists work in sql"
+    ],
+    "hinglish": [
+     "not exists kya hai",
+     "not exists kaise use kare"
+    ],
+    "hindi": [
+     "NOT EXISTS क्या है"
+    ]
+   },
+   "answer": {
+    "en": "NOT EXISTS (subquery) is true when the subquery finds no row: rows that have no match, such as customers who never ordered or products never sold (an anti-join). Unlike NOT IN, a NULL anywhere can't empty the result, so it is the safe way to write 'has no match'.",
+    "hinglish": "NOT EXISTS (subquery) tab true hai jab subquery koi row na paaye: jinka match nahi, jaise jinhone kabhi order nahi kiya ya jo product kabhi nahi bika (anti-join). NOT IN ki tarah koi NULL result khaali nahi kar sakta, isliye 'match nahi hai' ka surakshit tareeka yahi hai.",
+    "hindi": "NOT EXISTS तब true है जब subquery कोई row न पाए: बिना match वाली rows (anti-join)। NOT IN की तरह NULL परिणाम खाली नहीं करता।"
+   },
+   "mistake": {
+    "en": "Forgetting the link to the outer row (WHERE o.customer_id = c.id): then it is either true for every row or for none.",
+    "hinglish": "Bahar ki row se link bhool jaana (WHERE o.customer_id = c.id): tab ya har row true ya koi nahi.",
+    "hindi": "बाहर की row से link भूल जाना: तब या हर row true या कोई नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT p.id, p.name FROM products p WHERE NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.product_id = p.id AND oi.quantity > 1) ORDER BY p.id"
+     },
+     "columns": [
+      "id",
+      "name"
+     ],
+     "result": [
+      [
+       "1",
+       "Phone X"
+      ],
+      [
+       "2",
+       "Phone Lite"
+      ],
+      [
+       "3",
+       "Laptop Pro"
+      ],
+      [
+       "5",
+       "100% Cotton Bear"
+      ],
+      [
+       "6",
+       "Laptop Air"
+      ],
+      [
+       "7",
+       "Old Pager"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Planned as an anti-join from 8.0.17.",
+    "mariadb": "Supported; planned like an anti-join when it can.",
+    "postgresql": "Planned as an anti-join."
+   },
+   "related": [
+    "exists",
+    "not_in_vs_not_exists",
+    "anti_join"
+   ],
+   "fundamentals": [
+    "null_logic",
+    "correlation"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/exists-and-not-exists-subqueries.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "in_vs_exists",
+   "kind": "compare",
+   "title": {
+    "en": "IN vs EXISTS",
+    "hinglish": "IN vs EXISTS",
+    "hindi": "IN बनाम EXISTS"
+   },
+   "terms": [
+    [
+     "\\bin\\s*(vs|versus|or|and|aur|ya|बनाम|और|या)\\s*exists"
+    ],
+    [
+     "exists\\s*(vs|versus|or|and|aur|ya|बनाम|और|या)\\s*\\bin\\b"
+    ],
+    [
+     "\\bin subquery",
+     "exists"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "in vs exists",
+     "difference between in and exists",
+     "which is faster in or exists"
+    ],
+    "hinglish": [
+     "in aur exists mein kya farak hai",
+     "in ya exists kaunsa better hai"
+    ],
+    "hindi": [
+     "IN और EXISTS में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "For 'rows that have a match' they give the same rows: x IN (SELECT y ...) and EXISTS (SELECT 1 ... WHERE y = x) both keep each outer row once, and today's optimizers often run them the same way. IN compares one value with a list; EXISTS can test any condition (several columns, ranges). The difference is in the negative: NOT IN breaks on NULLs, NOT EXISTS doesn't.",
+    "hinglish": "'Match wali rows' ke liye dono same rows dete hain: x IN (SELECT y ...) aur EXISTS (SELECT 1 ... WHERE y = x) dono har bahar ki row ek baar rakhte hain, aur aaj ke optimizer aksar dono ko ek jaisa chalate hain. IN ek value ko list se milata hai; EXISTS koi bhi condition dekh sakta hai. Farak ulte mein hai: NOT IN NULL pe toot-ta hai, NOT EXISTS nahi.",
+    "hindi": "'Match वाली rows' के लिए दोनों वही rows देते हैं। फ़र्क उल्टे में है: NOT IN NULL पर टूटता है, NOT EXISTS नहीं।"
+   },
+   "mistake": {
+    "en": "Turning IN into a JOIN for speed: when the other side has several matches the rows multiply. And switching NOT IN to NOT EXISTS changes rows whose own value is NULL (NOT EXISTS keeps them).",
+    "hinglish": "Speed ke liye IN ko JOIN bana dena: doosri taraf kai match ho to rows guna. Aur NOT IN ko NOT EXISTS banana un rows ko badalta hai jinki apni value NULL hai (NOT EXISTS unhe rakhta hai).",
+    "hindi": "IN को JOIN बना देना: कई match हों तो rows गुणा। NOT IN से NOT EXISTS, NULL value वाली rows को बदलता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM customers c WHERE c.id IN (SELECT customer_id FROM orders)) AS with_in, (SELECT COUNT(*) FROM customers c WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id)) AS with_exists"
+     },
+     "columns": [
+      "with_in",
+      "with_exists"
+     ],
+     "result": [
+      [
+       "5",
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Both run as semi-joins in 8.0.",
+    "mariadb": "Both run as semi-joins when possible.",
+    "postgresql": "Both planned as semi-joins; = ANY (subquery) is the same as IN."
+   },
+   "related": [
+    "exists",
+    "not_in_vs_not_exists",
+    "join_vs_subquery"
+   ],
+   "fundamentals": [
+    "subquery_shape",
+    "null_logic"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/semijoins.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "not_in_vs_not_exists",
+   "kind": "compare",
+   "title": {
+    "en": "NOT IN vs NOT EXISTS",
+    "hinglish": "NOT IN vs NOT EXISTS",
+    "hindi": "NOT IN बनाम NOT EXISTS"
+   },
+   "terms": [
+    [
+     "not in",
+     "not exists"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "not in vs not exists",
+     "difference between not in and not exists",
+     "should i use not in or not exists"
+    ],
+    "hinglish": [
+     "not in aur not exists mein kya farak hai"
+    ],
+    "hindi": [
+     "NOT IN और NOT EXISTS में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "Both ask 'has no match', but NULLs split them. If the subquery's column holds even one NULL, x NOT IN (...) is never true and the result is empty. If x itself is NULL, NOT IN drops that row while NOT EXISTS keeps it. With no NULLs on either side they give the same rows. Prefer NOT EXISTS (or LEFT JOIN ... IS NULL on a key).",
+    "hinglish": "Dono 'match nahi hai' poochte hain, par NULL dono ko alag kar deta hai. Subquery ke column mein ek bhi NULL ho to x NOT IN (...) kabhi true nahi, result khaali. Agar x khud NULL ho to NOT IN wo row hata deta hai, NOT EXISTS rakhta hai. Dono taraf NULL na ho to same rows. NOT EXISTS (ya key pe LEFT JOIN ... IS NULL) lo.",
+    "hindi": "दोनों 'match नहीं है' पूछते हैं, पर NULL इन्हें अलग करता है: subquery में एक NULL हो तो NOT IN कुछ नहीं देता। NOT EXISTS लीजिए।"
+   },
+   "mistake": {
+    "en": "NOT IN (SELECT manager_id FROM employees): the top manager has NULL, so 'employees who manage nobody' returns nothing.",
+    "hinglish": "NOT IN (SELECT manager_id FROM employees): sabse upar wale ka manager NULL hai, isliye 'jo kisi ko manage nahi karte' kuch nahi deta.",
+    "hindi": "NOT IN (SELECT manager_id ...): ऊपर वाले का manager NULL है, इसलिए कुछ नहीं मिलता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM employees e WHERE e.id NOT IN (SELECT manager_id FROM employees)) AS with_not_in, (SELECT COUNT(*) FROM employees e WHERE NOT EXISTS (SELECT 1 FROM employees m WHERE m.manager_id = e.id)) AS with_not_exists"
+     },
+     "columns": [
+      "with_not_in",
+      "with_not_exists"
+     ],
+     "result": [
+      [
+       "0",
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same NULL logic.",
+    "mariadb": "Same NULL logic.",
+    "postgresql": "Same NULL logic; NOT IN also plans worse (no anti-join)."
+   },
+   "related": [
+    "not_exists",
+    "not_in_null",
+    "anti_join"
+   ],
+   "fundamentals": [
+    "null_logic"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html#FUNCTIONS-SUBQUERY-NOTIN",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "not_in_null",
+   "kind": "why",
+   "title": {
+    "en": "Why NOT IN returns no rows (NULL)",
+    "hinglish": "NOT IN koi row kyun nahi deta (NULL)",
+    "hindi": "NOT IN कोई row क्यों नहीं देता (NULL)"
+   },
+   "terms": [
+    [
+     "not in",
+     "nulls?"
+    ],
+    [
+     "not in",
+     "(no|empty|zero|0|koi nahi|nothing) (rows?|results?|data|output)"
+    ],
+    [
+     "not in",
+     "(returns|gives) nothing"
+    ],
+    [
+     "not in",
+     "(kuch|koi) (nahi|bhi nahi)"
+    ],
+    [
+     "not in",
+     "(why|kyun|kyon|kyu|क्यों)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why does not in return no rows",
+     "why does not in return nothing when there are nulls",
+     "why is not in dangerous with null values"
+    ],
+    "hinglish": [
+     "not in koi row kyun nahi deta",
+     "not in null ke saath kaam kyun nahi karta"
+    ],
+    "hindi": [
+     "NOT IN कोई row क्यों नहीं देता"
+    ]
+   },
+   "answer": {
+    "en": "x NOT IN (a, b, NULL) means x <> a AND x <> b AND x <> NULL, and x <> NULL is unknown, never true. So one NULL in the list (or in the subquery's column) makes the whole condition unknown for every row, and nothing passes, with no error. Filter the NULLs out (WHERE col IS NOT NULL inside), or use NOT EXISTS.",
+    "hinglish": "x NOT IN (a, b, NULL) ka matlab x <> a AND x <> b AND x <> NULL, aur x <> NULL unknown hai, kabhi true nahi. Isliye list (ya subquery ke column) mein ek NULL poori condition ko har row ke liye unknown bana deta hai, aur koi row nahi aati, bina error. NULL hatao (andar WHERE col IS NOT NULL) ya NOT EXISTS lo.",
+    "hindi": "x NOT IN (a, b, NULL) में x <> NULL कभी true नहीं, इसलिए एक NULL से कोई row नहीं आती। NULL हटाइए या NOT EXISTS लीजिए।"
+   },
+   "mistake": {
+    "en": "Writing NOT IN ('Pune', NULL) to mean 'not Pune and not empty': it returns nothing. NOT IN ('Pune') already leaves out the empty ones.",
+    "hinglish": "'Pune nahi aur khaali nahi' ke liye NOT IN ('Pune', NULL) likhna: kuch nahi aata. NOT IN ('Pune') khaali wali pehle hi chhod deta hai.",
+    "hindi": "NOT IN ('Pune', NULL) लिखना: कुछ नहीं आता। NOT IN ('Pune') खाली वाली पहले ही छोड़ देता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM customers WHERE city NOT IN ('Pune', NULL)) AS with_null, (SELECT COUNT(*) FROM customers WHERE city NOT IN ('Pune')) AS without_null"
+     },
+     "columns": [
+      "with_null",
+      "without_null"
+     ],
+     "result": [
+      [
+       "0",
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same: no rows, no warning.",
+    "mariadb": "Same: no rows, no warning.",
+    "postgresql": "Same: no rows, no warning."
+   },
+   "related": [
+    "not_in_vs_not_exists",
+    "null",
+    "in_operator"
+   ],
+   "fundamentals": [
+    "null_logic"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/comparison-operators.html#operator_not-in",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "any_all",
+   "kind": "concept",
+   "title": {
+    "en": "ANY / SOME / ALL",
+    "hinglish": "ANY / SOME / ALL",
+    "hindi": "ANY / SOME / ALL"
+   },
+   "terms": [
+    [
+     "\\bany\\b",
+     "\\ball\\b",
+     "(subquer\\w*|operators?|sql|kya|क्या)"
+    ],
+    [
+     "(all|any|some) operators?"
+    ],
+    [
+     "(>|<|=)\\s*(all|any|some)\\b"
+    ],
+    [
+     "\\b(greater|more|less|bada|chhota) than all\\b"
+    ],
+    [
+     "(>|<|=)\\s*(all|any|some)\\b",
+     "subquer\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what are any and all operators",
+     "how does > all work with a subquery",
+     "difference between any and all in sql"
+    ],
+    "hinglish": [
+     "any aur all kya hote hain",
+     "all operator kya hai"
+    ],
+    "hindi": [
+     "ANY और ALL क्या होते हैं"
+    ]
+   },
+   "answer": {
+    "en": "x > ANY (subquery) is true when x is bigger than at least one value (like > MIN); x > ALL (subquery) when it is bigger than every value (like > MAX). = ANY is the same as IN, and SOME is another name for ANY. Two traps: ALL over an empty subquery is true for every row, and a NULL in the values makes ALL never true.",
+    "hinglish": "x > ANY (subquery) tab true hai jab x kam se kam ek value se bada ho (jaise > MIN); x > ALL (subquery) jab har value se bada ho (jaise > MAX). = ANY IN jaisa hai, aur SOME ANY ka doosra naam. Do jaal: khaali subquery pe ALL har row ke liye true, aur values mein ek NULL ho to ALL kabhi true nahi.",
+    "hindi": "x > ANY: कम से कम एक value से बड़ा; x > ALL: हर value से बड़ा। खाली subquery पर ALL हमेशा true, और एक NULL से ALL कभी true नहीं।"
+   },
+   "mistake": {
+    "en": "salary > ALL (SELECT commission FROM employees) returns nothing because some commissions are NULL; compare with (SELECT MAX(commission) ...) if blanks should be ignored.",
+    "hinglish": "salary > ALL (SELECT commission FROM employees) kuch nahi deta kyunki kuch commission NULL hain; khaali chhodne ho to (SELECT MAX(commission) ...) se compare karo.",
+    "hindi": "salary > ALL (SELECT commission ...) कुछ नहीं देता क्योंकि कुछ commission NULL हैं; MAX से compare कीजिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, salary FROM employees WHERE salary > ALL (SELECT salary FROM employees WHERE department_id = 2) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "salary"
+     ],
+     "result": [
+      [
+       "1",
+       "90000"
+      ],
+      [
+       "2",
+       "60000"
+      ],
+      [
+       "3",
+       "60000"
+      ],
+      [
+       "6",
+       "75000"
+      ],
+      [
+       "7",
+       "50000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "ANY / SOME / ALL take a subquery only (no plain list).",
+    "mariadb": "ANY / SOME / ALL take a subquery only.",
+    "postgresql": "Also takes an array: x = ANY (ARRAY[1, 2])."
+   },
+   "related": [
+    "in_operator",
+    "subquery",
+    "min_max"
+   ],
+   "fundamentals": [
+    "null_logic",
+    "subquery_shape"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html#FUNCTIONS-SUBQUERY-ANY-SOME",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "latest_per_group",
+   "kind": "howto",
+   "title": {
+    "en": "Latest (or first) row of each group",
+    "hinglish": "Har group ki latest (ya pehli) row",
+    "hindi": "हर group की latest (या पहली) row"
+   },
+   "terms": [
+    [
+     "(latest|last|newest|recent|most recent|earliest|oldest|first|aakhri|akhri|pehla|pehli|naya|nayi|आखिरी|पहला|पहली|नवीनतम)\\w*",
+     "(each|every|per|har|हर)\\b"
+    ],
+    [
+     "greatest-n-per-group"
+    ],
+    [
+     "(latest|last|first) (row|record|entry) (per|of each|for each) group"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to get the latest order of each customer",
+     "how to get the last record per group",
+     "how to get the first order of every customer"
+    ],
+    "hinglish": [
+     "har customer ka latest order kaise nikale",
+     "har group ki last row kaise nikale"
+    ],
+    "hindi": [
+     "हर ग्राहक का आखिरी order कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "Pick, for each group, the row whose date is the group's own maximum. Window way (MySQL 8, MariaDB 10.2+, PostgreSQL): number the rows inside each group with ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC, id DESC) and keep number 1. Subquery way: WHERE order_date = (SELECT MAX(x.order_date) FROM orders x WHERE x.customer_id = o.customer_id), which keeps all rows tied on the date. PostgreSQL also has DISTINCT ON (customer_id).",
+    "hinglish": "Har group ke liye wo row lo jiski date us group ka apna maximum ho. Window tareeka: ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC, id DESC) se har group mein number do aur 1 rakho. Subquery tareeka: WHERE order_date = (SELECT MAX(x.order_date) FROM orders x WHERE x.customer_id = o.customer_id), jo same date wali sab rows rakhta hai. PostgreSQL mein DISTINCT ON (customer_id) bhi hai.",
+    "hindi": "हर group के लिए वह row लीजिए जिसकी date उस group का अपना maximum हो: ROW_NUMBER() OVER (PARTITION BY ...) = 1, या correlated MAX।"
+   },
+   "mistake": {
+    "en": "WHERE order_date = (SELECT MAX(order_date) FROM orders) with no link to the customer gives only the newest order of all; and GROUP BY customer_id with MAX(order_date), amount takes amount from any row, not the latest one.",
+    "hinglish": "Customer se bina link ke WHERE order_date = (SELECT MAX(order_date) FROM orders) sirf sabse naya ek order deta hai; aur GROUP BY customer_id ke saath MAX(order_date), amount kisi bhi row ka amount le leta hai, latest ka nahi.",
+    "hindi": "बिना link के MAX subquery सिर्फ़ सबसे नया एक order देती है; GROUP BY के साथ amount किसी भी row का आता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT customer_id, id, order_date, amount FROM (SELECT o.*, ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date DESC, id DESC) AS rn FROM orders o) t WHERE rn = 1 ORDER BY customer_id"
+     },
+     "columns": [
+      "customer_id",
+      "id",
+      "order_date",
+      "amount"
+     ],
+     "result": [
+      [
+       "1",
+       "2",
+       "2024-06-15",
+       "500"
+      ],
+      [
+       "2",
+       "7",
+       "2024-07-30",
+       "500"
+      ],
+      [
+       "3",
+       "5",
+       "2024-07-10",
+       "800"
+      ],
+      [
+       "6",
+       "6",
+       "2024-07-11",
+       "65000"
+      ],
+      [
+       "8",
+       "8",
+       "2024-08-03",
+       "300"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "ROW_NUMBER() from 8.0; on 5.7 use the correlated MAX subquery.",
+    "mariadb": "ROW_NUMBER() from 10.2.",
+    "postgresql": "Also SELECT DISTINCT ON (customer_id) ... ORDER BY customer_id, order_date DESC."
+   },
+   "related": [
+    "top_n_per_group",
+    "correlated_subquery",
+    "group_by_vs_window"
+   ],
+   "fundamentals": [
+    "ranking",
+    "correlation"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/example-maximum-column-group-row.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/greatest-n-per-group"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "top_n_per_group",
+   "kind": "howto",
+   "title": {
+    "en": "Top N rows of each group",
+    "hinglish": "Har group ki top N rows",
+    "hindi": "हर group की top N rows"
+   },
+   "terms": [
+    [
+     "top (\\d+|n|two|three|five)",
+     "(each|every|per|har|हर)\\b"
+    ],
+    [
+     "(\\d+|two|three) (highest|biggest|largest|best|latest)",
+     "(each|every|per|har)\\b"
+    ],
+    [
+     "top-?n-per-group"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to get top 3 products in each category",
+     "top n per group in sql",
+     "how to get the 2 biggest orders of every customer"
+    ],
+    "hinglish": [
+     "har category ke top 3 products kaise nikale"
+    ],
+    "hindi": [
+     "हर category के top 3 products कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "Rank the rows inside each group and keep the first N: ROW_NUMBER() OVER (PARTITION BY category_id ORDER BY price DESC, id) <= 3 in an outer query (a WHERE can't see a window directly). Use RANK() instead if tied rows at the cut-off should all stay.",
+    "hinglish": "Har group ke andar rows ko rank do aur pehli N rakho: bahar wali query mein ROW_NUMBER() OVER (PARTITION BY category_id ORDER BY price DESC, id) <= 3 (WHERE window ko seedha nahi dekh sakta). Cut-off pe barabar rows sab rakhni hon to RANK() lo.",
+    "hindi": "हर group के अंदर ROW_NUMBER() OVER (PARTITION BY ...) से rank दीजिए और बाहर की query में <= N रखिए।"
+   },
+   "mistake": {
+    "en": "ORDER BY price DESC LIMIT 3 gives the top 3 of the whole table, not of each category.",
+    "hinglish": "ORDER BY price DESC LIMIT 3 poori table ke top 3 deta hai, har category ke nahi.",
+    "hindi": "ORDER BY price DESC LIMIT 3 पूरी table के top 3 देता है, हर category के नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT category_id, id, name, price FROM (SELECT p.*, ROW_NUMBER() OVER (PARTITION BY category_id ORDER BY price DESC, id) AS rn FROM products p WHERE category_id IS NOT NULL) t WHERE rn <= 2 ORDER BY category_id, rn"
+     },
+     "columns": [
+      "category_id",
+      "id",
+      "name",
+      "price"
+     ],
+     "result": [
+      [
+       "2",
+       "1",
+       "Phone X",
+       "25000"
+      ],
+      [
+       "2",
+       "2",
+       "Phone Lite",
+       "12000"
+      ],
+      [
+       "3",
+       "3",
+       "Laptop Pro",
+       "80000"
+      ],
+      [
+       "3",
+       "6",
+       "Laptop Air",
+       "65000"
+      ],
+      [
+       "4",
+       "4",
+       "SQL Basics",
+       "500"
+      ],
+      [
+       "5",
+       "5",
+       "100% Cotton Bear",
+       "800"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Window functions from 8.0.",
+    "mariadb": "Window functions from 10.2.",
+    "postgresql": "Window functions; also LATERAL (... ORDER BY ... LIMIT n) per group."
+   },
+   "related": [
+    "latest_per_group",
+    "order_limit_ties",
+    "lateral_join"
+   ],
+   "fundamentals": [
+    "ranking",
+    "grain"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/greatest-n-per-group"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "nth_highest",
+   "kind": "howto",
+   "title": {
+    "en": "Second (or Nth) highest value",
+    "hinglish": "Doosri (ya Nth) sabse badi value",
+    "hindi": "दूसरी (या Nth) सबसे बड़ी value"
+   },
+   "terms": [
+    [
+     "(second|2nd|third|3rd|nth|n-?th|doosr\\w*|dusr\\w*|teesr\\w*|दूसर\\w*|तीसर\\w*)",
+     "(highest|largest|biggest|max\\w*|top|salary|sabse (badi|bada|zyada)|सबसे)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to find the second highest salary",
+     "nth highest salary in sql",
+     "how to get the third largest order amount"
+    ],
+    "hinglish": [
+     "doosri sabse badi salary kaise nikale",
+     "second highest salary kaise nikale"
+    ],
+    "hindi": [
+     "दूसरी सबसे बड़ी salary कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "Decide first whether ties count. 'The second different value': SELECT MAX(salary) FROM employees WHERE salary < (SELECT MAX(salary) FROM employees), or DENSE_RANK() = 2. 'The second row when sorted': ORDER BY salary DESC LIMIT 1 OFFSET 1, which returns the same top salary again when two people share it.",
+    "hinglish": "Pehle tay karo ki barabar values ginni hain ya nahi. 'Doosri alag value': SELECT MAX(salary) FROM employees WHERE salary < (SELECT MAX(salary) FROM employees), ya DENSE_RANK() = 2. 'Sort karke doosri row': ORDER BY salary DESC LIMIT 1 OFFSET 1, jo do logon ki same top salary ho to wahi dobara deta hai.",
+    "hindi": "पहले तय कीजिए कि बराबर values गिननी हैं या नहीं: अलग दूसरी value के लिए MAX(salary) WHERE salary < (SELECT MAX ...) या DENSE_RANK() = 2।"
+   },
+   "mistake": {
+    "en": "LIMIT 1 OFFSET 1 when the top salary is shared: you get the top salary again, not the second one.",
+    "hinglish": "Top salary do logon ki ho tab LIMIT 1 OFFSET 1: doosri nahi, wahi top salary dobara aati hai.",
+    "hindi": "Top salary साझा हो तो LIMIT 1 OFFSET 1 वही top salary फिर देता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT MAX(salary) AS second_highest FROM employees WHERE salary < (SELECT MAX(salary) FROM employees)"
+     },
+     "columns": [
+      "second_highest"
+     ],
+     "result": [
+      [
+       "75000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "DENSE_RANK() from 8.0.",
+    "mariadb": "DENSE_RANK() from 10.2.",
+    "postgresql": "DENSE_RANK(); also OFFSET 1 FETCH FIRST 1 ROW ONLY."
+   },
+   "related": [
+    "top_n_per_group",
+    "order_limit_ties",
+    "min_max"
+   ],
+   "fundamentals": [
+    "ranking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://leetcode.com/problems/second-highest-salary/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cte_vs_subquery",
+   "kind": "compare",
+   "title": {
+    "en": "CTE (WITH) vs subquery",
+    "hinglish": "CTE (WITH) vs subquery",
+    "hindi": "CTE (WITH) बनाम subquery"
+   },
+   "terms": [
+    [
+     "(cte|ctes|with clause|common table expressions?)",
+     "subquer\\w*"
+    ],
+    [
+     "(cte|ctes|with clause)",
+     "derived tables?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "cte vs subquery",
+     "difference between with clause and subquery",
+     "is a cte faster than a subquery"
+    ],
+    "hinglish": [
+     "cte aur subquery mein kya farak hai"
+    ],
+    "hindi": [
+     "CTE और subquery में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "A CTE (WITH name AS (SELECT ...)) is a named subquery written before the main query. It gives the same rows as the same subquery in FROM, but it can be read top to bottom, used twice by name, and be recursive. Speed is usually the same: MySQL 8, MariaDB and PostgreSQL 12+ fold a simple CTE into the query like a derived table.",
+    "hinglish": "CTE (WITH naam AS (SELECT ...)) ek naam wali subquery hai jo main query se pehle likhi jaati hai. FROM wali usi subquery jaisi rows deti hai, par upar se neeche padhi jaati hai, naam se do baar use ho sakti hai, aur recursive ho sakti hai. Speed aam taur pe same: MySQL 8, MariaDB aur PostgreSQL 12+ simple CTE ko derived table ki tarah query mein mila dete hain.",
+    "hindi": "CTE एक नाम वाली subquery है जो main query से पहले लिखी जाती है; rows वही, पर पढ़ने में आसान, दो बार इस्तेमाल हो सकती है, recursive भी।"
+   },
+   "mistake": {
+    "en": "Expecting a CTE to be computed once and cached: PostgreSQL 12+ may inline it (write AS MATERIALIZED to force once), and MySQL may inline it too.",
+    "hinglish": "Ye maanna ki CTE ek baar ban ke rakh li jaati hai: PostgreSQL 12+ use inline kar sakta hai (ek baar ke liye AS MATERIALIZED), MySQL bhi.",
+    "hindi": "यह मानना कि CTE एक बार बनकर रखी जाती है: PostgreSQL 12+ और MySQL उसे inline कर सकते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH spent AS (SELECT customer_id, SUM(amount) AS total FROM orders GROUP BY customer_id) SELECT customer_id, total FROM spent WHERE total > 20000 ORDER BY customer_id"
+     },
+     "columns": [
+      "customer_id",
+      "total"
+     ],
+     "result": [
+      [
+       "1",
+       "26000"
+      ],
+      [
+       "2",
+       "80500"
+      ],
+      [
+       "6",
+       "65000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "WITH from 8.0.",
+    "mariadb": "WITH from 10.2.",
+    "postgresql": "WITH; AS MATERIALIZED / NOT MATERIALIZED from 12."
+   },
+   "related": [
+    "derived_table",
+    "subquery",
+    "join_vs_subquery"
+   ],
+   "fundamentals": [
+    "subquery_shape",
+    "grain"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-with.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "lateral_join",
+   "kind": "concept",
+   "title": {
+    "en": "LATERAL join",
+    "hinglish": "LATERAL join",
+    "hindi": "LATERAL join"
+   },
+   "terms": [
+    [
+     "lateral"
+    ],
+    [
+     "cross apply"
+    ],
+    [
+     "outer apply"
+    ],
+    [
+     "lateral",
+     "subquer\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a lateral join",
+     "lateral vs subquery",
+     "is there cross apply in postgres"
+    ],
+    "hinglish": [
+     "lateral join kya hai"
+    ],
+    "hindi": [
+     "LATERAL join क्या है"
+    ]
+   },
+   "answer": {
+    "en": "JOIN LATERAL (SELECT ...) lets a subquery in FROM read the columns of the tables before it, so it runs once per row and can return several columns or several rows for that row, such as each customer's 2 biggest orders (ORDER BY ... LIMIT 2). SQL Server calls it CROSS APPLY / OUTER APPLY.",
+    "hinglish": "JOIN LATERAL (SELECT ...) FROM wali subquery ko pehle ki tables ke columns padhne deta hai, isliye wo har row ke liye chalti hai aur us row ke liye kai columns ya kai rows de sakti hai, jaise har customer ke 2 sabse bade orders (ORDER BY ... LIMIT 2). SQL Server mein ise CROSS APPLY / OUTER APPLY kehte hain.",
+    "hindi": "JOIN LATERAL FROM वाली subquery को पहले की tables के columns पढ़ने देता है, जैसे हर ग्राहक के 2 सबसे बड़े orders।"
+   },
+   "mistake": {
+    "en": "Writing it on MariaDB: it has no LATERAL; use a window function (ROW_NUMBER() per group) or a correlated subquery per column.",
+    "hinglish": "MariaDB pe likhna: usme LATERAL nahi hai; window function (har group ka ROW_NUMBER()) ya har column ke liye correlated subquery lo.",
+    "hindi": "MariaDB में LATERAL नहीं है; window function या correlated subquery लीजिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT c.id, (SELECT MAX(o.amount) FROM orders o WHERE o.customer_id = c.id) AS biggest FROM customers c WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id) ORDER BY c.id",
+      "postgresql": "SELECT c.id, t.amount AS biggest FROM customers c JOIN LATERAL (SELECT o.amount FROM orders o WHERE o.customer_id = c.id ORDER BY o.amount DESC LIMIT 1) t ON true ORDER BY c.id"
+     },
+     "columns": [
+      "id",
+      "biggest"
+     ],
+     "result": [
+      [
+       "1",
+       "25500"
+      ],
+      [
+       "2",
+       "80000"
+      ],
+      [
+       "3",
+       "12000"
+      ],
+      [
+       "6",
+       "65000"
+      ],
+      [
+       "8",
+       "300"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "LATERAL from 8.0.14.",
+    "mariadb": "No LATERAL (use a window function or a correlated subquery).",
+    "postgresql": "JOIN LATERAL / LEFT JOIN LATERAL ... ON true."
+   },
+   "related": [
+    "top_n_per_group",
+    "correlated_subquery",
+    "derived_table"
+   ],
+   "fundamentals": [
+    "correlation",
+    "grain"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html#QUERIES-LATERAL",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "exists_select_1",
+   "kind": "why",
+   "title": {
+    "en": "SELECT 1 vs SELECT * inside EXISTS",
+    "hinglish": "EXISTS ke andar SELECT 1 vs SELECT *",
+    "hindi": "EXISTS के अंदर SELECT 1 बनाम SELECT *"
+   },
+   "terms": [
+    [
+     "exists",
+     "select (1|\\*|star|one)"
+    ],
+    [
+     "select 1",
+     "(vs|or|ya|matter|farak|difference)"
+    ],
+    [
+     "why select 1"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does select 1 or select * matter in exists",
+     "why do people write select 1 in exists",
+     "exists select 1 vs select star"
+    ],
+    "hinglish": [
+     "exists mein select 1 kyun likhte hain"
+    ],
+    "hindi": [
+     "EXISTS में SELECT 1 क्यों लिखते हैं"
+    ]
+   },
+   "answer": {
+    "en": "It doesn't matter: EXISTS only checks whether a row is found, and every engine ignores the select list there. SELECT 1 is just a habit that says 'only the existence matters'. What does matter is a total: SELECT COUNT(*) or MAX(...) without GROUP BY always gives a row, so EXISTS becomes always true.",
+    "hinglish": "Farak nahi padta: EXISTS sirf dekhta hai row mili ya nahi, aur har engine wahan select list ko nazarandaz karta hai. SELECT 1 bas aadat hai jo kehti hai 'sirf hona maayne rakhta hai'. Jo farak padta hai wo total hai: GROUP BY ke bina SELECT COUNT(*) ya MAX(...) hamesha row deta hai, isliye EXISTS hamesha true ho jaata hai.",
+    "hindi": "फ़र्क नहीं पड़ता: EXISTS सिर्फ़ row का होना देखता है। पर GROUP BY के बिना COUNT(*) हमेशा row देता है, तो EXISTS हमेशा true।"
+   },
+   "mistake": {
+    "en": "EXISTS (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id): true even for customers with no orders.",
+    "hinglish": "EXISTS (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id): bina order wale customers ke liye bhi true.",
+    "hindi": "EXISTS (SELECT COUNT(*) ...): बिना order वाले ग्राहकों के लिए भी true।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM customers c WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id)) AS select_1, (SELECT COUNT(*) FROM customers c WHERE EXISTS (SELECT * FROM orders o WHERE o.customer_id = c.id)) AS select_star, (SELECT COUNT(*) FROM customers c WHERE EXISTS (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id)) AS select_count"
+     },
+     "columns": [
+      "select_1",
+      "select_star",
+      "select_count"
+     ],
+     "result": [
+      [
+       "5",
+       "5",
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "The select list of EXISTS is ignored.",
+    "mariadb": "The select list of EXISTS is ignored.",
+    "postgresql": "The select list of EXISTS is ignored."
+   },
+   "related": [
+    "exists",
+    "exists_vs_count",
+    "aggregates"
+   ],
+   "fundamentals": [
+    "subquery_shape"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/exists-and-not-exists-subqueries.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "exists_vs_count",
+   "kind": "compare",
+   "title": {
+    "en": "EXISTS vs COUNT(*) > 0",
+    "hinglish": "EXISTS vs COUNT(*) > 0",
+    "hindi": "EXISTS बनाम COUNT(*) > 0"
+   },
+   "terms": [
+    [
+     "exists",
+     "count"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "exists vs count",
+     "should i use exists or count(*) > 0",
+     "difference between exists and count"
+    ],
+    "hinglish": [
+     "exists aur count mein kya farak hai"
+    ],
+    "hindi": [
+     "EXISTS और COUNT में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "To ask 'is there at least one', EXISTS (SELECT 1 ...) and (SELECT COUNT(*) ...) > 0 give the same answer, but EXISTS can stop at the first matching row while COUNT has to count them all. Use COUNT when you need the number itself.",
+    "hinglish": "'Kam se kam ek hai kya' ke liye EXISTS (SELECT 1 ...) aur (SELECT COUNT(*) ...) > 0 same jawab dete hain, par EXISTS pehli match wali row pe ruk sakta hai jabki COUNT ko sab ginna padta hai. Ginti khud chahiye to COUNT.",
+    "hindi": "'कम से कम एक है?' के लिए दोनों वही जवाब देते हैं, पर EXISTS पहली row पर रुक सकता है; गिनती चाहिए तो COUNT।"
+   },
+   "mistake": {
+    "en": "Mixing the two: EXISTS (SELECT COUNT(*) ...) is always true, because the count is a row even when it is 0.",
+    "hinglish": "Dono ko mila dena: EXISTS (SELECT COUNT(*) ...) hamesha true, kyunki 0 bhi ek row hai.",
+    "hindi": "EXISTS (SELECT COUNT(*) ...) हमेशा true, क्योंकि 0 भी एक row है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT d.id, EXISTS (SELECT 1 FROM employees e WHERE e.department_id = d.id) AS has_staff, (SELECT COUNT(*) FROM employees e WHERE e.department_id = d.id) AS staff FROM departments d ORDER BY d.id"
+     },
+     "columns": [
+      "id",
+      "has_staff",
+      "staff"
+     ],
+     "result": [
+      [
+       "1",
+       "1",
+       "3"
+      ],
+      [
+       "2",
+       "1",
+       "2"
+      ],
+      [
+       "3",
+       "1",
+       "1"
+      ],
+      [
+       "4",
+       "0",
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "EXISTS (...) as a value gives 1 / 0.",
+    "mariadb": "EXISTS (...) as a value gives 1 / 0.",
+    "postgresql": "EXISTS (...) as a value gives true / false."
+   },
+   "related": [
+    "exists",
+    "exists_select_1",
+    "count_distinct"
+   ],
+   "fundamentals": [
+    "subquery_shape",
+    "aggregation"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html#FUNCTIONS-SUBQUERY-EXISTS",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "limit_in_subquery",
+   "kind": "howto",
+   "title": {
+    "en": "LIMIT inside a subquery",
+    "hinglish": "Subquery ke andar LIMIT",
+    "hindi": "Subquery के अंदर LIMIT"
+   },
+   "terms": [
+    [
+     "limit",
+     "subquer\\w*"
+    ],
+    [
+     "limit",
+     "\\bin\\s*\\("
+    ],
+    [
+     "limit & in"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to use limit in a subquery in mysql",
+     "can i use limit inside an in subquery",
+     "why can't i use limit in a subquery"
+    ],
+    "hinglish": [
+     "subquery mein limit kaise lagaye"
+    ],
+    "hindi": [
+     "subquery में LIMIT कैसे लगाएँ"
+    ]
+   },
+   "answer": {
+    "en": "MySQL and MariaDB refuse LIMIT directly inside IN / ANY / ALL (error 1235), but allow it one level deeper: x IN (SELECT * FROM (SELECT ... ORDER BY ... LIMIT 3) AS t), or join that derived table. PostgreSQL accepts it directly. Always pair the LIMIT with an ORDER BY, or which rows you get is up to the engine.",
+    "hinglish": "MySQL aur MariaDB IN / ANY / ALL ke andar seedha LIMIT nahi maante (error 1235), par ek level andar maan lete hain: x IN (SELECT * FROM (SELECT ... ORDER BY ... LIMIT 3) AS t), ya us derived table ko join karo. PostgreSQL seedha maanta hai. LIMIT ke saath hamesha ORDER BY do, warna kaunsi rows aayengi engine pe hai.",
+    "hindi": "MySQL/MariaDB IN के अंदर सीधे LIMIT नहीं मानते (1235), पर एक level अंदर मान लेते हैं। LIMIT के साथ हमेशा ORDER BY दीजिए।"
+   },
+   "mistake": {
+    "en": "Moving the LIMIT outside to make the error go away: that limits the final rows, a different question.",
+    "hinglish": "Error hatane ke liye LIMIT bahar le jaana: wo final rows limit karta hai, sawaal hi badal jaata hai.",
+    "hindi": "Error हटाने के लिए LIMIT बाहर ले जाना: सवाल ही बदल जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, first_name FROM customers WHERE id IN (SELECT * FROM (SELECT customer_id FROM orders ORDER BY amount DESC, id LIMIT 3) AS t) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "1",
+       "Aarav"
+      ],
+      [
+       "2",
+       "Diya"
+      ],
+      [
+       "6",
+       "Tara"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Error 1235 directly inside IN / ANY / ALL; fine in a derived table.",
+    "mariadb": "Error 1235 directly inside IN; fine in a derived table.",
+    "postgresql": "Allowed directly."
+   },
+   "related": [
+    "subquery",
+    "derived_table",
+    "limit"
+   ],
+   "fundamentals": [
+    "subquery_shape",
+    "ranking"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/subquery-restrictions.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/subquery",
+    "https://dba.stackexchange.com/questions/tagged/subquery"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

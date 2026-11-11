@@ -23,7 +23,10 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         "dialect_limit_pg", "dialect_backticks_pg", "dialect_nulls_mariadb", "dialect_cast_mariadb",
         # night 3: aggregation (what a total sees: non-NULL values of the rows that reach it, once per group)
         "count_case", "count_bool", "sum_bool_pg", "nested_agg", "window_agg", "having_alias_pg", "count_multi_pg", "sum_null",
-        "avg_avg", "count_said", "pct_total", "sum_distinct"]
+        "avg_avg", "count_said", "pct_total", "sum_distinct",
+        # night 4: subqueries (shape: one value / a set / EXISTS; scope: the inner FROM first; NULLs in IN / NOT IN / ALL)
+        "exists_agg", "corr_self", "in_grouped_agg", "sub_columns", "sub_sum_null", "in_limit_mariadb", "derived_alias_mysql",
+        "all_null", "in_list_null", "not_in_outer", "semi_join", "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
@@ -33,11 +36,17 @@ TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": 
          "dialect_backticks_pg": "dialect", "dialect_nulls_mariadb": "dialect", "dialect_cast_mariadb": "dialect",
          "count_case": "count_case", "count_bool": "count_bool", "sum_bool_pg": "sum_bool", "nested_agg": "nested_agg",
          "window_agg": "window_agg", "having_alias_pg": "having_alias", "count_multi_pg": "count_multi", "sum_null": "sum_null",
-         "avg_avg": "avg_avg", "count_said": "count_said", "pct_total": "pct_total", "sum_distinct": "sum_distinct"}
-NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join", "sum_distinct"}   # found is enough
+         "avg_avg": "avg_avg", "count_said": "count_said", "pct_total": "pct_total", "sum_distinct": "sum_distinct",
+         "exists_agg": "exists_agg", "corr_self": "corr_self", "in_grouped_agg": "in_grouped_agg", "sub_columns": "sub_columns",
+         "sub_sum_null": "sub_sum_null", "in_limit_mariadb": "in_limit", "derived_alias_mysql": "derived_alias", "all_null": "all_null",
+         "in_list_null": "in_list_null", "not_in_outer": "not_in_outer", "semi_join": "semi_join", "exists_uncorr": "exists_uncorr",
+         "sub_outer_col": "sub_outer_col", "scalar_rows": "scalar_rows", "sub_limit_order": "sub_limit_order"}
+NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join", "sum_distinct",
+          "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order"}   # found is enough
 # a 'check' (depends on engine, data or intent) whose suggested rewrite must do exactly what the person meant
 FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes", "pk_pk", "anti_nullable", "self_pairs",
-                 "distinct_join", "sum_null", "avg_avg", "pct_total"}
+                 "distinct_join", "sum_null", "avg_avg", "pct_total", "sub_sum_null", "all_null", "in_list_null", "not_in_outer",
+                 "semi_join"}
 
 
 def _cols(t, *kinds):
@@ -335,6 +344,8 @@ def make(seed: int):
         return item
     elif bug in AGG_BUGS:
         return _agg_bug(seed, bug, rnd, schema, tables, t)
+    elif bug in SUB_BUGS:
+        return _sub_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -483,6 +494,156 @@ def _agg_bug(seed, bug, rnd, schema, tables, t):
     if words:
         broken += ";\n\n" + words
     item = {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": t["name"], "broken": broken, "truth": truth}
+    if engine:
+        item["engine"] = engine
+    return item
+
+
+SUB_BUGS = {"exists_agg", "corr_self", "in_grouped_agg", "sub_columns", "sub_sum_null", "in_limit_mariadb", "derived_alias_mysql",
+            "all_null", "in_list_null", "not_in_outer", "semi_join", "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order"}
+
+
+def _sub_bug(seed, bug, rnd, schema, tables, t):
+    """Night 4: subquery mistakes on random real tables. truth = the statement the person meant."""
+    from app.agents.sqljoins import _base
+
+    links = [(c, x) for x in tables for c in x["cols"] if c["kind"] == "fk"]       # (fk column, child table)
+    if not links:
+        return None
+    fkc, child = rnd.choice(links)
+    parent = schema["tables"][fkc["ref"]]
+    fk, cpk, ppk, cn, pn = fkc["name"], child["pk"], parent["pk"], child["name"], parent["name"]
+    cnums = [c["name"] for c in child["cols"] if c["kind"] in ("int", "money")]
+    ccats = [c for c in child["cols"] if c["kind"] == "cat" and c["params"]]
+    tnums = [c["name"] for c in t["cols"] if c["kind"] in ("int", "money")]
+    tgroups = [c["name"] for c in t["cols"] if c["kind"] in ("fk", "cat")]
+    tcats = [c for c in t["cols"] if c["kind"] == "cat" and c["params"]]
+    pk, name = t["pk"], t["name"]
+    engine, words, stmt = None, "", "select"
+
+    def cat_cond(alias, cats):
+        c = rnd.choice(cats)
+        return f"{alias}{c['name']} = '{rnd.choice(c['params'])}'"
+
+    if bug == "exists_agg":
+        agg = rnd.choice(["COUNT(*)", f"MAX(c.{cpk})", f"MIN(c.{fk})"] + ([f"SUM(c.{cnums[0]})"] if cnums else []))
+        neg = rnd.choice(["", "NOT "])
+        extra = f" AND {cat_cond('c.', ccats)}" if ccats and rnd.random() < 0.5 else ""
+        truth = f"SELECT p.{ppk}\nFROM {pn} p\nWHERE {neg}EXISTS (SELECT 1 FROM {cn} c WHERE c.{fk} = p.{ppk}{extra})\nORDER BY p.{ppk}"
+        broken = truth.replace("SELECT 1 FROM", f"SELECT {agg} FROM")
+    elif bug == "corr_self":
+        if not tnums or not tgroups:
+            return None
+        n, g = rnd.choice(tnums), rnd.choice(tgroups)
+        if rnd.random() < 0.5:
+            truth = f"SELECT a.{pk}\nFROM {name} a\nWHERE a.{n} > (SELECT AVG(b.{n}) FROM {name} b WHERE b.{g} = a.{g})\nORDER BY a.{pk}"
+            broken = truth.replace(f"b.{g} = a.{g}", f"b.{g} = b.{g}")
+        else:
+            truth = f"SELECT a.{pk}\nFROM {name} a\nWHERE a.{n} > (SELECT AVG(b.{n}) FROM {name} b WHERE b.{g} = a.{g})\nORDER BY a.{pk}"
+            broken = f"SELECT {pk}\nFROM {name}\nWHERE {n} > (SELECT AVG({n}) FROM {name} WHERE {g} = {name}.{g})\nORDER BY {pk}"
+    elif bug == "in_grouped_agg":
+        if not tnums or not tgroups:
+            return None
+        n, g, fn = rnd.choice(tnums), rnd.choice(tgroups), rnd.choice(["MAX", "MIN"])
+        broken = f"SELECT {pk}\nFROM {name}\nWHERE {n} IN (SELECT {fn}({n}) FROM {name} GROUP BY {g})\nORDER BY {pk}"
+        truth = f"SELECT {pk}\nFROM {name}\nWHERE ({g}, {n}) IN (SELECT {g}, {fn}({n}) FROM {name} GROUP BY {g})\nORDER BY {pk}"
+    elif bug == "sub_columns":
+        other = rnd.choice([c["name"] for c in child["cols"] if c["name"] and c["name"] != fk])
+        where = f" WHERE {cat_cond('', ccats)}" if ccats else ""
+        truth = f"SELECT {ppk}\nFROM {pn}\nWHERE {ppk} IN (SELECT {fk} FROM {cn}{where})\nORDER BY {ppk}"
+        cols = rnd.choice([f"{fk}, {other}", f"{other}, {fk}"])
+        broken = f"SELECT {cpk}\nFROM {cn}\nWHERE {fk} IN (SELECT {cols} FROM {cn}{where})\nORDER BY {cpk}"
+        truth = f"SELECT {cpk}\nFROM {cn}\nWHERE {fk} IN (SELECT {fk} FROM {cn}{where})\nORDER BY {cpk}"
+    elif bug == "sub_sum_null":
+        if not cnums:
+            return None
+        n = rnd.choice(cnums)
+        broken = f"SELECT p.{ppk}, (SELECT SUM(c.{n}) FROM {cn} c WHERE c.{fk} = p.{ppk}) AS total\nFROM {pn} p\nORDER BY p.{ppk}"
+        truth = f"SELECT p.{ppk}, COALESCE((SELECT SUM(c.{n}) FROM {cn} c WHERE c.{fk} = p.{ppk}), 0) AS total\nFROM {pn} p\nORDER BY p.{ppk}"
+        words = rnd.choice(["", f"total of each {_base(pn)}, 0 when none"])
+    elif bug == "in_limit_mariadb":
+        if not cnums:
+            return None
+        k = rnd.randint(2, 6)
+        inner = f"SELECT {fk} FROM {cn} ORDER BY {rnd.choice(cnums)} DESC, {cpk} LIMIT {k}"
+        broken = f"SELECT {ppk}\nFROM {pn}\nWHERE {ppk} IN ({inner})\nORDER BY {ppk}"
+        truth = f"SELECT {ppk}\nFROM {pn}\nWHERE {ppk} IN (SELECT * FROM ({inner}) AS limited)\nORDER BY {ppk}"
+        engine = rnd.choice(["mariadb", "mysql"])
+    elif bug == "derived_alias_mysql":
+        if not tgroups:
+            return None
+        g = rnd.choice(tgroups)
+        fn = rnd.choice(["MAX", "MIN", "AVG"])
+        broken = f"SELECT {fn}(n) AS v\nFROM (SELECT {g}, COUNT(*) AS n FROM {name} GROUP BY {g})"
+        truth = broken + " AS t"
+        engine = rnd.choice(["mariadb", "mysql"])
+    elif bug == "all_null":
+        if not tnums:
+            return None
+        n, m = rnd.choice(tnums), rnd.choice(tnums)
+        op = rnd.choice([">", ">=", "<", "<="])
+        fn = "MAX" if op.startswith(">") else "MIN"
+        where = f" WHERE {cat_cond('', tcats)}" if tcats and rnd.random() < 0.7 else ""
+        broken = f"SELECT {pk}\nFROM {name}\nWHERE {n} {op} ALL (SELECT {m} FROM {name}{where})\nORDER BY {pk}"
+        truth = f"SELECT {pk}\nFROM {name}\nWHERE {n} {op} (SELECT {fn}({m}) FROM {name}{where})\nORDER BY {pk}"
+    elif bug == "in_list_null":
+        if not tcats:
+            return None
+        c = rnd.choice(tcats)
+        vals = rnd.sample(c["params"], min(len(c["params"]), rnd.randint(1, 2)))
+        lst = ", ".join(f"'{v}'" for v in vals)
+        neg = rnd.random() < 0.6
+        stmt = rnd.choice(["select", "select", "update", "delete"]) if neg else "select"
+        if neg:
+            cond_b, cond_t = f"{c['name']} NOT IN ({lst}, NULL)", f"{c['name']} NOT IN ({lst})"
+        else:
+            cond_b, cond_t = f"{c['name']} IN ({lst}, NULL)", f"({c['name']} IN ({lst}) OR {c['name']} IS NULL)"
+        if stmt == "update" and tnums:
+            broken = f"UPDATE {name}\nSET {tnums[0]} = {tnums[0]}\nWHERE {cond_b}"
+            truth = f"UPDATE {name}\nSET {tnums[0]} = {tnums[0]}\nWHERE {cond_t}"
+        elif stmt == "delete" and not any(c2.get("ref") == name for x in tables for c2 in x["cols"]):
+            broken, truth = f"DELETE FROM {name}\nWHERE {cond_b}", f"DELETE FROM {name}\nWHERE {cond_t}"
+        else:
+            stmt = "select"
+            broken = f"SELECT {pk}\nFROM {name}\nWHERE {cond_b}\nORDER BY {pk}"
+            truth = f"SELECT {pk}\nFROM {name}\nWHERE {cond_t}\nORDER BY {pk}"
+    elif bug == "not_in_outer":
+        pcats = [c for c in parent["cols"] if c["kind"] == "cat" and c["params"]]
+        if not pcats:
+            return None
+        cond = cat_cond("", pcats)
+        broken = f"SELECT {cpk}\nFROM {cn}\nWHERE {fk} NOT IN (SELECT {ppk} FROM {pn} WHERE {cond})\nORDER BY {cpk}"
+        truth = (f"SELECT c.{cpk}\nFROM {cn} c\nWHERE NOT EXISTS (SELECT 1 FROM {pn} p WHERE p.{ppk} = c.{fk} AND p.{cond})\n"
+                 f"ORDER BY c.{cpk}")
+    elif bug == "semi_join":
+        if not ccats:
+            return None
+        cond = cat_cond("c.", ccats)
+        broken = f"SELECT p.{ppk}\nFROM {pn} p\nJOIN {cn} c ON c.{fk} = p.{ppk}\nWHERE {cond}\nORDER BY p.{ppk}"
+        truth = f"SELECT p.{ppk}\nFROM {pn} p\nWHERE EXISTS (SELECT 1 FROM {cn} c WHERE c.{fk} = p.{ppk} AND {cond})\nORDER BY p.{ppk}"
+        words = rnd.choice([f"{_base(pn)} that have a matching {_base(cn).replace('_', ' ')}", f"list {_base(pn)} who have one",
+                            f"wo {_base(pn)} jinke paas {_base(cn).replace('_', ' ')} hai"])
+    elif bug == "exists_uncorr":
+        if not ccats:
+            return None
+        broken = f"SELECT p.{ppk}\nFROM {pn} p\nWHERE {rnd.choice(['', 'NOT '])}EXISTS (SELECT 1 FROM {cn} c WHERE {cat_cond('c.', ccats)})"
+        truth = None
+    elif bug == "sub_outer_col":
+        where = f" WHERE {cat_cond('c.', ccats)}" if ccats else ""
+        broken = f"SELECT p.{ppk}\nFROM {pn} p\nWHERE p.{ppk} {rnd.choice(['IN', 'NOT IN'])} (SELECT p.{ppk} FROM {cn} c{where})"
+        truth = None
+    elif bug == "scalar_rows":
+        other = rnd.choice([c["name"] for c in child["cols"] if c["name"] and c["kind"] not in ("pk", "fk")] or [cpk])
+        broken = f"SELECT p.{ppk}, (SELECT c.{other} FROM {cn} c WHERE c.{fk} = p.{ppk}) AS v\nFROM {pn} p"
+        truth = None
+    else:                                                 # sub_limit_order
+        other = rnd.choice([c["name"] for c in child["cols"] if c["name"] and c["kind"] not in ("pk", "fk")] or [cpk])
+        broken = f"SELECT p.{ppk}, (SELECT c.{other} FROM {cn} c WHERE c.{fk} = p.{ppk} LIMIT 1) AS v\nFROM {pn} p"
+        truth = None
+    if words:
+        broken += ";\n\n" + words
+    item = {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": t["name"] if stmt != "select" else t["name"],
+            "broken": broken, "truth": truth}
     if engine:
         item["engine"] = engine
     return item

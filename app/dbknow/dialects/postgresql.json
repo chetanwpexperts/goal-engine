@@ -522,6 +522,8 @@
   "double_quotes": "identifier",
   "concat_null": "ignored",
   "like_case": "sensitive",
+  "limit_in_subquery": {"behaviour": "works", "says": "PostgreSQL runs LIMIT inside IN (SELECT ...).", "proven": ["postgresql"]},
+  "derived_alias": {"behaviour": "works", "says": "PostgreSQL 16 and later accept a subquery in FROM without a name; 15 and older refuse it (42601, subquery in FROM must have an alias).", "proven": ["postgresql"]},
   "sum_boolean": {"behaviour": "error", "code": "42883", "says": "PostgreSQL refuses it (42883, function sum(boolean) does not exist): a comparison is a boolean there, not a number.", "proven": ["postgresql"]},
   "having_alias": {"behaviour": "error", "code": "42703", "says": "PostgreSQL refuses it (42703, column does not exist; or 42803 if the name is also a real column): HAVING is worked out before SELECT names exist.", "proven": ["postgresql"]},
   "count_distinct_multi": {"behaviour": "error", "code": "42883", "says": "PostgreSQL refuses it (42883, function count(...) does not exist): COUNT takes one argument there.", "proven": ["postgresql"]},

@@ -33,6 +33,7 @@ class Source:
     on_start: int = 0
     on_end: int = 0
     refs: set = field(default_factory=set)
+    lateral: bool = False   # JOIN LATERAL (SELECT ...): tied to the rows before it inside the subquery, ON may be just TRUE
 
 
 @dataclass
@@ -150,6 +151,9 @@ def _sources(s: str, dep, a: int, b: int) -> list[Source]:
         on_m = re.search(r"\bon\b", t, re.I)
         using_m = re.search(r"\busing\s*\(([^)]*)\)", t, re.I)
         head = t[:on_m.start()] if on_m else (t[:using_m.start()] if using_m else t)
+        lateral = re.match(r"lateral\s*(?=\()", head, re.I)
+        if lateral:                                    # JOIN LATERAL (SELECT ...) t: a derived table that may read the rows before it
+            head = head[lateral.end():]
         if head.startswith("("):
             close = _close(head, 0)
             name, rest = "", head[close + 1:]
@@ -158,7 +162,7 @@ def _sources(s: str, dep, a: int, b: int) -> list[Source]:
             name, rest = (nm.group(1).replace("`", "").replace('"', ""), head[nm.end():]) if nm else ("", head)
         am = re.match(r"\s*(?:as\s+)?[`\"]?([A-Za-z_][\w$]*)[`\"]?", rest, re.I)
         alias = am.group(1) if am and am.group(1).lower() not in KW else (name.split(".")[-1] if name else "")
-        src = Source(kind=kind, name=name, alias=alias, start=a + st, end=a + en)
+        src = Source(kind=kind, name=name, alias=alias, start=a + st, end=a + en, lateral=bool(lateral))
         if on_m:
             src.on_start = a + head_end + lead + on_m.end()
             src.on_end = a + en
@@ -516,6 +520,14 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
                              f"in HAVING after GROUP BY; in UPDATE/DELETE, compare with a subquery, e.g. salary < (SELECT AVG(salary) FROM ...).",
                              f"WHERE ek-ek row dekhta hai, totals se pehle: MySQL error 1111, PostgreSQL 'aggregate functions are not allowed "
                              f"in WHERE'. Total pe condition GROUP BY ke baad HAVING mein; UPDATE/DELETE mein subquery se compare karo."))
+
+    # subquery reasoning (app/agents/sqlsubq.py): shape (one value / a set / EXISTS), scope (the inner FROM first), NULLs
+    from app.agents import sqlsubq
+
+    for fnd, sedits in sqlsubq.subqueries(sql, s, intent, Finding):
+        F.append(fnd)
+        if sedits and not any(a < e[1] and e[0] < b for e in sedits for a, b, _n in edits):
+            edits += sedits
 
     # 9-13: traps from SQL practice (LEFT JOIN counts, NOT IN with NULLs, BETWEEN on timestamps, ties, top N per group)
     for fnd, edit in _workbook_traps(sql, s, is_select, intent):
@@ -896,7 +908,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
         if alias and re.fullmatch(r"[`\"]?\w+[`\"]?\.[`\"]?\w+[`\"]?", t):
             alias = ""
         items.append({"text": t, "alias": alias, "start": sel_a + off + (len(txt) - len(txt.lstrip())),
-                      "end": sel_a + off + len(txt.rstrip()), "agg": bool(AGG.search(t)) and " over" not in t.lower()})
+                      "end": sel_a + off + len(txt.rstrip()), "agg": bool(AGG.search(_no_subqueries(t))) and " over" not in _no_subqueries(t).lower()})
     sel_aliases = {i["alias"].lower(): i for i in items if i["alias"]}
 
     # ------------------------------------------------ 1. names: aliases that don't exist, tables used by name after an alias
@@ -983,7 +995,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
             add("wrong", "join", f"{x.name} {x.alias} is joined without ON", f"{x.name} {x.alias} bina ON ke joda hai",
                 line_of(x.start), "Without ON every row is paired with every row of this table (rows multiply). Add ON with the matching columns.",
                 "ON ke bina har row is table ki har row se judti hai (rows guna ho jaati hain). Matching columns ke saath ON lagao.")
-        if x.on and a and a not in x.refs and i > 0:
+        if x.on and a and a not in x.refs and i > 0 and not x.lateral:
             add("wrong", "join", f"The ON of {x.alias} doesn't mention {x.alias}", f"{x.alias} ke ON mein {x.alias} hai hi nahi",
                 line_of(x.on_start), f"An ON condition must connect {x.alias} to a table before it; this one doesn't, so every {x.alias} row "
                 "is paired with every row (rows multiply).",
@@ -1048,6 +1060,12 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
         elif ges and not any(a < e[1] and e[0] < b for e in ges for a, b, _n in edits + agg_edits):
             agg_edits += ges                         # all of a finding's edits, or none of them
     edits += agg_edits
+
+    # a JOIN used only to keep the parents that have a child (app/agents/sqlsubq.py): EXISTS keeps each parent once
+    from app.agents import sqlsubq
+    for fnd, sedits in sqlsubq.semi_join(sql, s, cl, srcs, items, intent, Finding):
+        F.append(fnd)
+        whole = whole or next((e[2] for e in sedits if (e[0], e[1]) == (0, len(sql))), None)
 
     # self joins: the same table twice, joined parent.id = child.fk -> the children, not the parent
     for i, x in enumerate(srcs):
@@ -1138,7 +1156,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
             edits.append((m.start(), m.end(), right))
     where = cl.get("where")
     if where:
-        wtext = s[where[0]:where[1]]
+        wtext = _no_subqueries(s[where[0]:where[1]])     # a name inside a subquery is that subquery's own column
         for m in WORD.finditer(wtext):
             w = m.group(1)
             if w.lower() in sel_aliases and not any(w.lower() == (x.alias or "").lower() for x in srcs) and \
@@ -1389,8 +1407,8 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
             if not fm or fm.group(2):
                 continue
             A = alias_of(fm.group(3))
-            if A in single:
-                continue
+            if A in single or A not in by_alias:
+                continue                                     # (a total inside a subquery belongs to the subquery's own tables)
             mine = to_one_from({A})
             others = [y for y in live if y not in single and y not in mine and y != A and A not in to_one_from({y})]
             kids = [y for y in live if y not in single and y != A and A in to_one_from({y}) and y not in mine]

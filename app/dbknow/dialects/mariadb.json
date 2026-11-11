@@ -84,6 +84,8 @@
   "double_quotes": "string",
   "concat_null": "null",
   "like_case": "insensitive",
+  "limit_in_subquery": {"behaviour": "error", "code": "1235", "says": "MySQL and MariaDB refuse LIMIT inside IN / ANY / ALL / SOME (error 1235, doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery').", "proven": ["mariadb"]},
+  "derived_alias": {"behaviour": "error", "code": "1248", "says": "MySQL refuses a subquery in FROM without a name (error 1248, Every derived table must have its own alias); MariaDB stops with a syntax error (1064).", "proven": ["mariadb"]},
   "sum_boolean": {"behaviour": "works", "says": "MySQL and MariaDB treat true as 1 and false as 0, so SUM(condition) counts the matches there.", "proven": ["mariadb"]},
   "having_alias": {"behaviour": "works", "says": "MySQL and MariaDB let HAVING use a name made in SELECT.", "proven": ["mariadb"]},
   "count_distinct_multi": {"behaviour": "works", "says": "MySQL and MariaDB accept COUNT(DISTINCT a, b) and skip a combination that has a NULL in it.", "proven": ["mariadb"]},

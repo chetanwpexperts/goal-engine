@@ -33,6 +33,7 @@ NOTES_ONLY = {"sqlserver", "oracle", "sqlite"}   # no lab-tested knowledge yet: 
 SHAPES = [                                     # (shape, pattern) in the order they are tried
     ("compare", r"^which (one )?is (better|faster|safer)\b|\b(better|behtar|faster|tez)\b.*\b(ya|or)\b|बेहतर.*या|"
                 r"\bsame (hai|hain|h|he|hote|hota)\b|\bsame as\b|एक ही (है|हैं)|\bmein\b.*\bya\b.*\bmein\b|में .*या.* में"),
+    ("compare", r"\b(ya|or)\b.*\b(kaunsa|konsa|kaun sa|kaunsi|which)\b.*\b(better|behtar|faster|tez|sahi|accha|acha)\b"),
     ("compare", r"\b(vs\.?|versus|difference(s)? (between|in|of)|differ(ent|ence)?\b.*\b(from|and)|compared? (to|with)|"
                 r"(farak|fark|farq|antar|difference) (kya|hai|h|batao|bataiye|samjhao)|(mein|me|main) (kya )?(farak|fark|farq|antar|difference)|"
                 r"(farak|fark|farq|antar)\b|or\b.*\bwhich (one|is better))|अंतर|फ़र्क|फर्क|फरक|बनाम|में क्या अंतर"),
@@ -50,9 +51,10 @@ SHAPES = [                                     # (shape, pattern) in the order t
     ("when", r"^should (i|we|you|one)\b|\bshould (a|an|the|this)? ?\w+ (go|be put|be written)\b|\b(karna|karni|karne|lagana|likhna) chahiye\b|"
              r"\bchahiye kya\b"),
     ("howto", r"^can (i|we|you|one)\b|^is (it|there a way) (possible )?to\b"),
-    ("define", r"^(does|do|is|are|will)\b.*\b(matter|matters|same|different|allowed|possible|a database|a language)\b|"
+    ("define", r"^(does|do|is|are|will)\b.*\b(matter|matters|same|different|allowed|possible|a database|a language|faster|slower|"
+               r"better|quicker)\b|"
                r"^(is|are) \w+( \w+)? (a|an)\b|\b(hai|h|hain|karta hai|karti hai) kya\s*$|(है|हैं|करता है) क्या\s*$|मायने रखता"),
-    ("define", r"^[\w\s-]{2,40}\b(in|on|for|with|mein|me|में) (mysql|maria ?db|postgre\w*|sql server|oracle|sqlite)$"),
+    ("define", r"^[\w\s-]{2,40}\b(in|on|for|with|mein|me|में) (sql|mysql|maria ?db|postgre\w*|sql server|oracle|sqlite)$"),
     ("puzzle", r"\b(gives?|returns?|shows?|giving|returning) (random|different|wrong|duplicate|extra|null|zero|0|same)\b|"
                r"\b(gives?|returns?|shows?|comes?) .*\b(twice|two times|double)\b"),
     ("task", r"^(find|remove|delete|get rid of|show|list|count|get|write|make|combine|merge|replace|join|sort|search)\b"),

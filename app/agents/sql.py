@@ -233,6 +233,19 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
     said = request_words(query)
     if not original:
         return {"ok": False, "error": "No query given", "findings": []}
+    from app.agents import sqllock
+
+    many = sqllock.n_plus_one(_strip_comments(original))
+    if many:                                          # a log of the same statement per value (N+1): one statement does the work
+        sql_one = many.pop("sql")
+        f = {**many, "basis": None}
+        from app.agents.sqlread import fundamentals as _funds
+
+        fd = _funds()["fundamentals"]["locking"]
+        f["basis"] = {"id": "locking", "en": fd["title_en"], "hi": fd["title_hi"], "rule_en": fd["rule_en"], "rule_hi": fd["rule_hi"]}
+        return {"ok": True, "findings": [f], "indexes": [], "check_query": None, "indexes_verified": False, "assumed_primary": [],
+                "notes": [], "rewritten": sql_one, "tables": [],
+                "correct": {"findings": [f], "corrected": sql_one, "guesses": []}}
     head = _strip_comments(original)
     from app.agents import sqlschema
 
@@ -458,6 +471,8 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
 
     # ---- with the table structure: why an index that exists can't serve this query (app/agents/sqlspeed.py)
     if extra:
+        for f in sqllock.lock_fit(original, extra, eng):
+            add(f["severity"], f["title_en"], f["title_hi"], f["evidence"], f["fix_en"], f["fix_hi"], f["topic"])
         for f in sqlspeed.index_fit(original, extra, eng):
             add(f["severity"], f["title_en"], f["title_hi"], f["evidence"], f["fix_en"], f["fix_hi"], f["topic"])
     # ---- EXPLAIN output, if pasted: read step by step (app/agents/sqlexplain.py); a fragment the reader can't place: the old checks
@@ -579,8 +594,10 @@ MEANING_CHECKS = {"count", "not_in", "date_range", "concat", "like", "and_or", "
                   # night 7: an ELSE for unmatched rows, a tie-breaker / ROWS frame, a wider frame for NTH_VALUE change the result
                   "case_no_else", "win_running_ties", "win_rank_ties", "win_last_value",
                   # night 8: offered, not applied: UNION ALL for an OR across tables, keyset paging (needs the last row's values)
-                  "or_union", "keyset"}
-SPEED_OFFERS = {"or_union", "keyset"}               # the same rows, a faster form: offered as 'try this', shown on the card
+                  "or_union", "keyset",
+                  # night 9: offered, not applied: running a change in batches, SKIP LOCKED for queue workers
+                  "batch_change", "skip_locked"}
+SPEED_OFFERS = {"or_union", "keyset", "batch_change", "skip_locked"}               # the same rows, a faster form: offered as 'try this', shown on the card
 
 
 def _is_select(low: str) -> bool:

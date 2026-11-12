@@ -552,7 +552,11 @@
   "text_vs_number": {"behaviour": "error", "code": "42883", "says": "PostgreSQL refuses to compare a text column with a number: 42883, operator does not exist: character varying = bigint.", "proven": ["postgresql"]},
   "or_same_table": {"behaviour": "fast", "says": "PostgreSQL combines two indexes for an OR on one table (EXPLAIN: BitmapOr of two Bitmap Index Scans).", "proven": ["postgresql"]},
   "expression_index": {"behaviour": "fast", "says": "PostgreSQL indexes an expression directly: CREATE INDEX ON t (lower(email)); WHERE lower(email) = ... then uses it (lab: Index Scan).", "proven": ["postgresql"]},
-  "offset_reads": {"behaviour": "slow", "says": "PostgreSQL's Limit node over an index scan still reads OFFSET + LIMIT rows (lab: 15,021 rows read for OFFSET 15000).", "proven": ["postgresql"]}
+  "offset_reads": {"behaviour": "slow", "says": "PostgreSQL's Limit node over an index scan still reads OFFSET + LIMIT rows (lab: 15,021 rows read for OFFSET 15000).", "proven": ["postgresql"]},
+  "skip_locked": {"behaviour": "works", "says": "PostgreSQL 9.5+ has SKIP LOCKED (lab: job 2 at once); NOWAIT fails at once with 55P03 (could not obtain lock on row).", "proven": ["postgresql"]},
+  "lock_scan": {"behaviour": "locks_matching", "says": "PostgreSQL locks only the rows it changes, so without an index it reads the whole table but doesn't block other rows (lab: the second session went on).", "proven": ["postgresql"]},
+  "gap_locks": {"behaviour": "none", "says": "PostgreSQL takes no gap locks: an INSERT into a range another transaction updated goes on (lab).", "proven": ["postgresql"]},
+  "deadlock": {"behaviour": "error", "code": "40P01", "says": "PostgreSQL stops one with 40P01 (deadlock detected) after deadlock_timeout (1 s); its DETAIL names the two processes and transactions.", "proven": ["postgresql"]}
  },
  "proven": [
   "postgresql"

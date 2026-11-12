@@ -502,6 +502,29 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  "locking": {
+   "title_en": "A change locks its rows until its transaction ends; others that need them wait",
+   "title_hi": "Badlaav apni rows ko transaction khatam hone tak lock rakhta hai; jinhe wahi rows chahiye wo rukte hain",
+   "rule_en": "Every UPDATE, DELETE and SELECT ... FOR UPDATE locks the rows it touches until COMMIT or ROLLBACK, and a writer that needs a locked row waits (until a lock timeout: MySQL/MariaDB 1205, PostgreSQL 55P03). Plain reads don't wait for writers (each sees the last committed version). So: keep transactions short; change huge sets of rows in batches, each its own transaction, so the final table is the same but nobody waits long; MySQL/MariaDB lock every row their search reads (and, under REPEATABLE READ, the gaps between them), so a WHERE without an index locks the whole table, while PostgreSQL locks only the rows it changes. Two transactions that take the same rows in opposite orders deadlock: one is rolled back (1213 / 40P01) and must be retried; taking rows in one fixed order everywhere prevents it. Queue workers take free rows with FOR UPDATE SKIP LOCKED instead of waiting on the first one. And one statement per value (N+1) costs a round trip each: one statement with IN (...) does the same work.",
+   "rule_hi": "Har UPDATE, DELETE aur SELECT ... FOR UPDATE apni rows ko COMMIT ya ROLLBACK tak lock rakhta hai, aur jise locked row chahiye wo rukta hai (lock timeout tak: 1205 / 55P03). Sirf padhne wale writers ka intezaar nahi karte. Isliye transaction chhote rakho; badi tadaad ki rows tukdon mein badlo, har tukda alag transaction; MySQL/MariaDB search mein padhi har row (aur REPEATABLE READ mein beech ke gaps) lock karte hain, isliye bina index ka WHERE poori table lock karta hai, PostgreSQL sirf badli rows. Do transaction ulte kram mein rows lein to deadlock: ek rollback hota hai (1213 / 40P01) aur dobara chalana padta hai; har jagah ek hi kram se ye nahi hota. Queue workers FOR UPDATE SKIP LOCKED se free rows lein. Aur har value ke liye alag statement (N+1) har baar chakkar lagata hai: IN (...) wala ek statement wahi kaam karta hai.",
+   "topics": [
+    "batch_change",
+    "skip_locked",
+    "lock_scan",
+    "n_plus_one",
+    "deadlock_order"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/explicit-locking.html",
+    "https://dba.stackexchange.com/questions/tagged/deadlock",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  }
 }

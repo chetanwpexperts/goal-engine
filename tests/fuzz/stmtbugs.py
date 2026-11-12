@@ -43,7 +43,9 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         # night 8: speed rewrites that must return exactly the same rows (a condition on the bare column, OR across two tables
         # as UNION ALL, deep OFFSET as keyset paging)
         "ix_year", "ix_year_month", "ix_day", "ix_cast_day", "ix_format", "ix_arith", "ix_coalesce", "ix_left", "ix_or_join",
-        "ix_keyset"]
+        "ix_keyset",
+        # night 9: locks and big data (a huge change said in words -> batches; queue workers -> SKIP LOCKED; N+1 -> one statement)
+        "lk_batch_delete", "lk_batch_update", "lk_skip_locked", "lk_nplus"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
@@ -76,7 +78,8 @@ TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": 
          "wf_running_ties": "win_running_ties", "wf_partition_said": "win_partition_said", "wf_nth_rank": "win_rank_ties",
          "wf_ties_rank": "ties", "wf_no_order": "win_no_order", "wf_nested": "win_nested", "wf_cte_cols": "cte_columns",
          "ix_year": "sargable", "ix_year_month": "sargable", "ix_day": "sargable", "ix_cast_day": "sargable", "ix_format": "sargable",
-         "ix_arith": "sargable", "ix_coalesce": "sargable", "ix_left": "sargable", "ix_or_join": "or_union", "ix_keyset": "keyset"}
+         "ix_arith": "sargable", "ix_coalesce": "sargable", "ix_left": "sargable", "ix_or_join": "or_union", "ix_keyset": "keyset",
+         "lk_batch_delete": "batch_change", "lk_batch_update": "batch_change", "lk_skip_locked": "skip_locked", "lk_nplus": "n_plus_one"}
 NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join", "sum_distinct",
           "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order", "ch_insert_count",
           "sd_two_pk", "sd_list_col", "sd_repeat", "sd_parent_copy", "wf_no_order", "wf_nested", "wf_cte_cols",
@@ -87,7 +90,8 @@ FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_qu
                  "semi_join", "ch_set_sub_null",
                  "sd_date_text", "sd_number_text", "sd_code_number", "sd_no_pk", "sd_fk_index_pg", "sd_over_wide", "sd_timestamp",
                  "sd_reserved", "wf_case_else_sort", "wf_running_ties",
-                 "ix_year", "ix_year_month", "ix_day", "ix_cast_day", "ix_format", "ix_arith", "ix_coalesce", "ix_left", "ix_or_join"}
+                 "ix_year", "ix_year_month", "ix_day", "ix_cast_day", "ix_format", "ix_arith", "ix_coalesce", "ix_left", "ix_or_join",
+                 "lk_skip_locked"}
 
 
 def _cols(t, *kinds):
@@ -395,6 +399,8 @@ def make(seed: int):
         return _win_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("ix_"):
         return _speed_bug(seed, bug, rnd, schema, tables, t, wrap, stmt)
+    elif bug.startswith("lk_"):
+        return _lock_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -1399,6 +1405,134 @@ def _check_keyset(item, engines, tag) -> list[str]:
     return bad
 
 
+def _lock_bug(seed, bug, rnd, schema, tables, t):
+    """Night 9: a huge change said in words (batches), queue workers (SKIP LOCKED), the same statement per value (N+1)."""
+    pk, name = t["pk"], t["name"]
+    rows = t["rows"]
+
+    def vals(c):
+        k = t["cols"].index(c)
+        return [r[k] for r in rows if r[k] is not None]
+
+    lit = lambda x: f"'{x}'" if not isinstance(x, (int, float)) and not hasattr(x, "as_tuple") else str(x)  # noqa: E731
+    conds = []
+    for c in t["cols"]:
+        if c["kind"] in ("cat", "int", "date", "money") and vals(c):
+            v = rnd.choice(vals(c))
+            op = "=" if c["kind"] == "cat" else rnd.choice(["<", ">=", "="])
+            conds.append(f"{c['name']} {op} {lit(v)}")
+    if not conds:
+        return None
+    cond = rnd.choice(conds)
+    engine = rnd.choice(["mariadb", "postgresql"])
+    only = ["mysql"] if engine == "mariadb" else ["postgres"]
+    words = rnd.choice(["the table has 20 million rows and this times out", "huge table, it locks everything", "lakhs of rows, ye atak jata hai",
+                        "very big table", "takes hours on production"])
+    parent = any(c.get("ref") == name for tt in tables for c in tt["cols"])   # rows other tables point at: a DELETE is refused
+    if bug == "lk_batch_delete":
+        if parent:
+            return None
+        truth = f"DELETE FROM {name}\nWHERE {cond}"
+        broken = f"{truth};\n\n{words}"
+        stmt = "delete"
+    elif bug == "lk_batch_update":
+        sets = [c for c in t["cols"] if c["kind"] in ("cat", "int") and c["name"] not in cond and vals(c)]
+        if not sets:
+            return None
+        c = rnd.choice(sets)
+        v = rnd.choice(vals(c)) if rnd.random() < 0.8 else None
+        truth = f"UPDATE {name}\nSET {c['name']} = {'NULL' if v is None else lit(v)}\nWHERE {cond}"
+        broken = f"{truth};\n\n{words}"
+        stmt = "update"
+    elif bug == "lk_skip_locked":
+        n = rnd.choice([1, 1, 2, 5])
+        truth = f"SELECT {pk}\nFROM {name}\nWHERE {cond}\nORDER BY {pk}\nLIMIT {n}\nFOR UPDATE"
+        broken = truth + ";\n\n" + rnd.choice(["several workers pick the next job", "job queue with parallel workers", "do worker ek saath agla task lete hain"])
+        stmt, only = "select", None
+        engine = rnd.choice([None, "mariadb", "postgresql"])
+    else:                                                      # lk_nplus
+        k = rnd.randint(3, 6)
+        ids = rnd.sample(range(1, len(rows) + 1), min(k, len(rows)))
+        cols = [c["name"] for c in t["cols"] if c["kind"] != "pk"][:2] or [pk]
+        form = rnd.choice(["select", "select", "update"] + ([] if parent else ["delete"]))
+        if form == "select":
+            parts = [f"SELECT {', '.join(cols)} FROM {name} WHERE {pk} = {i}" for i in ids]
+        elif form == "update":
+            sets = [c for c in t["cols"] if c["kind"] in ("cat", "int") and vals(c)]
+            if not sets:
+                return None
+            c = rnd.choice(sets)
+            v = lit(rnd.choice(vals(c)))
+            parts = [f"UPDATE {name} SET {c['name']} = {v} WHERE {pk} = {i}" for i in ids]
+        else:
+            parts = [f"DELETE FROM {name} WHERE {pk} = {i}" for i in ids]
+        truth = broken = ";\n".join(parts) + ";"
+        return {"seed": seed, "bug": bug, "stmt": form, "schema": schema, "table": name, "broken": broken, "truth": truth, "parts": parts}
+    item = {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": name, "broken": broken, "truth": truth}
+    if engine:
+        item["engine"] = engine
+    if only:
+        item["only"] = only
+    return item
+
+
+def _check_lock(item, engines, res, tag) -> list[str]:
+    """Batches: run the batched form with 3 rows a batch until it changes nothing: the same table as the single statement.
+    N+1: the combined statement returns / changes exactly what the separate ones did."""
+    import re as _re
+
+    from app.agents import sqllock
+
+    pk, table = item["schema"]["tables"][item["table"]]["pk"], item["table"]
+    bad = []
+    fixed = res.get("corrected")
+    if not fixed:
+        return [f"{tag}: nothing offered\n{item['broken']}"]
+    for name, eng in engines.items():
+        if item.get("only") and name not in item["only"]:
+            continue
+        eng.begin()
+        try:
+            if item["bug"].startswith("lk_batch"):
+                eng.run(item["truth"])
+                want = Counter(tuple(map(str, r)) for r in eng.run(f"SELECT * FROM {table} ORDER BY {pk}"))
+                eng.rollback()
+                eng.begin()
+                sql = _re.sub(rf"LIMIT {sqllock.BATCH}\b", "LIMIT 3", fixed.rstrip().rstrip(";"))
+                for _ in range(200):
+                    cur = eng.conn.cursor()
+                    cur.execute(sql)
+                    n = cur.rowcount
+                    cur.close()
+                    if not n:
+                        break
+                else:
+                    bad.append(f"{tag}: on {name} the batches never end\n{sql}")
+                got = Counter(tuple(map(str, r)) for r in eng.run(f"SELECT * FROM {table} ORDER BY {pk}"))
+            elif item["stmt"] == "select":
+                want = set()
+                for p in item["parts"]:
+                    want |= {tuple(map(str, r)) for r in eng.run(p)}
+                rows = [tuple(map(str, r)) for r in eng.run(fixed)]
+                width = len(next(iter(want))) if want else 0
+                got = {r[-width:] for r in rows} if width else set(rows)
+            else:
+                for p in item["parts"]:
+                    eng.run(p)
+                want = Counter(tuple(map(str, r)) for r in eng.run(f"SELECT * FROM {table} ORDER BY {pk}"))
+                eng.rollback()
+                eng.begin()
+                eng.run(fixed)
+                got = Counter(tuple(map(str, r)) for r in eng.run(f"SELECT * FROM {table} ORDER BY {pk}"))
+            if got != want:
+                bad.append(f"{tag}: on {name} the offer does something else\n{fixed}")
+        except Exception as exc:  # noqa: BLE001
+            bad.append(f"{tag}: on {name} the offer fails: {exc}\n{fixed}")
+        finally:
+            eng.rollback()
+    return bad
+
+
 def _effect(eng, sql, table, pk):
     """What a statement does: the rows a SELECT returns, or the table after an UPDATE/DELETE (rolled back afterwards)."""
     eng.begin()
@@ -1433,6 +1567,8 @@ def check(item, engines: dict) -> list[str]:
     sure = any(f["topic"] == want and f["kind"] in ("error", "wrong") for f in res["findings"])
     if item["bug"] in FIX_THE_CHECK:
         sure = True
+    if item["bug"] in ("lk_batch_delete", "lk_batch_update", "lk_nplus"):
+        return bad + ([] if bad else _check_lock(item, engines, res, tag))
     if item["bug"] == "ix_keyset" and not bad:
         return bad + _check_keyset(item, engines, tag)
     if item["bug"] in NO_FIX or not sure:

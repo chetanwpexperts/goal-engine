@@ -74,7 +74,7 @@ feed.
   running totals, LAG/LEAD, NTILE, gaps and islands, versions without window functions.
 - [x] **8. Indexes and EXPLAIN.** Reading EXPLAIN on both engines, composite indexes and the leftmost prefix, sargable
   rewrites, OR -> UNION ALL, keyset pagination, covering indexes; every speed rewrite proven to return the same rows.
-- [ ] **9. Concurrency and large data.** Deadlocks, lock waits, long transactions, batching huge changes, N+1; a deadlock
+- [x] **9. Concurrency and large data.** Deadlocks, lock waits, long transactions, batching huge changes, N+1; a deadlock
   and a lock wait reproduced in the lab.
 - [ ] **10. Mixed hard problems and portability.** Long CTE-heavy queries end to end; LIMIT/OFFSET/FETCH/TOP,
   IFNULL/COALESCE/NVL/ISNULL, dates, upsert, case, identities; Oracle / SQL Server / SQLite recognised and answered as notes.
@@ -291,3 +291,24 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   a plain index for `LIKE 'abc%'` (varchar_pattern_ops does); MariaDB matches '09812345678' and '9812345678 ' for `phone = 9812345678`
   (PostgreSQL 42883); MariaDB 10.11 doesn't use a virtual column's index for the same expression unless the query names the column;
   MariaDB's EXPLAIN for OFFSET 15000 shows rows = 15020; a temporary table has no statistics in PostgreSQL until ANALYZE.
+- **Night 9 (12 Nov 2026).** Locks and big data in `app/agents/sqllock.py` (new fundamental `locking`: a change locks its rows until
+  its transaction ends, and whoever needs them waits). Rules ('check', offered, never applied): a huge UPDATE / DELETE said in words
+  ('30 million rows', 'lakhs', 'times out', 'huge table') offered in batches of 5,000 in the database's own words (LIMIT on
+  MySQL/MariaDB, a ctid subquery on PostgreSQL), an UPDATE only when it sets plain values, with a guard so rows already done stop
+  matching (OR across columns; `SET x = x + 1` gets key-range advice instead); queue workers taking the next job with FOR UPDATE
+  offered SKIP LOCKED; the same statement sent once per value (an N+1 log: SELECT / UPDATE / DELETE by one value, or single-row
+  INSERTs) turned into one statement with IN (...) (the key column added to a SELECT) or one multi-row INSERT, skipped when the
+  value sits inside an OR / NOT. With the structure pasted: an UPDATE / DELETE / FOR UPDATE with no index on its WHERE locks every
+  row it reads on MySQL/MariaDB (only reads them on PostgreSQL). A pasted deadlock report (MariaDB/MySQL's LATEST DETECTED
+  DEADLOCK, PostgreSQL's DETAIL) is read in the chat: the statements, the table, the victim, gap locks, and the fix (one order
+  everywhere, short transactions, an index, retry the victim). Engine facts in the dialect files (`skip_locked`, `lock_scan`,
+  `gap_locks`, `deadlock`). A general 'what is lock wait timeout' is now a lesson ('timeout' alone is a symptom only with the person's
+  own query, page or database), a define question that only names a state ('what is idle in transaction') is answered, and 'when
+  should I ...' / 'kab kare' are when-questions. 18 concepts, 31-problem practice bank plus a live two-session lab, 4 generator
+  families. Lab lessons worth keeping: opposite-order updates gave MariaDB 1213 (SQLSTATE 40001) and PostgreSQL 40P01 (DETAIL
+  'Process A waits for ShareLock on transaction X; blocked by process B'); a lock wait ended in 1205 / 55P03; MariaDB blocked a change
+  of another row behind an UPDATE whose WHERE had no index (PostgreSQL didn't), and blocked an INSERT into a range another
+  transaction updated (gap lock, REPEATABLE READ; PostgreSQL didn't); FOR UPDATE made the second worker wait, SKIP LOCKED gave it job 2
+  at once; MariaDB's NOWAIT fails at once with 1205 (not MySQL's 3572), PostgreSQL's with 55P03; a plain read saw the committed 100
+  while a writer held 999; a WHERE that names a plpgsql word first ('raise prices ...') after a ';' is read as SQL, so it isn't taken
+  as the person's words.

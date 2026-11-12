@@ -18296,6 +18296,1732 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "deadlock",
+   "kind": "concept",
+   "title": {
+    "en": "Deadlock (and how to avoid it)",
+    "hinglish": "Deadlock (and how to avoid it)",
+    "hindi": "Deadlock (and how to avoid it)"
+   },
+   "terms": [
+    [
+     "deadlocks?"
+    ],
+    [
+     "dead lock"
+    ],
+    [
+     "डेडलॉक"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a deadlock in a database",
+     "how to avoid deadlocks",
+     "why do deadlocks happen"
+    ],
+    "hinglish": [
+     "deadlock kya hota hai",
+     "deadlock kaise roke"
+    ],
+    "hindi": [
+     "deadlock क्या होता है",
+     "डेडलॉक कैसे रोकें"
+    ]
+   },
+   "answer": {
+    "en": "Two transactions each hold a row lock the other one needs: A locked row 1 and wants row 2, B locked row 2 and wants row 1. Neither can go on, so the database picks one, rolls it back and gives it an error (MySQL/MariaDB 1213, PostgreSQL 40P01); the other continues. Avoid it by taking rows in the same order everywhere (e.g. always the lower id first, or SELECT ... ORDER BY id FOR UPDATE), keeping transactions short, and indexing the WHERE so fewer rows are locked; and let the app retry the transaction that got the error.",
+    "hinglish": "Do transaction ek doosre ki chahi hui row pakde baithe hain: A ne row 1 lock ki aur row 2 chahta hai, B ne row 2 lock ki aur row 1 chahta hai. Database ek ko rollback karke error deta hai (1213 / 40P01), doosra chalta rehta hai. Bachav: har jagah rows ek hi kram mein lo (pehle chhoti id), transaction chhote rakho, WHERE pe index, aur error aane pe app transaction dobara chalaye.",
+    "hindi": "दो transaction एक-दूसरे की चाही हुई row पकड़े हैं; डेटाबेस एक को rollback करता है (1213 / 40P01)। हर जगह rows एक ही क्रम में लो और error पर दोबारा चलाओ।"
+   },
+   "mistake": {
+    "en": "Treating a deadlock error as a bug to hide: it is normal under load. The victim was rolled back completely, so the app must retry it (not continue as if half of it ran).",
+    "hinglish": "Deadlock error ko chhupana: load mein ye normal hai. Victim poora rollback hua, isliye app use dobara chalaye.",
+    "hindi": "Deadlock error को छिपाना: victim पूरा rollback हुआ, app उसे दोबारा चलाए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount FROM orders WHERE id IN (1, 3) ORDER BY id FOR UPDATE"
+     },
+     "columns": [
+      "id",
+      "amount"
+     ],
+     "result": [
+      [
+       "1",
+       "25500"
+      ],
+      [
+       "3",
+       "80000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Error 1213 (SQLSTATE 40001); SHOW ENGINE INNODB STATUS shows the LATEST DETECTED DEADLOCK; innodb_print_all_deadlocks logs every one.",
+    "mariadb": "Same as MySQL (lab: 1213 when two sessions updated rows 1 and 2 in opposite orders).",
+    "postgresql": "40P01 after deadlock_timeout (1 s); the DETAIL names both processes (lab)."
+   },
+   "related": [
+    "lock_wait_timeout",
+    "select_for_update",
+    "transaction"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-deadlocks.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "lock_wait_timeout",
+   "kind": "concept",
+   "title": {
+    "en": "Lock wait timeout",
+    "hinglish": "Lock wait timeout",
+    "hindi": "Lock wait timeout"
+   },
+   "terms": [
+    [
+     "lock wait timeout"
+    ],
+    [
+     "lock timeout"
+    ],
+    [
+     "innodb_lock_wait_timeout"
+    ],
+    [
+     "lock",
+     "wait\\w*",
+     "(timeout|time out)"
+    ],
+    [
+     "lock_timeout"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is lock wait timeout",
+     "what does lock wait timeout exceeded mean",
+     "what is lock_timeout in postgres"
+    ],
+    "hinglish": [
+     "lock wait timeout kya hai",
+     "lock timeout ka matlab"
+    ],
+    "hindi": [
+     "lock wait timeout क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A statement that needs a row another transaction has locked waits; if the lock isn't released in time it gives up with an error: MySQL/MariaDB 1205 after innodb_lock_wait_timeout (50 s by default), PostgreSQL 55P03 when lock_timeout is set (by default it waits forever). Only that statement fails, not the whole transaction (MySQL) unless innodb_rollback_on_timeout is on. The cause is the other, long-running transaction holding the lock: find it and shorten it.",
+    "hinglish": "Jis statement ko doosre transaction ki locked row chahiye wo rukta hai; time pe lock na chhoote to error: MySQL/MariaDB 1205 (innodb_lock_wait_timeout, default 50 s), PostgreSQL 55P03 (lock_timeout set ho to; warna hamesha rukta hai). Wajah doosra lamba transaction hai jo lock pakde hai: use dhoondho aur chhota karo.",
+    "hindi": "जिस statement को locked row चाहिए वो रुकता है; समय पर lock न छूटे तो 1205 / 55P03।"
+   },
+   "mistake": {
+    "en": "Raising the timeout to make the error go away: the other transaction is still holding the rows; find who blocks (sys.innodb_lock_waits / pg_blocking_pids) and why it stays open.",
+    "hinglish": "Timeout badha ke error chhupana: doosra transaction phir bhi rows pakde hai; dhoondho kaun rok raha hai.",
+    "hindi": "Timeout बढ़ाकर error छिपाना: रोकने वाला transaction ढूँढो।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT @@innodb_lock_wait_timeout > 0 AS set_up",
+      "postgresql": "SELECT current_setting('lock_timeout') IS NOT NULL AS set_up"
+     },
+     "columns": [
+      "set_up"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "SET SESSION innodb_lock_wait_timeout = 5; error 1205.",
+    "mariadb": "Same (lab: 1205 after 1 s with the timeout at 1).",
+    "postgresql": "SET lock_timeout = '5s'; error 55P03 (canceling statement due to lock timeout) (lab)."
+   },
+   "related": [
+    "deadlock",
+    "find_blocking_queries",
+    "long_transaction"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "row_vs_table_lock",
+   "kind": "compare",
+   "title": {
+    "en": "Row lock vs table lock",
+    "hinglish": "Row lock vs table lock",
+    "hindi": "Row lock vs table lock"
+   },
+   "terms": [
+    [
+     "row[- ]level lock\\w*"
+    ],
+    [
+     "table[- ]level lock\\w*"
+    ],
+    [
+     "row lock",
+     "table lock"
+    ],
+    [
+     "lock tables?"
+    ],
+    [
+     "table lock"
+    ],
+    [
+     "lock",
+     "whole table"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "row lock vs table lock",
+     "what is a table lock",
+     "does update lock the whole table"
+    ],
+    "hinglish": [
+     "row lock aur table lock mein farak",
+     "update poori table lock karta hai kya"
+    ],
+    "hindi": [
+     "row lock और table lock में अंतर"
+    ]
+   },
+   "answer": {
+    "en": "A row lock covers only the rows a statement changes (or reads FOR UPDATE), so other sessions can work on other rows; a table lock blocks the whole table. InnoDB and PostgreSQL lock rows. But InnoDB locks every row its search reads: an UPDATE whose WHERE has no usable index reads, and locks, the whole table, so in practice it behaves like a table lock. PostgreSQL locks only the rows it changes. Table locks come from LOCK TABLES / LOCK TABLE, from MyISAM, and from many ALTER TABLE operations.",
+    "hinglish": "Row lock sirf badli (ya FOR UPDATE padhi) rows pe hota hai, baaki rows pe doosre kaam kar sakte hain; table lock poori table rokta hai. InnoDB aur PostgreSQL rows lock karte hain. Par InnoDB search mein padhi har row lock karta hai: bina index ke WHERE wali UPDATE poori table padh ke lock karti hai. PostgreSQL sirf badli rows.",
+    "hindi": "Row lock सिर्फ़ बदली rows पर; table lock पूरी table पर। InnoDB बिना index के पूरी table lock कर देता है।"
+   },
+   "mistake": {
+    "en": "Assuming 'InnoDB has row locks, so my UPDATE can't block others': without an index on the WHERE it locked every row (lab: another session's update of a different row waited and got 1205).",
+    "hinglish": "'InnoDB row lock karta hai, isliye meri UPDATE kisi ko nahi rokegi' maan lena: bina index ke saari rows lock (lab: 1205).",
+    "hindi": "बिना index के InnoDB सारी rows lock करता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, stock FROM products WHERE id = 1 FOR UPDATE"
+     },
+     "columns": [
+      "id",
+      "stock"
+     ],
+     "result": [
+      [
+       "1",
+       "12"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "InnoDB: row locks on the index records read (plus gaps under REPEATABLE READ); LOCK TABLES t WRITE locks the table.",
+    "mariadb": "Same (lab: UPDATE ... WHERE owner = 'a' with no index blocked an update of owner = 'd').",
+    "postgresql": "Row locks on changed rows only; LOCK TABLE t IN ... MODE for table locks (lab: no blocking)."
+   },
+   "related": [
+    "select_for_update",
+    "gap_lock",
+    "deadlock"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "select_for_update",
+   "kind": "concept",
+   "title": {
+    "en": "SELECT ... FOR UPDATE",
+    "hinglish": "SELECT ... FOR UPDATE",
+    "hindi": "SELECT ... FOR UPDATE"
+   },
+   "terms": [
+    [
+     "for update"
+    ],
+    [
+     "select",
+     "lock",
+     "(row|rows)",
+     "(update|change)"
+    ],
+    [
+     "फॉर अपडेट"
+    ],
+    [
+     "lock",
+     "row",
+     "before"
+    ],
+    [
+     "lock",
+     "row",
+     "updat\\w*"
+    ],
+    [
+     "row",
+     "lock",
+     "pehle"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is select for update",
+     "when to use select for update",
+     "how to lock a row before updating it"
+    ],
+    "hinglish": [
+     "select for update kya hai",
+     "row ko update se pehle lock kaise kare"
+    ],
+    "hindi": [
+     "select for update क्या है"
+    ]
+   },
+   "answer": {
+    "en": "SELECT ... FOR UPDATE reads rows and locks them as if you were about to change them, until your transaction ends: other transactions that want to change (or FOR UPDATE) the same rows wait. Use it inside BEGIN ... COMMIT for read-then-write work, e.g. check a stock level and then reduce it, so nobody changes the row in between. In autocommit it locks for an instant and does nothing useful.",
+    "hinglish": "SELECT ... FOR UPDATE rows padhta hai aur unhe transaction khatam hone tak lock rakhta hai: unhi rows ko badalna chahne wale rukte hain. BEGIN ... COMMIT ke andar 'padho phir badlo' kaam ke liye, jaise stock dekh ke ghatana, taaki beech mein koi aur na badle. Autocommit mein ye bekaar hai.",
+    "hindi": "SELECT ... FOR UPDATE rows पढ़कर transaction ख़त्म होने तक lock रखता है।"
+   },
+   "mistake": {
+    "en": "Locking many rows without an index, or holding the lock while waiting for a user or an API: every other writer queues behind it.",
+    "hinglish": "Bina index ke bahut rows lock karna, ya user / API ka intezaar karte hue lock pakde rehna: baaki sab rukte hain.",
+    "hindi": "Lock पकड़े रहकर user या API का इंतज़ार करना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, stock FROM products WHERE id = 1 FOR UPDATE"
+     },
+     "columns": [
+      "id",
+      "stock"
+     ],
+     "result": [
+      [
+       "1",
+       "12"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Locks the index records read; LOCK IN SHARE MODE / FOR SHARE (8.0) for a read lock.",
+    "mariadb": "Same; FOR UPDATE NOWAIT / WAIT n / SKIP LOCKED (10.6+).",
+    "postgresql": "FOR UPDATE / FOR NO KEY UPDATE / FOR SHARE / FOR KEY SHARE; NOWAIT and SKIP LOCKED."
+   },
+   "related": [
+    "skip_locked_nowait",
+    "transaction",
+    "deadlock"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "skip_locked_nowait",
+   "kind": "concept",
+   "title": {
+    "en": "SKIP LOCKED and NOWAIT (job queues)",
+    "hinglish": "SKIP LOCKED and NOWAIT (job queues)",
+    "hindi": "SKIP LOCKED and NOWAIT (job queues)"
+   },
+   "terms": [
+    [
+     "skip locked"
+    ],
+    [
+     "nowait"
+    ],
+    [
+     "(job|task) queue"
+    ],
+    [
+     "queue",
+     "(database|table|sql|mysql|postgres\\w*)"
+    ],
+    [
+     "workers?",
+     "(same|next) (job|row|task)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is skip locked",
+     "how to build a job queue in a database table",
+     "what does nowait do in sql"
+    ],
+    "hinglish": [
+     "skip locked kya hai",
+     "database table se job queue kaise banaye"
+    ],
+    "hindi": [
+     "skip locked क्या है"
+    ]
+   },
+   "answer": {
+    "en": "For a queue table where several workers each take 'the next job': SELECT ... ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED makes each worker skip rows another worker has locked and take the next free one at once, instead of all waiting on the first. NOWAIT fails immediately instead of waiting when the row is locked. Take the job, mark it (status = 'running') and COMMIT in one short transaction.",
+    "hinglish": "Queue table jahan kai workers 'agla job' lete hain: SELECT ... ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED se har worker doosre ki locked row chhod ke agli free row turant leta hai. NOWAIT locked row pe rukne ki jagah turant error deta hai. Job lo, status = 'running' karo aur chhote transaction mein COMMIT.",
+    "hindi": "SKIP LOCKED से हर worker locked row छोड़कर अगली free row लेता है; NOWAIT तुरंत error देता है।"
+   },
+   "mistake": {
+    "en": "Plain FOR UPDATE in a queue: every worker reads the same first row and waits for it (lab: the second worker waited until 1205 / 55P03).",
+    "hinglish": "Queue mein plain FOR UPDATE: har worker pehli row pe rukta hai (lab: 1205 / 55P03).",
+    "hindi": "Queue में plain FOR UPDATE: सब पहली row पर रुकते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM orders WHERE status = 'paid' ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0.1+; NOWAIT error 3572.",
+    "mariadb": "SKIP LOCKED 10.6+; NOWAIT fails at once with 1205 (lab).",
+    "postgresql": "9.5+; NOWAIT error 55P03 (lab)."
+   },
+   "related": [
+    "select_for_update",
+    "deadlock",
+    "lock_wait_timeout"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-select.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "long_transaction",
+   "kind": "concept",
+   "title": {
+    "en": "Long-running transactions (and idle in transaction)",
+    "hinglish": "Long-running transactions (and idle in transaction)",
+    "hindi": "Long-running transactions (and idle in transaction)"
+   },
+   "terms": [
+    [
+     "long[- ]running transactions?"
+    ],
+    [
+     "long transactions?"
+    ],
+    [
+     "idle in transaction"
+    ],
+    [
+     "open transactions?"
+    ],
+    [
+     "transaction",
+     "(open|khula|lamba|hours)"
+    ],
+    [
+     "लंबा transaction"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why are long transactions bad",
+     "what is idle in transaction",
+     "how to find long running transactions"
+    ],
+    "hinglish": [
+     "lamba transaction kyun bura hai",
+     "idle in transaction kya hai"
+    ],
+    "hindi": [
+     "लंबा transaction क्यों बुरा है"
+    ]
+   },
+   "answer": {
+    "en": "A transaction keeps every lock it took until it ends, and the database must keep old row versions it might still read: MySQL/MariaDB's undo log (history list) grows, PostgreSQL's VACUUM can't clean dead rows. A session 'idle in transaction' (BEGIN, some work, then nothing: a forgotten COMMIT, an app waiting on a user or an API) blocks writers and bloats tables. Find them: information_schema.innodb_trx ORDER BY trx_started (MySQL/MariaDB), pg_stat_activity WHERE state = 'idle in transaction' (PostgreSQL); commit early and set idle_in_transaction_session_timeout (PostgreSQL).",
+    "hinglish": "Transaction apne saare locks khatam hone tak rakhta hai, aur database purane row versions sambhal ke rakhta hai: MySQL/MariaDB ka undo log badhta hai, PostgreSQL ka VACUUM dead rows saaf nahi kar paata. 'Idle in transaction' session (BEGIN, thoda kaam, phir kuch nahi) writers ko rokta hai. Dhoondho: information_schema.innodb_trx (MySQL), pg_stat_activity state = 'idle in transaction' (PostgreSQL); jaldi commit karo.",
+    "hindi": "लंबा transaction locks पकड़े रहता है और पुराने versions जमा करता है; idle in transaction writers को रोकता है।"
+   },
+   "mistake": {
+    "en": "Opening a transaction, then calling a payment API or waiting for a user before COMMIT: the locks are held the whole time.",
+    "hinglish": "Transaction khol ke COMMIT se pehle payment API ya user ka intezaar: locks poore samay pakde rehte hain.",
+    "hindi": "Transaction खोलकर API या user का इंतज़ार करना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS open_orders FROM orders WHERE status = 'pending'"
+     },
+     "columns": [
+      "open_orders"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "information_schema.innodb_trx (trx_started); SHOW ENGINE INNODB STATUS 'History list length'.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "pg_stat_activity (xact_start, state); idle_in_transaction_session_timeout; long transactions hold back VACUUM."
+   },
+   "related": [
+    "transaction",
+    "lock_wait_timeout",
+    "mvcc"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "mvcc",
+   "kind": "concept",
+   "title": {
+    "en": "MVCC (why readers don't wait for writers)",
+    "hinglish": "MVCC (why readers don't wait for writers)",
+    "hindi": "MVCC (why readers don't wait for writers)"
+   },
+   "terms": [
+    [
+     "mvcc"
+    ],
+    [
+     "multi[- ]?version"
+    ],
+    [
+     "readers?",
+     "writers?",
+     "block\\w*"
+    ],
+    [
+     "(read|select)",
+     "block\\w*",
+     "(update|write)"
+    ],
+    [
+     "select",
+     "wait\\w*",
+     "update"
+    ],
+    [
+     "select",
+     "intezaar"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is mvcc",
+     "do readers block writers in mysql",
+     "does a select wait for an update"
+    ],
+    "hinglish": [
+     "mvcc kya hai",
+     "select update ka intezaar karta hai kya"
+    ],
+    "hindi": [
+     "mvcc क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Multi-version concurrency control: a change writes a new version of the row and keeps the old one, so a plain SELECT reads the last committed version instead of waiting for the writer. Readers don't block writers and writers don't block plain readers; only writers (and SELECT ... FOR UPDATE / FOR SHARE) wait for each other. InnoDB keeps old versions in the undo log, PostgreSQL in the table itself (VACUUM removes them later).",
+    "hinglish": "Multi-version concurrency control: badlaav row ka naya version likhta hai aur purana rakhta hai, isliye plain SELECT writer ka intezaar kiye bina aakhri committed version padhta hai. Padhne wale likhne walon ko nahi rokte; sirf likhne wale (aur FOR UPDATE) ek doosre ka intezaar karte hain.",
+    "hindi": "MVCC: plain SELECT आख़िरी committed version पढ़ता है, writer का इंतज़ार नहीं करता।"
+   },
+   "mistake": {
+    "en": "Expecting a plain SELECT to see another session's uncommitted change, or to wait for it: it sees the old committed value (lab: 100 while the other session had set 999).",
+    "hinglish": "Plain SELECT doosre session ka bina commit badlaav dekhega ya rukega, ye maan lena: wo purani committed value dekhta hai (lab: 999 ki jagah 100).",
+    "hindi": "Plain SELECT दूसरे session का uncommitted बदलाव नहीं देखता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount FROM orders WHERE id = 1"
+     },
+     "columns": [
+      "id",
+      "amount"
+     ],
+     "result": [
+      [
+       "1",
+       "25500"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "InnoDB: consistent reads from the undo log; READ COMMITTED vs REPEATABLE READ decide which snapshot.",
+    "mariadb": "Same (lab: reader saw 100 while a writer held 999).",
+    "postgresql": "Row versions in the table; VACUUM removes dead ones (lab: reader saw 100)."
+   },
+   "related": [
+    "isolation_levels",
+    "transaction",
+    "long_transaction"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/mvcc-intro.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "gap_lock",
+   "kind": "concept",
+   "title": {
+    "en": "Gap locks and next-key locks (InnoDB)",
+    "hinglish": "Gap locks and next-key locks (InnoDB)",
+    "hindi": "Gap locks and next-key locks (InnoDB)"
+   },
+   "terms": [
+    [
+     "gap locks?"
+    ],
+    [
+     "next[- ]key locks?"
+    ],
+    [
+     "insert intention"
+    ],
+    [
+     "insert",
+     "wait\\w*",
+     "transaction"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a gap lock",
+     "what is a next key lock in mysql",
+     "why does an insert wait for another transaction"
+    ],
+    "hinglish": [
+     "gap lock kya hai",
+     "next key lock kya hota hai"
+    ],
+    "hindi": [
+     "gap lock क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Under REPEATABLE READ (InnoDB's default) a search that locks rows also locks the gaps between the index entries it read, so no other transaction can insert a row into that range until it ends (this is how InnoDB stops phantom rows). An UPDATE ... WHERE id > 2 therefore blocks an INSERT of id 10. PostgreSQL has no gap locks; its SERIALIZABLE level detects such conflicts instead.",
+    "hinglish": "REPEATABLE READ (InnoDB ka default) mein rows lock karne wala search padhe gaye index entries ke beech ke gaps bhi lock karta hai, taaki us range mein koi insert na kar sake. Isliye UPDATE ... WHERE id > 2, id 10 ka INSERT rok deta hai. PostgreSQL mein gap locks nahi.",
+    "hindi": "REPEATABLE READ में InnoDB rows के बीच के gaps भी lock करता है; INSERT रुक जाता है।"
+   },
+   "mistake": {
+    "en": "Expecting an INSERT not to wait because 'no row with that id exists yet': the gap was locked (lab: 1205 on MariaDB, no wait on PostgreSQL).",
+    "hinglish": "'Us id ki row hai hi nahi' soch ke INSERT ke na rukne ki ummeed: gap locked tha (lab: MariaDB 1205, PostgreSQL nahi ruka).",
+    "hindi": "Gap lock से INSERT रुकता है (MariaDB 1205)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM orders WHERE id BETWEEN 2 AND 4 ORDER BY id FOR UPDATE"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "2"
+      ],
+      [
+       "3"
+      ],
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "REPEATABLE READ takes next-key locks; READ COMMITTED mostly doesn't.",
+    "mariadb": "Same (lab: INSERT into a range under UPDATE waited, 1205).",
+    "postgresql": "No gap locks (lab: the INSERT went on); SERIALIZABLE uses predicate locks and may fail with 40001."
+   },
+   "related": [
+    "isolation_levels",
+    "row_vs_table_lock",
+    "deadlock"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "optimistic_pessimistic",
+   "kind": "compare",
+   "title": {
+    "en": "Optimistic vs pessimistic locking",
+    "hinglish": "Optimistic vs pessimistic locking",
+    "hindi": "Optimistic vs pessimistic locking"
+   },
+   "terms": [
+    [
+     "optimistic lock\\w*"
+    ],
+    [
+     "pessimistic lock\\w*"
+    ],
+    [
+     "optimistic",
+     "pessimistic"
+    ],
+    [
+     "version column"
+    ],
+    [
+     "lost updates?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "optimistic vs pessimistic locking",
+     "what is optimistic locking",
+     "how to prevent lost updates"
+    ],
+    "hinglish": [
+     "optimistic locking kya hai",
+     "lost update kaise roke"
+    ],
+    "hindi": [
+     "optimistic locking क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Pessimistic: lock the row first (SELECT ... FOR UPDATE), then change it; others wait. Optimistic: don't lock; remember a version (or the old value) when reading and change the row only if it is still the same: UPDATE t SET qty = 4, version = version + 1 WHERE id = 7 AND version = 3. If 0 rows changed, someone else got there first: read again and retry. Optimistic suits rare conflicts and long user think-time; pessimistic suits frequent conflicts in short transactions.",
+    "hinglish": "Pessimistic: pehle row lock (FOR UPDATE), phir badlo; doosre rukte hain. Optimistic: lock nahi; padhte waqt version yaad rakho aur row tabhi badlo jab wo waisi hi ho: UPDATE ... WHERE id = 7 AND version = 3. 0 rows badli to kisi aur ne pehle badla: dobara padho. Kam takraav aur user ke lambe soch-samay ke liye optimistic.",
+    "hindi": "Pessimistic: पहले lock; optimistic: version से जाँचकर बदलो, 0 rows बदली तो दोबारा।"
+   },
+   "mistake": {
+    "en": "Reading a value, computing in the app, and writing it back without either: two users both read stock 5 and both write 4 (a lost update).",
+    "hinglish": "Value padh ke app mein hisaab aur bina kisi lock/version ke wapas likhna: dono 5 padh ke 4 likhte hain (lost update).",
+    "hindi": "बिना lock या version के पढ़-लिखना: lost update।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "UPDATE products SET stock = stock - 1 WHERE id = 1 AND stock = 12"
+     },
+     "changed": 1
+    }
+   ],
+   "engines": {
+    "mysql": "Check the affected rows (ROW_COUNT()); note MySQL counts only rows actually changed.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "UPDATE ... RETURNING tells you what changed; SERIALIZABLE is another option."
+   },
+   "related": [
+    "select_for_update",
+    "transaction",
+    "isolation_levels"
+   ],
+   "fundamentals": [
+    "locking",
+    "changes_safety"
+   ],
+   "source": "https://www.postgresql.org/docs/current/explicit-locking.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "n_plus_one",
+   "kind": "concept",
+   "title": {
+    "en": "The N+1 query problem",
+    "hinglish": "The N+1 query problem",
+    "hindi": "The N+1 query problem"
+   },
+   "terms": [
+    [
+     "n\\s*\\+\\s*1"
+    ],
+    [
+     "n plus 1"
+    ],
+    [
+     "n plus one"
+    ],
+    [
+     "query",
+     "(in|inside) (a )?loop"
+    ],
+    [
+     "loop",
+     "(mein|me) query"
+    ],
+    [
+     "quer\\w*",
+     "loop"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the n+1 query problem",
+     "why are queries in a loop bad",
+     "how to fix n plus 1 queries"
+    ],
+    "hinglish": [
+     "n+1 problem kya hai",
+     "loop mein query chalana kyun bura hai"
+    ],
+    "hindi": [
+     "n+1 query problem क्या है"
+    ]
+   },
+   "answer": {
+    "en": "One query fetches a list (N rows), then the code runs one more query per row: N+1 round trips, each with its own network, parsing and transaction cost, growing with the data. Fetch the related rows in one go instead: collect the ids and use WHERE id IN (...), or a JOIN; for writes, one UPDATE ... WHERE id IN (...) or one multi-row INSERT. ORMs cause it with lazy loading (use eager loading: with(), select_related, include).",
+    "hinglish": "Ek query list laati hai (N rows), phir code har row ke liye ek aur query chalata hai: N+1 chakkar, data ke saath badhte hue. Saari related rows ek baar mein lo: ids ikattha karke WHERE id IN (...), ya JOIN; likhne ke liye ek UPDATE ... IN (...) ya ek multi-row INSERT. ORM mein eager loading (with(), select_related).",
+    "hindi": "List के बाद हर row के लिए अलग query: N+1 चक्कर। ids इकट्ठा करके IN (...) या JOIN से एक बार में लो।"
+   },
+   "mistake": {
+    "en": "Fixing it with a cache or more servers instead of one query: the number of round trips still grows with the data.",
+    "hinglish": "Ek query ki jagah cache ya zyada servers se theek karna: chakkar phir bhi data ke saath badhte hain.",
+    "hindi": "Cache से ठीक करना: चक्कर फिर भी बढ़ते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, first_name FROM customers WHERE id IN (1, 2, 7) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "1",
+       "Aarav"
+      ],
+      [
+       "2",
+       "Diya"
+      ],
+      [
+       "7",
+       "Dev"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Watch performance_schema.events_statements_summary_by_digest for one statement run thousands of times.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "pg_stat_statements: a tiny query with a huge 'calls' count."
+   },
+   "related": [
+    "in_operator",
+    "join",
+    "bulk_insert"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/performance-schema-statement-summary-tables.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/97197/what-is-the-n1-selects-problem-in-orm-object-relational-mapping",
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "shared_exclusive_lock",
+   "kind": "compare",
+   "title": {
+    "en": "Shared vs exclusive locks",
+    "hinglish": "Shared vs exclusive locks",
+    "hindi": "Shared vs exclusive locks"
+   },
+   "terms": [
+    [
+     "shared lock\\w*"
+    ],
+    [
+     "exclusive lock\\w*"
+    ],
+    [
+     "(read|write) lock\\w*"
+    ],
+    [
+     "lock in share mode"
+    ],
+    [
+     "for share"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "shared vs exclusive lock",
+     "what is a shared lock",
+     "what is lock in share mode"
+    ],
+    "hinglish": [
+     "shared aur exclusive lock mein farak",
+     "shared lock kya hai"
+    ],
+    "hindi": [
+     "shared और exclusive lock में अंतर"
+    ]
+   },
+   "answer": {
+    "en": "A shared (read) lock lets others also read-lock the row but stops anyone changing it; an exclusive (write) lock, taken by UPDATE, DELETE and SELECT ... FOR UPDATE, stops other locks on the row until the transaction ends. SELECT ... FOR SHARE (MySQL 8 / PostgreSQL) or LOCK IN SHARE MODE (MySQL, MariaDB) takes a shared lock: use it to make sure a parent row isn't deleted while you insert its child. Plain SELECTs take no row locks at all (MVCC).",
+    "hinglish": "Shared (read) lock doosron ko bhi padhne ka lock lene deta hai par row badalne nahi deta; exclusive (write) lock (UPDATE, DELETE, FOR UPDATE) transaction khatam hone tak baaki locks rokta hai. FOR SHARE / LOCK IN SHARE MODE shared lock leta hai. Plain SELECT koi row lock nahi leta.",
+    "hindi": "Shared lock पढ़ने देता है पर बदलने नहीं; exclusive lock बाकी सब रोकता है।"
+   },
+   "mistake": {
+    "en": "Two transactions that both FOR SHARE the same row and then both try to UPDATE it: each waits for the other's shared lock, a deadlock.",
+    "hinglish": "Do transaction ek row pe FOR SHARE leke dono UPDATE karein: ek doosre ka intezaar, deadlock.",
+    "hindi": "दोनों FOR SHARE लेकर UPDATE करें तो deadlock।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT id FROM orders WHERE id = 1 LOCK IN SHARE MODE",
+      "postgresql": "SELECT id FROM orders WHERE id = 1 FOR SHARE"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "LOCK IN SHARE MODE, or FOR SHARE (8.0+).",
+    "mariadb": "LOCK IN SHARE MODE.",
+    "postgresql": "FOR SHARE / FOR KEY SHARE."
+   },
+   "related": [
+    "select_for_update",
+    "deadlock",
+    "mvcc"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "find_blocking_queries",
+   "kind": "howto",
+   "title": {
+    "en": "Finding which query is blocking others",
+    "hinglish": "Finding which query is blocking others",
+    "hindi": "Finding which query is blocking others"
+   },
+   "terms": [
+    [
+     "(blocking|blocked) (quer\\w*|session\\w*|transaction\\w*)"
+    ],
+    [
+     "who is blocking"
+    ],
+    [
+     "(see|show|find|check|list|dekh\\w*) (the )?locks"
+    ],
+    [
+     "pg_locks"
+    ],
+    [
+     "pg_blocking_pids"
+    ],
+    [
+     "innodb_trx"
+    ],
+    [
+     "locks? (kaise|kaun)"
+    ],
+    [
+     "locks",
+     "(see|show|dekh\\w*|check|list|view|find)"
+    ],
+    [
+     "current locks"
+    ],
+    [
+     "block\\w*",
+     "(query|queries|session)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to find blocking queries",
+     "how to see who is blocking in mysql",
+     "how to see current locks in postgres"
+    ],
+    "hinglish": [
+     "kaunsi query block kar rahi hai kaise dekhe",
+     "locks kaise dekhe"
+    ],
+    "hindi": [
+     "कौनसी query block कर रही है कैसे देखें"
+    ]
+   },
+   "answer": {
+    "en": "Ask the database who waits for whom. MySQL 8 / MariaDB: sys.innodb_lock_waits (waiting and blocking queries side by side), or information_schema.innodb_trx with performance_schema.data_lock_waits; SHOW PROCESSLIST shows what each session runs. PostgreSQL: SELECT pid, state, query, pg_blocking_pids(pid) FROM pg_stat_activity WHERE cardinality(pg_blocking_pids(pid)) > 0. The blocker is often an idle transaction that never committed. These are read-only checks.",
+    "hinglish": "Database se poochho kaun kiska intezaar kar raha hai. MySQL 8 / MariaDB: sys.innodb_lock_waits, ya innodb_trx + data_lock_waits; SHOW PROCESSLIST. PostgreSQL: pg_stat_activity ke saath pg_blocking_pids(pid). Rokne wala aksar ek idle transaction hota hai jo commit nahi hua.",
+    "hindi": "डेटाबेस से पूछो कौन किसका इंतज़ार कर रहा है: sys.innodb_lock_waits या pg_blocking_pids।"
+   },
+   "mistake": {
+    "en": "Killing the waiting session instead of the blocking one: the blocker keeps its locks and the next query waits again.",
+    "hinglish": "Rukne wale session ko kill karna, rokne wale ko nahi: rokne wala lock pakde rehta hai.",
+    "hindi": "रुकने वाले को kill करना, रोकने वाले को नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT COUNT(*) > 0 AS seen FROM information_schema.PROCESSLIST",
+      "postgresql": "SELECT COUNT(*) > 0 AS seen FROM pg_stat_activity"
+     },
+     "columns": [
+      "seen"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "sys.innodb_lock_waits; performance_schema.data_locks.",
+    "mariadb": "information_schema.INNODB_LOCK_WAITS / INNODB_TRX; SHOW PROCESSLIST.",
+    "postgresql": "pg_stat_activity + pg_blocking_pids(); pg_locks for the details."
+   },
+   "related": [
+    "lock_wait_timeout",
+    "kill_query",
+    "long_transaction"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/view-pg-locks.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "kill_query",
+   "kind": "howto",
+   "title": {
+    "en": "Stopping a running query (KILL, pg_cancel_backend)",
+    "hinglish": "Stopping a running query (KILL, pg_cancel_backend)",
+    "hindi": "Stopping a running query (KILL, pg_cancel_backend)"
+   },
+   "terms": [
+    [
+     "kill (a |the )?(query|process|session|connection)"
+    ],
+    [
+     "pg_cancel_backend"
+    ],
+    [
+     "pg_terminate_backend"
+    ],
+    [
+     "(stop|cancel) (a |the )?running query"
+    ],
+    [
+     "query",
+     "(rok\\w*|band)",
+     "(kaise|how)"
+    ],
+    [
+     "kill",
+     "query"
+    ],
+    [
+     "kill",
+     "process"
+    ],
+    [
+     "cancel",
+     "query"
+    ],
+    [
+     "stop",
+     "running query"
+    ],
+    [
+     "(rok\\w*|रोक\\w*)",
+     "query"
+    ],
+    [
+     "चलती",
+     "query"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to kill a running query in mysql",
+     "how to cancel a query in postgres",
+     "how to stop a long running query"
+    ],
+    "hinglish": [
+     "chalti query kaise roke",
+     "mysql mein query kill kaise kare"
+    ],
+    "hindi": [
+     "चलती query कैसे रोकें"
+    ]
+   },
+   "answer": {
+    "en": "Find the session id first, then stop only the statement if you can. MySQL/MariaDB: SHOW PROCESSLIST, then KILL QUERY id (stops the statement) or KILL id (closes the connection). PostgreSQL: SELECT pid, query FROM pg_stat_activity, then SELECT pg_cancel_backend(pid) (the statement) or pg_terminate_backend(pid) (the session). A killed change is rolled back, which can itself take time for a big one. Prevention: max_execution_time (MySQL SELECTs), max_statement_time (MariaDB), statement_timeout (PostgreSQL).",
+    "hinglish": "Pehle session id dhoondho, phir ho sake to sirf statement roko. MySQL/MariaDB: SHOW PROCESSLIST, phir KILL QUERY id (statement) ya KILL id (connection). PostgreSQL: pg_stat_activity se pid, phir pg_cancel_backend(pid) ya pg_terminate_backend(pid). Roka gaya badlaav rollback hota hai, jo badi query mein khud samay leta hai.",
+    "hindi": "पहले session id ढूँढो; फिर KILL QUERY id या pg_cancel_backend(pid)।"
+   },
+   "mistake": {
+    "en": "Killing a huge UPDATE halfway and running it again at once: its rollback is still running and holds the locks.",
+    "hinglish": "Badi UPDATE beech mein kill karke turant dobara chalana: uska rollback abhi chal raha hai aur locks pakde hai.",
+    "hindi": "बड़ी UPDATE को kill करके तुरंत दोबारा चलाना: rollback अभी चल रहा है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT COUNT(*) > 0 AS seen FROM information_schema.PROCESSLIST",
+      "postgresql": "SELECT COUNT(*) > 0 AS seen FROM pg_stat_activity"
+     },
+     "columns": [
+      "seen"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "KILL QUERY id / KILL id; max_execution_time for SELECTs.",
+    "mariadb": "KILL QUERY id; max_statement_time.",
+    "postgresql": "pg_cancel_backend / pg_terminate_backend; statement_timeout."
+   },
+   "related": [
+    "find_blocking_queries",
+    "long_transaction",
+    "lock_wait_timeout"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/kill.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "count_big_table",
+   "kind": "howto",
+   "title": {
+    "en": "Counting rows in a big table quickly",
+    "hinglish": "Counting rows in a big table quickly",
+    "hindi": "Counting rows in a big table quickly"
+   },
+   "terms": [
+    [
+     "count",
+     "(big|large|huge|badi|bade) tables?"
+    ],
+    [
+     "count",
+     "millions"
+    ],
+    [
+     "(approximate|estimate\\w*|fast|quick|jaldi) (row )?count"
+    ],
+    [
+     "count\\(\\*\\)",
+     "(slow|fast|time)"
+    ],
+    [
+     "rows",
+     "kitni",
+     "(badi|bahut)"
+    ],
+    [
+     "rows",
+     "gin\\w*"
+    ],
+    [
+     "rows",
+     "गिन\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to count rows in a big table quickly",
+     "how to get an approximate row count",
+     "how to count millions of rows fast"
+    ],
+    "hinglish": [
+     "badi table ki rows jaldi kaise gine",
+     "approximate row count kaise nikale"
+    ],
+    "hindi": [
+     "बड़ी table की rows जल्दी कैसे गिनें"
+    ]
+   },
+   "answer": {
+    "en": "COUNT(*) must look at every row visible to your transaction (MVCC), so on a big table it reads a whole index (InnoDB picks the smallest one) or the table (PostgreSQL, unless an index-only scan works). If an estimate is enough: information_schema.TABLES.TABLE_ROWS (MySQL/MariaDB) or pg_class.reltuples (PostgreSQL), both refreshed by ANALYZE. If the exact number is needed often, keep it in a counter table updated with the changes; and COUNT with a selective, indexed WHERE is fast.",
+    "hinglish": "COUNT(*) ko transaction ko dikhne wali har row dekhni padti hai (MVCC), isliye badi table pe poora index ya table padhta hai. Andaaza chalega to information_schema.TABLES.TABLE_ROWS (MySQL/MariaDB) ya pg_class.reltuples (PostgreSQL). Exact baar baar chahiye to counter table rakho; index wale chhote WHERE ke saath COUNT tez hai.",
+    "hindi": "COUNT(*) हर row देखता है; अंदाज़ा चाहिए तो TABLE_ROWS या pg_class.reltuples।"
+   },
+   "mistake": {
+    "en": "Showing information_schema.TABLES.TABLE_ROWS as an exact count: for InnoDB it is an estimate that can be off by a lot.",
+    "hinglish": "TABLE_ROWS ko exact count batana: InnoDB mein ye andaaza hai.",
+    "hindi": "TABLE_ROWS exact नहीं, अंदाज़ा है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS n FROM orders"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "SELECT TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_NAME = 't' (estimate).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "SELECT reltuples::bigint FROM pg_class WHERE relname = 't' (estimate)."
+   },
+   "related": [
+    "aggregates",
+    "mvcc",
+    "analyze_statistics"
+   ],
+   "fundamentals": [
+    "locking",
+    "aggregation"
+   ],
+   "source": "https://www.postgresql.org/docs/current/catalog-pg-class.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "online_ddl",
+   "kind": "howto",
+   "title": {
+    "en": "Changing a big table without locking it (online DDL)",
+    "hinglish": "Changing a big table without locking it (online DDL)",
+    "hindi": "Changing a big table without locking it (online DDL)"
+   },
+   "terms": [
+    [
+     "online ddl"
+    ],
+    [
+     "(alter|add column|index)",
+     "(without|bina) (lock\\w*|downtime)"
+    ],
+    [
+     "algorithm\\s*=\\s*(instant|inplace)"
+    ],
+    [
+     "create index concurrently"
+    ],
+    [
+     "concurrently"
+    ],
+    [
+     "pt-online-schema-change"
+    ],
+    [
+     "gh-ost"
+    ],
+    [
+     "(big|large|huge|badi) table",
+     "(alter|add column|column add)"
+    ],
+    [
+     "column",
+     "without lock\\w*"
+    ],
+    [
+     "column",
+     "bina lock"
+    ],
+    [
+     "column",
+     "बिना lock"
+    ],
+    [
+     "column",
+     "bina lock",
+     "jod\\w*"
+    ],
+    [
+     "column",
+     "बिना lock",
+     "जोड़\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to add a column to a big table without locking",
+     "what is online ddl",
+     "how to create an index without locking the table"
+    ],
+    "hinglish": [
+     "badi table mein column bina lock ke kaise jode",
+     "online ddl kya hai"
+    ],
+    "hindi": [
+     "बड़ी table में बिना lock के column कैसे जोड़ें"
+    ]
+   },
+   "answer": {
+    "en": "Many ALTER TABLE operations can run while the table stays usable. MySQL 8 / MariaDB 10.3+: ADD COLUMN at the end is ALGORITHM=INSTANT (metadata only); building an index is ALGORITHM=INPLACE, LOCK=NONE (writes go on). PostgreSQL: ADD COLUMN with a constant default is instant (11+); CREATE INDEX CONCURRENTLY builds an index without blocking writes (slower, can't run inside a transaction). Every ALTER still needs a brief metadata lock: a long open transaction on the table makes it wait, and everything else queue behind it, so set a short lock timeout and retry. For changes that rewrite the table, tools like pt-online-schema-change or gh-ost copy it in the background.",
+    "hinglish": "Kai ALTER TABLE table ko chalte hue hi ho jaate hain. MySQL 8 / MariaDB 10.3+: aakhir mein ADD COLUMN ALGORITHM=INSTANT; index ALGORITHM=INPLACE, LOCK=NONE. PostgreSQL: constant default wala ADD COLUMN turant (11+); CREATE INDEX CONCURRENTLY writes roke bina index banata hai. Har ALTER ko thodi der metadata lock chahiye: lamba khula transaction use rokta hai, isliye chhota lock timeout rakho aur dobara try karo.",
+    "hindi": "बहुत से ALTER table चलते हुए हो जाते हैं: INSTANT / INPLACE, CREATE INDEX CONCURRENTLY।"
+   },
+   "mistake": {
+    "en": "Running ALTER TABLE on a busy table while a long transaction is open: the ALTER waits for its metadata lock and every new query on the table queues behind it (MySQL 'Waiting for table metadata lock').",
+    "hinglish": "Lamba transaction khula ho aur busy table pe ALTER: ALTER metadata lock ka intezaar karta hai aur har nayi query uske peeche rukti hai.",
+    "hindi": "लंबे transaction के रहते ALTER: सब queries पीछे रुक जाती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE INDEX ix_orders_status ON orders (status) ALGORITHM=INPLACE LOCK=NONE",
+      "postgresql": "CREATE INDEX CONCURRENTLY ix_orders_status ON orders (status)"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "mysql": "ALGORITHM=INSTANT (8.0.12+) / INPLACE, LOCK=NONE; lock_wait_timeout for the metadata lock.",
+    "mariadb": "INSTANT ADD COLUMN 10.3+; CREATE INDEX ... ALGORITHM=INPLACE LOCK=NONE.",
+    "postgresql": "CREATE INDEX CONCURRENTLY; ADD COLUMN ... DEFAULT const is instant (11+); SET lock_timeout before ALTER."
+   },
+   "related": [
+    "alter_table",
+    "index",
+    "long_transaction"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-online-ddl-operations.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "advisory_lock",
+   "kind": "concept",
+   "title": {
+    "en": "Advisory (named) locks",
+    "hinglish": "Advisory (named) locks",
+    "hindi": "Advisory (named) locks"
+   },
+   "terms": [
+    [
+     "advisory locks?"
+    ],
+    [
+     "get_lock"
+    ],
+    [
+     "pg_advisory\\w*"
+    ],
+    [
+     "named locks?"
+    ],
+    [
+     "(app|application)[- ]level locks?"
+    ],
+    [
+     "only once at a time"
+    ],
+    [
+     "ek waqt",
+     "ek hi baar"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is an advisory lock",
+     "what does get_lock do in mysql",
+     "how to make sure a job runs only once at a time"
+    ],
+    "hinglish": [
+     "advisory lock kya hai",
+     "job ek waqt mein ek hi baar chale kaise"
+    ],
+    "hindi": [
+     "advisory lock क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A lock on a name or number that means whatever your app decides, not on any row: SELECT GET_LOCK('nightly_report', 0) (MySQL/MariaDB) or SELECT pg_try_advisory_lock(42) (PostgreSQL) returns 1 / true if you got it, so only one copy of a cron job or a report runs at a time. Release it with RELEASE_LOCK / pg_advisory_unlock (it also ends with the session).",
+    "hinglish": "Kisi naam ya number pe lock jiska matlab app tay karti hai, kisi row pe nahi: GET_LOCK('nightly_report', 0) (MySQL/MariaDB) ya pg_try_advisory_lock(42) (PostgreSQL) mila to 1 / true, taaki cron job ki ek hi copy chale. RELEASE_LOCK / pg_advisory_unlock se chhodo (session khatam hone pe bhi chhoot jaata hai).",
+    "hindi": "नाम या नंबर पर lock: GET_LOCK / pg_try_advisory_lock, ताकि job की एक ही copy चले।"
+   },
+   "mistake": {
+    "en": "Using a connection pool and taking the lock on one connection, releasing it on another: the lock belongs to the session that took it.",
+    "hinglish": "Connection pool mein ek connection pe lock lena aur doosre pe chhodna: lock usi session ka hai jisne liya.",
+    "hindi": "Lock उसी session का है जिसने लिया।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT GET_LOCK('nightly_report', 0) AS got; SELECT RELEASE_LOCK('nightly_report') AS released",
+      "postgresql": "SELECT pg_try_advisory_lock(42) AS got; SELECT pg_advisory_unlock(42) AS released"
+     },
+     "columns": [
+      "released"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "GET_LOCK(name, timeout) / RELEASE_LOCK / IS_FREE_LOCK.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "pg_advisory_lock / pg_try_advisory_lock / pg_advisory_xact_lock (released at COMMIT)."
+   },
+   "related": [
+    "deadlock",
+    "skip_locked_nowait",
+    "transaction"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "bulk_insert",
+   "kind": "howto",
+   "title": {
+    "en": "Loading many rows fast (bulk insert)",
+    "hinglish": "Loading many rows fast (bulk insert)",
+    "hindi": "Loading many rows fast (bulk insert)"
+   },
+   "terms": [
+    [
+     "bulk (insert|load|import)"
+    ],
+    [
+     "load data"
+    ],
+    [
+     "\\bcopy\\b",
+     "(postgres\\w*|csv|file)"
+    ],
+    [
+     "(insert|import|load)",
+     "(millions|lakhs|fast|quickly|jaldi)"
+    ],
+    [
+     "multi[- ]row insert"
+    ],
+    [
+     "लाखों",
+     "insert"
+    ],
+    [
+     "insert",
+     "jaldi"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to bulk insert data fast",
+     "what is load data infile",
+     "how to insert millions of rows quickly"
+    ],
+    "hinglish": [
+     "lakhs rows jaldi kaise insert kare",
+     "bulk insert kaise kare"
+    ],
+    "hindi": [
+     "लाखों rows जल्दी कैसे insert करें"
+    ]
+   },
+   "answer": {
+    "en": "Send many rows per statement and few commits: one INSERT with many VALUES rows (a few hundred to a few thousand per statement), inside a transaction per batch, instead of one INSERT and one commit per row. For files, the loaders are far faster: LOAD DATA [LOCAL] INFILE (MySQL/MariaDB), COPY ... FROM (PostgreSQL, or \\copy from psql). For a huge first load, create secondary indexes after loading.",
+    "hinglish": "Ek statement mein bahut rows aur kam commit: ek INSERT mein kai VALUES rows (kuch sau se kuch hazaar), har batch ek transaction mein, har row ke liye alag INSERT aur commit nahi. File ke liye loaders kahin tez: LOAD DATA INFILE (MySQL/MariaDB), COPY (PostgreSQL). Bade pehle load ke liye secondary indexes baad mein banao.",
+    "hindi": "एक statement में बहुत rows, कम commit; फ़ाइल के लिए LOAD DATA / COPY।"
+   },
+   "mistake": {
+    "en": "One INSERT per row in autocommit: every row is its own transaction with its own log flush, often 10-100x slower.",
+    "hinglish": "Autocommit mein har row ka alag INSERT: har row alag transaction, aksar 10-100 guna dheema.",
+    "hindi": "हर row का अलग INSERT: बहुत धीमा।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "INSERT INTO departments (id, name, location) VALUES (5, 'Ops', 'Pune'), (6, 'Legal', NULL)"
+     },
+     "changed": 2
+    }
+   ],
+   "engines": {
+    "mysql": "LOAD DATA [LOCAL] INFILE; max_allowed_packet limits one statement's size.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "COPY t FROM STDIN / \\copy; multi-row VALUES too."
+   },
+   "related": [
+    "insert_into",
+    "n_plus_one",
+    "transaction"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/insert-optimization.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "partition_table",
+   "kind": "concept",
+   "title": {
+    "en": "Table partitioning (for very big tables)",
+    "hinglish": "Table partitioning (for very big tables)",
+    "hindi": "Table partitioning (for very big tables)"
+   },
+   "terms": [
+    [
+     "partition\\w*"
+    ],
+    [
+     "पार्टीशन"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is table partitioning",
+     "when should i partition a table",
+     "how to delete old data with partitions"
+    ],
+    "hinglish": [
+     "partitioning kya hai",
+     "table partition kab kare"
+    ],
+    "hindi": [
+     "table partition क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A partitioned table is stored as several smaller tables split by a key, usually a date range (one partition per month). Queries whose WHERE names the key read only the matching partitions, and old data is removed by dropping a whole partition (instant, no huge DELETE). It doesn't make ordinary indexed lookups faster by itself, adds rules (the partition key must be in every unique key on MySQL/MariaDB), and suits tables with clear time-based retention.",
+    "hinglish": "Partitioned table ek key se (aksar date range, har mahine ek partition) chhoti tables mein bati hoti hai. WHERE mein key ho to sirf wahi partitions padhe jaate hain, aur purana data poora partition drop karke hatata hai (turant, badi DELETE nahi). Normal indexed lookup apne aap tez nahi hota, aur niyam badhte hain.",
+    "hindi": "Partitioned table key से छोटे हिस्सों में; पुराना data partition drop करके हटता है।"
+   },
+   "mistake": {
+    "en": "Partitioning a table to 'make it faster' when the queries don't filter by the partition key: every partition is searched.",
+    "hinglish": "Query partition key se filter na kare phir bhi 'tez' karne ke liye partition: har partition dhoondha jaata hai.",
+    "hindi": "Partition key से filter न हो तो हर partition पढ़ा जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE demo_pk (id INT, d DATE, PRIMARY KEY (id, d)) PARTITION BY RANGE (YEAR(d)) (PARTITION p2024 VALUES LESS THAN (2025), PARTITION pmax VALUES LESS THAN MAXVALUE)",
+      "postgresql": "CREATE TABLE demo_pk (id INT, d DATE, PRIMARY KEY (id, d)) PARTITION BY RANGE (d)"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "mysql": "PARTITION BY RANGE / LIST / HASH; the key must be part of every unique key; ALTER TABLE ... DROP PARTITION.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Declarative partitioning (10+): CREATE TABLE ... PARTITION OF parent FOR VALUES FROM ... TO ...; DROP or DETACH a partition."
+   },
+   "related": [
+    "batch_delete",
+    "count_big_table",
+    "index"
+   ],
+   "fundamentals": [
+    "locking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-partitioning.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/locking",
+    "https://dba.stackexchange.com/questions/tagged/locking",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

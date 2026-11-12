@@ -555,6 +555,18 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
         if pedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in pedits for a, b, _n in edits):
             edits += pedits
 
+    # locks and big data (app/agents/sqllock.py): a huge change in batches, queue workers with SKIP LOCKED (offered, same rows)
+    from app.agents import sqllock
+
+    for fnd, ledits in sqllock.locks(sql, s, intent, Finding, is_select):
+        if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        if _SURE_ONLY.get():
+            continue
+        if ledits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in ledits for a, b, _n in edits):
+            edits += ledits
+
     # changing data (app/agents/sqlchange.py): which rows, how often, what value, which column, engine syntax
     if not is_select:
         from app.agents import sqlchange
@@ -904,7 +916,13 @@ def _check(sql: str, _again: bool = False, intent: str = "") -> dict:
 
 
 def _check_once(sql: str, _again: bool = False, intent: str = "") -> dict:
-    from app.agents import sqlroutine
+    from app.agents import sqllock, sqlroutine
+
+    many = sqllock.n_plus_one(sql)
+    if many:                                          # the same statement once per value (N+1): one statement does the same work
+        one = many.pop("sql")
+        return {"findings": [Finding(many["kind"], many["topic"], many["title_en"], many["title_hi"], many["evidence"], many["fix_en"],
+                                     many["fix_hi"]).as_dict()], "corrected": one, "guesses": []}
 
     if sqlroutine.is_routine(sql):                    # CREATE PROCEDURE / FUNCTION / TRIGGER, DO: read as a routine (night 5)
         order = {"error": 0, "wrong": 1, "check": 2}

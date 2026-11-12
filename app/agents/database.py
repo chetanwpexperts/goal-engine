@@ -371,7 +371,10 @@ def wants_database(goal: Goal | None, text: str) -> bool:
 
     if reasoning.evidence(text):
         return True                       # a pasted database error (even with the query in it): the reasoning explains it
-    from app.agents import sqlexplain
+    from app.agents import sqlexplain, sqllock
+
+    if sqllock.read_deadlock(text):
+        return True                       # a pasted deadlock report (SHOW ENGINE INNODB STATUS / PostgreSQL's DETAIL)
 
     if sqlexplain.looks_like_plan(text) and sqlexplain.read(text):
         return True                       # a pasted EXPLAIN plan: read step by step
@@ -793,7 +796,9 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     described = bool(reasoning.complaints(text)) and not _query_in(text)   # 'cannot connect', 'connect nahi ho raha'
     if described and not reasoning.evidence(text) and not reasoning.report(reasoning.diagnose(text), turn.hi):
         described = False                 # the core has no likely causes for it: the usual reply below
-    if reasoning.evidence(text) or described:   # an error / EXPLAIN / lock report, or a problem put in words
+    from app.agents import sqllock
+
+    if reasoning.evidence(text) or described or sqllock.read_deadlock(text):   # an error / EXPLAIN / lock report, or a problem in words
         return _error_turn(db, goal, text, turn.hi, visitor_id)
     if query_in(text):                    # a pasted query is for the SQL checker, whatever else the message says
         return _check_pasted_query(db, goal, text, turn.hi)
@@ -950,6 +955,11 @@ def _error_turn(db: Session, goal: Goal, text: str, hi: bool, visitor_id: str):
     from app import dbarea
 
     reply = reasoning.report(result, hi, signed_in=user is not None, can_connect=dbarea.connect_open(user))
+    from app.agents import sqllock
+
+    dl = sqllock.read_deadlock(text)
+    if dl:                                # the deadlock report itself: which rows, in which order, and the fix
+        reply = (dl["hi"] if hi else dl["en"]) + ("\n\n" + reply if reply else "")
     taps = []
     eid = named or (rec or {}).get("id")
     if detected and result.get("found"):

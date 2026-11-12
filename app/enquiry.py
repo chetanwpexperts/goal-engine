@@ -1,14 +1,14 @@
 """The enquiry form: people interested in Goal Engine (DBaba, Sheetu, the website checker, automation agents) tell us who
 they are and what they need. Each enquiry lands in the admin panel and emails the owner.
 
-Spam: a hidden field bots fill, a minimum time on the form, and a few enquiries per address per hour.
+Spam: our own picture captcha (app/captcha.py, no outside service), a hidden field bots fill, a minimum time on the
+form, and a few enquiries per address per hour (counted in auth_attempts, so every app process sees the same number).
 Privacy: only what the person typed in the form, plus the account it came from when logged in.
 """
 
 import logging
 import os
 import re
-import time
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request
@@ -32,7 +32,6 @@ STATUSES = ("new", "talking", "customer", "closed", "spam")
 PER_HOUR_PER_ADDRESS = 3
 KEEP = timedelta(days=365)
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[A-Za-z]{2,}$")
-_recent: dict[str, list[float]] = {}
 
 
 class EnquiryIn(BaseModel):
@@ -48,10 +47,14 @@ class EnquiryIn(BaseModel):
     source: str = ""
     website: str = ""          # honeypot: people never see it, bots fill it
     elapsed_ms: int = 0        # time spent on the form
+    captcha_token: str = ""
+    captcha: str = ""          # the characters typed from the picture
 
 
 class EnquiryError(ValueError):
-    pass
+    def __init__(self, message: str, captcha: bool = False):
+        super().__init__(message)
+        self.captcha = captcha      # True: the browser shows a new picture
 
 
 def _clean(text: str, n: int) -> str:
@@ -73,11 +76,19 @@ def create(db: Session, body: EnquiryIn, visitor_id: str, user_id: int | None, i
     message = _clean(body.message, 4000)
     if len(message) < 5 and not body.interest:
         raise EnquiryError("Tell us a little about what you need, or pick what you're interested in.")
-    now = time.time()
-    recent = [t for t in _recent.get(ip, []) if now - t < 3600]
-    if len(recent) >= PER_HOUR_PER_ADDRESS:
+    from app import captcha
+    from app.models import AuthAttempt
+
+    try:
+        captcha.check(db, body.captcha_token, body.captcha)
+    except captcha.CaptchaError as exc:
+        raise EnquiryError(str(exc), captcha=True)
+    key = f"enquiry-ip:{ip}"[:120]
+    recent = db.scalar(select(func.count()).select_from(AuthAttempt)
+                       .where(AuthAttempt.key == key, AuthAttempt.at > utcnow() - timedelta(hours=1)))
+    if recent >= PER_HOUR_PER_ADDRESS:
         raise EnquiryError("We've received your enquiries. We'll be in touch soon.")
-    _recent[ip] = recent + [now]
+    db.add(AuthAttempt(key=key, at=utcnow()))
     phone = re.sub(r"[^\d+ ()-]", "", body.phone or "")[:30]
     row = Enquiry(name=name, email=email, phone=phone, company=_clean(body.company, 120),
                   role=body.role if body.role in ROLES else "", team=body.team if body.team in TEAMS else "",
@@ -135,8 +146,15 @@ def send_enquiry(body: EnquiryIn, request: Request, db: Session = Depends(get_db
     try:
         row = create(db, body, request.state.visitor_id, me.id if me else None, accounts.client_ip(request))
     except EnquiryError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
+        return JSONResponse({"error": str(exc), "captcha": exc.captcha}, status_code=400)
     if row is not None:
         base = str(request.base_url).rstrip("/")
         notify(row, accounts.mailer(), base)
     return {"ok": True}
+
+
+@router.get("/api/enquiry/captcha")
+def new_captcha():
+    from app import captcha
+
+    return JSONResponse(captcha.new(), headers={"Cache-Control": "no-store"})

@@ -79,6 +79,18 @@
       </fieldset>
       <label class="row">What do you need?
         <textarea name="message" rows="5" maxlength="4000" placeholder="For example: our team keeps hitting deadlocks on MySQL and we want a quick way to find the cause. Please don't paste passwords."></textarea></label>
+      <div class="row captcha">
+        <span class="cap-label" id="capLabel">Type the characters you see <span class="req" aria-hidden="true">*</span></span>
+        <div class="cap-row">
+          <img id="capImg" alt="A picture of 5 letters and numbers to type" width="220" height="70">
+          <button type="button" class="cap-new" id="capNew" title="Show a different picture" aria-label="Show a different picture">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
+          </button>
+          <input name="captcha" id="capText" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false"
+                 aria-labelledby="capLabel" inputmode="text">
+        </div>
+        <span class="opt">Not case sensitive. This keeps out spam bots; no outside service sees you.</span>
+      </div>
       <label class="hp" aria-hidden="true">Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label>
       <label class="consent"><input type="checkbox" name="consent">
         <span>You may contact me about this enquiry. We keep it for a year at most, and delete it sooner if you ask.</span></label>

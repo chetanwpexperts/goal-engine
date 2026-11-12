@@ -19,6 +19,21 @@ GOOD = {"name": "Asha Rao", "email": "asha@example.com", "phone": "98765 43210",
         "source": "home", "elapsed_ms": 9000}
 
 
+def solved(code="ACE47"):
+    """A captcha token whose answer we know (as if a person read the picture)."""
+    import secrets
+    import time
+
+    from app import captcha
+
+    nonce, expires = secrets.token_hex(8), int(time.time()) + 600
+    return {"captcha_token": f"{nonce}.{expires}.{captcha._sign(nonce, expires, code)}", "captcha": code.lower()}
+
+
+def good(**over):
+    return {**GOOD, **solved(), **over}
+
+
 class Mail:
     def __init__(self):
         self.sent = []
@@ -30,12 +45,11 @@ class Mail:
 
 @pytest.fixture()
 def mail(monkeypatch):
-    from app import accounts, enquiry
+    from app import accounts
 
     m = Mail()
     monkeypatch.setattr(accounts, "mailer", lambda: m)
     monkeypatch.setenv("ENQUIRY_EMAIL", "owner@example.com")
-    enquiry._recent.clear()
     return m
 
 
@@ -77,7 +91,7 @@ def test_admin_page_and_enquiry_page_rules(admin):
 
 
 def test_enquiry_reaches_the_owner_and_the_panel(admin, mail):
-    r = admin.post("/api/enquiry", json=GOOD)
+    r = admin.post("/api/enquiry", json=good())
     assert r.status_code == 200 and r.json() == {"ok": True}
     m = mail.sent[-1]
     assert m["to"] == "owner@example.com" and m["reply_to"] == "asha@example.com"
@@ -98,7 +112,7 @@ def test_enquiry_from_a_logged_in_person_is_linked_to_the_account(client, mail):
     from tests.test_accounts import new_user
 
     client.post("/api/account/signup", json=new_user(n=71))
-    assert client.post("/api/enquiry", json=GOOD).status_code == 200
+    assert client.post("/api/enquiry", json=good()).status_code == 200
     from app.db import get_db
     from app.models import Enquiry
     assert next(get_db()).query(Enquiry).one().user_id is not None
@@ -108,8 +122,8 @@ def test_bots_are_dropped_quietly(client, mail):
     from app.db import get_db
     from app.models import Enquiry
 
-    assert client.post("/api/enquiry", json={**GOOD, "website": "http://spam.example"}).json() == {"ok": True}
-    assert client.post("/api/enquiry", json={**GOOD, "elapsed_ms": 800}).json() == {"ok": True}
+    assert client.post("/api/enquiry", json={**good(), "website": "http://spam.example"}).json() == {"ok": True}
+    assert client.post("/api/enquiry", json={**good(), "elapsed_ms": 800}).json() == {"ok": True}
     assert next(get_db()).query(Enquiry).count() == 0 and mail.sent == []
 
 
@@ -118,12 +132,12 @@ def test_bots_are_dropped_quietly(client, mail):
     ({"message": "", "interest": []}, "what you need"),
 ])
 def test_enquiry_validation(client, mail, change, says):
-    r = client.post("/api/enquiry", json={**GOOD, **change})
+    r = client.post("/api/enquiry", json={**good(), **change})
     assert r.status_code == 400 and says in r.json()["error"]
 
 
 def test_enquiry_cleans_what_it_keeps(admin, mail):
-    admin.post("/api/enquiry", json={**GOOD, "role": "hacker", "team": "999", "interest": ["dbaba", "<script>"],
+    admin.post("/api/enquiry", json={**good(), "role": "hacker", "team": "999", "interest": ["dbaba", "<script>"],
                                      "phone": "+91 98765<b>43210", "name": "Asha\x00 Rao"})
     e = admin.get("/api/admin/enquiries").json()["enquiries"][0]
     assert e["role"] == "" and e["team"] == "" and len(e["interest"]) == 1 and "<" not in e["phone"] and "\x00" not in e["name"]
@@ -131,8 +145,8 @@ def test_enquiry_cleans_what_it_keeps(admin, mail):
 
 def test_three_an_hour_from_one_address(client, mail):
     for _ in range(3):
-        assert client.post("/api/enquiry", json=GOOD).status_code == 200
-    assert client.post("/api/enquiry", json=GOOD).status_code == 400
+        assert client.post("/api/enquiry", json=good()).status_code == 200
+    assert client.post("/api/enquiry", json=good()).status_code == 400
 
 
 def test_delete_all_my_data_and_old_ones_expire(client, mail):
@@ -140,11 +154,11 @@ def test_delete_all_my_data_and_old_ones_expire(client, mail):
     from app.db import get_db
     from app.models import Enquiry, utcnow
 
-    client.post("/api/enquiry", json=GOOD)
+    client.post("/api/enquiry", json=good())
     client.post("/api/privacy/delete-all")
     db = next(get_db())
     assert db.query(Enquiry).count() == 0
-    client.post("/api/enquiry", json=GOOD)
+    client.post("/api/enquiry", json=good())
     row = db.query(Enquiry).one()
     row.created_at = utcnow() - timedelta(days=400)
     db.commit()
@@ -177,7 +191,7 @@ def test_overview_and_people_add_up(admin, mail, ml_mode):
     from tests.test_ml import say
 
     say(admin, "meri website bahut slow hai example.com")
-    admin.post("/api/enquiry", json=GOOD)
+    admin.post("/api/enquiry", json=good())
     admin.post("/api/account/signup", json=new_user(n=72))
     ov = admin.get("/api/admin/overview").json()
     assert ov["people"][-1] >= 1 and ov["messages"][-1] >= 1 and ov["people_week"] >= 1
@@ -223,5 +237,61 @@ def test_enquiry_open_before_launch(client, monkeypatch):
     monkeypatch.setenv("SITE_MODE", "closed")
     assert "Talk to us" in client.get("/enquiry").text
     assert client.get("/static/enquiry.js").status_code == 200
-    assert client.post("/api/enquiry", json={**GOOD, "website": "x"}).status_code == 200
+    assert client.post("/api/enquiry", json={**good(), "website": "x"}).status_code == 200
     assert "Coming soon" in client.get("/console").text                 # the rest of the site stays closed
+
+
+# ---------------------------------------------------------------- our own captcha
+def test_captcha_is_needed_and_checked(client, mail):
+    from app.db import get_db
+    from app.models import Enquiry
+
+    no = client.post("/api/enquiry", json={**GOOD})
+    assert no.status_code == 400 and no.json()["captcha"] is True
+    wrong = client.post("/api/enquiry", json={**GOOD, **solved("ACE47"), "captcha": "ACE48"})
+    assert wrong.status_code == 400 and wrong.json()["captcha"] is True and "match" in wrong.json()["error"]
+    tok = solved()
+    assert client.post("/api/enquiry", json={**GOOD, **tok}).status_code == 200
+    again = client.post("/api/enquiry", json={**GOOD, **tok})          # one picture, one enquiry
+    assert again.status_code == 400 and "already used" in again.json()["error"]
+    forged = {**tok, "captcha_token": tok["captcha_token"][:-4] + "abcd"}
+    assert client.post("/api/enquiry", json={**GOOD, **forged}).status_code == 400
+    assert next(get_db()).query(Enquiry).count() == 1
+
+
+def test_captcha_wrong_answer_spends_the_picture(client, mail):
+    tok = solved("HK73M")
+    assert client.post("/api/enquiry", json={**GOOD, **tok, "captcha": "HK73N"}).status_code == 400
+    assert client.post("/api/enquiry", json={**GOOD, **tok, "captcha": "HK73M"}).status_code == 400   # no second guess
+
+
+def test_captcha_expires(client):
+    import time
+
+    from app import captcha
+    from app.db import get_db
+
+    c = captcha.new(now=time.time() - 3600)
+    with pytest.raises(captcha.CaptchaError, match="expired"):
+        captcha.check(next(get_db()), c["token"], "AAAAA")
+
+
+def test_captcha_picture_never_gives_the_code_away(client):
+    import base64
+    import random
+
+    from app import captcha
+
+    d = client.get("/api/enquiry/captcha")
+    assert d.headers["cache-control"] == "no-store"
+    body = d.json()
+    assert set(body) == {"token", "image"} and body["image"].startswith("data:image/svg+xml;base64,")
+    svg = base64.b64decode(body["image"].split(",", 1)[1]).decode()
+    assert "<text" not in svg and "<path" in svg and "<script" not in svg
+    pic = captcha.picture("ACE47", random.Random(1))
+    for ch in "ACE47":
+        assert f">{ch}<" not in pic
+    assert captcha.picture("ACE47", random.Random(1)) != captcha.picture("ACE47", random.Random(2))   # never the same drawing
+    assert all(ch in captcha.GLYPHS for ch in captcha.ALPHABET)
+    for look_alike in "01IOLSBZG9":
+        assert look_alike not in captcha.ALPHABET

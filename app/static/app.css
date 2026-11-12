@@ -794,3 +794,28 @@ body[data-state="active"] .bar { background: linear-gradient(to bottom, var(--pa
 .found.folded details > summary::after { content: " ›"; color: var(--muted, #888); }
 .found.folded details[open] > summary::after { content: " ⌄"; }
 .found.folded details .f, .found.folded details .e { margin-top: 4px; }
+
+/* ---------------------------------------------------------------- talk to us (enquiry form, /enquiry) */
+.talk { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 15px; border-radius: 999px; background: var(--ink);
+  color: var(--paper); font-weight: 700; font-size: 14px; text-decoration: none; margin-right: 4px; white-space: nowrap; }
+.talk svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.talk:hover { background: #2A3560; }
+.talk:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.talk-cta { width: min(1140px, 100%); margin-top: 20px; padding: 22px clamp(18px, 3vw, 32px); border-radius: 22px; display: flex;
+  align-items: center; justify-content: space-between; gap: 18px; background: #141A38; color: #fff; text-align: left; box-sizing: border-box; }
+.talk-cta h2 { margin: 0 0 4px; font-size: clamp(19px, 2vw, 24px); letter-spacing: -0.01em; }
+.talk-cta p { margin: 0; color: #C5CBE3; max-width: 62ch; line-height: 1.5; }
+.talk-btn { flex: none; background: var(--signal); color: #1B2340; font-weight: 800; text-decoration: none; border-radius: 999px; padding: 13px 24px; }
+.talk-btn:hover { background: #F7B65C; }
+.talk-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+body.typing .talk-cta { visibility: hidden; }
+@media (max-width: 640px) {
+  .talk { padding: 0 11px; font-size: 12.5px; margin-right: 0; }
+  .talk svg { display: none; }
+  .talk-cta { flex-direction: column; align-items: flex-start; }
+}
+@media (max-width: 370px) {
+  .talk span { display: none; }
+  .talk svg { display: block; }
+  .talk { width: 40px; padding: 0; justify-content: center; }
+}

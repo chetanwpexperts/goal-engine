@@ -259,11 +259,7 @@ def run_job(job_id: int) -> None:
         with _slots:
             path = dbagent.save_upload_path(job) if job.kind == "export" else None   # exports go straight to disk
             try:
-                if connector.kind == "php":
-                    from app.agents import phpconn
-
-                    data = phpconn.run(connector, job.kind, loads(job.payload, {}), export_path=path, job_id=job.id)
-                elif job.kind in ("change", "undo"):
+                if job.kind in ("change", "undo"):
                     data = _write_job(db, connector, job)
                 else:
                     conn = _open(decrypt(connector.secret or ""))

@@ -21,10 +21,9 @@ from sqlalchemy.orm import Session
 from app.ai.router import AIRouter, AIUnavailable
 from app.ml.brain import Brain
 from app.agents import automation
-from app import accounts, dbarea, expert, privacy
+from app import accounts, console, dbarea, expert, privacy
 from app.agents import database as dbagent
 from app.agents import direct as dbagent_direct
-from app.agents import phpconn
 from app.agents.core import AgentError, agent_dict, claim_due, goal_agents, run_agent
 from app.agents.mailer import SmtpMailer
 from app.engine import _after_run
@@ -76,6 +75,7 @@ _MIN_JS: dict = {}
 
 app.include_router(accounts.router)
 app.include_router(dbarea.router)
+app.include_router(console.router)
 
 
 @app.get("/static/app.js", include_in_schema=False)
@@ -109,7 +109,6 @@ def _run_db_report(db: Session, agent: Agent) -> None:
 
 
 _last_maintenance = 0.0
-_last_file_check = 0.0
 
 
 def _scheduler(stop: threading.Event) -> None:
@@ -134,15 +133,12 @@ def _scheduler(stop: threading.Event) -> None:
                     except AgentError as exc:
                         log.warning("Scheduled agent %s: %s", agent.id, exc)
                 global _last_maintenance
-                global _last_file_check
-                if time.monotonic() - _last_file_check > 6 * 3600:
-                    _last_file_check = time.monotonic()
-                    log.info("Website files changed state: %s", phpconn.check_all(db))
                 if time.monotonic() - _last_maintenance > 600:
                     _last_maintenance = time.monotonic()
                     log.info("Privacy clean-up: %s", privacy.maintain(db))
                     log.info("Account clean-up: %s", accounts.maintain(db))
                     log.info("Database area: %s", dbarea.maintain(db))
+                    log.info("SQL console connections ended: %s", console.maintain(db))
                     from app.limits import prune_bursts
 
                     prune_bursts(db)
@@ -548,6 +544,18 @@ def connector_installer(request: Request) -> Response:
 @app.get("/connector/goal_connector.py")
 def connector_script() -> FileResponse:
     return FileResponse(Path(__file__).resolve().parents[1] / "connector" / "goal_connector.py", media_type="text/x-python")
+
+
+CONSOLE_CSP = ("default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; "
+               "connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+
+
+@app.get("/console", include_in_schema=False)
+def console_page() -> FileResponse:
+    """The SQL console: its own page, its own strict rules (no other site's code, no framing, nothing cached)."""
+    return FileResponse(STATIC / "console.html", headers={"Content-Security-Policy": CONSOLE_CSP, "X-Frame-Options": "DENY",
+                                                          "Referrer-Policy": "no-referrer", "Cache-Control": "no-store",
+                                                          "X-Robots-Tag": "noindex, nofollow"})
 
 
 @app.get("/")
@@ -964,51 +972,6 @@ def connect_direct(body: DirectIn, request: Request, db: Session = Depends(get_d
         agent.inputs = dumps(inputs)
         db.commit()
         return _agent_payload(db, agent, visitor)
-    return {"connector": dbagent.connector_dict(connector, db)}
-
-
-class PhpLinkIn(BaseModel):
-    url: str = ""
-
-
-@app.post("/api/agents/{agent_id}/php-connector")
-def create_php_connector(agent_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    agent = own_agent(db, agent_id, visitor)
-    try:
-        connector = phpconn.create(db, visitor)
-    except (dbagent.DatabaseError, dbagent_direct.DirectError) as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-    inputs = loads(agent.inputs, {}) or {}
-    inputs["connector_id"] = connector.id
-    agent.inputs = dumps(inputs)
-    db.commit()
-    return _agent_payload(db, agent, visitor)
-
-
-@app.get("/api/connectors/{connector_id}/php-file")
-def download_php_file(connector_id: int, changes: int = 0, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    try:
-        connector = dbagent.own_connector(db, connector_id, visitor)
-    except dbagent.DatabaseError:
-        raise HTTPException(404, "Not found")
-    if connector.kind != "php" or not connector.secret:
-        raise HTTPException(404, "Not found")
-    phpconn.set_allow_changes(db, connector, bool(changes))
-    return Response(phpconn.file_text(connector), media_type="application/x-httpd-php",
-                    headers={"Content-Disposition": f'attachment; filename="{phpconn.file_name(connector)}"',
-                             "Cache-Control": "no-store"})
-
-
-@app.post("/api/connectors/{connector_id}/php-link")
-def link_php_file(connector_id: int, body: PhpLinkIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    try:
-        connector = dbagent.own_connector(db, connector_id, visitor)
-        if connector.kind != "php":
-            raise dbagent.DatabaseError("Not a website connection")
-        dbagent_direct._rate_limit(visitor)
-        phpconn.link(db, connector, body.url)
-    except (dbagent.DatabaseError, dbagent_direct.DirectError) as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
     return {"connector": dbagent.connector_dict(connector, db)}
 
 

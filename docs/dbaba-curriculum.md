@@ -51,6 +51,12 @@ never as fixed sentences. These questions never go to the query checker, the err
 "no specific answer" reply. An unknown concept is said honestly, with the nearest known ones, and recorded in the learning
 feed.
 
+**E. Every reply leaves the person satisfied.** It opens with the answer, the corrected query or the plan, then the short
+reason. Friendly, confident words ("two small changes make this exact", "here is a faster way"), never blaming or alarming ones
+("your query is wrong", "bad design"). What can't be proven from what was shared is turned into a next step the person can take
+in one tap ("connect your database or paste the table and I'll confirm it"), never a dead end. Positive in tone, never untrue:
+DBaba still claims only what it proved, because a confident answer that turns out wrong is what loses a user.
+
 ## The 15 nights
 
 - [x] **1. Foundation and basics.** Merge the query-fundamentals and learn-from-misses work (fundamentals behind every
@@ -72,13 +78,34 @@ feed.
   numbers stored as text, utf8 vs utf8mb4, over-wide types; advising a better structure.
 - [x] **7. CASE, CTEs, windows.** CASE order and missing ELSE, recursive CTEs that must stop, window frames and ties in
   running totals, LAG/LEAD, NTILE, gaps and islands, versions without window functions.
-- [ ] **8. Indexes and EXPLAIN.** Reading EXPLAIN on both engines, composite indexes and the leftmost prefix, sargable
-  rewrites, OR -> UNION ALL, keyset pagination, covering indexes; every speed rewrite proven to return the same rows.
-- [ ] **9. Concurrency and large data.** Deadlocks, lock waits, long transactions, batching huge changes, N+1; a deadlock
-  and a lock wait reproduced in the lab.
-- [ ] **10. Mixed hard problems and portability.** Long CTE-heavy queries end to end; LIMIT/OFFSET/FETCH/TOP,
-  IFNULL/COALESCE/NVL/ISNULL, dates, upsert, case, identities; Oracle / SQL Server / SQLite recognised and answered as notes.
-  Final exam: 50 generated problems and 100 basic questions, all passing.
+- [ ] **8. Indexes, EXPLAIN and safe optimization.** Reading EXPLAIN / EXPLAIN ANALYZE on MySQL/MariaDB (access type, key,
+  rows, filtered, Extra: Using index / temporary / filesort, judged by size, not by name) and EXPLAIN (ANALYZE, BUFFERS) on
+  PostgreSQL (Seq vs Index Scan, join methods, estimated vs actual rows). Composite indexes (equality columns first, then range
+  and sort, from the real workload), the leftmost prefix, covering indexes and their write cost, why not every column.
+  Sargable rewrites (functions on columns -> half-open ranges, implicit casts, leading %), OR -> UNION ALL, keyset instead of a
+  deep OFFSET, repeated scalar or correlated subqueries pre-aggregated once, DISTINCT used to hide join copies, SELECT * in wide
+  joins, several one-to-many joins totalled before joining. Indexes on expressions: generated / functional columns (JSON fields
+  that are filtered often), PostgreSQL expression, partial and INCLUDE indexes. Partitioning: pruning when the filter matches
+  the key, never a substitute for an index. The safe workflow every rewrite follows: say the expected output and grain, keep a
+  baseline result, change one block at a time, prove equivalence (row count, keys, totals, rows only in old / only in new, NULL
+  and empty cases, ties, duplicates, date boundaries) on both engines, then measure. A slow-query evidence list (exact SQL and
+  parameters, plan, row counts, index definitions, data spread, slow log, load and locks at the time).
+- [ ] **9. Concurrency and large data.** Isolation levels and what each engine defaults to (InnoDB REPEATABLE READ with
+  next-key / gap locks, PostgreSQL READ COMMITTED with MVCC), SELECT ... FOR UPDATE only where a later change depends on the read,
+  deadlocks (same locking order, short transactions, retry the victim), lock waits, long transactions, batching huge UPDATE /
+  DELETE by a stable key (and the rows that can be missed or done twice while others write), the N+1 pattern; a deadlock and a
+  lock wait reproduced in the lab.
+- [ ] **10. Mixed hard problems and portability.** Solve the data problem first in neutral terms (grain, relationships,
+  filters, totals, business rules, expected result), then write it in the named engine's words. Long CTE-heavy queries read and
+  fixed end to end. Dialect layer for MySQL / MariaDB / PostgreSQL / Oracle / SQL Server / SQLite: LIMIT, OFFSET/FETCH, TOP;
+  identity and sequences; current time; concatenation; IFNULL / COALESCE / NVL / ISNULL; date arithmetic (DATE_ADD, + INTERVAL,
+  DATEADD, datetime(..., '+7 days')); upsert (ON DUPLICATE KEY, ON CONFLICT, MERGE); the plan tool of each (EXPLAIN, DBMS_XPLAN,
+  actual execution plan, EXPLAIN QUERY PLAN) and the index features of each (filtered / included columns, function-based and
+  bitmap, partial and expression); booleans (BOOLEAN, TINYINT(1), BIT, numbers); case and accent sensitivity from collation
+  (ILIKE, NOCASE, NLS); default isolation of each; procedural layers told apart from query SQL (stored routines, PL/pgSQL,
+  PL/SQL, T-SQL, none in SQLite). A translation drill (one neutral requirement written for every engine) and a portability
+  checklist on every translated answer. Oracle / SQL Server / SQLite recognised from syntax and answered as notes until they
+  have a lab. Final exam: 50 generated problems and 100 basic questions, all passing.
 
 Reading a whole project (nights 10A-10B, before the query-only nights, which get stronger once the real schema can be read):
 

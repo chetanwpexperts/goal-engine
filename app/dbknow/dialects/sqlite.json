@@ -3,15 +3,201 @@
   "notes_only": true,
   "family": "relational",
   "about": "No lab-tested knowledge yet: DBaba recognises SQLite from its words or error format and answers with general SQL reasoning plus the notes below.",
-  "named": ["\\bsqlite3?\\b", "एसक्यूलाइट"],
-  "query_marks": ["\\bautoincrement\\b", "\\bpragma\\s+\\w+", "\\bglob\\s+'", "\\bsqlite_master\\b"],
+  "named": [
+    "\\bsqlite3?\\b",
+    "एसक्यूलाइट"
+  ],
+  "query_marks": [
+    "\\bautoincrement\\b",
+    "\\bpragma\\s+\\w+",
+    "\\bglob\\s+'",
+    "\\bsqlite_master\\b"
+  ],
   "weak_marks": [],
-  "error_marks": ["\\bsqlite3\\.\\w+Error\\b", "\\bSQLITE_[A-Z]+\\b", "\\bno such (table|column):"],
+  "error_marks": [
+    "\\bsqlite3\\.\\w+Error\\b",
+    "\\bSQLITE_[A-Z]+\\b",
+    "\\bno such (table|column):"
+  ],
   "notes": {
     "limit": "LIMIT n OFFSET m works as on MySQL/PostgreSQL.",
-    "concat": "|| joins text on SQLite; CONCAT() exists only from 3.44.",
-    "full_join": "RIGHT and FULL OUTER JOIN exist only from SQLite 3.39."
+    "concat": "|| joins text (NULL makes it NULL); CONCAT() exists from 3.44 and skips NULL parts.",
+    "full_join": "RIGHT and FULL OUTER JOIN exist only from SQLite 3.39.",
+    "null_fn": "IFNULL(x, 0) and COALESCE both work.",
+    "now": "date('now') / datetime('now') (UTC) or CURRENT_DATE / CURRENT_TIMESTAMP; there is no NOW().",
+    "date_add": "Dates are text: date(d, '+7 days'), date(d, '+1 month'); no INTERVAL and no DATE_ADD.",
+    "date_diff": "julianday(end) - julianday(start) gives days (date - date subtracts the leading numbers of the text).",
+    "string_agg": "group_concat(col, '-') joins a group's text (string_agg is its other name from 3.44).",
+    "identity": "INTEGER PRIMARY KEY is the row id and numbers itself; AUTOINCREMENT only stops ids being reused; INSERT ... RETURNING id (3.35+) gives the new id.",
+    "upsert": "INSERT ... ON CONFLICT(col) DO UPDATE / DO NOTHING (3.24+), like PostgreSQL; also INSERT OR REPLACE / INSERT OR IGNORE.",
+    "case": "= compares case-sensitively; LIKE ignores case for ASCII letters.",
+    "types": "Column types are only preferences: an INTEGER column accepted 'hello' and kept it as text. Add CHECK (typeof(col) = 'integer') or a STRICT table (3.37+) to refuse it.",
+    "division": "int / int drops the fraction (7 / 2 = 3), like PostgreSQL.",
+    "greatest": "No GREATEST/LEAST: max(a, b, c) / min(a, b, c) with several arguments (NULL if any argument is NULL).",
+    "length": "length() counts characters for text.",
+    "position": "instr(text, 'x') finds where x starts.",
+    "boolean": "No BOOLEAN type: TRUE and FALSE are 1 and 0."
   },
   "source": "https://www.sqlite.org/lang.html",
-  "proven": []
+  "proven": [],
+  "note_marks": {
+    "limit": "\\blimit\\b",
+    "null_fn": "\\b(ifnull|nvl|isnull|coalesce)\\s*\\(",
+    "now": "\\b(now|curdate|current_date|current_timestamp|getdate|sysdate)\\b",
+    "date_add": "\\b(date_add|date_sub|dateadd|interval)\\b",
+    "date_diff": "\\b(datediff|timestampdiff)\\b|\\b\\w*date\\w*\\s*-\\s*\\w*date\\w*",
+    "string_agg": "\\b(group_concat|string_agg|listagg)\\s*\\(",
+    "identity": "\\b(auto_increment|serial|identity|autoincrement|last_insert_id|returning|lastval)\\b",
+    "upsert": "\\b(on\\s+duplicate\\s+key|on\\s+conflict|merge\\s+into|replace\\s+into|insert\\s+ignore)\\b",
+    "case": "(?:=|<>|\\blike)\\s*'[^']*[A-Za-z]",
+    "length": "\\b(length|len|char_length)\\s*\\(",
+    "position": "\\b(locate|instr|charindex|position|strpos)\\s*\\(",
+    "boolean": "\\b(true|false|boolean)\\b",
+    "division": "[\\w)]\\s*/\\s*[\\w(]",
+    "greatest": "\\b(greatest|least)\\s*\\(",
+    "concat": "\\bconcat\\s*\\(|\\|\\|",
+    "types": "\\bcreate\\s+table\\b"
+  },
+  "lab": [
+    {
+      "note": "concat",
+      "sql": "SELECT 'a' || NULL, CONCAT('a', NULL)",
+      "result": [
+        [
+          null,
+          "a"
+        ]
+      ],
+      "since": [
+        3,
+        44,
+        0
+      ]
+    },
+    {
+      "note": "now",
+      "sql": "SELECT CURRENT_DATE IS NOT NULL, datetime('now') IS NOT NULL",
+      "result": [
+        [
+          1,
+          1
+        ]
+      ]
+    },
+    {
+      "note": "date_add",
+      "sql": "SELECT date('2024-01-31', '+7 days')",
+      "result": [
+        [
+          "2024-02-07"
+        ]
+      ]
+    },
+    {
+      "note": "date_diff",
+      "sql": "SELECT julianday('2024-02-03') - julianday('2024-01-25')",
+      "result": [
+        [
+          9.0
+        ]
+      ]
+    },
+    {
+      "note": "string_agg",
+      "sql": "SELECT group_concat(x, '-') FROM (SELECT 'a' AS x UNION ALL SELECT 'b')",
+      "result": [
+        [
+          "a-b"
+        ]
+      ]
+    },
+    {
+      "note": "case",
+      "sql": "SELECT 'a' = 'A', 'a' LIKE 'A'",
+      "result": [
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    {
+      "note": "division",
+      "sql": "SELECT 7 / 2, 7 / 2.0",
+      "result": [
+        [
+          3,
+          3.5
+        ]
+      ]
+    },
+    {
+      "note": "greatest",
+      "sql": "SELECT max(1, NULL, 3), max(1, 2, 3)",
+      "result": [
+        [
+          null,
+          3
+        ]
+      ]
+    },
+    {
+      "note": "types",
+      "sql": "CREATE TABLE lab_u (n INTEGER); INSERT INTO lab_u VALUES ('hello'); SELECT typeof(n), n FROM lab_u",
+      "result": [
+        [
+          "text",
+          "hello"
+        ]
+      ]
+    },
+    {
+      "note": "upsert",
+      "sql": "CREATE TABLE lab_t (id INTEGER PRIMARY KEY, v TEXT UNIQUE); INSERT INTO lab_t (v) VALUES ('a'); INSERT INTO lab_t (v) VALUES ('a') ON CONFLICT (v) DO NOTHING; SELECT COUNT(*) FROM lab_t",
+      "result": [
+        [
+          1
+        ]
+      ],
+      "since": [
+        3,
+        24,
+        0
+      ]
+    },
+    {
+      "note": "identity",
+      "sql": "CREATE TABLE lab_i (id INTEGER PRIMARY KEY, v TEXT); INSERT INTO lab_i (v) VALUES ('a'); INSERT INTO lab_i (v) VALUES ('b') RETURNING id",
+      "result": [
+        [
+          2
+        ]
+      ],
+      "since": [
+        3,
+        35,
+        0
+      ]
+    },
+    {
+      "note": "boolean",
+      "sql": "SELECT TRUE, FALSE",
+      "result": [
+        [
+          1,
+          0
+        ]
+      ]
+    },
+    {
+      "note": "length",
+      "sql": "SELECT length('ñab')",
+      "result": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "lab_about": "These notes were run on SQLite 3.53 (Python's sqlite3) by tests/practice/test_night10.py; SQLite stays notes-only until it has its own rules."
 }

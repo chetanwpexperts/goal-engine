@@ -522,6 +522,19 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
                              f"WHERE ek-ek row dekhta hai, totals se pehle: MySQL error 1111, PostgreSQL 'aggregate functions are not allowed "
                              f"in WHERE'. Total pe condition GROUP BY ke baad HAVING mein; UPDATE/DELETE mein subquery se compare karo."))
 
+    # portability (app/agents/sqlport.py): another database's words the chosen one refuses (rewritten in its own words), and
+    # spellings that run but mean something else there (date - date, INTERVAL '2' WEEK, CAST AS CHAR, ^)
+    from app.agents import sqlport
+
+    for fnd, pedits in sqlport.port(sql, s, intent, Finding, is_select):
+        if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        if fnd.kind == "check" and _SURE_ONLY.get():
+            continue
+        if pedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in pedits for a, b, _n in edits):
+            edits += pedits
+
     # subquery reasoning (app/agents/sqlsubq.py): shape (one value / a set / EXISTS), scope (the inner FROM first), NULLs
     from app.agents import sqlsubq
 
@@ -1481,7 +1494,13 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                         single.add(al)
                         changed = True
         loose = []
+        # GROUP BY 1, 2: positions in the SELECT list (every engine reads them so); that SELECT item is grouped as a whole
+        ords = {int(x.strip()) for _p, x in _split_top(gtext) if x.strip().isdigit()}
+        # ... and GROUP BY a SELECT name (u in SELECT UPPER(c) u ... GROUP BY u): MySQL, MariaDB and PostgreSQL group by that item
+        named = {x.strip().strip('`"').lower() for _p, x in _split_top(gtext)} - {(x.alias or "").lower() for x in srcs}
         for i in plain:
+            if items.index(i) + 1 in ords or ((i.get("alias") or "").lower() in named and i.get("alias")):
+                continue
             if re.search(r"\bover\s*\(", i["text"], re.I):
                 continue                                 # a window: judged with its own rule (app/agents/sqlaggs.py, window_agg)
             for q, c, _p in _qrefs(i["text"]):

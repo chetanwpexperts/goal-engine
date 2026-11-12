@@ -65,6 +65,11 @@
    "id": "design",
    "en": "For a table design: does each table name its rows (primary key), does each link point at a key of the same type with an index, does each column's type match its values, and is each fact kept once?",
    "hi": "Table design ke liye: har table apni rows ko naam deti hai (primary key), har link same type ki key pe index ke saath, har column ka type uski values se mel khata hai, aur har baat ek hi baar?"
+  },
+  {
+   "id": "words",
+   "en": "Is every function, operator and type written in this database's own words, and does each one mean here what it meant where it came from (dates, case, division, NULLs)?",
+   "hi": "Kya har function, operator aur type is database ke apne shabdon mein hai, aur kya uska matlab yahan wahi hai jo wahan tha (dates, case, bhaag, NULL)?"
   }
  ],
  "fundamentals": {
@@ -520,6 +525,32 @@
     "https://www.postgresql.org/docs/current/explicit-locking.html",
     "https://dba.stackexchange.com/questions/tagged/deadlock",
     "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "portability": {
+   "title_en": "One SQL language, each database's own words: a translation keeps the meaning, not just the spelling",
+   "title_hi": "SQL ek bhasha hai, par har database ke kuch shabd apne hain: translation matlab bachata hai, sirf spelling nahi",
+   "rule_en": "SQL is a standard, but every database spells some ideas its own way: the first n rows (LIMIT, TOP, FETCH FIRST, ROWNUM), today's date (NOW(), CURRENT_DATE, GETDATE(), SYSDATE), adding to a date (DATE_ADD, + INTERVAL, DATEADD), the days between two dates (DATEDIFF, date - date), finding text in text (LOCATE, POSITION, CHARINDEX, INSTR, STRPOS), joining a group's text (GROUP_CONCAT, string_agg), quoting names (`backticks`, \"double quotes\", [brackets]) and cast type names. Text one database refuses is easy to see; the dangerous kind runs everywhere but means something else: date - date is a number of days on PostgreSQL and a meaningless subtraction of YYYYMMDD numbers on MySQL/MariaDB, PostgreSQL reads INTERVAL '2' WEEK as two seconds, CAST(x AS CHAR) keeps one character on PostgreSQL, ^ is a power on PostgreSQL and XOR on MySQL, text comparison ignores case on MySQL/MariaDB and not on PostgreSQL, integer division drops the fraction on PostgreSQL, and CONCAT / GREATEST treat NULL differently. So a translation rewrites each construct into the target's own words, proves on the target that it gives the same values, and names the differences in meaning it can't remove.",
+   "rule_hi": "SQL standard hai, par har database kuch cheezein apne shabdon mein likhta hai: pehli n rows (LIMIT, TOP, FETCH FIRST, ROWNUM), aaj ki date (NOW(), CURRENT_DATE, GETDATE()), date mein din jodna (DATE_ADD, + INTERVAL, DATEADD), do dates ke beech din (DATEDIFF, date - date), text mein text dhoondhna (LOCATE, POSITION, CHARINDEX), group ka text jodna (GROUP_CONCAT, string_agg), naam quote karna aur cast ke type. Jo database mana kare wo dikh jaata hai; khatarnaak wo hai jo har jagah chalta hai par matlab alag: date - date PostgreSQL pe din, MySQL/MariaDB pe bekaar number; INTERVAL '2' WEEK PostgreSQL pe 2 second; CAST(x AS CHAR) PostgreSQL pe ek akshar; ^ PostgreSQL pe power, MySQL pe XOR; text compare MySQL pe case ignore, PostgreSQL pe nahi; integer bhaag PostgreSQL pe fraction hatata hai. Isliye translation har cheez target ke shabdon mein likhta hai, target pe same values sabit karta hai, aur jo matlab ka farak nahi hat sakta use batata hai.",
+   "topics": [
+    "date_math",
+    "interval_unit",
+    "cast_char",
+    "power_xor"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-datetime.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html",
+    "https://mariadb.com/kb/en/date-time-functions/",
+    "https://learn.microsoft.com/en-us/sql/t-sql/functions/date-and-time-data-types-and-functions-transact-sql",
+    "https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/Functions.html",
+    "https://www.sqlite.org/lang_datefunc.html",
+    "https://stackoverflow.com/questions/tagged/sql-server+mysql",
+    "https://dba.stackexchange.com/questions/tagged/migration"
    ],
    "proven": [
     "mariadb",

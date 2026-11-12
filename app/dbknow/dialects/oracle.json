@@ -3,17 +3,68 @@
   "notes_only": true,
   "family": "relational",
   "about": "No lab-tested knowledge yet: DBaba recognises Oracle from its syntax or error format and answers with general SQL reasoning plus the notes below. These are notes from the official docs, not lab-proven rules.",
-  "named": ["\\boracle\\b", "\\bpl/?sql\\b", "ओरेकल"],
-  "query_marks": ["\\brownum\\b", "\\b\\w+\\.nextval\\b", "\\b\\w+\\.currval\\b", "\\bvarchar2\\b", "\\bconnect\\s+by\\b", "\\(\\+\\)", "\\bsysdate\\b(?!\\s*\\()", "\\bto_date\\s*\\(", "\\bfetch\\s+first\\s+\\d+\\s+rows\\b(?![\\s\\S]*\\blimit\\b)"],
-  "weak_marks": ["\\bnvl\\s*\\(", "\\bfrom\\s+dual\\b", "\\bdecode\\s*\\("],
+  "named": [
+    "\\boracle\\b",
+    "\\bpl/?sql\\b",
+    "ओरेकल"
+  ],
+  "query_marks": [
+    "\\brownum\\b",
+    "\\b\\w+\\.nextval\\b",
+    "\\b\\w+\\.currval\\b",
+    "\\bvarchar2\\b",
+    "\\bconnect\\s+by\\b",
+    "\\(\\+\\)",
+    "\\bsysdate\\b(?!\\s*\\()",
+    "\\bto_date\\s*\\(",
+    "\\bfetch\\s+first\\s+\\d+\\s+rows\\b(?![\\s\\S]*\\blimit\\b)"
+  ],
+  "weak_marks": [
+    "\\bnvl\\s*\\(",
+    "\\bfrom\\s+dual\\b",
+    "\\bdecode\\s*\\("
+  ],
   "weak_why": "NVL, DUAL and DECODE also work on MariaDB (and DUAL on MySQL), so alone they don't show Oracle.",
-  "error_marks": ["\\bORA-\\d{5}\\b"],
+  "error_marks": [
+    "\\bORA-\\d{5}\\b"
+  ],
   "notes": {
-    "limit": "Oracle has no LIMIT: use FETCH FIRST n ROWS ONLY (12c and later) or ROWNUM in an outer query.",
-    "concat": "|| joins text on Oracle; an empty string is NULL on Oracle, so || skips it.",
+    "limit": "Oracle has no LIMIT: use FETCH FIRST n ROWS ONLY (12c and later; OFFSET m ROWS before it), or ROWNUM in an outer query (ROWNUM is numbered before ORDER BY, so sort in a subquery first).",
+    "concat": "|| joins text on Oracle; an empty string is NULL on Oracle, so || skips it and '' IS NULL is true.",
     "null_fn": "NVL(x, 0) is Oracle's null replacement; COALESCE works too and is portable.",
-    "full_join": "FULL OUTER JOIN is supported; the old (+) outer-join marker is still accepted but the JOIN syntax is clearer."
+    "full_join": "FULL OUTER JOIN is supported; the old (+) outer-join marker is still accepted but the JOIN syntax is clearer.",
+    "now": "SYSDATE (no brackets) is the date and time; TRUNC(SYSDATE) today's date; CURRENT_DATE / SYSTIMESTAMP also exist.",
+    "date_add": "d + 7 adds days to a DATE; ADD_MONTHS(d, 1) adds months; INTERVAL '7' DAY works too.",
+    "date_diff": "date - date gives days (with a fraction when there is time); MONTHS_BETWEEN(a, b) months.",
+    "string_agg": "LISTAGG(col, ',') WITHIN GROUP (ORDER BY ...) joins a group's text.",
+    "identity": "GENERATED ALWAYS AS IDENTITY (12c+) or a sequence: seq.NEXTVAL; RETURNING id INTO a variable gives the new id.",
+    "upsert": "MERGE INTO t USING ... ON (...) WHEN MATCHED THEN UPDATE ... WHEN NOT MATCHED THEN INSERT ...",
+    "dual": "SELECT without a table needs FROM DUAL (until 23ai).",
+    "case": "Text comparison is case-sensitive by default; UPPER() both sides or NLS_COMP=LINGUISTIC to ignore case.",
+    "quotes": "Names in \"double quotes\" keep their case; unquoted names are stored in UPPER case.",
+    "length": "LENGTH counts characters, LENGTHB bytes; LENGTH('') is NULL (empty text is NULL).",
+    "position": "INSTR(text, 'x') finds where x starts.",
+    "if": "No IF() in SQL: CASE WHEN ... END or DECODE(x, a, b, c).",
+    "boolean": "No BOOLEAN column type before 23ai: NUMBER(1) or CHAR(1) with a check."
   },
   "source": "https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/",
-  "proven": []
+  "proven": [],
+  "note_marks": {
+    "limit": "\\blimit\\b",
+    "null_fn": "\\b(ifnull|nvl|isnull|coalesce)\\s*\\(",
+    "now": "\\b(now|curdate|current_date|current_timestamp|getdate|sysdate)\\b",
+    "date_add": "\\b(date_add|date_sub|dateadd|interval)\\b",
+    "date_diff": "\\b(datediff|timestampdiff)\\b|\\b\\w*date\\w*\\s*-\\s*\\w*date\\w*",
+    "string_agg": "\\b(group_concat|string_agg|listagg)\\s*\\(",
+    "identity": "\\b(auto_increment|serial|identity|autoincrement|last_insert_id|returning|lastval)\\b",
+    "upsert": "\\b(on\\s+duplicate\\s+key|on\\s+conflict|merge\\s+into|replace\\s+into|insert\\s+ignore)\\b",
+    "case": "(?:=|<>|\\blike)\\s*'[^']*[A-Za-z]",
+    "quotes": "`|\\[\\w|\\\"\\w",
+    "length": "\\b(length|len|char_length)\\s*\\(",
+    "position": "\\b(locate|instr|charindex|position|strpos)\\s*\\(",
+    "if": "\\b(if|iif|case)\\b",
+    "boolean": "\\b(true|false|boolean)\\b",
+    "dual": "\\bselect\\b(?![\\s\\S]*\\bfrom\\b)",
+    "concat": "\\bconcat\\s*\\(|\\|\\||''"
+  }
 }

@@ -212,6 +212,12 @@ def _owner(col: str, tables: list[Table]) -> tuple[Table | None, str]:
     return (tables[0] if len(tables) == 1 else None), col
 
 
+def _notes_only(engine: str | None) -> bool:
+    from app.dbknow import engines as E
+
+    return E.notes_only(engine)
+
+
 def analyze_sql(query: str, extra: str = "", engine: str | None = None) -> dict:
     """query: the SQL. extra: optional EXPLAIN output and/or CREATE TABLE statements. engine: the database the person named,
     chose or that was detected (standing rule A: app/dbknow/engines.py); None = not known, each engine's behaviour is said."""
@@ -223,6 +229,8 @@ def analyze_sql(query: str, extra: str = "", engine: str | None = None) -> dict:
     try:
         out = _analyze_sql(query, extra)
         out["engine"] = engine
+        if _notes_only(engine):
+            out["notes_for"] = query            # SQL Server / Oracle / SQLite: the notes that speak to this query
         return out
     finally:
         CHOSEN.reset(token)

@@ -652,6 +652,10 @@ def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) ->
 
     if relation != "safety" and concept_question(text) is not None:
         return True                       # 'what is a JOIN': the concepts pack, whatever the reader guessed
+    from app.agents import sqlport
+
+    if relation != "safety" and sqlport.is_request(text):
+        return True                       # 'convert this query to PostgreSQL': written in that database's words
 
     if ANOTHER_RE.search(text or "") and not query_in(text):
         return True                       # the 'Check another query' tap: ask for it, don't repeat the last answer
@@ -800,6 +804,10 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
 
     if reasoning.evidence(text) or described or sqllock.read_deadlock(text):   # an error / EXPLAIN / lock report, or a problem in words
         return _error_turn(db, goal, text, turn.hi, visitor_id)
+    from app.agents import sqlport
+
+    if sqlport.is_request(text):          # 'convert this query to PostgreSQL': the query in that database's own words
+        return _translate_turn(db, goal, text, turn.hi)
     if query_in(text):                    # a pasted query is for the SQL checker, whatever else the message says
         return _check_pasted_query(db, goal, text, turn.hi)
 
@@ -835,6 +843,31 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
             ("Database juda hua hai, card mein check shuru karo." if has else "Bas batao database kahan hai; judte hi main khud check karke wajah aur fix dhoondhunga.") if turn.hi
             else ("Your database is connected; start the check on the card." if has else "Just tell me where your database is; once it's connected I'll check it myself and find the cause and the fix."))
     return reply, [], "agent_plan"
+
+
+def _translate_turn(db: Session, goal: Goal, text: str, hi: bool, query: str | None = None):
+    """A query to be written in another database's words (night 10): the target named after to / into / mein is remembered
+    for the conversation (rule A); each construct is rewritten in its words (lab-proven on MariaDB and PostgreSQL), the
+    differences in meaning are named, and what couldn't be translated is said. SQL Server / Oracle / SQLite: notes only."""
+    from app.agents import sqlport
+    from app.dbknow import engines as E
+
+    if query is None:
+        query, words = sqlport.split_request(text)
+    else:                                  # a follow-up ('now convert it to PostgreSQL'): the checked query, these words
+        words = text
+    target, source = sqlport.target_of(words)
+    E.remember(goal, target, "named")
+    lang = E.lang_of(words) if len(re.findall(r"\w+", words)) >= 2 else _goal_lang(goal, hi)
+    if lang == "en" and (hi or re.search(r"\b(mein|me|badlo|badal\w*|likho|kar\s*do|karo|ye|yeh|isko|ise)\b|[ऀ-ॿ]", words, re.I)):
+        lang = "hinglish"
+    t = sqlport.translate(query, target, source)
+    reply = sqlport.translation_text(query, t, "hindi" if re.search(r"[ऀ-ॿ]", words) else "en" if lang == "en" else "hinglish")
+    goal.title = f"SQL: query for {E.label(target)}"[:200]
+    goal.intent = "slow_db_query"
+    goal.missing_info, goal.pending = "[]", None
+    db.commit()
+    return reply, [], "translate"
 
 
 PLAN_QUERY = re.compile(r"^\s*(?:explain\s+(?:analyze\s+|\(\s*[\w\s,]+\)\s+|format\s*=\s*\w+\s+|extended\s+)?)?((?:select|with)\b[\s\S]*?)"
@@ -1005,6 +1038,12 @@ def holds_conversation(db, goal, text: str, any_text: bool = False):
         a, run = _sql_agent(db, goal)
         if run is not None and run.status == "done":
             return a
+    from app.agents import sqlport
+
+    if text and not any_text and sqlport.is_followup(text):
+        a, run = _sql_agent(db, goal)     # 'now convert it to PostgreSQL': the checked query, in that database's words
+        if run is not None and run.status == "done":
+            return a
     if text and not any_text and concept_question(text) is not None:
         return None                       # 'what is a LEFT JOIN' after a check: a concept question, not about that query
     if (text or "").strip().startswith(("Why: ", "Kyun: ")) and not any_text:
@@ -1044,6 +1083,13 @@ def continue_turn(db, goal, agent, text: str):
     if agent.recipe == "sql_review" and E.correction(text, goal):   # 'it's PostgreSQL': check it again for that one
         return _engine_reply(db, goal, agent, E.correction(text, goal), "named", hi0, again=True)
 
+    from app.agents import sqlport
+
+    if agent.recipe == "sql_review" and sqlport.is_followup(text):
+        raw = (loads(agent.inputs, {}) or {}).get("query", "")
+        if raw.strip():
+            reply, options, _rel = _translate_turn(db, goal, text, hi0, query=raw)
+            return reply, options, hi0
     if not FEEDBACK_RE.search(text or ""):
         return _continue_turn(db, goal, agent, text)
     inputs = loads(agent.inputs, {}) or {}

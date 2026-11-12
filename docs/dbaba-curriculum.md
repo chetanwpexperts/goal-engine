@@ -76,7 +76,7 @@ feed.
   rewrites, OR -> UNION ALL, keyset pagination, covering indexes; every speed rewrite proven to return the same rows.
 - [x] **9. Concurrency and large data.** Deadlocks, lock waits, long transactions, batching huge changes, N+1; a deadlock
   and a lock wait reproduced in the lab.
-- [ ] **10. Mixed hard problems and portability.** Long CTE-heavy queries end to end; LIMIT/OFFSET/FETCH/TOP,
+- [x] **10. Mixed hard problems and portability.** Long CTE-heavy queries end to end; LIMIT/OFFSET/FETCH/TOP,
   IFNULL/COALESCE/NVL/ISNULL, dates, upsert, case, identities; Oracle / SQL Server / SQLite recognised and answered as notes.
   Final exam: 50 generated problems and 100 basic questions, all passing.
 
@@ -312,3 +312,31 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   at once; MariaDB's NOWAIT fails at once with 1205 (not MySQL's 3572), PostgreSQL's with 55P03; a plain read saw the committed 100
   while a writer held 999; a WHERE that names a plpgsql word first ('raise prices ...') after a ';' is read as SQL, so it isn't taken
   as the person's words.
+- **Night 10 (12 Nov 2026).** Portability in `app/agents/sqlport.py` (new fundamental `portability`: one SQL language, each
+  database's own words; a translation keeps the meaning, not just the spelling). For the database named, chosen or detected
+  (rule A), another database's words are found and rewritten in its own: SQL Server's TOP (moved to LIMIT at the end of that
+  SELECT), DATEADD / DATEDIFF(unit, ...) / DATEPART / LEN / CHARINDEX / IIF / CONVERT(type, x) / GETDATE() / [brackets]; Oracle's
+  ROWNUM (LIMIT, with the note that ROWNUM is given before ORDER BY), bare SYSDATE, FROM DUAL; MySQL's DATE_ADD / DATE_SUB /
+  INTERVAL 7 DAY / DATEDIFF / TIMESTAMPDIFF / YEAR() / IF() / LOCATE / INSTR / UCASE / SUBSTRING_INDEX / GROUP_CONCAT (ORDER BY and
+  SEPARATOR kept) / DATE_FORMAT and STR_TO_DATE (format codes translated, never guessed) / CONVERT(x, SIGNED) / DIV / REGEXP /
+  CAST AS SIGNED or DATETIME on PostgreSQL; PostgreSQL's STRPOS / SPLIT_PART / DATE_TRUNC / string_agg / to_date / INTERVAL '7 days'
+  / ~* / CAST AS TEXT or BIGINT or TIMESTAMP on MySQL/MariaDB. Calls are rewritten innermost first (DATEADD(day, 1, GETDATE())).
+  Spellings that run but mean something else: date - date and date +/- n on MySQL/MariaDB (`wrong`, DATEDIFF / INTERVAL n DAY;
+  a `check` naming both meanings when the database isn't known), PostgreSQL's INTERVAL 'n' WEEK / QUARTER, CAST(x AS CHAR) on
+  PostgreSQL (CHAR(1)), and ^ on MySQL/MariaDB (XOR; POWER offered). 'Convert this query to PostgreSQL' (with the query, or after
+  a check) is a translation in the chat: the query in the target's words, each change, definite mistakes fixed on the way, what
+  couldn't be translated, and the meaning a translation can't remove (case-sensitive comparison, integer division, NULL in
+  CONCAT / GREATEST, LENGTH in bytes, NULL sort order, GROUP_CONCAT's length limit); the target is remembered (rule A). SQL Server,
+  Oracle and SQLite targets get notes only (`note_marks` pick the notes that speak to the query); SQLite's notes were run on
+  SQLite 3.53. Engine words live in the dialect files' new `port` sections (calls with templates, interval words, date-format
+  codes, cast type names) and `refuses`. Also fixed: GROUP BY 1 and GROUP BY a SELECT name were called 'columns that aren't
+  grouped' (a false alarm on every engine), and 'how many days between two dates' (how many / how much) is now a question shape.
+  22 concepts, 51-problem practice bank (each proven on the target, and where the wrong query is valid at home, proven to return
+  what it returned there), 13 generator families. Final exam: 50 generated problems from all ten nights' families and 100 basic
+  questions across the whole pack, all passing. Lab lessons worth keeping: MariaDB computes DATE '2024-02-03' - DATE '2024-01-25' as
+  78 (two YYYYMMDD numbers) and DATE '2024-03-01' - 1 as 20240300, with no warning; PostgreSQL's SELECT d + INTERVAL '2' WEEK
+  gives d + 2 seconds in a column named week (its INTERVAL qualifier has no WEEK / QUARTER; elsewhere a syntax error); CAST(x AS
+  CHAR) is CHAR(1) on PostgreSQL ('2024-06-01' -> '2') and CHAR(n) pads with spaces; 2 ^ 3 is 1 on MariaDB and 8 on PostgreSQL;
+  GREATEST(1, NULL, 3) is NULL on MariaDB, 3 on PostgreSQL; LENGTH('ñab') is 4 on MariaDB, 3 on PostgreSQL; CAST('5.25' AS DECIMAL)
+  is 5 on MariaDB; MariaDB 10.11 accepts FETCH FIRST n ROWS ONLY and TO_CHAR but refuses CAST AS TEXT / BIGINT / NUMERIC /
+  TIMESTAMP / BOOLEAN and UPDATE ... RETURNING; INTERVAL '30' DAY (number quoted, unit outside) runs on both.

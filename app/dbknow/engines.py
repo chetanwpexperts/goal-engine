@@ -214,12 +214,15 @@ def detected_line(rec: dict, lang: str) -> tuple[str, list[str]]:
     return line, taps
 
 
-def notes_line(eid: str, lang: str) -> str:
-    """For SQL Server / Oracle / SQLite: which parts are general SQL reasoning and which are only notes."""
+def notes_line(eid: str, lang: str, sql: str = "") -> str:
+    """For SQL Server / Oracle / SQLite: which parts are general SQL reasoning and which are only notes (the notes that speak
+    to what the query uses, when it shows any: LIMIT, IFNULL, NOW(), ...)."""
     if not notes_only(eid):
         return ""
     d = dialect(eid)
-    notes = " ".join(d.get("notes", {}).values())
+    from app.agents.sqlport import notes_for
+
+    notes = " ".join(n for n, _h in notes_for(eid, sql))
     if lang == "en":
         return (f"{d['name']}: DBaba has no lab-tested {d['name']} knowledge yet. The checks above are general SQL reasoning "
                 f"(true on every database); anything said about MySQL/PostgreSQL behaviour doesn't apply. {d['name']} notes (from its "

@@ -498,7 +498,7 @@
  ],
  "named": ["\\bpostgre(s|sql)?\\b", "\\bpgsql\\b", "\\bpsql\\b", "पोस्टग्रे\\w*"],
  "error_marks": ["\\bERROR:\\s{1,2}[a-z]", "\\bDETAIL:\\s", "\\bpsycopg2?\\.", "\\bPSQLException\\b"],
- "refuses": [{"id": "backticks", "re": "`([^`]+)`", "to": "@bare", "error": "42601 syntax error at or near \"`\"", "title_en": "{db} doesn't accept `backticks` (that's MySQL/MariaDB)", "title_hi": "{db} `backticks` nahi maanta (wo MySQL/MariaDB ke hain)", "fix_en": "Leave the name bare (plain names), or put it in double quotes when it is a reserved word or has spaces; a double-quoted name keeps its exact upper/lower case, a bare one is matched in lower case.", "fix_hi": "Naam bina quote ke likho, ya double quotes mein (double quotes mein naam ka case waisa hi rehta hai).", "proven": ["postgresql"]}, {"id": "limit_comma", "re": "\\blimit\\s+(\\d+)\\s*,\\s*(\\d+)", "to": "LIMIT \\2 OFFSET \\1", "error": "LIMIT #,# syntax is not supported", "title_en": "{db} has no LIMIT offset, count (that's MySQL/MariaDB)", "title_hi": "{db} mein LIMIT offset, count nahi hota", "fix_en": "Write LIMIT count OFFSET offset (this also works on MySQL/MariaDB).", "fix_hi": "LIMIT count OFFSET offset likho (ye MySQL/MariaDB pe bhi chalta hai).", "proven": ["postgresql"]}, {"id": "curdate", "re": "\\bcurdate\\s*\\(\\s*\\)", "to": "CURRENT_DATE", "error": "42883 function curdate() does not exist", "title_en": "{db} has no CURDATE() (that's MySQL/MariaDB)", "title_hi": "{db} mein CURDATE() nahi hota", "fix_en": "Use CURRENT_DATE (works on MySQL/MariaDB too).", "fix_hi": "CURRENT_DATE likho (MySQL/MariaDB pe bhi chalta hai).", "proven": ["postgresql"]}, {"id": "unix_timestamp", "re": "\\bunix_timestamp\\s*\\(\\s*\\)", "to": "EXTRACT(EPOCH FROM now())", "error": "42883 function unix_timestamp() does not exist", "title_en": "{db} has no UNIX_TIMESTAMP() (that's MySQL/MariaDB)", "title_hi": "{db} mein UNIX_TIMESTAMP() nahi hota", "fix_en": "Use EXTRACT(EPOCH FROM now()) (seconds, with a fraction).", "fix_hi": "EXTRACT(EPOCH FROM now()) likho.", "proven": ["postgresql"]}, {"id": "date_format", "re": "\\bdate_format\\s*\\(", "to": null, "error": "42883 function date_format(...) does not exist", "title_en": "{db} has no DATE_FORMAT() (that's MySQL/MariaDB)", "title_hi": "{db} mein DATE_FORMAT() nahi hota", "fix_en": "Use to_char(col, 'YYYY-MM-DD'); its format codes differ (%Y -> YYYY, %m -> MM, %d -> DD, %H -> HH24, %i -> MI).", "fix_hi": "to_char(col, 'YYYY-MM-DD') likho; format code alag hain (%Y -> YYYY, %m -> MM, %d -> DD).", "proven": ["postgresql"]}, {"id": "group_concat", "re": "\\bgroup_concat\\s*\\(", "to": null, "error": "42883 function group_concat(...) does not exist", "title_en": "{db} has no GROUP_CONCAT() (that's MySQL/MariaDB)", "title_hi": "{db} mein GROUP_CONCAT() nahi hota", "fix_en": "Use string_agg(col::text, ',' ORDER BY ...).", "fix_hi": "string_agg(col::text, ',' ORDER BY ...) likho.", "proven": ["postgresql"]}, {"id": "str_to_date", "re": "\\bstr_to_date\\s*\\(", "to": null, "error": "42883 function str_to_date(...) does not exist", "title_en": "{db} has no STR_TO_DATE() (that's MySQL/MariaDB)", "title_hi": "{db} mein STR_TO_DATE() nahi hota", "fix_en": "Use to_date(text, 'DD-MM-YYYY') or to_timestamp(text, format).", "fix_hi": "to_date(text, 'DD-MM-YYYY') ya to_timestamp(text, format) likho.", "proven": ["postgresql"]}, {"id": "top", "re": "\\bselect\\s+(?:distinct\\s+)?top\\s*\\(?\\s*\\d+\\s*\\)?", "to": null, "error": "42601 syntax error", "title_en": "{db} has no TOP n (that's SQL Server)", "title_hi": "{db} mein TOP n nahi hota (wo SQL Server ka hai)", "fix_en": "Remove TOP n and end the query with ORDER BY ... LIMIT n.", "fix_hi": "TOP n hatao aur aakhir mein ORDER BY ... LIMIT n likho.", "proven": ["postgresql"]}, {"id": "getdate", "re": "\\bgetdate\\s*\\(\\s*\\)", "to": "now()", "error": "42883 function getdate() does not exist", "title_en": "{db} has no GETDATE() (that's SQL Server)", "title_hi": "{db} mein GETDATE() nahi hota", "fix_en": "Use now() (or CURRENT_DATE for the date only).", "fix_hi": "now() (ya sirf date ke liye CURRENT_DATE) likho.", "proven": ["postgresql"]}],
+ "refuses": [{"id": "backticks", "re": "`([^`]+)`", "to": "@bare", "error": "42601 syntax error at or near \"`\"", "title_en": "{db} doesn't accept `backticks` (that's MySQL/MariaDB)", "title_hi": "{db} `backticks` nahi maanta (wo MySQL/MariaDB ke hain)", "fix_en": "Leave the name bare (plain names), or put it in double quotes when it is a reserved word or has spaces; a double-quoted name keeps its exact upper/lower case, a bare one is matched in lower case.", "fix_hi": "Naam bina quote ke likho, ya double quotes mein (double quotes mein naam ka case waisa hi rehta hai).", "proven": ["postgresql"]}, {"id": "limit_comma", "re": "\\blimit\\s+(\\d+)\\s*,\\s*(\\d+)", "to": "LIMIT \\2 OFFSET \\1", "error": "LIMIT #,# syntax is not supported", "title_en": "{db} has no LIMIT offset, count (that's MySQL/MariaDB)", "title_hi": "{db} mein LIMIT offset, count nahi hota", "fix_en": "Write LIMIT count OFFSET offset (this also works on MySQL/MariaDB).", "fix_hi": "LIMIT count OFFSET offset likho (ye MySQL/MariaDB pe bhi chalta hai).", "proven": ["postgresql"]}, {"id": "curdate", "re": "\\bcurdate\\s*\\(\\s*\\)", "to": "CURRENT_DATE", "error": "42883 function curdate() does not exist", "title_en": "{db} has no CURDATE() (that's MySQL/MariaDB)", "title_hi": "{db} mein CURDATE() nahi hota", "fix_en": "Use CURRENT_DATE (works on MySQL/MariaDB too).", "fix_hi": "CURRENT_DATE likho (MySQL/MariaDB pe bhi chalta hai).", "proven": ["postgresql"]}, {"id": "unix_timestamp", "re": "\\bunix_timestamp\\s*\\(\\s*\\)", "to": "EXTRACT(EPOCH FROM now())", "error": "42883 function unix_timestamp() does not exist", "title_en": "{db} has no UNIX_TIMESTAMP() (that's MySQL/MariaDB)", "title_hi": "{db} mein UNIX_TIMESTAMP() nahi hota", "fix_en": "Use EXTRACT(EPOCH FROM now()) (seconds, with a fraction).", "fix_hi": "EXTRACT(EPOCH FROM now()) likho.", "proven": ["postgresql"]}, {"id": "getdate", "re": "\\bgetdate\\s*\\(\\s*\\)", "to": "now()", "error": "42883 function getdate() does not exist", "title_en": "{db} has no GETDATE() (that's SQL Server)", "title_hi": "{db} mein GETDATE() nahi hota", "fix_en": "Use now() (or CURRENT_DATE for the date only).", "fix_hi": "now() (ya sirf date ke liye CURRENT_DATE) likho.", "proven": ["postgresql"]}, {"id": "brackets", "re": "(?<![\\w\\]\\)'])\\[([A-Za-z_][\\w ]*)\\]", "to": "@bare", "error": "42601 syntax error at or near \"[\"", "title_en": "{db} doesn't quote names with [brackets] (that's SQL Server)", "title_hi": "{db} naam [brackets] mein nahi maanta (wo SQL Server ka hai)", "fix_en": "Leave a plain name bare, or put it in double quotes when it is a reserved word or has spaces.", "fix_hi": "Naam bina quote ke likho, ya double quotes mein.", "proven": ["postgresql"]}, {"id": "from_dual", "re": "\\s+from\\s+dual\\b", "to": "", "error": "42P01 relation \"dual\" does not exist", "title_en": "{db} has no DUAL table (that's Oracle / MySQL)", "title_hi": "{db} mein DUAL table nahi hoti", "fix_en": "Leave FROM DUAL out: a SELECT needs no FROM on {db} (a WHERE without FROM works too).", "fix_hi": "FROM DUAL hata do: {db} pe bina FROM ke SELECT chalta hai.", "proven": ["postgresql"]}, {"id": "sysdate_bare", "re": "\\bsysdate\\b(?!\\s*\\()", "to": "now()", "error": "42703 column \"sysdate\" does not exist", "title_en": "{db} has no SYSDATE (that's Oracle / MySQL)", "title_hi": "{db} mein SYSDATE nahi hota", "fix_en": "Use now() (CURRENT_DATE for the date only).", "fix_hi": "now() likho.", "proven": ["postgresql"]}, {"id": "sysdatetime", "re": "\\b(?:sysdatetime|getutcdate)\\s*\\(\\s*\\)", "to": "now()", "error": "42883 function does not exist", "title_en": "{db} has no SYSDATETIME() / GETUTCDATE() (that's SQL Server)", "title_hi": "{db} mein SYSDATETIME() nahi hota", "fix_en": "Use now() (now() AT TIME ZONE 'UTC' for UTC).", "fix_hi": "now() likho.", "proven": ["postgresql"]}, {"id": "regexp", "re": "\\bnot\\s+(?:regexp|rlike)\\b", "to": "!~*", "error": "42601 syntax error", "title_en": "{db} has no NOT REGEXP (that's MySQL/MariaDB)", "title_hi": "{db} mein NOT REGEXP nahi hota", "fix_en": "Use !~* (no match, ignoring case, as REGEXP does with a _ci collation; !~ matches case).", "fix_hi": "!~* likho.", "proven": ["postgresql"]}, {"id": "regexp_match", "re": "\\b(?:regexp|rlike)\\b(?!\\s*\\()", "to": "~*", "error": "42601 syntax error at or near the pattern", "title_en": "{db} has no REGEXP / RLIKE (that's MySQL/MariaDB)", "title_hi": "{db} mein REGEXP nahi hota", "fix_en": "Use ~* (a regex match ignoring case, as REGEXP does with a _ci collation; ~ matches case).", "fix_hi": "~* likho.", "proven": ["postgresql"]}, {"id": "div", "re": "(?<![\\w.])([A-Za-z_][\\w.]*|\\d+)\\s+div\\s+([A-Za-z_][\\w.]*|\\d+)\\b", "to": "DIV(\\1, \\2)", "error": "42601 syntax error at or near the number", "title_en": "{db} has no DIV operator (that's MySQL/MariaDB)", "title_hi": "{db} mein DIV operator nahi hota", "fix_en": "Use the function DIV(a, b): the whole-number quotient, cut toward zero like MySQL's DIV.", "fix_hi": "DIV(a, b) function likho.", "proven": ["postgresql"]}, {"id": "pg_backslash_g", "re": "\\\\G\\s*$", "to": ";", "error": "\\G is a mysql client command", "title_en": "{db}'s psql has no \\G (that's the mysql client)", "title_hi": "psql mein \\G nahi hota", "fix_en": "End with ; (for one column per line in psql, turn on \\x first).", "fix_hi": "; lagao (psql mein \\x).", "proven": ["postgresql"]}],
  "wording": [{"re": "MySQL refuses the query \\(error 1055[^)]*\\) or, with it off, shows one random value", "to": "PostgreSQL refuses the query (error 42803: must appear in the GROUP BY clause)"}, {"re": "MySQL error 1055 deta hai \\(ya random value dikhata hai\\)", "to": "PostgreSQL error 42803 deta hai"}, {"re": "MySQL refuses this \\(error 1140\\) or squashes everything into one row", "to": "PostgreSQL refuses this (error 42803: must appear in the GROUP BY clause)"}, {"re": "MySQL error 1140 deta hai ya sab ek row mein daba deta hai", "to": "PostgreSQL error 42803 deta hai"}, {"re": "MySQL stops with error 1242 \\(Subquery returns more than 1 row\\) and PostgreSQL with", "to": "PostgreSQL stops with error 21000:"}, {"re": "MySQL error 1242 deta hai aur PostgreSQL", "to": "PostgreSQL error 21000 deta hai:"}, {"re": "MySQL stops with error 1111 \\(Invalid use of group function\\), PostgreSQL with", "to": "PostgreSQL stops with error 42803:"}, {"re": "MySQL error 1111, PostgreSQL", "to": "PostgreSQL error 42803:"}, {"re": "\\(MySQL error 1054 Unknown column '[^']*', PostgreSQL: (column [^)]*)\\)", "to": "(PostgreSQL error 42703: \\1)"}, {"re": "\\(MySQL error 1054, PostgreSQL: column does not exist\\)", "to": "(PostgreSQL error 42703: column does not exist)"}, {"re": "\\bMySQL stops with error 1054(?: \\(Unknown column '[^']*'\\))?", "to": "PostgreSQL stops with error 42703 (column does not exist)"}, {"re": "\\bMySQL error 1054\\b", "to": "PostgreSQL error 42703"}, {"re": "\\(error 1054(?: Unknown column '[^']*')?\\)", "to": "(error 42703: column does not exist)"}, {"re": "\\berror 1054\\b", "to": "error 42703"}, {"re": "\\bMySQL stops with error 1052", "to": "PostgreSQL stops with error 42702 (column reference is ambiguous)"}, {"re": "\\bMySQL stops \\(error 1052(, ambiguous)?\\)", "to": "PostgreSQL stops (error 42702, ambiguous)"}, {"re": "\\bMySQL error 1052\\b", "to": "PostgreSQL error 42702"}, {"re": "\\berror 1052\\b", "to": "error 42702"}, {"re": "\\bMySQL only knows the alias", "to": "PostgreSQL only knows the alias"}, {"re": "\\bMySQL sirf alias pehchanta hai", "to": "PostgreSQL sirf alias pehchanta hai"}, {"re": "\\bMySQL reads joins top to bottom", "to": "PostgreSQL reads joins top to bottom"}, {"re": "\\bMySQL joins upar se neeche padhta hai", "to": "PostgreSQL joins upar se neeche padhta hai"}],
  "not_here": ["^FULL OUTER JOIN .*: MySQL doesn't have FULL OUTER JOIN", "^The subquery reads \\S+, the table being changed"],
  "query_marks": [
@@ -797,5 +797,582 @@
    "Result": {"en": "a value worked out without reading a table", "hi": "bina table padhe value"},
    "Values Scan": {"en": "rows of a VALUES list", "hi": "VALUES list ki rows"}
   }
+ },
+ "port": {
+  "about": "What PostgreSQL refuses from other databases' SQL and how to say it in its words; and its interval, date-format and cast words. Every entry was run on PostgreSQL 16 (lab: tests/practice/test_night10.py).",
+  "interval": {
+   "literal": "INTERVAL '{n}' {UNIT}",
+   "expr": "({n}) * INTERVAL '{k} {unit}'",
+   "units": {
+    "WEEK": [
+     "DAY",
+     7
+    ],
+    "QUARTER": [
+     "MONTH",
+     3
+    ]
+   },
+   "error": "42601 syntax error at or near the number"
+  },
+  "rows": {
+   "top_error": "42601 syntax error",
+   "rownum_error": "42703 column \"rownum\" does not exist"
+  },
+  "date_codes": {
+   "YYYY": "year4",
+   "YY": "year2",
+   "MM": "month2",
+   "FMMM": "month",
+   "DD": "day2",
+   "FMDD": "day",
+   "HH24": "hour24",
+   "HH12": "hour12",
+   "MI": "minute",
+   "SS": "second",
+   "FMMonth": "monthname",
+   "Mon": "monthabbr",
+   "FMDay": "dayname",
+   "Dy": "dayabbr",
+   "DDD": "dayofyear",
+   "AM": "ampm",
+   "HH24:MI:SS": "time24"
+  },
+  "cast_refused": [
+   "signed",
+   "signed integer",
+   "unsigned",
+   "unsigned integer",
+   "datetime",
+   "double",
+   "datetime2"
+  ],
+  "cast_types": {
+   "signed": "BIGINT",
+   "signed integer": "BIGINT",
+   "unsigned": "BIGINT",
+   "unsigned integer": "BIGINT",
+   "datetime": "TIMESTAMP",
+   "datetime2": "TIMESTAMP",
+   "double": "DOUBLE PRECISION",
+   "nvarchar": "VARCHAR{size}",
+   "nchar": "VARCHAR{size}",
+   "char": "VARCHAR{size}",
+   "varchar": "VARCHAR{size}",
+   "int": "INTEGER",
+   "integer": "INTEGER",
+   "bigint": "BIGINT",
+   "smallint": "SMALLINT",
+   "decimal": "DECIMAL{size}",
+   "numeric": "NUMERIC{size}",
+   "float": "DOUBLE PRECISION",
+   "real": "REAL",
+   "date": "DATE",
+   "time": "TIME",
+   "text": "TEXT"
+  },
+  "cast_error": "42704 type does not exist",
+  "special": {
+   "group_concat": {
+    "from": "MySQL/MariaDB",
+    "error": "42883 function group_concat(...) does not exist",
+    "fix_en": "string_agg(text, separator ORDER BY ...) joins a group's values; it needs text, so the value is cast.",
+    "fix_hi": "string_agg(text, separator ORDER BY ...) likho.",
+    "manual_en": "Use string_agg(col::text, ',' ORDER BY ...); for several columns join them first (col1 || ' ' || col2).",
+    "manual_hi": "string_agg(col::text, ',' ORDER BY ...) likho.",
+    "proven": [
+     "postgresql"
+    ]
+   },
+   "convert": {
+    "from": "SQL Server / MySQL",
+    "error": "42883 function convert(...) does not exist (or 42703 for the type word)",
+    "fix_en": "CAST(value AS type) with a PostgreSQL type.",
+    "fix_hi": "CAST(value AS type) likho.",
+    "manual_en": "Write CAST(value AS type) with a PostgreSQL type (TEXT, VARCHAR(n), INTEGER, BIGINT, NUMERIC(p,s), DATE, TIMESTAMP).",
+    "manual_hi": "CAST(value AS type) likho.",
+    "proven": [
+     "postgresql"
+    ]
+   }
+  },
+  "calls": [
+   {
+    "fn": "date_add",
+    "args": [
+     2
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42601 syntax error at INTERVAL n (and 42883 function date_add does not exist)",
+    "fix_en": "Add an interval with +: date + INTERVAL 'n' UNIT.",
+    "fix_hi": "date + INTERVAL 'n' UNIT likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "({0} + {IVARG1})"
+   },
+   {
+    "fn": "date_sub",
+    "args": [
+     2
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42601 syntax error at INTERVAL n (and 42883 function date_sub does not exist)",
+    "fix_en": "Subtract an interval with -: date - INTERVAL 'n' UNIT.",
+    "fix_hi": "date - INTERVAL 'n' UNIT likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "({0} - {IVARG1})"
+   },
+   {
+    "fn": "adddate",
+    "args": [
+     2
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function adddate does not exist",
+    "fix_en": "Add an interval with +.",
+    "fix_hi": "+ INTERVAL likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "({0} + {IVARG1})"
+   },
+   {
+    "fn": "datediff",
+    "args": [
+     2
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function datediff(...) does not exist",
+    "fix_en": "date - date gives the days between them on PostgreSQL (the casts drop any time, as MySQL's DATEDIFF does).",
+    "fix_hi": "date - date din deta hai.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "(CAST({0} AS DATE) - CAST({1} AS DATE))"
+   },
+   {
+    "fn": "datediff",
+    "args": [
+     3
+    ],
+    "from": "SQL Server",
+    "error": "42703 column \"day\" does not exist",
+    "fix_en": "date - date gives the days between them on PostgreSQL.",
+    "fix_hi": "date - date din deta hai.",
+    "proven": [
+     "postgresql"
+    ],
+    "by": {
+     "DAY": "(CAST({2} AS DATE) - CAST({1} AS DATE))"
+    },
+    "by_arg": 0,
+    "by_unit": true,
+    "manual_en": "For hours or minutes: EXTRACT(EPOCH FROM (end - start)) / 3600; for months, use age(end, start) and its years * 12 + months.",
+    "manual_hi": "Ghante: EXTRACT(EPOCH FROM (end - start)) / 3600."
+   },
+   {
+    "fn": "timestampdiff",
+    "args": [
+     3
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42703 column \"minute\" does not exist",
+    "fix_en": "The seconds between two times come from EXTRACT(EPOCH FROM end - start); TRUNC keeps whole units like TIMESTAMPDIFF.",
+    "fix_hi": "EXTRACT(EPOCH FROM end - start) se seconds, TRUNC se poore units.",
+    "proven": [
+     "postgresql"
+    ],
+    "by": {
+     "SECOND": "TRUNC(EXTRACT(EPOCH FROM (CAST({2} AS TIMESTAMP) - CAST({1} AS TIMESTAMP))))",
+     "MINUTE": "TRUNC(EXTRACT(EPOCH FROM (CAST({2} AS TIMESTAMP) - CAST({1} AS TIMESTAMP))) / 60)",
+     "HOUR": "TRUNC(EXTRACT(EPOCH FROM (CAST({2} AS TIMESTAMP) - CAST({1} AS TIMESTAMP))) / 3600)",
+     "DAY": "TRUNC(EXTRACT(EPOCH FROM (CAST({2} AS TIMESTAMP) - CAST({1} AS TIMESTAMP))) / 86400)"
+    },
+    "by_arg": 0,
+    "by_unit": true,
+    "manual_en": "For months or years use age(end, start): EXTRACT(YEAR FROM age(...)) * 12 + EXTRACT(MONTH FROM age(...)).",
+    "manual_hi": "Mahine/saal ke liye age(end, start)."
+   },
+   {
+    "fn": "dateadd",
+    "args": [
+     3
+    ],
+    "from": "SQL Server",
+    "error": "42703 column \"day\" does not exist",
+    "fix_en": "Add an interval with +: date + INTERVAL 'n' UNIT.",
+    "fix_hi": "date + INTERVAL likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "({2} + {IV:1:U0})"
+   },
+   {
+    "fn": "datepart",
+    "args": [
+     2
+    ],
+    "from": "SQL Server",
+    "error": "42703 column does not exist",
+    "fix_en": "EXTRACT(part FROM date) works on PostgreSQL, MySQL and MariaDB alike.",
+    "fix_hi": "EXTRACT(part FROM date) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "EXTRACT({U0} FROM {1})"
+   },
+   {
+    "fn": "year",
+    "args": [
+     1
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function year(...) does not exist",
+    "fix_en": "EXTRACT(YEAR FROM date) works on every one of them.",
+    "fix_hi": "EXTRACT(YEAR FROM date) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "EXTRACT(YEAR FROM {0})"
+   },
+   {
+    "fn": "month",
+    "args": [
+     1
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function month(...) does not exist",
+    "fix_en": "EXTRACT(MONTH FROM date) works on every one of them.",
+    "fix_hi": "EXTRACT(MONTH FROM date) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "EXTRACT(MONTH FROM {0})"
+   },
+   {
+    "fn": "day",
+    "args": [
+     1
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function day(...) does not exist",
+    "fix_en": "EXTRACT(DAY FROM date) works on every one of them.",
+    "fix_hi": "EXTRACT(DAY FROM date) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "EXTRACT(DAY FROM {0})"
+   },
+   {
+    "fn": "dayofmonth",
+    "args": [
+     1
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function dayofmonth(...) does not exist",
+    "fix_en": "EXTRACT(DAY FROM date).",
+    "fix_hi": "EXTRACT(DAY FROM date) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "EXTRACT(DAY FROM {0})"
+   },
+   {
+    "fn": "hour",
+    "args": [
+     1
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function hour(...) does not exist",
+    "fix_en": "EXTRACT(HOUR FROM time).",
+    "fix_hi": "EXTRACT(HOUR FROM time) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "EXTRACT(HOUR FROM {0})"
+   },
+   {
+    "fn": "minute",
+    "args": [
+     1
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function minute(...) does not exist",
+    "fix_en": "EXTRACT(MINUTE FROM time).",
+    "fix_hi": "EXTRACT(MINUTE FROM time) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "EXTRACT(MINUTE FROM {0})"
+   },
+   {
+    "fn": "if",
+    "args": [
+     3
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function if(boolean, ...) does not exist",
+    "fix_en": "CASE WHEN ... THEN ... ELSE ... END does it on every database.",
+    "fix_hi": "CASE WHEN ... THEN ... ELSE ... END likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "CASE WHEN {0} THEN {1} ELSE {2} END"
+   },
+   {
+    "fn": "iif",
+    "args": [
+     3
+    ],
+    "from": "SQL Server",
+    "error": "42883 function iif(boolean, ...) does not exist",
+    "fix_en": "CASE WHEN ... THEN ... ELSE ... END does it on every database.",
+    "fix_hi": "CASE WHEN likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "CASE WHEN {0} THEN {1} ELSE {2} END"
+   },
+   {
+    "fn": "locate",
+    "args": [
+     2
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function locate(...) does not exist",
+    "fix_en": "POSITION(x IN text) finds where x starts (0 when it isn't there), on every database.",
+    "fix_hi": "POSITION(x IN text) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "POSITION({0} IN {1})",
+    "manual_en": "LOCATE with a start position: strpos(substr(text, start), x) + start - 1 when found.",
+    "manual_hi": "strpos(substr(...)) likho."
+   },
+   {
+    "fn": "instr",
+    "args": [
+     2
+    ],
+    "from": "MySQL/MariaDB / Oracle",
+    "error": "42883 function instr(...) does not exist",
+    "fix_en": "POSITION(x IN text) finds where x starts; INSTR takes the text first.",
+    "fix_hi": "POSITION(x IN text) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "POSITION({1} IN {0})"
+   },
+   {
+    "fn": "charindex",
+    "args": [
+     2
+    ],
+    "from": "SQL Server",
+    "error": "42883 function charindex(...) does not exist",
+    "fix_en": "POSITION(x IN text) finds where x starts.",
+    "fix_hi": "POSITION(x IN text) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "POSITION({0} IN {1})"
+   },
+   {
+    "fn": "len",
+    "args": [
+     1
+    ],
+    "from": "SQL Server",
+    "error": "42883 function len(...) does not exist",
+    "fix_en": "LENGTH counts characters on PostgreSQL.",
+    "fix_hi": "LENGTH likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "LENGTH({0})"
+   },
+   {
+    "fn": "rand",
+    "args": [
+     0
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function rand() does not exist",
+    "fix_en": "random() gives a random number from 0 to 1.",
+    "fix_hi": "random() likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "random()"
+   },
+   {
+    "fn": "uuid",
+    "args": [
+     0
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function uuid() does not exist",
+    "fix_en": "gen_random_uuid() (PostgreSQL 13+) makes a new UUID.",
+    "fix_hi": "gen_random_uuid() likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "gen_random_uuid()"
+   },
+   {
+    "fn": "newid",
+    "args": [
+     0
+    ],
+    "from": "SQL Server",
+    "error": "42883 function newid() does not exist",
+    "fix_en": "gen_random_uuid() (PostgreSQL 13+) makes a new UUID.",
+    "fix_hi": "gen_random_uuid() likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "gen_random_uuid()"
+   },
+   {
+    "fn": "ucase",
+    "args": [
+     1
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function ucase(...) does not exist",
+    "fix_en": "UPPER works everywhere.",
+    "fix_hi": "UPPER likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "UPPER({0})"
+   },
+   {
+    "fn": "lcase",
+    "args": [
+     1
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function lcase(...) does not exist",
+    "fix_en": "LOWER works everywhere.",
+    "fix_hi": "LOWER likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "LOWER({0})"
+   },
+   {
+    "fn": "substring_index",
+    "args": [
+     3
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function substring_index(...) does not exist",
+    "fix_en": "SPLIT_PART(text, sep, 1) is the part before the first separator.",
+    "fix_hi": "SPLIT_PART(text, sep, 1) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "by": {
+     "1": "SPLIT_PART({0}, {1}, 1)"
+    },
+    "by_arg": 2,
+    "manual_en": "For the last part (count -1) use (regexp_split_to_array(text, sep))[array_length(...)] or reverse + split_part; other counts by hand.",
+    "manual_hi": "Baaki counts haath se likho."
+   },
+   {
+    "fn": "truncate",
+    "args": [
+     2
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function truncate(numeric, integer) does not exist",
+    "fix_en": "TRUNC(number, places) cuts the decimals without rounding.",
+    "fix_hi": "TRUNC(number, places) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "TRUNC({0}, {1})"
+   },
+   {
+    "fn": "date_format",
+    "args": [
+     2
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function date_format(...) does not exist",
+    "fix_en": "to_char(date, format) with PostgreSQL's format codes (%Y -> YYYY, %m -> MM, %d -> DD, %H -> HH24, %i -> MI).",
+    "fix_hi": "to_char(date, format) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "to_char({0}, {F1})",
+    "fmt_from": "mysql",
+    "manual_en": "Use to_char(col, 'YYYY-MM-DD'): its codes differ (%Y -> YYYY, %m -> MM, %d -> DD, %H -> HH24, %i -> MI, %s -> SS, %M -> FMMonth).",
+    "manual_hi": "to_char(col, 'YYYY-MM-DD') likho."
+   },
+   {
+    "fn": "str_to_date",
+    "args": [
+     2
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function str_to_date(...) does not exist",
+    "fix_en": "to_date(text, format) reads text as a date with PostgreSQL's codes (to_timestamp when it has a time).",
+    "fix_hi": "to_date(text, format) likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "to_date({0}, {F1})",
+    "fmt_from": "mysql",
+    "manual_en": "Use to_date(text, 'DD-MM-YYYY') or to_timestamp(text, 'DD-MM-YYYY HH24:MI').",
+    "manual_hi": "to_date(text, 'DD-MM-YYYY') likho."
+   },
+   {
+    "fn": "last_insert_id",
+    "args": [
+     0
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function last_insert_id() does not exist",
+    "fix_en": "lastval() gives the last id this session took from a sequence; better: INSERT ... RETURNING id.",
+    "fix_hi": "lastval() ya INSERT ... RETURNING id.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "lastval()"
+   },
+   {
+    "fn": "curtime",
+    "args": [
+     0
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function curtime() does not exist",
+    "fix_en": "CURRENT_TIME works on every one of them.",
+    "fix_hi": "CURRENT_TIME likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "CURRENT_TIME"
+   },
+   {
+    "fn": "sysdate",
+    "args": [
+     0
+    ],
+    "from": "MySQL/MariaDB",
+    "error": "42883 function sysdate() does not exist",
+    "fix_en": "clock_timestamp() is the time at the moment it runs, like MySQL's SYSDATE() (now() is the transaction's start).",
+    "fix_hi": "clock_timestamp() likho.",
+    "proven": [
+     "postgresql"
+    ],
+    "to": "clock_timestamp()"
+   }
+  ]
  }
 }

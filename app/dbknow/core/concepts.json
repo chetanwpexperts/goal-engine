@@ -20022,6 +20022,2318 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "top_vs_limit",
+   "kind": "compare",
+   "title": {
+    "en": "LIMIT vs TOP vs FETCH FIRST (the first n rows)",
+    "hinglish": "LIMIT vs TOP vs FETCH FIRST (pehli n rows)",
+    "hindi": "LIMIT बनाम TOP बनाम FETCH FIRST"
+   },
+   "terms": [
+    [
+     "top",
+     "limit"
+    ],
+    [
+     "fetch first"
+    ],
+    [
+     "fetch next"
+    ],
+    [
+     "top \\d+",
+     "(sql ?server|ms ?sql|t-?sql)"
+    ],
+    [
+     "(first|top|pehli|pehle) \\d+ (rows|records)",
+     "(sql ?server|ms ?sql|oracle)"
+    ],
+    [
+     "\\d+ rows",
+     "(sql ?server|oracle)",
+     "(kaise|how|कैसे)"
+    ],
+    [
+     "select top"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "limit vs top",
+     "how to get the first 10 rows in sql server",
+     "what is fetch first n rows only"
+    ],
+    "hinglish": [
+     "oracle mein pehli 5 rows kaise nikale",
+     "top aur limit mein kya farak hai"
+    ],
+    "hindi": [
+     "SQL Server में पहली 10 rows कैसे लें"
+    ]
+   },
+   "answer": {
+    "en": "Every database can return only the first n rows, in its own words: MySQL, MariaDB, PostgreSQL and SQLite end the query with LIMIT n (OFFSET m to skip), SQL Server puts TOP (n) after SELECT (or OFFSET m ROWS FETCH NEXT n ROWS ONLY), Oracle 12c+ and PostgreSQL also take the standard FETCH FIRST n ROWS ONLY (MariaDB 10.6+ too, MySQL not), and old Oracle used ROWNUM. Whatever the words, 'first' only means something with an ORDER BY that has a tie-breaker.",
+    "hinglish": "Har database pehli n rows apne shabdon mein deta hai: MySQL, MariaDB, PostgreSQL aur SQLite query ke aakhir mein LIMIT n (OFFSET m), SQL Server SELECT ke baad TOP (n) (ya OFFSET m ROWS FETCH NEXT n ROWS ONLY), Oracle 12c+ aur PostgreSQL standard FETCH FIRST n ROWS ONLY (MariaDB 10.6+ bhi, MySQL nahi), purana Oracle ROWNUM. 'Pehli' ka matlab tabhi hai jab ORDER BY ho, tie-breaker ke saath.",
+    "hindi": "हर database पहली n rows अपने शब्दों में देता है: MySQL, MariaDB, PostgreSQL, SQLite में LIMIT n, SQL Server में TOP (n), Oracle 12c+ और PostgreSQL में FETCH FIRST n ROWS ONLY। ORDER BY के बिना 'पहली' का कोई मतलब नहीं।"
+   },
+   "mistake": {
+    "en": "Writing SELECT TOP 10 on MySQL/PostgreSQL (a syntax error), or LIMIT without ORDER BY (any 10 rows, different each time).",
+    "hinglish": "MySQL/PostgreSQL pe SELECT TOP 10 likhna (syntax error), ya bina ORDER BY ke LIMIT (koi bhi 10 rows).",
+    "hindi": "MySQL/PostgreSQL पर SELECT TOP 10 (error), या ORDER BY के बिना LIMIT।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT id, amount FROM orders ORDER BY amount DESC, id LIMIT 3",
+      "postgresql": "SELECT id, amount FROM orders ORDER BY amount DESC, id FETCH FIRST 3 ROWS ONLY"
+     },
+     "columns": [
+      "id",
+      "amount"
+     ],
+     "result": [
+      [
+       "3",
+       "80000"
+      ],
+      [
+       "6",
+       "65000"
+      ],
+      [
+       "1",
+       "25500"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "LIMIT n OFFSET m (or LIMIT m, n); no TOP, no FETCH FIRST.",
+    "mariadb": "LIMIT n OFFSET m; FETCH FIRST n ROWS ONLY from 10.6 (ran on 10.11 in the lab).",
+    "postgresql": "LIMIT n OFFSET m, or the standard OFFSET m ROWS FETCH FIRST n ROWS ONLY; no TOP and no LIMIT m, n.",
+    "sqlserver": "SELECT TOP (n) ... ORDER BY ..., or ORDER BY ... OFFSET m ROWS FETCH NEXT n ROWS ONLY (2012+); no LIMIT.",
+    "oracle": "FETCH FIRST n ROWS ONLY (12c+); before that ROWNUM in an outer query (ROWNUM is given before ORDER BY).",
+    "sqlite": "LIMIT n OFFSET m."
+   },
+   "related": [
+    "limit",
+    "order_limit_ties",
+    "rownum"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-select.html#SQL-LIMIT",
+   "seen_at": [
+    "https://learn.microsoft.com/en-us/sql/t-sql/queries/top-transact-sql",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "null_function_names",
+   "kind": "compare",
+   "title": {
+    "en": "IFNULL vs COALESCE vs NVL vs ISNULL",
+    "hinglish": "IFNULL vs COALESCE vs NVL vs ISNULL",
+    "hindi": "IFNULL बनाम COALESCE बनाम NVL बनाम ISNULL"
+   },
+   "terms": [
+    [
+     "ifnull",
+     "coalesce"
+    ],
+    [
+     "nvl",
+     "coalesce"
+    ],
+    [
+     "isnull",
+     "coalesce"
+    ],
+    [
+     "ifnull",
+     "nvl"
+    ],
+    [
+     "ifnull",
+     "isnull"
+    ],
+    [
+     "nvl",
+     "isnull"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "ifnull vs coalesce",
+     "difference between nvl and coalesce",
+     "isnull vs coalesce in sql server"
+    ],
+    "hinglish": [
+     "ifnull aur coalesce mein kya farak hai",
+     "nvl ya coalesce kaunsa use kare"
+    ],
+    "hindi": [
+     "NVL और COALESCE में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "All of them replace NULL with a value, but only COALESCE is standard SQL and works everywhere, with any number of arguments (the first non-NULL wins). IFNULL(x, y) is MySQL/MariaDB/SQLite, NVL(x, y) is Oracle (MariaDB accepts it too), ISNULL(x, y) is SQL Server; on MySQL ISNULL(x) only tests for NULL (two arguments: error 1582), and PostgreSQL has none of the three.",
+    "hinglish": "Sab NULL ki jagah value dete hain, par sirf COALESCE standard hai aur har jagah chalta hai, kitne bhi arguments ke saath (pehla non-NULL). IFNULL MySQL/MariaDB/SQLite ka, NVL Oracle ka (MariaDB bhi maanta hai), ISNULL(x, y) SQL Server ka; MySQL pe ISNULL(x) sirf NULL check karta hai (do argument: error 1582), PostgreSQL mein inmein se koi nahi.",
+    "hindi": "सब NULL की जगह value देते हैं; सिर्फ COALESCE standard है और हर जगह चलता है। IFNULL MySQL का, NVL Oracle का, ISNULL SQL Server का।"
+   },
+   "mistake": {
+    "en": "Moving a query to PostgreSQL with IFNULL / NVL in it (function does not exist), or using ISNULL(x, 0) on MySQL.",
+    "hinglish": "IFNULL/NVL wali query PostgreSQL pe le jaana (function nahi hai), ya MySQL pe ISNULL(x, 0).",
+    "hindi": "PostgreSQL पर IFNULL/NVL, या MySQL पर ISNULL(x, 0)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT id, IFNULL(discount, 0) AS d1, COALESCE(discount, shipping, 0) AS d2 FROM orders WHERE id IN (1, 3) ORDER BY id",
+      "postgresql": "SELECT id, COALESCE(discount, 0) AS d1, COALESCE(discount, shipping, 0) AS d2 FROM orders WHERE id IN (1, 3) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "d1",
+      "d2"
+     ],
+     "result": [
+      [
+       "1",
+       "0",
+       "100"
+      ],
+      [
+       "3",
+       "1000",
+       "1000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "IFNULL and COALESCE; ISNULL(x) is a one-argument test; no NVL.",
+    "mariadb": "IFNULL, COALESCE and NVL (an alias of IFNULL).",
+    "postgresql": "Only COALESCE (and NULLIF).",
+    "sqlserver": "ISNULL(x, y) (takes x's type) and COALESCE.",
+    "oracle": "NVL, NVL2 and COALESCE.",
+    "sqlite": "IFNULL and COALESCE."
+   },
+   "related": [
+    "coalesce",
+    "null",
+    "convert_between_databases"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-conditional.html#FUNCTIONS-COALESCE-NVL-IFNULL",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "current_datetime",
+   "kind": "howto",
+   "title": {
+    "en": "Today's date and the current time",
+    "hinglish": "Aaj ki date aur abhi ka time",
+    "hindi": "आज की तारीख और अभी का समय"
+   },
+   "terms": [
+    [
+     "(current|today'?s?|todays|aaj ki|aaj ka) (date|time|datetime|timestamp|tareekh|tarikh)"
+    ],
+    [
+     "now",
+     "current_timestamp"
+    ],
+    [
+     "getdate"
+    ],
+    [
+     "sysdate"
+    ],
+    [
+     "आज की (तारीख|date)"
+    ],
+    [
+     "current_date"
+    ],
+    [
+     "date",
+     "today"
+    ],
+    [
+     "getdate",
+     "sql ?server"
+    ],
+    [
+     "sysdate",
+     "oracle"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to get the current date in sql",
+     "now vs current_timestamp",
+     "what is getdate in sql server"
+    ],
+    "hinglish": [
+     "aaj ki date kaise nikale sql mein",
+     "current time kaise milega postgres mein"
+    ],
+    "hindi": [
+     "SQL में आज की तारीख कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "CURRENT_DATE (the date) and CURRENT_TIMESTAMP (date and time) are standard and work on MySQL, MariaDB, PostgreSQL and SQLite. Each also has its own words: NOW() and CURDATE() on MySQL/MariaDB, now() on PostgreSQL, GETDATE() / SYSDATETIME() on SQL Server, SYSDATE on Oracle. NOW() is the moment the statement (PostgreSQL: the transaction) started; the time zone is the session's.",
+    "hinglish": "CURRENT_DATE (date) aur CURRENT_TIMESTAMP (date + time) standard hain, MySQL, MariaDB, PostgreSQL aur SQLite pe chalte hain. Apne shabd bhi hain: MySQL/MariaDB pe NOW() aur CURDATE(), PostgreSQL pe now(), SQL Server pe GETDATE(), Oracle pe SYSDATE. Time zone session ka hota hai.",
+    "hindi": "CURRENT_DATE और CURRENT_TIMESTAMP हर जगह चलते हैं; MySQL में NOW()/CURDATE(), SQL Server में GETDATE(), Oracle में SYSDATE।"
+   },
+   "mistake": {
+    "en": "Comparing a DATETIME column with CURDATE() to get 'today' (= only matches midnight): use col >= CURRENT_DATE AND col < CURRENT_DATE + 1 day.",
+    "hinglish": "DATETIME column ko = CURDATE() se compare karna (sirf midnight milta hai): col >= CURRENT_DATE AND col < kal likho.",
+    "hindi": "DATETIME column को = CURDATE() से मिलाना (सिर्फ आधी रात मिलती है)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS orders_before_today FROM orders WHERE order_date < CURRENT_DATE"
+     },
+     "columns": [
+      "orders_before_today"
+     ],
+     "result": [
+      [
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "NOW(), CURDATE(), CURRENT_TIMESTAMP, SYSDATE() (the time at that moment).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "now() / CURRENT_TIMESTAMP (transaction start), clock_timestamp() (this moment), CURRENT_DATE; no CURDATE() or GETDATE().",
+    "sqlserver": "GETDATE(), SYSDATETIME(), CAST(GETDATE() AS DATE) for the date.",
+    "oracle": "SYSDATE (no brackets), SYSTIMESTAMP, TRUNC(SYSDATE) for today.",
+    "sqlite": "CURRENT_DATE, CURRENT_TIMESTAMP, date('now') (UTC); no NOW()."
+   },
+   "related": [
+    "add_to_date",
+    "date_difference",
+    "datetime_vs_timestamp"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "add_to_date",
+   "kind": "howto",
+   "title": {
+    "en": "Adding days, months or years to a date",
+    "hinglish": "Date mein din, mahine ya saal jodna",
+    "hindi": "तारीख में दिन, महीने या साल जोड़ना"
+   },
+   "terms": [
+    [
+     "(add|jod\\w*|plus|badha\\w*)",
+     "(days?|months?|years?|weeks?|din|mahin\\w*|saal)",
+     "(dates?|tareekh|tarikh)"
+    ],
+    [
+     "date_add"
+    ],
+    [
+     "dateadd"
+    ],
+    [
+     "date_sub"
+    ],
+    [
+     "adddate"
+    ],
+    [
+     "interval",
+     "(dates?|days?|sql|postgre\\w*|mysql)"
+    ],
+    [
+     "तारीख",
+     "(दिन|महीने|जोड़\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to add days to a date in sql",
+     "what is date_add in mysql",
+     "how to add 1 month to a date in postgresql"
+    ],
+    "hinglish": [
+     "date mein 30 din kaise jode",
+     "dateadd kya hai"
+    ],
+    "hindi": [
+     "तारीख में 30 दिन कैसे जोड़ें"
+    ]
+   },
+   "answer": {
+    "en": "MySQL/MariaDB: DATE_ADD(d, INTERVAL 30 DAY) or d + INTERVAL 30 DAY. PostgreSQL: d + INTERVAL '30 days' (or INTERVAL '30' DAY). SQL Server: DATEADD(day, 30, d). Oracle: d + 30 or ADD_MONTHS(d, 1). SQLite: date(d, '+30 days'). INTERVAL '30' DAY (number in quotes, unit outside) runs on MySQL, MariaDB and PostgreSQL alike. Adding a month to 31 January gives the month's last day (29 Feb in 2024) on all of them.",
+    "hinglish": "MySQL/MariaDB: DATE_ADD(d, INTERVAL 30 DAY) ya d + INTERVAL 30 DAY. PostgreSQL: d + INTERVAL '30 days'. SQL Server: DATEADD(day, 30, d). Oracle: d + 30. SQLite: date(d, '+30 days'). INTERVAL '30' DAY teeno (MySQL, MariaDB, PostgreSQL) pe chalta hai.",
+    "hindi": "MySQL: DATE_ADD(d, INTERVAL 30 DAY); PostgreSQL: d + INTERVAL '30 days'; SQL Server: DATEADD(day, 30, d)। INTERVAL '30' DAY तीनों पर चलता है।"
+   },
+   "mistake": {
+    "en": "Writing d + 30 on MySQL/MariaDB: the date becomes a number (2024-03-01 -> 20240301) and the result is a meaningless number, with no error. And INTERVAL '2' WEEK on PostgreSQL is 2 seconds: write 14 days.",
+    "hinglish": "MySQL/MariaDB pe d + 30 likhna: date number ban jaati hai aur bekaar number aata hai, bina error. PostgreSQL pe INTERVAL '2' WEEK 2 second hai: 14 DAY likho.",
+    "hindi": "MySQL पर d + 30: तारीख number बन जाती है, गलत नतीजा बिना error के।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT id, order_date, DATE_ADD(order_date, INTERVAL 30 DAY) AS due FROM orders WHERE id IN (1, 4) ORDER BY id",
+      "postgresql": "SELECT id, order_date, CAST(order_date + INTERVAL '30 days' AS DATE) AS due FROM orders WHERE id IN (1, 4) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "order_date",
+      "due"
+     ],
+     "result": [
+      [
+       "1",
+       "2024-06-01",
+       "2024-07-01"
+      ],
+      [
+       "4",
+       "2024-07-02",
+       "2024-08-01"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "DATE_ADD / DATE_SUB / + INTERVAL n UNIT (WEEK and QUARTER too).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "date + INTERVAL '30 days' (gives a timestamp; cast back to DATE), date + 30 (an integer adds days to a DATE). INTERVAL 'n' WEEK / QUARTER in that form is read as seconds: use days / months.",
+    "sqlserver": "DATEADD(day | month | year, n, d).",
+    "oracle": "d + n (days), ADD_MONTHS(d, n), d + INTERVAL '7' DAY.",
+    "sqlite": "date(d, '+7 days'), date(d, '+1 month')."
+   },
+   "related": [
+    "date_difference",
+    "current_datetime",
+    "date_parts"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html#function_date-add",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/functions-datetime.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "date_difference",
+   "kind": "howto",
+   "title": {
+    "en": "Days (or time) between two dates",
+    "hinglish": "Do dates ke beech din (ya time)",
+    "hindi": "दो तारीखों के बीच दिन"
+   },
+   "terms": [
+    [
+     "datediff"
+    ],
+    [
+     "timestampdiff"
+    ],
+    [
+     "days?",
+     "between",
+     "dates?"
+    ],
+    [
+     "days",
+     "between",
+     "(two )?dates"
+    ],
+    [
+     "(difference|diff|farak|antar) (between|of|in) (two )?(dates|days)"
+    ],
+    [
+     "(date|dates)",
+     "(minus|subtract\\w*|ghata\\w*)"
+    ],
+    [
+     "दो तारीख\\w*",
+     "(बीच|अंतर|दिन)"
+    ],
+    [
+     "(din|days)",
+     "(beech|बीच)",
+     "(dates|तारीख\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to find the number of days between two dates",
+     "datediff in postgresql",
+     "how to calculate the days between order date and payment date"
+    ],
+    "hinglish": [
+     "do dates ke beech kitne din hai kaise nikale",
+     "datediff postgres mein kaise likhe"
+    ],
+    "hindi": [
+     "दो तारीखों के बीच कितने दिन हैं कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "MySQL/MariaDB: DATEDIFF(end, start) gives whole days (time ignored); TIMESTAMPDIFF(MINUTE, start, end) for other units. PostgreSQL: end_date - start_date gives days for DATE values (EXTRACT(EPOCH FROM end - start) / 3600 for hours on timestamps). SQL Server: DATEDIFF(day, start, end) (unit first, start first). SQLite: julianday(end) - julianday(start). Note the argument order differs: MySQL's DATEDIFF puts the end first.",
+    "hinglish": "MySQL/MariaDB: DATEDIFF(end, start) poore din deta hai; baaki units ke liye TIMESTAMPDIFF(MINUTE, start, end). PostgreSQL: DATE values pe end - start din deta hai. SQL Server: DATEDIFF(day, start, end). SQLite: julianday(end) - julianday(start). Dhyan do: MySQL ke DATEDIFF mein end pehle aata hai.",
+    "hindi": "MySQL: DATEDIFF(end, start); PostgreSQL: end - start; SQL Server: DATEDIFF(day, start, end)।"
+   },
+   "mistake": {
+    "en": "end_date - start_date on MySQL/MariaDB: both dates are read as numbers (20240203 - 20240125 = 78, not 9 days), silently. Use DATEDIFF there.",
+    "hinglish": "MySQL/MariaDB pe end_date - start_date: dates number ban jaati hain (78, 9 din nahi), bina error. Wahan DATEDIFF likho.",
+    "hindi": "MySQL पर end_date - start_date गलत number देता है (78, 9 नहीं)। DATEDIFF लिखिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT o.id, p.paid_at, DATEDIFF(p.paid_at, o.order_date) AS days_to_pay FROM orders o JOIN payments p ON p.order_id = o.id WHERE o.id IN (2, 3) ORDER BY o.id, p.paid_at",
+      "postgresql": "SELECT o.id, p.paid_at, p.paid_at - o.order_date AS days_to_pay FROM orders o JOIN payments p ON p.order_id = o.id WHERE o.id IN (2, 3) ORDER BY o.id, p.paid_at"
+     },
+     "columns": [
+      "id",
+      "paid_at",
+      "days_to_pay"
+     ],
+     "result": [
+      [
+       "2",
+       "2024-06-16",
+       "1"
+      ],
+      [
+       "3",
+       "2024-06-21",
+       "1"
+      ],
+      [
+       "3",
+       "2024-06-28",
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "DATEDIFF(end, start) in days; TIMESTAMPDIFF(unit, start, end) whole units. date - date is a number subtraction (wrong).",
+    "mariadb": "Same as MySQL (lab: 78 instead of 9 for date - date).",
+    "postgresql": "date - date = integer days; timestamp - timestamp = an interval; age(end, start) for years/months; no DATEDIFF.",
+    "sqlserver": "DATEDIFF(unit, start, end) counts the boundaries crossed (31 Dec -> 1 Jan = 1 year).",
+    "oracle": "date - date = days (with a fraction); MONTHS_BETWEEN.",
+    "sqlite": "julianday(end) - julianday(start)."
+   },
+   "related": [
+    "add_to_date",
+    "current_datetime",
+    "date_parts"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html#function_datediff",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/functions-datetime.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "format_date",
+   "kind": "howto",
+   "title": {
+    "en": "Formatting a date as text (DATE_FORMAT, TO_CHAR)",
+    "hinglish": "Date ko format karna (DATE_FORMAT, TO_CHAR)",
+    "hindi": "तारीख का format बदलना"
+   },
+   "terms": [
+    [
+     "date_format"
+    ],
+    [
+     "to_char"
+    ],
+    [
+     "format\\w*",
+     "dates?"
+    ],
+    [
+     "dd[-/ ]?mm[-/ ]?yyyy"
+    ],
+    [
+     "तारीख",
+     "(format|फॉर्मेट)"
+    ],
+    [
+     "str_to_date"
+    ],
+    [
+     "to_date"
+    ],
+    [
+     "date",
+     "(dikha\\w*|show)",
+     "(format|dd|mm)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to format a date in sql",
+     "date_format vs to_char",
+     "how to show a date as dd/mm/yyyy"
+    ],
+    "hinglish": [
+     "date ko dd-mm-yyyy mein kaise dikhaye",
+     "to_char kya hai postgres mein"
+    ],
+    "hindi": [
+     "तारीख का format कैसे बदलें"
+    ]
+   },
+   "answer": {
+    "en": "Turning a date into text in a chosen shape uses each database's own function and codes: MySQL/MariaDB DATE_FORMAT(d, '%d/%m/%Y'), PostgreSQL (and MariaDB 10.6+, Oracle) to_char(d, 'DD/MM/YYYY'), SQL Server FORMAT(d, 'dd/MM/yyyy') or CONVERT(varchar, d, 103), SQLite strftime('%d/%m/%Y', d). The reverse (text to date) is STR_TO_DATE / to_date. Keep dates as dates in tables and WHERE; format only for display.",
+    "hinglish": "Date ko pasand ke shape mein text banane ke liye har database ka apna function aur codes: MySQL/MariaDB DATE_FORMAT(d, '%d/%m/%Y'), PostgreSQL to_char(d, 'DD/MM/YYYY'), SQL Server FORMAT(d, 'dd/MM/yyyy'), SQLite strftime. Ulta (text se date): STR_TO_DATE / to_date. Format sirf dikhane ke liye; WHERE mein date hi rakho.",
+    "hindi": "MySQL: DATE_FORMAT(d, '%d/%m/%Y'); PostgreSQL: to_char(d, 'DD/MM/YYYY'); SQL Server: FORMAT(d, 'dd/MM/yyyy')।"
+   },
+   "mistake": {
+    "en": "Filtering or sorting on the formatted text (DATE_FORMAT(d, '%d/%m/%Y') > '01/02/2024' compares text, and sorts 02/01 before 31/12), and it blocks the index.",
+    "hinglish": "Formatted text pe filter/sort karna (text compare hota hai, galat order), aur index bhi nahi lagta.",
+    "hindi": "Format किए text पर filter/sort करना गलत नतीजे देता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT id, DATE_FORMAT(order_date, '%d/%m/%Y') AS shown FROM orders WHERE id IN (1, 2) ORDER BY id",
+      "postgresql": "SELECT id, to_char(order_date, 'DD/MM/YYYY') AS shown FROM orders WHERE id IN (1, 2) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "shown"
+     ],
+     "result": [
+      [
+       "1",
+       "01/06/2024"
+      ],
+      [
+       "2",
+       "15/06/2024"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "DATE_FORMAT with % codes (%Y year, %m month, %d day, %H hour, %i minute, %b short month).",
+    "mariadb": "DATE_FORMAT; TO_CHAR too from 10.6.",
+    "postgresql": "to_char with YYYY MM DD HH24 MI SS Mon (FMMonth for the full name without padding).",
+    "sqlserver": "FORMAT(d, 'dd/MM/yyyy') or CONVERT(varchar(10), d, 103).",
+    "oracle": "TO_CHAR(d, 'DD/MM/YYYY').",
+    "sqlite": "strftime('%d/%m/%Y', d)."
+   },
+   "related": [
+    "date_parts",
+    "dates_as_text",
+    "add_to_date"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html#function_date-format",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/functions-formatting.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "date_parts",
+   "kind": "howto",
+   "title": {
+    "en": "Getting the year, month or day out of a date",
+    "hinglish": "Date se saal, mahina ya din nikalna",
+    "hindi": "तारीख से साल, महीना या दिन निकालना"
+   },
+   "terms": [
+    [
+     "(year|month|day|saal|mahina|month)",
+     "(from|se|nikal\\w*|get)",
+     "(dates?|tareekh|tarikh)"
+    ],
+    [
+     "extract",
+     "(year|month|day|date|hour)"
+    ],
+    [
+     "datepart"
+    ],
+    [
+     "year\\(?\\)?",
+     "(postgre\\w*|sql ?server|function)"
+    ],
+    [
+     "तारीख से",
+     "(साल|महीना|दिन)"
+    ],
+    [
+     "extract"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to get the year from a date in sql",
+     "what is extract in sql",
+     "year function in postgresql"
+    ],
+    "hinglish": [
+     "date se month kaise nikale",
+     "extract kya karta hai"
+    ],
+    "hindi": [
+     "तारीख से साल कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "EXTRACT(YEAR FROM d) (MONTH, DAY, HOUR, ...) is standard and works on MySQL, MariaDB and PostgreSQL (and Oracle). MySQL/MariaDB also have YEAR(d), MONTH(d), DAY(d); SQL Server has YEAR(d) and DATEPART(year, d); SQLite uses strftime('%Y', d). PostgreSQL returns a numeric (2024), MySQL an integer.",
+    "hinglish": "EXTRACT(YEAR FROM d) (MONTH, DAY, HOUR ...) standard hai: MySQL, MariaDB, PostgreSQL (aur Oracle) pe chalta hai. MySQL/MariaDB mein YEAR(d), MONTH(d) bhi; SQL Server mein DATEPART(year, d); SQLite mein strftime('%Y', d).",
+    "hindi": "EXTRACT(YEAR FROM d) हर जगह चलता है; MySQL में YEAR(d) भी, SQL Server में DATEPART।"
+   },
+   "mistake": {
+    "en": "Filtering with WHERE YEAR(d) = 2024: right rows, but the index on d can't be used; write d >= '2024-01-01' AND d < '2025-01-01'.",
+    "hinglish": "WHERE YEAR(d) = 2024: rows sahi, par d ka index nahi lagta; d >= '2024-01-01' AND d < '2025-01-01' likho.",
+    "hindi": "WHERE YEAR(d) = 2024 से index नहीं लगता; range लिखिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT EXTRACT(MONTH FROM order_date) AS month, COUNT(*) AS orders FROM orders GROUP BY EXTRACT(MONTH FROM order_date) ORDER BY month"
+     },
+     "columns": [
+      "month",
+      "orders"
+     ],
+     "result": [
+      [
+       "6",
+       "3"
+      ],
+      [
+       "7",
+       "4"
+      ],
+      [
+       "8",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "YEAR(), MONTH(), DAY(), HOUR() and EXTRACT().",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "EXTRACT(part FROM d) or date_part('year', d); no YEAR() function.",
+    "sqlserver": "YEAR(d), MONTH(d), DATEPART(part, d).",
+    "oracle": "EXTRACT(YEAR FROM d), TO_CHAR(d, 'YYYY').",
+    "sqlite": "strftime('%Y', d) (text)."
+   },
+   "related": [
+    "format_date",
+    "group_by_month",
+    "sargable"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-EXTRACT",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html#function_extract",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "find_in_text",
+   "kind": "howto",
+   "title": {
+    "en": "Finding where a text appears inside another (LOCATE, POSITION, CHARINDEX)",
+    "hinglish": "Text ke andar text ki position (LOCATE, POSITION, CHARINDEX)",
+    "hindi": "text में text की जगह ढूँढना"
+   },
+   "terms": [
+    [
+     "locate"
+    ],
+    [
+     "charindex"
+    ],
+    [
+     "instr"
+    ],
+    [
+     "strpos"
+    ],
+    [
+     "position",
+     "(string|text|character|char|akshar|word|substring)"
+    ],
+    [
+     "position of"
+    ],
+    [
+     "(index|position) of",
+     "(character|substring|text)"
+    ],
+    [
+     "स्ट्रिंग",
+     "(position|जगह)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to find the position of a character in a string in sql",
+     "locate vs position",
+     "charindex in mysql"
+    ],
+    "hinglish": [
+     "string mein character ki position kaise nikale",
+     "instr kya karta hai"
+    ],
+    "hindi": [
+     "string में अक्षर की position कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "POSITION('x' IN text) is standard and works on MySQL, MariaDB and PostgreSQL: it gives where 'x' starts (1 for the first character, 0 when it isn't there). The same idea with other names: LOCATE('x', text) and INSTR(text, 'x') on MySQL/MariaDB (note the opposite argument orders), strpos(text, 'x') on PostgreSQL, CHARINDEX('x', text) on SQL Server, INSTR(text, 'x') on Oracle and SQLite.",
+    "hinglish": "POSITION('x' IN text) standard hai: MySQL, MariaDB, PostgreSQL pe chalta hai; 'x' kahan shuru hota hai (pehla akshar 1, na mile to 0). Doosre naam: MySQL pe LOCATE('x', text) aur INSTR(text, 'x') (arguments ka kram ulta), PostgreSQL pe strpos(text, 'x'), SQL Server pe CHARINDEX('x', text).",
+    "hindi": "POSITION('x' IN text) हर जगह चलता है; MySQL में LOCATE/INSTR, SQL Server में CHARINDEX।"
+   },
+   "mistake": {
+    "en": "Swapping the arguments when moving between them (LOCATE takes the text to find first, INSTR and strpos take it second), and forgetting that MySQL/MariaDB match case-insensitively there (PostgreSQL doesn't).",
+    "hinglish": "Database badalte waqt arguments ulat dena (LOCATE mein dhoondhne wala pehle, INSTR/strpos mein baad mein), aur bhoolna ki MySQL case ignore karta hai.",
+    "hindi": "Arguments का क्रम उल्टा कर देना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, email, POSITION('@' IN email) AS at_sign FROM customers WHERE id IN (1, 2) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "email",
+      "at_sign"
+     ],
+     "result": [
+      [
+       "1",
+       "aarav@mail.test",
+       "6"
+      ],
+      [
+       "2",
+       "diya@mail.test",
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "LOCATE(x, text [, start]), INSTR(text, x), POSITION(x IN text); case-insensitive with a _ci collation.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "POSITION(x IN text), strpos(text, x); case-sensitive.",
+    "sqlserver": "CHARINDEX(x, text [, start]), PATINDEX for patterns.",
+    "oracle": "INSTR(text, x [, start, n]).",
+    "sqlite": "instr(text, x)."
+   },
+   "related": [
+    "text_length",
+    "like",
+    "case_insensitive_search"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-string.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/string-functions.html#function_locate",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "text_length",
+   "kind": "compare",
+   "title": {
+    "en": "LENGTH vs CHAR_LENGTH (bytes or characters)",
+    "hinglish": "LENGTH vs CHAR_LENGTH (bytes ya characters)",
+    "hindi": "LENGTH बनाम CHAR_LENGTH"
+   },
+   "terms": [
+    [
+     "char_length"
+    ],
+    [
+     "character_length"
+    ],
+    [
+     "length",
+     "(string|text|characters?|name|column|value)"
+    ],
+    [
+     "\\blen\\b"
+    ],
+    [
+     "(count|gin\\w*)",
+     "(characters|letters|akshar)"
+    ],
+    [
+     "लंबाई"
+    ],
+    [
+     "octet_length"
+    ],
+    [
+     "datalength"
+    ],
+    [
+     "\\blen\\b",
+     "sql ?server"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "length vs char_length",
+     "how to count the characters in a string in sql",
+     "what is len in sql server"
+    ],
+    "hinglish": [
+     "string ki length kaise nikale",
+     "char_length aur length mein kya farak hai"
+    ],
+    "hindi": [
+     "स्ट्रिंग की लंबाई कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "CHAR_LENGTH(text) counts characters on MySQL, MariaDB and PostgreSQL alike. LENGTH(text) counts BYTES on MySQL/MariaDB (with utf8mb4 'ñ' or a Hindi letter is 2-3 bytes) but characters on PostgreSQL, Oracle and SQLite. SQL Server's LEN counts characters and ignores trailing spaces; its DATALENGTH counts bytes.",
+    "hinglish": "CHAR_LENGTH(text) MySQL, MariaDB aur PostgreSQL teeno pe characters ginta hai. LENGTH MySQL/MariaDB pe BYTES ginta hai ('ñ' ya Hindi akshar 2-3 bytes), PostgreSQL pe characters. SQL Server ka LEN characters ginta hai aur aakhri spaces chhod deta hai.",
+    "hindi": "CHAR_LENGTH हर जगह characters गिनता है; MySQL में LENGTH bytes गिनता है।"
+   },
+   "mistake": {
+    "en": "Using LENGTH(name) > 50 on MySQL to check a 50-character limit: names in Hindi or with accents are counted 2-3 times longer.",
+    "hinglish": "MySQL pe 50 character ki limit LENGTH se check karna: Hindi/accent wale naam 2-3 guna lambe gine jaate hain.",
+    "hindi": "MySQL में LENGTH से character limit जाँचना: हिंदी नाम 2-3 गुना गिने जाते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT name, CHAR_LENGTH(name) AS chars FROM products WHERE id IN (1, 4) ORDER BY id"
+     },
+     "columns": [
+      "name",
+      "chars"
+     ],
+     "result": [
+      [
+       "Phone X",
+       "7"
+      ],
+      [
+       "SQL Basics",
+       "10"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "LENGTH = bytes, CHAR_LENGTH = characters (lab: 'ñab' -> 4 vs 3).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "LENGTH and CHAR_LENGTH = characters; OCTET_LENGTH = bytes.",
+    "sqlserver": "LEN = characters without trailing spaces; DATALENGTH = bytes.",
+    "oracle": "LENGTH = characters, LENGTHB = bytes; LENGTH('') is NULL.",
+    "sqlite": "length() = characters for text."
+   },
+   "related": [
+    "find_in_text",
+    "utf8mb4",
+    "varchar_vs_char"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/string-functions.html#function_char-length",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/functions-string.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "if_in_sql",
+   "kind": "howto",
+   "title": {
+    "en": "IF() / IIF() / CASE: a condition inside a query",
+    "hinglish": "Query ke andar condition: IF() / IIF() / CASE",
+    "hindi": "Query में शर्त: IF / CASE"
+   },
+   "terms": [
+    [
+     "\\bif\\b",
+     "(select|query|sql|postgre\\w*|mysql|column)"
+    ],
+    [
+     "\\biif\\b"
+    ],
+    [
+     "if ?else",
+     "(select|query|sql|column)"
+    ],
+    [
+     "if function"
+    ],
+    [
+     "(अगर|if)",
+     "(query|क्वेरी)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to use if in a select query",
+     "if function in postgresql",
+     "iif vs case"
+    ],
+    "hinglish": [
+     "select mein if else kaise lagaye",
+     "postgres mein if kaise likhe"
+    ],
+    "hindi": [
+     "query में if else कैसे लगाएं"
+    ]
+   },
+   "answer": {
+    "en": "CASE WHEN condition THEN a ELSE b END is standard and works on every database, inside SELECT, WHERE, ORDER BY or an UPDATE's SET. MySQL/MariaDB also have IF(condition, a, b), SQL Server IIF(condition, a, b), Oracle DECODE; PostgreSQL has none of them in plain SQL (its IF is only inside PL/pgSQL code), so CASE is the portable choice.",
+    "hinglish": "CASE WHEN condition THEN a ELSE b END standard hai aur har database pe chalta hai (SELECT, WHERE, ORDER BY, UPDATE SET). MySQL/MariaDB mein IF(condition, a, b) bhi, SQL Server mein IIF; PostgreSQL ki plain SQL mein ye nahi (IF sirf PL/pgSQL code mein), isliye CASE likho.",
+    "hindi": "CASE WHEN ... END हर जगह चलता है; MySQL में IF(), SQL Server में IIF()।"
+   },
+   "mistake": {
+    "en": "Writing IF(...) in a PostgreSQL query (function if(boolean, ...) does not exist), or leaving out ELSE (NULL for every other row).",
+    "hinglish": "PostgreSQL query mein IF(...) likhna (function nahi hai), ya ELSE bhool jaana (baaki rows NULL).",
+    "hindi": "PostgreSQL में IF() लिखना, या ELSE भूलना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount, CASE WHEN amount >= 10000 THEN 'big' ELSE 'small' END AS size FROM orders WHERE id IN (1, 2) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "amount",
+      "size"
+     ],
+     "result": [
+      [
+       "1",
+       "25500",
+       "big"
+      ],
+      [
+       "2",
+       "500",
+       "small"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "IF(cond, a, b) and CASE.",
+    "mariadb": "IF, CASE; no IIF.",
+    "postgresql": "CASE only (IF exists only in PL/pgSQL blocks).",
+    "sqlserver": "IIF(cond, a, b) (2012+) and CASE.",
+    "oracle": "CASE and DECODE.",
+    "sqlite": "CASE and iif() (3.32+)."
+   },
+   "related": [
+    "case_when",
+    "case_no_else",
+    "coalesce"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-conditional.html#FUNCTIONS-CASE",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/flow-control-functions.html#function_if",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "quote_names",
+   "kind": "compare",
+   "title": {
+    "en": "Quoting names: `backticks`, \"double quotes\", [brackets]",
+    "hinglish": "Naam quote karna: `backticks`, \"double quotes\", [brackets]",
+    "hindi": "नाम quote करना"
+   },
+   "terms": [
+    [
+     "backticks?"
+    ],
+    [
+     "double quotes?",
+     "(names?|columns?|tables?|identifiers?|postgre\\w*)"
+    ],
+    [
+     "square brackets?"
+    ],
+    [
+     "identifiers?",
+     "quot\\w*"
+    ],
+    [
+     "(column|table) (name|naam)\\w*",
+     "(space|reserved|keyword)"
+    ],
+    [
+     "quot\\w*",
+     "(column|table) names?"
+    ],
+    [
+     "square brackets?",
+     "sql ?server"
+    ],
+    [
+     "कॉलम",
+     "space"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "backticks vs double quotes in sql",
+     "what are square brackets in sql server",
+     "how to write a column name with a space"
+    ],
+    "hinglish": [
+     "column naam mein space ho to kaise likhe",
+     "backtick aur double quote mein kya farak hai"
+    ],
+    "hindi": [
+     "कॉलम नाम में space हो तो कैसे लिखें"
+    ]
+   },
+   "answer": {
+    "en": "A name that is a reserved word or has spaces must be quoted, in each database's own way: `backticks` on MySQL/MariaDB, \"double quotes\" on PostgreSQL, Oracle and SQLite (the SQL standard), [brackets] on SQL Server. Text VALUES always use 'single quotes'. On PostgreSQL a quoted name keeps its exact case (\"Name\" is not name), while unquoted names are folded to lower case; on MySQL double quotes make a TEXT value unless ANSI_QUOTES is on.",
+    "hinglish": "Reserved word ya space wala naam quote karna padta hai, har database ke tareeke se: MySQL/MariaDB pe `backticks`, PostgreSQL/Oracle/SQLite pe \"double quotes\", SQL Server pe [brackets]. Text VALUES hamesha 'single quotes' mein. PostgreSQL pe quote wala naam apna case rakhta hai; MySQL pe double quotes text value ban jaate hain.",
+    "hindi": "MySQL: `backticks`, PostgreSQL: \"double quotes\", SQL Server: [brackets]; values हमेशा 'single quotes' में।"
+   },
+   "mistake": {
+    "en": "Writing WHERE status = \"paid\" on PostgreSQL (it looks for a COLUMN named paid), or SELECT \"id\" on MySQL (it returns the text 'id').",
+    "hinglish": "PostgreSQL pe WHERE status = \"paid\" (paid naam ka column dhoondhta hai), ya MySQL pe SELECT \"id\" (text 'id' aata hai).",
+    "hindi": "PostgreSQL में \"paid\" column समझा जाता है; MySQL में \"id\" text।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT `id`, `status` FROM orders WHERE id = 1",
+      "postgresql": "SELECT \"id\", \"status\" FROM orders WHERE id = 1"
+     },
+     "columns": [
+      "id",
+      "status"
+     ],
+     "result": [
+      [
+       "1",
+       "paid"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "`name`; \"x\" is a text value unless sql_mode has ANSI_QUOTES.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "\"name\" (keeps case); backticks are a syntax error.",
+    "sqlserver": "[name] or \"name\" (QUOTED_IDENTIFIER on).",
+    "oracle": "\"NAME\" (unquoted names are stored in upper case).",
+    "sqlite": "\"name\" (also accepts `name` and [name])."
+   },
+   "related": [
+    "alias",
+    "sql_vs_database",
+    "convert_between_databases"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/identifiers.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "case_insensitive_search",
+   "kind": "howto",
+   "title": {
+    "en": "Searching without caring about upper/lower case",
+    "hinglish": "Bina case ki parwah search karna",
+    "hindi": "बड़े-छोटे अक्षर की परवाह किए बिना खोजना"
+   },
+   "terms": [
+    [
+     "case[- ]?(in)?sensitive",
+     "(search\\w*|match\\w*|compar\\w*|like|where|dhoondh\\w*|filter)"
+    ],
+    [
+     "ilike"
+    ],
+    [
+     "ignor\\w*",
+     "case"
+    ],
+    [
+     "case",
+     "ignore"
+    ],
+    [
+     "(upper|lower) ?case",
+     "(search|match|compare|dhoondh\\w*)"
+    ],
+    [
+     "बड़े",
+     "छोटे",
+     "अक्षर"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to search case insensitive in sql",
+     "what is ilike in postgresql",
+     "how to compare strings ignoring case"
+    ],
+    "hinglish": [
+     "case ignore karke search kaise kare",
+     "ilike kya hai"
+    ],
+    "hindi": [
+     "बड़े छोटे अक्षर की परवाह किए बिना कैसे खोजें"
+    ]
+   },
+   "answer": {
+    "en": "Whether 'Pune' = 'PUNE' depends on the database: MySQL/MariaDB's usual _ci collations already ignore case; PostgreSQL, SQLite (for =) and Oracle compare exactly. The portable way is LOWER(col) = LOWER('Pune') (or LIKE on LOWER(col)); PostgreSQL also has ILIKE, and SQL Server follows the column's collation (usually case-insensitive).",
+    "hinglish": "'Pune' = 'PUNE' database pe depend karta hai: MySQL/MariaDB ki aam _ci collation case ignore karti hai; PostgreSQL, SQLite (= ke liye) aur Oracle exact compare karte hain. Portable tareeka LOWER(col) = LOWER('Pune'); PostgreSQL mein ILIKE bhi hai.",
+    "hindi": "MySQL case ignore करता है, PostgreSQL नहीं; हर जगह LOWER(col) = LOWER('...') लिखिए।"
+   },
+   "mistake": {
+    "en": "Moving a MySQL query to PostgreSQL and finding fewer rows: WHERE city = 'pune' no longer matches 'Pune'. And on a big table, LOWER(col) needs an index on LOWER(col) to stay fast.",
+    "hinglish": "MySQL query PostgreSQL pe le jaane pe kam rows: WHERE city = 'pune' ab 'Pune' se nahi milta. Badi table pe LOWER(col) ke liye LOWER(col) ka index chahiye.",
+    "hindi": "MySQL से PostgreSQL पर कम rows मिलना: 'pune' अब 'Pune' से नहीं मिलता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, first_name FROM customers WHERE LOWER(first_name) LIKE 'a%' ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "1",
+       "Aarav"
+      ],
+      [
+       "5",
+       "Aarav"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Ignores case with the default _ci collations; use BINARY or a _bin/_cs collation for an exact match.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Case-sensitive; ILIKE, LOWER(), the citext type, or a nondeterministic ICU collation.",
+    "sqlserver": "Follows the collation (default ..._CI_AS ignores case).",
+    "oracle": "Case-sensitive; UPPER() both sides.",
+    "sqlite": "= is case-sensitive; LIKE ignores ASCII case."
+   },
+   "related": [
+    "collation",
+    "like",
+    "expression_index"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-LIKE",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/case-sensitivity.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "get_inserted_id",
+   "kind": "howto",
+   "title": {
+    "en": "Getting the id of the row just inserted",
+    "hinglish": "Abhi insert hui row ki id lena",
+    "hindi": "अभी डाली गई row की id"
+   },
+   "terms": [
+    [
+     "last_insert_id"
+    ],
+    [
+     "returning",
+     "(id|insert\\w*)"
+    ],
+    [
+     "scope_identity"
+    ],
+    [
+     "lastval"
+    ],
+    [
+     "(inserted|insert\\w*|new) (row|record)?",
+     "\\bid\\b",
+     "(get|return|find|milega|kaise|पता)"
+    ],
+    [
+     "insert",
+     "(ke baad|के बाद|after)",
+     "\\bid\\b"
+    ],
+    [
+     "scope_identity",
+     "sql ?server"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to get the id of the last inserted row",
+     "last_insert_id vs returning",
+     "what is scope_identity in sql server"
+    ],
+    "hinglish": [
+     "insert ke baad id kaise milega",
+     "last_insert_id kya hai"
+    ],
+    "hindi": [
+     "insert के बाद नई id कैसे पता करें"
+    ]
+   },
+   "answer": {
+    "en": "After inserting a row with an auto-numbered key, ask for its new id in the database's own way: MySQL/MariaDB SELECT LAST_INSERT_ID() (per connection, so other users' inserts don't mix in), PostgreSQL INSERT ... RETURNING id (the cleanest: the id comes back with the insert; MariaDB 10.5+ and SQLite 3.35+ have RETURNING too), SQL Server SCOPE_IDENTITY() or OUTPUT inserted.id. Never SELECT MAX(id): another insert can land in between.",
+    "hinglish": "Auto number wali key ke saath row insert karne ke baad nayi id database ke tareeke se lo: MySQL/MariaDB SELECT LAST_INSERT_ID() (har connection ki apni), PostgreSQL INSERT ... RETURNING id (id insert ke saath hi aati hai), SQL Server SCOPE_IDENTITY(). SELECT MAX(id) kabhi nahi: beech mein koi aur insert ho sakta hai.",
+    "hindi": "MySQL: LAST_INSERT_ID(); PostgreSQL: INSERT ... RETURNING id; SQL Server: SCOPE_IDENTITY()। MAX(id) कभी नहीं।"
+   },
+   "mistake": {
+    "en": "SELECT MAX(id) after the insert: with two users inserting at once, one of them gets the other's id.",
+    "hinglish": "Insert ke baad SELECT MAX(id): do log ek saath insert karein to ek ko doosre ki id milti hai.",
+    "hindi": "insert के बाद MAX(id): दो users एक साथ हों तो गलत id।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE demo_pk (id INT AUTO_INCREMENT PRIMARY KEY, d DATE);\nINSERT INTO demo_pk (d) VALUES ('2024-01-01');\nSELECT LAST_INSERT_ID() AS new_id",
+      "postgresql": "CREATE TABLE demo_pk (id INT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, d DATE);\nINSERT INTO demo_pk (d) VALUES ('2024-01-01') RETURNING id AS new_id"
+     },
+     "columns": [
+      "new_id"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "LAST_INSERT_ID() (the first id of a multi-row insert); no RETURNING.",
+    "mariadb": "LAST_INSERT_ID(); INSERT/DELETE ... RETURNING from 10.5 (not UPDATE).",
+    "postgresql": "INSERT ... RETURNING id; or currval('seq') / lastval() in the same session.",
+    "sqlserver": "SCOPE_IDENTITY() or OUTPUT inserted.id (@@IDENTITY can return a trigger's id).",
+    "oracle": "INSERT ... RETURNING id INTO :v.",
+    "sqlite": "last_insert_rowid() or RETURNING (3.35+)."
+   },
+   "related": [
+    "auto_increment",
+    "insert_into",
+    "upsert"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/information-functions.html#function_last-insert-id",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/dml-returning.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "dual_table",
+   "kind": "concept",
+   "title": {
+    "en": "DUAL (SELECT without a table)",
+    "hinglish": "DUAL (bina table ka SELECT)",
+    "hindi": "DUAL (बिना table का SELECT)"
+   },
+   "terms": [
+    [
+     "dual"
+    ],
+    [
+     "select",
+     "without",
+     "(table|from)"
+    ],
+    [
+     "bina table",
+     "select"
+    ],
+    [
+     "dual",
+     "(oracle|from|table|select|need)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is dual in sql",
+     "why does oracle need from dual",
+     "can i select without a table"
+    ],
+    "hinglish": [
+     "dual table kya hai",
+     "bina table select kaise kare"
+    ],
+    "hindi": [
+     "DUAL टेबल क्या है"
+    ]
+   },
+   "answer": {
+    "en": "DUAL is a one-row dummy table that Oracle needed for a SELECT that reads no table (SELECT SYSDATE FROM DUAL). MySQL and MariaDB accept FROM DUAL but don't need it; PostgreSQL, SQL Server and SQLite have no DUAL at all and simply allow SELECT 1 + 1 with no FROM (PostgreSQL: relation \"dual\" does not exist).",
+    "hinglish": "DUAL ek row wali dummy table hai jo Oracle ko bina table wale SELECT ke liye chahiye thi (SELECT SYSDATE FROM DUAL). MySQL/MariaDB FROM DUAL maante hain par zaroorat nahi; PostgreSQL, SQL Server aur SQLite mein DUAL hai hi nahi, wahan bas SELECT 1 + 1 likho.",
+    "hindi": "DUAL Oracle की एक-row वाली dummy table है; PostgreSQL में नहीं है, वहाँ बिना FROM के SELECT चलता है।"
+   },
+   "mistake": {
+    "en": "Keeping FROM DUAL when moving a query to PostgreSQL (relation \"dual\" does not exist): just drop it.",
+    "hinglish": "PostgreSQL pe FROM DUAL rehne dena (error): bas hata do.",
+    "hindi": "PostgreSQL पर FROM DUAL रखना (error)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT 1 + 1 AS two FROM DUAL",
+      "postgresql": "SELECT 1 + 1 AS two"
+     },
+     "columns": [
+      "two"
+     ],
+     "result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "FROM DUAL is accepted and ignored.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "No DUAL: SELECT without FROM.",
+    "sqlserver": "No DUAL: SELECT without FROM.",
+    "oracle": "FROM DUAL is required before 23ai.",
+    "sqlite": "No DUAL: SELECT without FROM."
+   },
+   "related": [
+    "select",
+    "rownum",
+    "convert_between_databases"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/select.html",
+   "seen_at": [
+    "https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/Selecting-from-the-DUAL-Table.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "rownum",
+   "kind": "concept",
+   "title": {
+    "en": "ROWNUM (Oracle's row counter)",
+    "hinglish": "ROWNUM (Oracle ka row counter)",
+    "hindi": "ROWNUM (Oracle का row counter)"
+   },
+   "terms": [
+    [
+     "rownum"
+    ],
+    [
+     "row ?num",
+     "oracle"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is rownum in sql",
+     "rownum in mysql",
+     "how to use rownum in postgresql"
+    ],
+    "hinglish": [
+     "rownum kya hai",
+     "mysql mein rownum kaise likhe"
+    ],
+    "hindi": [
+     "ROWNUM क्या है"
+    ]
+   },
+   "answer": {
+    "en": "ROWNUM is Oracle's number for each row as it is read (1, 2, 3 ...), used to keep the first n rows (WHERE ROWNUM <= 10). It is given BEFORE ORDER BY, so ORDER BY ... with ROWNUM <= 10 sorts 10 arbitrary rows; the top 10 needs the sort in a subquery first (or FETCH FIRST 10 ROWS ONLY on 12c+). MySQL, MariaDB and PostgreSQL have no ROWNUM: use ORDER BY ... LIMIT n, or ROW_NUMBER() OVER (ORDER BY ...) for a running number.",
+    "hinglish": "ROWNUM Oracle ka har padhi row ka number hai (1, 2, 3 ...), pehli n rows rakhne ke liye (WHERE ROWNUM <= 10). Ye ORDER BY se PEHLE milta hai, isliye ROWNUM <= 10 ke saath ORDER BY koi bhi 10 rows sort karta hai. MySQL, MariaDB, PostgreSQL mein ROWNUM nahi: ORDER BY ... LIMIT n, ya number ke liye ROW_NUMBER() OVER (ORDER BY ...).",
+    "hindi": "ROWNUM Oracle का row number है, ORDER BY से पहले दिया जाता है। MySQL/PostgreSQL में ORDER BY ... LIMIT n लिखिए।"
+   },
+   "mistake": {
+    "en": "Expecting WHERE ROWNUM <= 5 ORDER BY amount DESC to give the 5 biggest: Oracle picks 5 rows first, then sorts them.",
+    "hinglish": "WHERE ROWNUM <= 5 ORDER BY amount DESC se 5 sabse bade ki ummeed: Oracle pehle koi 5 rows leta hai, phir sort.",
+    "hindi": "ROWNUM <= 5 के साथ ORDER BY से सबसे बड़े 5 नहीं मिलते।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount FROM orders ORDER BY amount DESC, id LIMIT 2"
+     },
+     "columns": [
+      "id",
+      "amount"
+     ],
+     "result": [
+      [
+       "3",
+       "80000"
+      ],
+      [
+       "6",
+       "65000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "No ROWNUM (error 1054 unknown column): ORDER BY ... LIMIT n, or ROW_NUMBER() OVER (...) (8.0+).",
+    "mariadb": "No ROWNUM before 10.6.1 (Oracle mode only); LIMIT / ROW_NUMBER().",
+    "postgresql": "No ROWNUM (42703): LIMIT / FETCH FIRST, ROW_NUMBER() OVER (...).",
+    "sqlserver": "No ROWNUM: TOP (n) or ROW_NUMBER() OVER (...).",
+    "oracle": "ROWNUM (before ORDER BY), FETCH FIRST n ROWS ONLY (12c+).",
+    "sqlite": "No ROWNUM: LIMIT."
+   },
+   "related": [
+    "top_vs_limit",
+    "row_number",
+    "limit"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-select.html#SQL-LIMIT",
+   "seen_at": [
+    "https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/ROWNUM-Pseudocolumn.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "merge_statement",
+   "kind": "concept",
+   "title": {
+    "en": "MERGE (insert or update from a source in one statement)",
+    "hinglish": "MERGE (ek statement mein insert ya update)",
+    "hindi": "MERGE (एक statement में insert या update)"
+   },
+   "terms": [
+    [
+     "merge\\s+(into|statement|command|query)"
+    ],
+    [
+     "merge",
+     "(upsert|sql ?server|oracle|postgre\\w*)"
+    ],
+    [
+     "what is merge"
+    ],
+    [
+     "merge kya"
+    ],
+    [
+     "merge क्या"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is merge in sql",
+     "merge statement vs upsert",
+     "merge into in postgresql"
+    ],
+    "hinglish": [
+     "merge statement kya hai",
+     "merge kya hai sql mein"
+    ],
+    "hindi": [
+     "MERGE क्या है SQL में"
+    ]
+   },
+   "answer": {
+    "en": "MERGE INTO target USING source ON (match) WHEN MATCHED THEN UPDATE ... WHEN NOT MATCHED THEN INSERT ... applies a whole set of rows at once: matching rows are changed, new ones added (and optionally missing ones deleted). It is standard SQL on SQL Server, Oracle and PostgreSQL 15+. MySQL/MariaDB have no MERGE: INSERT ... ON DUPLICATE KEY UPDATE does the upsert part; PostgreSQL and SQLite also have INSERT ... ON CONFLICT.",
+    "hinglish": "MERGE INTO target USING source ON (match) WHEN MATCHED THEN UPDATE ... WHEN NOT MATCHED THEN INSERT ... poora set ek baar mein lagata hai: mile to badlo, naye ho to jodo. SQL Server, Oracle aur PostgreSQL 15+ mein hai. MySQL/MariaDB mein MERGE nahi: INSERT ... ON DUPLICATE KEY UPDATE; PostgreSQL/SQLite mein INSERT ... ON CONFLICT bhi.",
+    "hindi": "MERGE मिलती rows बदलता है और नई जोड़ता है; MySQL में नहीं है, वहाँ ON DUPLICATE KEY UPDATE।"
+   },
+   "mistake": {
+    "en": "A MERGE whose ON matches one target row with two source rows: SQL Server and PostgreSQL stop with an error (a row can't be changed twice); de-duplicate the source first.",
+    "hinglish": "MERGE jiska ON ek target row ko do source rows se milaye: error aata hai; pehle source ke duplicate hatao.",
+    "hindi": "एक target row से दो source rows मिलें तो error; पहले source साफ़ करें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "INSERT INTO products (id, name, stock) VALUES (1, 'Phone X', 5), (8, 'Tablet', 2) ON DUPLICATE KEY UPDATE stock = stock + VALUES(stock);\nSELECT id, stock FROM products WHERE id IN (1, 8) ORDER BY id",
+      "postgresql": "MERGE INTO products p USING (VALUES (1, 'Phone X', 5), (8, 'Tablet', 2)) AS s(id, name, add_stock) ON p.id = s.id WHEN MATCHED THEN UPDATE SET stock = p.stock + s.add_stock WHEN NOT MATCHED THEN INSERT (id, name, stock) VALUES (s.id, s.name, s.add_stock);\nSELECT id, stock FROM products WHERE id IN (1, 8) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "stock"
+     ],
+     "result": [
+      [
+       "1",
+       "17"
+      ],
+      [
+       "8",
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "No MERGE: INSERT ... ON DUPLICATE KEY UPDATE.",
+    "mariadb": "No MERGE: INSERT ... ON DUPLICATE KEY UPDATE.",
+    "postgresql": "MERGE from 15 (ran on 16 in the lab); INSERT ... ON CONFLICT for upserts.",
+    "sqlserver": "MERGE (use a unique key and HOLDLOCK against races).",
+    "oracle": "MERGE INTO ... USING ... ON (...).",
+    "sqlite": "No MERGE: INSERT ... ON CONFLICT."
+   },
+   "related": [
+    "upsert",
+    "insert_ignore_replace",
+    "update_join"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-merge.html",
+   "seen_at": [
+    "https://learn.microsoft.com/en-us/sql/t-sql/statements/merge-transact-sql",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "sqlite_intro",
+   "kind": "concept",
+   "title": {
+    "en": "SQLite",
+    "hinglish": "SQLite",
+    "hindi": "SQLite"
+   },
+   "terms": [
+    [
+     "sqlite3?"
+    ],
+    [
+     "एसक्यूलाइट"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is sqlite",
+     "sqlite vs mysql",
+     "when should i use sqlite"
+    ],
+    "hinglish": [
+     "sqlite kya hai",
+     "sqlite aur mysql mein kya farak hai"
+    ],
+    "hindi": [
+     "SQLite क्या है"
+    ]
+   },
+   "answer": {
+    "en": "SQLite is a database inside a single file, used through a library (phones, desktop apps, tests, small sites): no server, no users, no network. It speaks most of standard SQL (LIMIT, CTEs, window functions, ON CONFLICT upserts), but column types are only preferences (an INTEGER column kept 'hello' as text in the lab unless the table is STRICT), dates are text handled by date() / strftime(), and only one writer works at a time. MySQL, MariaDB and PostgreSQL are servers for many users writing at once.",
+    "hinglish": "SQLite ek file ke andar database hai, library se chalta hai (phone, desktop app, tests, chhoti site): server, users, network kuch nahi. Zyada standard SQL samajhta hai (LIMIT, CTE, window functions, ON CONFLICT), par column type sirf pasand hai (lab mein INTEGER column ne 'hello' rakh liya), dates text hain, aur ek waqt pe ek hi likhne wala. MySQL, MariaDB, PostgreSQL bahut users ke liye server hain.",
+    "hindi": "SQLite एक file में database है, बिना server के; एक समय में एक लिखने वाला। MySQL/PostgreSQL कई users के लिए server हैं।"
+   },
+   "mistake": {
+    "en": "Using SQLite for a web app with many users writing at once (writers queue up: 'database is locked'), or trusting its column types without STRICT.",
+    "hinglish": "Bahut users ke saath likhne wali web app ke liye SQLite ('database is locked'), ya bina STRICT ke column type pe bharosa.",
+    "hindi": "कई users के साथ SQLite ('database is locked')।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM orders ORDER BY id LIMIT 2"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ],
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "A server for many users; the same LIMIT query runs on SQLite.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "A server for many users; SQLite copies much of its syntax (ON CONFLICT, RETURNING, ||).",
+    "sqlite": "One file, one writer at a time, flexible types (STRICT tables from 3.37), dates as text; lab-checked notes (SQLite 3.53) in its dialect file."
+   },
+   "related": [
+    "which_database",
+    "mysql_vs_postgresql",
+    "sql_vs_database"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/features.html",
+   "seen_at": [
+    "https://www.sqlite.org/whentouse.html",
+    "https://www.sqlite.org/datatype3.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "sqlserver_intro",
+   "kind": "compare",
+   "title": {
+    "en": "SQL Server and T-SQL",
+    "hinglish": "SQL Server aur T-SQL",
+    "hindi": "SQL Server और T-SQL"
+   },
+   "terms": [
+    [
+     "^(what is|what's|whats|explain|define|tell me about) (ms ?|microsoft )?sql ?server$",
+     "sql ?server"
+    ],
+    [
+     "t-?sql"
+    ],
+    [
+     "ms ?sql"
+    ],
+    [
+     "transact[- ]sql"
+    ],
+    [
+     "एसक्यूएल सर्वर"
+    ],
+    [
+     "sql ?server",
+     "(kya|क्या)"
+    ],
+    [
+     "sql ?server",
+     "(vs|versus|difference|farak|fark|when to use|kab)"
+    ],
+    [
+     "sql ?server",
+     "(vs|versus|difference|farak|fark|aur)",
+     "(mysql|postgre\\w*|oracle|maria ?db)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is sql server",
+     "what is t-sql",
+     "sql server vs mysql"
+    ],
+    "hinglish": [
+     "sql server kya hai",
+     "t-sql kya hota hai"
+    ],
+    "hindi": [
+     "SQL Server क्या है"
+    ]
+   },
+   "answer": {
+    "en": "SQL Server is Microsoft's database server; T-SQL is its dialect of SQL. The core (SELECT, JOIN, GROUP BY, window functions, CTEs, transactions) is the same as elsewhere; the words differ: TOP (n) instead of LIMIT, [brackets] for names, GETDATE() for now, DATEADD / DATEDIFF(unit, start, end), ISNULL(x, y), + to join text, IDENTITY columns and MERGE for upserts. DBaba recognises it and answers with general SQL reasoning plus notes (not lab-tested yet).",
+    "hinglish": "SQL Server Microsoft ka database server hai; T-SQL uski SQL boli. Core (SELECT, JOIN, GROUP BY, window functions, CTE, transactions) same hai; shabd alag: LIMIT ki jagah TOP (n), naam [brackets] mein, GETDATE(), DATEADD / DATEDIFF(unit, start, end), ISNULL(x, y), text jodne ke liye +, IDENTITY aur MERGE. DBaba ise pehchanta hai aur general SQL + notes se jawab deta hai (abhi lab-tested nahi).",
+    "hindi": "SQL Server Microsoft का database है, T-SQL उसकी SQL; TOP, [brackets], GETDATE() जैसे अपने शब्द।"
+   },
+   "mistake": {
+    "en": "Pasting a MySQL query (LIMIT, backticks, IFNULL, NOW()) into SQL Server, or a T-SQL one (TOP, [brackets], GETDATE()) into MySQL: each refuses the other's words.",
+    "hinglish": "MySQL query (LIMIT, backticks, IFNULL) SQL Server pe ya T-SQL (TOP, [brackets]) MySQL pe chalana: dono ek doosre ke shabd mana karte hain.",
+    "hindi": "एक database की query दूसरे पर चलाना: शब्द मना हो जाते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount FROM orders ORDER BY amount DESC, id LIMIT 3"
+     },
+     "columns": [
+      "id",
+      "amount"
+     ],
+     "result": [
+      [
+       "3",
+       "80000"
+      ],
+      [
+       "6",
+       "65000"
+      ],
+      [
+       "1",
+       "25500"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "The same query on MySQL ends with LIMIT 3; SQL Server writes SELECT TOP (3) ... ORDER BY.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "LIMIT 3 or FETCH FIRST 3 ROWS ONLY (SQL Server also has OFFSET 0 ROWS FETCH NEXT 3 ROWS ONLY).",
+    "sqlserver": "TOP, [names], GETDATE(), DATEADD/DATEDIFF, ISNULL, + for text, IDENTITY, MERGE, SCOPE_IDENTITY(); notes, not lab-tested."
+   },
+   "related": [
+    "top_vs_limit",
+    "quote_names",
+    "convert_between_databases"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/features.html",
+   "seen_at": [
+    "https://learn.microsoft.com/en-us/sql/t-sql/language-reference",
+    "https://www.postgresql.org/docs/current/sql-select.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "oracle_intro",
+   "kind": "concept",
+   "title": {
+    "en": "Oracle Database and PL/SQL",
+    "hinglish": "Oracle Database aur PL/SQL",
+    "hindi": "Oracle Database और PL/SQL"
+   },
+   "terms": [
+    [
+     "oracle"
+    ],
+    [
+     "pl/?sql"
+    ],
+    [
+     "ओरेकल"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is oracle database",
+     "what is pl/sql",
+     "oracle vs postgresql"
+    ],
+    "hinglish": [
+     "oracle kya hai",
+     "pl/sql kya hota hai"
+    ],
+    "hindi": [
+     "Oracle क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Oracle Database is Oracle's commercial database server; PL/SQL is its language for procedures and triggers. Its SQL is standard at the core with its own words: FETCH FIRST n ROWS ONLY (12c+) or ROWNUM instead of LIMIT, NVL for COALESCE, SYSDATE for now, FROM DUAL for a SELECT without a table, sequences (seq.NEXTVAL) or IDENTITY for ids, || for text, and an empty string '' is NULL. PostgreSQL is the closest free database to it. DBaba recognises it and answers with general SQL plus notes (not lab-tested yet).",
+    "hinglish": "Oracle Database Oracle ka commercial database server hai; PL/SQL procedures aur triggers ki bhasha. Core SQL standard hai, apne shabdon ke saath: LIMIT ki jagah FETCH FIRST n ROWS ONLY (12c+) ya ROWNUM, NVL, SYSDATE, bina table ke SELECT ke liye FROM DUAL, ids ke liye sequence (seq.NEXTVAL), text ke liye ||, aur '' (khali text) NULL hai. PostgreSQL isse sabse milta-julta free database hai.",
+    "hindi": "Oracle commercial database है, PL/SQL उसकी procedure भाषा; ROWNUM, NVL, SYSDATE, DUAL जैसे अपने शब्द।"
+   },
+   "mistake": {
+    "en": "Checking col = '' in Oracle: the empty string is NULL there, so nothing ever matches; write col IS NULL.",
+    "hinglish": "Oracle mein col = '' check karna: khali text NULL hai, kuch match nahi hota; col IS NULL likho.",
+    "hindi": "Oracle में '' NULL है, col = '' कुछ नहीं मिलाता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT id, amount FROM orders ORDER BY amount DESC, id LIMIT 2",
+      "postgresql": "SELECT id, amount FROM orders ORDER BY amount DESC, id FETCH FIRST 2 ROWS ONLY"
+     },
+     "columns": [
+      "id",
+      "amount"
+     ],
+     "result": [
+      [
+       "3",
+       "80000"
+      ],
+      [
+       "6",
+       "65000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "LIMIT n; Oracle 12c+ writes FETCH FIRST n ROWS ONLY.",
+    "mariadb": "Has an Oracle mode (sql_mode=ORACLE) for some PL/SQL syntax.",
+    "postgresql": "FETCH FIRST n ROWS ONLY is the same words as Oracle 12c+; PL/pgSQL is close to PL/SQL.",
+    "oracle": "ROWNUM / FETCH FIRST, NVL, SYSDATE, DUAL, sequences, '' IS NULL; notes, not lab-tested."
+   },
+   "related": [
+    "rownum",
+    "dual_table",
+    "convert_between_databases"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/features.html",
+   "seen_at": [
+    "https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/",
+    "https://www.postgresql.org/docs/current/sql-select.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "convert_between_databases",
+   "kind": "howto",
+   "title": {
+    "en": "Converting a query from one database to another",
+    "hinglish": "Query ko ek database se doosre mein badalna",
+    "hindi": "Query को एक database से दूसरे में बदलना"
+   },
+   "terms": [
+    [
+     "(convert\\w*|translat\\w*|migrat\\w*|port\\w*|badl\\w*|badal\\w*|बदल\\w*)",
+     "(query|queries|sql|क्वेरी)",
+     "(mysql|postgre\\w*|sql ?server|oracle|sqlite|maria ?db|database|db)"
+    ],
+    [
+     "(mysql|postgre\\w*|sql ?server|oracle|maria ?db|sqlite) (to|se|से|into|in) (mysql|postgre\\w*|sql ?server|oracle|maria ?db|sqlite)",
+     "(convert\\w*|migrat\\w*|badl\\w*|बदल\\w*|move|moving|shift\\w*|port\\w*)",
+     "(query|queries|sql|क्वेरी)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to convert a mysql query to postgresql",
+     "how to migrate queries from sql server to mysql",
+     "how to move a query from mysql to postgresql"
+    ],
+    "hinglish": [
+     "mysql query ko postgres mein kaise badle",
+     "sql server ki query mysql mein kaise convert kare"
+    ],
+    "hindi": [
+     "MySQL query को PostgreSQL में कैसे बदलें"
+    ]
+   },
+   "answer": {
+    "en": "Most of a query (SELECT, JOIN, WHERE, GROUP BY, CTEs, window functions) moves as it is; what changes is each database's own words: the first n rows (LIMIT / TOP / FETCH FIRST), NULL replacement (IFNULL / COALESCE / ISNULL / NVL), dates (NOW() / GETDATE(), DATE_ADD / + INTERVAL / DATEADD, DATEDIFF / date - date, DATE_FORMAT / to_char), text functions (LOCATE / POSITION / CHARINDEX, GROUP_CONCAT / string_agg), name quoting and cast types. Then check the meaning, not just the spelling: case-sensitive comparison, integer division, NULL in CONCAT and NULL sort order differ. Send DBaba the query with the words 'convert to PostgreSQL' (or MySQL / MariaDB): it rewrites it, lists each change and the meaning differences.",
+    "hinglish": "Query ka zyada hissa (SELECT, JOIN, WHERE, GROUP BY, CTE, window functions) waisa hi chalta hai; badalte hain database ke apne shabd: pehli n rows (LIMIT / TOP / FETCH FIRST), NULL ki jagah (IFNULL / COALESCE / ISNULL / NVL), dates (NOW() / GETDATE(), DATE_ADD / + INTERVAL, DATEDIFF / date - date, DATE_FORMAT / to_char), text functions, naam ke quotes aur cast types. Phir matlab check karo: case-sensitive compare, integer bhaag, CONCAT mein NULL, NULL ka sort. Query ke saath 'convert to PostgreSQL' likh do: DBaba badal ke har badlaav aur matlab ka farak batayega.",
+    "hindi": "ज़्यादातर query वैसी ही चलती है; बदलते हैं LIMIT/TOP, IFNULL/COALESCE, तारीख और text functions, quotes और casts। फिर case, भाग और NULL का अर्थ जाँचें। Query के साथ 'convert to PostgreSQL' लिखिए।"
+   },
+   "mistake": {
+    "en": "Fixing only the errors and stopping: the query then runs on the new database but silently gives other rows (WHERE city = 'pune' no longer matches 'Pune' on PostgreSQL; 7 / 2 becomes 3).",
+    "hinglish": "Sirf errors theek karke ruk jaana: query chal jaati hai par chupchaap alag rows deti hai (PostgreSQL pe 'pune' ab 'Pune' se nahi milta; 7 / 2 = 3).",
+    "hindi": "सिर्फ errors ठीक करना: query चलती है पर चुपचाप दूसरे नतीजे देती है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT id, IFNULL(discount, 0) AS discount FROM orders WHERE id IN (1, 3) ORDER BY id LIMIT 2",
+      "postgresql": "SELECT id, COALESCE(discount, 0) AS discount FROM orders WHERE id IN (1, 3) ORDER BY id LIMIT 2"
+     },
+     "columns": [
+      "id",
+      "discount"
+     ],
+     "result": [
+      [
+       "1",
+       "0"
+      ],
+      [
+       "3",
+       "1000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Comes in with backticks, LIMIT a,b, IFNULL, DATE_ADD, DATE_FORMAT, GROUP_CONCAT; case-insensitive comparison.",
+    "mariadb": "Like MySQL, plus FETCH FIRST, TO_CHAR, RETURNING (INSERT/DELETE).",
+    "postgresql": "Comes in with ::casts, ILIKE, string_agg, to_char, + INTERVAL '7 days', RETURNING; case-sensitive comparison, integer division.",
+    "sqlserver": "TOP, [names], GETDATE(), DATEADD/DATEDIFF, ISNULL, + for text (notes only).",
+    "oracle": "ROWNUM, NVL, SYSDATE, DUAL, sequences, '' IS NULL (notes only).",
+    "sqlite": "LIMIT, ||, date(), dynamic types (notes only)."
+   },
+   "related": [
+    "mysql_vs_postgresql",
+    "null_function_names",
+    "top_vs_limit"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-select.html",
+   "seen_at": [
+    "https://wiki.postgresql.org/wiki/Converting_from_other_Databases_to_PostgreSQL",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cast_convert",
+   "kind": "compare",
+   "title": {
+    "en": "CAST vs CONVERT vs :: (changing a value's type)",
+    "hinglish": "CAST vs CONVERT vs :: (value ka type badalna)",
+    "hindi": "CAST बनाम CONVERT बनाम ::"
+   },
+   "terms": [
+    [
+     "cast",
+     "convert"
+    ],
+    [
+     "double colon"
+    ],
+    [
+     "type ?cast\\w*"
+    ],
+    [
+     "cast\\w*",
+     "(type|integer|int|text|string|number|date|varchar|char)"
+    ],
+    [
+     "convert\\w*",
+     "(type|integer|int|string|number|text|varchar)\\b",
+     "(to|into|mein|में)"
+    ],
+    [
+     "टाइप",
+     "(cast|बदल\\w*)"
+    ],
+    [
+     "(string|text)",
+     "(number|integer|int|date)",
+     "(badl\\w*|convert\\w*|बदल\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "cast vs convert in sql",
+     "what is double colon cast in postgresql",
+     "how to convert a string to a number in sql"
+    ],
+    "hinglish": [
+     "type cast kaise kare sql mein",
+     "string ko number mein kaise badle"
+    ],
+    "hindi": [
+     "SQL में टाइप कैसे बदलें"
+    ]
+   },
+   "answer": {
+    "en": "CAST(value AS type) is standard and works everywhere; only the type names differ: MySQL/MariaDB cast to CHAR, SIGNED, UNSIGNED, DECIMAL(p,s), DOUBLE, DATE, DATETIME (not TEXT, BIGINT, NUMERIC or TIMESTAMP: error 1064), PostgreSQL to TEXT, VARCHAR, INTEGER, BIGINT, NUMERIC, DATE, TIMESTAMP (not SIGNED or DATETIME). PostgreSQL also writes value::type, MySQL CONVERT(value, type), SQL Server CONVERT(type, value [, style]).",
+    "hinglish": "CAST(value AS type) standard hai aur har jagah chalta hai; sirf type ke naam alag: MySQL/MariaDB CHAR, SIGNED, DECIMAL(p,s), DATE, DATETIME (TEXT, BIGINT, NUMERIC, TIMESTAMP nahi: error 1064), PostgreSQL TEXT, VARCHAR, INTEGER, BIGINT, NUMERIC, TIMESTAMP (SIGNED, DATETIME nahi). PostgreSQL mein value::type, MySQL mein CONVERT(value, type), SQL Server mein CONVERT(type, value).",
+    "hindi": "CAST(value AS type) हर जगह चलता है; type के नाम अलग: MySQL में SIGNED/CHAR, PostgreSQL में INTEGER/TEXT।"
+   },
+   "mistake": {
+    "en": "CAST(x AS CHAR) on PostgreSQL keeps ONE character (CHAR means CHAR(1) there: '2024-06-01' became '2'); and CAST(x AS DECIMAL) with no size on MySQL rounds to a whole number (5.25 -> 5).",
+    "hinglish": "PostgreSQL pe CAST(x AS CHAR) sirf EK akshar rakhta hai ('2024-06-01' -> '2'); MySQL pe bina size ka CAST(x AS DECIMAL) poora number bana deta hai (5.25 -> 5).",
+    "hindi": "PostgreSQL पर CAST(x AS CHAR) एक अक्षर रखता है; MySQL पर DECIMAL बिना size के गोल कर देता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT id, CAST(amount AS SIGNED) AS whole, CAST(id AS CHAR) AS text_id FROM orders WHERE id = 2",
+      "postgresql": "SELECT id, CAST(amount AS INTEGER) AS whole, CAST(id AS VARCHAR) AS text_id FROM orders WHERE id = 2"
+     },
+     "columns": [
+      "id",
+      "whole",
+      "text_id"
+     ],
+     "result": [
+      [
+       "2",
+       "500",
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "CAST / CONVERT(value, type) to CHAR, SIGNED, UNSIGNED, DECIMAL(p,s), DOUBLE, DATE, DATETIME, TIME.",
+    "mariadb": "Same as MySQL (CAST AS INT / INTEGER also accepted).",
+    "postgresql": "CAST or ::, any type name (TEXT, VARCHAR, INTEGER, BIGINT, NUMERIC, DATE, TIMESTAMP, BOOLEAN); CHAR = CHAR(1).",
+    "sqlserver": "CAST and CONVERT(type, value, style); TRY_CAST returns NULL instead of failing.",
+    "oracle": "CAST, TO_NUMBER, TO_CHAR, TO_DATE.",
+    "sqlite": "CAST(x AS INTEGER) keeps the leading number ('12abc' -> 12)."
+   },
+   "related": [
+    "data_types",
+    "implicit_conversion",
+    "decimal_vs_float"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-expressions.html#SQL-SYNTAX-TYPE-CASTS",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/cast-functions.html",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "random_rows",
+   "kind": "howto",
+   "title": {
+    "en": "Picking random rows",
+    "hinglish": "Random rows nikalna",
+    "hindi": "रैंडम rows निकालना"
+   },
+   "terms": [
+    [
+     "random\\w*",
+     "(select|pick|choose|sample|get|fetch|nikal\\w*|kaise|how|le|lo)"
+    ],
+    [
+     "\\brand\\b"
+    ],
+    [
+     "newid"
+    ],
+    [
+     "रैंडम"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to select random rows in sql",
+     "rand vs random",
+     "how to pick one random record"
+    ],
+    "hinglish": [
+     "random row kaise nikale",
+     "sql mein random 5 rows kaise le"
+    ],
+    "hindi": [
+     "SQL में रैंडम rows कैसे लें"
+    ]
+   },
+   "answer": {
+    "en": "Sort by a random number and take the first n: ORDER BY RAND() LIMIT n on MySQL/MariaDB, ORDER BY random() LIMIT n on PostgreSQL and SQLite, ORDER BY NEWID() with TOP (n) on SQL Server, ORDER BY DBMS_RANDOM.VALUE on Oracle. It reads and sorts the whole table, which is fine for small tables; for big ones PostgreSQL has TABLESAMPLE, or pick random ids in a range and fetch those.",
+    "hinglish": "Random number se sort karke pehli n lo: MySQL/MariaDB pe ORDER BY RAND() LIMIT n, PostgreSQL/SQLite pe ORDER BY random() LIMIT n, SQL Server pe ORDER BY NEWID() aur TOP (n). Ye poori table padhta aur sort karta hai: chhoti table ke liye theek, badi ke liye PostgreSQL ka TABLESAMPLE ya random id range.",
+    "hindi": "MySQL: ORDER BY RAND() LIMIT n; PostgreSQL: ORDER BY random() LIMIT n; SQL Server: ORDER BY NEWID()।"
+   },
+   "mistake": {
+    "en": "ORDER BY RAND() on a table with millions of rows for every page view: each call sorts the whole table.",
+    "hinglish": "Lakhon rows wali table pe har page view pe ORDER BY RAND(): har baar poori table sort hoti hai.",
+    "hindi": "बड़ी table पर हर बार ORDER BY RAND(): पूरी table sort होती है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT COUNT(*) AS picked FROM (SELECT id FROM orders ORDER BY RAND() LIMIT 3) AS r",
+      "postgresql": "SELECT COUNT(*) AS picked FROM (SELECT id FROM orders ORDER BY random() LIMIT 3) AS r"
+     },
+     "columns": [
+      "picked"
+     ],
+     "result": [
+      [
+       "3"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "RAND(); RAND(seed) repeats the same order.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "random() (setseed() to repeat); TABLESAMPLE SYSTEM / BERNOULLI for big tables.",
+    "sqlserver": "ORDER BY NEWID(); TABLESAMPLE.",
+    "oracle": "DBMS_RANDOM.VALUE; SAMPLE (n).",
+    "sqlite": "random() (a big integer); ORDER BY random() LIMIT n."
+   },
+   "related": [
+    "limit",
+    "order_by",
+    "keyset_pagination"
+   ],
+   "fundamentals": [
+    "portability"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/mathematical-functions.html#function_rand",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/functions-math.html#FUNCTIONS-MATH-RANDOM-TABLE",
+    "https://stackoverflow.com/questions/tagged/sql",
+    "https://dba.stackexchange.com/questions/tagged/migration",
+    "https://www.reddit.com/r/SQL/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

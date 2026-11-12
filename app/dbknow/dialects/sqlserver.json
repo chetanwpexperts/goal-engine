@@ -3,17 +3,70 @@
   "notes_only": true,
   "family": "relational",
   "about": "No lab-tested knowledge yet: DBaba recognises SQL Server from its syntax or error format and answers with general SQL reasoning plus the notes below. These are notes from the official docs, not lab-proven rules.",
-  "named": ["\\bsql\\s?server\\b", "\\bms\\s?sql\\b", "\\bmssql\\b", "\\bt-?sql\\b", "\\bazure sql\\b", "एसक्यूएल सर्वर"],
-  "query_marks": ["\\bselect\\s+(distinct\\s+)?top\\s*\\(?\\s*\\d", "\\[[A-Za-z_][\\w ]*\\]\\.\\[|\\bfrom\\s+\\[[A-Za-z_][\\w ]*\\]", "\\bgetdate\\s*\\(\\s*\\)", "\\bnvarchar\\b", "@@identity\\b", "\\bscope_identity\\s*\\(", "\\bwith\\s*\\(\\s*nolock\\s*\\)", "\\boffset\\s+\\d+\\s+rows\\s+fetch\\s+next\\b"],
+  "named": [
+    "\\bsql\\s?server\\b",
+    "\\bms\\s?sql\\b",
+    "\\bmssql\\b",
+    "\\bt-?sql\\b",
+    "\\bazure sql\\b",
+    "एसक्यूएल सर्वर"
+  ],
+  "query_marks": [
+    "\\bselect\\s+(distinct\\s+)?top\\s*\\(?\\s*\\d",
+    "\\[[A-Za-z_][\\w ]*\\]\\.\\[|\\bfrom\\s+\\[[A-Za-z_][\\w ]*\\]",
+    "\\bgetdate\\s*\\(\\s*\\)",
+    "\\bnvarchar\\b",
+    "@@identity\\b",
+    "\\bscope_identity\\s*\\(",
+    "\\bwith\\s*\\(\\s*nolock\\s*\\)",
+    "\\boffset\\s+\\d+\\s+rows\\s+fetch\\s+next\\b"
+  ],
   "weak_marks": [],
-  "error_marks": ["\\bMsg \\d{3,5}, Level \\d+, State \\d+", "\\bSqlException\\b", "\\[SQL Server\\]", "\\bInvalid object name '"],
+  "error_marks": [
+    "\\bMsg \\d{3,5}, Level \\d+, State \\d+",
+    "\\bSqlException\\b",
+    "\\[SQL Server\\]",
+    "\\bInvalid object name '"
+  ],
   "notes": {
-    "limit": "SQL Server has no LIMIT: use SELECT TOP (n) ... ORDER BY ..., or ORDER BY ... OFFSET n ROWS FETCH NEXT m ROWS ONLY.",
+    "limit": "SQL Server has no LIMIT: use SELECT TOP (n) ... ORDER BY ..., or ORDER BY ... OFFSET n ROWS FETCH NEXT m ROWS ONLY (2012+).",
     "concat": "+ joins text on SQL Server (NULL makes the whole result NULL); CONCAT() skips NULL parts.",
-    "null_fn": "ISNULL(x, 0) is SQL Server's two-argument null replacement; COALESCE works too and is portable.",
+    "null_fn": "ISNULL(x, 0) is SQL Server's two-argument null replacement (its result takes x's type); COALESCE works too and is portable.",
     "quotes": "Names are quoted with [brackets] (or \"double quotes\" with QUOTED_IDENTIFIER on); text values use 'single quotes'.",
-    "full_join": "FULL OUTER JOIN is supported."
+    "full_join": "FULL OUTER JOIN is supported.",
+    "now": "GETDATE() / SYSDATETIME() give the current date and time; CAST(GETDATE() AS DATE) the date; CURRENT_TIMESTAMP works too.",
+    "date_add": "DATEADD(day, 7, d) adds to a date; there is no INTERVAL.",
+    "date_diff": "DATEDIFF(day, start, end) counts the day boundaries crossed (unit first, start before end, the opposite order to MySQL's DATEDIFF(end, start)).",
+    "string_agg": "STRING_AGG(col, ',') WITHIN GROUP (ORDER BY ...) (2017+) joins a group's text; there is no GROUP_CONCAT.",
+    "identity": "An auto-numbered key is INT IDENTITY(1,1); after an INSERT, SCOPE_IDENTITY() or OUTPUT inserted.id gives the new id.",
+    "upsert": "No ON DUPLICATE KEY / ON CONFLICT: use MERGE (carefully, with a unique key and HOLDLOCK) or UPDATE then INSERT WHERE NOT EXISTS in one transaction.",
+    "case": "Text comparison follows the column's collation; the usual default (..._CI_AS) ignores case.",
+    "length": "LEN(x) counts characters and ignores trailing spaces; DATALENGTH(x) counts bytes.",
+    "position": "CHARINDEX('x', text) finds where x starts (0 if missing).",
+    "if": "IIF(cond, a, b) (2012+) or CASE WHEN ... END.",
+    "division": "int / int drops the fraction (7 / 2 = 3); multiply by 1.0 first.",
+    "boolean": "There is no BOOLEAN type: BIT holds 0 / 1, and a condition can't be selected as a value (use CASE).",
+    "dual": "No DUAL: SELECT 1 needs no FROM."
   },
   "source": "https://learn.microsoft.com/en-us/sql/t-sql/language-reference",
-  "proven": []
+  "proven": [],
+  "note_marks": {
+    "limit": "\\blimit\\b",
+    "null_fn": "\\b(ifnull|nvl|isnull|coalesce)\\s*\\(",
+    "now": "\\b(now|curdate|current_date|current_timestamp|getdate|sysdate)\\b",
+    "date_add": "\\b(date_add|date_sub|dateadd|interval)\\b",
+    "date_diff": "\\b(datediff|timestampdiff)\\b|\\b\\w*date\\w*\\s*-\\s*\\w*date\\w*",
+    "string_agg": "\\b(group_concat|string_agg|listagg)\\s*\\(",
+    "identity": "\\b(auto_increment|serial|identity|autoincrement|last_insert_id|returning|lastval)\\b",
+    "upsert": "\\b(on\\s+duplicate\\s+key|on\\s+conflict|merge\\s+into|replace\\s+into|insert\\s+ignore)\\b",
+    "case": "(?:=|<>|\\blike)\\s*'[^']*[A-Za-z]",
+    "quotes": "`|\\[\\w|\\\"\\w",
+    "length": "\\b(length|len|char_length)\\s*\\(",
+    "position": "\\b(locate|instr|charindex|position|strpos)\\s*\\(",
+    "if": "\\b(if|iif|case)\\b",
+    "division": "[\\w)]\\s*/\\s*[\\w(]",
+    "boolean": "\\b(true|false|boolean)\\b",
+    "dual": "\\bdual\\b",
+    "concat": "\\bconcat\\s*\\(|\\|\\|"
+  }
 }

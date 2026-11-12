@@ -75,11 +75,11 @@ def _sql_summary(result: dict, hi: bool) -> str:
         from app.dbknow import engines
 
         lang = rec.get("lang") or ("hinglish" if hi else "en")
-        extra = engines.detected_line(rec, lang)[0] or engines.notes_line(rec["id"], lang)   # 'not sure': each finding names its engines
+        extra = engines.detected_line(rec, lang)[0] or engines.notes_line(rec["id"], lang, result.get("notes_for", ""))   # 'not sure': each finding names its engines
         if rec.get("how") in ("named", "chosen", "remembered") and rec["id"] != engines.NOT_SURE and not extra:
             extra = (f"Checked for {engines.label(rec['id'])}." if lang == "en" else f"{engines.label(rec['id'])} ke liye check kiya.")
         elif engines.notes_only(rec["id"]) and rec.get("how") == "detected":
-            extra = engines.detected_line(rec, lang)[0] + "\n" + engines.notes_line(rec["id"], lang)
+            extra = engines.detected_line(rec, lang)[0] + "\n" + engines.notes_line(rec["id"], lang, result.get("notes_for", ""))
         if extra:
             text = f"{text}\n\n{extra}"
     return text

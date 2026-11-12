@@ -51,6 +51,8 @@ SHAPES = [                                     # (shape, pattern) in the order t
     ("when", r"^should (i|we|you|one)\b|\bshould (a|an|the|this)? ?\w+ (go|be put|be written)\b|\b(karna|karni|karne|lagana|likhna) chahiye\b|"
              r"\bchahiye kya\b"),
     ("howto", r"^can (i|we|you|one)\b|^is (it|there a way) (possible )?to\b"),
+    # 'how many days between two dates': a general how-much question (never one about their own data: 'how many orders did we get')
+    ("howto", r"^how (many|much)\b(?!.*\b(my|our|we|i|me|us|mera|meri|mere|hamar\w*|humar\w*|apn\w*)\b)"),
     ("define", r"^(does|do|is|are|will)\b.*\b(matter|matters|same|different|allowed|possible|a database|a language|faster|slower|"
                r"better|quicker)\b|"
                r"^(is|are) \w+( \w+)? (a|an)\b|^(is|are|does|do)\b.*\bby default\b|\b(hai|h|hain|karta hai|karti hai) kya\s*$|(है|हैं|करता है) क्या\s*$|मायने रखता"),

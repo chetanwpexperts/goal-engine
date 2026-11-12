@@ -80,6 +80,19 @@ feed.
   IFNULL/COALESCE/NVL/ISNULL, dates, upsert, case, identities; Oracle / SQL Server / SQLite recognised and answered as notes.
   Final exam: 50 generated problems and 100 basic questions, all passing.
 
+Reading a whole project (nights 10A-10B, before the query-only nights, which get stronger once the real schema can be read):
+
+- [ ] **10A. Find the SQL in a project's files.** Walk a folder (skip vendor/, node_modules/, .git/, build output); find SQL in
+  .sql files and inside code strings (PHP incl. heredoc, JS/TS template strings, Python, Java) and raw-query calls
+  (mysqli_query, PDO, $wpdb, DB::select / DB::statement, cursor.execute, pool.query ...); a string counts only with a real SQL
+  shape; placeholders (?, :id, $1, %s, {$var}) are values. Report each finding as file:line with the corrected query; read only,
+  never edit. Queries built from pieces across functions, and ORM code, are reported as "found, couldn't read completely", never
+  guessed. A `dbaba check <folder>` command for the same. Generator: realistic PHP / Laravel / WordPress / Node / Python files
+  with planted wrong queries, found at the right file and line, quiet on ordinary strings, fixes proven on both databases.
+- [ ] **10B. Read the project's own schema.** CREATE TABLE scripts, schema dumps and migration files (Laravel, plain SQL
+  migrations first) become the project's schema: tables, columns, types, NULLs, keys, indexes. Findings that depend on the
+  schema are upgraded to verified (or dropped) for that project; index advice says what exists and what is missing.
+
 Query-only reasoning (nights 11-15): with only the pasted query, never invent schema facts; prove what the text proves,
 label the rest, upgrade to verified when schema, EXPLAIN or data arrive.
 
@@ -102,6 +115,31 @@ label the rest, upgrade to verified when schema, EXPLAIN or data arrive.
 Real users' feed first, then the weakest area the generators or feed show, then in order: vacuum and bloat (PostgreSQL),
 charset and collation, permissions and grants, backups that won't restore, timeouts and pool exhaustion, the planner and
 statistics. Every night still adds 15+ concepts from its area. A new guide document gets its own nights added here.
+
+Project blueprints (domain knowledge, after the list above): a person describes a project in their own words (an ERP, a shop,
+a clinic) and DBaba gives the whole picture before any code: what it understood (modules, scale, rules, assumptions), which
+database suits it and why, the design (tables, keys, links, diagram), the schema in that database's own words (checked by the
+design checker and built in the lab), the indexing plan tied to the queries it serves, the core transactions (posting a sale, a
+purchase, a stock movement, a payment: locking order, no negative stock), the domain's reports (each run on sample data on
+both databases), growth (rows per year, summary tables, archiving), safety (roles, backups that restore), a build order, and
+an honest list of what needs the person's decision. No AI: a database-choice scorer from written rules, and one domain pack
+per night, each with its entities, rules, standard reports and common design mistakes, tested with practice project
+descriptions that must give a correct design and working reports.
+
+- [ ] **P1. Choosing the database.** MySQL / MariaDB / PostgreSQL (and notes for others) scored on the project's own facts.
+- [ ] **P2. Sales and customers.**
+- [ ] **P3. Purchase and suppliers.**
+- [ ] **P4. Inventory and warehouses.**
+- [ ] **P5. Accounts (ledger, trial balance, P&L).**
+- [ ] **P6. GST / tax.**
+- [ ] **P7. HR and payroll.**
+- [ ] **P8. Manufacturing (BOM, production).**
+- [ ] **P9. Reports and dashboards across modules.**
+- [ ] **P10. The blueprint builder** that puts it together as one plan the person can download.
+
+Building tracks (not knowledge nights; they use the same DBaba): a desktop workspace that runs fully offline (Mac first, then
+Windows and Linux) with knowledge-pack updates from the merged nights and opt-in miss reports with values hidden; and editor
+support (a language server, then a VS Code extension, then JetBrains) built on `dbaba check`.
 
 ## Night log
 

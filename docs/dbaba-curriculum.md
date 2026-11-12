@@ -126,6 +126,24 @@ an honest list of what needs the person's decision. No AI: a database-choice sco
 per night, each with its entities, rules, standard reports and common design mistakes, tested with practice project
 descriptions that must give a correct design and working reports.
 
+How a blueprint thinks, not what it stores:
+
+- Reports are worked out, not listed from memory. Every entity and every event in the design implies report families: a
+  register of each event (all sales, all receipts), totals by each of its dimensions (day/month, customer, product, branch,
+  person), balances and ageing for anything owed or held (receivables, payables, stock, leave), movement ledgers with opening and
+  closing (stock, cash, accounts), comparisons (this period vs last, plan vs actual), exceptions (below reorder level, overdue,
+  negative margin, duplicates), audit (who changed what) and the statutory ones of the domain (GST returns, payroll statements).
+  Each report gets its query, the index it needs, and a test on sample data; the design is changed until every report can be
+  answered from it (a report the tables can't answer means a missing table, column or link).
+- The structure is high level: one fact in one place, money exact, every change traceable (created/updated by and at, a history
+  of status changes, no hard deletes of posted documents), multi-company/branch and currency where the words suggest growth,
+  documents with lines (header + items), postings that balance, numbering that never repeats.
+- Security is part of every blueprint: least-privilege database users per part of the app (no app connecting as root),
+  separate read-only users for reports, sensitive columns named (personal data, bank and salary fields) with how to protect them,
+  passwords only as strong hashes, every query from the app parameterised (and the code scan of night 10A flags string-built
+  SQL), audit of logins and of changes to money and stock, backups that are restored and checked on a schedule, no production
+  data copied to test without masking, and TLS for remote connections. Defensive advice only.
+
 - [ ] **P1. Choosing the database.** MySQL / MariaDB / PostgreSQL (and notes for others) scored on the project's own facts.
 - [ ] **P2. Sales and customers.**
 - [ ] **P3. Purchase and suppliers.**

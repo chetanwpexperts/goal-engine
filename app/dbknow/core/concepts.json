@@ -15964,6 +15964,2338 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "composite_index",
+   "kind": "concept",
+   "title": {
+    "en": "Composite (multi-column) index",
+    "hinglish": "Composite (multi-column) index",
+    "hindi": "Composite (multi-column) index"
+   },
+   "terms": [
+    [
+     "composite index(es)?"
+    ],
+    [
+     "multi[- ]?column index(es)?"
+    ],
+    [
+     "index on two columns"
+    ],
+    [
+     "index on multiple columns"
+    ],
+    [
+     "index",
+     "two columns"
+    ],
+    [
+     "compound index"
+    ],
+    [
+     "concatenated index"
+    ],
+    [
+     "कम्पोजिट"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a composite index",
+     "multi column index in sql",
+     "how does an index on two columns work"
+    ],
+    "hinglish": [
+     "composite index kya hota hai",
+     "multi column index kaise kaam karta hai"
+    ],
+    "hindi": [
+     "composite index क्या होता है",
+     "कम्पोजिट इंडेक्स क्या है"
+    ]
+   },
+   "answer": {
+    "en": "An index on several columns, sorted by the first column, then by the second inside each value of the first, and so on (like a phone book: surname, then first name). It serves conditions on its leading columns: (status, order_date) helps WHERE status = 'paid', and WHERE status = 'paid' AND order_date >= '2024-07-01', and ORDER BY order_date after status = 'paid'. Put the columns compared with = first, then the one range or sort column.",
+    "hinglish": "Kai columns ka ek index: pehle column se sort, phir har value ke andar doosre se (phone book jaisa: surname, phir naam). Ye shuru wale columns ki conditions mein kaam aata hai: (status, order_date) WHERE status = 'paid' mein bhi aur status = 'paid' AND order_date >= ... mein bhi. '=' wale columns pehle, phir ek range ya sort wala column.",
+    "hindi": "कई columns का एक index: पहले column से sort, फिर हर value के अंदर दूसरे से (phone book जैसा)। यह शुरुआती columns की conditions में काम आता है। '=' वाले columns पहले, फिर range या sort वाला।"
+   },
+   "mistake": {
+    "en": "Putting the range column first: (order_date, status) with order_date >= ... AND status = 'paid' can only use order_date to search; status is checked entry by entry. And a filter on the second column alone can't jump into the index at all.",
+    "hinglish": "Range wala column pehle rakhna: (order_date, status) mein status sirf entry-entry check hota hai. Aur sirf doosre column ka filter index mein seedha nahi jaa sakta.",
+    "hindi": "Range वाला column पहले रखना; और सिर्फ़ दूसरे column का filter index में सीधे नहीं जा सकता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE INDEX ix_orders_status_date ON orders (status, order_date)"
+     },
+     "changed": "ok"
+    },
+    {
+     "sql": {
+      "all": "SELECT id FROM orders WHERE status = 'paid' AND order_date >= '2024-07-01' ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "5"
+      ],
+      [
+       "7"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "InnoDB adds the primary key to every secondary index, so (status, order_date) also holds id. EXPLAIN's key_len shows how many leading columns were used.",
+    "mariadb": "Same as MySQL; 'Using index condition' means a later column is checked inside the index, not used to search.",
+    "postgresql": "A B-tree on (status, order_date); PostgreSQL 16 may scan the whole index for a condition on order_date alone (slow), 18 adds skip scan for some cases."
+   },
+   "related": [
+    "index",
+    "leftmost_prefix",
+    "covering_index"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/multiple-column-indexes.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "leftmost_prefix",
+   "kind": "concept",
+   "title": {
+    "en": "Leftmost prefix rule (column order in an index)",
+    "hinglish": "Leftmost prefix rule (column order in an index)",
+    "hindi": "Leftmost prefix rule (column order in an index)"
+   },
+   "terms": [
+    [
+     "left[- ]?most prefix"
+    ],
+    [
+     "column order",
+     "index"
+    ],
+    [
+     "order of columns",
+     "index"
+    ],
+    [
+     "index",
+     "second column"
+    ],
+    [
+     "index",
+     "doosre column"
+    ],
+    [
+     "index",
+     "dusre column"
+    ],
+    [
+     "इंडेक्स",
+     "क्रम"
+    ],
+    [
+     "index",
+     "क्रम"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the leftmost prefix rule",
+     "does column order matter in an index",
+     "why is an index not used for the second column"
+    ],
+    "hinglish": [
+     "index mein column order matter karta hai kya",
+     "leftmost prefix rule kya hai",
+     "index sirf doosre column pe kaam karta hai kya"
+    ],
+    "hindi": [
+     "इंडेक्स में column का क्रम क्यों मायने रखता है",
+     "leftmost prefix rule क्या है"
+    ]
+   },
+   "answer": {
+    "en": "An index on (a, b, c) is sorted by a first, so it can find rows only by a, by a and b, or by a, b and c: a prefix starting from the left. A condition on b or c alone can't jump into it (the database reads the whole index or the table). And after a range on a column (a > 5), the columns after it no longer narrow the search. So: equality columns first, then one range or ORDER BY column.",
+    "hinglish": "(a, b, c) wala index pehle a se sort hai, isliye rows sirf a se, a aur b se, ya a, b, c se dhoondh sakta hai: baayein se shuru hone wala hissa. Sirf b ya c ki condition se index mein seedha nahi ja sakte. Aur ek range (a > 5) ke baad wale columns search chhota nahi karte. Isliye '=' wale pehle, phir ek range/sort column.",
+    "hindi": "(a, b, c) वाला index पहले a से sort है, इसलिए rows सिर्फ़ a से, a और b से, या a, b, c से ढूँढ सकता है। सिर्फ़ b या c की condition से index में सीधे नहीं जा सकते।"
+   },
+   "mistake": {
+    "en": "Expecting an index on (customer_id, order_date) to speed up WHERE order_date = ... alone. Lab: MariaDB read the whole index (type index) or the table (ALL); PostgreSQL 16 scanned the entire index.",
+    "hinglish": "(customer_id, order_date) wale index se sirf WHERE order_date = ... tez hone ki ummeed. Lab mein poora index ya table padha gaya.",
+    "hindi": "(customer_id, order_date) वाले index से सिर्फ़ order_date की condition तेज़ होने की उम्मीद।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE INDEX ix_orders_cust_date ON orders (customer_id, order_date)"
+     },
+     "changed": "ok"
+    },
+    {
+     "sql": {
+      "all": "SELECT id FROM orders WHERE customer_id = 3 AND order_date >= '2024-07-01' ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "4"
+      ],
+      [
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "MySQL 8.0.13+ has skip scan for some queries on a later column when the first has few values (EXPLAIN: Using index for skip scan).",
+    "mariadb": "No skip scan in 10.11: a condition on a later column alone reads the whole index or table.",
+    "postgresql": "PostgreSQL 16 can use the later column as an index condition only by scanning the whole index; PostgreSQL 18 adds skip scan."
+   },
+   "related": [
+    "composite_index",
+    "index",
+    "sargable"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/multiple-column-indexes.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "covering_index",
+   "kind": "concept",
+   "title": {
+    "en": "Covering index (index-only scan)",
+    "hinglish": "Covering index (index-only scan)",
+    "hindi": "Covering index (index-only scan)"
+   },
+   "terms": [
+    [
+     "covering (index|indexes)"
+    ],
+    [
+     "index[- ]only scan"
+    ],
+    [
+     "using index",
+     "explain"
+    ],
+    [
+     "include (columns|clause)",
+     "index"
+    ],
+    [
+     "index",
+     "cover(s|ing)? (the )?query"
+    ],
+    [
+     "कवरिंग (index|इंडेक्स)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a covering index",
+     "what is an index only scan",
+     "what does using index mean in explain"
+    ],
+    "hinglish": [
+     "covering index kya hota hai",
+     "index only scan kya hai"
+    ],
+    "hindi": [
+     "covering index क्या होता है",
+     "कवरिंग इंडेक्स क्या है"
+    ]
+   },
+   "answer": {
+    "en": "An index that holds every column a query needs (in its WHERE, SELECT, ORDER BY), so the database answers from the index alone and never visits the table. MySQL/MariaDB show 'Using index' in EXPLAIN's Extra; PostgreSQL shows 'Index Only Scan'. Example: an index on (customer_id, order_date) covers SELECT order_date FROM orders WHERE customer_id = 3.",
+    "hinglish": "Aisa index jisme query ke saare columns hon (WHERE, SELECT, ORDER BY), to database sirf index se jawab de deta hai, table nahi padhta. MySQL/MariaDB EXPLAIN mein 'Using index', PostgreSQL mein 'Index Only Scan'.",
+    "hindi": "ऐसा index जिसमें query के सारे columns हों, तो डेटाबेस सिर्फ़ index से जवाब देता है, table नहीं पढ़ता। EXPLAIN में 'Using index' या 'Index Only Scan'।"
+   },
+   "mistake": {
+    "en": "SELECT * can never be covered (every column is needed). And on PostgreSQL an Index Only Scan still visits the table for pages changed since the last VACUUM (Heap Fetches).",
+    "hinglish": "SELECT * kabhi cover nahi hota. PostgreSQL mein pichle VACUUM ke baad badle pages ke liye table phir bhi padhi jaati hai (Heap Fetches).",
+    "hindi": "SELECT * कभी cover नहीं होता। PostgreSQL में VACUUM के बाद बदले pages के लिए table फिर भी पढ़ी जाती है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE INDEX ix_orders_cust_cover ON orders (customer_id, order_date)"
+     },
+     "changed": "ok"
+    },
+    {
+     "sql": {
+      "all": "SELECT order_date FROM orders WHERE customer_id = 3 ORDER BY order_date"
+     },
+     "columns": [
+      "order_date"
+     ],
+     "result": [
+      [
+       "2024-07-02"
+      ],
+      [
+       "2024-07-10"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "InnoDB secondary indexes also hold the primary key, so (customer_id, order_date) covers id too. EXPLAIN Extra: Using index.",
+    "mariadb": "Same as MySQL (lab: SELECT id ... WHERE YEAR(order_date) = ... read the whole index with 'Using index').",
+    "postgresql": "Index Only Scan; INCLUDE (col) adds non-key columns to an index (PostgreSQL 11+). Needs a recent VACUUM to skip the table."
+   },
+   "related": [
+    "composite_index",
+    "index",
+    "explain"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://www.postgresql.org/docs/current/indexes-index-only-scans.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "explain",
+   "kind": "concept",
+   "title": {
+    "en": "EXPLAIN (reading a query plan)",
+    "hinglish": "EXPLAIN (reading a query plan)",
+    "hindi": "EXPLAIN (reading a query plan)"
+   },
+   "terms": [
+    [
+     "explain (plan|output|statement|command|keyword)"
+    ],
+    [
+     "query plans?"
+    ],
+    [
+     "execution plans?"
+    ],
+    [
+     "read(ing)? (an? |the )?explain"
+    ],
+    [
+     "explain",
+     "(kya|क्या)"
+    ],
+    [
+     "what is explain"
+    ],
+    [
+     "एक्सप्लेन"
+    ],
+    [
+     "explain (kaise|कैसे) padh\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is EXPLAIN in sql",
+     "how to read an explain plan",
+     "what is a query execution plan"
+    ],
+    "hinglish": [
+     "explain plan kaise padhe",
+     "explain kya hota hai"
+    ],
+    "hindi": [
+     "EXPLAIN क्या होता है",
+     "explain plan कैसे पढ़ें"
+    ]
+   },
+   "answer": {
+    "en": "EXPLAIN shows how the database will run a query, without running it: for each table, how its rows are found (through an index, or by reading everything), in what order tables are joined, and roughly how many rows each step handles. MySQL/MariaDB print one row per table (type, key, rows, Extra); PostgreSQL prints a tree of steps (Seq Scan, Index Scan, Hash Join ...), where the most indented ones run first. Look for full scans of big tables, sorts and temporary tables, and row counts far bigger than the result.",
+    "hinglish": "EXPLAIN batata hai database query kaise chalayega, bina chalaye: har table ki rows kaise milengi (index se ya sab padh ke), tables kis kram mein judengi, aur har step lagbhag kitni rows sambhalega. MySQL/MariaDB har table ki ek row dikhate hain (type, key, rows, Extra); PostgreSQL steps ka tree (Seq Scan, Index Scan, Hash Join ...), sabse andar wale pehle chalte hain. Badi table ka full scan, sort, temporary table, aur result se bahut zyada rows dhoondho.",
+    "hindi": "EXPLAIN बताता है कि डेटाबेस query कैसे चलाएगा, बिना चलाए: हर table की rows कैसे मिलेंगी, tables किस क्रम में जुड़ेंगी, और हर step लगभग कितनी rows संभालेगा।"
+   },
+   "mistake": {
+    "en": "Reading the row counts of plain EXPLAIN as facts: they are estimates. EXPLAIN ANALYZE runs the query and shows the real counts (careful: it really runs an UPDATE/DELETE too).",
+    "hinglish": "Plain EXPLAIN ki rows ko sach maan lena: ye andaaza hain. EXPLAIN ANALYZE query chala ke asli counts dikhata hai (dhyan: UPDATE/DELETE bhi sach mein chalta hai).",
+    "hindi": "Plain EXPLAIN की rows को सच मानना: ये अंदाज़ा हैं। EXPLAIN ANALYZE असली counts दिखाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount FROM orders WHERE customer_id = 3 ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "amount"
+     ],
+     "result": [
+      [
+       "4",
+       "12000"
+      ],
+      [
+       "5",
+       "800"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "EXPLAIN SELECT ...; EXPLAIN FORMAT=TREE (8.0.16+) shows a tree; EXPLAIN ANALYZE (8.0.18+) runs it.",
+    "mariadb": "EXPLAIN SELECT ...; ANALYZE SELECT ... runs it and adds r_rows / r_filtered; ANALYZE FORMAT=JSON shows time per step.",
+    "postgresql": "EXPLAIN SELECT ...; EXPLAIN (ANALYZE, BUFFERS) runs it and shows actual rows, loops and pages read."
+   },
+   "related": [
+    "explain_analyze",
+    "explain_access_types",
+    "index"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://www.postgresql.org/docs/current/using-explain.html",
+   "seen_at": [
+    "https://use-the-index-luke.com/",
+    "https://dev.mysql.com/doc/refman/8.0/en/explain-output.html",
+    "https://mariadb.com/kb/en/explain/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "explain_analyze",
+   "kind": "compare",
+   "title": {
+    "en": "EXPLAIN vs EXPLAIN ANALYZE",
+    "hinglish": "EXPLAIN vs EXPLAIN ANALYZE",
+    "hindi": "EXPLAIN vs EXPLAIN ANALYZE"
+   },
+   "terms": [
+    [
+     "explain",
+     "analy[sz]e"
+    ],
+    [
+     "एक्सप्लेन",
+     "एनालाइज़"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the difference between explain and explain analyze",
+     "explain vs explain analyze"
+    ],
+    "hinglish": [
+     "explain aur explain analyze mein kya farak hai",
+     "explain analyze kya karta hai"
+    ],
+    "hindi": [
+     "explain और explain analyze में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "EXPLAIN only plans the query and shows estimates. EXPLAIN ANALYZE (MariaDB: ANALYZE SELECT ...) actually runs it and shows, beside each estimate, the real rows, loops and time. A big gap between estimated and real rows means the statistics are stale or the condition hides the column (a function), and the plan was chosen blind.",
+    "hinglish": "EXPLAIN sirf plan banata hai, andaaza dikhata hai. EXPLAIN ANALYZE (MariaDB: ANALYZE SELECT ...) query sach mein chala ke har step ki asli rows, loops aur time dikhata hai. Andaaze aur asli mein bada farak = statistics purane ya column function mein chhupa hai.",
+    "hindi": "EXPLAIN सिर्फ़ plan बनाता है; EXPLAIN ANALYZE query सच में चला कर असली rows और समय दिखाता है।"
+   },
+   "mistake": {
+    "en": "Running EXPLAIN ANALYZE on an UPDATE or DELETE: it really changes the rows. Wrap it in BEGIN ... ROLLBACK.",
+    "hinglish": "UPDATE ya DELETE pe EXPLAIN ANALYZE chalana: rows sach mein badal jaati hain. BEGIN ... ROLLBACK ke andar chalao.",
+    "hindi": "UPDATE/DELETE पर EXPLAIN ANALYZE: rows सच में बदलती हैं। BEGIN ... ROLLBACK में चलाओ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS n FROM orders WHERE amount > 1000"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "EXPLAIN ANALYZE SELECT ... (8.0.18+), tree output with actual time and rows.",
+    "mariadb": "ANALYZE SELECT ... (table output with r_rows, r_filtered) or ANALYZE FORMAT=JSON SELECT ...",
+    "postgresql": "EXPLAIN (ANALYZE, BUFFERS) SELECT ...; rows shown are per loop (multiply by loops)."
+   },
+   "related": [
+    "explain",
+    "analyze_statistics"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-explain.html",
+   "seen_at": [
+    "https://use-the-index-luke.com/",
+    "https://mariadb.com/kb/en/analyze-statement/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "explain_access_types",
+   "kind": "concept",
+   "title": {
+    "en": "EXPLAIN access types (ALL, index, range, ref, eq_ref, const)",
+    "hinglish": "EXPLAIN access types (ALL, index, range, ref, eq_ref, const)",
+    "hindi": "EXPLAIN access types (ALL, index, range, ref, eq_ref, const)"
+   },
+   "terms": [
+    [
+     "type",
+     "\\ball\\b",
+     "explain"
+    ],
+    [
+     "(type|access type)s? (in|of) explain"
+    ],
+    [
+     "eq_ref"
+    ],
+    [
+     "\\bref\\b",
+     "\\brange\\b"
+    ],
+    [
+     "explain",
+     "\\btype\\b"
+    ],
+    [
+     "full table scan"
+    ],
+    [
+     "type all"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what does type ALL mean in explain",
+     "what is a full table scan",
+     "explain type ref vs range vs eq_ref"
+    ],
+    "hinglish": [
+     "explain mein type all ka matlab kya hai",
+     "full table scan kya hota hai"
+    ],
+    "hindi": [
+     "explain में type ALL का मतलब क्या है",
+     "full table scan क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "MySQL/MariaDB's type column says how a table's rows are found, best to worst: const/system (one row by a key), eq_ref (one row per earlier row, by a unique key), ref (rows with one index value), range (a stretch of an index), index (the whole index read), ALL (every row of the table read: a full table scan). ALL on a big table usually means no index fits the WHERE or the join. PostgreSQL's equivalents are Index Scan / Index Only Scan / Bitmap Index Scan versus Seq Scan.",
+    "hinglish": "type column batata hai rows kaise milti hain, achhe se bure tak: const/system (key se ek row), eq_ref (pichli har row ke liye unique key se ek), ref (index ki ek value wali rows), range (index ka ek hissa), index (poora index), ALL (table ki har row: full table scan). Badi table pe ALL = WHERE ya join ke liye koi index fit nahi. PostgreSQL mein Index Scan / Bitmap Index Scan bamukabla Seq Scan.",
+    "hindi": "type column बताता है rows कैसे मिलती हैं: const, eq_ref, ref, range, index, ALL (हर row पढ़ी जाती है: full table scan)।"
+   },
+   "mistake": {
+    "en": "Treating every ALL as a problem: on a small table, or when most rows are needed, reading everything is the right plan.",
+    "hinglish": "Har ALL ko problem maan lena: chhoti table ya zyada rows chahiye hon to sab padhna hi sahi plan hai.",
+    "hindi": "हर ALL को problem मानना: छोटी table पर सब पढ़ना ही सही है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM orders WHERE id = 3"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "3"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "type is in EXPLAIN's table output; FORMAT=TREE says 'Table scan on t' for ALL and 'Index lookup on t using ix' for ref.",
+    "mariadb": "Same type values; ANALYZE adds r_rows (real rows read).",
+    "postgresql": "No type column: the node names say it (Seq Scan = full scan; Index Scan, Index Only Scan, Bitmap Heap Scan use an index)."
+   },
+   "related": [
+    "explain",
+    "index",
+    "seq_scan_vs_index_scan"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/explain-output.html",
+   "seen_at": [
+    "https://use-the-index-luke.com/",
+    "https://mariadb.com/kb/en/explain/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "seq_scan_vs_index_scan",
+   "kind": "compare",
+   "title": {
+    "en": "Seq Scan vs Index Scan (PostgreSQL plans)",
+    "hinglish": "Seq Scan vs Index Scan (PostgreSQL plans)",
+    "hindi": "Seq Scan vs Index Scan (PostgreSQL plans)"
+   },
+   "terms": [
+    [
+     "seq(uential)? scan"
+    ],
+    [
+     "index scan",
+     "bitmap"
+    ],
+    [
+     "bitmap (heap|index) scan"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a seq scan in postgres",
+     "seq scan vs index scan",
+     "what is a bitmap heap scan"
+    ],
+    "hinglish": [
+     "seq scan aur index scan mein farak",
+     "seq scan kya hai postgres mein"
+    ],
+    "hindi": [
+     "seq scan क्या होता है",
+     "seq scan और index scan में अंतर"
+    ]
+   },
+   "answer": {
+    "en": "A Seq Scan reads every row of the table in storage order and checks the filter on each. An Index Scan walks the index to the matching entries and fetches only those rows. A Bitmap Index Scan + Bitmap Heap Scan first collects the matching pages from one or more indexes, then reads those pages in order (good for medium-sized matches and for OR / AND of two indexes). PostgreSQL picks a Seq Scan on purpose when a large share of rows matches.",
+    "hinglish": "Seq Scan table ki har row padh ke filter check karta hai. Index Scan index se matching entries tak jaa ke sirf wahi rows laata hai. Bitmap Index Scan + Bitmap Heap Scan pehle ek ya zyada index se matching pages ikattha karta hai, phir unhe kram se padhta hai (OR / AND ke liye bhi). Zyada rows match hon to PostgreSQL jaan boojh ke Seq Scan chunta hai.",
+    "hindi": "Seq Scan हर row पढ़ता है; Index Scan index से सिर्फ़ matching rows लाता है; Bitmap scan पहले pages इकट्ठा करता है।"
+   },
+   "mistake": {
+    "en": "Forcing an index (SET enable_seqscan = off) to 'fix' a Seq Scan in production: find why the index isn't chosen (a function on the column, a type mismatch, stale statistics, too many rows matched) instead.",
+    "hinglish": "Production mein index zabardasti use karwana (enable_seqscan = off): pehle wajah dhoondho (column pe function, type ka farak, purane statistics, bahut rows match).",
+    "hindi": "Index ज़बरदस्ती इस्तेमाल करवाना: पहले वजह ढूँढो।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM orders WHERE customer_id = 2 ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "3"
+      ],
+      [
+       "7"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "MySQL/MariaDB call a Seq Scan type ALL and an index search ref / range.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "EXPLAIN shows Seq Scan / Index Scan / Index Only Scan / Bitmap Heap Scan nodes."
+   },
+   "related": [
+    "explain_access_types",
+    "explain",
+    "index"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://www.postgresql.org/docs/current/using-explain.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "sargable",
+   "kind": "concept",
+   "title": {
+    "en": "Sargable conditions (function on an indexed column)",
+    "hinglish": "Sargable conditions (function on an indexed column)",
+    "hindi": "Sargable conditions (function on an indexed column)"
+   },
+   "terms": [
+    [
+     "sargable"
+    ],
+    [
+     "non[- ]?sargable"
+    ],
+    [
+     "function",
+     "column",
+     "index"
+    ],
+    [
+     "function",
+     "index"
+    ],
+    [
+     "year",
+     "index"
+    ],
+    [
+     "date function",
+     "index"
+    ],
+    [
+     "lower",
+     "index",
+     "where"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a sargable query",
+     "why does a function on a column stop the index",
+     "does YEAR() in where use the index"
+    ],
+    "hinglish": [
+     "sargable kya hota hai",
+     "column pe function lagane se index kyun nahi lagta"
+    ],
+    "hindi": [
+     "sargable query क्या होती है",
+     "column पर function से index क्यों नहीं लगता"
+    ]
+   },
+   "answer": {
+    "en": "A condition is sargable when an index can be used to search it: the bare column compared with a value (order_date >= '2024-01-01'). Wrapping the column (YEAR(order_date) = 2024, DATE(created_at) = '...', qty + 1 = 5, LEFT(sku, 3) = 'LP_', COALESCE(discount, 0) = 0) makes the database work out a new value for every row, so it reads them all. Say the same rows on the bare column: a date range, the number moved across, LIKE 'LP%', discount = 0 OR discount IS NULL.",
+    "hinglish": "Condition sargable tab hai jab index se search ho sake: seedha column ek value se compare (order_date >= '2024-01-01'). Column ko lapetna (YEAR(order_date) = 2024, DATE(created_at) = ..., qty + 1 = 5, LEFT(sku, 3) = ..., COALESCE(discount, 0) = 0) har row ke liye nayi value banata hai, isliye sab rows padhi jaati hain. Wahi rows seedhe column pe likho: date range, number doosri taraf, LIKE 'LP%', discount = 0 OR discount IS NULL.",
+    "hindi": "Condition sargable तब है जब index से search हो सके: सीधा column एक value से compare। Column पर function हर row की नई value बनाता है, इसलिए सारी rows पढ़ी जाती हैं।"
+   },
+   "mistake": {
+    "en": "WHERE YEAR(order_date) = 2024 on an indexed order_date. Lab (20,000 rows): MariaDB read the whole index, PostgreSQL did a Seq Scan and guessed 100 rows for 7,362 real ones; the range form used the index on both.",
+    "hinglish": "Indexed order_date pe WHERE YEAR(order_date) = 2024. Lab mein dono ne poora index/table padha; range wala roop dono pe index use karta hai.",
+    "hindi": "Indexed order_date पर WHERE YEAR(order_date) = 2024: पूरी table पढ़ी जाती है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM orders WHERE order_date >= '2024-07-01' AND order_date < '2024-08-01' ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "4"
+      ],
+      [
+       "5"
+      ],
+      [
+       "6"
+      ],
+      [
+       "7"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "MySQL 8.0.13+ can index the expression itself (INDEX ((YEAR(order_date)))), but the range is simpler and serves more queries.",
+    "mariadb": "No expression index in 10.11: a virtual column with an index, compared by its own name.",
+    "postgresql": "No YEAR(): EXTRACT(YEAR FROM d) or d::date also hide the column; an expression index CREATE INDEX ON t ((EXTRACT(YEAR FROM d))) works but the range is better."
+   },
+   "related": [
+    "index",
+    "expression_index",
+    "leading_wildcard"
+   ],
+   "fundamentals": [
+    "index_use",
+    "time_ranges"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/range-optimization.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "leading_wildcard",
+   "kind": "concept",
+   "title": {
+    "en": "LIKE '%abc' and indexes (leading wildcard)",
+    "hinglish": "LIKE '%abc' and indexes (leading wildcard)",
+    "hindi": "LIKE '%abc' and indexes (leading wildcard)"
+   },
+   "terms": [
+    [
+     "leading wildcard"
+    ],
+    [
+     "like",
+     "%\\w+",
+     "index\\w*"
+    ],
+    [
+     "like pe index"
+    ],
+    [
+     "like par index"
+    ],
+    [
+     "like use an index"
+    ],
+    [
+     "like use the index"
+    ],
+    [
+     "like में index"
+    ],
+    [
+     "like",
+     "index",
+     "work"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can like '%abc%' use an index",
+     "what is a leading wildcard in like",
+     "does like use an index"
+    ],
+    "hinglish": [
+     "like '%abc%' index use karta hai kya",
+     "like pe index kaam karta hai kya"
+    ],
+    "hindi": [
+     "like '%abc%' पर index काम करता है क्या",
+     "LIKE में index लगता है क्या"
+    ]
+   },
+   "answer": {
+    "en": "An ordinary index is sorted from the first character, so it serves LIKE 'abc%' (a known start: a range) but not LIKE '%abc' or '%abc%' (any start: every row is checked). For 'contains' searches PostgreSQL has trigram indexes (pg_trgm, gin_trgm_ops), which serve LIKE '%abc%' exactly; MySQL/MariaDB have FULLTEXT indexes with MATCH ... AGAINST, which search whole words (a different search).",
+    "hinglish": "Normal index pehle akshar se sort hota hai, isliye LIKE 'abc%' (shuruaat pata: range) mein kaam aata hai, LIKE '%abc' ya '%abc%' mein nahi (har row check). 'Contains' search ke liye PostgreSQL ka trigram index (pg_trgm) LIKE '%abc%' theek wahi rows deta hai; MySQL/MariaDB ka FULLTEXT poore shabd dhoondhta hai (alag search).",
+    "hindi": "Normal index पहले अक्षर से sort होता है, इसलिए LIKE 'abc%' में काम आता है, '%abc%' में नहीं। PostgreSQL में pg_trgm, MySQL में FULLTEXT।"
+   },
+   "mistake": {
+    "en": "Expecting LIKE 'abc%' to use a plain index on PostgreSQL in every collation: outside the C collation it needs varchar_pattern_ops / text_pattern_ops (lab: Seq Scan with a plain index under C.UTF-8, Bitmap Index Scan with varchar_pattern_ops).",
+    "hinglish": "PostgreSQL mein har collation mein LIKE 'abc%' plain index use karega ye maan lena: C collation ke bahar varchar_pattern_ops chahiye.",
+    "hindi": "PostgreSQL में C collation के बाहर LIKE 'abc%' के लिए varchar_pattern_ops चाहिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, name FROM products WHERE name LIKE 'Laptop%' ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "name"
+     ],
+     "result": [
+      [
+       "3",
+       "Laptop Pro"
+      ],
+      [
+       "6",
+       "Laptop Air"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "LIKE 'abc%' becomes a range on the index; FULLTEXT + MATCH ... AGAINST for word search.",
+    "mariadb": "Same as MySQL (lab: type range for LIKE 'user123%').",
+    "postgresql": "LIKE 'abc%' needs C collation or varchar_pattern_ops; CREATE EXTENSION pg_trgm + GIN (col gin_trgm_ops) for '%abc%'."
+   },
+   "related": [
+    "like",
+    "like_wildcards",
+    "sargable"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://www.postgresql.org/docs/current/indexes-opclass.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "keyset_pagination",
+   "kind": "concept",
+   "title": {
+    "en": "Keyset pagination (instead of a big OFFSET)",
+    "hinglish": "Keyset pagination (instead of a big OFFSET)",
+    "hindi": "Keyset pagination (instead of a big OFFSET)"
+   },
+   "terms": [
+    [
+     "keyset"
+    ],
+    [
+     "keyset pagination"
+    ],
+    [
+     "seek method"
+    ],
+    [
+     "seek pagination"
+    ],
+    [
+     "cursor based pagination"
+    ],
+    [
+     "offset",
+     "pagination"
+    ],
+    [
+     "big offset"
+    ],
+    [
+     "large offset"
+    ],
+    [
+     "deep offset"
+    ],
+    [
+     "bada offset"
+    ],
+    [
+     "offset",
+     "पेजिनेशन"
+    ],
+    [
+     "पेजिनेशन"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is keyset pagination",
+     "why is a big offset slow for pagination",
+     "offset vs keyset pagination"
+    ],
+    "hinglish": [
+     "keyset pagination kya hai",
+     "bada offset pagination mein dheema kyun hota hai"
+    ],
+    "hindi": [
+     "keyset pagination क्या है",
+     "पेजिनेशन में बड़ा offset क्यों धीमा होता है"
+    ]
+   },
+   "answer": {
+    "en": "LIMIT 20 OFFSET 100000 still finds and sorts the 100,000 rows before the page and throws them away, so every page is slower than the last. Keyset (seek) paging remembers the last row shown and asks for the rows after it: WHERE id > :last_id ORDER BY id LIMIT 20 (or WHERE (created_at, id) > (:last_created_at, :last_id) ORDER BY created_at, id). It reads only the page, through the index, and gives the same page as the OFFSET query when the ORDER BY ends with a unique column.",
+    "hinglish": "LIMIT 20 OFFSET 100000 page se pehle ki 100,000 rows dhoondh ke sort karke phenk deta hai, isliye har agla page aur slow. Keyset (seek) paging pichli aakhri row yaad rakhta hai aur uske baad wali rows maangta hai: WHERE id > :last_id ORDER BY id LIMIT 20. Sirf page padhta hai, index se, aur ORDER BY ke aakhir mein unique column ho to OFFSET wala hi page deta hai.",
+    "hindi": "बड़ा OFFSET पहले की सारी rows पढ़कर फेंकता है। Keyset paging आख़िरी row याद रखकर उसके बाद की rows माँगता है: WHERE id > :last_id ORDER BY id LIMIT 20।"
+   },
+   "mistake": {
+    "en": "Keyset on a column that isn't unique (ORDER BY created_at alone): rows with the same time are skipped or repeated between pages. End the sort with the key (created_at, id). Also, keyset can't jump straight to page 500; it suits next/previous and infinite scroll.",
+    "hinglish": "Unique na ho aise column pe keyset (sirf created_at): barabar time wali rows chhoot ya dohra jaati hain. Sort ke aakhir mein key (created_at, id). Aur keyset seedha page 500 pe nahi jaa sakta.",
+    "hindi": "Unique न हो ऐसे column पर keyset: rows छूट या दोहरा जाती हैं। Sort के आख़िर में key रखो।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, order_date FROM orders WHERE id > 4 ORDER BY id LIMIT 3"
+     },
+     "columns": [
+      "id",
+      "order_date"
+     ],
+     "result": [
+      [
+       "5",
+       "2024-07-10"
+      ],
+      [
+       "6",
+       "2024-07-11"
+      ],
+      [
+       "7",
+       "2024-07-30"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "WHERE (a, b) > (x, y) is understood, but write it as a > x OR (a = x AND b > y) so the range optimizer uses the index.",
+    "mariadb": "Same as MySQL (lab: EXPLAIN for OFFSET 15000 showed rows = 15020).",
+    "postgresql": "Row comparison WHERE (created_at, id) > ($1, $2) uses a (created_at, id) index directly."
+   },
+   "related": [
+    "limit",
+    "order_limit_ties",
+    "index"
+   ],
+   "fundamentals": [
+    "index_use",
+    "ranking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-limit.html",
+   "seen_at": [
+    "https://use-the-index-luke.com/no-offset",
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/paging"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "or_vs_union",
+   "kind": "compare",
+   "title": {
+    "en": "OR vs UNION ALL (indexes and OR conditions)",
+    "hinglish": "OR vs UNION ALL (indexes and OR conditions)",
+    "hindi": "OR vs UNION ALL (indexes and OR conditions)"
+   },
+   "terms": [
+    [
+     "\\bor\\b",
+     "union( all)?"
+    ],
+    [
+     "\\bor\\b (condition|clause)s?",
+     "index\\w*"
+    ],
+    [
+     "index merge"
+    ],
+    [
+     "bitmapor"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "or vs union all which is faster",
+     "does an or condition use the index",
+     "what is index merge"
+    ],
+    "hinglish": [
+     "or aur union all mein kya farak hai",
+     "or condition pe index lagta hai kya"
+    ],
+    "hindi": [
+     "OR और UNION ALL में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "An OR between two columns of one table can use two indexes at once: MariaDB/MySQL do an index merge (EXPLAIN: index_merge, Using union), PostgreSQL a BitmapOr. If either column has no index, the whole table is read whatever you write. An OR between columns of two different tables in a join can't use any single index; writing it as UNION ALL of the two cases, with the second excluding rows the first returned ((cond1) IS NOT TRUE), gives the same rows and lets each part use its own index.",
+    "hinglish": "Ek table ke do columns ke beech OR do index ek saath use kar sakta hai: MariaDB/MySQL index merge, PostgreSQL BitmapOr. Ek column ka bhi index na ho to poori table padhi jaati hai. Join mein do alag tables ke columns ke beech OR koi ek index use nahi kar sakta; UNION ALL mein do hisse (doosra pehle wali rows chhod ke: (cond1) IS NOT TRUE) wahi rows deta hai aur har hissa apna index use karta hai.",
+    "hindi": "एक table के दो columns का OR दोनों index एक साथ इस्तेमाल कर सकता है। दो tables के columns का OR नहीं; तब UNION ALL मदद करता है।"
+   },
+   "mistake": {
+    "en": "Rewriting with UNION instead of UNION ALL: UNION removes real duplicate rows too (two orders with the same values). Or UNION ALL without excluding the first condition: rows that match both come back twice.",
+    "hinglish": "UNION ALL ki jagah UNION: asli duplicate rows bhi hat jaati hain. Ya pehli condition chhode bina UNION ALL: dono match karne wali rows do baar aati hain.",
+    "hindi": "UNION से असली duplicate rows भी हट जाती हैं; बिना शर्त UNION ALL से rows दो बार आती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM orders WHERE status = 'pending' UNION ALL SELECT id FROM orders WHERE customer_id = 2 AND (status = 'pending') IS NOT TRUE ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "3"
+      ],
+      [
+       "6"
+      ],
+      [
+       "7"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "index_merge (Using union(a,b)) when both columns are indexed.",
+    "mariadb": "Same as MySQL (lab: index_merge for customer_id = 5 OR email = ...).",
+    "postgresql": "BitmapOr of two Bitmap Index Scans (lab)."
+   },
+   "related": [
+    "and_or",
+    "explain",
+    "index"
+   ],
+   "fundamentals": [
+    "index_use",
+    "precedence"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/index-merge-optimization.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "clustered_index",
+   "kind": "compare",
+   "title": {
+    "en": "Clustered vs non-clustered (secondary) index",
+    "hinglish": "Clustered vs non-clustered (secondary) index",
+    "hindi": "Clustered vs non-clustered (secondary) index"
+   },
+   "terms": [
+    [
+     "clustered"
+    ],
+    [
+     "non[- ]?clustered"
+    ],
+    [
+     "secondary index(es)?"
+    ],
+    [
+     "क्लस्टर्ड"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a clustered index",
+     "clustered vs non clustered index",
+     "what is a secondary index"
+    ],
+    "hinglish": [
+     "clustered index kya hota hai",
+     "clustered aur non clustered index mein farak"
+    ],
+    "hindi": [
+     "clustered index क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "In a clustered index the table's rows themselves are stored in the index's order. MySQL/MariaDB InnoDB always cluster by the primary key: the table is the primary-key B-tree, and every other (secondary) index stores the primary key to find the row. PostgreSQL keeps rows in a heap with no fixed order; every index, the primary key's included, points at row locations (CLUSTER reorders the table once, not for later rows).",
+    "hinglish": "Clustered index mein table ki rows khud index ke kram mein rakhi hoti hain. MySQL/MariaDB InnoDB hamesha primary key se cluster karta hai: table hi primary key ka B-tree hai, aur har doosra (secondary) index row tak pahunchne ke liye primary key rakhta hai. PostgreSQL rows ko heap mein bina kram rakhta hai; har index row ki jagah batata hai.",
+    "hindi": "Clustered index में rows ख़ुद index के क्रम में रखी होती हैं। InnoDB primary key से cluster करता है; PostgreSQL heap में रखता है।"
+   },
+   "mistake": {
+    "en": "A long or random primary key on InnoDB (a UUID string): it is copied into every secondary index and random inserts split pages. Prefer a short, increasing key.",
+    "hinglish": "InnoDB pe lamba ya random primary key (UUID string): har secondary index mein copy hota hai aur random inserts pages todte hain. Chhota, badhta hua key behtar.",
+    "hindi": "InnoDB पर लंबा या random primary key हर secondary index में copy होता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, name FROM products WHERE id BETWEEN 2 AND 4 ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "name"
+     ],
+     "result": [
+      [
+       "2",
+       "Phone Lite"
+      ],
+      [
+       "3",
+       "Laptop Pro"
+      ],
+      [
+       "4",
+       "SQL Basics"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "InnoDB: the primary key is the clustered index; no primary key -> the first UNIQUE NOT NULL index, else a hidden row id.",
+    "mariadb": "Same as MySQL for InnoDB.",
+    "postgresql": "No clustered index kept up to date; CLUSTER t USING ix reorders once."
+   },
+   "related": [
+    "primary_key",
+    "index",
+    "uuid_vs_auto_increment"
+   ],
+   "fundamentals": [
+    "index_use",
+    "table_keys"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-index-types.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "index_selectivity",
+   "kind": "concept",
+   "title": {
+    "en": "Index selectivity and cardinality",
+    "hinglish": "Index selectivity and cardinality",
+    "hindi": "Index selectivity and cardinality"
+   },
+   "terms": [
+    [
+     "selectivity"
+    ],
+    [
+     "cardinality"
+    ],
+    [
+     "few distinct values"
+    ],
+    [
+     "low cardinality"
+    ],
+    [
+     "index",
+     "gender"
+    ],
+    [
+     "कार्डिनैलिटी"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is index selectivity",
+     "what is cardinality of an index",
+     "should i index a column with few distinct values like gender"
+    ],
+    "hinglish": [
+     "cardinality kya hoti hai index mein",
+     "gender column pe index lagana chahiye kya"
+    ],
+    "hindi": [
+     "index की cardinality क्या होती है"
+    ]
+   },
+   "answer": {
+    "en": "Selectivity is the share of rows a condition keeps; cardinality is how many different values a column has. An index pays off when the condition keeps a small share of the table: a lookup by email (unique) is ideal, a lookup by a yes/no flag that half the rows have is not (the database reads half the table through the index, slower than reading it straight). A low-cardinality column still helps as the first part of a composite index ((status, order_date)) or when one rare value is searched.",
+    "hinglish": "Selectivity = condition kitna hissa rows rakhti hai; cardinality = column mein kitni alag values. Index tab faayda deta hai jab condition table ka chhota hissa rakhe: email (unique) se dhoondhna best, aadhi rows wale yes/no flag se nahi. Kam values wala column composite index ke pehle hisse mein ((status, order_date)) ya kisi kam aane wali value ke liye phir bhi kaam aata hai.",
+    "hindi": "Selectivity = condition कितनी rows रखती है; cardinality = column में कितनी अलग values। Index तब फ़ायदा देता है जब condition छोटा हिस्सा रखे।"
+   },
+   "mistake": {
+    "en": "Adding an index on every yes/no column 'for speed': the optimizer ignores it for common values, and each one slows every insert and update.",
+    "hinglish": "Har yes/no column pe index lagana: optimizer aam values ke liye use nahi karta, aur har index insert/update dheema karta hai.",
+    "hindi": "हर yes/no column पर index लगाना: optimizer उसे छोड़ देता है और हर write धीमा होता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT status, COUNT(*) AS n FROM orders GROUP BY status ORDER BY status"
+     },
+     "columns": [
+      "status",
+      "n"
+     ],
+     "result": [
+      [
+       "cancelled",
+       "1"
+      ],
+      [
+       "paid",
+       "4"
+      ],
+      [
+       "pending",
+       "1"
+      ],
+      [
+       "shipped",
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "SHOW INDEX shows Cardinality (an estimate, refreshed by ANALYZE TABLE).",
+    "mariadb": "Same; histograms (ANALYZE TABLE t PERSISTENT FOR ALL) help with skewed values.",
+    "postgresql": "pg_stats.n_distinct and most_common_vals; a partial index serves one rare value well."
+   },
+   "related": [
+    "index",
+    "composite_index",
+    "partial_index"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://www.postgresql.org/docs/current/planner-stats.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "too_many_indexes",
+   "kind": "concept",
+   "title": {
+    "en": "The cost of indexes (too many indexes)",
+    "hinglish": "The cost of indexes (too many indexes)",
+    "hindi": "The cost of indexes (too many indexes)"
+   },
+   "terms": [
+    [
+     "too many index(es)?"
+    ],
+    [
+     "many indexes",
+     "bad"
+    ],
+    [
+     "disadvantages",
+     "index\\w*"
+    ],
+    [
+     "downside",
+     "index\\w*"
+    ],
+    [
+     "nuksaan",
+     "index\\w*"
+    ],
+    [
+     "nuksan",
+     "index\\w*"
+    ],
+    [
+     "indexes",
+     "slow down"
+    ],
+    [
+     "index\\w*",
+     "insert",
+     "dheema"
+    ],
+    [
+     "zyada index"
+    ],
+    [
+     "jyada index"
+    ],
+    [
+     "बहुत index"
+    ],
+    [
+     "नुकसान",
+     "index\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can too many indexes be bad",
+     "what are the disadvantages of indexes",
+     "do indexes slow down inserts"
+    ],
+    "hinglish": [
+     "zyada index lagane ka nuksaan kya hai",
+     "index se insert dheema hota hai kya"
+    ],
+    "hindi": [
+     "बहुत index लगाने का नुकसान क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Every index is another sorted copy that each INSERT, UPDATE of its columns and DELETE must change too, and it takes disk and memory. So indexes speed up reads and slow down writes. Keep the ones your real queries use: a composite index (a, b) already serves queries on a alone, so a separate index on (a) is redundant. Unused ones can be found in sys.schema_unused_indexes (MySQL) or pg_stat_user_indexes with idx_scan = 0 (PostgreSQL).",
+    "hinglish": "Har index ek aur sorted copy hai jise har INSERT, UPDATE aur DELETE ko bhi badalna padta hai, aur ye disk/memory leta hai. Index padhna tez aur likhna dheema karte hain. Wahi rakho jo asli queries use karti hain: (a, b) pehle se sirf a wali queries serve karta hai, alag (a) bekaar hai. Bina use wale: sys.schema_unused_indexes (MySQL), pg_stat_user_indexes idx_scan = 0 (PostgreSQL).",
+    "hindi": "हर index एक और copy है जिसे हर INSERT/UPDATE/DELETE बदलता है: पढ़ना तेज़, लिखना धीमा।"
+   },
+   "mistake": {
+    "en": "An index on (a) next to one on (a, b): the first adds write cost and serves nothing the second doesn't.",
+    "hinglish": "(a, b) ke saath alag (a) index: likhne ka kharcha badhata hai, kaam kuch naya nahi.",
+    "hindi": "(a, b) के साथ अलग (a) index बेकार है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE INDEX ix_items_order ON order_items (order_id)"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "mysql": "sys.schema_unused_indexes and sys.schema_redundant_indexes list candidates.",
+    "mariadb": "INDEX_STATISTICS (with userstat=1) shows which indexes are read.",
+    "postgresql": "pg_stat_user_indexes.idx_scan counts index uses since the last stats reset."
+   },
+   "related": [
+    "index",
+    "composite_index",
+    "index_selectivity"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "expression_index",
+   "kind": "concept",
+   "title": {
+    "en": "Expression (functional) index",
+    "hinglish": "Expression (functional) index",
+    "hindi": "Expression (functional) index"
+   },
+   "terms": [
+    [
+     "(functional|expression|function[- ]based) (index|indexes)"
+    ],
+    [
+     "index on (an? )?(expression|function)"
+    ],
+    [
+     "index",
+     "lower\\s*\\(?\\s*(email)?"
+    ],
+    [
+     "virtual column",
+     "index"
+    ],
+    [
+     "generated column",
+     "index"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a functional index",
+     "how to index lower(email)",
+     "can i create an index on an expression"
+    ],
+    "hinglish": [
+     "expression index kya hota hai",
+     "lower email pe index kaise lagaye"
+    ],
+    "hindi": [
+     "functional index क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "An index on the result of an expression (lower(email), date(created_at)), so a WHERE that uses exactly that expression can search it. PostgreSQL: CREATE INDEX ON customers ((lower(email))). MySQL 8.0.13+: CREATE INDEX ix ON customers ((LOWER(email))). MariaDB 10.11: add a generated (virtual) column for the expression, index it, and compare that column by name. Prefer rewriting the condition on the bare column when the same rows can be said that way (a date range); keep expression indexes for things like case-blind lookups.",
+    "hinglish": "Expression ke result pe index (lower(email), date(created_at)), taaki WHERE mein bilkul wahi expression ho to search ho sake. PostgreSQL: CREATE INDEX ON customers ((lower(email))). MySQL 8.0.13+: ((LOWER(email))). MariaDB 10.11: expression ka generated (virtual) column banao, us pe index, aur WHERE mein usi column ka naam. Jahan seedhe column pe wahi rows likh sako (date range) wahan wahi behtar.",
+    "hindi": "Expression के result पर index (lower(email)); WHERE में वही expression हो तो search होता है। MariaDB 10.11 में virtual column + index।"
+   },
+   "mistake": {
+    "en": "A slightly different expression in the query (LOWER(TRIM(email)) against an index on lower(email)): it won't be used. And on MariaDB 10.11 the virtual column's index is used only when the query names that column (lab).",
+    "hinglish": "Query mein thoda alag expression (LOWER(TRIM(email))): index use nahi hoga. MariaDB 10.11 mein virtual column ka index tabhi jab query us column ka naam le (lab).",
+    "hindi": "Query में थोड़ा अलग expression हो तो index इस्तेमाल नहीं होगा।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE demo_pk (email VARCHAR(80), email_lc VARCHAR(80) AS (LOWER(email)) VIRTUAL, INDEX ix_demo_email_lc (email_lc))",
+      "postgresql": "CREATE INDEX ix_customers_email_lc ON customers ((lower(email)))"
+     },
+     "changed": "ok"
+    },
+    {
+     "sql": {
+      "all": "SELECT id FROM customers WHERE LOWER(email) = 'aarav@mail.test' ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ],
+      [
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0.13+: functional key parts INDEX ((expr)); before that, a generated column with an index.",
+    "mariadb": "10.11: generated column + index, queried by the column's name (lab: LOWER(email) = ... still read the whole index).",
+    "postgresql": "CREATE INDEX ... ((expr)); ANALYZE also gathers statistics on the expression."
+   },
+   "related": [
+    "sargable",
+    "index",
+    "collation"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://www.postgresql.org/docs/current/indexes-expressional.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "partial_index",
+   "kind": "concept",
+   "title": {
+    "en": "Partial index (index on some rows)",
+    "hinglish": "Partial index (index on some rows)",
+    "hindi": "Partial index (index on some rows)"
+   },
+   "terms": [
+    [
+     "partial index(es)?"
+    ],
+    [
+     "filtered index"
+    ],
+    [
+     "index",
+     "only some rows"
+    ],
+    [
+     "index",
+     "kuch rows"
+    ],
+    [
+     "पार्शियल"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a partial index",
+     "can i index only some rows",
+     "partial index in postgres"
+    ],
+    "hinglish": [
+     "partial index kya hota hai",
+     "sirf kuch rows pe index lagta hai kya"
+    ],
+    "hindi": [
+     "partial index क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A PostgreSQL index with a WHERE: CREATE INDEX ON orders (order_date) WHERE status = 'pending' holds only the pending orders, so it is small and fast for queries that say status = 'pending'. A partial UNIQUE index can enforce 'one active row per customer'. MySQL and MariaDB have no partial indexes: use a composite index starting with the column (status, order_date), or a generated column that is NULL for the other rows.",
+    "hinglish": "WHERE wala PostgreSQL index: CREATE INDEX ON orders (order_date) WHERE status = 'pending' sirf pending orders rakhta hai, chhota aur tez, un queries ke liye jo status = 'pending' kehti hain. Partial UNIQUE index 'har customer ki ek active row' jaise niyam bhi laga sakta hai. MySQL/MariaDB mein partial index nahi: (status, order_date) composite index use karo.",
+    "hindi": "WHERE वाला PostgreSQL index: सिर्फ़ कुछ rows रखता है, छोटा और तेज़। MySQL/MariaDB में नहीं है।"
+   },
+   "mistake": {
+    "en": "A query whose WHERE doesn't imply the index's condition (status IN ('pending', 'paid')): the partial index can't be used.",
+    "hinglish": "Query ka WHERE index ki condition ko cover na kare (status IN ('pending', 'paid')): partial index use nahi hota.",
+    "hindi": "Query का WHERE index की condition से मेल न खाए तो partial index काम नहीं आता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE INDEX ix_orders_status_odate ON orders (status, order_date)",
+      "postgresql": "CREATE INDEX ix_orders_pending_date ON orders (order_date) WHERE status = 'pending'"
+     },
+     "changed": "ok"
+    },
+    {
+     "sql": {
+      "all": "SELECT id, order_date FROM orders WHERE status = 'pending' ORDER BY order_date"
+     },
+     "columns": [
+      "id",
+      "order_date"
+     ],
+     "result": [
+      [
+       "6",
+       "2024-07-11"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "No partial indexes; a composite index (status, ...) or a generated column.",
+    "mariadb": "No partial indexes; same as MySQL.",
+    "postgresql": "CREATE INDEX ... WHERE condition; the query's WHERE must imply it."
+   },
+   "related": [
+    "index",
+    "index_selectivity",
+    "unique"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://www.postgresql.org/docs/current/indexes-partial.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "implicit_conversion",
+   "kind": "concept",
+   "title": {
+    "en": "Implicit type conversion (text column compared with a number)",
+    "hinglish": "Implicit type conversion (text column compared with a number)",
+    "hindi": "Implicit type conversion (text column compared with a number)"
+   },
+   "terms": [
+    [
+     "implicit (type )?conversion"
+    ],
+    [
+     "implicit cast"
+    ],
+    [
+     "varchar",
+     "number",
+     "compar\\w*"
+    ],
+    [
+     "text column",
+     "number"
+    ],
+    [
+     "without quotes",
+     "number"
+    ],
+    [
+     "type mismatch",
+     "index"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is implicit type conversion in sql",
+     "why does comparing a varchar column with a number skip the index",
+     "what happens if a number is compared without quotes to a text column"
+    ],
+    "hinglish": [
+     "implicit conversion kya hota hai",
+     "varchar column ko number se compare karne pe index kyun nahi lagta"
+    ],
+    "hindi": [
+     "implicit conversion क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "When a comparison mixes types, the database converts one side. If a text column is compared with a number (phone = 9812345678), MySQL/MariaDB convert every row's text to a number: the index can't be used, and '09812345678' and '9812345678 ' match too. PostgreSQL refuses it (42883, operator does not exist). Quote the value to match the column's type (phone = '9812345678'). The other way round is harmless: a number column compared with '5' converts only the constant.",
+    "hinglish": "Comparison mein types alag hon to database ek taraf convert karta hai. Text column ko number se compare karo (phone = 9812345678) to MySQL/MariaDB har row ka text number banate hain: index use nahi hota, aur '09812345678' aur '9812345678 ' bhi match ho jaate hain. PostgreSQL mana kar deta hai (42883). Value ko column ke type mein likho (phone = '9812345678'). Ulta harmless hai: number column ko '5' se compare karne pe sirf constant badalta hai.",
+    "hindi": "Text column को number से compare करने पर MySQL हर row बदलता है: index नहीं लगता और ग़लत rows भी मिलती हैं। PostgreSQL error देता है। Value quotes में लिखो।"
+   },
+   "mistake": {
+    "en": "Joining two tables on columns of different types (INT to VARCHAR): every row is converted, the index on one side is useless.",
+    "hinglish": "Do tables ko alag type ke columns pe jodna (INT aur VARCHAR): har row convert hoti hai, ek taraf ka index bekaar.",
+    "hindi": "अलग type के columns पर join: index बेकार हो जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM customers WHERE phone = '98100' ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Silent: a 1292 note at most; EXPLAIN shows type index/ALL instead of ref.",
+    "mariadb": "Same as MySQL (lab: '09812345678' and '9812345678 ' matched phone = 9812345678).",
+    "postgresql": "Error 42883 (operator does not exist: character varying = bigint)."
+   },
+   "related": [
+    "data_types",
+    "sargable",
+    "phone_number_type"
+   ],
+   "fundamentals": [
+    "index_use",
+    "values_types"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/type-conversion.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "index_order_by",
+   "kind": "concept",
+   "title": {
+    "en": "Indexes for ORDER BY (avoiding a sort / filesort)",
+    "hinglish": "Indexes for ORDER BY (avoiding a sort / filesort)",
+    "hindi": "Indexes for ORDER BY (avoiding a sort / filesort)"
+   },
+   "terms": [
+    [
+     "filesort"
+    ],
+    [
+     "index",
+     "order by"
+    ],
+    [
+     "avoid",
+     "sort"
+    ],
+    [
+     "using temporary"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is using filesort",
+     "can an index help order by",
+     "how to avoid a sort in a query"
+    ],
+    "hinglish": [
+     "using filesort kya hai",
+     "order by ke liye index kaise lagaye"
+    ],
+    "hindi": [
+     "using filesort क्या है"
+    ]
+   },
+   "answer": {
+    "en": "An index keeps its rows in order, so ORDER BY can read them already sorted and stop at the LIMIT, instead of finding every row and sorting (MySQL/MariaDB 'Using filesort', PostgreSQL a Sort node). The index must start with the WHERE's equality columns, followed by the ORDER BY columns in the same order (and directions): WHERE customer_id = 3 ORDER BY order_date DESC LIMIT 10 is served by (customer_id, order_date).",
+    "hinglish": "Index rows ko kram mein rakhta hai, isliye ORDER BY unhe pehle se sorted padh ke LIMIT pe ruk sakta hai, bajay saari rows dhoondh ke sort karne ke (MySQL/MariaDB 'Using filesort', PostgreSQL Sort node). Index mein pehle WHERE ke '=' columns, phir ORDER BY ke columns usi kram mein: WHERE customer_id = 3 ORDER BY order_date DESC LIMIT 10 ke liye (customer_id, order_date).",
+    "hindi": "Index rows को क्रम में रखता है, इसलिए ORDER BY ... LIMIT बिना sort के हो सकता है। पहले '=' columns, फिर ORDER BY columns।"
+   },
+   "mistake": {
+    "en": "A range in the WHERE before the sort column ((order_date, amount) with order_date > ... ORDER BY amount): the rows aren't in amount order inside the range, so a sort is still needed.",
+    "hinglish": "Sort column se pehle range ((order_date, amount) mein order_date > ... ORDER BY amount): range ke andar rows amount ke kram mein nahi, sort phir bhi chahiye.",
+    "hindi": "Sort column से पहले range हो तो sort फिर भी चाहिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, order_date FROM orders WHERE customer_id = 3 ORDER BY order_date DESC LIMIT 1"
+     },
+     "columns": [
+      "id",
+      "order_date"
+     ],
+     "result": [
+      [
+       "5",
+       "2024-07-10"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0 supports descending index parts (INDEX (a, b DESC)) for mixed directions.",
+    "mariadb": "Descending index parts from 10.8; before that, mixed ASC/DESC needs a sort.",
+    "postgresql": "Index Scan Backward reads an ascending index for DESC; mixed directions need an index declared that way."
+   },
+   "related": [
+    "order_by",
+    "composite_index",
+    "explain"
+   ],
+   "fundamentals": [
+    "index_use",
+    "ranking"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/order-by-optimization.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "analyze_statistics",
+   "kind": "concept",
+   "title": {
+    "en": "Table statistics and ANALYZE (why the planner picks a plan)",
+    "hinglish": "Table statistics and ANALYZE (why the planner picks a plan)",
+    "hindi": "Table statistics and ANALYZE (why the planner picks a plan)"
+   },
+   "terms": [
+    [
+     "analy[sz]e table"
+    ],
+    [
+     "statistics"
+    ],
+    [
+     "optimizer",
+     "bad plan"
+    ],
+    [
+     "optimizer",
+     "wrong plan"
+    ],
+    [
+     "planner",
+     "bad plan"
+    ],
+    [
+     "histograms?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what does analyze table do",
+     "what are table statistics in a database",
+     "why does the optimizer choose a bad plan"
+    ],
+    "hinglish": [
+     "analyze table kya karta hai",
+     "statistics purane hone se kya hota hai"
+    ],
+    "hindi": [
+     "analyze table क्या करता है"
+    ]
+   },
+   "answer": {
+    "en": "The optimizer picks a plan from statistics: how many rows a table has and how values are spread. ANALYZE TABLE t (MySQL/MariaDB) or ANALYZE t (PostgreSQL) refreshes them. Stale statistics after a big load, or a condition the statistics can't see through (a function on the column), lead to estimates far from the real row counts and to a poor plan: EXPLAIN ANALYZE shows the gap.",
+    "hinglish": "Optimizer statistics se plan chunta hai: table mein kitni rows aur values kaise faili hain. ANALYZE TABLE t (MySQL/MariaDB) ya ANALYZE t (PostgreSQL) unhe taaza karta hai. Bade load ke baad purane statistics, ya function wali condition, andaaze ko asli rows se bahut door le jaate hain: EXPLAIN ANALYZE ye farak dikhata hai.",
+    "hindi": "Optimizer statistics से plan चुनता है; ANALYZE उन्हें ताज़ा करता है।"
+   },
+   "mistake": {
+    "en": "Blaming the index when the estimate is the problem. Lab: a temporary table in PostgreSQL has no statistics until you ANALYZE it (autovacuum doesn't visit temporary tables).",
+    "hinglish": "Andaaza galat ho aur dosh index ko dena. Lab: PostgreSQL ki temporary table ke statistics ANALYZE ke bina nahi bante.",
+    "hindi": "अंदाज़ा ग़लत हो और दोष index को देना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS n FROM orders"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "InnoDB samples pages for statistics (innodb_stats_persistent); 8.0 adds histograms (ANALYZE TABLE t UPDATE HISTOGRAM ON col).",
+    "mariadb": "Engine-independent statistics and histograms: ANALYZE TABLE t PERSISTENT FOR ALL.",
+    "postgresql": "autovacuum runs ANALYZE; CREATE STATISTICS for columns that depend on each other."
+   },
+   "related": [
+    "explain_analyze",
+    "explain",
+    "index_selectivity"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-analyze.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "slow_query_log",
+   "kind": "howto",
+   "title": {
+    "en": "Finding the slow queries (slow query log, pg_stat_statements)",
+    "hinglish": "Finding the slow queries (slow query log, pg_stat_statements)",
+    "hindi": "Finding the slow queries (slow query log, pg_stat_statements)"
+   },
+   "terms": [
+    [
+     "slow query log"
+    ],
+    [
+     "pg_stat_statements"
+    ],
+    [
+     "find slow queries"
+    ],
+    [
+     "slow queries",
+     "find"
+    ],
+    [
+     "slow queries",
+     "dhoondh"
+    ],
+    [
+     "slow queries",
+     "kaise"
+    ],
+    [
+     "long running queries"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to find slow queries in mysql",
+     "what is the slow query log",
+     "what is pg_stat_statements"
+    ],
+    "hinglish": [
+     "mysql mein slow queries kaise dhoondhe",
+     "slow query log kya hai"
+    ],
+    "hindi": [
+     "slow query log क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Let the database tell you which queries cost the most. MySQL/MariaDB: turn on the slow query log (slow_query_log = ON, long_query_time = 1) and summarise it with mysqldumpslow or pt-query-digest; performance_schema's events_statements_summary_by_digest ranks queries by total time. PostgreSQL: the pg_stat_statements extension keeps totals per query shape (ORDER BY total_exec_time DESC), and log_min_duration_statement logs each slow one. Fix the top few first, with EXPLAIN.",
+    "hinglish": "Database se hi poochho kaunsi queries sabse mehngi hain. MySQL/MariaDB: slow query log chalu karo (slow_query_log = ON, long_query_time = 1) aur mysqldumpslow / pt-query-digest se summary; performance_schema events_statements_summary_by_digest total time se queries dikhata hai. PostgreSQL: pg_stat_statements har query shape ka total rakhta hai (ORDER BY total_exec_time DESC), log_min_duration_statement har dheemi query log karta hai. Sabse upar wali pehle, EXPLAIN ke saath.",
+    "hindi": "डेटाबेस से ही पूछो कौनसी queries सबसे महँगी हैं: MySQL में slow query log, PostgreSQL में pg_stat_statements।"
+   },
+   "mistake": {
+    "en": "Tuning the one query you noticed instead of the ones that cost the most in total: a 50 ms query run 100,000 times a day outweighs a 5 s report run once.",
+    "hinglish": "Jo query dikhi use hi sudharna, bajay unke jo kul milake sabse mehngi: 50 ms ki query din mein 1 lakh baar, 5 s ki ek report se bhaari.",
+    "hindi": "कुल मिलाकर सबसे महँगी queries पहले सुधारो।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS n FROM orders WHERE status = 'paid'"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "SET GLOBAL slow_query_log = ON; SET GLOBAL long_query_time = 1; sys.statement_analysis ranks digests.",
+    "mariadb": "Same variables; log_slow_verbosity=query_plan,explain adds the plan to each entry.",
+    "postgresql": "CREATE EXTENSION pg_stat_statements (with shared_preload_libraries); log_min_duration_statement = '1s'."
+   },
+   "related": [
+    "explain",
+    "explain_analyze",
+    "index"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/slow-query-log.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/pgstatstatements.html",
+    "https://www.percona.com/blog/",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "btree_vs_hash",
+   "kind": "compare",
+   "title": {
+    "en": "B-tree vs hash (and other) index types",
+    "hinglish": "B-tree vs hash (and other) index types",
+    "hindi": "B-tree vs hash (and other) index types"
+   },
+   "terms": [
+    [
+     "btree",
+     "index"
+    ],
+    [
+     "b-tree",
+     "index"
+    ],
+    [
+     "b tree",
+     "index"
+    ],
+    [
+     "hash index(es)?"
+    ],
+    [
+     "gin index"
+    ],
+    [
+     "gist index"
+    ],
+    [
+     "brin index"
+    ],
+    [
+     "types of index(es)?"
+    ],
+    [
+     "index",
+     "types"
+    ],
+    [
+     "index",
+     "प्रकार"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a btree index",
+     "btree vs hash index",
+     "what are the types of indexes"
+    ],
+    "hinglish": [
+     "btree index kya hota hai",
+     "index ke types kya hote hain"
+    ],
+    "hindi": [
+     "index के प्रकार क्या होते हैं"
+    ]
+   },
+   "answer": {
+    "en": "A B-tree (the default everywhere) keeps keys sorted, so it serves =, <, >, BETWEEN, LIKE 'abc%', ORDER BY and prefixes of composite indexes. A hash index serves only = (no ranges, no sorting); in MySQL it exists for MEMORY tables, in PostgreSQL as USING hash. PostgreSQL also has GIN (arrays, JSONB, full text, trigrams), GiST (geometry, ranges), BRIN (huge tables whose rows follow the column, like a log's time). MySQL/MariaDB add FULLTEXT and SPATIAL.",
+    "hinglish": "B-tree (har jagah default) keys ko sorted rakhta hai: =, <, >, BETWEEN, LIKE 'abc%', ORDER BY aur composite ke prefix mein kaam aata hai. Hash index sirf = (range nahi, sort nahi). PostgreSQL mein GIN (arrays, JSONB, full text, trigram), GiST (geometry, ranges), BRIN (badi tables jahan rows column ke kram mein hon) bhi. MySQL/MariaDB mein FULLTEXT aur SPATIAL.",
+    "hindi": "B-tree keys को sorted रखता है (=, <, >, ORDER BY); hash सिर्फ़ = के लिए।"
+   },
+   "mistake": {
+    "en": "Choosing a hash index 'because it's faster': it can't serve a range, a sort or a LIKE prefix, and a B-tree's = lookup is already a few page reads.",
+    "hinglish": "'Tez hai' soch ke hash index lena: range, sort, LIKE prefix mein kaam nahi aata; B-tree ka = bhi kuch hi pages padhta hai.",
+    "hindi": "Hash index range या sort में काम नहीं आता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE INDEX ix_customers_city ON customers (city)"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "mysql": "InnoDB indexes are B-trees (USING HASH is accepted but ignored); the adaptive hash index is internal.",
+    "mariadb": "Same as MySQL for InnoDB; MEMORY tables default to HASH.",
+    "postgresql": "CREATE INDEX ... USING btree | hash | gin | gist | brin | spgist."
+   },
+   "related": [
+    "index",
+    "leading_wildcard",
+    "fulltext_index"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://www.postgresql.org/docs/current/indexes-types.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "fulltext_index",
+   "kind": "concept",
+   "title": {
+    "en": "Full-text search index",
+    "hinglish": "Full-text search index",
+    "hindi": "Full-text search index"
+   },
+   "terms": [
+    [
+     "full[- ]?text"
+    ],
+    [
+     "match\\s*\\(?.*against"
+    ],
+    [
+     "to_tsvector|tsvector|tsquery"
+    ],
+    [
+     "word search",
+     "index"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a fulltext index",
+     "how to do full text search in mysql",
+     "what is tsvector in postgres"
+    ],
+    "hinglish": [
+     "full text search kaise kare",
+     "fulltext index kya hai"
+    ],
+    "hindi": [
+     "full text search क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A full-text index breaks text into words and indexes each word, so a search for words is fast on big text columns. MySQL/MariaDB: FULLTEXT INDEX (title, body) and WHERE MATCH(title, body) AGAINST ('phone case'). PostgreSQL: a GIN index on to_tsvector('english', body) and WHERE to_tsvector('english', body) @@ plainto_tsquery('english', 'phone case'). It finds words (with stemming, stop words and relevance), which is not the same as LIKE '%text%'.",
+    "hinglish": "Full-text index text ko shabdon mein todta hai aur har shabd index karta hai, isliye badi text columns mein shabd dhoondhna tez. MySQL/MariaDB: FULLTEXT INDEX aur MATCH(...) AGAINST ('...'). PostgreSQL: to_tsvector pe GIN index aur @@ plainto_tsquery. Ye shabd dhoondhta hai (stemming, stop words), LIKE '%text%' jaisa nahi.",
+    "hindi": "Full-text index text को शब्दों में तोड़कर हर शब्द index करता है; LIKE '%text%' जैसा नहीं है।"
+   },
+   "mistake": {
+    "en": "Expecting MATCH ... AGAINST to return exactly what LIKE '%abc%' returned: parts of words, very short words and stop words aren't found.",
+    "hinglish": "MATCH ... AGAINST se LIKE '%abc%' jaise hi result ki ummeed: shabd ke hisse, chhote shabd aur stop words nahi milte.",
+    "hindi": "MATCH ... AGAINST से LIKE जैसे result की उम्मीद ग़लत है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, name FROM products WHERE name LIKE '%Phone%' ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "name"
+     ],
+     "result": [
+      [
+       "1",
+       "Phone X"
+      ],
+      [
+       "2",
+       "Phone Lite"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "InnoDB FULLTEXT (5.6+); innodb_ft_min_token_size = 3 by default; ngram parser for CJK.",
+    "mariadb": "InnoDB and Aria FULLTEXT; MATCH ... AGAINST in natural language or boolean mode.",
+    "postgresql": "tsvector / tsquery with GIN; pg_trgm for LIKE '%abc%' with the same results as LIKE."
+   },
+   "related": [
+    "leading_wildcard",
+    "like",
+    "btree_vs_hash"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/fulltext-search.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "index_not_used",
+   "kind": "puzzle",
+   "title": {
+    "en": "Why an index is not used",
+    "hinglish": "Why an index is not used",
+    "hindi": "Why an index is not used"
+   },
+   "terms": [
+    [
+     "index",
+     "not used"
+    ],
+    [
+     "index",
+     "not being used"
+    ],
+    [
+     "index",
+     "ignore"
+    ],
+    [
+     "index",
+     "full scan"
+    ],
+    [
+     "index hote hue"
+    ],
+    [
+     "index",
+     "use kyun nahi"
+    ],
+    [
+     "index",
+     "क्यों नहीं"
+    ],
+    [
+     "इंडेक्स",
+     "क्यों नहीं"
+    ],
+    [
+     "not using the index"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why is the index not used",
+     "why does the database ignore an index",
+     "why is the optimizer not using the index"
+    ],
+    "hinglish": [
+     "index use kyun nahi ho raha",
+     "index hote hue bhi full scan kyun hota hai"
+    ],
+    "hindi": [
+     "index इस्तेमाल क्यों नहीं हो रहा"
+    ]
+   },
+   "answer": {
+    "en": "An index that exists is skipped when: the column is wrapped in a function or arithmetic (YEAR(d), d + 1, LOWER(x)); the value has another type (text column = 123); LIKE starts with %; the condition is on a later column of a composite index without the first; an OR mixes an unindexed column; the condition matches a large share of the table (reading it straight is cheaper); or the statistics are stale. EXPLAIN shows which: possible_keys with key = NULL (MySQL), or Seq Scan with the condition in Filter (PostgreSQL).",
+    "hinglish": "Index hote hue bhi chhoot jaata hai jab: column function/hisaab mein lipta ho (YEAR(d), d + 1, LOWER(x)); value alag type ki ho (text column = 123); LIKE % se shuru ho; composite index ke pehle column ke bina baad wale ki condition ho; OR mein bina index wala column ho; condition table ka bada hissa match kare; ya statistics purane hon. EXPLAIN batata hai kaunsa: possible_keys hai par key NULL (MySQL), ya Seq Scan aur condition Filter mein (PostgreSQL).",
+    "hindi": "Index तब छूटता है जब column function में हो, type अलग हो, LIKE % से शुरू हो, composite index का पहला column न हो, या condition बहुत rows match करे।"
+   },
+   "mistake": {
+    "en": "Forcing it (FORCE INDEX / USE INDEX / enable_seqscan = off) before finding which of these it is.",
+    "hinglish": "Wajah dhoondhe bina zabardasti (FORCE INDEX / enable_seqscan = off).",
+    "hindi": "वजह ढूँढे बिना ज़बरदस्ती index लगाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM orders WHERE order_date >= '2024-07-01' AND order_date < '2024-08-01' ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "4"
+      ],
+      [
+       "5"
+      ],
+      [
+       "6"
+      ],
+      [
+       "7"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "EXPLAIN: possible_keys lists it, key is NULL; SHOW WARNINGS after EXPLAIN shows the rewritten query.",
+    "mariadb": "Same as MySQL; ANALYZE SELECT shows r_rows to compare with the estimate.",
+    "postgresql": "EXPLAIN (ANALYZE): Seq Scan with the condition under Filter; compare estimated and actual rows."
+   },
+   "related": [
+    "sargable",
+    "leftmost_prefix",
+    "implicit_conversion"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/mysql-indexes.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/indexing",
+    "https://dba.stackexchange.com/questions/tagged/index-tuning",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

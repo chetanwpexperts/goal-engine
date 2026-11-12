@@ -113,7 +113,9 @@ def test_postgres_structure_is_read():
     res = S.analyze_sql("SELECT * FROM fz_staff WHERE id = 5", PG_DUMP)
     assert not res["indexes"]                                                                   # ADD CONSTRAINT ... PRIMARY KEY
     res = S.analyze_sql("SELECT * FROM fz_staff WHERE StaffName = 'x'", PG_DUMP)
-    assert res["indexes"] == ["ALTER TABLE fz_staff ADD INDEX idx_fz_staff_staffname (staffname);"]  # PostgreSQL's real name
+    # PostgreSQL's real name, in PostgreSQL's own words (rule A: the pg_dump shows the database; ALTER TABLE ... ADD INDEX is a
+    # syntax error there)
+    assert res["indexes"] == ["CREATE INDEX idx_fz_staff_staffname ON fz_staff (staffname);"]
     res = S.analyze_sql("SELECT * FROM fz_staff WHERE team_id = 3", PG_DUMP)
     assert any("(team_id)" in i for i in res["indexes"])                                        # a PostgreSQL FK has no index
 

@@ -78,6 +78,11 @@ OWN_WORK = re.compile(
     r"time(d)? ?out|exception|warning|broken|hang(s|ing)?|nahi chal\w*|kaam nahi|atak\w*|dheem\w*|dhire)\b|"
     r"\b(sqlstate|errno|err(or)? ?code)\b|\b[0-9]{4,5}\b|एरर|त्रुटि|धीम|काम नहीं|चल नहीं|"
     r"(ये|यह|इस|इसे|इसको|मेरी|मेरा|हमारी|ऊपर वाली)\s*(sql\s*)?(क्वेरी|query|स्टेटमेंट)", re.I)
+SLOW = re.compile(r"\bslow(ly|er|s)?\b|\bdheem\w*|\bdhire\b|धीम\w*", re.I)
+SLOW_TOPIC = re.compile(r"\bslow[- ]quer(y|ies)(\s+log)?\b|\bslow log\b", re.I)
+OWN_THING = re.compile(r"\b(my|our|this|mera|meri|mere|hamara|hamari|humara|apna|apni|ye|yeh|iss|query|queries|"
+                       r"database|databases|db|site|website|app|application|server|page|report|reports|api|system|login|dashboard)\b|"
+                       r"मेरा|मेरी|मेरे|हमारा|हमारी|ये|यह|इस|क्वेरी|डेटाबेस|साइट", re.I)
 # another field's file (a spreadsheet's duplicates are the office agent's work)
 OTHER_FIELD = re.compile(r"\b(excel|spreadsheets?|sheets?|xlsx?|csv|vlookup|xlookup|pivot table|word file|docx|google sheets?)\b|एक्सेल|शीट", re.I)
 # the words that make an unknown 'what is X' a question about databases (so it is answered honestly here, not elsewhere)
@@ -175,7 +180,16 @@ def _is_work(text: str) -> bool:
             return True
     except Exception:  # noqa: BLE001
         pass
-    return bool(OWN_WORK.search(text or "") or OTHER_FIELD.search(text or ""))
+    if OTHER_FIELD.search(text or ""):
+        return True
+    if OWN_WORK.search(text or ""):
+        # 'slow' alone in a general question ('why is a big OFFSET slow', 'do indexes slow down inserts', 'how to find slow
+        # queries') is a lesson; with the person's own query, database, site or app it is their problem, for the checker
+        rest = SLOW_TOPIC.sub(" ", text or "")
+        if OWN_WORK.search(SLOW.sub(" ", rest)) or (SLOW.search(rest) and OWN_THING.search(rest)):
+            return True
+        return False
+    return False
 
 
 def match(text: str) -> dict | None:

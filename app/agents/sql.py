@@ -21,6 +21,7 @@ class SqlFinding:
     evidence: str
     fix_en: str
     fix_hi: str
+    topic: str = ""
 
     def as_dict(self) -> dict:
         return self.__dict__.copy()
@@ -245,8 +246,14 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
     findings: list[SqlFinding] = []
     tables = _tables(sql)
 
-    def add(sev, ten, thi, ev, fen, fhi):
-        findings.append(SqlFinding(sev, ten, thi, ev, fen, fhi))
+    def add(sev, ten, thi, ev, fen, fhi, topic=""):
+        findings.append(SqlFinding(sev, ten, thi, ev, fen, fhi, topic))
+
+    from app.agents import sqlexplain, sqlspeed
+
+    plan = sqlexplain.read(extra) if extra else None
+    eng = sqlspeed._engine(original) or ((plan or {}).get("engine") if plan else None) or \
+        ("postgresql" if extra and _looks_postgres(extra) else None)    # rule A: the index commands in that database's words
 
     if re.search(r"\bselect\s+(distinct\s+)?([`\"]?\w+[`\"]?\.)?\*", low):
         add(2, "SELECT * reads every column", "SELECT * har column padhta hai", "SELECT *",
@@ -288,21 +295,37 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
             fen, fhi = ("Store the cleaned value in its own column (or index the same expression) and compare that column directly.",
                         "Saaf value alag column mein rakho (ya usi expression pe index) aur us column ko seedha compare karo.")
         add(3, f"{f}() on a column in WHERE blocks the index", f"WHERE mein column pe {f}() index ko rok deta hai",
-            f"{f}({c}) in WHERE", fen, fhi)
+            f"{f}({c}) in WHERE", fen, fhi, "sargable")
     if re.search(r"\blike\s+'%\?'", where, re.I):
+        pg_trgm = ("On PostgreSQL a trigram index finds exactly the same rows: CREATE EXTENSION pg_trgm; then CREATE INDEX ... USING gin "
+                   "(column gin_trgm_ops).")
+        fulltext = ("On MySQL/MariaDB a FULLTEXT index with MATCH ... AGAINST searches whole words, which is a different search "
+                    "(not every LIKE '%x%' match), so check it returns what you want.")
         add(2, "LIKE '%...' can't use an index", "LIKE '%...' index use nahi kar sakta", "leading % in LIKE",
-            "Use prefix search (LIKE 'abc%') or a FULLTEXT index for word search.",
-            "Prefix search (LIKE 'abc%') ya word search ke liye FULLTEXT index.")
+            "An index is sorted from the first character, and '%' first means any start, so every row is read (lab: MariaDB type "
+            "index/ALL, PostgreSQL Seq Scan). Search from the start (LIKE 'abc%') when that is what you mean. "
+            + (pg_trgm if eng == "postgresql" else fulltext if eng == "mysql" else f"{pg_trgm} {fulltext}"),
+            "Index pehle akshar se sort hota hai, aur shuru mein '%' ka matlab koi bhi shuruaat, isliye har row padhi jaati hai. "
+            "Matlab shuru se ho to LIKE 'abc%' likho. PostgreSQL mein pg_trgm (gin_trgm_ops) index wahi rows deta hai; MySQL/MariaDB "
+            "ka FULLTEXT poore shabd dhoondhta hai (alag search).", "leading_wildcard")
     if _mixed_and_or(where):
         add(3, "AND and OR mixed without brackets: probably wrong results", "AND aur OR bina bracket ke: shayad galat result",
             "a AND b OR c", "AND runs before OR. Add brackets to say what you mean, e.g. a AND (b OR c).",
             "AND pehle chalta hai, OR baad mein. Bracket lagao, jaise a AND (b OR c).")
+    or_note = None
     if re.search(r"\bor\b", where, re.I):
         cols = {c.lower() for c in re.findall(r"([`\w.]+)\s*(?:=|in\b|like\b|>|<)", where, re.I)}
-        if len(cols) > 1:
-            add(2, "OR across different columns often skips indexes", "Alag columns pe OR aksar index chhod deta hai",
-                "OR in WHERE", "Split into two queries joined with UNION ALL, each using its own index.",
-                "Do queries banake UNION ALL se jodo, har ek apna index use kare.")
+        if len(cols) > 1 and len(tables) == 1:          # one table: both engines combine two indexes (lab); across tables: or_union
+            from app.agents.sqlbasics import rules as _rules
+
+            says = {"mysql": _rules("mysql")["or_same_table"]["says"], "postgresql": _rules("postgresql")["or_same_table"]["says"]}
+            or_note = {"en": "The OR compares different columns of one table. That is fine when each of them has its own index: "
+                             + (says[eng] if eng in says else f"{says['mysql']} {says['postgresql']}")
+                             + " If one of them has no index, the whole table is read whatever way the query is written, so index "
+                               "both (rewriting it as UNION ALL doesn't help then).",
+                       "hi": "OR ek hi table ke alag columns compare karta hai. Har column ka apna index ho to ye theek hai: MariaDB "
+                             "(index_merge) aur PostgreSQL (BitmapOr) do index milaate hain. Ek ka bhi index na ho to poori table "
+                             "padhi jaati hai, isliye dono pe index lagao (UNION ALL se tab fayda nahi)."}
     if re.search(r"\bnot\s+in\s*\(\s*select\b", low):
         add(2, "NOT IN (SELECT ...) is slow and breaks on NULLs", "NOT IN (SELECT ...) slow hai aur NULL pe galat",
             "NOT IN subquery", "Use NOT EXISTS (or LEFT JOIN ... WHERE x IS NULL).", "NOT EXISTS (ya LEFT JOIN ... WHERE x IS NULL) use karo.")
@@ -317,7 +340,7 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
     if offset and int(offset.group(1) or offset.group(2)) >= 10000:
         add(2, "Large OFFSET reads and throws away rows", "Bada OFFSET rows padh ke phenk deta hai", offset.group(0),
             "Use keyset pagination: WHERE id > last_seen_id ORDER BY id LIMIT n.",
-            "Keyset pagination: WHERE id > last_seen_id ORDER BY id LIMIT n.")
+            "Keyset pagination: WHERE id > last_seen_id ORDER BY id LIMIT n.", "keyset")
     if re.search(r"\bfrom\s+[`\w.]+(\s+\w+)?\s*,\s*[`\w.]+", low) and not where:
         add(3, "Comma join without a condition multiplies rows", "Bina condition ke comma join rows guna kar deta hai",
             "FROM a, b without WHERE", "Use explicit JOIN ... ON with the matching columns.", "Saaf JOIN ... ON matching columns ke saath.")
@@ -402,7 +425,7 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
         rng = clean(t.rng, short)
         filt = clean(t.eq + (rng[:1] if rng else t.order), short)[:4]
         if filt and filt[0].lower() not in have and not (_likely_primary(short, filt[0]) and short.lower() not in known):
-            indexes.append(f"ALTER TABLE {t.name} ADD INDEX {_index_name(short, filt)} ({', '.join(filt)});")
+            indexes.append(sqlspeed.index_ddl(t.name, _index_name(short, filt), filt, eng))
         if t.name in has_filter and len(tables) > 1:
             continue                    # MySQL reads this table through its filter index; its join columns point outward
         joins = []
@@ -417,14 +440,10 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
             joins = []                  # an index already starts with one of the join columns: MySQL can use it
         if joins:                       # one index for all the columns this table is joined on, not one each
             cols = joins[:4]
-            indexes.append(f"ALTER TABLE {t.name} ADD INDEX {_index_name(short, cols)} ({', '.join(cols)});")
+            indexes.append(sqlspeed.index_ddl(t.name, _index_name(short, cols), cols, eng))
     check_query = None
     if indexes and not seen_structure:
-        names = ", ".join(f"'{t.name.split('.')[-1]}'" for t in tables)
-        check_query = ("SELECT TABLE_NAME, INDEX_NAME, GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS columns\n"
-                       "FROM information_schema.STATISTICS\n"
-                       f"WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ({names})\n"
-                       "GROUP BY TABLE_NAME, INDEX_NAME;")
+        check_query = sqlspeed.check_query(list(dict.fromkeys(t.name.split(".")[-1] for t in tables)), eng)
         add(2, "These columns need an index if they don't have one yet (I can't see your current indexes from the query alone)",
             "In columns pe index chahiye agar pehle se nahi hai (sirf query se aapke maujooda index nahi dikhte)",
             "columns used in WHERE / JOIN / ORDER BY",
@@ -437,8 +456,15 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
             "Jin columns pe query filter aur join karti hai unpe index nahi hai (aapke table structure se check kiya)",
             "columns used in WHERE / JOIN / ORDER BY", "Add the indexes below.", "Neeche wale index lagao.")
 
-    # ---- EXPLAIN output, if pasted
+    # ---- with the table structure: why an index that exists can't serve this query (app/agents/sqlspeed.py)
     if extra:
+        for f in sqlspeed.index_fit(original, extra, eng):
+            add(f["severity"], f["title_en"], f["title_hi"], f["evidence"], f["fix_en"], f["fix_hi"], f["topic"])
+    # ---- EXPLAIN output, if pasted: read step by step (app/agents/sqlexplain.py); a fragment the reader can't place: the old checks
+    if plan:
+        for f in plan["findings"]:
+            add(f["severity"], f["title_en"], f["title_hi"], f["evidence"], f["fix_en"], f["fix_hi"], f["topic"])
+    elif extra:
         ex = extra.lower()
         if re.search(r"\btype\b.*\ball\b|\|\s*all\s*\|", ex):
             add(3, "EXPLAIN shows a full table scan (type: ALL)", "EXPLAIN mein poori table scan (type: ALL)",
@@ -452,9 +478,13 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
 
     findings.sort(key=lambda f: f.severity, reverse=True)
     notes = _notes(sql, tables, original)
+    if or_note:
+        notes.append(or_note)
     out = {"ok": True, "findings": [f.as_dict() for f in findings], "indexes": indexes, "check_query": check_query,
            "indexes_verified": bool(seen_structure), "assumed_primary": skipped, "notes": notes,
            "rewritten": rewritten if rewritten != original else None, "tables": [t.name for t in tables]}
+    if plan:
+        out["plan"] = {"engine": plan["engine"], "en": sqlexplain.render(plan), "hi": sqlexplain.render(plan, True)}
     if not is_select:                                 # see the rows first (fundamental 'changes_safety'): app/agents/sqlchange.py
         from app.agents import sqlchange
 
@@ -493,7 +523,10 @@ def _with_correctness(original: str, out: dict, said: str = "") -> dict:
         return out
     mine = [{"severity": SEVERITY[f["kind"]], "title_en": f["title_en"], "title_hi": f["title_hi"], "evidence": f["evidence"],
              "fix_en": f["fix_en"], "fix_hi": f["fix_hi"], "kind": f["kind"], "topic": f["topic"]} for f in c["findings"]]
-    speed = [f for f in out["findings"] if not (f["title_en"].startswith("HAVING") and any(m["topic"] == "having" for m in mine))]
+    mine_titles = {m["title_en"] for m in mine}
+    mine_topics = {m["topic"] for m in mine}
+    speed = [f for f in out["findings"] if not (f["title_en"].startswith("HAVING") and any(m["topic"] == "having" for m in mine))
+             and f["title_en"] not in mine_titles and not (f.get("topic") == "keyset" and "keyset" in mine_topics)]
     if broken:
         out["speed_later"] = {"findings": speed, "indexes": out["indexes"], "check_query": out["check_query"]}
         out["findings"], out["indexes"], out["check_query"] = mine, [], None
@@ -505,6 +538,9 @@ def _with_correctness(original: str, out: dict, said: str = "") -> dict:
             out["rewritten"] = c["corrected"]
         else:                                      # only 'check' items that change the result: offered, never applied as the fix
             out["suggested"] = c["corrected"]
+            offered = {f["topic"] for f in c["findings"] if f["topic"] in MEANING_CHECKS}
+            if offered and offered <= SPEED_OFFERS:
+                out["suggested_kind"] = "speed"          # the same rows, faster: 'try this form', not 'if that's what you meant'
     return out
 
 
@@ -541,7 +577,10 @@ MEANING_CHECKS = {"count", "not_in", "date_range", "concat", "like", "and_or", "
                   "no_primary_key", "date_as_text", "number_as_text", "code_as_number", "over_wide", "timestamp_range",
                   "fk_no_index", "reserved_name", "varchar_length", "text_key", "row_too_big", "fk_type", "fk_target",
                   # night 7: an ELSE for unmatched rows, a tie-breaker / ROWS frame, a wider frame for NTH_VALUE change the result
-                  "case_no_else", "win_running_ties", "win_rank_ties", "win_last_value"}
+                  "case_no_else", "win_running_ties", "win_rank_ties", "win_last_value",
+                  # night 8: offered, not applied: UNION ALL for an OR across tables, keyset paging (needs the last row's values)
+                  "or_union", "keyset"}
+SPEED_OFFERS = {"or_union", "keyset"}               # the same rows, a faster form: offered as 'try this', shown on the card
 
 
 def _is_select(low: str) -> bool:

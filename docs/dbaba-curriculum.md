@@ -72,7 +72,7 @@ feed.
   numbers stored as text, utf8 vs utf8mb4, over-wide types; advising a better structure.
 - [x] **7. CASE, CTEs, windows.** CASE order and missing ELSE, recursive CTEs that must stop, window frames and ties in
   running totals, LAG/LEAD, NTILE, gaps and islands, versions without window functions.
-- [ ] **8. Indexes and EXPLAIN.** Reading EXPLAIN on both engines, composite indexes and the leftmost prefix, sargable
+- [x] **8. Indexes and EXPLAIN.** Reading EXPLAIN on both engines, composite indexes and the leftmost prefix, sargable
   rewrites, OR -> UNION ALL, keyset pagination, covering indexes; every speed rewrite proven to return the same rows.
 - [ ] **9. Concurrency and large data.** Deadlocks, lock waits, long transactions, batching huge changes, N+1; a deadlock
   and a lock wait reproduced in the lab.
@@ -267,3 +267,27 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   (4018) but runs NTILE and ROW_NUMBER; FIRST_VALUE() OVER () returned different rows on the two engines; ROW_NUMBER numbered two
   tied rows the other way round on each; a CASE mixing 'none' with a numeric column is text on MariaDB (sorted '1000.00' <
   '50.00') and 22P02 on PostgreSQL.
+- **Night 8 (12 Nov 2026).** Indexes and speed in `app/agents/sqlspeed.py`, EXPLAIN in `app/agents/sqlexplain.py` (new fundamental
+  `index_use`: an index finds rows only by the bare column, from its first column on; a speed rewrite must return exactly the same
+  rows, and a plan is the proof). Rules ('check', never 'error'/'wrong'): a function or arithmetic around a filtered column (YEAR,
+  EXTRACT, DATE, CAST AS DATE, ::date, DATE_FORMAT, TO_CHAR, YEAR + MONTH, + - * on a number, COALESCE / IFNULL, LEFT / SUBSTRING)
+  rewritten on the bare column (a date range, the number moved across, `c = v [OR c IS NULL]`, `LIKE 'abc%'`) and applied as the
+  faster form; an OR across two tables of a join offered as UNION ALL with `(first) IS NOT TRUE` (same rows, each part with its
+  own index); a deep OFFSET offered as keyset paging (`:last_<col>` placeholders, expanded form on MySQL/MariaDB, row comparison
+  on PostgreSQL) when the sort ends with the row's key. With the structure pasted: a composite index whose first column isn't
+  filtered, a range on the first column of (a, b), a text column compared with a number. EXPLAIN plans read step by step in MySQL /
+  MariaDB table, `\G` and tree forms and PostgreSQL text (with or without ANALYZE): full scans, an index that existed but wasn't
+  picked, a filter that wraps the column, joins with no index (join buffer, nested loop over a Seq Scan, a Join Filter over every
+  pair), filesort / temporary, sorts and hashes spilled to disk, estimates 10x off, heap fetches, DEPENDENT SUBQUERY; a pasted plan
+  in the chat is read in its engine's words (detected from the format), with its query checked beside it. Index commands follow
+  rule A (`CREATE INDEX` and `pg_indexes` on PostgreSQL; `ALTER TABLE ... ADD INDEX` was a syntax error there). Engine facts in
+  the dialect files (`like_prefix_index`, `text_vs_number`, `or_same_table`, `expression_index`, `offset_reads`, and an `explain`
+  section with what each access type / plan node means). A general 'why is a big OFFSET slow' is now a lesson, while 'my query is
+  slow' still goes to the checker, and 'slow queries kaise dhoondhe' no longer gets the website-speed steps. 23 concepts, 40-problem
+  practice bank, 10 generator families. Lab lessons worth keeping (20,000 rows, ANALYZEd): YEAR(), DATE(), EXTRACT(), qty + 1,
+  COALESCE() and LEFT() made MariaDB read the whole index (or the table) and PostgreSQL Seq Scan, the bare-column forms used the index
+  on both; PostgreSQL guessed 100 rows for 7,362 behind EXTRACT(); an OR on two indexed columns of one table is already fast
+  (MariaDB index_merge, PostgreSQL BitmapOr), across two joined tables it read both in full; PostgreSQL 16 under C.UTF-8 does NOT use
+  a plain index for `LIKE 'abc%'` (varchar_pattern_ops does); MariaDB matches '09812345678' and '9812345678 ' for `phone = 9812345678`
+  (PostgreSQL 42883); MariaDB 10.11 doesn't use a virtual column's index for the same expression unless the query names the column;
+  MariaDB's EXPLAIN for OFFSET 15000 shows rows = 15020; a temporary table has no statistics in PostgreSQL until ANALYZE.

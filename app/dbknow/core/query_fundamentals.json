@@ -464,6 +464,44 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  "index_use": {
+   "title_en": "An index finds rows only by the bare column, from its first column on",
+   "title_hi": "Index rows sirf seedhe column se dhoondhta hai, pehle column se shuru karke",
+   "rule_en": "An index is a sorted copy of some columns with a pointer to each row; it can jump to the rows whose stored value matches. So the condition must compare the column as it is stored with a value of its own type: a function or arithmetic around the column (YEAR(d), d + 1, LOWER(x), COALESCE(c, 0)), a text column compared with a number, or a LIKE that starts with % gives every row a new value to check, and the whole table (or index) is read. A composite index (a, b) is sorted by a, then by b inside each a: it serves a, or a and b, never b alone, and after a range on a, b only filters. OR between columns of two joined tables can't use one index (UNION ALL of the cases can). OFFSET m still reads the m rows it skips (paging by the last row seen does not). Speed rewrites must return exactly the same rows, and a plan (EXPLAIN) is the proof of what the database actually does.",
+   "rule_hi": "Index kuch columns ki sorted copy hai, har row ke pointer ke saath; ye seedha un rows tak jaata hai jinki stored value match kare. Isliye condition mein column waisa hi ho jaisa store hai, apne type ki value se compare: column pe function ya hisaab (YEAR(d), d + 1, LOWER(x), COALESCE(c, 0)), text column ko number se compare, ya % se shuru LIKE har row ki nayi value banata hai aur poori table padhi jaati hai. Composite index (a, b) pehle a se, phir har a ke andar b se sort hai: a, ya a aur b mein kaam aata hai, akele b mein nahi, aur a pe range ke baad b sirf filter karta hai. Do jude tables ke columns ka OR ek index use nahi kar sakta (UNION ALL kar sakta hai). OFFSET m chhodi hui m rows bhi padhta hai (pichli row se paging nahi). Speed ke rewrite bilkul wahi rows dein, aur EXPLAIN plan saboot hai ki database asal mein kya karta hai.",
+   "topics": [
+    "sargable",
+    "or_union",
+    "keyset",
+    "index_prefix",
+    "index_range_first",
+    "implicit_cast",
+    "leading_wildcard",
+    "plan_full_scan",
+    "plan_index_ignored",
+    "plan_function",
+    "plan_join_scan",
+    "plan_filesort",
+    "plan_temporary",
+    "plan_spill",
+    "plan_estimate",
+    "plan_filter_after_index",
+    "plan_full_index",
+    "plan_heap_fetches",
+    "plan_dependent",
+    "plan_impossible"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/mysql-indexes.html",
+   "seen_at": [
+    "https://use-the-index-luke.com/",
+    "https://www.postgresql.org/docs/current/indexes.html",
+    "https://www.postgresql.org/docs/current/using-explain.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  }
 }

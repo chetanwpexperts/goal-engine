@@ -57,7 +57,8 @@ HOWTOS: list[HowTo] = [
            "Put a QR code for the link at the counter.",
            "Reply to every review, especially bad ones, politely.")),
     HowTo("website_speed", "Website ki speed kaise check kare",
-          r"(speed|3 second|fast|slow|khulti|load).*(check|chek|dekh|test|kaise)|(check|chek|test).*(website|speed)",
+          r"^(?!.*\b(sql|quer(y|ies)|my ?sql|maria ?db|postgre\w*|database|db|index(es)?|tables?)\b)"   # a database's speed: not the site's
+          r"(?:.*(speed|3 second|fast|slow|khulti|load).*(check|chek|dekh|test|kaise)|.*(check|chek|test).*(website|speed))",
           ("pagespeed.web.dev kholo aur apni website ka address daalo.",
            "\"Mobile\" wala score dekho. 50 se kam hai to website slow hai.",
            "Apne phone pe mobile data se website kholo aur gino kitne second lagte hai.",

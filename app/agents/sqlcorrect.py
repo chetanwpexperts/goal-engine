@@ -542,6 +542,19 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
         if wedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in wedits for a, b, _n in edits):
             edits += wedits
 
+    # indexes and speed (app/agents/sqlspeed.py): a condition on the bare column, OR across two tables, deep OFFSET -> keyset.
+    # Each rewrite returns exactly the same rows (lab-proven); only the speed changes, so it is a 'check'
+    from app.agents import sqlspeed
+
+    for fnd, pedits in sqlspeed.speed(sql, s, intent, Finding, is_select):
+        if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        if _SURE_ONLY.get():
+            continue                                       # a definite mistake is fixed alone; the faster form comes after
+        if pedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in pedits for a, b, _n in edits):
+            edits += pedits
+
     # changing data (app/agents/sqlchange.py): which rows, how often, what value, which column, engine syntax
     if not is_select:
         from app.agents import sqlchange
@@ -753,7 +766,8 @@ def _workbook_traps(sql: str, s: str, is_select: bool, intent: str) -> list:
                     (m.start(), m.end(), new)))
 
     # 11. BETWEEN 'day1' AND 'day2' on a date-time column misses everything after 00:00 on day2
-    for m in re.finditer(r"([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s+between\s+'(\d{4}-\d{2}-\d{2})'\s+and\s+'(\d{4}-\d{2}-\d{2})'", sql, re.I):
+    for m in re.finditer(r"(?<![\w$.:`\"])([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s+between\s+'(\d{4}-\d{2}-\d{2})'\s+and\s+'(\d{4}-\d{2}-\d{2})'",
+                         sql, re.I):                       # (x::date BETWEEN ...: a day cast, not a time column)
         col = m.group(1).split(".")[-1].strip('`"')
         if not TIME_COL.search(col):
             continue

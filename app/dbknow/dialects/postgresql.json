@@ -547,7 +547,12 @@
   "case_mixed_types": {"behaviour": "error", "code": "22P02", "says": "PostgreSQL refuses it: the text is read as a number and fails (22P02, invalid input syntax for type numeric / integer).", "proven": ["postgresql"]},
   "recursion_limit": {"behaviour": "endless", "says": "PostgreSQL has no round limit: it keeps going until it is cancelled (statement_timeout) or runs out of disk.", "proven": ["postgresql"], "source": "https://www.postgresql.org/docs/current/queries-with.html#QUERIES-WITH-RECURSIVE"},
   "recursive_text_width": {"behaviour": "error", "code": "42804", "says": "PostgreSQL refuses a VARCHAR(n) anchor that the recursive part makes into plain text (42804, column has type character varying(40) in non-recursive term but type character varying overall); a text literal anchor is fine.", "proven": ["postgresql"]},
-  "window_needs_order": {"behaviour": "arbitrary", "says": "PostgreSQL runs them without ORDER BY, but every row is a tie: RANK() gives 1 to every row and LAG/LEAD take whatever row was read before.", "proven": ["postgresql"]}
+  "window_needs_order": {"behaviour": "arbitrary", "says": "PostgreSQL runs them without ORDER BY, but every row is a tie: RANK() gives 1 to every row and LAG/LEAD take whatever row was read before.", "proven": ["postgresql"]},
+  "like_prefix_index": {"behaviour": "needs_ops", "says": "On PostgreSQL an ordinary index serves LIKE 'abc%' only in the C collation; otherwise create it with varchar_pattern_ops / text_pattern_ops (lab: Seq Scan with a plain index under C.UTF-8, Bitmap Index Scan with varchar_pattern_ops).", "proven": ["postgresql"]},
+  "text_vs_number": {"behaviour": "error", "code": "42883", "says": "PostgreSQL refuses to compare a text column with a number: 42883, operator does not exist: character varying = bigint.", "proven": ["postgresql"]},
+  "or_same_table": {"behaviour": "fast", "says": "PostgreSQL combines two indexes for an OR on one table (EXPLAIN: BitmapOr of two Bitmap Index Scans).", "proven": ["postgresql"]},
+  "expression_index": {"behaviour": "fast", "says": "PostgreSQL indexes an expression directly: CREATE INDEX ON t (lower(email)); WHERE lower(email) = ... then uses it (lab: Index Scan).", "proven": ["postgresql"]},
+  "offset_reads": {"behaviour": "slow", "says": "PostgreSQL's Limit node over an index scan still reads OFFSET + LIMIT rows (lab: 15,021 rows read for OFFSET 15000).", "proven": ["postgresql"]}
  },
  "proven": [
   "postgresql"
@@ -751,5 +756,42 @@
   "proven": [
    "postgresql"
   ]
+ },
+ "explain": {
+  "about": "PostgreSQL EXPLAIN: a tree of steps (nodes); the most indented run first. cost and rows are estimates; with ANALYZE, actual rows and loops are what happened (rows are per loop).",
+  "proven": ["postgresql"],
+  "nodes": {
+   "Seq Scan": {"en": "every row of the table is read and checked (a full table scan)", "hi": "table ki har row padh ke check (full table scan)"},
+   "Parallel Seq Scan": {"en": "the whole table read by several workers at once", "hi": "kai workers milke poori table padhte hain"},
+   "Index Scan": {"en": "index entries found, then each row fetched from the table", "hi": "index se entries, phir har row table se"},
+   "Index Scan Backward": {"en": "an index read in reverse order (ORDER BY ... DESC)", "hi": "index ulte kram mein (DESC)"},
+   "Index Only Scan": {"en": "everything needed is in the index (covering): the table is visited only for pages not marked all-visible", "hi": "saara data index mein (covering); table sirf zaroorat pe"},
+   "Bitmap Index Scan": {"en": "the matching entries of an index are collected as a list of pages", "hi": "index ki matching entries pages ki list mein"},
+   "Bitmap Heap Scan": {"en": "those pages of the table are read in physical order and rechecked", "hi": "un pages ko table se kram mein padha aur dobara check kiya"},
+   "BitmapOr": {"en": "two index lists combined for an OR", "hi": "OR ke liye do index lists milaayi"},
+   "BitmapAnd": {"en": "two index lists intersected for an AND", "hi": "AND ke liye do index lists ka common"},
+   "Nested Loop": {"en": "for each row of the outer side, the inner side is searched", "hi": "bahar ki har row ke liye andar wali taraf dhoondhi jaati hai"},
+   "Hash Join": {"en": "the smaller side goes into a hash table and the other side probes it", "hi": "chhoti taraf hash table mein, doosri usme dhoondhti hai"},
+   "Merge Join": {"en": "both sides, sorted on the join key, are walked together", "hi": "dono taraf join key pe sorted, saath chalti hain"},
+   "Hash": {"en": "the hash table for a Hash Join is built", "hi": "Hash Join ka hash table banta hai"},
+   "Sort": {"en": "rows are sorted (Sort Method says in memory or on disk)", "hi": "rows sort hoti hain (memory ya disk)"},
+   "Incremental Sort": {"en": "rows already sorted on the first keys are sorted on the rest in small groups", "hi": "pehle keys pe sorted rows ko baaki pe chhote groups mein sort"},
+   "Limit": {"en": "only the first rows are passed on (after reading and skipping the OFFSET rows)", "hi": "sirf pehli rows (OFFSET wali padh ke chhod di)"},
+   "Aggregate": {"en": "totals over all rows", "hi": "saari rows ka total"},
+   "HashAggregate": {"en": "groups built in a hash table", "hi": "hash table mein groups"},
+   "GroupAggregate": {"en": "groups totalled from rows sorted by the group", "hi": "group se sorted rows ke totals"},
+   "Materialize": {"en": "rows kept in memory to be read again", "hi": "rows memory mein dobara padhne ke liye"},
+   "Memoize": {"en": "inner lookups cached by key", "hi": "andar ke lookups key se cache"},
+   "Append": {"en": "the results of several parts are put one after another (UNION ALL, partitions)", "hi": "kai hisson ke results ek ke baad ek (UNION ALL)"},
+   "Unique": {"en": "duplicate rows removed from sorted input", "hi": "sorted rows se duplicates hataye"},
+   "WindowAgg": {"en": "window functions worked out", "hi": "window functions"},
+   "Gather": {"en": "the rows of parallel workers collected", "hi": "parallel workers ki rows ikattha"},
+   "Gather Merge": {"en": "sorted rows of parallel workers merged", "hi": "workers ki sorted rows milaayi"},
+   "Subquery Scan": {"en": "the rows of a subquery read", "hi": "subquery ki rows"},
+   "CTE Scan": {"en": "the rows of a WITH query read", "hi": "WITH query ki rows"},
+   "Function Scan": {"en": "rows made by a function (generate_series ...)", "hi": "function se bani rows"},
+   "Result": {"en": "a value worked out without reading a table", "hi": "bina table padhe value"},
+   "Values Scan": {"en": "rows of a VALUES list", "hi": "VALUES list ki rows"}
+  }
  }
 }

@@ -143,6 +143,9 @@ def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up:
         out.append(("Har database pe chalne wali query card mein hai." if hi else
                     "A version that runs on every database is in the card.") if not n_err + n_wrong and
                    all(f["topic"] == "same_table" for f in fs) else
+                   ("Tez roop card mein hai: rows wahi, bas index kaam aa sakta hai (EXPLAIN se milao)." if hi else
+                    "The faster form is in the card: the same rows, written so an index can be used (compare with EXPLAIN).")
+                   if not n_err + n_wrong and all(f["topic"] in ("sargable", "or_union", "keyset") for f in fs) else
                    ("Agar aapka matlab yahi tha, to wo query card mein hai." if hi else
                     "If that's what you meant, the query for it is in the card.") if not n_err + n_wrong and
                    any(f["topic"] in ("count", "not_in", "date_range") for f in fs) else

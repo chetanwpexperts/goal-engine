@@ -371,6 +371,10 @@ def wants_database(goal: Goal | None, text: str) -> bool:
 
     if reasoning.evidence(text):
         return True                       # a pasted database error (even with the query in it): the reasoning explains it
+    from app.agents import sqlexplain
+
+    if sqlexplain.looks_like_plan(text) and sqlexplain.read(text):
+        return True                       # a pasted EXPLAIN plan: read step by step
     if SQL_TEXT.search(text or ""):
         return False
     from app.dbknow import brain
@@ -780,6 +784,12 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
         db.commit()
         return (("Agli SQL query paste karo, main use check karunga: pehle sahi hai ya nahi, phir speed." if turn.hi else
                  "Paste the next SQL query and I'll check it: first whether it's right, then its speed."), [], "agent_plan")
+    from app.agents import sqlexplain
+
+    if sqlexplain.looks_like_plan(text):
+        plan = sqlexplain.read(text)
+        if plan:                          # a pasted EXPLAIN (with or without its query): read step by step, in its engine's words
+            return _plan_turn(db, goal, text, turn.hi, plan)
     described = bool(reasoning.complaints(text)) and not _query_in(text)   # 'cannot connect', 'connect nahi ho raha'
     if described and not reasoning.evidence(text) and not reasoning.report(reasoning.diagnose(text), turn.hi):
         described = False                 # the core has no likely causes for it: the usual reply below
@@ -820,6 +830,64 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
             ("Database juda hua hai, card mein check shuru karo." if has else "Bas batao database kahan hai; judte hi main khud check karke wajah aur fix dhoondhunga.") if turn.hi
             else ("Your database is connected; start the check on the card." if has else "Just tell me where your database is; once it's connected I'll check it myself and find the cause and the fix."))
     return reply, [], "agent_plan"
+
+
+PLAN_QUERY = re.compile(r"^\s*(?:explain\s+(?:analyze\s+|\(\s*[\w\s,]+\)\s+|format\s*=\s*\w+\s+|extended\s+)?)?((?:select|with)\b[\s\S]*?)"
+                        r"(?:;|\n\s*\n|\n(?=\s*[+|]|\s*QUERY PLAN|\s*\*{5}|\s*id\s|\s*->|\s*[A-Z][a-z]+ (?:Scan|Join|Loop)))", re.I)
+
+
+def _plan_turn(db: Session, goal: Goal, text: str, hi: bool, plan: dict):
+    """A pasted EXPLAIN / EXPLAIN ANALYZE plan. With its query in the message: the query is checked with the plan beside it
+    (the card shows both); without: the plan read step by step, and what to change, for the engine its format shows."""
+    from app.agents import sqlexplain
+
+    from app.dbknow import engines as E
+
+    if not E.named(text) and not E.remembered(goal):     # rule A: the plan's own format shows the database
+        eid = plan["engine"] if plan["engine"] == "postgresql" else (
+            "mariadb" if re.search(r"\bBNL join\b|\br_rows\b|\br_filtered\b|MariaDB", text) else "mysql")
+        E.remember(goal, eid, "detected", "the EXPLAIN plan's format")
+    lines = (text or "").strip()
+    m = PLAN_QUERY.search(lines[:4000])
+    if m and len(m.group(1)) > 15 and re.search(r"\bfrom\b", m.group(1), re.I):
+        query = m.group(1).strip()
+        rest = text.replace(m.group(0), " ", 1)
+        msg = f"{query};\n"
+        from app.agents.core import RECIPES, inputs_from_text
+
+        found = inputs_from_text(RECIPES["sql_review"], msg, {})
+        found["explain"] = rest.strip()[:20000]
+        agent = next((a for a in _sql_agents(db, goal)), None)
+        if agent is None:
+            agent = Agent(visitor_id=goal.visitor_id, goal_id=goal.id, recipe="sql_review", inputs=dumps(found), status="proposed")
+            db.add(agent)
+        else:
+            agent.inputs = dumps({**(loads(agent.inputs, {}) or {}), **found})
+        goal.intent = "slow_db_query"
+        db.flush()
+        from app.agents.core import AgentError, run_agent
+        from app.engine import _after_run
+
+        try:
+            run = run_agent(db, agent, hi)
+            reply, options = _after_run(agent, run, hi)
+        except AgentError as exc:
+            return str(exc), list(getattr(exc, "options", [])), "agent_plan"
+        return reply, [o for o in options if o in _engine_taps(run)], "agent_run"
+    goal.title = ("EXPLAIN plan ki padhai" if hi else "Reading an EXPLAIN plan")[:200]
+    goal.intent = goal.intent or "slow_db_query"
+    goal.missing_info, goal.pending = "[]", None
+    db.commit()
+    reply = sqlexplain.render(plan, hi)
+    reply += "\n\n" + ("Query bhi paste karo to main use bhi check karke plan ke saath sahi index aur rewrite dunga." if hi else
+                         "Paste the query too and I'll check it against this plan: the exact index and rewrite.")
+    return reply, [], "agent_plan"
+
+
+def _sql_agents(db, goal):
+    from app.agents.core import goal_agents
+
+    return [a for a in goal_agents(db, goal.id) if a.recipe == "sql_review"]
 
 
 def _error_turn(db: Session, goal: Goal, text: str, hi: bool, visitor_id: str):
@@ -1132,6 +1200,10 @@ def _norm(q: str) -> str:
     return re.sub(r"\s+", " ", (q or "")).strip().rstrip(";").lower()
 
 
+SPEED_TOPICS = {"sargable", "or_union", "keyset", "keyset_offset", "leading_wildcard", "select_star", "index_prefix", "index_range_first",
+                "implicit_cast"}
+
+
 def _sql_reply(ask, query, better, changed, res, hi) -> str:
     notes = [n["hi" if hi else "en"] for n in res.get("notes", [])]
     fixes = [f for f in res.get("findings", [])
@@ -1162,10 +1234,12 @@ def _sql_reply(ask, query, better, changed, res, hi) -> str:
         parts.append("Ye query slow kyun ho sakti hai:" if hi else "Why this query can be slow:")
         reasons = []
         if idx:
-            reasons.append(("Jin columns pe ye filter aur join karti hai unpe index na ho to MySQL har table poori padhta hai: "
-                            + ", ".join(re.sub(r"^ALTER TABLE (\S+) ADD INDEX \S+ \((.+)\);$", r"\1 (\2)", x) for x in idx)) if hi else
-                           ("Without an index on the columns it filters and joins on, MySQL reads each table in full: "
-                            + ", ".join(re.sub(r"^ALTER TABLE (\S+) ADD INDEX \S+ \((.+)\);$", r"\1 (\2)", x) for x in idx)))
+            short = lambda x: re.sub(r"^(?:ALTER TABLE (\S+) ADD INDEX \S+|CREATE INDEX \S+ ON (\S+)) \((.+)\);$",  # noqa: E731
+                                     lambda m: f"{m.group(1) or m.group(2)} ({m.group(3)})", x)
+            reasons.append(("Jin columns pe ye filter aur join karti hai unpe index na ho to database har table poori padhta hai: "
+                            + ", ".join(short(x) for x in idx)) if hi else
+                           ("Without an index on the columns it filters and joins on, the database reads each table in full: "
+                            + ", ".join(short(x) for x in idx)))
         reasons += [f["title_hi" if hi else "title_en"] + ": " + f["fix_hi" if hi else "fix_en"] for f in fixes]
         reasons += notes
         parts += [f"- {r}" for r in reasons] or [("- Isme slow hone wala koi pattern nahi dikha; EXPLAIN output paste karo." if hi else
@@ -1203,6 +1277,10 @@ def _sql_reply(ask, query, better, changed, res, hi) -> str:
         parts.append(("Aapki query ka behtar roop (result wahi rahega):" if hi else "Your query, optimised (same result):") + f"\n\n{better}")
         if fixes:
             parts.append(("Kya badla:\n" if hi else "What changed:\n") + "\n".join(f"- {f['fix_hi' if hi else 'fix_en']}" for f in fixes[:5]))
+    elif fixes and res.get("suggested_kind") == "speed" and all(f.get("topic") in SPEED_TOPICS or not f.get("kind") for f in fixes):
+        parts.append(("Query ka text maine nahi badla: tez roop alag shakal ka hai par rows wahi deta hai; neeche hai, EXPLAIN se dono "
+                      "milao:\n" if hi else "I haven't changed your query's text: the faster form has another shape but returns the same "
+                      "rows; it's below, compare the two with EXPLAIN:\n") + "\n".join(f"- {f['fix_hi' if hi else 'fix_en']}" for f in fixes[:5]))
     elif fixes:
         parts.append(("Query ka text maine nahi badla: inhe badalne se result badal sakta hai, isliye faisla aapka. Ye baatein ise tez "
                       "karengi:\n" if hi else "I haven't changed the query's text: these changes could change what it returns, so "
@@ -1215,6 +1293,11 @@ def _sql_reply(ask, query, better, changed, res, hi) -> str:
     else:
         parts.append("Aapki query pehle se theek likhi hai aur koi naya index bhi nahi chahiye; isliye wahi query rakho." if hi else
                      "Your query is already written well and needs no new index, so I'm not changing anything.")
+    if res.get("suggested") and res.get("suggested_kind") == "speed":
+        parts.append(("Ye tez roop try karo (rows wahi rahengi; EXPLAIN se dono milao):" if hi else
+                      "A faster form to try (the same rows; compare the two with EXPLAIN):") + f"\n\n{res['suggested']}")
+    if res.get("plan"):
+        parts.append(res["plan"]["hi" if hi else "en"])
     if notes:
         parts.append("\n".join(f"- {n}" for n in notes))
     if idx:

@@ -283,7 +283,7 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   rule A (`CREATE INDEX` and `pg_indexes` on PostgreSQL; `ALTER TABLE ... ADD INDEX` was a syntax error there). Engine facts in
   the dialect files (`like_prefix_index`, `text_vs_number`, `or_same_table`, `expression_index`, `offset_reads`, and an `explain`
   section with what each access type / plan node means). A general 'why is a big OFFSET slow' is now a lesson, while 'my query is
-  slow' still goes to the checker, and 'slow queries kaise dhoondhe' no longer gets the website-speed steps. 23 concepts, 40-problem
+  slow' still goes to the checker, and 'slow queries kaise dhoondhe' no longer gets the website-speed steps. 23 concepts, 39-problem
   practice bank, 10 generator families. Lab lessons worth keeping (20,000 rows, ANALYZEd): YEAR(), DATE(), EXTRACT(), qty + 1,
   COALESCE() and LEFT() made MariaDB read the whole index (or the table) and PostgreSQL Seq Scan, the bare-column forms used the index
   on both; PostgreSQL guessed 100 rows for 7,362 behind EXTRACT(); an OR on two indexed columns of one table is already fast

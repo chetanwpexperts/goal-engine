@@ -127,9 +127,14 @@ per night, each with its entities, rules, standard reports and common design mis
 descriptions that must give a correct design and working reports.
 
 - [ ] **P1. Choosing the database.** MySQL / MariaDB / PostgreSQL (and notes for others) scored on the project's own facts.
-- [ ] **P2. Sales and customers.** - [ ] **P3. Purchase and suppliers.** - [ ] **P4. Inventory and warehouses.**
-- [ ] **P5. Accounts (ledger, trial balance, P&L).** - [ ] **P6. GST / tax.** - [ ] **P7. HR and payroll.**
-- [ ] **P8. Manufacturing (BOM, production).** - [ ] **P9. Reports and dashboards across modules.**
+- [ ] **P2. Sales and customers.**
+- [ ] **P3. Purchase and suppliers.**
+- [ ] **P4. Inventory and warehouses.**
+- [ ] **P5. Accounts (ledger, trial balance, P&L).**
+- [ ] **P6. GST / tax.**
+- [ ] **P7. HR and payroll.**
+- [ ] **P8. Manufacturing (BOM, production).**
+- [ ] **P9. Reports and dashboards across modules.**
 - [ ] **P10. The blueprint builder** that puts it together as one plan the person can download.
 
 Building tracks (not knowledge nights; they use the same DBaba): a desktop workspace that runs fully offline (Mac first, then

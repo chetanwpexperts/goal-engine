@@ -88,7 +88,7 @@ def test_guests_get_404_and_the_page_has_strict_rules(client, locked):
         r = getattr(client, method)(path, **({"json": {}} if method == "post" else {}))
         assert r.status_code == 404, (path, r.status_code)
     page = client.get("/console")
-    assert page.status_code == 200 and "SQL console" in page.text
+    assert page.status_code == 200 and "DBaba workspace" in page.text
     csp = page.headers["content-security-policy"]
     assert "frame-ancestors 'none'" in csp and "script-src 'self'" in csp and "connect-src 'self'" in csp
     assert page.headers["x-frame-options"] == "DENY" and page.headers["cache-control"] == "no-store"
@@ -248,3 +248,94 @@ def test_postgresql_too(client, locked):
     err = client.post("/api/console/run", json={"sql": "SELECT nope FROM orders"}).json()
     assert err["reason"] == "db_error" and "42703" in err["error"]
     assert client.post("/api/console/run", json={"sql": "DELETE FROM orders"}).json()["reason"] == "not_read_only"
+
+
+# ---------------------------------------------------------------- Ask DBaba: a developer's issue in any form
+CODE = {
+    "php": ('$sql = "SELECT * FROM orders o JOIN customers c ON o.id = c.id WHERE c.email = \'$email\'";\n'
+            '$res = mysqli_query($conn, $sql);'),
+    "java": ('String sql = "SELECT name FROM users " +\n             "WHERE email = NULL";\n'
+             'PreparedStatement ps = conn.prepareStatement(sql);'),
+    "node": "const rows = await pool.query(`SELECT id, COUNT(CASE WHEN status='paid' THEN 1 ELSE 0 END) FROM orders WHERE id = ${id} GROUP BY id`)",
+    "dotnet": 'var cmd = new SqlCommand("SELECT id FROM Orders WHERE Status = @s AND Total = NULL", conn);',
+    "python": 'cursor.execute(f"SELECT * FROM users WHERE id = {uid} AND deleted_at = NULL")',
+}
+
+
+def _titles(blocks):
+    return [i["title"] for b in blocks if b["type"] == "findings" for i in b["items"]]
+
+
+def test_sql_is_found_inside_code_of_any_language():
+    from app.console import injection_finding, sql_in_code
+
+    assert sql_in_code(CODE["java"]) == "SELECT name FROM users WHERE email = NULL"
+    assert sql_in_code(CODE["dotnet"]) == "SELECT id FROM Orders WHERE Status = @s AND Total = NULL"
+    assert sql_in_code("hello 'world' and \"nothing\" here") is None
+    glued = [CODE["php"], CODE["node"], CODE["python"], 'q = "SELECT * FROM t WHERE id = " + id;',
+             '$q = "SELECT * FROM t WHERE id = " . $id;', 'cursor.execute("SELECT * FROM t WHERE a = \'%s\'" % a)']
+    safe = ['cursor.execute("SELECT * FROM t WHERE id = %s", (uid,))', 'await client.query("SELECT * FROM t WHERE id = $1", [id])',
+            '$st = $pdo->prepare("SELECT * FROM t WHERE email = ?"); $st->execute([$email]);', CODE["dotnet"], CODE["java"]]
+    for t in glued:
+        assert injection_finding(t, sql_in_code(t) or t, False), t
+    for t in safe:
+        assert injection_finding(t, sql_in_code(t) or t, False) is None, t
+
+
+@pytest.mark.parametrize("lang", sorted(CODE))
+def test_ask_reads_code_in_any_language(client, locked, lang):
+    _open_area(client, locked, 60 + sorted(CODE).index(lang))
+    r = client.post("/api/console/ask", json={"text": CODE[lang]})
+    assert r.status_code == 200 and r.headers["cache-control"] == "no-store", r.json()
+    titles = _titles(r.json()["blocks"])
+    assert titles, (lang, r.json())
+    if lang in ("php", "node", "python"):
+        assert "SQL injection" in titles[0], (lang, titles)                # glued values come first, with the safe way
+    if lang in ("java", "dotnet", "python"):
+        assert any("NULL" in t for t in titles), (lang, titles)
+    if lang == "node":
+        assert any("counts every row" in t for t in titles), titles
+
+
+def test_ask_errors_problems_and_questions(client, locked):
+    _open_area(client, locked, 70)
+    err = client.post("/api/console/ask", json={"text": "SQLSTATE[HY000] [1040] Too many connections in /var/www/app/db.php"}).json()
+    assert "connections" in err["blocks"][0]["title"].lower() and "Fix" in err["blocks"][0]["body"]
+    slow = client.post("/api/console/ask", json={"text": "Deadlock found when trying to get lock; try restarting transaction"}).json()
+    assert "deadlock" in (slow["blocks"][0]["title"] + slow["blocks"][0]["body"]).lower()
+    q = client.post("/api/console/ask", json={"text": "left join aur inner join mein kya farak hai"}).json()
+    assert q["blocks"][0]["type"] == "text" and "LEFT JOIN" in q["blocks"][0]["body"]
+    vague = client.post("/api/console/ask", json={"text": "hmm something is off"}).json()
+    assert vague["blocks"][-1]["type"] == "text"
+    assert client.post("/api/console/ask", json={"text": ""}).status_code == 400
+
+
+def test_asking_keeps_nothing(client, locked, caplog):
+    caplog.set_level(logging.DEBUG)
+    _open_area(client, locked, 71)
+    marker = "zq-ask-marker-5512"
+    r = client.post("/api/console/ask", json={"text": f"SELECT id FROM orders WHERE note = '{marker}' AND amount = NULL"})
+    assert r.status_code == 200
+    from app.db import _SessionLocal
+    from app.models import Goal, LearnRequest, Message
+
+    stored = _everything_stored()
+    assert marker not in stored and marker not in caplog.text
+    with _SessionLocal() as db:
+        assert db.query(Message).count() == 0 and db.query(Goal).count() == 0 and db.query(LearnRequest).count() == 0
+
+
+@pytest.mark.skipif(not _up(3306), reason="needs local MySQL")
+def test_ask_checks_on_the_connected_database(client, locked):
+    _open_area(client, locked, 72)
+    assert client.post("/api/console/connect", json=DB).status_code == 200
+    r = client.post("/api/console/ask", json={"text": "my app shows too many connections error at peak time"}).json()
+    assert r["connected"] is True and r["engine"] == "mysql"
+    assert r["blocks"] and "connections" in r["blocks"][0]["title"].lower()
+    pb = client.post("/api/console/ask", json={"text": "too many connections"}).json()   # a known problem: its own checks, run here
+    tables = [b for b in pb["blocks"] if b["type"] == "table"]
+    assert tables and all(b.get("columns") or b.get("error") for b in tables), pb
+    q = client.post("/api/console/ask", json={"text": "SELECT * FROM orders WHERE YEAR(created) = 2024"}).json()
+    sqls = [b for b in q["blocks"] if b["type"] == "sql"]
+    assert any(b["run"] for b in sqls)                                                    # a read-only query it suggests can be run here
+    assert client.get("/api/console/state").json()["seconds_left"] > 590                  # asking counts as activity

@@ -118,7 +118,64 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 5px; border-radius
 #historyList .hq { white-space: pre-wrap; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 #historyList .hm { color: var(--muted); font-family: var(--font); font-size: 11px; margin-top: 3px; }
 
-.main { display: grid; grid-template-rows: auto minmax(120px, var(--editor-h, 38%)) 6px minmax(0, 1fr); min-height: 0; min-width: 0; }
+.main { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.sqlmode { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.sqlwrap { flex: 1; display: grid; grid-template-rows: auto minmax(120px, var(--editor-h, 38%)) 6px minmax(0, 1fr); min-height: 0; }
+.needdb { flex: 1; display: grid; place-content: center; justify-items: center; gap: 12px; color: var(--muted); }
+
+/* ---------------------------------------------------------------- modes: Ask DBaba | SQL editor */
+.modes { display: flex; align-items: center; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.mode { display: inline-flex; align-items: center; gap: 7px; background: none; border: 0; padding: 7px 12px; border-radius: 8px; cursor: pointer;
+  color: var(--muted); font-weight: 600; }
+.mode[aria-selected="true"] { color: var(--ink); background: var(--panel-2); box-shadow: inset 0 -2px 0 var(--signal); }
+.private { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.private::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+/* ---------------------------------------------------------------- Ask DBaba */
+.ask { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.thread { flex: 1; overflow: auto; padding: 20px clamp(16px, 4vw, 48px) 8px; display: flex; flex-direction: column; gap: 16px; }
+.welcome { max-width: 760px; margin: 6vh auto 0; text-align: center; }
+.welcome h1 { font-size: 26px; margin: 0 0 8px; }
+.chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 18px; }
+.chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 7px 14px; cursor: pointer; font-weight: 500; }
+.chip:hover { border-color: var(--signal); }
+.q { align-self: flex-end; max-width: min(820px, 92%); background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px 12px 4px 12px;
+  padding: 10px 14px; font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+.a { align-self: stretch; max-width: 980px; width: 100%; display: grid; gap: 10px; }
+.a-head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.a-head .who { color: var(--signal); font-weight: 800; letter-spacing: .02em; }
+.badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.badge.plain { background: var(--panel-2); color: var(--muted); }
+.blk { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.blk h3 { margin: 0 0 8px; font-size: 15px; }
+.blk details > summary { cursor: pointer; font-weight: 700; }
+.blk .ln { margin: 3px 0; }
+.blk .li { padding-left: 16px; position: relative; margin: 3px 0; }
+.blk .li::before { content: "•"; position: absolute; left: 3px; color: var(--signal); }
+.blk .gap { height: 8px; }
+.code { position: relative; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 6px 0;
+  font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+.acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.blk .findings { padding: 0; }
+.blk .findings li { background: var(--panel-2); }
+.findings .basis { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.findings li.speed { border-left-color: var(--ok); }
+.blk table.grid { margin-top: 6px; }
+.blk .tablewrap { overflow: auto; max-height: 320px; border: 1px solid var(--line); border-radius: 8px; }
+.thinking { color: var(--muted); font-style: italic; }
+.composer { border-top: 1px solid var(--line); background: var(--panel); padding: 10px clamp(16px, 4vw, 48px) 12px; display: grid; gap: 8px; }
+.composer textarea { width: 100%; resize: vertical; min-height: 64px; max-height: 40vh; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg); padding: 10px 12px; font-family: var(--mono); font-size: 13px; line-height: 1.5; outline: none; }
+.composer textarea:focus { border-color: var(--signal); }
+.composer-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+/* ---------------------------------------------------------------- side without a database, connect dialog */
+.side-empty { padding: 4px 12px 12px; display: grid; gap: 6px; }
+.side-empty p { margin: 0; }
+.modal { position: fixed; inset: 0; background: rgba(5, 8, 18, .6); display: grid; place-items: start center; padding: 8vh 16px; z-index: 40; overflow: auto; }
+.modal .card { position: relative; }
+.modal .close { position: absolute; top: 12px; right: 12px; }
+.cap { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
 .grow { flex: 1; }
 .run { display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 8px; padding: 7px 14px; background: var(--signal);
@@ -186,4 +243,8 @@ table.grid { border-collapse: separate; border-spacing: 0; font-family: var(--mo
   .conn .where { display: none; }
   .top { gap: 10px; flex-wrap: wrap; }
   .form .two { grid-template-columns: 1fr 96px; }
+  .private { display: none; }
+  .mode, .run { white-space: nowrap; }
+  .composer-row .fine { font-size: 11.5px; }
 }
+.pane .acts.pad { padding: 0 16px 12px; }

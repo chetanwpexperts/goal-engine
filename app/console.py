@@ -15,6 +15,7 @@ EXPLAIN), run in a read-only transaction with a time limit; columns that hold pa
 Every endpoint sits inside the locked database area: 404 for anyone not logged in, 403 until the area is opened.
 """
 
+import re
 import threading
 import time
 from datetime import timedelta
@@ -271,6 +272,280 @@ def check(body: SqlIn, db: Session = Depends(get_db), visitor: str = Depends(_vi
     keep = ("kind", "topic", "title_en", "evidence", "fix_en")
     return _reply({"findings": [{k: f.get(k) for k in keep} for f in res.get("findings", [])],
                    "corrected": res.get("corrected"), "engine": engine})
+
+
+# ---------------------------------------------------------------- Ask DBaba: any issue, in words, an error, code or SQL
+class AskIn(BaseModel):
+    text: str = ""
+
+
+ENGINE_ID = {"mysql": "mysql", "postgres": "postgresql"}
+LIVE_CHECK_ROWS = 50
+
+
+def _open_quiet(c: Connector | None):
+    """The developer's connected database for read-only checks, or None (not connected / can't reach it now)."""
+    from app.agents import direct
+
+    if c is None or not c.secret:
+        return None
+    try:
+        conn = direct._open(direct.decrypt(c.secret))
+    except Exception:  # noqa: BLE001 - the answer then says it's based on what was pasted
+        return None
+    if (c.db_type or "mysql") == "mysql":
+        for limit in ("SET SESSION max_execution_time = 10000", "SET SESSION max_statement_time = 10"):   # MySQL / MariaDB
+            try:
+                conn.conn.cursor().execute(limit)
+            except Exception:  # noqa: BLE001
+                pass
+    return conn
+
+
+def _query_blocks(q: str, engine: str | None, hi: bool, connected: bool) -> list[dict]:
+    """A query (maybe inside PHP / .NET / Java / Node code): mistakes first, then speed, with the queries to use."""
+    from app.agents.sql import analyze_sql
+
+    res = analyze_sql(q, engine=engine)
+    if not res.get("ok"):
+        return [{"type": "text", "title": "Query" if not hi else "Query", "body": res.get("error") or ""}]
+    L = "hi" if hi else "en"
+    blocks = []
+    corr = res.get("correct") or {}
+    mistakes = [{"kind": f["kind"], "title": f["title_" + L], "evidence": f.get("evidence"), "fix": f["fix_" + L],
+                 "basis": ((f.get("basis") or {}).get(L) or "")} for f in corr.get("findings") or []]
+    blocks.append({"type": "findings", "title": ("Galtiyan" if hi else "Mistakes") if mistakes else
+                   ("Query sahi lagti hai" if hi else "No mistakes found in the query"), "items": mistakes})
+    fixed = corr.get("corrected")
+    if fixed:
+        sure = any(f["kind"] in ("error", "wrong") for f in corr.get("findings") or [])
+        blocks.append({"type": "sql", "title": ("Theek ki hui query" if hi else "Corrected query") if sure else
+                       ("Agar aapka matlab yahi tha" if hi else "If that's what you meant"), "sql": fixed, "run": connected})
+    speed = [{"kind": "speed", "title": f["title_" + L], "evidence": f.get("evidence"), "fix": f["fix_" + L]}
+             for f in res.get("findings") or [] if f.get("kind") not in ("error", "wrong", "check")]
+    if speed and not any(f["kind"] in ("error", "wrong") for f in corr.get("findings") or []):
+        blocks.append({"type": "findings", "title": "Speed" if not hi else "Speed", "items": speed})
+        if res.get("rewritten") and res["rewritten"] != fixed:
+            blocks.append({"type": "sql", "title": "Faster version (same rows)" if not hi else "Tez version (wahi rows)",
+                           "sql": res["rewritten"], "run": connected})
+        if res.get("indexes"):
+            blocks.append({"type": "sql", "title": ("Indexes worth adding (check they don't exist yet)" if not hi else
+                                                    "Ye index lagane layak (pehle dekh lo pehle se to nahi)"),
+                           "sql": "\n".join(res["indexes"]), "run": False})
+        if res.get("check_query") and connected:
+            blocks.append({"type": "sql", "title": "See the indexes these tables have now" if not hi else "In tables ke abhi ke index dekho",
+                           "sql": res["check_query"], "run": True})
+    reading = (res.get("reading") or {}).get(L)
+    if reading:
+        blocks.append({"type": "text", "title": "How DBaba read this query" if not hi else "DBaba ne query kaise padhi",
+                       "body": reading, "folded": True})
+    return blocks
+
+
+def _diagnosis_blocks(text: str, engine: str | None, hi: bool, conn) -> list[dict]:
+    """An error, or a problem in words: the likely causes, proven or ruled out on the connected database when there is one."""
+    from app.dbknow import brain as dbbrain
+    from app.dbknow import reasoning, service
+
+    blocks = []
+    result = reasoning.diagnose(text, engine=engine)
+    if conn is not None and reasoning.live_plan(result):
+        try:
+            live = reasoning.run_live(reasoning.live_plan(result), lambda sql, params: conn.rows(sql, params, limit=LIVE_CHECK_ROWS)[1])
+            live = {k: v for k, v in live.items() if v is not None}
+            if live:
+                result = reasoning.diagnose(text, live, engine=engine)
+        except Exception:  # noqa: BLE001 - a check that can't run leaves the answer based on the text
+            pass
+    body = reasoning.report(result, hi, signed_in=True, can_connect=True)
+    if body:
+        body = body.replace("Open your database area and connect your database, and I'll check it there and prove it.",
+                            "Connect your database here and ask again: I'll check it on your database and prove it.")
+        body = body.replace("Database area kholo aur database jodo: main khud check karke saboot ke saath bataunga.",
+                            "Yahan database jodo aur dobara poocho: main aapke database pe check karke saboot dunga.")
+        blocks.append({"type": "text", "title": reasoning.headline(result, hi) or ("Likely causes" if not hi else "Aam wajah"),
+                       "body": body, "live": bool(result.get("live"))})
+    rec = dbbrain.recognize(text)
+    nxt = (rec.get("alternatives") or [{}])[0].get("confidence", 0)
+    sure = rec["kind"] == "issue" and (rec["confidence"] >= 0.6 or (rec["confidence"] >= 0.35 and rec["confidence"] >= 4 * nxt))
+    issue = service.playbook(rec["id"]) if sure else None
+    if issue and not blocks:
+        L = "hi" if hi else "en"
+        lines = [("Aam wajah:" if hi else "Usual causes:")] + [f"- {c['title_' + L]}" for c in issue.get("causes", [])]
+        lines += ["", "Theek karne ke liye:" if hi else "Fixes:"] + [f"- {f['steps_' + L]}" for f in issue.get("fixes", [])]
+        if issue.get("verify"):
+            lines += ["", ("Pakka kaise: " if hi else "How to confirm it's fixed: ") + issue["verify"].get(L, "")]
+        blocks.append({"type": "text", "title": issue["title_" + L], "body": "\n".join(lines)})
+    if issue and conn is not None:                             # its read-only checks, run on the developer's database now
+        if blocks and blocks[0]["type"] == "text" and not blocks[0].get("live"):
+            keep = [ln for ln in blocks[0]["body"].split("\n") if not ln.startswith((
+                "Based on what you pasted", "Connect your database here", "Ye aapke paste kiye", "Yahan database jodo"))]
+            keep.append("The checks below ran on your database just now (read-only): compare them with the causes above."
+                        if not hi else "Neeche ki checks abhi aapke database pe chali (sirf padhne wali): upar ki wajahon se milao.")
+            blocks[0] = {**blocks[0], "body": "\n".join(keep).rstrip(), "live": True}
+        db_type = "postgres" if engine == "postgresql" else "mysql"
+        for chk in service.checks_for(issue, db_type)[:6]:
+            try:
+                out = conn.query(chk["sql"], LIVE_CHECK_ROWS)
+                blocks.append({"type": "table", "title": chk.get("look_for") or "", "sql": chk["sql"], "columns": out["columns"],
+                               "rows": [[_cell(v) for v in r] for r in out["rows"]], "limited": out["limited"]})
+            except Exception as exc:  # noqa: BLE001 - e.g. the user lacks the right to read that view
+                blocks.append({"type": "table", "title": chk.get("look_for") or "", "sql": chk["sql"], "error": _db_message(exc)})
+    return blocks
+
+
+LITERAL = re.compile(r'"((?:[^"\\]|\\.)*)"|\'((?:[^\'\\]|\\.)*)\'|`((?:[^`\\]|\\.)*)`', re.S)
+SQL_START = re.compile(r"^\s*\(?\s*(select|with|update|delete|insert|replace)\b", re.I)
+SQL_BODY = re.compile(r"\b(from|set|into|values)\b", re.I)
+
+
+def sql_in_code(text: str) -> str | None:
+    """The SQL inside a program's string literals: "SELECT ... " + "FROM ..." joined as the program would (Java, C#,
+    JavaScript, Python, PHP), the longest one that reads as a query. None when there is none."""
+    found, group, last_end = [], [], None
+    for m in LITERAL.finditer(text or ""):
+        body = next(g for g in m.groups() if g is not None)
+        between = text[last_end:m.start()] if last_end is not None else ""
+        if group and not re.fullmatch(r"[\s+.&]*", between):        # not joined to the previous piece: a new string
+            found.append(" ".join(group))
+            group = []
+        group.append(body.replace('\\"', '"').replace("\\'", "'").replace("\\n", "\n").replace("\\t", " "))
+        last_end = m.end()
+    if group:
+        found.append(" ".join(group))
+    sqls = [re.sub(r"[ \t]+", " ", s).strip() for s in found if SQL_START.match(s) and SQL_BODY.search(s)]
+    return max(sqls, key=len) if sqls else None
+
+
+GLUED_IN_SQL = [  # inside the SQL string itself
+    (re.compile(r"\$\{[^}]+\}"), "js"),                          # `... ${email}`  (JavaScript template)
+    (re.compile(r"\{\$[A-Za-z_]\w*|\$[A-Za-z_]\w*"), "php"),    # "... '$email'" / {$id}  ($1 placeholders are fine)
+]
+GLUED_AROUND = [  # how the program builds the string
+    (re.compile(r"\b[fF](\"|')\s*(select|with|update|delete|insert)\b[^\n]*?\{[^}]+\}", re.I), "python"),   # f"... {email}"
+    (re.compile(r"(\"|')\s+%\s*[(\w]|(\"|')%\s*\(|(\"|')\s*\.format\(|\bsprintf\s*\(|String\.format\s*\(", re.I), "fmt"),
+    (re.compile(r"[\"'`]\s*\+\s*[A-Za-z_][\w.\[\]()]*\s*(\+|;|\))|[\"']\s*\.\s*\$[A-Za-z_]\w*"), "concat"),
+]
+PARAMS = {
+    "php": "PDO: $st = $pdo->prepare('SELECT ... WHERE email = ?'); $st->execute([$email]);  (mysqli: prepare + bind_param)",
+    "java": "PreparedStatement ps = conn.prepareStatement(\"SELECT ... WHERE email = ?\"); ps.setString(1, email);",
+    "dotnet": "var cmd = new SqlCommand(\"SELECT ... WHERE Email = @email\", conn); cmd.Parameters.AddWithValue(\"@email\", email);",
+    "js": "await pool.query('SELECT ... WHERE email = ?', [email])  (node-postgres: $1 and [email])",
+    "python": "cursor.execute('SELECT ... WHERE email = %s', (email,))",
+}
+
+
+def _code_language(text: str, hint: str) -> str:
+    if re.search(r"<\?php|\$[a-z_]\w*\s*=|mysqli_|->prepare|PDO", text):
+        return "php"
+    if re.search(r"SqlCommand|Parameters\.Add|\bvar\s+\w+\s*=\s*new\b|using\s*\(", text):
+        return "dotnet"
+    if re.search(r"\bString\s+\w+\s*=|PreparedStatement|createStatement|executeQuery", text):
+        return "java"
+    if re.search(r"\bconst\s|\blet\s|await\s|=>|require\(", text):
+        return "js"
+    if re.search(r"\bdef\s|cursor\.execute|\bimport\s", text):
+        return "python"
+    return {"js": "js", "php": "php", "python": "python"}.get(hint, "")
+
+
+def injection_finding(text: str, sql: str, hi: bool) -> dict | None:
+    """A value glued into the SQL text by the program (SQL injection: someone types SQL into a form field). Defensive only."""
+    hit = None
+    for rx, how in GLUED_IN_SQL:
+        m = rx.search(sql or "")
+        if m:
+            hit = (m.group(0), how)
+            break
+    if hit is None:
+        for rx, how in GLUED_AROUND:
+            m = rx.search(text or "")
+            if m:
+                hit = (m.group(0), how)
+                break
+    if hit is None:
+        return None
+    lang = _code_language(text, hit[1])
+    fix = ("Pass the value as a parameter so the database never reads it as SQL. " if not hi else
+           "Value ko parameter ki tarah do, taaki database use kabhi SQL na samjhe. ") + (PARAMS.get(lang) or
+           "Use your database library's placeholders (? or $1 or @name) and pass the values separately.")
+    return {"kind": "wrong", "title": ("The query is built by gluing values into the SQL text: SQL injection risk" if not hi else
+                                       "Query mein value seedhi jodi gayi hai: SQL injection ka khatra"),
+            "evidence": hit[0][:120], "fix": fix,
+            "basis": ("A value typed by a user can end the string and add its own SQL. Parameters keep data and SQL apart."
+                      if not hi else "User ki likhi value string band karke apni SQL jod sakti hai. Parameter data aur SQL ko alag rakhte hain.")}
+
+
+@router.post("/ask")
+def ask(body: AskIn, db: Session = Depends(get_db), visitor: str = Depends(_visitor)):
+    """DBaba answers a developer's issue: a question, an error, a query or code with a query in it (PHP, .NET, Java, Node...),
+    or a problem in words. Read-only checks run on the connected database when one is connected. Nothing is kept: no
+    conversation, no goal, no learning feed (this area is private)."""
+    from app.agents import direct
+    from app.agents.core import query_in
+    from app.dbknow import concepts
+    from app.dbknow import engines as E
+    from app.dbknow import reasoning
+
+    text = (body.text or "").strip()
+    if not text:
+        return _error("Describe the issue, or paste the error, the code or the query.")
+    if len(text) > 30000:
+        return _error("That's very long. Paste the error and the part of the code with the query.")
+    if not _rate(visitor):
+        return _error("That's a lot of questions in one minute. Please wait a few seconds.", 429)
+    c, _why = _live(db, visitor)
+    if c is not None:
+        _touch(db, c)
+    lang = E.lang_of(text)
+    hi = lang != "en"
+    engine = E.named(text) or (ENGINE_ID.get(c.db_type or "") if c is not None else None) or E.shown(text)[0]
+    blocks: list[dict] = []
+    m = concepts.match(text)
+    if m is not None and m.get("concept") is not None:
+        reply, _taps = concepts.answer({**m, "engine": E.named(text) or m.get("engine") or engine}, text)
+        title, _, rest = reply.partition("\n")
+        blocks.append({"type": "text", "title": title, "body": rest.strip()})
+        return _reply({"blocks": blocks, "engine": engine, "connected": c is not None, "seconds_left": _seconds_left(c) if c else None})
+    q = query_in(text)
+    has_error = bool(reasoning.evidence(text))
+    if q is None:                                              # code with the query in a string (PHP, Java, .NET, Node...)
+        q = sql_in_code(text)
+    conn = None
+    if (has_error or q is None) and c is not None:
+        if not direct._slots.acquire(timeout=15):
+            return _error("Goal Engine is busy running other checks. Please try again in a moment.", 503)
+        try:
+            conn = _open_quiet(c)
+            try:
+                blocks += _diagnosis_blocks(text, engine, hi, conn)
+            finally:
+                if conn is not None:
+                    direct._close(conn)
+        finally:
+            direct._slots.release()
+    elif has_error or q is None:
+        blocks += _diagnosis_blocks(text, engine, hi, None)
+    if q is not None:
+        qb = _query_blocks(q, engine, hi, c is not None)
+        inj = injection_finding(text, sql_in_code(text) or q, hi) if not SQL_START.match(text) else None   # code, not a plain query
+        if inj and qb and qb[0]["type"] == "findings":
+            qb[0]["items"].insert(0, inj)
+            qb[0]["title"] = "Mistakes" if not hi else "Galtiyan"
+        blocks += qb
+    if not blocks:
+        near = concepts.nearest(text)
+        L = {"en": "en", "hinglish": "hinglish", "hindi": "hindi"}[lang]
+        body = ("I couldn't pin this down yet. What helps most: the exact error message (with its code), the query or the code "
+                "that runs it, and what you expected to happen." if not hi else
+                "Abhi ye pakad nahi paaya. Sabse zyada madad: poora error message (code ke saath), query ya wo code jo use chalata "
+                "hai, aur aap kya hona chahte the.")
+        if near:
+            body += "\n\n" + ("Related topics I know:" if not hi else "Isse jude topics:") + "\n" + "\n".join(
+                f"- {x['title'].get(L) or x['title']['en']}" for x in near)
+        blocks.append({"type": "text", "title": "Tell me a bit more" if not hi else "Thoda aur batao", "body": body})
+    return _reply({"blocks": blocks, "engine": engine, "connected": c is not None,
+                   "seconds_left": _seconds_left(c) if c is not None else None})
 
 
 @router.get("/schema")

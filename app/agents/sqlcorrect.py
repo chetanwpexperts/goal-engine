@@ -4,6 +4,7 @@ sure it is: 'error' (MySQL refuses to run it), 'wrong' (runs, but the rows are w
 your table structure can say). A corrected query is written with every guessed name marked for the person to check.
 """
 
+import contextvars
 import difflib
 import re
 from dataclasses import dataclass, field
@@ -33,6 +34,7 @@ class Source:
     on_start: int = 0
     on_end: int = 0
     refs: set = field(default_factory=set)
+    lateral: bool = False   # JOIN LATERAL (SELECT ...): tied to the rows before it inside the subquery, ON may be just TRUE
 
 
 @dataclass
@@ -150,6 +152,9 @@ def _sources(s: str, dep, a: int, b: int) -> list[Source]:
         on_m = re.search(r"\bon\b", t, re.I)
         using_m = re.search(r"\busing\s*\(([^)]*)\)", t, re.I)
         head = t[:on_m.start()] if on_m else (t[:using_m.start()] if using_m else t)
+        lateral = re.match(r"lateral\s*(?=\()", head, re.I)
+        if lateral:                                    # JOIN LATERAL (SELECT ...) t: a derived table that may read the rows before it
+            head = head[lateral.end():]
         if head.startswith("("):
             close = _close(head, 0)
             name, rest = "", head[close + 1:]
@@ -158,7 +163,7 @@ def _sources(s: str, dep, a: int, b: int) -> list[Source]:
             name, rest = (nm.group(1).replace("`", "").replace('"', ""), head[nm.end():]) if nm else ("", head)
         am = re.match(r"\s*(?:as\s+)?[`\"]?([A-Za-z_][\w$]*)[`\"]?", rest, re.I)
         alias = am.group(1) if am and am.group(1).lower() not in KW else (name.split(".")[-1] if name else "")
-        src = Source(kind=kind, name=name, alias=alias, start=a + st, end=a + en)
+        src = Source(kind=kind, name=name, alias=alias, start=a + st, end=a + en, lateral=bool(lateral))
         if on_m:
             src.on_start = a + head_end + lead + on_m.end()
             src.on_end = a + en
@@ -517,6 +522,25 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
                              f"WHERE ek-ek row dekhta hai, totals se pehle: MySQL error 1111, PostgreSQL 'aggregate functions are not allowed "
                              f"in WHERE'. Total pe condition GROUP BY ke baad HAVING mein; UPDATE/DELETE mein subquery se compare karo."))
 
+    # subquery reasoning (app/agents/sqlsubq.py): shape (one value / a set / EXISTS), scope (the inner FROM first), NULLs
+    from app.agents import sqlsubq
+
+    for fnd, sedits in sqlsubq.subqueries(sql, s, intent, Finding):
+        F.append(fnd)
+        if sedits and not any(a < e[1] and e[0] < b for e in sedits for a, b, _n in edits):
+            edits += sedits
+
+    # changing data (app/agents/sqlchange.py): which rows, how often, what value, which column, engine syntax
+    if not is_select:
+        from app.agents import sqlchange
+
+        for fnd, cedits in sqlchange.changes(sql, s, intent, Finding):
+            if any(f.topic == fnd.topic and f.evidence == fnd.evidence and f.title_en == fnd.title_en for f in F):
+                continue
+            F.append(fnd)
+            if cedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in cedits for a, b, _n in edits):
+                edits += cedits
+
     # 9-13: traps from SQL practice (LEFT JOIN counts, NOT IN with NULLs, BETWEEN on timestamps, ties, top N per group)
     for fnd, edit in _workbook_traps(sql, s, is_select, intent):
         F.append(fnd)
@@ -827,7 +851,61 @@ def check(sql: str, _again: bool = False, intent: str = "", engine: str | None =
     return _check(sql, _again, intent)
 
 
+def _meaning_checks() -> set:
+    from app.agents.sql import MEANING_CHECKS
+
+    return MEANING_CHECKS
+
+
+# set while the corrected query is rebuilt for a query with a definite mistake: 'check' rewrites that change what the query
+# means (AVG over NULLs as 0, ...) are not mixed into the fix of an 'error'/'wrong' one
+_SURE_ONLY = contextvars.ContextVar("dbaba_sure_only", default=False)
+
+
 def _check(sql: str, _again: bool = False, intent: str = "") -> dict:
+    out = _check_once(sql, _again, intent)
+    fs = out.get("findings") or []
+    if out.get("corrected") and any(f["kind"] in ("error", "wrong") for f in fs) and \
+            any(f["kind"] == "check" and f["topic"] in _meaning_checks() for f in fs) and not _SURE_ONLY.get():
+        token = _SURE_ONLY.set(True)
+        try:
+            again = _check_once(sql, _again, intent)
+        finally:
+            _SURE_ONLY.reset(token)
+        if again.get("corrected"):
+            out["corrected"] = again["corrected"]
+    return out
+
+
+def _check_once(sql: str, _again: bool = False, intent: str = "") -> dict:
+    from app.agents import sqlroutine
+
+    if sqlroutine.is_routine(sql):                    # CREATE PROCEDURE / FUNCTION / TRIGGER, DO: read as a routine (night 5)
+        order = {"error": 0, "wrong": 1, "check": 2}
+        found = sqlroutine.routines(sql, intent, Finding)
+        edits = []
+        for _f, e in found:
+            if e and not any(a < x[1] and x[0] < b or (a == b == x[0]) for x in e for a, b, _n in edits):
+                edits += e
+        fs = sorted((f for f, _e in found), key=lambda f: order[f.kind])
+        fixed = _apply_plain(sql, edits)
+        if any(f.topic == "delimiter" for f in fs) and len(sqlroutine.split_script(sql, blocks=True)) == 1:
+            fixed = sqlroutine.with_delimiter(fixed or sql)
+        return {"findings": [f.as_dict() for f in fs], "corrected": fixed, "guesses": []}
+    from app.agents import sqlschema
+
+    if sqlschema.is_schema(sql):                     # CREATE TABLE: a table design, read for keys, types and facts (night 6)
+        order = {"error": 0, "wrong": 1, "check": 2}
+        found = sorted(sqlschema.schema(sql, intent, Finding), key=lambda fe: order[fe[0].kind])
+        sure = any(f.kind in ("error", "wrong") for f, _e in found)
+        edits = []
+        for f, e in found:
+            if sure and f.kind == "check":
+                continue                             # a definite mistake is fixed alone; design advice is offered on its own
+            if e and not any(a < x[1] and x[0] < b or (a == b == x[0]) for x in e for a, b, _n in edits):
+                edits += e
+        fixed = sqlschema.apply(sql, edits) if edits else None
+        return {"findings": [f.as_dict() for f, _e in found], "corrected": fixed if fixed != sql else None, "guesses": []}
     s = _mask(sql)
     known = {w.lower() for w in re.findall(r"\b(?:from|join|update|into)\s+[`\"]?([\w$]+)", s, re.I)}
     known |= {w.lower() for w in re.findall(r"\b(?:from|join|update)\s+[`\"]?[\w$.]+[`\"]?\s+(?:as\s+)?([A-Za-z_]\w*)", s, re.I)
@@ -896,7 +974,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
         if alias and re.fullmatch(r"[`\"]?\w+[`\"]?\.[`\"]?\w+[`\"]?", t):
             alias = ""
         items.append({"text": t, "alias": alias, "start": sel_a + off + (len(txt) - len(txt.lstrip())),
-                      "end": sel_a + off + len(txt.rstrip()), "agg": bool(AGG.search(t)) and " over" not in t.lower()})
+                      "end": sel_a + off + len(txt.rstrip()), "agg": bool(AGG.search(_no_subqueries(t))) and " over" not in _no_subqueries(t).lower()})
     sel_aliases = {i["alias"].lower(): i for i in items if i["alias"]}
 
     # ------------------------------------------------ 1. names: aliases that don't exist, tables used by name after an alias
@@ -983,7 +1061,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
             add("wrong", "join", f"{x.name} {x.alias} is joined without ON", f"{x.name} {x.alias} bina ON ke joda hai",
                 line_of(x.start), "Without ON every row is paired with every row of this table (rows multiply). Add ON with the matching columns.",
                 "ON ke bina har row is table ki har row se judti hai (rows guna ho jaati hain). Matching columns ke saath ON lagao.")
-        if x.on and a and a not in x.refs and i > 0:
+        if x.on and a and a not in x.refs and i > 0 and not x.lateral:
             add("wrong", "join", f"The ON of {x.alias} doesn't mention {x.alias}", f"{x.alias} ke ON mein {x.alias} hai hi nahi",
                 line_of(x.on_start), f"An ON condition must connect {x.alias} to a table before it; this one doesn't, so every {x.alias} row "
                 "is paired with every row (rows multiply).",
@@ -1026,6 +1104,36 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
             whole = edit[2]
         elif edit and edit[2] is not None and not any(a < edit[1] and edit[0] < b for a, b, _n in edits):
             edits.append(edit)
+
+    # aggregation reasoning (app/agents/sqlaggs.py): COUNT of a comparison or of CASE ... ELSE 0, totals inside totals,
+    # windows in a grouped query, SUM over a LEFT JOIN, AVG with NULLs, averages of averages, shares, what was asked to count
+    from app.agents import sqlaggs
+
+    groups = []                                      # a finding and its edits ((None, edit) = one more edit of the one before)
+    for fnd, edit in sqlaggs.aggs(sql, s, cl, srcs, alias_of, items, intent, Finding):
+        if fnd is None and groups:
+            groups[-1][1].append(edit)
+        elif fnd is not None:
+            groups.append((fnd, [edit] if edit else []))
+    agg_edits = []
+    for fnd, ges in groups:
+        if any(f.title_en == fnd.title_en and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        ges = [e for e in ges if e and e[2] is not None]
+        if len(ges) == 1 and (ges[0][0], ges[0][1]) == (0, len(sql)):
+            whole = whole or ges[0][2]
+        elif fnd.kind == "check" and _SURE_ONLY.get() and fnd.topic in _meaning_checks():
+            continue                                 # a definite mistake is being fixed: a rewrite that changes the meaning waits
+        elif ges and not any(a < e[1] and e[0] < b for e in ges for a, b, _n in edits + agg_edits):
+            agg_edits += ges                         # all of a finding's edits, or none of them
+    edits += agg_edits
+
+    # a JOIN used only to keep the parents that have a child (app/agents/sqlsubq.py): EXISTS keeps each parent once
+    from app.agents import sqlsubq
+    for fnd, sedits in sqlsubq.semi_join(sql, s, cl, srcs, items, intent, Finding):
+        F.append(fnd)
+        whole = whole or next((e[2] for e in sedits if (e[0], e[1]) == (0, len(sql))), None)
 
     # self joins: the same table twice, joined parent.id = child.fk -> the children, not the parent
     for i, x in enumerate(srcs):
@@ -1116,7 +1224,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
             edits.append((m.start(), m.end(), right))
     where = cl.get("where")
     if where:
-        wtext = s[where[0]:where[1]]
+        wtext = _no_subqueries(s[where[0]:where[1]])     # a name inside a subquery is that subquery's own column
         for m in WORD.finditer(wtext):
             w = m.group(1)
             if w.lower() in sel_aliases and not any(w.lower() == (x.alias or "").lower() for x in srcs) and \
@@ -1325,6 +1433,8 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                         changed = True
         loose = []
         for i in plain:
+            if re.search(r"\bover\s*\(", i["text"], re.I):
+                continue                                 # a window: judged with its own rule (app/agents/sqlaggs.py, window_agg)
             for q, c, _p in _qrefs(i["text"]):
                 if (alias_of(q), c.lower()) not in gref and alias_of(q) not in single:
                     loose.append(f"{q}.{c}")
@@ -1365,8 +1475,8 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
             if not fm or fm.group(2):
                 continue
             A = alias_of(fm.group(3))
-            if A in single:
-                continue
+            if A in single or A not in by_alias:
+                continue                                     # (a total inside a subquery belongs to the subquery's own tables)
             mine = to_one_from({A})
             others = [y for y in live if y not in single and y not in mine and y != A and A not in to_one_from({y})]
             kids = [y for y in live if y not in single and y != A and A in to_one_from({y}) and y not in mine]

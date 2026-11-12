@@ -20,18 +20,56 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         "limit_no_order", "distinct_paren",
         # night 2: joins and relationships, and syntax the named database doesn't have (rule A)
         "comma_cartesian", "on_one_side", "pk_pk", "anti_nullable", "self_pairs", "distinct_join", "natural_join",
-        "dialect_limit_pg", "dialect_backticks_pg", "dialect_nulls_mariadb", "dialect_cast_mariadb"]
+        "dialect_limit_pg", "dialect_backticks_pg", "dialect_nulls_mariadb", "dialect_cast_mariadb",
+        # night 3: aggregation (what a total sees: non-NULL values of the rows that reach it, once per group)
+        "count_case", "count_bool", "sum_bool_pg", "nested_agg", "window_agg", "having_alias_pg", "count_multi_pg", "sum_null",
+        "avg_avg", "count_said", "pct_total", "sum_distinct",
+        # night 4: subqueries (shape: one value / a set / EXISTS; scope: the inner FROM first; NULLs in IN / NOT IN / ALL)
+        "exists_agg", "corr_self", "in_grouped_agg", "sub_columns", "sub_sum_null", "in_limit_mariadb", "derived_alias_mysql",
+        "all_null", "in_list_null", "not_in_outer", "semi_join", "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order",
+        # night 5: changing data (which rows, how often, what value, which column) and each engine's change syntax
+        "ch_update_join_pg", "ch_update_from_my", "ch_set_qualified_pg", "ch_update_from_self", "ch_join_many_my", "ch_join_many_pg",
+        "ch_set_sub_null", "ch_upsert_pg", "ch_conflict_my", "ch_conflict_amb", "ch_insert_order", "ch_insert_count", "ch_limit_pg",
+        "ch_dedupe", "ch_delete_no_target", "ch_delete_join_pg",
+        # night 6: table design (keys, types, one fact in one place) and each engine's own CREATE TABLE words and limits
+        "sd_money_float", "sd_date_text", "sd_number_text", "sd_code_number", "sd_no_pk", "sd_fk_index_pg", "sd_utf8", "sd_myisam_fk",
+        "sd_dialect_pg", "sd_dialect_my", "sd_two_pk", "sd_fk_type", "sd_varchar_len", "sd_reserved", "sd_row_big", "sd_fk_order",
+        "sd_over_wide", "sd_list_col", "sd_repeat", "sd_parent_copy", "sd_timestamp"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
          "and_or": "and_or", "division": "division", "double_quotes": "quotes", "limit_no_order": "stable_order", "distinct_paren": "distinct",
          "comma_cartesian": "cartesian", "on_one_side": "cartesian", "pk_pk": "join_key", "anti_nullable": "anti_join",
          "self_pairs": "self_join", "distinct_join": "distinct_join", "natural_join": "natural_join", "dialect_limit_pg": "dialect",
-         "dialect_backticks_pg": "dialect", "dialect_nulls_mariadb": "dialect", "dialect_cast_mariadb": "dialect"}
-NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join"}   # found is enough
+         "dialect_backticks_pg": "dialect", "dialect_nulls_mariadb": "dialect", "dialect_cast_mariadb": "dialect",
+         "count_case": "count_case", "count_bool": "count_bool", "sum_bool_pg": "sum_bool", "nested_agg": "nested_agg",
+         "window_agg": "window_agg", "having_alias_pg": "having_alias", "count_multi_pg": "count_multi", "sum_null": "sum_null",
+         "avg_avg": "avg_avg", "count_said": "count_said", "pct_total": "pct_total", "sum_distinct": "sum_distinct",
+         "exists_agg": "exists_agg", "corr_self": "corr_self", "in_grouped_agg": "in_grouped_agg", "sub_columns": "sub_columns",
+         "sub_sum_null": "sub_sum_null", "in_limit_mariadb": "in_limit", "derived_alias_mysql": "derived_alias", "all_null": "all_null",
+         "in_list_null": "in_list_null", "not_in_outer": "not_in_outer", "semi_join": "semi_join", "exists_uncorr": "exists_uncorr",
+         "sub_outer_col": "sub_outer_col", "scalar_rows": "scalar_rows", "sub_limit_order": "sub_limit_order",
+         "ch_update_join_pg": "update_join_syntax", "ch_update_from_my": "update_join_syntax", "ch_set_qualified_pg": "set_qualified",
+         "ch_update_from_self": "update_from_self", "ch_join_many_my": "join_change_many", "ch_join_many_pg": "join_change_many",
+         "ch_set_sub_null": "set_subquery_null", "ch_upsert_pg": "upsert_syntax", "ch_conflict_my": "upsert_syntax",
+         "ch_conflict_amb": "conflict_ambiguous", "ch_insert_order": "insert_order", "ch_insert_count": "insert_count",
+         "ch_limit_pg": "change_limit", "ch_dedupe": "dedupe_self", "ch_delete_no_target": "delete_no_target",
+         "ch_delete_join_pg": "delete_join_syntax",
+         "sd_money_float": "money_float", "sd_date_text": "date_as_text", "sd_number_text": "number_as_text",
+         "sd_code_number": "code_as_number", "sd_no_pk": "no_primary_key", "sd_fk_index_pg": "fk_no_index", "sd_utf8": "utf8mb3",
+         "sd_myisam_fk": "myisam_fk", "sd_dialect_pg": "ddl_dialect", "sd_dialect_my": "ddl_dialect", "sd_two_pk": "two_primary_keys",
+         "sd_fk_type": "fk_type", "sd_varchar_len": "varchar_length", "sd_reserved": "reserved_name", "sd_row_big": "row_too_big",
+         "sd_fk_order": "fk_order", "sd_over_wide": "over_wide", "sd_list_col": "list_in_column", "sd_repeat": "repeating_group",
+         "sd_parent_copy": "parent_copy", "sd_timestamp": "timestamp_range"}
+NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join", "sum_distinct",
+          "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order", "ch_insert_count",
+          "sd_two_pk", "sd_list_col", "sd_repeat", "sd_parent_copy"}   # found is enough
 # a 'check' (depends on engine, data or intent) whose suggested rewrite must do exactly what the person meant
 FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes", "pk_pk", "anti_nullable", "self_pairs",
-                 "distinct_join"}
+                 "distinct_join", "sum_null", "avg_avg", "pct_total", "sub_sum_null", "all_null", "in_list_null", "not_in_outer",
+                 "semi_join", "ch_set_sub_null",
+                 "sd_date_text", "sd_number_text", "sd_code_number", "sd_no_pk", "sd_fk_index_pg", "sd_over_wide", "sd_timestamp",
+                 "sd_reserved"}
 
 
 def _cols(t, *kinds):
@@ -327,6 +365,14 @@ def make(seed: int):
         if bug == "dialect_cast_mariadb" or bug == "dialect_backticks_pg":
             item["only"] = ["mysql"] if engine != "postgresql" else ["postgres"]
         return item
+    elif bug in AGG_BUGS:
+        return _agg_bug(seed, bug, rnd, schema, tables, t)
+    elif bug in SUB_BUGS:
+        return _sub_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("ch_"):
+        return _change_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("sd_"):
+        return _schema_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -337,12 +383,723 @@ def make(seed: int):
     return {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": t["name"], "broken": broken, "truth": truth}
 
 
+
+AGG_BUGS = {"count_case", "count_bool", "sum_bool_pg", "nested_agg", "window_agg", "having_alias_pg", "count_multi_pg", "sum_null",
+            "avg_avg", "count_said", "pct_total", "sum_distinct"}
+
+
+def _plural_words(base: str) -> str:
+    return base.replace("_", " ")
+
+
+def _agg_bug(seed, bug, rnd, schema, tables, t):
+    """Night 3: aggregation mistakes on a random real table. truth = the statement the person meant."""
+    pk, name = t["pk"], t["name"]
+    groups = [c for c in t["cols"] if c["kind"] in ("fk", "cat")]
+    nums = [c["name"] for c in t["cols"] if c["kind"] in ("int", "money")]
+    cats = [c for c in t["cols"] if c["kind"] == "cat" and c["params"]]
+    engine, words = None, ""
+    if bug in ("count_case", "count_bool", "sum_bool_pg", "pct_total") and not cats:
+        return None
+    if bug in ("nested_agg", "window_agg", "having_alias_pg", "count_case", "pct_total") and not groups:
+        return None
+    g = rnd.choice(groups)["name"] if groups else None
+    if bug == "count_case":
+        c = rnd.choice(cats)
+        v = rnd.choice(c["params"])
+        cond = f"{c['name']} = '{v}'"
+        els = rnd.choice(["0", "0", "'no'", "-1"])
+        then = "1" if els != "'no'" else "'yes'"
+        truth = f"SELECT {g}, COUNT(CASE WHEN {cond} THEN 1 END) AS n\nFROM {name}\nGROUP BY {g}\nORDER BY {g}"
+        broken = f"SELECT {g}, COUNT(CASE WHEN {cond} THEN {then} ELSE {els} END) AS n\nFROM {name}\nGROUP BY {g}\nORDER BY {g}"
+    elif bug == "count_bool":
+        if nums and rnd.random() < 0.4:
+            col = rnd.choice(nums)
+            cond = f"{col} > {rnd.randint(1, 50)}"
+        else:
+            c = rnd.choice(cats)
+            cond = f"{c['name']} = '{rnd.choice(c['params'])}'"
+        truth = f"SELECT COUNT(*)\nFROM {name}\nWHERE {cond}"
+        broken = f"SELECT COUNT({cond})\nFROM {name}"
+    elif bug == "sum_bool_pg":
+        c = rnd.choice(cats)
+        cond = f"{c['name']} = '{rnd.choice(c['params'])}'"
+        truth = f"SELECT COUNT(*)\nFROM {name}\nWHERE {cond}"
+        broken = f"SELECT SUM({cond})\nFROM {name}"
+        engine = "postgresql"
+    elif bug == "nested_agg":
+        if nums and rnd.random() < 0.5:
+            outer, inner = rnd.choice(["AVG", "MAX", "MIN"]), f"SUM({rnd.choice(nums)})"
+        else:
+            outer, inner = rnd.choice(["MAX", "MIN", "AVG"]), "COUNT(*)"
+        truth = f"SELECT {outer}(v)\nFROM (SELECT {inner} AS v FROM {name} GROUP BY {g}) AS x"
+        broken = f"SELECT {outer}({inner})\nFROM {name}\nGROUP BY {g}"
+    elif bug == "window_agg":
+        if not nums:
+            return None
+        m = rnd.choice(nums)
+        fn = rnd.choice(["SUM", "MAX", "MIN"])
+        truth = f"SELECT {g}, {fn}({m}) AS v, {fn}({fn}({m})) OVER () AS whole\nFROM {name}\nGROUP BY {g}\nORDER BY {g}"
+        broken = f"SELECT {g}, {fn}({m}) AS v, {fn}({m}) OVER () AS whole\nFROM {name}\nGROUP BY {g}\nORDER BY {g}"
+    elif bug == "having_alias_pg":
+        k = rnd.randint(1, 4)
+        if nums and rnd.random() < 0.5:
+            m = rnd.choice(nums)
+            agg, lim = f"SUM({m})", rnd.randint(10, 500)
+        else:
+            agg, lim = "COUNT(*)", k
+        alias = rnd.choice(["total", "cnt", "n_rows", "how_many"])
+        truth = f"SELECT {g}, {agg} AS {alias}\nFROM {name}\nGROUP BY {g}\nHAVING {agg} > {lim}\nORDER BY {g}"
+        broken = f"SELECT {g}, {agg} AS {alias}\nFROM {name}\nGROUP BY {g}\nHAVING {alias} > {lim}\nORDER BY {g}"
+        engine = "postgresql"
+    elif bug == "count_multi_pg":
+        plain = [c["name"] for c in t["cols"] if c["kind"] in ("cat", "fk", "int")]
+        if len(plain) < 2:
+            return None
+        a, b = rnd.sample(plain, 2)
+        truth = f"SELECT COUNT(*)\nFROM (SELECT DISTINCT {a}, {b} FROM {name} WHERE {a} IS NOT NULL AND {b} IS NOT NULL) AS d"
+        broken = f"SELECT COUNT(DISTINCT {a}, {b})\nFROM {name}"
+        engine = "postgresql"
+    elif bug in ("sum_null", "count_said"):
+        kids = [(c, x) for x in tables for c in x["cols"] if c["kind"] == "fk"]
+        if not kids:
+            return None
+        fk, child = rnd.choice(kids)
+        parent = schema["tables"][fk["ref"]]
+        t = child
+        cn = [c["name"] for c in child["cols"] if c["kind"] in ("int", "money")]
+        if bug == "sum_null":
+            if not cn:
+                return None
+            m = rnd.choice(cn)
+            ppk = parent["pk"]
+            base = (f"SELECT p.{ppk}, {{}} AS total\nFROM {parent['name']} p\nLEFT JOIN {child['name']} c ON c.{fk['name']} = p.{ppk}\n"
+                    f"GROUP BY p.{ppk}\nORDER BY p.{ppk}")
+            truth, broken = base.format(f"COALESCE(SUM(c.{m}), 0)"), base.format(f"SUM(c.{m})")
+            words = f"total {m} for every {parent['base']} row, 0 when it has none"
+        else:
+            from app.agents.sqljoins import _fk
+
+            if _fk(parent["name"]).replace("_", "") != fk["name"].lower().replace("_", ""):
+                return None                               # the words name the parent; its key column must follow the usual name
+            cond = ""
+            ccats = [c for c in child["cols"] if c["kind"] == "cat" and c["params"]]
+            if ccats and rnd.random() < 0.5:
+                cc = rnd.choice(ccats)
+                cond = f"\nWHERE {cc['name']} = '{rnd.choice(cc['params'])}'"
+            counted = rnd.choice(["*", fk["name"]])
+            truth = f"SELECT COUNT(DISTINCT {fk['name']})\nFROM {child['name']}{cond}"
+            broken = f"SELECT COUNT({counted})\nFROM {child['name']}{cond}"
+            noun = _plural_words(parent["base"])
+            words = rnd.choice([f"how many {noun} have a {_plural_words(child['base'])} row", f"number of {noun} with {_plural_words(child['base'])}",
+                                f"kitne {noun} ke {_plural_words(child['base'])} hain"])
+    elif bug == "avg_avg":
+        if not nums or not groups:
+            return None
+        m = rnd.choice(nums)
+        truth = f"SELECT 1.0 * SUM({m}) / COUNT({m})\nFROM {name}"
+        broken = f"SELECT AVG(a)\nFROM (SELECT {g}, AVG({m}) AS a FROM {name} GROUP BY {g}) AS x"
+        words = "the average over all rows"
+    elif bug == "pct_total":
+        c = rnd.choice(cats)
+        v = rnd.choice(c["params"])
+        if g == c["name"]:
+            others = [x["name"] for x in groups if x["name"] != c["name"]]
+            if not others:
+                return None
+            g = rnd.choice(others)
+        truth = (f"SELECT {g}, 100.0 * COUNT(*) / (SELECT COUNT(*) FROM {name} WHERE {c['name']} = '{v}') AS pct\nFROM {name}\n"
+                 f"WHERE {c['name']} = '{v}'\nGROUP BY {g}\nORDER BY {g}")
+        broken = (f"SELECT {g}, 100.0 * COUNT(*) / (SELECT COUNT(*) FROM {name}) AS pct\nFROM {name}\n"
+                  f"WHERE {c['name']} = '{v}'\nGROUP BY {g}\nORDER BY {g}")
+        words = f"each {g}'s share of the {v} rows"
+    else:                                                 # sum_distinct
+        if not nums:
+            return None
+        truth = None
+        broken = f"SELECT SUM(DISTINCT {rnd.choice(nums)})\nFROM {name}"
+    if words:
+        broken += ";\n\n" + words
+    item = {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": t["name"], "broken": broken, "truth": truth}
+    if engine:
+        item["engine"] = engine
+    return item
+
+
+SUB_BUGS = {"exists_agg", "corr_self", "in_grouped_agg", "sub_columns", "sub_sum_null", "in_limit_mariadb", "derived_alias_mysql",
+            "all_null", "in_list_null", "not_in_outer", "semi_join", "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order"}
+
+
+def _sub_bug(seed, bug, rnd, schema, tables, t):
+    """Night 4: subquery mistakes on random real tables. truth = the statement the person meant."""
+    from app.agents.sqljoins import _base
+
+    links = [(c, x) for x in tables for c in x["cols"] if c["kind"] == "fk"]       # (fk column, child table)
+    if not links:
+        return None
+    fkc, child = rnd.choice(links)
+    parent = schema["tables"][fkc["ref"]]
+    fk, cpk, ppk, cn, pn = fkc["name"], child["pk"], parent["pk"], child["name"], parent["name"]
+    cnums = [c["name"] for c in child["cols"] if c["kind"] in ("int", "money")]
+    ccats = [c for c in child["cols"] if c["kind"] == "cat" and c["params"]]
+    tnums = [c["name"] for c in t["cols"] if c["kind"] in ("int", "money")]
+    tgroups = [c["name"] for c in t["cols"] if c["kind"] in ("fk", "cat")]
+    tcats = [c for c in t["cols"] if c["kind"] == "cat" and c["params"]]
+    pk, name = t["pk"], t["name"]
+    engine, words, stmt = None, "", "select"
+
+    def cat_cond(alias, cats):
+        c = rnd.choice(cats)
+        return f"{alias}{c['name']} = '{rnd.choice(c['params'])}'"
+
+    if bug == "exists_agg":
+        agg = rnd.choice(["COUNT(*)", f"MAX(c.{cpk})", f"MIN(c.{fk})"] + ([f"SUM(c.{cnums[0]})"] if cnums else []))
+        neg = rnd.choice(["", "NOT "])
+        extra = f" AND {cat_cond('c.', ccats)}" if ccats and rnd.random() < 0.5 else ""
+        truth = f"SELECT p.{ppk}\nFROM {pn} p\nWHERE {neg}EXISTS (SELECT 1 FROM {cn} c WHERE c.{fk} = p.{ppk}{extra})\nORDER BY p.{ppk}"
+        broken = truth.replace("SELECT 1 FROM", f"SELECT {agg} FROM")
+    elif bug == "corr_self":
+        if not tnums or not tgroups:
+            return None
+        n, g = rnd.choice(tnums), rnd.choice(tgroups)
+        if rnd.random() < 0.5:
+            truth = f"SELECT a.{pk}\nFROM {name} a\nWHERE a.{n} > (SELECT AVG(b.{n}) FROM {name} b WHERE b.{g} = a.{g})\nORDER BY a.{pk}"
+            broken = truth.replace(f"b.{g} = a.{g}", f"b.{g} = b.{g}")
+        else:
+            truth = f"SELECT a.{pk}\nFROM {name} a\nWHERE a.{n} > (SELECT AVG(b.{n}) FROM {name} b WHERE b.{g} = a.{g})\nORDER BY a.{pk}"
+            broken = f"SELECT {pk}\nFROM {name}\nWHERE {n} > (SELECT AVG({n}) FROM {name} WHERE {g} = {name}.{g})\nORDER BY {pk}"
+    elif bug == "in_grouped_agg":
+        if not tnums or not tgroups:
+            return None
+        n, g, fn = rnd.choice(tnums), rnd.choice(tgroups), rnd.choice(["MAX", "MIN"])
+        broken = f"SELECT {pk}\nFROM {name}\nWHERE {n} IN (SELECT {fn}({n}) FROM {name} GROUP BY {g})\nORDER BY {pk}"
+        truth = f"SELECT {pk}\nFROM {name}\nWHERE ({g}, {n}) IN (SELECT {g}, {fn}({n}) FROM {name} GROUP BY {g})\nORDER BY {pk}"
+    elif bug == "sub_columns":
+        other = rnd.choice([c["name"] for c in child["cols"] if c["name"] and c["name"] != fk])
+        where = f" WHERE {cat_cond('', ccats)}" if ccats else ""
+        truth = f"SELECT {ppk}\nFROM {pn}\nWHERE {ppk} IN (SELECT {fk} FROM {cn}{where})\nORDER BY {ppk}"
+        cols = rnd.choice([f"{fk}, {other}", f"{other}, {fk}"])
+        broken = f"SELECT {cpk}\nFROM {cn}\nWHERE {fk} IN (SELECT {cols} FROM {cn}{where})\nORDER BY {cpk}"
+        truth = f"SELECT {cpk}\nFROM {cn}\nWHERE {fk} IN (SELECT {fk} FROM {cn}{where})\nORDER BY {cpk}"
+    elif bug == "sub_sum_null":
+        if not cnums:
+            return None
+        n = rnd.choice(cnums)
+        broken = f"SELECT p.{ppk}, (SELECT SUM(c.{n}) FROM {cn} c WHERE c.{fk} = p.{ppk}) AS total\nFROM {pn} p\nORDER BY p.{ppk}"
+        truth = f"SELECT p.{ppk}, COALESCE((SELECT SUM(c.{n}) FROM {cn} c WHERE c.{fk} = p.{ppk}), 0) AS total\nFROM {pn} p\nORDER BY p.{ppk}"
+        words = rnd.choice(["", f"total of each {_base(pn)}, 0 when none"])
+    elif bug == "in_limit_mariadb":
+        if not cnums:
+            return None
+        k = rnd.randint(2, 6)
+        inner = f"SELECT {fk} FROM {cn} ORDER BY {rnd.choice(cnums)} DESC, {cpk} LIMIT {k}"
+        broken = f"SELECT {ppk}\nFROM {pn}\nWHERE {ppk} IN ({inner})\nORDER BY {ppk}"
+        truth = f"SELECT {ppk}\nFROM {pn}\nWHERE {ppk} IN (SELECT * FROM ({inner}) AS limited)\nORDER BY {ppk}"
+        engine = rnd.choice(["mariadb", "mysql"])
+    elif bug == "derived_alias_mysql":
+        if not tgroups:
+            return None
+        g = rnd.choice(tgroups)
+        fn = rnd.choice(["MAX", "MIN", "AVG"])
+        broken = f"SELECT {fn}(n) AS v\nFROM (SELECT {g}, COUNT(*) AS n FROM {name} GROUP BY {g})"
+        truth = broken + " AS t"
+        engine = rnd.choice(["mariadb", "mysql"])
+    elif bug == "all_null":
+        if not tnums:
+            return None
+        n, m = rnd.choice(tnums), rnd.choice(tnums)
+        op = rnd.choice([">", ">=", "<", "<="])
+        fn = "MAX" if op.startswith(">") else "MIN"
+        where = f" WHERE {cat_cond('', tcats)}" if tcats and rnd.random() < 0.7 else ""
+        broken = f"SELECT {pk}\nFROM {name}\nWHERE {n} {op} ALL (SELECT {m} FROM {name}{where})\nORDER BY {pk}"
+        truth = f"SELECT {pk}\nFROM {name}\nWHERE {n} {op} (SELECT {fn}({m}) FROM {name}{where})\nORDER BY {pk}"
+    elif bug == "in_list_null":
+        if not tcats:
+            return None
+        c = rnd.choice(tcats)
+        vals = rnd.sample(c["params"], min(len(c["params"]), rnd.randint(1, 2)))
+        lst = ", ".join(f"'{v}'" for v in vals)
+        neg = rnd.random() < 0.6
+        stmt = rnd.choice(["select", "select", "update", "delete"]) if neg else "select"
+        if neg:
+            cond_b, cond_t = f"{c['name']} NOT IN ({lst}, NULL)", f"{c['name']} NOT IN ({lst})"
+        else:
+            cond_b, cond_t = f"{c['name']} IN ({lst}, NULL)", f"({c['name']} IN ({lst}) OR {c['name']} IS NULL)"
+        if stmt == "update" and tnums:
+            broken = f"UPDATE {name}\nSET {tnums[0]} = {tnums[0]}\nWHERE {cond_b}"
+            truth = f"UPDATE {name}\nSET {tnums[0]} = {tnums[0]}\nWHERE {cond_t}"
+        elif stmt == "delete" and not any(c2.get("ref") == name for x in tables for c2 in x["cols"]):
+            broken, truth = f"DELETE FROM {name}\nWHERE {cond_b}", f"DELETE FROM {name}\nWHERE {cond_t}"
+        else:
+            stmt = "select"
+            broken = f"SELECT {pk}\nFROM {name}\nWHERE {cond_b}\nORDER BY {pk}"
+            truth = f"SELECT {pk}\nFROM {name}\nWHERE {cond_t}\nORDER BY {pk}"
+    elif bug == "not_in_outer":
+        pcats = [c for c in parent["cols"] if c["kind"] == "cat" and c["params"]]
+        if not pcats:
+            return None
+        cond = cat_cond("", pcats)
+        broken = f"SELECT {cpk}\nFROM {cn}\nWHERE {fk} NOT IN (SELECT {ppk} FROM {pn} WHERE {cond})\nORDER BY {cpk}"
+        truth = (f"SELECT c.{cpk}\nFROM {cn} c\nWHERE NOT EXISTS (SELECT 1 FROM {pn} p WHERE p.{ppk} = c.{fk} AND p.{cond})\n"
+                 f"ORDER BY c.{cpk}")
+    elif bug == "semi_join":
+        if not ccats:
+            return None
+        cond = cat_cond("c.", ccats)
+        broken = f"SELECT p.{ppk}\nFROM {pn} p\nJOIN {cn} c ON c.{fk} = p.{ppk}\nWHERE {cond}\nORDER BY p.{ppk}"
+        truth = f"SELECT p.{ppk}\nFROM {pn} p\nWHERE EXISTS (SELECT 1 FROM {cn} c WHERE c.{fk} = p.{ppk} AND {cond})\nORDER BY p.{ppk}"
+        words = rnd.choice([f"{_base(pn)} that have a matching {_base(cn).replace('_', ' ')}", f"list {_base(pn)} who have one",
+                            f"wo {_base(pn)} jinke paas {_base(cn).replace('_', ' ')} hai"])
+    elif bug == "exists_uncorr":
+        if not ccats:
+            return None
+        broken = f"SELECT p.{ppk}\nFROM {pn} p\nWHERE {rnd.choice(['', 'NOT '])}EXISTS (SELECT 1 FROM {cn} c WHERE {cat_cond('c.', ccats)})"
+        truth = None
+    elif bug == "sub_outer_col":
+        where = f" WHERE {cat_cond('c.', ccats)}" if ccats else ""
+        broken = f"SELECT p.{ppk}\nFROM {pn} p\nWHERE p.{ppk} {rnd.choice(['IN', 'NOT IN'])} (SELECT p.{ppk} FROM {cn} c{where})"
+        truth = None
+    elif bug == "scalar_rows":
+        other = rnd.choice([c["name"] for c in child["cols"] if c["name"] and c["kind"] not in ("pk", "fk")] or [cpk])
+        broken = f"SELECT p.{ppk}, (SELECT c.{other} FROM {cn} c WHERE c.{fk} = p.{ppk}) AS v\nFROM {pn} p"
+        truth = None
+    else:                                                 # sub_limit_order
+        other = rnd.choice([c["name"] for c in child["cols"] if c["name"] and c["kind"] not in ("pk", "fk")] or [cpk])
+        broken = f"SELECT p.{ppk}, (SELECT c.{other} FROM {cn} c WHERE c.{fk} = p.{ppk} LIMIT 1) AS v\nFROM {pn} p"
+        truth = None
+    if words:
+        broken += ";\n\n" + words
+    item = {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": t["name"] if stmt != "select" else t["name"],
+            "broken": broken, "truth": truth}
+    if engine:
+        item["engine"] = engine
+    return item
+
+
+def _change_bug(seed, bug, rnd, schema, tables, t):
+    """Night 5: mistakes in UPDATE / DELETE / INSERT on random real tables. truth = the statement the person meant; 'only' = the
+    engine whose syntax it is (the other one refuses both)."""
+    links = [(c, x) for x in tables for c in x["cols"] if c["kind"] == "fk"]       # (fk column, child table)
+    if not links:
+        return None
+    fkc, child = rnd.choice(links)
+    parent = schema["tables"][fkc["ref"]]
+    fk, ppk, cn, pn = fkc["name"], parent["pk"], child["name"], parent["name"]
+    cnums = [c["name"] for c in child["cols"] if c["kind"] in ("int", "money")]
+    pnums = [c["name"] for c in parent["cols"] if c["kind"] in ("int", "money")]
+    pcats = [c for c in parent["cols"] if c["kind"] == "cat" and c["params"]]
+    tnums = [c["name"] for c in t["cols"] if c["kind"] in ("int", "money")]
+    tcats = [c for c in t["cols"] if c["kind"] == "cat" and c["params"]]
+    pk, name = t["pk"], t["name"]
+    engine, only, target = None, None, name
+    k = rnd.randint(1, len(t["rows"]))
+
+    def pcond(alias):
+        c = rnd.choice(pcats)
+        return f"{alias}.{c['name']} = '{rnd.choice(c['params'])}'"
+
+    if bug in ("ch_update_join_pg", "ch_update_from_my", "ch_update_from_self", "ch_delete_no_target", "ch_delete_join_pg"):
+        if not pcats or (bug.startswith("ch_update") and not cnums):
+            return None
+        cond, target = pcond("p"), cn
+        num = cnums[0] if cnums else None
+        my_upd = f"UPDATE {cn} c\nJOIN {pn} p ON p.{ppk} = c.{fk}\nSET c.{num} = 0\nWHERE {cond}"
+        pg_upd = f"UPDATE {cn} c\nSET {num} = 0\nFROM {pn} p\nWHERE p.{ppk} = c.{fk} AND {cond}"
+        my_del = f"DELETE c FROM {cn} c\nJOIN {pn} p ON p.{ppk} = c.{fk}\nWHERE {cond}"
+        pg_del = f"DELETE FROM {cn} c\nUSING {pn} p\nWHERE p.{ppk} = c.{fk} AND {cond}"
+        if bug == "ch_update_join_pg":
+            broken, truth, engine, only = my_upd, pg_upd, "postgresql", ["postgres"]
+        elif bug == "ch_update_from_my":
+            broken, truth, engine, only = pg_upd, my_upd, rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        elif bug == "ch_update_from_self":
+            broken = f"UPDATE {cn}\nSET {num} = 0\nFROM {cn} c\nJOIN {pn} p ON p.{ppk} = c.{fk}\nWHERE {cond}"
+            truth, only = pg_upd, ["postgres"]
+        elif bug == "ch_delete_no_target":
+            broken = f"DELETE FROM {cn} c\nJOIN {pn} p ON p.{ppk} = c.{fk}\nWHERE {cond}"
+            engine = rnd.choice(["mariadb", "postgresql"])
+            truth, only = (my_del, ["mysql"]) if engine == "mariadb" else (pg_del, ["postgres"])
+        else:
+            broken, truth, engine, only = my_del, pg_del, "postgresql", ["postgres"]
+    elif bug == "ch_set_qualified_pg":
+        if not tnums:
+            return None
+        c = rnd.choice(tnums)
+        broken = f"UPDATE {name} x\nSET x.{c} = 7\nWHERE x.{pk} = {k}"
+        truth, engine, only = f"UPDATE {name}\nSET {c} = 7\nWHERE {pk} = {k}", "postgresql", ["postgres"]
+    elif bug in ("ch_join_many_my", "ch_join_many_pg", "ch_set_sub_null"):
+        if not cnums or not pnums:
+            return None
+        pc, cc, target = rnd.choice(pnums), rnd.choice(cnums), pn
+        derived = f"(SELECT {fk}, SUM({cc}) AS {cc} FROM {cn} GROUP BY {fk})"
+        if bug == "ch_join_many_my":
+            broken = f"UPDATE {pn} p\nJOIN {cn} c ON c.{fk} = p.{ppk}\nSET p.{pc} = p.{pc} + c.{cc}"
+            truth = f"UPDATE {pn} p\nJOIN {derived} c ON c.{fk} = p.{ppk}\nSET p.{pc} = p.{pc} + c.{cc}"
+            engine, only = rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        elif bug == "ch_join_many_pg":
+            broken = f"UPDATE {pn} p\nSET {pc} = p.{pc} + c.{cc}\nFROM {cn} c\nWHERE c.{fk} = p.{ppk}"
+            truth = f"UPDATE {pn} p\nSET {pc} = p.{pc} + c.{cc}\nFROM {derived} c\nWHERE c.{fk} = p.{ppk}"
+            engine, only = "postgresql", ["postgres"]
+        else:
+            sub = f"(SELECT MAX(c.{cc}) FROM {cn} c WHERE c.{fk} = p.{ppk})"
+            broken = f"UPDATE {pn} p\nSET {pc} = {sub}"
+            truth = f"UPDATE {pn} p\nSET {pc} = {sub}\nWHERE EXISTS (SELECT 1 FROM {cn} c WHERE c.{fk} = p.{ppk})"
+    elif bug in ("ch_upsert_pg", "ch_conflict_my", "ch_conflict_amb"):
+        if not tnums:
+            return None
+        c = rnd.choice(tnums)
+        k2 = rnd.choice([k, len(t["rows"]) + 50])
+        head = f"INSERT INTO {name} ({pk}, {c})\nVALUES ({k2}, 5)\n"
+        if bug == "ch_upsert_pg":
+            broken = head + f"ON DUPLICATE KEY UPDATE {c} = VALUES({c})"
+            truth, engine, only = head + f"ON CONFLICT ({pk}) DO UPDATE SET {c} = EXCLUDED.{c}", "postgresql", ["postgres"]
+        elif bug == "ch_conflict_my":
+            broken = head + f"ON CONFLICT ({pk}) DO UPDATE SET {c} = EXCLUDED.{c}"
+            truth, engine, only = head + f"ON DUPLICATE KEY UPDATE {c} = VALUES({c})", rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        else:
+            broken = head + f"ON CONFLICT ({pk}) DO UPDATE SET {c} = {c} + EXCLUDED.{c}"
+            truth, only = head + f"ON CONFLICT ({pk}) DO UPDATE SET {c} = {name}.{c} + EXCLUDED.{c}", ["postgres"]
+    elif bug in ("ch_insert_order", "ch_insert_count"):
+        same = [[c["name"] for c in t["cols"] if c["kind"] == kind] for kind in ("cat", "int", "money", "name")]
+        pair = next((g for g in rnd.sample(same, len(same)) if len(g) >= 2), None)
+        if not pair:
+            return None
+        a, b = rnd.sample(pair, 2)
+        if bug == "ch_insert_order":
+            broken = f"INSERT INTO {name} ({pk}, {a}, {b})\nSELECT {pk} + 100000, {b}, {a}\nFROM {name}\nWHERE {pk} = {k}"
+            truth = f"INSERT INTO {name} ({pk}, {a}, {b})\nSELECT {pk} + 100000, {a}, {b}\nFROM {name}\nWHERE {pk} = {k}"
+        else:
+            broken = rnd.choice([f"INSERT INTO {name} ({pk}, {a}, {b})\nVALUES ({len(t['rows']) + 9}, NULL)",
+                                 f"INSERT INTO {name} ({pk}, {a}, {b})\nSELECT {pk} + 100000, {a}\nFROM {name}\nWHERE {pk} = {k}"])
+            truth = None
+    elif bug == "ch_limit_pg":
+        if not tcats:
+            return None
+        c = rnd.choice(tcats)
+        cond = f"{c['name']} = '{rnd.choice(c['params'])}'"
+        verb = rnd.choice(["DELETE", "UPDATE"]) if tnums else "DELETE"
+        n = rnd.randint(1, 3)
+        if verb == "DELETE":
+            broken = f"DELETE FROM {name}\nWHERE {cond}\nORDER BY {pk}\nLIMIT {n}"
+            truth = f"DELETE FROM {name}\nWHERE {pk} IN (SELECT {pk} FROM {name} WHERE {cond} ORDER BY {pk} LIMIT {n})"
+        else:
+            broken = f"UPDATE {name}\nSET {tnums[0]} = 0\nWHERE {cond}\nORDER BY {pk}\nLIMIT {n}"
+            truth = f"UPDATE {name}\nSET {tnums[0]} = 0\nWHERE {pk} IN (SELECT {pk} FROM {name} WHERE {cond} ORDER BY {pk} LIMIT {n})"
+        engine, only = "postgresql", ["postgres"]
+    else:                                                 # ch_dedupe: the key named id, as the rewrite assumes
+        if pk.lower() != "id" or not tcats:
+            return None
+        c = rnd.choice(tcats)["name"]
+        broken = f"DELETE a FROM {name} a\nJOIN {name} b ON a.{c} = b.{c}"
+        truth = f"DELETE a FROM {name} a\nJOIN {name} b ON a.{c} = b.{c} AND a.{pk} > b.{pk}"
+        only = ["mysql"]
+    item = {"seed": seed, "bug": bug, "stmt": "change", "schema": schema, "table": target, "broken": broken, "truth": truth}
+    if engine:
+        item["engine"] = engine
+    if only:
+        item["only"] = only
+    return item
+
+
+SD_TYPES = {"mysql": {"datetime": "DATETIME"}, "postgresql": {"datetime": "TIMESTAMP"}, None: {"datetime": "TIMESTAMP"}}
+SD_RESERVED = {"order": "sort_order", "desc": "description", "group": "group_name", "check": "check_value", "limit": "limit_value",
+               "default": "default_value"}
+
+
+def _sd_type(c, fam):
+    k = c["kind"]
+    return {"pk": "INT NOT NULL", "fk": "INT", "int": "INT", "money": "DECIMAL(12,2)", "date": "DATE"}.get(k) or \
+        (SD_TYPES[fam]["datetime"] if k == "datetime" else "VARCHAR(80)")
+
+
+def _sd_design(t, name, fam, types=None, names=None, extra=None, pk=True, fks=True, tail="", engine_opt=None, fk_index=None):
+    """CREATE TABLE <name> with t's columns (same order as the real table, so INSERT ... SELECT * fills it)."""
+    types, names = types or {}, names or {}
+    cols = []
+    for c in t["cols"]:
+        nm = names.get(c["name"], c["name"])
+        cols.append(f"{nm} {types.get(c['name'], _sd_type(c, fam))}")
+    cols += extra or []
+    if pk:
+        cols.append(f"PRIMARY KEY ({names.get(t['pk'], t['pk'])})")
+    if fks:
+        cols += [f"FOREIGN KEY ({c}) REFERENCES {p} ({ppk})" for c, p, ppk in t["fks"]]
+    body = ",\n  ".join(cols)
+    out = f"CREATE TABLE {name} (\n  {body}\n)"
+    if engine_opt:
+        out += " " + engine_opt
+    if fk_index is None:
+        fk_index = fam != "mysql"                       # a good design indexes its links where the engine doesn't (PostgreSQL)
+    if fks and fk_index:
+        tail = "".join(f"\nCREATE INDEX ix_{name}_{c} ON {name} ({c});" for c, _p, _k in t["fks"]) + tail
+    return out + ";" + tail
+
+
+def _schema_bug(seed, bug, rnd, schema, tables, t):
+    """Night 6: a table design with one planted mistake, made from a random real table (same columns and data). truth = the
+    design the person meant; its rows (the real table's, copied in) and its catalog (types, keys, indexes) are the answer."""
+    from app.agents import sqlschema as SS
+
+    if schema["style"] != "snake":
+        return None                                      # the names must read the same on both engines
+    name = f"n6{t['name']}"                       # a new table, named like the real one (its singular still reads)
+    fam = rnd.choice(["mariadb", "postgresql", None])
+    fk_of = {c["name"]: c for c in t["cols"] if c["kind"] == "fk"}
+    engine, only, extra_drop = fam, None, []
+    fmy = {"mariadb": "mysql", "mysql": "mysql", "postgresql": "postgresql", None: None}[fam]
+
+    def col(kinds, test=lambda c: True):
+        cs = [c for c in t["cols"] if c["kind"] in kinds and test(c)]
+        return rnd.choice(cs) if cs else None
+
+    if bug == "sd_money_float":
+        c = col(("money",), lambda c: SS.MONEY.search(c["name"]) and not re.search(r"(^|_)rate$", c["name"]))
+        if not c:
+            return None
+        bad = rnd.choice({"mysql": ["FLOAT", "DOUBLE", "FLOAT(10,2)"], "postgresql": ["REAL", "DOUBLE PRECISION", "FLOAT"],
+                          None: ["REAL", "FLOAT", "DOUBLE PRECISION"]}[fmy])
+        good = "DECIMAL(10,2)" if bad == "FLOAT(10,2)" else "DECIMAL(12,2)"
+        broken, truth = _sd_design(t, name, fmy, {c["name"]: bad}), _sd_design(t, name, fmy, {c["name"]: good})
+    elif bug == "sd_date_text":
+        c = col(("date", "datetime"), lambda c: SS.DATEISH.search(c["name"]) and
+                (c["kind"] == "date") == bool(SS.DAY_ONLY.search(c["name"]) and not re.search(r"(^|_)(at|timestamp|datetime)$", c["name"])))
+        if not c or (c["kind"] == "datetime" and fmy is None):
+            return None
+        broken = _sd_design(t, name, fmy, {c["name"]: rnd.choice(["VARCHAR(30)", "CHAR(19)", "TEXT"])})
+        truth = _sd_design(t, name, fmy)
+    elif bug == "sd_number_text":
+        c = col(("money", "int"), lambda c: (SS.MONEY.search(c["name"]) or SS.COUNTISH.search(c["name"])) and
+                (c["kind"] == "money") == bool(SS.MONEY.search(c["name"])))
+        if not c:
+            return None
+        broken, truth = _sd_design(t, name, fmy, {c["name"]: rnd.choice(["VARCHAR(20)", "TEXT", "CHAR(12)"])}), _sd_design(t, name, fmy)
+    elif bug == "sd_code_number":
+        c = col(("phone",))
+        if not c:
+            return None
+        broken = _sd_design(t, name, fmy, {c["name"]: "BIGINT"})
+        truth = _sd_design(t, name, fmy, {c["name"]: "VARCHAR(20)"})
+    elif bug == "sd_no_pk":
+        if not (t["pk"] == "id" or t["pk"].endswith("_id")):
+            return None
+        broken, truth = _sd_design(t, name, fmy, pk=False), _sd_design(t, name, fmy)
+    elif bug == "sd_fk_index_pg":
+        if not t["fks"]:
+            return None
+        engine, only = "postgresql", ["postgres"]
+        broken = _sd_design(t, name, "postgresql", fk_index=False)
+        truth = _sd_design(t, name, "postgresql")
+    elif bug == "sd_utf8":
+        engine, only = rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        cs = rnd.choice(["utf8", "utf8mb3"])
+        broken = _sd_design(t, name, "mysql", engine_opt=f"ENGINE=InnoDB DEFAULT CHARSET={cs}")
+        truth = _sd_design(t, name, "mysql", engine_opt="ENGINE=InnoDB DEFAULT CHARSET=utf8mb4")
+    elif bug == "sd_myisam_fk":
+        if not t["fks"]:
+            return None
+        engine, only = rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        broken = _sd_design(t, name, "mysql", engine_opt="ENGINE=MyISAM")
+        truth = _sd_design(t, name, "mysql", engine_opt="ENGINE=InnoDB")
+    elif bug == "sd_dialect_pg":
+        engine, only = "postgresql", ["postgres"]
+        cat = col(("cat",))
+        my_types = {t["pk"]: "INT(11) NOT NULL AUTO_INCREMENT"}
+        pg_types = {t["pk"]: "INTEGER NOT NULL GENERATED BY DEFAULT AS IDENTITY"}
+        for c in t["cols"]:
+            if c["kind"] == "datetime":
+                my_types[c["name"]], pg_types[c["name"]] = "DATETIME", "TIMESTAMP"
+            elif c["kind"] == "int" and rnd.random() < 0.5:
+                my_types[c["name"]], pg_types[c["name"]] = "INT(11) UNSIGNED", "INTEGER"
+        extra_my = [f"KEY ix_{cat['name']} ({cat['name']})"] if cat else []
+        broken = _sd_design(t, name, "mysql", my_types, extra=extra_my, engine_opt="ENGINE=InnoDB DEFAULT CHARSET=utf8mb4")
+        if rnd.random() < 0.5:
+            broken = re.sub(r"\b(" + "|".join(re.escape(c["name"]) for c in t["cols"]) + r")\b(?=\s+[A-Z])", r"`\1`", broken)
+        truth = _sd_design(t, name, "postgresql", pg_types, fk_index=False) + (f"\nCREATE INDEX ix_{name}_{cat['name']} ON {name} ({cat['name']});" if cat else "")
+    elif bug == "sd_dialect_my":
+        engine, only = rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        pg_types = {t["pk"]: "INT GENERATED BY DEFAULT AS IDENTITY"}
+        my_types = {t["pk"]: "INT AUTO_INCREMENT"}
+        dts = [c for c in t["cols"] if c["kind"] == "datetime"]
+        for c in dts:
+            pg_types[c["name"]], my_types[c["name"]] = rnd.choice(["TIMESTAMPTZ", "TIMESTAMP WITH TIME ZONE"]), "DATETIME"
+        if not dts:
+            return None
+        broken, truth = _sd_design(t, name, "postgresql", pg_types), _sd_design(t, name, "mysql", my_types)
+    elif bug == "sd_two_pk":
+        c = col(("cat", "name", "email"))
+        if not c:
+            return None
+        broken = _sd_design(t, name, fmy, {c["name"]: "VARCHAR(80) PRIMARY KEY"})
+        truth = None
+    elif bug == "sd_fk_type":
+        if not t["fks"]:
+            return None
+        engine, only = rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        c = rnd.choice(t["fks"])[0]
+        broken = _sd_design(t, name, "mysql", {c: rnd.choice(["BIGINT", "INT UNSIGNED", "SMALLINT"])})
+        truth = _sd_design(t, name, "mysql")
+        # the parent's key is in the script (a real table's key is outside the text, so its type isn't known)
+        p = schema["tables"][fk_of[c]["ref"]]
+        pdesign = _sd_design(p, f"n6p{p['name']}", "mysql", fks=False)
+        broken = pdesign + "\n" + broken.replace(f"REFERENCES {p['name']} ", f"REFERENCES n6p{p['name']} ")
+        truth = pdesign + "\n" + truth.replace(f"REFERENCES {p['name']} ", f"REFERENCES n6p{p['name']} ")
+        extra_drop = [f"n6p{p['name']}"]
+    elif bug == "sd_varchar_len":
+        c = col(("cat",))
+        if not c:
+            return None
+        engine, only = rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        broken = _sd_design(t, name, "mysql", {c["name"]: "VARCHAR"})
+        truth = _sd_design(t, name, "mysql", {c["name"]: "VARCHAR(255)"})
+    elif bug == "sd_reserved":
+        c = col(("cat", "int", "text"))
+        if not c:
+            return None
+        w = rnd.choice(sorted(SD_RESERVED))
+        engine, fmy = None, None
+        broken = _sd_design(t, name, None, names={c["name"]: w})
+        truth = _sd_design(t, name, None, names={c["name"]: SD_RESERVED[w]})
+    elif bug == "sd_row_big":
+        cs = [c for c in t["cols"] if c["kind"] in ("cat", "name", "text", "email")]
+        if len(cs) < 2:
+            return None
+        a, b = cs[:2]
+        engine, only = rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        broken = _sd_design(t, name, "mysql", {a["name"]: "VARCHAR(10000)", b["name"]: "VARCHAR(9000)"})
+        truth = _sd_design(t, name, "mysql", {a["name"]: "TEXT", b["name"]: "VARCHAR(9000)"})
+    elif bug == "sd_fk_order":
+        if not t["fks"]:
+            return None
+        c, pname, ppk = rnd.choice(t["fks"])
+        p = schema["tables"][pname]
+        pdesign = _sd_design(p, f"n6p{pname}", fmy, fks=False)
+        child_b = _sd_design(t, name, fmy).replace(f"REFERENCES {pname} ", f"REFERENCES n6p{pname} ")
+        broken, truth = child_b + "\n" + pdesign, pdesign + "\n" + child_b
+        extra_drop = [f"n6p{pname}"]
+    elif bug == "sd_over_wide":
+        c = col(("email", "cat", "name"), lambda c: c["name"] in SS.SHORT_FIELD)
+        if not c:
+            return None
+        broken = _sd_design(t, name, fmy, {c["name"]: f"VARCHAR({rnd.choice([1000, 2000, 5000])})"})
+        truth = _sd_design(t, name, fmy, {c["name"]: f"VARCHAR({SS.SHORT_FIELD[c['name']]})"})
+    elif bug == "sd_list_col":
+        broken = _sd_design(t, name, fmy, extra=[f"{rnd.choice(['tag_ids', 'tags', 'skills', 'product_ids'])} VARCHAR(200)"])
+        truth = None
+    elif bug == "sd_repeat":
+        stem = rnd.choice(["phone", "email", "item", "alt_mobile"])
+        broken = _sd_design(t, name, fmy, extra=[f"{stem}1 VARCHAR(40)", f"{stem}2 VARCHAR(40)"] + ([f"{stem}3 VARCHAR(40)"] if rnd.random() < .5 else []))
+        truth = None
+    elif bug == "sd_parent_copy":
+        fks = [c for c in fk_of if c.endswith("_id")]
+        if not fks:
+            return None
+        stem = rnd.choice(fks)[:-3]
+        broken = _sd_design(t, name, fmy, extra=[f"{stem}_{rnd.choice(['name', 'email', 'city', 'phone'])} VARCHAR(80)"])
+        truth = None
+    else:                                                 # sd_timestamp: a birth date or expiry in a MySQL/MariaDB TIMESTAMP
+        c = col(("date",), lambda c: SS.OLD_OR_FAR.search(c["name"]))
+        if not c:
+            return None
+        engine, only = rnd.choice(["mariadb", "mysql"]), ["mysql"]
+        broken = _sd_design(t, name, "mysql", {c["name"]: "TIMESTAMP NULL"})
+        truth = _sd_design(t, name, "mysql", {c["name"]: "DATE NULL"})
+    if only is None and fmy:
+        only = ["mysql"] if fmy == "mysql" else ["postgres"]
+    item = {"seed": seed, "bug": bug, "stmt": "ddl", "schema": schema, "table": name, "source": t["name"], "broken": broken,
+            "truth": truth, "drop": [name] + extra_drop}
+    if engine:
+        item["engine"] = engine
+    if only:
+        item["only"] = only
+    return item
+
+
+def _drop_ddl(eng, names):
+    eng.rollback()
+    for n in names:
+        try:
+            eng.run(f"DROP TABLE IF EXISTS {n}" + (" CASCADE" if eng.kind == "postgres" else ""))
+        except Exception:  # noqa: BLE001
+            eng.rollback()
+
+
+def _ddl_effect(eng, script, item):
+    """What a design makes: its columns and types, primary key, indexes, foreign keys, engine and charset, and the real table's
+    rows copied into it. ('refused', ...) when the design doesn't run."""
+    from app.agents.sqlroutine import split_script
+
+    name = item["table"]
+    _drop_ddl(eng, item["drop"])
+    try:
+        try:
+            for st in split_script(script):
+                eng.run(st)
+        except Exception as exc:  # noqa: BLE001
+            eng.rollback()
+            return ("refused", str(exc)[:80])
+        if eng.kind == "mysql":
+            cat = eng.run("SELECT column_name, column_type, is_nullable, column_key, character_set_name FROM information_schema.columns "
+                          f"WHERE table_schema = DATABASE() AND table_name = '{name}' ORDER BY ordinal_position")
+            idx = eng.run("SELECT column_name, seq_in_index, non_unique FROM information_schema.statistics WHERE table_schema = DATABASE() "
+                          f"AND table_name = '{name}' ORDER BY 1, 2")
+            more = eng.run(f"SELECT engine FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '{name}'")
+            fks = eng.run("SELECT column_name, referenced_table_name FROM information_schema.key_column_usage WHERE "
+                          f"table_schema = DATABASE() AND table_name = '{name}' AND referenced_table_name IS NOT NULL ORDER BY 1")
+        else:
+            cat = eng.run("SELECT column_name, data_type, character_maximum_length, numeric_precision, numeric_scale, is_nullable, "
+                          f"is_identity FROM information_schema.columns WHERE table_name = '{name}' ORDER BY ordinal_position")
+            idx = [(re.sub(r"INDEX \S+ ON", "INDEX ON", r[0]),) for r in
+                   eng.run(f"SELECT indexdef FROM pg_indexes WHERE tablename = '{name}' ORDER BY indexdef")]
+            idx.sort()
+            more = []
+            fks = eng.run("SELECT kcu.column_name FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu "
+                          "ON kcu.constraint_name = tc.constraint_name WHERE tc.constraint_type = 'FOREIGN KEY' AND "
+                          f"tc.table_name = '{name}' ORDER BY 1")
+        try:
+            eng.run(f"INSERT INTO {name} SELECT * FROM {item['source']}")
+            rows = Counter(tuple(str(x) for x in r) for r in eng.run(f"SELECT * FROM {name}"))
+        except Exception as exc:  # noqa: BLE001
+            eng.rollback()
+            rows = ("insert refused", type(exc).__name__)
+        return (tuple(map(tuple, cat)), tuple(map(tuple, idx)), tuple(map(tuple, more)), tuple(map(tuple, fks)), rows)
+    finally:
+        _drop_ddl(eng, item["drop"])
+
+
+def _check_ddl(item, engines, res, tag) -> list[str]:
+    from app.agents import sqlcorrect
+
+    bad = []
+    if item["truth"] is not None:
+        tf = [f["title_en"] for f in sqlcorrect.check(item["truth"], engine=item.get("engine"))["findings"] if f["kind"] in ("error", "wrong")]
+        if tf:
+            bad.append(f"{tag}: false alarm on the intended design {tf}\n{item['truth']}")
+    want = TOPIC[item["bug"]]
+    sure = any(f["topic"] == want and f["kind"] in ("error", "wrong") for f in res["findings"]) or item["bug"] in FIX_THE_CHECK
+    if item["bug"] in NO_FIX or not sure:
+        return bad
+    fixed = res["corrected"]
+    if not fixed:
+        return bad + [f"{tag}: no corrected design\n{item['broken']}"]
+    again = [f["title_en"] for f in sqlcorrect.check(fixed, engine=item.get("engine"))["findings"] if f["kind"] in ("error", "wrong")]
+    if again:
+        bad.append(f"{tag}: the corrected design still has mistakes {again}\n{fixed}")
+    for name, eng in engines.items():
+        if item.get("only") and name not in item["only"]:
+            continue
+        got, exp = _ddl_effect(eng, fixed, item), _ddl_effect(eng, item["truth"], item)
+        if exp[0] == "refused":
+            bad.append(f"{tag}: on {name} the intended design is refused {exp}\n{item['truth']}")
+        elif got != exp:
+            bad.append(f"{tag}: on {name} the corrected design makes something else\n{fixed}\n--- got {str(got)[:300]}\n--- want {str(exp)[:300]}")
+    return bad
+
+
 def _effect(eng, sql, table, pk):
     """What a statement does: the rows a SELECT returns, or the table after an UPDATE/DELETE (rolled back afterwards)."""
     eng.begin()
     try:
         out = eng.run(sql)
-        if not isinstance(out, list):
+        if not isinstance(out, (list, tuple)):            # a SELECT's rows (a tuple on MySQL/MariaDB), else the changed table
             out = eng.run(f"SELECT * FROM {table} ORDER BY {pk}")
         return Counter(tuple(str(x) for x in r) for r in out)
     except Exception as exc:  # noqa: BLE001 - a refusal the intended statement gets too (a foreign key) is the same effect
@@ -366,6 +1123,8 @@ def check(item, engines: dict) -> list[str]:
     extra = [f["title_en"] for f in res["findings"] if f["kind"] in ("error", "wrong") and f["topic"] != want]
     if extra:
         bad.append(f"{tag}: extra findings {extra}\n{item['broken']}")
+    if item["stmt"] == "ddl":
+        return bad + _check_ddl(item, engines, res, tag)
     sure = any(f["topic"] == want and f["kind"] in ("error", "wrong") for f in res["findings"])
     if item["bug"] in FIX_THE_CHECK:
         sure = True

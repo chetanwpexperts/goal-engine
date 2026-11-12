@@ -55,6 +55,16 @@
    "id": "speed",
    "en": "Which filters and joins need an index, and does a function on a column stop the index?",
    "hi": "Kin filters aur joins ko index chahiye, aur kya column pe function index rok deta hai?"
+  },
+  {
+   "id": "subqueries",
+   "en": "For each subquery: where does it stand (one value, a set, EXISTS), and which names tie it to the outer row?",
+   "hi": "Har subquery ke liye: wo kahan khadi hai (ek value, set, EXISTS), aur kaunse naam use bahar ki row se jodte hain?"
+  },
+  {
+   "id": "design",
+   "en": "For a table design: does each table name its rows (primary key), does each link point at a key of the same type with an index, does each column's type match its values, and is each fact kept once?",
+   "hi": "Table design ke liye: har table apni rows ko naam deti hai (primary key), har link same type ki key pe index ke saath, har column ka type uski values se mel khata hai, aur har baat ek hi baar?"
   }
  ],
  "fundamentals": {
@@ -67,7 +77,8 @@
     "group",
     "per_group",
     "top_n",
-    "distinct"
+    "distinct",
+    "count_said"
    ],
    "source": "https://dev.mysql.com/doc/refman/8.4/en/group-by-handling.html"
   },
@@ -78,7 +89,8 @@
    "rule_hi": "Kai rows wali table join karne se doosri taraf har match pe dohraati hai. Ek parent pe do aise join ek doosre ko guna karte hain; pehle har child ka total uske apne grain pe nikaalo, phir join karo.",
    "topics": [
     "join",
-    "distinct_join"
+    "distinct_join",
+    "semi_join"
    ],
    "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html"
   },
@@ -103,7 +115,11 @@
     "not_in",
     "null_fn",
     "null_math",
-    "nulls_order"
+    "nulls_order",
+    "all_null",
+    "in_list_null",
+    "not_in_outer",
+    "sub_sum_null"
    ],
    "source": "https://www.postgresql.org/docs/current/functions-comparison.html"
   },
@@ -121,13 +137,23 @@
   "subquery_shape": {
    "title_en": "A subquery is one value or a set",
    "title_hi": "Subquery ek value hai ya ek set",
-   "rule_en": "After = < > a subquery must return exactly one row (one value); after IN / EXISTS it may return many. A subquery is evaluated against the data as it was when the statement started, and MySQL won't let it read the table an UPDATE/DELETE is changing unless it is wrapped as a derived table.",
-   "rule_hi": "= < > ke baad subquery ko ek hi row deni chahiye; IN / EXISTS ke baad kai de sakti hai. MySQL UPDATE/DELETE ki apni table ko subquery mein tabhi padhne deta hai jab use derived table mein lapeta jaaye.",
+   "rule_en": "Where a subquery stands decides how much it may return. After = < > or in the SELECT list it must give one row and one column; after IN / NOT IN / ANY / ALL one column and any number of rows; after EXISTS only whether there is at least one row matters, so what it selects doesn't matter, and an aggregate without GROUP BY always gives exactly one row (EXISTS (SELECT COUNT(*) ...) is always true). LIMIT without ORDER BY inside it keeps whichever row came first. A subquery is evaluated against the data as it was when the statement started, and MySQL won't let it read the table an UPDATE/DELETE is changing unless it is wrapped as a derived table; MySQL and MariaDB also refuse LIMIT inside IN and a subquery in FROM without a name.",
+   "rule_hi": "Subquery kahan khadi hai, wahi tay karta hai wo kitna de sakti hai. = < > ke baad ya SELECT list mein ek row aur ek column; IN / NOT IN / ANY / ALL ke baad ek column aur kitni bhi rows; EXISTS ke baad sirf ye ki koi row hai ya nahi, isliye wo kya select karti hai farak nahi padta, aur GROUP BY ke bina aggregate hamesha ek row deta hai (EXISTS (SELECT COUNT(*) ...) hamesha true). Andar ORDER BY ke bina LIMIT jo row pehle mili wahi rakhta hai. MySQL UPDATE/DELETE ki apni table ko subquery mein tabhi padhne deta hai jab use derived table mein lapeta jaaye; MySQL/MariaDB IN ke andar LIMIT aur bina naam ki FROM subquery bhi nahi maante.",
    "topics": [
     "subquery",
-    "same_table"
+    "same_table",
+    "exists_agg",
+    "sub_columns",
+    "scalar_rows",
+    "sub_limit_order",
+    "in_limit",
+    "derived_alias"
    ],
-   "source": "https://dev.mysql.com/doc/refman/8.4/en/subquery-errors.html"
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/subquery-errors.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   },
   "values_types": {
    "title_en": "Values have types: text in quotes, dates in quotes",
@@ -153,7 +179,8 @@
    "topics": [
     "alias",
     "column",
-    "order"
+    "order",
+    "having_alias"
    ],
    "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-alias.html"
   },
@@ -180,14 +207,28 @@
    "source": "https://www.postgresql.org/docs/current/datatype-datetime.html"
   },
   "changes_safety": {
-   "title_en": "UPDATE/DELETE: preview, separate assignments, small batches",
-   "title_hi": "UPDATE/DELETE: pehle dekho, alag assignments, chhote batches",
-   "rule_en": "Run the same WHERE as a SELECT first to see which rows change. In SET, assignments are separated by commas (AND makes one boolean expression). Change very large sets in batches so locks and undo stay small.",
-   "rule_hi": "Pehle wahi WHERE SELECT mein chala ke dekho kaunsi rows badlengi. SET mein assignments comma se alag (AND ek hi boolean ban jata hai). Bahut badi rows chhote batches mein badlo.",
+   "title_en": "Changing data: which rows, how often, what value, which column",
+   "title_hi": "Data badalna: kaunsi rows, kitni baar, kya value, kaunsa column",
+   "rule_en": "A change touches exactly the rows its WHERE and joins let through, so run the same FROM and WHERE as a SELECT first. Every joined table must be tied to the target row, or every target row passes; PostgreSQL's FROM in an UPDATE is a separate list, so naming the target table there again adds an unlinked copy. Each target row is changed at most once per statement, so a row with several matching child rows gets one of them (total the children first). SET col = (SELECT ...) gives NULL where the subquery finds nothing. INSERT ... SELECT fills the column list by position, never by name. Deleting duplicates needs a rule for which copy stays (t1.id > t2.id). In SET, assignments are separated by commas (AND makes one boolean expression). Change very large sets in batches.",
+   "rule_hi": "Change wahi rows chhoota hai jo uska WHERE aur joins dete hain, isliye pehle wahi FROM aur WHERE SELECT mein chalao. Har joined table target row se judi honi chahiye, warna har row badalti hai; PostgreSQL ke UPDATE ka FROM alag list hai, wahan target table dobara likhna ek bina-judi copy hai. Har target row ek statement mein ek hi baar badalti hai, isliye kai child rows mein se ek hi lagti hai (pehle total banao). SET col = (SELECT ...) match na mile to NULL deta hai. INSERT ... SELECT position se bharta hai, naam se nahi. Duplicate hatane mein batao kaunsi copy rahe (t1.id > t2.id). SET mein comma, AND nahi. Badi rows batches mein.",
    "topics": [
-    "set"
+    "set",
+    "update_from_self",
+    "change_unlinked",
+    "join_change_many",
+    "set_subquery_null",
+    "insert_order",
+    "insert_count",
+    "insert_no_columns",
+    "dedupe_self",
+    "insert_ignore",
+    "replace_into"
    ],
-   "source": "https://dev.mysql.com/doc/refman/8.4/en/update.html"
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/update.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   },
   "precedence": {
    "title_en": "Conditions combine in a fixed order: NOT, then AND, then OR",
@@ -222,9 +263,143 @@
    "rule_en": "SQL is the shared language, but each database adds its own words: MySQL/MariaDB have backtick names, LIMIT offset,count, IFNULL, GROUP_CONCAT, DATE_FORMAT; PostgreSQL has :: casts, ILIKE, DISTINCT ON, NULLS FIRST/LAST, string_agg; SQL Server has TOP n, [brackets], GETDATE(). A database refuses another one's words, so the answer depends on which database runs the query: name it, or DBaba reads it from the query.",
    "rule_hi": "SQL sabki common language hai, par har database apne shabd jodta hai: MySQL/MariaDB mein backtick naam, LIMIT offset,count, IFNULL, GROUP_CONCAT; PostgreSQL mein :: cast, ILIKE, DISTINCT ON, NULLS FIRST/LAST; SQL Server mein TOP n, [brackets], GETDATE(). Ek database doosre ke shabd mana kar deta hai, isliye jawab is baat pe tika hai ki query kaunsa database chalayega.",
    "topics": [
-    "dialect"
+    "dialect",
+    "update_join_syntax",
+    "delete_join_syntax",
+    "set_qualified",
+    "upsert_syntax",
+    "conflict_ambiguous",
+    "conflict_no_target",
+    "change_limit",
+    "delete_no_target",
+    "delimiter",
+    "trigger_body_pg",
+    "no_language",
+    "cursor_handler",
+    "declare_order",
+    "ddl_dialect",
+    "reserved_name",
+    "varchar_length",
+    "text_key",
+    "row_too_big"
    ],
    "source": "https://www.postgresql.org/docs/current/features.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "aggregation": {
+   "title_en": "A total sees only the rows and values that reach it",
+   "title_hi": "Total sirf unhi rows aur values ko dekhta hai jo us tak pahunchti hain",
+   "rule_en": "An aggregate works on the rows left after WHERE and the joins, and of those only on the values that are not NULL; COUNT(*) is the one that counts rows. So COUNT(x) counts filled values, not true ones (a 0 or a false is counted); SUM and AVG skip NULLs, so AVG is the average of the rows that have a value, and SUM of no rows or of only NULLs is NULL, not 0; DISTINCT inside a total works on values, so equal amounts of different rows count once. Totals are made once per group: a total can't hold another total at the same level (do it in two stages), and in a grouped query a window function sees one row per group, so its argument must itself be a total. An average of per-group averages weighs every group the same, and a share is only right when its total covers the same rows as its part.",
+   "rule_hi": "Aggregate WHERE aur joins ke baad bachi rows par chalta hai, aur unme bhi sirf un values par jo NULL nahi; sirf COUNT(*) rows ginta hai. Isliye COUNT(x) bhari values ginta hai, true wali nahi (0 ya false bhi gina jaata hai); SUM aur AVG NULL chhod dete hain, to AVG sirf value wali rows ka average hai, aur khaali ya sirf-NULL ka SUM NULL hai, 0 nahi; total ke andar DISTINCT values par chalta hai, to alag rows ki barabar raqam ek baar gini jaati hai. Total har group ka ek baar banta hai: total ke andar total ek hi level par nahi chalta (do stage mein karo), aur grouped query mein window har group ki ek row dekhta hai, to uska argument bhi total hona chahiye. Group averages ka average har group ko barabar wazan deta hai, aur share tabhi sahi hai jab total un hi rows ka ho jinka hissa hai.",
+   "topics": [
+    "count_case",
+    "count_bool",
+    "sum_bool",
+    "nested_agg",
+    "window_agg",
+    "sum_null",
+    "sum_distinct",
+    "avg_null",
+    "avg_avg",
+    "count_multi",
+    "pct_total"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-aggregate.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "correlation": {
+   "title_en": "A subquery reads its own FROM first",
+   "title_hi": "Subquery pehle apna FROM padhti hai",
+   "rule_en": "A name inside a subquery is looked up in the subquery's own FROM first and only then in the query around it. A subquery is tied to the outer row (correlated) only through a name that belongs to the outer query; without one it gives the same answer for every row. So when the subquery reads the same table again, orders.customer_id inside it means the inner orders (x = x, always true) unless the inner copy gets a name of its own; a column of the outer row in the subquery's SELECT list just repeats the row's own value; and IN (SELECT MAX(y) ... GROUP BY g) gives values without saying which group they belong to, so a row matches any group's maximum, not its own. Compare the pair ((g, y) IN (SELECT g, MAX(y) ...)) or correlate on g.",
+   "rule_hi": "Subquery ke andar naam pehle uske apne FROM mein dhoondha jaata hai, phir bahar wali query mein. Subquery bahar ki row se tabhi judti hai (correlated) jab usme bahar wali query ka koi naam ho; warna har row ka ek hi jawab. Isliye wahi table dobara padhne par andar orders.customer_id andar wali orders hai (x = x, hamesha true) jab tak andar wali copy ko apna naam na do; SELECT list mein bahar ki row ka column bas usi row ki value dohraata hai; aur IN (SELECT MAX(y) ... GROUP BY g) values deta hai par ye nahi batata kis group ki, isliye row kisi bhi group ke max se match ho jaati hai. Jodi compare karo ((g, y) IN (SELECT g, MAX(y) ...)) ya g par correlate karo.",
+   "topics": [
+    "exists_uncorr",
+    "sub_outer_col",
+    "corr_self",
+    "in_grouped_agg",
+    "sub_key"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-expressions.html#SQL-SYNTAX-SCALAR-SUBQUERIES",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "routine_flow": {
+   "title_en": "A routine must end, answer, and not feed itself",
+   "title_hi": "Routine ko khatam hona, jawab dena, aur khud ko na chalana zaroori hai",
+   "rule_en": "A loop ends only when its condition reads something the body changes, or when it reaches LEAVE / EXIT / RETURN. A function must reach a RETURN on every path; a PostgreSQL trigger function returns the row to save (RETURN NEW), and NULL from a BEFORE row trigger means skip the row. A trigger must not run a statement on its own table: MySQL/MariaDB refuse it (1442), PostgreSQL fires it again until the stack runs out. To change the row being saved, change NEW in a BEFORE trigger; in an AFTER trigger the row is already saved.",
+   "rule_hi": "Loop tabhi rukta hai jab condition kuch aisa padhe jo body badalti hai, ya LEAVE / EXIT / RETURN aaye. Function ko har raaste pe RETURN chahiye; PostgreSQL trigger function save hone wali row lautata hai (RETURN NEW), BEFORE row trigger se NULL ka matlab row chhodo. Trigger apni hi table pe statement na chalaye: MySQL/MariaDB mana (1442), PostgreSQL baar baar chalata hai. Row badalni hai to BEFORE trigger mein NEW badlo; AFTER mein row save ho chuki hoti hai.",
+   "topics": [
+    "endless_loop",
+    "function_return",
+    "trigger_same_table",
+    "after_new",
+    "trigger_return"
+   ],
+   "source": "https://www.postgresql.org/docs/current/plpgsql-trigger.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "table_keys": {
+   "title_en": "Every table names its rows; every link points at a key",
+   "title_hi": "Har table apni rows ko naam deti hai; har link kisi key pe point karta hai",
+   "rule_en": "A primary key says what one row is, so a table has exactly one (it may span several columns). A foreign key points at a parent's primary key or UNIQUE column, in a table that already exists, and both ends hold the same type (MySQL/MariaDB: same integer size and signedness). The link is read from the child's side (joins from the parent, a parent's DELETE), so the child column wants an index: MySQL/MariaDB InnoDB make one, PostgreSQL does not. MyISAM tables keep no foreign keys at all.",
+   "rule_hi": "Primary key batati hai ek row kya hai, isliye table mein ek hi hoti hai (kai columns ki bhi ho sakti hai). Foreign key parent ki primary key ya UNIQUE column pe point karti hai, pehle se bani table mein, aur dono sire same type ke hon. Link child ki taraf se padha jaata hai, isliye child column pe index chahiye: InnoDB khud banata hai, PostgreSQL nahi. MyISAM foreign key rakhta hi nahi.",
+   "topics": [
+    "no_primary_key",
+    "two_primary_keys",
+    "fk_order",
+    "fk_target",
+    "fk_type",
+    "fk_no_index",
+    "myisam_fk"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "column_types": {
+   "title_en": "A column's type is a promise about its values",
+   "title_hi": "Column ka type uski values ka vaada hai",
+   "rule_en": "Pick the type by what the value is and what will be done with it. Money is exact: DECIMAL / NUMERIC, never FLOAT / DOUBLE / REAL (binary guesses). Days and moments are DATE / DATETIME / TIMESTAMP, never text (text sorts letter by letter and accepts 30 February). Quantities are numbers; codes made of digits (phone, PIN code, account number) are text (numbers drop the leading 0 and overflow). On MySQL/MariaDB, text needs utf8mb4 (their 'utf8' is the 3-byte utf8mb3), TIMESTAMP only covers 1970-2038, and VARCHARs share a 65,535-byte row. A length is also a check: make it fit real values.",
+   "rule_hi": "Type value ke hisaab se chuno. Paisa exact: DECIMAL / NUMERIC, FLOAT / DOUBLE / REAL kabhi nahi. Din aur samay DATE / DATETIME / TIMESTAMP, text nahi (text akshar se sort hota hai aur 30 February le leta hai). Quantity number; digits wale code (phone, PIN) text (number aage ka 0 hata deta hai). MySQL/MariaDB pe text ke liye utf8mb4, TIMESTAMP sirf 1970-2038, aur VARCHARs ek 65,535-byte row baant-te hain.",
+   "topics": [
+    "money_float",
+    "date_as_text",
+    "number_as_text",
+    "code_as_number",
+    "utf8mb3",
+    "timestamp_range",
+    "over_wide"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-float.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "one_fact_one_place": {
+   "title_en": "One fact in one place",
+   "title_hi": "Ek baat ek hi jagah",
+   "rule_en": "Each fact is stored once, in the table it belongs to (normalization). A list inside one value ('3,7,12'), numbered copies of a column (phone1, phone2) and a parent's details copied next to its id (customer_id with customer_name) all let one fact be written twice and disagree. Lists and repeats become rows of a child or link table; a parent's details are read with a JOIN, unless the copy is a deliberate snapshot.",
+   "rule_hi": "Har baat ek baar, apni table mein (normalization). Ek value mein list ('3,7,12'), numbered columns (phone1, phone2) aur id ke saath parent ki details ki copy, sab ek baat ko do jagah likhte hain jo baad mein alag ho jaati hai. List aur repeat child/link table ki rows bante hain; parent ki details JOIN se padho.",
+   "topics": [
+    "list_in_column",
+    "repeating_group",
+    "parent_copy"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-FK",
    "proven": [
     "mariadb",
     "postgresql"

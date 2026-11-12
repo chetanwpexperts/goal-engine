@@ -45,7 +45,7 @@ EMERGENCY_RE = re.compile(r"(accident ho gaya|heart attack|aag lag gayi|house on
 # "I didn't understand" / "you gave the same answer again": go one simple step at a time.
 CONFUSED_RE = re.compile(r"(samajh nahi|samjh nahi|samaj nahi|samjha nahi|nahi samajh|nahi samjha|samajh mein nahi|"
                          r"didn.?t understand|did not understand|don.?t understand|not clear|confus|"
-                         r"phir se (vahi|wahi)|(vahi|wahi|same) (answer|aansar|jawab|baat)|same thing again|repeat)")
+                         r"phir se (vahi|wahi)|(vahi|wahi|same) (answer|aansar|jawab|baat)|same thing again|\brepeat\b(?!\s+(read|until|loop))(?!able))")
 
 SKIP_RE = re.compile(r"(pata nahi|nahi pata|maloom nahi|don.?t know|dont know|not sure|\bskip\b|aap decide|you decide|"
                      r"kuch bhi|koi bhi|anything|nahi bata sakta)")

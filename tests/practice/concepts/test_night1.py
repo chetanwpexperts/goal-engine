@@ -99,7 +99,7 @@ def test_changes_come_with_a_preview_first():
 
 
 def test_unknown_concepts_are_said_honestly_and_kept_to_learn(client, ml_mode):
-    r = ask(client, "what is a stored procedure in mysql")
+    r = ask(client, "what is a tablespace in postgresql")      # (stored procedures were unknown here until night 5 taught them)
     assert r["relation"] == "concept" and "won't guess" in r["reply"] and not WRONG_PLACES.search(r["reply"])
     feed = client.get("/api/learning/feed").json() if False else None
     from app.db import _SessionLocal
@@ -107,7 +107,7 @@ def test_unknown_concepts_are_said_honestly_and_kept_to_learn(client, ml_mode):
 
     with _SessionLocal() as db:
         rows = db.query(LearnRequest).filter(LearnRequest.brain == "database").all()
-    assert any("stored procedure" in x.text for x in rows), feed
+    assert any("tablespace" in x.text for x in rows), feed
 
 
 @pytest.mark.parametrize("text", [

@@ -38,6 +38,7 @@ SPELLINGS = {
     "bikri": "sales", "sale": "sales", "selling": "sales",
     "paisa": "paise", "paise": "paise", "payment": "payment", "payments": "payment",
     "plz": "please", "pls": "please",
+    "pwd": "password", "passwd": "password", "pswd": "password", "passwrd": "password",   # the usual short forms
     "u": "you", "ur": "your", "r": "are",
     "gaadi": "gadi", "gaddi": "gadi",
     "naukri": "job", "jobs": "job",

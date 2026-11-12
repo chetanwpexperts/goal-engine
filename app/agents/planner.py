@@ -188,4 +188,8 @@ def plan_ai(text: str, router) -> dict | None:
 
 
 def plan(text: str, router=None, use_ai: bool = False) -> dict | None:
+    from app.agents.database import concept_question
+
+    if concept_question(text):
+        return None              # 'har mahine ka total kaise nikale (sql)': a question to answer, not a job to schedule
     return plan_rules(text) or (plan_ai(text, router) if use_ai else None)

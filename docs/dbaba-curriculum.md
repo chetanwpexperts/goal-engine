@@ -61,14 +61,14 @@ feed.
 - [x] **2. Rule A, then joins.** Named / detected / ask, in three languages, including a switch mid-conversation. Then every
   join type, anti-join, self-join, missing or wrong join condition (row explosion), joining on the wrong column, duplicates
   hidden by DISTINCT.
-- [ ] **3. Aggregation.** COUNT(*) vs COUNT(col) vs COUNT(DISTINCT), AVG/SUM with NULLs, SUM(CASE ...), totals at the wrong
+- [x] **3. Aggregation.** COUNT(*) vs COUNT(col) vs COUNT(DISTINCT), AVG/SUM with NULLs, SUM(CASE ...), totals at the wrong
   grain, fan-out through two child tables, percent of total.
-- [ ] **4. Subqueries.** IN vs EXISTS vs JOIN (same rows or not), correlated subqueries in SELECT, latest/first row per
+- [x] **4. Subqueries.** IN vs EXISTS vs JOIN (same rows or not), correlated subqueries in SELECT, latest/first row per
   group, anti-joins with NULLs.
-- [ ] **5. Changing data.** UPDATE/DELETE with JOIN per engine, upsert, INSERT ... SELECT column order, preview before
+- [x] **5. Changing data.** UPDATE/DELETE with JOIN per engine, upsert, INSERT ... SELECT column order, preview before
   change, batching, isolation basics; procedures, functions and triggers (DELIMITER, endless loops, missing handlers,
   trigger recursion).
-- [ ] **6. Schema design.** Reading CREATE TABLE: missing primary key, unindexed foreign key, money as FLOAT, dates or
+- [x] **6. Schema design.** Reading CREATE TABLE: missing primary key, unindexed foreign key, money as FLOAT, dates or
   numbers stored as text, utf8 vs utf8mb4, over-wide types; advising a better structure.
 - [ ] **7. CASE, CTEs, windows.** CASE order and missing ELSE, recursive CTEs that must stop, window frames and ties in
   running totals, LAG/LEAD, NTILE, gaps and islands, versions without window functions.
@@ -121,4 +121,70 @@ statistics. Every night still adds 15+ concepts from its area. A new guide docum
   practice bank, 11 generator families. Lab lessons worth keeping: `JOIN t` with no ON is a cross join on MariaDB but a syntax
   error on PostgreSQL; NATURAL JOIN of two tables with `id` pairs row N with row N; a `-uses` plural is not always `-us`
   (warehouses, not warehous); a backticked name on PostgreSQL is safest bare (unquoted names fold to lower case).
-
+- **Night 3 (11 Nov 2026).** Aggregation in `app/agents/sqlaggs.py` (new fundamental `aggregation`: a total sees only the rows
+  and the non-NULL values that reach it, once per group): COUNT of CASE ... ELSE 0 / IF(c, 1, 0) / a comparison counts every
+  row; a total inside a total (MAX(COUNT(*))); a plain column inside a window of a grouped query; SUM over a LEFT JOIN is NULL,
+  not 0; AVG skips NULLs; SUM(DISTINCT x); an average of averages (rewritten to total / count); a share whose total ignores the
+  outer WHERE; 'how many customers' while the query counts order rows (request words). Per-engine facts in the dialect files'
+  query_rules (`sum_boolean`, `having_alias`, `count_distinct_multi`, `window_over_ungrouped`). 21 concepts, 40-problem practice
+  bank, 12 generator families. The statement generator now really compares a SELECT's rows on MariaDB (pymysql returns a
+  tuple, which was being read as "not a SELECT"). Lab lessons worth keeping: MariaDB runs `SUM(amount) OVER ()` in a grouped
+  query and sums one arbitrary row per group (silently wrong; PostgreSQL 42803); `COUNT(DISTINCT a, b)` skips NULL pairs on
+  MariaDB but `COUNT(DISTINCT (a, b))` counts them on PostgreSQL; a HAVING name that is also a real column means the column on
+  PostgreSQL; MariaDB 10.11 has only `WITH ROLLUP` (no `ROLLUP (...)`, no `GROUPING()`, no `FILTER`).
+- **Night 4 (11 Nov 2026).** Subqueries in `app/agents/sqlsubq.py` (fundamental `subquery_shape` widened: where a subquery stands
+  says how much it may return; new fundamental `correlation`: a subquery reads its own FROM first and is tied to the outer row
+  only through an outer name). Rules: EXISTS (SELECT COUNT(*) ...) is always true; x = x inside a correlated subquery (an alias
+  twice, or the same table name inside and outside); a subquery that returns the outer row's own column; an id compared with
+  another table's id; IN (SELECT MAX(y) ... GROUP BY g) forgetting whose maximum it is (rewritten to `(g, y) IN`); two columns
+  where one is compared; a scalar subquery in SELECT tied on a non-key; a correlated SUM that is NULL for nothing; LIMIT with no
+  ORDER BY in a subquery; > ALL with NULLs or no rows; NOT IN (..., NULL) and IN (..., NULL); NOT IN dropping rows whose own value
+  is NULL; EXISTS with no link to the outer row; a JOIN used only to keep parents that have a child (rewritten to EXISTS).
+  Per-engine facts in the dialect files' query_rules (`limit_in_subquery`, `derived_alias`). The checker no longer crashes on a
+  total inside a scalar subquery in SELECT, `JOIN LATERAL (...) t ON true` is no longer called a join that mentions nothing, and a
+  name inside a WHERE subquery or inside a total in HAVING is no longer taken for a SELECT name. 18 concepts, 41-problem practice
+  bank, 15 generator families. Lab lessons worth keeping: `orders.customer_id` inside a subquery that reads orders again binds to
+  the inner orders on both engines; MariaDB 10.11 refuses LIMIT inside IN (1235), refuses an unnamed FROM subquery with a plain
+  syntax error (1064, MySQL says 1248), has no LATERAL, and reports `id = (SELECT a, b ...)` as 4078 (illegal parameter data
+  types) rather than 1241; PostgreSQL 16 accepts an unnamed FROM subquery.
+- **Night 5 (11 Nov 2026).** Changing data in `app/agents/sqlchange.py` (fundamental `changes_safety` widened: which rows a
+  change touches, how often each changes, what value it gets, which column it fills) and stored routines in
+  `app/agents/sqlroutine.py` (new fundamental `routine_flow`: a routine must end, answer, and not feed itself). The checker now
+  reads INSERT / REPLACE and CREATE PROCEDURE / FUNCTION / TRIGGER (and DO blocks), and every UPDATE / DELETE comes with a
+  read-only preview SELECT of the rows it would change. Rules: each engine's UPDATE / DELETE with a join (rewritten both ways);
+  SET alias.col on PostgreSQL; PostgreSQL's FROM reading the target again or a joined table never tied to the target (every row
+  changes); one target row with several joined rows (changed once: totalled first); SET col = (SELECT ...) with no WHERE (NULL
+  for no match); ON DUPLICATE KEY UPDATE / ON CONFLICT rewritten both ways, a bare column in DO UPDATE, DO UPDATE with no target;
+  INSERT ... SELECT filling by position; too few values; no column list; LIMIT on UPDATE/DELETE on PostgreSQL (ctid); deleting
+  duplicates through a self-join with no rule for which copy stays; DELETE FROM a JOIN b; INSERT IGNORE; REPLACE. Routines:
+  WHILE / REPEAT whose condition the body never changes and LOOP with no way out; a function that can end without RETURN; a
+  cursor with no NOT FOUND handler; DECLARE order; DELIMITER for the mysql client; a trigger that changes its own table; NEW
+  changed in an AFTER trigger; a PostgreSQL trigger function with no RETURN or RETURN NULL; a MySQL trigger body on PostgreSQL;
+  SET NEW.x in plpgsql; no LANGUAGE. 18 concepts, 59-problem practice bank (41 statements, 18 routines), 16 generator
+  families. Also fixed: words after a query that start like SQL ('set the amount to 0 ...') were taken as SQL; a meaning-changing
+  'check' rewrite was mixed into the fix of a definite mistake; 'repeatable read' was read as 'repeat' (confused). Lab lessons
+  worth keeping: an UPDATE changes each row at most once on both engines, so a join to two payments adds one of them;
+  PostgreSQL's `SET NEW.note = 'x'` in plpgsql silently sets a custom setting named new.note (with an expression it is a syntax
+  error); RETURN NULL from a BEFORE row trigger skips the row with no error; MariaDB compares emails case-blind, so a self-join
+  dedupe removes more rows there than on PostgreSQL; MariaDB fires 1442 / 1362 / 1329 / 1337 / 1338 / 1321 exactly as the docs
+  say; DELIMITER is only the mysql client's (the CLI cuts an undelimited CREATE PROCEDURE at the first ';', 1064 near '').
+- **Night 6 (11 Nov 2026).** Table designs in `app/agents/sqlschema.py` (new fundamentals `table_keys`: every table names its rows
+  and every link points at a key of the same type, with an index on the child side; `column_types`: a column's type is a promise
+  about its values; `one_fact_one_place`). The checker and the chat now take CREATE TABLE scripts (with the CREATE INDEX / ALTER
+  TABLE after them), show "How DBaba read this design" (tables, what names a row, each link) and offer a corrected design. Rules:
+  money in FLOAT / DOUBLE / REAL; dates and numbers kept as text; phone / PIN codes kept as numbers; no primary key (PRIMARY KEY on
+  the id that is there, both columns of a link table, or a new id in the engine's own words); two primary keys; a foreign key to
+  a table made later (reordered), to a column that is not a key, or of another type; PostgreSQL's unindexed foreign keys; utf8
+  (utf8mb3) and MyISAM on MySQL/MariaDB; TIMESTAMP for birth dates and expiries (1970-2038); VARCHAR without a length; TEXT as a
+  primary key; the 65,535-byte row; over-wide VARCHAR / CHAR; reserved words as names; lists in a column, numbered columns, a
+  parent's details copied next to its id; and a design written for the other database, rewritten in the named one's words (rule
+  A). Engine facts (marks, reserved words, foreign types and options, limits) in the dialect files' `schema_rules`. 22 concepts,
+  49-problem practice bank, 21 generator families. Question shapes now also cover "what data type for X", "kaunsa data type",
+  "X use kare ya Y" and general yes/no questions ("is mysql case sensitive"; never one about the person's own work). Lab lessons
+  worth keeping: MariaDB 10.11 enforces an inline column REFERENCES (MySQL before 9.0 ignores it, per its docs); MyISAM accepts a
+  FOREIGN KEY with no warning and never checks it; INT -> BIGINT, INT -> INT UNSIGNED and INT -> MariaDB SERIAL foreign keys are
+  errno 150 on MariaDB but INT -> BIGINT is fine on PostgreSQL; MariaDB accepts a foreign key to a non-unique indexed column
+  (PostgreSQL 42830); MariaDB 10.11 TIMESTAMP refused both 1965 and 2040; MariaDB's BOOLEAN stored 5; ADD COLUMN ... NOT NULL
+  with no DEFAULT fills '' on MariaDB and is refused by PostgreSQL; MariaDB accepts TEXT in UNIQUE (hidden hash) but not as a
+  PRIMARY KEY (1170); `key`, `range`, `rows`, `index`, `values` are reserved on MariaDB only, `user`, `end`, `window`, `do` on
+  PostgreSQL only.

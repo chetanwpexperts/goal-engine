@@ -149,11 +149,15 @@ def test_session_cookie_is_safe(client, mail):
     assert client.get("/api/account/me").json()["user"] is None
 
 
-def test_no_daily_cap_in_ml_mode_but_floods_stop(client, ml_mode):
+def test_no_daily_cap_in_ml_mode_but_floods_stop(client, ml_mode, monkeypatch):
     from app import limits
     from tests.test_ml import say
     old = limits.BURST["visitor"]
     limits.BURST["visitor"] = 26                          # (the address and total limits stay high for tests)
+    # the flood counter is per clock minute: hold the clock on one minute, so the 27 messages can't straddle two
+    # minutes (on a slow runner they did, the count started again at 0 and the 27th got through)
+    minute = limits._minute()
+    monkeypatch.setattr(limits, "_minute", lambda offset=0: minute if offset == 0 else "00000000")
     try:
         for _ in range(25):                               # more than the old 25-a-day cap
             say(client, "My Excel total is wrong")

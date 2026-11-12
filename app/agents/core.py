@@ -67,6 +67,9 @@ def _website_summary(result: dict, hi: bool) -> str:
 
 def _sql_summary(result: dict, hi: bool) -> str:
     text = _sql_summary_text(result, hi)
+    if result.get("ok") and result.get("preview"):           # a change: see its rows first (fundamental 'changes_safety')
+        text += ("\n\nChalane se pehle dekh lo kaunsi rows badlengi (ye sirf padhti hai):" if hi else
+                 "\n\nBefore running it, see the rows it will change (this only reads):") + f"\n\n{result['preview']}"
     rec = result.get("engine_rule") or {}
     if rec and result.get("ok"):
         from app.dbknow import engines
@@ -236,7 +239,11 @@ RECIPE_FOR_INTENT = {
 
 INPUT_SLOTS = {"website_check": ("website_url",), "website_watch": ("website_url",)}
 URL_RE = re.compile(r"\b((?:https?://)?(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.(?:com|in|co\.in|net|org|co|io|biz|info|store|shop|online|co\.uk|com\.au|ae|dev|app|site|tech)(?:/[^\s]*)?)", re.I)
-SQL_RE = re.compile(r"\b(select\b[\s\S]+?\bfrom\b|update\s+[`\w.]+\s+set\b|delete\s+from\b)", re.I)
+SQL_RE = re.compile(r"\b(select\b[\s\S]+?\bfrom\b|update\s+[`\w.]+\s+set\b|delete\s+from\b|update\s+[`\w.]+(?:\s+(?:as\s+)?\w+)?\s+"
+                    r"(?:inner\s+|left\s+)?join\b|delete\s+[`\w]+(?:\s*,\s*[`\w]+)*\s+from\b|"
+                    r"(?:insert|replace)\s+(?:ignore\s+)?into\s+[`\"\w.]+[\s\S]*?\b(?:values?|select|set)\b|"
+                    r"create\s+(?:or\s+replace\s+)?(?:definer\s*=\s*\S+\s+)?(?:procedure|function|trigger)\s+[`\"\w.]+|do\s+\$|"
+                    r"create\s+(?:temp(?:orary)?\s+)?table\s+(?:if\s+not\s+exists\s+)?[`\"\w.]+\s*\()", re.I)
 YES_RE = re.compile(r"^\s*(haan|ha|haa|han|yes|yep|ok|okay|theek hai|thik hai|kar do|karo|start|go|chalu karo|shuru karo|please do)\b", re.I)
 
 RUNS_PER_VISITOR_PER_DAY = 30
@@ -259,7 +266,7 @@ def query_in(text: str) -> str | None:
         if len(lead.split()) > 15:
             break
         q = _strip_comments(unwrap(rest)).strip()
-        if re.match(r"^\(?\s*(select|with|update|delete)\b", q, re.I) and SQL_RE.search(q):
+        if re.match(r"^\(?\s*(select|with|update|delete|insert|replace|create|delimiter|do)\b", q, re.I) and SQL_RE.search(q):
             return rest.strip()
     return None
 

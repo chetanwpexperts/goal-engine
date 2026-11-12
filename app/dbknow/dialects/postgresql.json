@@ -509,7 +509,13 @@
   "\\bdistinct\\s+on\\s*\\(",
   "\\bnulls\\s+(first|last)\\b",
   "\\bserial\\b",
-  "\\bstring_agg\\s*\\("
+  "\\bstring_agg\\s*\\(",
+  "\\bon\\s+conflict\\b",
+  "\\blanguage\\s+plpgsql\\b",
+  "\\$\\$",
+  "\\bexecute\\s+(?:function|procedure)\\b",
+  "\\bdelete\\s+from\\s+[\\w\\\".]+(?:\\s+(?:as\\s+)?\\w+)?\\s+using\\b",
+  "\\bupdate\\s+[\\w\\\".]+(?:\\s+(?:as\\s+)?\\w+)?\\s+set\\b[^;(]*\\bfrom\\b"
  ],
  "query_rules": {
   "pipes": "concat",
@@ -521,9 +527,225 @@
   "nvl": false,
   "double_quotes": "identifier",
   "concat_null": "ignored",
-  "like_case": "sensitive"
+  "like_case": "sensitive",
+  "limit_in_subquery": {"behaviour": "works", "says": "PostgreSQL runs LIMIT inside IN (SELECT ...).", "proven": ["postgresql"]},
+  "derived_alias": {"behaviour": "works", "says": "PostgreSQL 16 and later accept a subquery in FROM without a name; 15 and older refuse it (42601, subquery in FROM must have an alias).", "proven": ["postgresql"]},
+  "sum_boolean": {"behaviour": "error", "code": "42883", "says": "PostgreSQL refuses it (42883, function sum(boolean) does not exist): a comparison is a boolean there, not a number.", "proven": ["postgresql"]},
+  "having_alias": {"behaviour": "error", "code": "42703", "says": "PostgreSQL refuses it (42703, column does not exist; or 42803 if the name is also a real column): HAVING is worked out before SELECT names exist.", "proven": ["postgresql"]},
+  "count_distinct_multi": {"behaviour": "error", "code": "42883", "says": "PostgreSQL refuses it (42883, function count(...) does not exist): COUNT takes one argument there.", "proven": ["postgresql"]},
+  "window_over_ungrouped": {"behaviour": "error", "code": "42803", "says": "PostgreSQL refuses it (42803, must appear in the GROUP BY clause or be used in an aggregate function).", "proven": ["postgresql"]},
+  "update_join": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no JOIN directly after UPDATE: 'syntax error at or near JOIN'. It writes UPDATE a SET col = ... FROM b WHERE a.x = b.y.", "proven": ["postgresql"]},
+  "update_from": {"behaviour": "works", "says": "PostgreSQL joins in an UPDATE with UPDATE a SET col = ... FROM b WHERE a.x = b.y.", "proven": ["postgresql"]},
+  "set_qualified": {"behaviour": "error", "code": "42703", "says": "PostgreSQL refuses a table name on the column being set (42703: column \"o\" of relation ... does not exist).", "proven": ["postgresql"]},
+  "delete_join": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no DELETE a FROM a JOIN b ('syntax error'); it writes DELETE FROM a USING b WHERE a.x = b.y.", "proven": ["postgresql"]},
+  "delete_using": {"behaviour": "works", "says": "PostgreSQL deletes through another table with DELETE FROM a USING b WHERE a.x = b.y.", "proven": ["postgresql"]},
+  "on_duplicate_key": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no ON DUPLICATE KEY UPDATE ('syntax error at or near DUPLICATE').", "proven": ["postgresql"]},
+  "on_conflict": {"behaviour": "works", "says": "PostgreSQL upserts with INSERT ... ON CONFLICT (key) DO UPDATE SET col = EXCLUDED.col (9.5+).", "proven": ["postgresql"]},
+  "change_limit": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no LIMIT (or ORDER BY) on UPDATE/DELETE ('syntax error at or near LIMIT').", "proven": ["postgresql"]},
+  "insert_ignore": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no INSERT IGNORE ('syntax error at or near IGNORE'); ON CONFLICT DO NOTHING skips duplicates.", "proven": ["postgresql"]},
+  "replace_into": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no REPLACE INTO ('syntax error at or near REPLACE').", "proven": ["postgresql"]}
  },
  "proven": [
   "postgresql"
- ]
+ ],
+ "schema_rules": {
+  "about": "How PostgreSQL takes a CREATE TABLE (night 6). Lab: PostgreSQL 16.",
+  "marks": [
+   "\\b(?:big|small)?serial\\b",
+   "\\bgenerated\\s+(?:always|by\\s+default)\\s+as\\s+identity\\b",
+   "\\b(timestamptz|jsonb|bytea|citext|cidr)\\b",
+   "\\btimestamp\\s+with(?:out)?\\s+time\\s+zone\\b",
+   "\\w\\s*\\[\\s*\\]",
+   "::\\s*[a-z]\\w*"
+  ],
+  "fk_auto_index": {
+   "behaviour": "none",
+   "says": "PostgreSQL indexes the referenced key (it must be a primary key or UNIQUE) but never the referencing column: joins from the parent and every parent DELETE / key change scan the child without one.",
+   "proven": [
+    "postgresql"
+   ]
+  },
+  "fk_same_type": {
+   "behaviour": "compatible",
+   "says": "INT -> BIGINT is accepted; a number pointing at text is refused (foreign key constraint cannot be implemented).",
+   "proven": [
+    "postgresql"
+   ]
+  },
+  "fk_target": {
+   "behaviour": "error",
+   "code": "42830",
+   "says": "The referenced columns must be a primary key or UNIQUE (42830 there is no unique constraint matching given keys).",
+   "proven": [
+    "postgresql"
+   ]
+  },
+  "varchar_needs_length": {
+   "behaviour": "works",
+   "says": "VARCHAR without a length is accepted (no limit, like TEXT).",
+   "proven": [
+    "postgresql"
+   ]
+  },
+  "timestamp_range": {
+   "value": [
+    "4713 BC",
+    "294276 AD"
+   ],
+   "says": "timestamp holds any date people need (lab: 1965 and 2040 kept).",
+   "proven": [
+    "postgresql"
+   ]
+  },
+  "reserved": [
+   "all",
+   "analyse",
+   "analyze",
+   "any",
+   "array",
+   "asymmetric",
+   "authorization",
+   "binary",
+   "both",
+   "cast",
+   "check",
+   "collation",
+   "column",
+   "concurrently",
+   "constraint",
+   "create",
+   "current_date",
+   "current_user",
+   "default",
+   "desc",
+   "distinct",
+   "do",
+   "else",
+   "end",
+   "except",
+   "false",
+   "fetch",
+   "for",
+   "foreign",
+   "freeze",
+   "from",
+   "grant",
+   "group",
+   "having",
+   "ilike",
+   "in",
+   "intersect",
+   "into",
+   "isnull",
+   "lateral",
+   "leading",
+   "limit",
+   "localtime",
+   "natural",
+   "not",
+   "notnull",
+   "null",
+   "offset",
+   "on",
+   "only",
+   "or",
+   "order",
+   "overlaps",
+   "placing",
+   "primary",
+   "references",
+   "returning",
+   "select",
+   "session_user",
+   "similar",
+   "some",
+   "symmetric",
+   "table",
+   "to",
+   "trailing",
+   "true",
+   "union",
+   "unique",
+   "user",
+   "using",
+   "variadic",
+   "verbose",
+   "when",
+   "where",
+   "window",
+   "with"
+  ],
+  "reserved_note": "Lab-tested on PostgreSQL 16 as bare table and column names.",
+  "foreign_types": {
+   "datetime": "TIMESTAMP",
+   "tinyint": "SMALLINT",
+   "mediumint": "INTEGER",
+   "double": "DOUBLE PRECISION",
+   "longtext": "TEXT",
+   "mediumtext": "TEXT",
+   "tinytext": "TEXT",
+   "blob": "BYTEA",
+   "longblob": "BYTEA",
+   "mediumblob": "BYTEA",
+   "tinyblob": "BYTEA",
+   "year": "SMALLINT",
+   "enum": "VARCHAR"
+  },
+  "foreign_attrs": [
+   [
+    "\\bauto_increment\\b",
+    "GENERATED BY DEFAULT AS IDENTITY",
+    "AUTO_INCREMENT"
+   ],
+   [
+    "\\s*\\bon\\s+update\\s+current_timestamp(?:\\s*\\(\\s*\\d*\\s*\\))?",
+    "",
+    "ON UPDATE CURRENT_TIMESTAMP"
+   ],
+   [
+    "\\s*\\b(?:character\\s+set|charset)\\s*=?\\s*\\w+",
+    "",
+    "CHARACTER SET"
+   ],
+   [
+    "\\s*\\bcollate\\s*=?\\s*\\w+",
+    "",
+    "COLLATE"
+   ],
+   [
+    "\\s*\\bcomment\\s+'x*'",
+    "",
+    "COMMENT"
+   ]
+  ],
+  "foreign_options": [
+   [
+    "\\bengine\\s*=?\\s*\\w+",
+    "ENGINE="
+   ],
+   [
+    "\\b(?:default\\s+)?(?:character\\s+set|charset)\\s*=?\\s*\\w+",
+    "CHARSET="
+   ],
+   [
+    "\\b(?:default\\s+)?collate\\s*=?\\s*\\w+",
+    "COLLATE="
+   ],
+   [
+    "\\bauto_increment\\s*=?\\s*\\d+",
+    "AUTO_INCREMENT=n"
+   ],
+   [
+    "\\brow_format\\s*=?\\s*\\w+",
+    "ROW_FORMAT="
+   ],
+   [
+    "\\bcomment\\s*=?\\s*'x*'",
+    "COMMENT="
+   ]
+  ],
+  "proven": [
+   "postgresql"
+  ]
+ }
 }

@@ -34,7 +34,12 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         # night 6: table design (keys, types, one fact in one place) and each engine's own CREATE TABLE words and limits
         "sd_money_float", "sd_date_text", "sd_number_text", "sd_code_number", "sd_no_pk", "sd_fk_index_pg", "sd_utf8", "sd_myisam_fk",
         "sd_dialect_pg", "sd_dialect_my", "sd_two_pk", "sd_fk_type", "sd_varchar_len", "sd_reserved", "sd_row_big", "sd_fk_order",
-        "sd_over_wide", "sd_list_col", "sd_repeat", "sd_parent_copy", "sd_timestamp"]
+        "sd_over_wide", "sd_list_col", "sd_repeat", "sd_parent_copy", "sd_timestamp",
+        # night 7: CASE (first true WHEN wins, = NULL), WITH RECURSIVE (the keyword, something that ends it), windows (where they
+        # stand, frames, ties, PARTITION BY said in words, ORDER BY they need, nesting)
+        "wf_case_order", "wf_case_and", "wf_case_null", "wf_case_else_sort", "wf_rec_keyword", "wf_rec_no_stop", "wf_win_where",
+        "wf_win_alias", "wf_last_value", "wf_running_ties", "wf_partition_said", "wf_nth_rank", "wf_ties_rank", "wf_no_order",
+        "wf_nested", "wf_cte_cols"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
@@ -60,16 +65,21 @@ TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": 
          "sd_myisam_fk": "myisam_fk", "sd_dialect_pg": "ddl_dialect", "sd_dialect_my": "ddl_dialect", "sd_two_pk": "two_primary_keys",
          "sd_fk_type": "fk_type", "sd_varchar_len": "varchar_length", "sd_reserved": "reserved_name", "sd_row_big": "row_too_big",
          "sd_fk_order": "fk_order", "sd_over_wide": "over_wide", "sd_list_col": "list_in_column", "sd_repeat": "repeating_group",
-         "sd_parent_copy": "parent_copy", "sd_timestamp": "timestamp_range"}
+         "sd_parent_copy": "parent_copy", "sd_timestamp": "timestamp_range",
+         "wf_case_order": "case_unreachable", "wf_case_and": "case_unreachable", "wf_case_null": "case_null",
+         "wf_case_else_sort": "case_no_else", "wf_rec_keyword": "cte_recursive_kw", "wf_rec_no_stop": "cte_no_stop",
+         "wf_win_where": "win_where", "wf_win_alias": "win_alias_where", "wf_last_value": "win_last_value",
+         "wf_running_ties": "win_running_ties", "wf_partition_said": "win_partition_said", "wf_nth_rank": "win_rank_ties",
+         "wf_ties_rank": "ties", "wf_no_order": "win_no_order", "wf_nested": "win_nested", "wf_cte_cols": "cte_columns"}
 NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join", "sum_distinct",
           "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order", "ch_insert_count",
-          "sd_two_pk", "sd_list_col", "sd_repeat", "sd_parent_copy"}   # found is enough
+          "sd_two_pk", "sd_list_col", "sd_repeat", "sd_parent_copy", "wf_no_order", "wf_nested", "wf_cte_cols"}   # found is enough
 # a 'check' (depends on engine, data or intent) whose suggested rewrite must do exactly what the person meant
 FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes", "pk_pk", "anti_nullable", "self_pairs",
                  "distinct_join", "sum_null", "avg_avg", "pct_total", "sub_sum_null", "all_null", "in_list_null", "not_in_outer",
                  "semi_join", "ch_set_sub_null",
                  "sd_date_text", "sd_number_text", "sd_code_number", "sd_no_pk", "sd_fk_index_pg", "sd_over_wide", "sd_timestamp",
-                 "sd_reserved"}
+                 "sd_reserved", "wf_case_else_sort", "wf_running_ties"}
 
 
 def _cols(t, *kinds):
@@ -373,6 +383,8 @@ def make(seed: int):
         return _change_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("sd_"):
         return _schema_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("wf_"):
+        return _win_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -1092,6 +1104,113 @@ def _check_ddl(item, engines, res, tag) -> list[str]:
         elif got != exp:
             bad.append(f"{tag}: on {name} the corrected design makes something else\n{fixed}\n--- got {str(got)[:300]}\n--- want {str(exp)[:300]}")
     return bad
+
+
+def _win_bug(seed, bug, rnd, schema, tables, t):
+    """Night 7: CASE, WITH RECURSIVE and window mistakes on a random real table. truth = the statement the person meant."""
+    pk, name = t["pk"], t["name"]
+    nums = [c["name"] for c in t["cols"] if c["kind"] in ("int", "money")]
+    groups = [c for c in t["cols"] if c["kind"] in ("fk", "cat")]
+    cats = [c for c in t["cols"] if c["kind"] == "cat" and c["params"] and all(isinstance(v, str) for v in c["params"])]
+    words, engine = "", None
+    if bug in ("wf_case_order", "wf_case_and", "wf_case_null", "wf_win_where", "wf_win_alias", "wf_last_value", "wf_running_ties",
+               "wf_partition_said", "wf_nth_rank", "wf_ties_rank", "wf_no_order", "wf_nested") and not nums:
+        return None
+    if bug in ("wf_last_value", "wf_running_ties", "wf_partition_said", "wf_ties_rank") and not groups:
+        return None
+    if bug in ("wf_case_and", "wf_case_else_sort") and not cats:
+        return None
+    m = rnd.choice(nums) if nums else None
+    g = rnd.choice(groups)["name"] if groups else None
+    if bug == "wf_case_order":
+        vals = sorted(r[t["cols"].index(next(c for c in t["cols"] if c["name"] == m))] for r in t["rows"]
+                      if r[t["cols"].index(next(c for c in t["cols"] if c["name"] == m))] is not None)
+        if len(vals) < 4:
+            return None
+        lo, hi = int(vals[len(vals) // 4]), int(vals[3 * len(vals) // 4])
+        if lo >= hi:
+            return None
+        op = rnd.choice([">", ">="])
+        truth = (f"SELECT {pk}, CASE WHEN {m} {op} {hi} THEN 'high' WHEN {m} {op} {lo} THEN 'mid' ELSE 'low' END AS band\n"
+                 f"FROM {name}\nORDER BY {pk}")
+        broken = (f"SELECT {pk}, CASE WHEN {m} {op} {lo} THEN 'mid' WHEN {m} {op} {hi} THEN 'high' ELSE 'low' END AS band\n"
+                  f"FROM {name}\nORDER BY {pk}")
+    elif bug == "wf_case_and":
+        c = rnd.choice(cats)
+        v = rnd.choice(c["params"])
+        lim = rnd.randint(1, 50)
+        cond = f"{m} > {lim}" if nums and rnd.random() < 0.5 else f"{pk} > {lim}"
+        truth = (f"SELECT {pk}, CASE WHEN {cond} AND {c['name']} = '{v}' THEN 'both' WHEN {cond} THEN 'one' ELSE 'none' END AS tag\n"
+                 f"FROM {name}")
+        broken = (f"SELECT {pk}, CASE WHEN {cond} THEN 'one' WHEN {cond} AND {c['name']} = '{v}' THEN 'both' ELSE 'none' END AS tag\n"
+                  f"FROM {name}")
+    elif bug == "wf_case_null":
+        truth = f"SELECT {pk}, CASE WHEN {m} IS NULL THEN 'missing' ELSE 'given' END AS state\nFROM {name}"
+        broken = f"SELECT {pk}, CASE {m} WHEN NULL THEN 'missing' ELSE 'given' END AS state\nFROM {name}"
+    elif bug == "wf_case_else_sort":
+        c = rnd.choice(cats)
+        if len(c["params"]) < 3:
+            return None
+        a, b = rnd.sample(c["params"], 2)
+        truth = f"SELECT {pk}\nFROM {name}\nORDER BY CASE {c['name']} WHEN '{a}' THEN 1 WHEN '{b}' THEN 2 ELSE 3 END, {pk}"
+        broken = f"SELECT {pk}\nFROM {name}\nORDER BY CASE {c['name']} WHEN '{a}' THEN 1 WHEN '{b}' THEN 2 END, {pk}"
+    elif bug == "wf_rec_keyword":
+        k = rnd.randint(3, 12)
+        body = f"n AS (SELECT 1 AS x UNION ALL SELECT x + 1 FROM n WHERE x < {k})\nSELECT t.{pk}\nFROM {name} t JOIN n ON n.x = t.{pk}"
+        truth, broken = f"WITH RECURSIVE {body}", f"WITH {body}"
+    elif bug == "wf_rec_no_stop":
+        k = rnd.randint(3, 12)
+        words = rnd.choice([f"the rows with ids 1 to {k}", f"numbers 1 to {k}", f"1 se {k} tak wale ids"])
+        head = "n AS (SELECT 1 AS x UNION ALL SELECT x + 1 FROM n{})\nSELECT t.{} FROM {} t JOIN n ON n.x = t.{}"
+        truth = "WITH RECURSIVE " + head.format(f" WHERE x < {k}", pk, name, pk)
+        broken = "WITH RECURSIVE " + head.format("", pk, name, pk)
+    elif bug == "wf_win_where":
+        truth = f"SELECT {pk}\nFROM (SELECT {pk}, ROW_NUMBER() OVER (ORDER BY {m} DESC, {pk}) AS w FROM {name}) AS x\nWHERE w <= 3"
+        broken = f"SELECT {pk}\nFROM {name}\nWHERE ROW_NUMBER() OVER (ORDER BY {m} DESC, {pk}) <= 3"
+    elif bug == "wf_win_alias":
+        fn = rnd.choice(["RANK", "DENSE_RANK"])
+        truth = f"SELECT {pk}, r\nFROM (SELECT {pk}, {fn}() OVER (ORDER BY {m} DESC) AS r FROM {name}) AS x\nWHERE r <= 2"
+        broken = f"SELECT {pk}, {fn}() OVER (ORDER BY {m} DESC) AS r\nFROM {name}\nWHERE r <= 2"
+    elif bug == "wf_last_value":
+        truth = (f"SELECT {pk}, LAST_VALUE({m}) OVER (PARTITION BY {g} ORDER BY {m} ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED "
+                 f"FOLLOWING) AS v\nFROM {name}")
+        broken = f"SELECT {pk}, LAST_VALUE({m}) OVER (PARTITION BY {g} ORDER BY {m}) AS v\nFROM {name}"
+    elif bug == "wf_running_ties":
+        truth = f"SELECT {pk}, SUM({m}) OVER (ORDER BY {g}, {pk} ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS run\nFROM {name}"
+        broken = f"SELECT {pk}, SUM({m}) OVER (ORDER BY {g}) AS run\nFROM {name}"
+    elif bug == "wf_partition_said":
+        noun = g[:-3] if g.endswith("_id") else g
+        words = rnd.choice([f"running total of {m} per {noun}", f"har {noun} ka running total", f"a running {m} total for each {noun}"])
+        truth = f"SELECT {pk}, {g}, SUM({m}) OVER (PARTITION BY {g} ORDER BY {pk}) AS run\nFROM {name}"
+        broken = f"SELECT {pk}, {g}, SUM({m}) OVER (ORDER BY {pk}) AS run\nFROM {name}"
+    elif bug == "wf_nth_rank":
+        k = rnd.choice(["second", "2nd", "third", "3rd"])
+        n = 2 if k in ("second", "2nd") else 3
+        words = f"the rows with the {k} highest {m}"
+        truth = f"SELECT {pk}\nFROM (SELECT {pk}, DENSE_RANK() OVER (ORDER BY {m} DESC) AS rn FROM {name} WHERE {m} IS NOT NULL) AS x\nWHERE rn = {n}"
+        broken = f"SELECT {pk}\nFROM (SELECT {pk}, ROW_NUMBER() OVER (ORDER BY {m} DESC) AS rn FROM {name} WHERE {m} IS NOT NULL) AS x\nWHERE rn = {n}"
+    elif bug == "wf_ties_rank":
+        words = rnd.choice([f"the top {m} in each group, all of them if tied", f"highest {m} rows, keep ties"])
+        truth = f"SELECT {pk}\nFROM (SELECT {pk}, RANK() OVER (PARTITION BY {g} ORDER BY {m} DESC) AS rn FROM {name} WHERE {m} IS NOT NULL) AS x\nWHERE rn = 1"
+        broken = f"SELECT {pk}\nFROM (SELECT {pk}, ROW_NUMBER() OVER (PARTITION BY {g} ORDER BY {m} DESC) AS rn FROM {name} WHERE {m} IS NOT NULL) AS x\nWHERE rn = 1"
+    elif bug == "wf_no_order":
+        fn = rnd.choice(["LAG", "LEAD", "RANK", "DENSE_RANK", "FIRST_VALUE", "NTILE"])
+        arg = {"RANK": "", "DENSE_RANK": "", "NTILE": "4"}.get(fn, m)
+        truth = f"SELECT {pk}, {fn}({arg}) OVER (ORDER BY {pk}) AS v\nFROM {name}"
+        broken = f"SELECT {pk}, {fn}({arg}) OVER () AS v\nFROM {name}"
+        engine = rnd.choice([None, "mariadb", "postgresql"])
+    elif bug == "wf_nested":
+        truth = f"SELECT {pk}, SUM(r) OVER () AS v\nFROM (SELECT {pk}, ROW_NUMBER() OVER (ORDER BY {pk}) AS r FROM {name}) AS x"
+        broken = f"SELECT {pk}, SUM(ROW_NUMBER() OVER (ORDER BY {pk})) OVER () AS v\nFROM {name}"
+    else:                                                 # wf_cte_cols
+        truth = f"WITH c ({pk}) AS (SELECT {pk} FROM {name})\nSELECT {pk} FROM c"
+        broken = f"WITH c ({pk}, extra) AS (SELECT {pk} FROM {name})\nSELECT {pk} FROM c"
+    if words:
+        broken += ";\n\n" + words
+    item = {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": name, "broken": broken, "truth": truth}
+    if engine:
+        item["engine"] = engine
+    return item
 
 
 def _effect(eng, sql, table, pk):

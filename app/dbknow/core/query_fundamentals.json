@@ -404,6 +404,66 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  "case_logic": {
+   "title_en": "CASE takes the first WHEN that is true, and gives one type",
+   "title_hi": "CASE pehla true WHEN leta hai, aur ek hi type deta hai",
+   "rule_en": "CASE is read from the top and stops at the first WHEN whose condition is true; the WHENs after it are never looked at for that row. So the narrow conditions must come before the wide ones (> 10000 before > 100), a WHEN that an earlier one already covers can never run, and CASE x WHEN NULL never matches because it means x = NULL. A row that matches no WHEN gets the ELSE, and with no ELSE it gets NULL (an empty label, or a NULL that sorts first on MySQL/MariaDB and last on PostgreSQL). All THEN and ELSE results make one column, so they must be one type: text mixed with numbers is refused by PostgreSQL and turns the column into text on MySQL/MariaDB.",
+   "rule_hi": "CASE upar se padha jaata hai aur pehle true WHEN par ruk jaata hai; us row ke liye baad ke WHEN dekhe hi nahi jaate. Isliye chhoti (narrow) conditions pehle (> 10000, > 100 se pehle); jis WHEN ko pehle wala WHEN dhak leta hai wo kabhi nahi chalta, aur CASE x WHEN NULL kabhi match nahi hota kyunki uska matlab x = NULL hai. Kisi WHEN se match na hone wali row ko ELSE milta hai, ELSE na ho to NULL. Saare THEN/ELSE ek column banate hain, isliye ek hi type ke hone chahiye.",
+   "topics": [
+    "case_unreachable",
+    "case_null",
+    "case_no_else",
+    "case_types"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-conditional.html#FUNCTIONS-CASE",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "recursion": {
+   "title_en": "A recursive query runs round after round until a round makes no rows",
+   "title_hi": "Recursive query round par round chalti hai jab tak kisi round mein koi row na bane",
+   "rule_en": "WITH names a query; only WITH RECURSIVE lets a query read its own name. A recursive query is an anchor, run once, UNION [ALL] a recursive part that is run again on the rows the last round made; it ends only when a round makes no new rows. So the recursive part needs something that runs out (a WHERE bound, or a join that finds no more children), a walk through data that can loop needs a depth limit or a visited-path check, and the recursive part can't total, group, sort or LIMIT the whole result. The anchor fixes each column's type and size, so text that grows must start wide enough. Databases guard runaway recursion differently: MariaDB silently stops after 1000 rounds, MySQL 8 errors after 1000, PostgreSQL has no limit.",
+   "rule_hi": "WITH ek query ko naam deta hai; sirf WITH RECURSIVE query ko apna naam padhne deta hai. Recursive query ek anchor (ek baar) aur ek recursive hissa hai jo pichle round ki rows par dobara chalta hai; wo tabhi rukti hai jab kisi round mein nayi row na bane. Isliye recursive hisse ko rukne ki shart chahiye (WHERE ya join jo khatam ho), loop wale data mein depth limit, aur anchor itna chauda ho ki badhta text fit ho. MariaDB 1000 round par chupchaap rukta hai, MySQL 8 error deta hai, PostgreSQL ki koi limit nahi.",
+   "topics": [
+    "cte_recursive_kw",
+    "cte_no_stop",
+    "cte_cycle",
+    "cte_width",
+    "cte_depth",
+    "cte_recursive_term",
+    "cte_columns",
+    "cte_dup_name"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-with.html#QUERIES-WITH-RECURSIVE",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "window_frames": {
+   "title_en": "A window function runs last, over a partition, an order and a frame",
+   "title_hi": "Window function sabse aakhir mein, partition, order aur frame par chalta hai",
+   "rule_en": "A window function adds a value to each row without merging rows, and it is worked out after WHERE, GROUP BY and HAVING, on the rows left; so it can't be used in WHERE, HAVING or GROUP BY (number in a subquery, filter outside). PARTITION BY says which rows belong together (none = the whole result), ORDER BY says their order (none = any order, so LAG, LEAD, RANK and FIRST_VALUE mean nothing), and the frame says which of them the function sees. With ORDER BY and no frame, the frame is RANGE from the start to the current row and its ties: a running total gives tied rows the same value and LAST_VALUE returns the current row. ROW_NUMBER numbers tied rows in any order; RANK and DENSE_RANK give ties one number.",
+   "rule_hi": "Window function rows ko milaye bina har row ko ek value deta hai, aur WHERE, GROUP BY, HAVING ke baad bachi rows par banta hai; isliye WHERE/HAVING/GROUP BY mein nahi chalta (subquery mein number karo, bahar filter). PARTITION BY batata hai kaunsi rows saath hain, ORDER BY unka kram (na ho to koi bhi kram), aur frame kaunsi rows dikhti hain. ORDER BY ho aur frame na ho to frame shuru se current row aur uske barabar wali rows tak: running total barabar rows ko ek hi value deta hai aur LAST_VALUE current row deta hai. ROW_NUMBER barabar rows ko kisi bhi kram mein number deta hai; RANK aur DENSE_RANK unhe ek number dete hain.",
+   "topics": [
+    "win_where",
+    "win_alias_where",
+    "win_nested",
+    "win_no_order",
+    "win_last_value",
+    "win_running_ties",
+    "win_rank_ties",
+    "win_partition_said",
+    "win_version"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-expressions.html#SYNTAX-WINDOW-FUNCTIONS",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  }
 }

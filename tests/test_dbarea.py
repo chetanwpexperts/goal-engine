@@ -41,7 +41,7 @@ def _open(client, mail, n):
 
 def test_guests_get_404_everywhere(client, locked):
     for method, path in [("post", "/api/connectors/direct"), ("get", "/api/connectors"), ("post", "/api/connectors"),
-                         ("get", "/api/connector-jobs/1"), ("post", "/api/agents/1/php-connector"),
+                         ("get", "/api/connector-jobs/1"), ("post", "/api/console/connect"), ("post", "/api/console/run"),
                          ("post", "/api/agents/1/connect/1"), ("get", "/api/db-area"), ("post", "/api/db-area/code")]:
         r = getattr(client, method)(path, **({"json": {}} if method == "post" else {}))
         assert r.status_code == 404, (path, r.status_code)

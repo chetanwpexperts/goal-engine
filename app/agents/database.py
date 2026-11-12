@@ -104,12 +104,12 @@ def authenticate(db: Session, token: str) -> Connector | None:
         return None
     connector = db.scalar(select(Connector).where(Connector.token_hash == _hash(token)))
     if connector is None or connector.status == "disconnected" or connector.kind in ("direct", "php"):
-        return None
+        return None                       # (php: the retired website-file connector; its rows never authenticate)
     return connector
 
 
 def is_online(connector: Connector) -> bool:
-    if connector.kind in ("direct", "php"):
+    if connector.kind == "direct":
         return connector.status == "online"
     return bool(connector.last_seen_at and utcnow() - connector.last_seen_at < ONLINE_WINDOW
                 and connector.status != "disconnected")
@@ -128,20 +128,7 @@ def connector_dict(connector: Connector, db: Session | None = None) -> dict:
         "allow_changes": bool(connector.allow_changes),
         "last_seen_at": connector.last_seen_at.isoformat() if connector.last_seen_at else None,
         "tables": (schema or {}).get("tables", []),
-        **({"file_url": _php_url(connector), "file_name": _php_name(connector)} if connector.kind == "php" else {}),
     }
-
-
-def _php_url(connector: Connector) -> str:
-    from app.agents import phpconn
-
-    return phpconn.file_url(connector)
-
-
-def _php_name(connector: Connector) -> str:
-    from app.agents import phpconn
-
-    return phpconn.file_name(connector)
 
 
 def hello(db: Session, connector: Connector, info: dict) -> None:
@@ -175,7 +162,7 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
         raise DatabaseError("This connector is disconnected")
     if kind not in JOB_KINDS:
         raise DatabaseError("Unknown job")
-    if connector.kind in ("direct", "php"):
+    if connector.kind == "direct":
         from app import dbarea
 
         if dbarea.enabled():
@@ -215,7 +202,7 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
                        summary=(summary or default_summary(kind, payload))[:300])
     db.add(job)
     db.commit()
-    if connector.kind in ("direct", "php"):
+    if connector.kind == "direct":
         from app.agents import direct
 
         direct.start(job.id)
@@ -365,7 +352,8 @@ def own_connector(db: Session, connector_id: int, visitor_id: str) -> Connector:
 
 
 def visitor_connectors(db: Session, visitor_id: str) -> list[Connector]:
-    return list(db.scalars(select(Connector).where(Connector.visitor_id == visitor_id, Connector.status != "disconnected")
+    return list(db.scalars(select(Connector).where(Connector.visitor_id == visitor_id, Connector.status != "disconnected",
+                                                   Connector.token_hint != "console")      # the SQL console's own (app/console.py)
                            .order_by(Connector.id.desc())))
 
 

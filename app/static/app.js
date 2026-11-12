@@ -642,69 +642,6 @@
   }
 
   // ---- the three ways in, chosen by one question
-  function phpPanel(a, hi, c) {
-    const box = el("div", "slot inner");
-    const step = (n, text) => { const p = el("p", "step"); p.append(el("b", null, `${n}`), el("span", null, text)); return p; };
-    const dl = el("button", "btn solid", T(hi, "File download karo", "Download the file")); dl.type = "button";
-    const allowRow = el("label", "check");
-    const allow = el("input"); allow.type = "checkbox";
-    allowRow.append(allow, el("span", null, T(hi, "Approved changes bhi allow karo (har change pehle preview, Undo ke saath). Band rakhna sabse safe hai.",
-                                                  "Also allow approved changes (each previewed first, with Undo). Leaving this off is safest.")));
-    const url = el("input"); url.type = "url"; url.placeholder = "https://aapki-site.com/goal-connector-….php";
-    const check = el("button", "btn go", T(hi, "Jodo", "Connect")); check.type = "submit";
-    const err = el("p", "note err"); err.hidden = true;
-    const form = el("form", "row"); form.append(url, check);
-    if (c && c.file_url) url.value = c.file_url;
-    if (c && c.status === "missing") {
-      const warn = el("div", "missing");
-      warn.append(
-        el("b", null, T(hi, "File nahi mil rahi", "The file isn't answering")),
-        el("p", null, T(hi, "Aksar hosting ka security scanner (Imunify360, Wordfence, Sucuri) nayi PHP files hata deta hai, ya firewall rok deta hai. Aapka data safe hai.",
-                            "Hosting security scanners (Imunify360, Wordfence, Sucuri) often remove new PHP files, or a firewall blocks them. Your data is safe.")),
-        el("p", null, T(hi, `Theek karne ke liye: 1) Neeche se file dobara download karke upload karo. 2) Scanner mein "${c.file_name}" ko allow / ignore list mein daalo. 3) Jodo dabao.`,
-                            `To fix: 1) Download the file again below and upload it. 2) Add "${c.file_name}" to the scanner's allow / ignore list. 3) Tap Connect.`)));
-      box.append(warn);
-    }
-    box.append(
-      step(1, T(hi, "Ye file download karo (har database ke liye alag, isme ek secret key hai):", "Download this file (one per database; it has its own secret key):")),
-      dl, allowRow,
-      step(2, T(hi, "Hosting ke File Manager mein website ke main folder mein upload karo, jahan wp-config.php ya .env hai.",
-                    "Upload it with your hosting's File Manager into the website's main folder, where wp-config.php or .env is.")),
-      step(3, T(hi, "Upload ki hui file ka link yahan paste karo:", "Paste the link of the uploaded file here:")),
-      form, err,
-      el("p", "fine", T(hi, "Password aapki hosting pe hi rehta hai. File sirf Goal Engine ki signed requests maanti hai aur kuch badal nahi sakti. Disconnect karne ke liye file delete kar do.",
-                            "Your password stays on your hosting. The file only accepts signed requests from Goal Engine and can't change anything. Delete the file to disconnect.")));
-    let cid = c ? c.id : null;
-    dl.addEventListener("click", async () => {
-      dl.disabled = true;
-      try {
-        if (!cid) {
-          const data = await api(`/api/agents/${a.id}/php-connector`, { method: "POST" });
-          cid = (data.agents.find((x) => x.id === a.id) || {}).connector.id;
-        }
-        window.location.href = `/api/connectors/${cid}/php-file?changes=${allow.checked ? 1 : 0}`;
-        dl.textContent = T(hi, "Download ho gaya. Dobara?", "Downloaded. Again?");
-        url.focus();
-      } catch (ex) { addMachine(ex.message, [], true); }
-      dl.disabled = false;
-    });
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      if (!cid) { err.textContent = T(hi, "Pehle file download karo (step 1).", "Download the file first (step 1)."); err.hidden = false; return; }
-      check.disabled = true; check.textContent = T(hi, "Check kar raha hoon…", "Checking…"); err.hidden = true;
-      try {
-        await api(`/api/connectors/${cid}/php-link`, { method: "POST", body: JSON.stringify({ url: url.value }) });
-        addMachine(T(hi, "Website ka database jud gaya. Tables padh raha hoon.", "Your website's database is connected. Reading the tables."),
-                   [T(hi, "Signed, read-only connection", "Signed, read-only connection")]);
-        await refreshGoal();
-      } catch (ex) {
-        err.textContent = ex.message; err.hidden = false;
-        check.disabled = false; check.textContent = T(hi, "Jodo", "Connect");
-      }
-    });
-    return box;
-  }
-
   function formPanel(a, hi, onUseCommand, opts = {}) {
     const form = el("form", "dbform inner");
     const field = (label, input) => { const l = el("label", "f"); l.append(el("span", null, label), input); return l; };
@@ -739,10 +676,7 @@
     const go = el("button", "btn solid", T(hi, "Jodo", "Connect")); go.type = "submit";
     const err = el("p", "note err"); err.hidden = true;
     const ga = el("div", "acts flat"); ga.append(go);
-    const other = el("button", "btn ghost", T(hi, "Doosra tareeka: website pe ek file upload karo", "Another way: upload a file to the website")); other.type = "button";
-    other.hidden = true;
-    if (opts.other) other.addEventListener("click", opts.other);
-    form.append(ipHint, ga, err, other);
+    form.append(ipHint, ga, err);
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (opts.hosting && /^(localhost|127\.0\.0\.1|::1)$/i.test(host.value.trim())) {
@@ -763,7 +697,6 @@
         err.textContent = ex.message; err.hidden = false;
         go.disabled = false; go.textContent = T(hi, "Jodo", "Connect");
         if (ex.data && ex.data.use_command && onUseCommand) onUseCommand();
-        if (opts.other) other.hidden = false;        // the hosting won't let us in from outside: offer the other way, never a dead end
       }
     });
     return form;
@@ -830,6 +763,9 @@
     const lockNow = el("button", "linkish inline", T(hi, "Abhi lock karo", "Lock now")); lockNow.type = "button";
     lockNow.addEventListener("click", async () => { await api("/api/db-area/lock", { method: "POST" }); dbGate(a, hi, box); });
     lockRow.append(lockNow);
+    const consoleLink = el("a", "linkish inline", T(hi, " · SQL console kholo ↗", " · Open the SQL console ↗"));
+    consoleLink.href = "/console"; consoleLink.target = "_blank"; consoleLink.rel = "noopener";
+    lockRow.append(consoleLink);
     box.prepend(lockRow);
   }
 
@@ -878,7 +814,7 @@
     const pick = (key) => {
       for (const b of choices.children) b.setAttribute("aria-pressed", String(b.dataset.key === key));
       panel.replaceChildren();
-      if (key === "hosting") panel.append(formPanel(a, hi, null, { hosting: true, other: () => panel.replaceChildren(phpPanel(a, hi, null)) }));
+      if (key === "hosting") panel.append(formPanel(a, hi, null, { hosting: true }));
       else if (key === "cloud") panel.append(formPanel(a, hi, () => pick("vps")));
       else if (key === "vps") panel.append(vpsPanel(a, hi));
       else panel.append(el("p", "fine", T(hi, "Windows connector ban raha hai. Agar aapki website kisi hosting pe hai to \"Website hosting\" chuno, wo abhi kaam karega.",
@@ -1210,28 +1146,12 @@
     const box = el("details", "db-sql changes");
     box.append(el("summary", null, T(hi, "Data badlo (pehle preview, phir Apply, Undo hamesha)", "Change data (preview first, then Apply, always undoable)")));
     if (!c.allow_changes) {
-      const how = c.kind === "php"
-        ? T(hi, "Is website file mein changes band hain. Changes wali file download karke purani file ki jagah upload karo, phir \"Dobara check karo\" dabao.",
-                "Changes are off in this website file. Download the file with changes on, upload it over the old one, then tap \"Check again\".")
-        : c.kind === "direct"
-          ? T(hi, "Changes band hain. Disconnect karke dobara jodo aur \"Approved changes allow karo\" tick karo (login ko data badalne ka haq chahiye).",
-              "Changes are off. Disconnect and connect again with \"Allow approved changes\" ticked (the login must be able to change data).")
-          : T(hi, "Changes band hain. Server pe connector ka setup dobara chalao aur \"Allow approved changes\" pe y dabao.",
-              "Changes are off. Run the connector setup again on your server and answer y to \"Allow approved changes\".");
+      const how = c.kind === "direct"
+        ? T(hi, "Changes band hain. Disconnect karke dobara jodo aur \"Approved changes allow karo\" tick karo (login ko data badalne ka haq chahiye).",
+            "Changes are off. Disconnect and connect again with \"Allow approved changes\" ticked (the login must be able to change data).")
+        : T(hi, "Changes band hain. Server pe connector ka setup dobara chalao aur \"Allow approved changes\" pe y dabao.",
+            "Changes are off. Run the connector setup again on your server and answer y to \"Allow approved changes\".");
       box.append(el("p", "fine", how));
-      if (c.kind === "php") {
-        const row = el("div", "acts flat");
-        const dl = el("button", "btn", T(hi, "Changes wali file download karo", "Download the file with changes on")); dl.type = "button";
-        dl.addEventListener("click", () => { window.location.href = `/api/connectors/${c.id}/php-file?changes=1`; });
-        const again = el("button", "btn solid", T(hi, "Dobara check karo", "Check again")); again.type = "button";
-        again.addEventListener("click", async () => {
-          again.disabled = true;
-          try { await api(`/api/connectors/${c.id}/php-link`, { method: "POST", body: JSON.stringify({ url: c.file_url }) }); await refreshGoal(); }
-          catch (ex) { addMachine(ex.message, [], true); again.disabled = false; }
-        });
-        row.append(dl, again);
-        box.append(row);
-      }
       return box;
     }
     const ta = el("textarea"); ta.placeholder = "UPDATE orders SET status = 'paid' WHERE id = 42";
@@ -1745,7 +1665,6 @@
     if (!a.available) card.append(el("p", "note", T(hi, "Ye level abhi ban raha hai. Tab tak data dekh, export aur report kar sakte ho.",
                                                       "This level is being built. Until then you can view, export and report.")));
     if (!c) { card.append(setupBox(a, hi)); return card; }
-    if (c.kind === "php" && !c.online) { card.append(phpPanel(a, hi, c)); return card; }
 
     const out = el("div", "db-out");
     const say = (text) => { out.replaceChildren(el("p", "waiting", text)); };

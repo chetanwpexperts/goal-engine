@@ -35,7 +35,7 @@ JOBS_WAITING_TOTAL = 40
 
 # Everything that reaches a user's database. NOT /api/connector/ (the program on their server, with its own token)
 # and not /api/connector-info (our server's public IP, shown in instructions).
-LOCKED = re.compile(r"^/api/(connectors(/|$)|connector-jobs/|agents/\d+/(php-connector|connector|connect/))")
+LOCKED = re.compile(r"^/api/(connectors(/|$)|connector-jobs/|agents/\d+/(connector|connect/)|console(/|$))")
 
 
 def enabled() -> bool:
@@ -131,6 +131,9 @@ def maintain(db: Session) -> dict:
     for user in db.scalars(select(User).join(Connector, Connector.visitor_id == User.visitor_id)
                            .where(Connector.kind == "direct", Connector.secret.is_not(None)).distinct()):
         _wipe_passwords(db, user)
+    # the website-file (PHP) connector was retired: any left from before are switched off and their keys wiped
+    for c in db.scalars(select(Connector).where(Connector.kind == "php", Connector.status != "disconnected")):
+        c.secret, c.status = None, "disconnected"
     trimmed = db.execute(delete(DbConnectLog).where(DbConnectLog.at < utcnow() - LOG_KEEP)).rowcount
     db.commit()
     return {"db_areas_locked": locked, "db_log_trimmed": trimmed}
@@ -180,11 +183,11 @@ def check_queue(db: Session, visitor_id: str) -> None:
 
     waiting = (ConnectorJob.status.in_(("queued", "claimed")), ConnectorJob.created_at > utcnow() - timedelta(minutes=10))
     mine = db.scalar(select(func.count()).select_from(ConnectorJob).join(Connector, Connector.id == ConnectorJob.connector_id)
-                     .where(Connector.visitor_id == visitor_id, Connector.kind.in_(("direct", "php")), *waiting))
+                     .where(Connector.visitor_id == visitor_id, Connector.kind == "direct", *waiting))
     if mine >= JOBS_WAITING_PER_USER:
         raise DatabaseError("Your earlier checks are still running. Please wait a few seconds.")
     total = db.scalar(select(func.count()).select_from(ConnectorJob).join(Connector, Connector.id == ConnectorJob.connector_id)
-                      .where(Connector.kind.in_(("direct", "php")), *waiting))
+                      .where(Connector.kind == "direct", *waiting))
     if total >= JOBS_WAITING_TOTAL:
         raise DatabaseError("Goal Engine is busy right now. Please try again in a minute.")
 

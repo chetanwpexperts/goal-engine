@@ -193,9 +193,10 @@ def curriculum() -> dict:
         text = (ROOT / "docs" / "dbaba-curriculum.md").read_text(encoding="utf-8")
     except OSError:
         return {"nights": [], "done": 0, "total": 0}
-    nights = [{"n": int(n), "done": x == "x", "title": t.strip().rstrip(".")}
-              for x, n, t in re.findall(r"^- \[( |x)\] \*\*(\d+)\. ([^*]+)\*\*", text, re.M)]
-    log = {int(n): d for n, d in re.findall(r"^- \*\*Night (\d+) \(([^)]+)\)", text, re.M)}
+    # nights are numbered 1-15, with inserted ones (10A) and project blueprints (P1, P2...)
+    nights = [{"n": n, "done": x == "x", "title": t.strip().rstrip(".")}
+              for x, n, t in re.findall(r"^- \[( |x)\] \*\*(\d+[A-Z]?|P\d+)\. ([^*]+)\*\*", text, re.M)]
+    log = {n: d for n, d in re.findall(r"^- \*\*Night (\d+[A-Z]?|P\d+) \(([^)]+)\)", text, re.M)}
     for night in nights:
         night["date"] = log.get(night["n"], "")
     return {"nights": nights, "done": sum(n["done"] for n in nights), "total": len(nights)}

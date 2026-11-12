@@ -271,7 +271,7 @@
   async function dbaba(box) {
     const d = await api("/api/admin/knowledge");
     const k = d.dbaba, cur = d.curriculum;
-    $("sub").textContent = `${cur.done} of ${cur.total} nights done`;
+    $("sub").textContent = `${cur.done} of ${cur.total} steps done`;
     const tiles = el("div", "tiles");
     tiles.append(
       tile("Concepts it can explain", k.concepts, `${k.phrasings} ways of asking (English, Hinglish, Hindi)`),

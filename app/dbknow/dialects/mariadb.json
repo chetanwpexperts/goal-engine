@@ -114,7 +114,8 @@
   "text_vs_number": {"behaviour": "silent", "code": "1292", "says": "MySQL/MariaDB turn every value of the column into a number to compare it, so the index can't be used (lab: type index / ALL) and '098...' and '98... ' match too (a 1292 note, no error).", "proven": ["mariadb"]},
   "or_same_table": {"behaviour": "fast", "says": "MariaDB combines two indexes for an OR on one table (EXPLAIN: index_merge, Using union(a,b)).", "proven": ["mariadb"]},
   "expression_index": {"behaviour": "versioned", "says": "MySQL 8.0.13+ can index an expression (INDEX ((LOWER(email)))). MariaDB 10.11 can't: add a virtual column (email_lc VARCHAR(80) AS (LOWER(email)) VIRTUAL, INDEX (email_lc)) and compare that column by name; the lab showed WHERE LOWER(email) = ... still reads the whole index.", "proven": ["mariadb"]},
-  "offset_reads": {"behaviour": "slow", "says": "MariaDB's EXPLAIN for ORDER BY id LIMIT 20 OFFSET 15000 shows rows = 15020: every skipped row is read.", "proven": ["mariadb"]}
+  "offset_reads": {"behaviour": "slow", "says": "MariaDB's EXPLAIN for ORDER BY id LIMIT 20 OFFSET 15000 shows rows = 15020: every skipped row is read.", "proven": ["mariadb"]},
+  "optimizer_sargable": {"behaviour": "versioned", "says": "MariaDB 11.1+ turns DATE(col) and YEAR(col) compared with a constant into a range on the index by itself (the CI run on MariaDB 11 also did it for LEFT(col, n) = 'abc'); MariaDB 10.11 and MySQL 8 don't (lab: 10.11 read the whole index). The bare-column form is fast on every version and on PostgreSQL.", "proven": ["mariadb"]}
  },
  "proven": [
   "mariadb"

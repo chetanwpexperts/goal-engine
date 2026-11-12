@@ -319,6 +319,8 @@ def _sargable(sql: str, s: str, F, eng) -> list:
         extra_en = ""
         if how == "prefix":
             extra_en = " " + _says("like_prefix_index", eng)
+        if fn in ("DATE", "YEAR", "LEFT") and eng != "postgresql":
+            extra_en += " " + _rule("mysql", "optimizer_sargable").get("says", "")
         out.append((F("check", "sargable", ten, thi, ev,
                       f"An index holds {col} as it is stored, so a condition on {_short(sql[a:b], 40)} has to work out a new value for "
                       f"every row and can't use it (MariaDB shows type ALL or a full 'index' scan, PostgreSQL a Seq Scan). The same rows, "

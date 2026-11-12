@@ -305,9 +305,25 @@ def test_the_lab_slow_form_reads_everything_and_the_fast_form_searches(big, slow
     for name, eng in big.items():
         if only and name != only:
             continue
-        assert _full(eng, _plan(eng, slow)), (name, slow, _plan(eng, slow))
+        if _optimizer_rewrites(eng, slow):
+            # MariaDB 11.1+ turns DATE(col) / YEAR(col) = const (and, in CI's MariaDB 11, LEFT(col, n) = const) into a range
+            # itself (CI: 'range'); 10.11 doesn't (the lab: 'index'). The bare-column form is fast on every version.
+            assert not _full(eng, _plan(eng, slow)), (name, slow, _plan(eng, slow))
+        else:
+            assert _full(eng, _plan(eng, slow)), (name, slow, _plan(eng, slow))
         assert not _full(eng, _plan(eng, fast)), (name, fast, _plan(eng, fast))
         assert sorted(eng.run(slow)) == sorted(eng.run(fast)), (name, slow)
+
+
+def _optimizer_rewrites(eng, slow: str) -> bool:
+    """Does this engine's own optimizer already search the index for this function form? (MariaDB 11.1+: DATE / YEAR, and
+    LEFT in the 11.x CI runs.)"""
+    if eng.kind != "mysql":
+        return False
+    v = str(eng.run("SELECT VERSION()")[0][0])
+    m = re.match(r"(\d+)\.(\d+)", v)
+    newer = "mariadb" in v.lower() and m and (int(m.group(1)), int(m.group(2))) >= (11, 1)
+    return bool(newer and re.search(r"\b(date|year|left)\s*\(", slow, re.I) and not re.search(r"\bmonth\s*\(", slow, re.I))
 
 
 def test_the_lab_or_across_two_tables(big):
@@ -483,6 +499,7 @@ def test_every_rule_records_where_it_was_proven():
     assert set(sqlspeed.PROVEN) <= topics and set(sqlexplain.PROVEN) <= topics
     for eng in ("mysql", "mariadb", "postgresql"):
         d = json.load(open(f"app/dbknow/dialects/{eng}.json"))
-        for key in ("like_prefix_index", "text_vs_number", "or_same_table", "expression_index", "offset_reads"):
+        keys = ("like_prefix_index", "text_vs_number", "or_same_table", "expression_index", "offset_reads")
+        for key in keys + (("optimizer_sargable",) if eng != "postgresql" else ()):
             assert d["query_rules"][key]["proven"] and d["query_rules"][key]["says"], (eng, key)
         assert d["explain"]["proven"]

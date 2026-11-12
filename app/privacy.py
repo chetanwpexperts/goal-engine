@@ -103,6 +103,9 @@ def delete_visitor(db: Session, visitor_id: str) -> dict:
     counts["email_log"] = db.execute(delete(SentEmail).where(SentEmail.visitor_id == visitor_id)).rowcount
     counts["email"] = db.execute(delete(OwnerContact).where(OwnerContact.visitor_id == visitor_id)).rowcount
     counts["expert_requests"] = db.execute(delete(ExpertRequest).where(ExpertRequest.visitor_id == visitor_id)).rowcount
+    from app.models import Enquiry
+
+    counts["enquiries"] = db.execute(delete(Enquiry).where(Enquiry.visitor_id == visitor_id)).rowcount
     counts["messages"] = db.execute(delete(Message).where(Message.visitor_id == visitor_id)).rowcount
     counts["goals"] = db.execute(delete(Goal).where(Goal.visitor_id == visitor_id)).rowcount
     from app import learning

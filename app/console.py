@@ -209,6 +209,9 @@ def connect(body: ConnectIn, request: Request, db: Session = Depends(get_db), vi
     if user is not None:
         dbarea.record(db, user, form, client_ip, True)
         dbarea.tell_owner(user, c.host_label or "", c.db_name or "", client_ip)
+    from app import usage
+
+    usage.count(db, "workspace_connect")
     return _reply({**_state(c), "user": details["user"], "tables": tables})
 
 
@@ -246,6 +249,9 @@ def run(body: SqlIn, db: Session = Depends(get_db), visitor: str = Depends(_visi
     finally:
         direct._slots.release()
     _touch(db, c)
+    from app import usage
+
+    usage.count(db, "workspace_run")
     return _reply({"columns": out["columns"], "rows": [[_cell(v) for v in r] for r in out["rows"]],
                    "row_count": out["row_count"], "limited": out["limited"], "hidden_columns": out["hidden_columns"],
                    "ms": ms, "seconds_left": _seconds_left(c)})
@@ -476,27 +482,15 @@ def injection_finding(text: str, sql: str, hi: bool) -> dict | None:
                       if not hi else "User ki likhi value string band karke apni SQL jod sakti hai. Parameter data aur SQL ko alag rakhte hain.")}
 
 
-@router.post("/ask")
-def ask(body: AskIn, db: Session = Depends(get_db), visitor: str = Depends(_visitor)):
-    """DBaba answers a developer's issue: a question, an error, a query or code with a query in it (PHP, .NET, Java, Node...),
-    or a problem in words. Read-only checks run on the connected database when one is connected. Nothing is kept: no
-    conversation, no goal, no learning feed (this area is private)."""
+def answer(text: str, c: Connector | None = None) -> tuple[list[dict], str | None]:
+    """DBaba's answer to one message, as blocks: a question, an error, a query or code with a query in it, or a problem in
+    words. With a connected database (c), its read-only checks run on it. Shared by the workspace and the admin test box."""
     from app.agents import direct
     from app.agents.core import query_in
     from app.dbknow import concepts
     from app.dbknow import engines as E
     from app.dbknow import reasoning
 
-    text = (body.text or "").strip()
-    if not text:
-        return _error("Describe the issue, or paste the error, the code or the query.")
-    if len(text) > 30000:
-        return _error("That's very long. Paste the error and the part of the code with the query.")
-    if not _rate(visitor):
-        return _error("That's a lot of questions in one minute. Please wait a few seconds.", 429)
-    c, _why = _live(db, visitor)
-    if c is not None:
-        _touch(db, c)
     lang = E.lang_of(text)
     hi = lang != "en"
     engine = E.named(text) or (ENGINE_ID.get(c.db_type or "") if c is not None else None) or E.shown(text)[0]
@@ -505,16 +499,14 @@ def ask(body: AskIn, db: Session = Depends(get_db), visitor: str = Depends(_visi
     if m is not None and m.get("concept") is not None:
         reply, _taps = concepts.answer({**m, "engine": E.named(text) or m.get("engine") or engine}, text)
         title, _, rest = reply.partition("\n")
-        blocks.append({"type": "text", "title": title, "body": rest.strip()})
-        return _reply({"blocks": blocks, "engine": engine, "connected": c is not None, "seconds_left": _seconds_left(c) if c else None})
+        return [{"type": "text", "title": title, "body": rest.strip()}], engine
     q = query_in(text)
     has_error = bool(reasoning.evidence(text))
     if q is None:                                              # code with the query in a string (PHP, Java, .NET, Node...)
         q = sql_in_code(text)
-    conn = None
     if (has_error or q is None) and c is not None:
         if not direct._slots.acquire(timeout=15):
-            return _error("Goal Engine is busy running other checks. Please try again in a moment.", 503)
+            raise BusyError()
         try:
             conn = _open_quiet(c)
             try:
@@ -544,6 +536,34 @@ def ask(body: AskIn, db: Session = Depends(get_db), visitor: str = Depends(_visi
             body += "\n\n" + ("Related topics I know:" if not hi else "Isse jude topics:") + "\n" + "\n".join(
                 f"- {x['title'].get(L) or x['title']['en']}" for x in near)
         blocks.append({"type": "text", "title": "Tell me a bit more" if not hi else "Thoda aur batao", "body": body})
+    return blocks, engine
+
+
+class BusyError(RuntimeError):
+    pass
+
+
+@router.post("/ask")
+def ask(body: AskIn, db: Session = Depends(get_db), visitor: str = Depends(_visitor)):
+    """DBaba answers a developer's issue. Nothing is kept: no conversation, no goal, no learning feed (this area is
+    private); only a count of uses per day, without any content."""
+    from app import usage
+
+    text = (body.text or "").strip()
+    if not text:
+        return _error("Describe the issue, or paste the error, the code or the query.")
+    if len(text) > 30000:
+        return _error("That's very long. Paste the error and the part of the code with the query.")
+    if not _rate(visitor):
+        return _error("That's a lot of questions in one minute. Please wait a few seconds.", 429)
+    c, _why = _live(db, visitor)
+    if c is not None:
+        _touch(db, c)
+    try:
+        blocks, engine = answer(text, c)
+    except BusyError:
+        return _error("Goal Engine is busy running other checks. Please try again in a moment.", 503)
+    usage.count(db, "workspace_ask")
     return _reply({"blocks": blocks, "engine": engine, "connected": c is not None,
                    "seconds_left": _seconds_left(c) if c is not None else None})
 

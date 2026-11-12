@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.ai.router import AIRouter, AIUnavailable
 from app.ml.brain import Brain
 from app.agents import automation
-from app import accounts, console, dbarea, expert, privacy
+from app import accounts, admin, console, dbarea, enquiry, expert, privacy
 from app.agents import database as dbagent
 from app.agents import direct as dbagent_direct
 from app.agents.core import AgentError, agent_dict, claim_due, goal_agents, run_agent
@@ -76,6 +76,8 @@ _MIN_JS: dict = {}
 app.include_router(accounts.router)
 app.include_router(dbarea.router)
 app.include_router(console.router)
+app.include_router(enquiry.router)
+app.include_router(admin.router)
 
 
 @app.get("/static/app.js", include_in_schema=False)
@@ -139,6 +141,7 @@ def _scheduler(stop: threading.Event) -> None:
                     log.info("Account clean-up: %s", accounts.maintain(db))
                     log.info("Database area: %s", dbarea.maintain(db))
                     log.info("SQL console connections ended: %s", console.maintain(db))
+                    log.info("Old enquiries deleted: %s", enquiry.maintain(db))
                     from app.limits import prune_bursts
 
                     prune_bursts(db)
@@ -151,7 +154,8 @@ def _scheduler(stop: threading.Event) -> None:
 # ---------------------------------------------------------------- coming soon (closed until SITE_MODE=open)
 PREVIEW_COOKIE = "ge_preview"
 OPEN_PATHS = ("/api/health", "/api/connector/", "/connector/", "/robots.txt", "/preview", "/static/coming-soon.html",
-              "/admin", "/api/admin/", "/api/learning/feed")      # admin and the feed have their own keys
+              "/admin", "/api/admin/", "/static/admin.", "/api/learning/feed",   # admin and the feed have their own keys
+              "/enquiry", "/api/enquiry", "/static/enquiry.")      # people interested can reach us before launch too
 
 
 def _site_open() -> bool:
@@ -298,7 +302,9 @@ def admin_page(request: Request, key: str = "") -> Response:
         return response
     if not _is_admin(request):
         return JSONResponse({"detail": "Not Found"}, status_code=404)
-    return FileResponse(STATIC / "admin.html", headers={"X-Robots-Tag": "noindex", "Cache-Control": "no-store"})
+    return FileResponse(STATIC / "admin.html", headers={"X-Robots-Tag": "noindex", "Cache-Control": "no-store",
+                                                        "Content-Security-Policy": ADMIN_CSP, "X-Frame-Options": "DENY",
+                                                        "Referrer-Policy": "no-referrer"})
 
 
 @app.get("/api/admin/requests")
@@ -556,6 +562,16 @@ def console_page() -> FileResponse:
     return FileResponse(STATIC / "console.html", headers={"Content-Security-Policy": CONSOLE_CSP, "X-Frame-Options": "DENY",
                                                           "Referrer-Policy": "no-referrer", "Cache-Control": "no-store",
                                                           "X-Robots-Tag": "noindex, nofollow"})
+
+
+ENQUIRY_CSP = CONSOLE_CSP.replace("form-action 'none'", "form-action 'self'")
+ADMIN_CSP = CONSOLE_CSP
+
+
+@app.get("/enquiry", include_in_schema=False)
+def enquiry_page() -> FileResponse:
+    """Talk to us: the enquiry form (app/enquiry.py)."""
+    return FileResponse(STATIC / "enquiry.html", headers={"Content-Security-Policy": ENQUIRY_CSP, "X-Frame-Options": "DENY"})
 
 
 @app.get("/")

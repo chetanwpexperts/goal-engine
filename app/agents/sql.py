@@ -539,7 +539,9 @@ MEANING_CHECKS = {"count", "not_in", "date_range", "concat", "like", "and_or", "
                   "sub_key", "scalar_rows", "sub_sum_null", "all_null", "not_in_outer", "in_list_null", "semi_join",
                   # night 6: table design advice changes what the table accepts (offered, never applied as the fix)
                   "no_primary_key", "date_as_text", "number_as_text", "code_as_number", "over_wide", "timestamp_range",
-                  "fk_no_index", "reserved_name", "varchar_length", "text_key", "row_too_big", "fk_type", "fk_target"}
+                  "fk_no_index", "reserved_name", "varchar_length", "text_key", "row_too_big", "fk_type", "fk_target",
+                  # night 7: an ELSE for unmatched rows, a tie-breaker / ROWS frame, a wider frame for NTH_VALUE change the result
+                  "case_no_else", "win_running_ties", "win_rank_ties", "win_last_value"}
 
 
 def _is_select(low: str) -> bool:

@@ -543,7 +543,11 @@
   "on_conflict": {"behaviour": "works", "says": "PostgreSQL upserts with INSERT ... ON CONFLICT (key) DO UPDATE SET col = EXCLUDED.col (9.5+).", "proven": ["postgresql"]},
   "change_limit": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no LIMIT (or ORDER BY) on UPDATE/DELETE ('syntax error at or near LIMIT').", "proven": ["postgresql"]},
   "insert_ignore": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no INSERT IGNORE ('syntax error at or near IGNORE'); ON CONFLICT DO NOTHING skips duplicates.", "proven": ["postgresql"]},
-  "replace_into": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no REPLACE INTO ('syntax error at or near REPLACE').", "proven": ["postgresql"]}
+  "replace_into": {"behaviour": "error", "code": "42601", "says": "PostgreSQL has no REPLACE INTO ('syntax error at or near REPLACE').", "proven": ["postgresql"]},
+  "case_mixed_types": {"behaviour": "error", "code": "22P02", "says": "PostgreSQL refuses it: the text is read as a number and fails (22P02, invalid input syntax for type numeric / integer).", "proven": ["postgresql"]},
+  "recursion_limit": {"behaviour": "endless", "says": "PostgreSQL has no round limit: it keeps going until it is cancelled (statement_timeout) or runs out of disk.", "proven": ["postgresql"], "source": "https://www.postgresql.org/docs/current/queries-with.html#QUERIES-WITH-RECURSIVE"},
+  "recursive_text_width": {"behaviour": "error", "code": "42804", "says": "PostgreSQL refuses a VARCHAR(n) anchor that the recursive part makes into plain text (42804, column has type character varying(40) in non-recursive term but type character varying overall); a text literal anchor is fine.", "proven": ["postgresql"]},
+  "window_needs_order": {"behaviour": "arbitrary", "says": "PostgreSQL runs them without ORDER BY, but every row is a tie: RANK() gives 1 to every row and LAG/LEAD take whatever row was read before.", "proven": ["postgresql"]}
  },
  "proven": [
   "postgresql"

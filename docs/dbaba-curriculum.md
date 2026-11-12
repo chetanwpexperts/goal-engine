@@ -70,7 +70,7 @@ feed.
   trigger recursion).
 - [x] **6. Schema design.** Reading CREATE TABLE: missing primary key, unindexed foreign key, money as FLOAT, dates or
   numbers stored as text, utf8 vs utf8mb4, over-wide types; advising a better structure.
-- [ ] **7. CASE, CTEs, windows.** CASE order and missing ELSE, recursive CTEs that must stop, window frames and ties in
+- [x] **7. CASE, CTEs, windows.** CASE order and missing ELSE, recursive CTEs that must stop, window frames and ties in
   running totals, LAG/LEAD, NTILE, gaps and islands, versions without window functions.
 - [ ] **8. Indexes and EXPLAIN.** Reading EXPLAIN on both engines, composite indexes and the leftmost prefix, sargable
   rewrites, OR -> UNION ALL, keyset pagination, covering indexes; every speed rewrite proven to return the same rows.
@@ -188,3 +188,26 @@ statistics. Every night still adds 15+ concepts from its area. A new guide docum
   with no DEFAULT fills '' on MariaDB and is refused by PostgreSQL; MariaDB accepts TEXT in UNIQUE (hidden hash) but not as a
   PRIMARY KEY (1170); `key`, `range`, `rows`, `index`, `values` are reserved on MariaDB only, `user`, `end`, `window`, `do` on
   PostgreSQL only.
+- **Night 7 (12 Nov 2026).** CASE, WITH and window functions in `app/agents/sqlwin.py` (new fundamentals `case_logic`: CASE takes
+  the first true WHEN and gives one type; `recursion`: a recursive query runs round after round until a round makes no rows;
+  `window_frames`: a window function runs last, over a partition, an order and a frame). Rules: a WHEN an earlier WHEN already
+  covers (reordered narrowest first); CASE x WHEN NULL (rewritten as searched CASE); no ELSE in ORDER BY (the others sort first on
+  MariaDB, last on PostgreSQL) or on labels; text mixed with numbers; a WITH that reads itself without RECURSIVE; a recursive part
+  with nothing that ends it (the bound added from the words: "1 to 10"); a walk with UNION ALL and no depth limit; the anchor's
+  type too narrow for the text the recursive part builds; MariaDB's / MySQL's 1000-round limit; aggregates, ORDER BY or LIMIT in
+  the recursive part; a column list that doesn't match; two CTEs with one name; a window function (or its SELECT name) in WHERE /
+  HAVING / GROUP BY (wrapped: numbered inside, filtered outside); a window inside a window; LAG / LEAD / RANK / FIRST_VALUE /
+  NTILE with no ORDER BY; LAST_VALUE / NTH_VALUE with the default frame; a running total or ROW_NUMBER over a sort with ties (a
+  tie-breaker the query already shows, plus ROWS); 'per customer' said with no PARTITION BY; ROW_NUMBER for 'the 3rd highest'
+  (DENSE_RANK); window functions or WITH on MySQL 5.x / MariaDB 10.0-10.1. Engine facts in the dialect files' query_rules
+  (`case_mixed_types`, `recursion_limit`, `recursive_text_width`, `window_needs_order`). The plain 'name made in SELECT' rule
+  no longer "fixes" WHERE rn = 1 by repeating the window in WHERE (refused everywhere), HAVING with a window is no longer called
+  a per-row filter, and drafted learned rules whose only engine message is lab trouble (a full disk, a made-up table) are no longer
+  shown: one of them told every recursive walk with a JOIN that "PostgreSQL refuses this". 23 concepts, 50-problem practice bank,
+  16 generator families. Lab lessons worth keeping: MariaDB stops a recursive CTE after max_recursive_iterations = 1000 rounds
+  with NO error (a series to 2000 returned 1001 rows), PostgreSQL never stops; MariaDB sizes a recursive text column from the
+  anchor ('x' -> 1406), PostgreSQL refuses a VARCHAR(n) anchor that CONCAT makes longer (42804) and also refuses CHAR(n) there, so
+  the cast is CHAR(1000) on MySQL/MariaDB and TEXT on PostgreSQL; MariaDB refuses LAG / LEAD / RANK / CUME_DIST without ORDER BY
+  (4018) but runs NTILE and ROW_NUMBER; FIRST_VALUE() OVER () returned different rows on the two engines; ROW_NUMBER numbered two
+  tied rows the other way round on each; a CASE mixing 'none' with a numeric column is text on MariaDB (sorted '1000.00' <
+  '50.00') and 22P02 on PostgreSQL.

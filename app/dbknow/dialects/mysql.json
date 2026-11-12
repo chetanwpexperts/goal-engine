@@ -552,7 +552,11 @@
   "on_conflict": {"behaviour": "error", "code": "1064", "says": "MySQL and MariaDB don't know ON CONFLICT: error 1064 (syntax error near 'CONFLICT').", "proven": ["mariadb"]},
   "change_limit": {"behaviour": "works", "says": "MySQL and MariaDB accept ORDER BY and LIMIT on a single-table UPDATE or DELETE.", "proven": ["mariadb"]},
   "insert_ignore": {"behaviour": "works", "says": "MySQL and MariaDB accept INSERT IGNORE.", "proven": ["mariadb"]},
-  "replace_into": {"behaviour": "works", "says": "MySQL and MariaDB accept REPLACE INTO.", "proven": ["mariadb"]}
+  "replace_into": {"behaviour": "works", "says": "MySQL and MariaDB accept REPLACE INTO.", "proven": ["mariadb"]},
+  "case_mixed_types": {"behaviour": "converts", "says": "MySQL and MariaDB run it but turn the whole CASE column into text, so the numbers then sort and compare as text ('1000' before '50').", "proven": ["mariadb"]},
+  "recursion_limit": {"behaviour": "error", "code": "3636", "says": "MySQL 8 stops after cte_max_recursion_depth (1000) rounds with error 3636 (Recursive query aborted after 1001 iterations); MariaDB stops after max_recursive_iterations (1000) rounds with NO error and returns only the rows made so far.", "proven": ["mariadb"], "source": "https://dev.mysql.com/doc/refman/8.0/en/with.html#common-table-expressions-recursion-limits"},
+  "recursive_text_width": {"behaviour": "error", "code": "1406", "says": "MySQL and MariaDB size a text column from the anchor ('x' is one character, a VARCHAR(40) column is 40), and a longer value from the recursive part stops the query with error 1406 (Data too long for column) in strict mode.", "proven": ["mariadb"]},
+  "window_needs_order": {"behaviour": "error", "code": "4018", "says": "MariaDB refuses LAG, LEAD, RANK, DENSE_RANK, PERCENT_RANK and CUME_DIST without ORDER BY in the window (error 4018, No order list in window specification); MySQL 8 runs them in an arbitrary order.", "proven": ["mariadb"]}
  },
  "proven": [
   "mariadb 10.11 (MySQL-compatible behaviour of these rules)"

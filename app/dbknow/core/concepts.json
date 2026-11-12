@@ -13240,6 +13240,2730 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "case_when",
+   "kind": "concept",
+   "title": {
+    "en": "CASE WHEN",
+    "hinglish": "CASE WHEN",
+    "hindi": "CASE WHEN"
+   },
+   "terms": [
+    [
+     "case when"
+    ],
+    [
+     "case (expression|statement)s?"
+    ],
+    [
+     "case",
+     "(sql|my ?sql|maria ?db|postgre\\w*|query|select)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is case when in sql",
+     "how to use a case statement in mysql",
+     "explain the case expression"
+    ],
+    "hinglish": [
+     "case when kya hota hai",
+     "sql mein case statement kaise use kare"
+    ],
+    "hindi": [
+     "SQL में CASE WHEN क्या है"
+    ]
+   },
+   "answer": {
+    "en": "CASE gives a value chosen by conditions, row by row: CASE WHEN condition THEN value ... ELSE value END. It is read from the top and takes the first WHEN that is true; with no ELSE, a row that matches nothing gets NULL. Use it for labels and bands, conditional totals (SUM(CASE ...)), a custom sort, or rows turned into columns. It works the same on MySQL, MariaDB and PostgreSQL.",
+    "hinglish": "CASE har row ke liye conditions se ek value chunta hai: CASE WHEN condition THEN value ... ELSE value END. Upar se padha jaata hai aur pehla true WHEN liya jaata hai; ELSE na ho to kisi se match na hone wali row ko NULL milta hai. Labels, bands, conditional totals (SUM(CASE ...)), custom sort ke liye.",
+    "hindi": "CASE हर row के लिए conditions से एक value चुनता है: CASE WHEN शर्त THEN value ... ELSE value END। ऊपर से पढ़ा जाता है और पहला सही WHEN लिया जाता है; ELSE न हो तो NULL मिलता है।"
+   },
+   "mistake": {
+    "en": "Putting a wide condition before a narrow one (amount > 100 before amount > 10000): the narrow WHEN can never be reached.",
+    "hinglish": "Chaudi condition ko chhoti se pehle likhna (amount > 100, amount > 10000 se pehle): chhota WHEN kabhi nahi chalta.",
+    "hindi": "चौड़ी शर्त को छोटी से पहले लिखना (amount > 100 पहले): छोटा WHEN कभी नहीं चलता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount, CASE WHEN amount >= 10000 THEN 'big' WHEN amount >= 1000 THEN 'mid' ELSE 'small' END AS size\nFROM orders ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "amount",
+      "size"
+     ],
+     "result": [
+      [
+       "1",
+       "25500",
+       "big"
+      ],
+      [
+       "2",
+       "500",
+       "small"
+      ],
+      [
+       "3",
+       "80000",
+       "big"
+      ],
+      [
+       "4",
+       "12000",
+       "big"
+      ],
+      [
+       "5",
+       "800",
+       "small"
+      ],
+      [
+       "6",
+       "65000",
+       "big"
+      ],
+      [
+       "7",
+       "500",
+       "small"
+      ],
+      [
+       "8",
+       "300",
+       "small"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Also IF(cond, a, b) (MySQL only); CASE is the portable one.",
+    "mariadb": "Same as MySQL (IF() too).",
+    "postgresql": "No IF(); CASE (or FILTER for totals: COUNT(*) FILTER (WHERE ...))."
+   },
+   "related": [
+    "case_when_order",
+    "case_no_else",
+    "conditional_count"
+   ],
+   "fundamentals": [
+    "case_logic"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-conditional.html#FUNCTIONS-CASE",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/case",
+    "https://dba.stackexchange.com/questions/tagged/case"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "case_when_order",
+   "kind": "concept",
+   "title": {
+    "en": "The order of WHENs in CASE",
+    "hinglish": "CASE mein WHEN ka order",
+    "hindi": "CASE में WHEN का क्रम"
+   },
+   "terms": [
+    [
+     "\\bwhen\\b",
+     "(order|sequence|kram|क्रम)(?! by)"
+    ],
+    [
+     "case",
+     "first (match|true|condition)"
+    ],
+    [
+     "case",
+     "(multiple|more than one|both|dono|kai) (conditions?|when\\w*) (are )?(true|match\\w*)"
+    ],
+    [
+     "case",
+     "(two|both|multiple|more than one|dono|kai)",
+     "(conditions?|when)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does the order of when conditions matter in case",
+     "what happens when two when conditions are true in case"
+    ],
+    "hinglish": [
+     "case mein when ka order matter karta hai kya",
+     "case mein dono conditions true ho to kya hota hai"
+    ],
+    "hindi": [
+     "CASE में WHEN का क्रम मायने रखता है क्या"
+    ]
+   },
+   "answer": {
+    "en": "Yes. CASE checks the WHENs from top to bottom and stops at the first true one; the rest are not looked at for that row. So write the narrowest condition first (> 10000, then > 1000, then the rest), and a WHEN that an earlier WHEN already covers can never run. The same on every database.",
+    "hinglish": "Haan. CASE WHEN ko upar se neeche dekhta hai aur pehle true par ruk jaata hai; baaki us row ke liye dekhe hi nahi jaate. Isliye sabse chhoti (narrow) condition pehle likho; jis WHEN ko pehle wala dhak le wo kabhi nahi chalta.",
+    "hindi": "हाँ। CASE ऊपर से नीचे देखता है और पहले सही WHEN पर रुक जाता है। इसलिए सबसे संकरी शर्त पहले लिखिए।"
+   },
+   "mistake": {
+    "en": "WHEN amount > 100 THEN 'mid' WHEN amount > 10000 THEN 'big': every order over 100 is 'mid', 'big' never shows (lab: no error, on both).",
+    "hinglish": "WHEN amount > 100 pehle: 'big' kabhi nahi aata (lab: bina error ke).",
+    "hindi": "WHEN amount > 100 पहले: 'big' कभी नहीं आता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount,\n       CASE WHEN amount > 10000 THEN 'big' WHEN amount > 100 THEN 'mid' ELSE 'small' END AS right_order,\n       CASE WHEN amount > 100 THEN 'mid' WHEN amount > 10000 THEN 'big' ELSE 'small' END AS wrong_order\nFROM orders ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "amount",
+      "right_order",
+      "wrong_order"
+     ],
+     "result": [
+      [
+       "1",
+       "25500",
+       "big",
+       "mid"
+      ],
+      [
+       "2",
+       "500",
+       "mid",
+       "mid"
+      ],
+      [
+       "3",
+       "80000",
+       "big",
+       "mid"
+      ],
+      [
+       "4",
+       "12000",
+       "big",
+       "mid"
+      ],
+      [
+       "5",
+       "800",
+       "mid",
+       "mid"
+      ],
+      [
+       "6",
+       "65000",
+       "big",
+       "mid"
+      ],
+      [
+       "7",
+       "500",
+       "mid",
+       "mid"
+      ],
+      [
+       "8",
+       "300",
+       "mid",
+       "mid"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same rule.",
+    "mariadb": "Same rule.",
+    "postgresql": "Same rule."
+   },
+   "related": [
+    "case_when",
+    "case_no_else"
+   ],
+   "fundamentals": [
+    "case_logic"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/flow-control-functions.html#operator_case",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/case",
+    "https://dba.stackexchange.com/questions/tagged/case"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "case_no_else",
+   "kind": "concept",
+   "title": {
+    "en": "CASE without ELSE",
+    "hinglish": "ELSE ke bina CASE",
+    "hindi": "ELSE के बिना CASE"
+   },
+   "terms": [
+    [
+     "case",
+     "\\belse\\b"
+    ],
+    [
+     "case",
+     "(returns?|gives?|deta|देता|aata|aa raha) null"
+    ],
+    [
+     "case",
+     "null",
+     "(kyun|kyu|why|क्यों|returns?|gives?|deta|देता)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what happens if a case has no else",
+     "why does case return null"
+    ],
+    "hinglish": [
+     "case mein else na ho to kya hota hai",
+     "case null kyun deta hai"
+    ],
+    "hindi": [
+     "CASE में ELSE न हो तो क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A row that matches no WHEN gets the ELSE value; with no ELSE it gets NULL. That shows as an empty label, is skipped by SUM/AVG/COUNT(x), and in ORDER BY sorts first on MySQL/MariaDB but last on PostgreSQL. Add an ELSE whenever the other rows need a value.",
+    "hinglish": "Kisi WHEN se match na hone wali row ko ELSE ki value milti hai; ELSE na ho to NULL. Wo khaali label dikhta hai, SUM/AVG use chhod dete hain, aur ORDER BY mein MySQL/MariaDB par upar, PostgreSQL par neeche jaata hai. Zarurat ho to ELSE likho.",
+    "hindi": "किसी WHEN से मेल न खाने वाली row को ELSE मिलता है; ELSE न हो तो NULL। ORDER BY में MySQL/MariaDB पर ऊपर, PostgreSQL पर नीचे।"
+   },
+   "mistake": {
+    "en": "ORDER BY CASE status WHEN 'pending' THEN 1 WHEN 'paid' THEN 2 END: the other statuses come first on MariaDB and last on PostgreSQL (lab).",
+    "hinglish": "ORDER BY CASE ... END bina ELSE: baaki rows MariaDB par upar, PostgreSQL par neeche (lab).",
+    "hindi": "ELSE के बिना ORDER BY CASE: बाकी rows MariaDB पर ऊपर, PostgreSQL पर नीचे।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, status, CASE WHEN status = 'paid' THEN 'done' WHEN status = 'shipped' THEN 'on the way' END AS no_else,\n       CASE WHEN status = 'paid' THEN 'done' WHEN status = 'shipped' THEN 'on the way' ELSE 'other' END AS with_else\nFROM orders ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "status",
+      "no_else",
+      "with_else"
+     ],
+     "result": [
+      [
+       "1",
+       "paid",
+       "done",
+       "done"
+      ],
+      [
+       "2",
+       "shipped",
+       "on the way",
+       "on the way"
+      ],
+      [
+       "3",
+       "paid",
+       "done",
+       "done"
+      ],
+      [
+       "4",
+       "cancelled",
+       "NULL",
+       "other"
+      ],
+      [
+       "5",
+       "paid",
+       "done",
+       "done"
+      ],
+      [
+       "6",
+       "pending",
+       "NULL",
+       "other"
+      ],
+      [
+       "7",
+       "paid",
+       "done",
+       "done"
+      ],
+      [
+       "8",
+       "shipped",
+       "on the way",
+       "on the way"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "NULL sorts first in ASC order.",
+    "mariadb": "NULL sorts first in ASC order.",
+    "postgresql": "NULL sorts last in ASC order (NULLS FIRST / LAST to choose)."
+   },
+   "related": [
+    "case_when",
+    "custom_sort",
+    "null"
+   ],
+   "fundamentals": [
+    "case_logic",
+    "null_logic"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-conditional.html#FUNCTIONS-CASE",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/case",
+    "https://dba.stackexchange.com/questions/tagged/case"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "simple_vs_searched_case",
+   "kind": "compare",
+   "title": {
+    "en": "Simple CASE vs searched CASE",
+    "hinglish": "Simple CASE aur searched CASE",
+    "hindi": "Simple CASE और searched CASE"
+   },
+   "terms": [
+    [
+     "simple case",
+     "searched case"
+    ],
+    [
+     "case",
+     "when null",
+     "(never|not|nahi|kabhi|match\\w*|why|kyun)"
+    ],
+    [
+     "case \\w+ when null"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "simple case vs searched case",
+     "why does case when null never match"
+    ],
+    "hinglish": [
+     "simple case aur searched case mein kya farak hai"
+    ],
+    "hindi": [
+     "simple CASE और searched CASE में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "Simple CASE compares one value with each WHEN: CASE status WHEN 'paid' THEN ... means status = 'paid'. Searched CASE takes a full condition in each WHEN: CASE WHEN amount > 1000 AND status = 'paid' THEN .... Because simple CASE uses =, CASE x WHEN NULL never matches (nothing equals NULL); write CASE WHEN x IS NULL THEN ... instead.",
+    "hinglish": "Simple CASE ek value ko har WHEN se compare karta hai (CASE status WHEN 'paid' = status = 'paid'). Searched CASE har WHEN mein poori condition leta hai. Simple CASE = use karta hai, isliye CASE x WHEN NULL kabhi match nahi hota; CASE WHEN x IS NULL likho.",
+    "hindi": "Simple CASE एक value को हर WHEN से = से मिलाता है; searched CASE हर WHEN में पूरी शर्त लेता है। CASE x WHEN NULL कभी मेल नहीं खाता।"
+   },
+   "mistake": {
+    "en": "CASE discount WHEN NULL THEN 'none' ...: every row falls to the ELSE, even the ones with no discount (lab, both).",
+    "hinglish": "CASE discount WHEN NULL: har row ELSE mein jaati hai (lab).",
+    "hindi": "CASE discount WHEN NULL: हर row ELSE में जाती है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, CASE discount WHEN NULL THEN 'none' ELSE 'some' END AS simple_form,\n       CASE WHEN discount IS NULL THEN 'none' ELSE 'some' END AS searched_form\nFROM orders ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "simple_form",
+      "searched_form"
+     ],
+     "result": [
+      [
+       "1",
+       "some",
+       "none"
+      ],
+      [
+       "2",
+       "some",
+       "some"
+      ],
+      [
+       "3",
+       "some",
+       "some"
+      ],
+      [
+       "4",
+       "some",
+       "none"
+      ],
+      [
+       "5",
+       "some",
+       "none"
+      ],
+      [
+       "6",
+       "some",
+       "some"
+      ],
+      [
+       "7",
+       "some",
+       "none"
+      ],
+      [
+       "8",
+       "some",
+       "none"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Same.",
+    "mariadb": "Same.",
+    "postgresql": "Same."
+   },
+   "related": [
+    "case_when",
+    "null"
+   ],
+   "fundamentals": [
+    "case_logic",
+    "null_logic"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-conditional.html#FUNCTIONS-CASE",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/case",
+    "https://dba.stackexchange.com/questions/tagged/case"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "custom_sort",
+   "kind": "howto",
+   "title": {
+    "en": "Sorting in a custom order",
+    "hinglish": "Custom order mein sort",
+    "hindi": "अपने क्रम में sort"
+   },
+   "terms": [
+    [
+     "custom (order|sort\\w*)"
+    ],
+    [
+     "order by",
+     "case"
+    ],
+    [
+     "sort\\w*",
+     "case"
+    ],
+    [
+     "(specific|particular|apne|manual) (order|kram)",
+     "sort\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to sort by a custom order in sql",
+     "how to use case in order by"
+    ],
+    "hinglish": [
+     "order by case kaise use kare",
+     "apne order mein sort kaise kare"
+    ],
+    "hindi": [
+     "custom order में sort कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "Sort by a CASE that turns each value into its place: ORDER BY CASE status WHEN 'pending' THEN 1 WHEN 'paid' THEN 2 ELSE 3 END, id. Give the ELSE a place too (otherwise the other rows are NULL and land first or last depending on the database), and end with a column that breaks ties.",
+    "hinglish": "Har value ko uski jagah dene wale CASE se sort karo: ORDER BY CASE status WHEN 'pending' THEN 1 WHEN 'paid' THEN 2 ELSE 3 END, id. ELSE ko bhi jagah do aur aakhir mein tie todne wala column.",
+    "hindi": "हर value को उसकी जगह देने वाले CASE से sort कीजिए; ELSE को भी जगह दीजिए।"
+   },
+   "mistake": {
+    "en": "Leaving out the ELSE: the rest are NULL, first on MySQL/MariaDB and last on PostgreSQL.",
+    "hinglish": "ELSE chhodna: baaki rows NULL, MySQL/MariaDB par pehle, PostgreSQL par aakhir.",
+    "hindi": "ELSE छोड़ना: बाकी rows NULL।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, status FROM orders\nORDER BY CASE status WHEN 'pending' THEN 1 WHEN 'paid' THEN 2 ELSE 3 END, id"
+     },
+     "columns": [
+      "id",
+      "status"
+     ],
+     "result": [
+      [
+       "6",
+       "pending"
+      ],
+      [
+       "1",
+       "paid"
+      ],
+      [
+       "3",
+       "paid"
+      ],
+      [
+       "5",
+       "paid"
+      ],
+      [
+       "7",
+       "paid"
+      ],
+      [
+       "2",
+       "shipped"
+      ],
+      [
+       "4",
+       "cancelled"
+      ],
+      [
+       "8",
+       "shipped"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "FIELD(status, 'pending', 'paid') also works (MySQL only; 0 for values not listed, so they come first).",
+    "mariadb": "FIELD() too (as MySQL).",
+    "postgresql": "No FIELD(); CASE, or array_position(ARRAY['pending','paid'], status)."
+   },
+   "related": [
+    "case_no_else",
+    "order_by"
+   ],
+   "fundamentals": [
+    "case_logic",
+    "ranking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-conditional.html#FUNCTIONS-CASE",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/case",
+    "https://dba.stackexchange.com/questions/tagged/case"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "pivot_case",
+   "kind": "howto",
+   "title": {
+    "en": "Rows into columns (pivot)",
+    "hinglish": "Rows ko columns banana (pivot)",
+    "hindi": "Rows को columns बनाना (pivot)"
+   },
+   "terms": [
+    [
+     "pivot\\w*"
+    ],
+    [
+     "rows?",
+     "(into|to|ko|को|as) columns?"
+    ],
+    [
+     "crosstab"
+    ],
+    [
+     "(each|every|har)",
+     "as (a )?(separate )?columns?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to pivot rows into columns in sql",
+     "how to show each status as a column"
+    ],
+    "hinglish": [
+     "rows ko columns mein kaise badle",
+     "pivot kaise kare mysql mein"
+    ],
+    "hindi": [
+     "rows को columns में कैसे बदलें"
+    ]
+   },
+   "answer": {
+    "en": "Group by what each output row stands for and make one total per column with a CASE inside it: SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS paid. The columns must be written out (SQL needs to know them before it runs); for values you don't know in advance, build the query in your app.",
+    "hinglish": "Output row jis cheez ki hai us par GROUP BY karo aur har column ke liye CASE wala total: SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS paid. Columns likhne padte hain; anjaan values ke liye query app mein banao.",
+    "hindi": "हर output row जिस चीज़ की है उस पर GROUP BY कीजिए और हर column के लिए CASE वाला total बनाइए।"
+   },
+   "mistake": {
+    "en": "Forgetting ELSE 0: the cell is NULL instead of 0 where a group has none.",
+    "hinglish": "ELSE 0 bhoolna: 0 ki jagah NULL.",
+    "hindi": "ELSE 0 भूलना: 0 की जगह NULL।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT customer_id,\n       SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END) AS paid,\n       SUM(CASE WHEN status = 'shipped' THEN amount ELSE 0 END) AS shipped\nFROM orders GROUP BY customer_id ORDER BY customer_id"
+     },
+     "columns": [
+      "customer_id",
+      "paid",
+      "shipped"
+     ],
+     "result": [
+      [
+       "1",
+       "25500",
+       "500"
+      ],
+      [
+       "2",
+       "80500",
+       "0"
+      ],
+      [
+       "3",
+       "800",
+       "0"
+      ],
+      [
+       "6",
+       "0",
+       "0"
+      ],
+      [
+       "8",
+       "0",
+       "300"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "No PIVOT keyword; SUM(IF(...)) also works.",
+    "mariadb": "No PIVOT keyword (as MySQL).",
+    "postgresql": "No PIVOT keyword; FILTER (WHERE ...) or crosstab() from tablefunc."
+   },
+   "related": [
+    "conditional_count",
+    "case_when",
+    "group_by"
+   ],
+   "fundamentals": [
+    "case_logic",
+    "aggregation"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/flow-control-functions.html#operator_case",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/case",
+    "https://dba.stackexchange.com/questions/tagged/case"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cte",
+   "kind": "concept",
+   "title": {
+    "en": "CTE (the WITH clause)",
+    "hinglish": "CTE (WITH clause)",
+    "hindi": "CTE (WITH clause)"
+   },
+   "terms": [
+    [
+     "(cte|ctes|common table expressions?)"
+    ],
+    [
+     "with (clause|query|queries|statement|keyword)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a cte in sql",
+     "what does the with clause do"
+    ],
+    "hinglish": [
+     "with clause kya hai",
+     "cte kya hota hai sql mein"
+    ],
+    "hindi": [
+     "CTE क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A CTE gives a query a name for the length of one statement: WITH spend AS (SELECT ...) SELECT ... FROM spend. It reads like steps, can be used more than once in the statement, and later CTEs can read earlier ones. It isn't stored anywhere (that would be a view or a table). WITH RECURSIVE lets it read itself.",
+    "hinglish": "CTE ek statement ke liye query ko naam deta hai: WITH spend AS (SELECT ...) SELECT ... FROM spend. Query steps ki tarah padhti hai, ek se zyada baar use ho sakti hai, aur baad wali CTE pehle wali ko padh sakti hai. Kahin save nahi hoti.",
+    "hindi": "CTE एक statement के लिए query को नाम देता है: WITH spend AS (SELECT ...) SELECT ... FROM spend। कहीं save नहीं होता।"
+   },
+   "mistake": {
+    "en": "Expecting it to last: a CTE exists only inside its own statement; the next query can't see it.",
+    "hinglish": "Sochna ki wo bachi rahegi: CTE sirf usi statement mein hai.",
+    "hindi": "यह सोचना कि CTE बचा रहेगा: वह सिर्फ़ उसी statement में है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH spend AS (\n  SELECT customer_id, SUM(amount) AS total FROM orders GROUP BY customer_id\n)\nSELECT c.first_name, s.total\nFROM customers c JOIN spend s ON s.customer_id = c.id\nWHERE s.total > 20000\nORDER BY s.total DESC"
+     },
+     "columns": [
+      "first_name",
+      "total"
+     ],
+     "result": [
+      [
+       "Diya",
+       "80500"
+      ],
+      [
+       "Tara",
+       "65000"
+      ],
+      [
+       "Aarav",
+       "26000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "MySQL 8.0+ (not 5.7).",
+    "mariadb": "MariaDB 10.2+.",
+    "postgresql": "All versions; since PostgreSQL 12 a CTE used once is inlined (MATERIALIZED to keep it separate)."
+   },
+   "related": [
+    "recursive_cte",
+    "cte_vs_subquery",
+    "view"
+   ],
+   "fundamentals": [
+    "grain",
+    "names_scope"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-with.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/recursive-query",
+    "https://dba.stackexchange.com/questions/tagged/cte",
+    "https://www.percona.com/blog/introduction-to-mysql-8-0-recursive-common-table-expression-part-2/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "recursive_cte",
+   "kind": "concept",
+   "title": {
+    "en": "Recursive CTE",
+    "hinglish": "Recursive CTE",
+    "hindi": "Recursive CTE"
+   },
+   "terms": [
+    [
+     "recursive",
+     "(cte|ctes|with|quer\\w*|sql)"
+    ],
+    [
+     "with recursive"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a recursive cte",
+     "how does with recursive work"
+    ],
+    "hinglish": [
+     "recursive query kaise likhe",
+     "recursive cte kya hota hai"
+    ],
+    "hindi": [
+     "recursive CTE क्या है"
+    ]
+   },
+   "answer": {
+    "en": "WITH RECURSIVE r AS (anchor UNION ALL recursive part) runs the anchor once, then runs the recursive part again and again on the rows the last round made, and stops when a round makes no rows. Use it for series (1 to 100, every date in a month) and for walking a tree (managers, categories). The recursive part needs something that runs out: a WHERE bound or a join that finds no more children.",
+    "hinglish": "WITH RECURSIVE r AS (anchor UNION ALL recursive hissa): anchor ek baar chalta hai, phir recursive hissa pichle round ki rows par baar baar chalta hai, aur jab koi nayi row nahi banti tab rukta hai. Series aur tree (manager, category) ke liye. Recursive hisse ko rukne ki shart chahiye.",
+    "hindi": "WITH RECURSIVE में anchor एक बार चलता है, फिर recursive हिस्सा पिछले round की rows पर बार-बार चलता है, जब तक नई row न बने।"
+   },
+   "mistake": {
+    "en": "No stop: WITH RECURSIVE n AS (SELECT 1 UNION ALL SELECT x + 1 FROM n): PostgreSQL never ends, MariaDB silently stops after 1000 rounds, MySQL 8 errors (3636).",
+    "hinglish": "Rukne ki shart nahi: PostgreSQL chalta rehta hai, MariaDB 1000 par chupchaap rukta hai.",
+    "hindi": "रुकने की शर्त नहीं: PostgreSQL चलता रहता है, MariaDB 1000 पर चुपचाप रुकता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH RECURSIVE n AS (\n  SELECT 1 AS x\n  UNION ALL\n  SELECT x + 1 FROM n WHERE x < 5\n)\nSELECT x FROM n"
+     },
+     "columns": [
+      "x"
+     ],
+     "result": [
+      [
+       "1"
+      ],
+      [
+       "2"
+      ],
+      [
+       "3"
+      ],
+      [
+       "4"
+      ],
+      [
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "MySQL 8.0+; stops with error 3636 after cte_max_recursion_depth (1000) rounds.",
+    "mariadb": "MariaDB 10.2+; stops WITHOUT an error after max_recursive_iterations (1000) rounds.",
+    "postgresql": "No round limit; a text anchor of type VARCHAR(n) must be cast (CAST(x AS TEXT)) when the recursive part makes it longer."
+   },
+   "related": [
+    "cte",
+    "generate_series",
+    "hierarchy_query"
+   ],
+   "fundamentals": [
+    "recursion"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-with.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/recursive-query",
+    "https://dba.stackexchange.com/questions/tagged/cte",
+    "https://www.percona.com/blog/introduction-to-mysql-8-0-recursive-common-table-expression-part-2/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "generate_series",
+   "kind": "howto",
+   "title": {
+    "en": "Making a series of numbers or dates",
+    "hinglish": "Numbers ya dates ki series banana",
+    "hindi": "Numbers या dates की series बनाना"
+   },
+   "terms": [
+    [
+     "generat\\w*",
+     "(numbers?|series|sequence|dates?|rows)"
+    ],
+    [
+     "(list|all|every|saar\\w*|sab\\w*) (the )?(dates|days|din)",
+     "(between|beech)"
+    ],
+    [
+     "\\d+ (to|se|से) \\d+",
+     "(numbers?|ginti|गिनती)"
+    ],
+    [
+     "calendar table"
+    ],
+    [
+     "(dates|days) (between|in) (two|a|the)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to generate numbers from 1 to 10 in sql",
+     "how to list all dates between two dates"
+    ],
+    "hinglish": [
+     "1 se 10 tak numbers kaise banaye",
+     "do dates ke beech saari dates kaise nikale"
+    ],
+    "hindi": [
+     "SQL में 1 से 10 तक numbers कैसे बनाएं"
+    ]
+   },
+   "answer": {
+    "en": "A recursive CTE: start with the first value and add a step until the last one: WITH RECURSIVE d AS (SELECT DATE '2024-06-01' AS day UNION ALL SELECT day + 1 day FROM d WHERE day < '2024-06-05') SELECT day FROM d. PostgreSQL also has generate_series(). Join the series to your data with a LEFT JOIN to show days that have nothing.",
+    "hinglish": "Recursive CTE: pehli value se shuru karo aur aakhri tak step jodo. PostgreSQL mein generate_series() bhi hai. Khaali din dikhane ke liye series ko data se LEFT JOIN karo.",
+    "hindi": "Recursive CTE: पहली value से शुरू करके आख़िरी तक step जोड़िए। PostgreSQL में generate_series() भी है।"
+   },
+   "mistake": {
+    "en": "A stop condition that never becomes true (or none): see recursive CTE; on MariaDB a series over 1000 values is cut at 1000 unless max_recursive_iterations is raised.",
+    "hinglish": "MariaDB par 1000 se lambi series 1000 par kat jaati hai (max_recursive_iterations).",
+    "hindi": "MariaDB पर 1000 से लंबी series 1000 पर कट जाती है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "WITH RECURSIVE d AS (\n  SELECT DATE '2024-06-01' AS day\n  UNION ALL\n  SELECT day + INTERVAL 1 DAY FROM d WHERE day < '2024-06-05'\n)\nSELECT day FROM d",
+      "postgresql": "SELECT CAST(d AS DATE) AS day\nFROM generate_series(DATE '2024-06-01', DATE '2024-06-05', INTERVAL '1 day') AS d"
+     },
+     "columns": [
+      "day"
+     ],
+     "result": [
+      [
+       "2024-06-01"
+      ],
+      [
+       "2024-06-02"
+      ],
+      [
+       "2024-06-03"
+      ],
+      [
+       "2024-06-04"
+      ],
+      [
+       "2024-06-05"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Recursive CTE (8.0+); cte_max_recursion_depth = 1000 by default.",
+    "mariadb": "Recursive CTE, or the sequence engine: SELECT seq FROM seq_1_to_10.",
+    "postgresql": "generate_series(start, stop, step) for numbers and timestamps."
+   },
+   "related": [
+    "recursive_cte",
+    "gaps_and_islands"
+   ],
+   "fundamentals": [
+    "recursion",
+    "time_ranges"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-with.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/recursive-query",
+    "https://dba.stackexchange.com/questions/tagged/cte",
+    "https://www.percona.com/blog/introduction-to-mysql-8-0-recursive-common-table-expression-part-2/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "hierarchy_query",
+   "kind": "howto",
+   "title": {
+    "en": "Walking a hierarchy (parent and child)",
+    "hinglish": "Hierarchy (parent-child) nikaalna",
+    "hindi": "Hierarchy (parent-child) निकालना"
+   },
+   "terms": [
+    [
+     "(hierarch\\w*|tree|org chart|parent.?child)",
+     "(query|sql|nikal\\w*|get|show|likh\\w*|लिख\\w*|निकाल\\w*|cte)"
+    ],
+    [
+     "(all|every|saare|sab\\w*)",
+     "(under|neeche|below|niche)",
+     "(manager|boss|parent|category)"
+    ],
+    [
+     "(chain|levels?) of (managers|parents|categories)"
+    ],
+    [
+     "(employees|staff|reports|categories|children|team)",
+     "(under|neeche|niche|below|beneath)",
+     "(manager|boss|parent|head)"
+    ],
+    [
+     "recursive\\w*",
+     "(manager|parent|tree|hierarch\\w*|org chart)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to get all employees under a manager",
+     "category tree query in sql"
+    ],
+    "hinglish": [
+     "parent child hierarchy kaise nikale",
+     "manager ke neeche saare employees kaise nikale"
+    ],
+    "hindi": [
+     "parent-child hierarchy query कैसे लिखें"
+    ]
+   },
+   "answer": {
+    "en": "Use a recursive CTE: the anchor picks the starting row (the manager), and the recursive part joins the table to the rows found so far (employees whose manager_id is one of them). Carry a depth column: it shows the level and lets you stop (WHERE depth < 20) if the data ever has a loop.",
+    "hinglish": "Recursive CTE lagao: anchor shuru wali row (manager) chunta hai, aur recursive hissa table ko ab tak mili rows se jodta hai. Depth column rakho: level dikhta hai aur data mein loop ho to WHERE depth < 20 se rok sakte ho.",
+    "hindi": "Recursive CTE: anchor शुरुआती row चुनता है और recursive हिस्सा table को अब तक मिली rows से जोड़ता है। depth column रखिए।"
+   },
+   "mistake": {
+    "en": "UNION ALL with no depth limit: one bad row (an employee who is their own manager's manager) makes it run for ever on PostgreSQL and 1000 rounds on MariaDB.",
+    "hinglish": "Depth limit ke bina UNION ALL: data mein loop ho to kabhi nahi rukta.",
+    "hindi": "Depth limit के बिना UNION ALL: data में loop हो तो कभी नहीं रुकता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH RECURSIVE team AS (\n  SELECT id, first_name, 1 AS depth FROM employees WHERE id = 1\n  UNION ALL\n  SELECT e.id, e.first_name, t.depth + 1 FROM employees e JOIN team t ON e.manager_id = t.id WHERE t.depth < 20\n)\nSELECT id, first_name, depth FROM team ORDER BY depth, id"
+     },
+     "columns": [
+      "id",
+      "first_name",
+      "depth"
+     ],
+     "result": [
+      [
+       "1",
+       "Asha",
+       "1"
+      ],
+      [
+       "2",
+       "Vikram",
+       "2"
+      ],
+      [
+       "3",
+       "Neha",
+       "2"
+      ],
+      [
+       "4",
+       "Rohan",
+       "2"
+      ],
+      [
+       "6",
+       "Kabir",
+       "2"
+      ],
+      [
+       "7",
+       "Meera",
+       "2"
+      ],
+      [
+       "5",
+       "Isha",
+       "3"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Recursive CTE (8.0+).",
+    "mariadb": "Recursive CTE (10.2+); CYCLE ... RESTRICT from 10.5.2.",
+    "postgresql": "Recursive CTE; CYCLE and SEARCH clauses from 14."
+   },
+   "related": [
+    "recursive_cte",
+    "self_join"
+   ],
+   "fundamentals": [
+    "recursion",
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-with.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/recursive-query",
+    "https://dba.stackexchange.com/questions/tagged/cte",
+    "https://www.percona.com/blog/introduction-to-mysql-8-0-recursive-common-table-expression-part-2/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "window_function",
+   "kind": "concept",
+   "title": {
+    "en": "Window functions (OVER)",
+    "hinglish": "Window functions (OVER)",
+    "hindi": "Window functions (OVER)"
+   },
+   "terms": [
+    [
+     "window (functions?|fn)"
+    ],
+    [
+     "over (clause|keyword|function)"
+    ],
+    [
+     "analytic(al)? functions?"
+    ],
+    [
+     "\\bover\\b",
+     "(sql|window|partition|row.?number|rank)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a window function in sql",
+     "explain the over clause"
+    ],
+    "hinglish": [
+     "window function kya hota hai",
+     "over clause kya hai"
+    ],
+    "hindi": [
+     "window function क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A window function adds a value to every row from a group of related rows, without merging the rows the way GROUP BY does: SUM(amount) OVER (PARTITION BY customer_id) puts each customer's total on each of their orders. PARTITION BY picks the rows that belong together, ORDER BY their order, and the frame which of them count. It runs after WHERE / GROUP BY / HAVING, so it can't be used in them.",
+    "hinglish": "Window function har row ko related rows ke group se ek value deta hai, GROUP BY ki tarah rows milaaye bina: SUM(amount) OVER (PARTITION BY customer_id) har order par us customer ka total rakhta hai. Ye WHERE/GROUP BY/HAVING ke baad chalta hai.",
+    "hindi": "Window function rows को मिलाए बिना हर row को एक value देता है। यह WHERE/GROUP BY/HAVING के बाद चलता है।"
+   },
+   "mistake": {
+    "en": "Filtering on it in WHERE (WHERE ROW_NUMBER() OVER (...) = 1): refused everywhere; number in a subquery, filter outside.",
+    "hinglish": "WHERE mein window par filter: har jagah error; subquery mein number karo, bahar filter.",
+    "hindi": "WHERE में window पर filter: हर जगह error।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, customer_id, amount,\n       SUM(amount) OVER (PARTITION BY customer_id) AS customer_total\nFROM orders ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "customer_id",
+      "amount",
+      "customer_total"
+     ],
+     "result": [
+      [
+       "1",
+       "1",
+       "25500",
+       "26000"
+      ],
+      [
+       "2",
+       "1",
+       "500",
+       "26000"
+      ],
+      [
+       "3",
+       "2",
+       "80000",
+       "80500"
+      ],
+      [
+       "4",
+       "3",
+       "12000",
+       "12800"
+      ],
+      [
+       "5",
+       "3",
+       "800",
+       "12800"
+      ],
+      [
+       "6",
+       "6",
+       "65000",
+       "65000"
+      ],
+      [
+       "7",
+       "2",
+       "500",
+       "80500"
+      ],
+      [
+       "8",
+       "8",
+       "300",
+       "300"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "MySQL 8.0+ only.",
+    "mariadb": "MariaDB 10.2+.",
+    "postgresql": "All supported versions; also FILTER and GROUPS frames."
+   },
+   "related": [
+    "partition_by",
+    "rank_functions",
+    "running_total",
+    "group_by_vs_window"
+   ],
+   "fundamentals": [
+    "window_frames"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "partition_by",
+   "kind": "concept",
+   "title": {
+    "en": "PARTITION BY",
+    "hinglish": "PARTITION BY",
+    "hindi": "PARTITION BY"
+   },
+   "terms": [
+    [
+     "partition by"
+    ],
+    [
+     "partition",
+     "(window|over)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is partition by in sql",
+     "what does partition by do in a window function"
+    ],
+    "hinglish": [
+     "partition by kya karta hai"
+    ],
+    "hindi": [
+     "PARTITION BY क्या है"
+    ]
+   },
+   "answer": {
+    "en": "PARTITION BY splits the rows into groups for a window function, which then starts again in each group: AVG(salary) OVER (PARTITION BY department_id) is each department's average, shown on every employee. Unlike GROUP BY, every row stays. With no PARTITION BY the whole result is one group.",
+    "hinglish": "PARTITION BY window function ke liye rows ko groups mein baantta hai, aur har group mein function naye sire se chalta hai. GROUP BY ke ulat, har row bachi rehti hai. PARTITION BY na ho to poora result ek group hai.",
+    "hindi": "PARTITION BY window function के लिए rows को groups में बाँटता है; GROUP BY के उलट हर row बची रहती है।"
+   },
+   "mistake": {
+    "en": "Leaving it out when you meant 'per customer': one running total or numbering over the whole table.",
+    "hinglish": "'Har customer' chahiye tha par PARTITION BY nahi likha: poori table ka ek hi total.",
+    "hindi": "PARTITION BY भूलना: पूरी table का एक ही total।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, department_id, salary,\n       AVG(salary) OVER (PARTITION BY department_id) AS dept_avg\nFROM employees ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "department_id",
+      "salary",
+      "dept_avg"
+     ],
+     "result": [
+      [
+       "1",
+       "1",
+       "90000",
+       "70000"
+      ],
+      [
+       "2",
+       "1",
+       "60000",
+       "70000"
+      ],
+      [
+       "3",
+       "1",
+       "60000",
+       "70000"
+      ],
+      [
+       "4",
+       "2",
+       "45000",
+       "43500"
+      ],
+      [
+       "5",
+       "2",
+       "42000",
+       "43500"
+      ],
+      [
+       "6",
+       "3",
+       "75000",
+       "75000"
+      ],
+      [
+       "7",
+       "NULL",
+       "50000",
+       "50000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0+.",
+    "mariadb": "10.2+.",
+    "postgresql": "Same; also used (differently) for table partitioning in CREATE TABLE."
+   },
+   "related": [
+    "window_function",
+    "group_by_vs_window"
+   ],
+   "fundamentals": [
+    "window_frames",
+    "grain"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "rank_functions",
+   "kind": "compare",
+   "title": {
+    "en": "ROW_NUMBER vs RANK vs DENSE_RANK",
+    "hinglish": "ROW_NUMBER, RANK aur DENSE_RANK",
+    "hindi": "ROW_NUMBER, RANK और DENSE_RANK"
+   },
+   "terms": [
+    [
+     "row.?number",
+     "(rank|dense.?rank)"
+    ],
+    [
+     "dense.?rank",
+     "rank"
+    ],
+    [
+     "dense.?rank"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "difference between row_number rank and dense_rank",
+     "rank vs dense_rank"
+    ],
+    "hinglish": [
+     "row_number aur rank mein kya farak hai"
+    ],
+    "hindi": [
+     "ROW_NUMBER, RANK और DENSE_RANK में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "All three number rows in the window's ORDER BY. ROW_NUMBER never repeats: tied rows get 1 and 2 in any order. RANK gives tied rows the same number and skips after them (1, 1, 3). DENSE_RANK gives ties the same number without gaps (1, 1, 2). Pick ROW_NUMBER for exactly one row per group (add a tie-breaker), RANK to keep all ties, DENSE_RANK for 'the 2nd highest value'.",
+    "hinglish": "Teeno window ke ORDER BY se number dete hain. ROW_NUMBER kabhi repeat nahi karta (barabar rows ko 1 aur 2, kisi bhi kram mein). RANK barabar ko same number aur phir gap (1, 1, 3). DENSE_RANK bina gap (1, 1, 2).",
+    "hindi": "ROW_NUMBER कभी दोहराता नहीं; RANK बराबर rows को एक नंबर और फिर gap (1, 1, 3); DENSE_RANK बिना gap (1, 1, 2)।"
+   },
+   "mistake": {
+    "en": "ROW_NUMBER for 'the 3rd highest salary': with two equal salaries it picks one row and can land on the wrong value; DENSE_RANK is the one for values.",
+    "hinglish": "3rd highest salary ke liye ROW_NUMBER: barabar salaries par galat row.",
+    "hindi": "3rd highest salary के लिए ROW_NUMBER: बराबर salaries पर गलत row।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, salary,\n       ROW_NUMBER() OVER (ORDER BY salary DESC, id) AS row_no,\n       RANK() OVER (ORDER BY salary DESC) AS rnk,\n       DENSE_RANK() OVER (ORDER BY salary DESC) AS dense_rnk\nFROM employees ORDER BY salary DESC, id"
+     },
+     "columns": [
+      "id",
+      "salary",
+      "row_no",
+      "rnk",
+      "dense_rnk"
+     ],
+     "result": [
+      [
+       "1",
+       "90000",
+       "1",
+       "1",
+       "1"
+      ],
+      [
+       "6",
+       "75000",
+       "2",
+       "2",
+       "2"
+      ],
+      [
+       "2",
+       "60000",
+       "3",
+       "3",
+       "3"
+      ],
+      [
+       "3",
+       "60000",
+       "4",
+       "3",
+       "3"
+      ],
+      [
+       "7",
+       "50000",
+       "5",
+       "5",
+       "4"
+      ],
+      [
+       "4",
+       "45000",
+       "6",
+       "6",
+       "5"
+      ],
+      [
+       "5",
+       "42000",
+       "7",
+       "7",
+       "6"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0+.",
+    "mariadb": "10.2+.",
+    "postgresql": "All versions."
+   },
+   "related": [
+    "row_number",
+    "nth_highest",
+    "top_n_per_group"
+   ],
+   "fundamentals": [
+    "window_frames",
+    "ranking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "row_number",
+   "kind": "concept",
+   "title": {
+    "en": "ROW_NUMBER()",
+    "hinglish": "ROW_NUMBER()",
+    "hindi": "ROW_NUMBER()"
+   },
+   "terms": [
+    [
+     "row.?number"
+    ],
+    [
+     "(serial|sequence|running) (number|no)",
+     "(rows?|result|select|query)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is row_number in sql",
+     "how to add a serial number to query results"
+    ],
+    "hinglish": [
+     "row_number kya karta hai",
+     "query result mein serial number kaise de"
+    ],
+    "hindi": [
+     "ROW_NUMBER क्या करता है"
+    ]
+   },
+   "answer": {
+    "en": "ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...) numbers the rows 1, 2, 3 ... in the window's order, starting again in each partition. It is the usual way to keep one row per group: number them in a subquery and keep rn = 1 outside. End the ORDER BY with a unique column, or tied rows get their numbers in any order.",
+    "hinglish": "ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...) rows ko 1, 2, 3 ... deta hai, har partition mein naye sire se. Har group ki ek row rakhne ke liye: subquery mein number karo aur bahar rn = 1. ORDER BY ke aakhir mein unique column rakho.",
+    "hindi": "ROW_NUMBER() rows को 1, 2, 3 ... देता है; हर group की एक row रखने के लिए subquery में number करके बाहर rn = 1।"
+   },
+   "mistake": {
+    "en": "ORDER BY a column with ties (salary): which tied row is number 1 differs between runs and databases (lab: MariaDB and PostgreSQL numbered two tied orders the other way round).",
+    "hinglish": "Barabar values par ORDER BY: kaunsi row 1 bane, tay nahi.",
+    "hindi": "बराबर values पर ORDER BY: कौनसी row 1 बने, तय नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT customer_id, id, order_date,\n       ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date, id) AS nth_order\nFROM orders ORDER BY customer_id, nth_order"
+     },
+     "columns": [
+      "customer_id",
+      "id",
+      "order_date",
+      "nth_order"
+     ],
+     "result": [
+      [
+       "1",
+       "1",
+       "2024-06-01",
+       "1"
+      ],
+      [
+       "1",
+       "2",
+       "2024-06-15",
+       "2"
+      ],
+      [
+       "2",
+       "3",
+       "2024-06-20",
+       "1"
+      ],
+      [
+       "2",
+       "7",
+       "2024-07-30",
+       "2"
+      ],
+      [
+       "3",
+       "4",
+       "2024-07-02",
+       "1"
+      ],
+      [
+       "3",
+       "5",
+       "2024-07-10",
+       "2"
+      ],
+      [
+       "6",
+       "6",
+       "2024-07-11",
+       "1"
+      ],
+      [
+       "8",
+       "8",
+       "2024-08-03",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0+; on 5.7 use a correlated subquery or user variables.",
+    "mariadb": "10.2+.",
+    "postgresql": "All versions."
+   },
+   "related": [
+    "rank_functions",
+    "latest_per_group",
+    "window_in_where"
+   ],
+   "fundamentals": [
+    "window_frames",
+    "ranking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "running_total",
+   "kind": "howto",
+   "title": {
+    "en": "Running (cumulative) total",
+    "hinglish": "Running (cumulative) total",
+    "hindi": "Running (cumulative) total"
+   },
+   "terms": [
+    [
+     "(running|cumulative|cummulative|progressive) (total|sum|count)"
+    ],
+    [
+     "(jodte|badhta|chalta) (hua )?total"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to calculate a running total in sql",
+     "how to get a cumulative sum by date"
+    ],
+    "hinglish": [
+     "cumulative sum kaise nikale",
+     "running total kaise banaye"
+    ],
+    "hindi": [
+     "running total कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "SUM(amount) OVER (ORDER BY order_date, id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW): each row gets the total of itself and every row before it. Add PARTITION BY customer_id for one running total per customer. End the ORDER BY with a unique column and use ROWS, or rows that tie on the date share one total.",
+    "hinglish": "SUM(amount) OVER (ORDER BY order_date, id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW): har row ko khud tak ka total. Har customer ka alag chahiye to PARTITION BY customer_id. ORDER BY ke aakhir mein unique column aur ROWS.",
+    "hindi": "SUM(amount) OVER (ORDER BY ... ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW): हर row को ख़ुद तक का total।"
+   },
+   "mistake": {
+    "en": "ORDER BY only the date with no frame: the default RANGE frame gives every row of the same day the day's full total (lab: three items of one order all showed 4).",
+    "hinglish": "Sirf date se ORDER BY, frame nahi: ek din ki saari rows ko ek hi total.",
+    "hindi": "सिर्फ़ date से ORDER BY: एक दिन की सारी rows को एक ही total।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, order_date, amount,\n       SUM(amount) OVER (ORDER BY order_date, id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running\nFROM orders ORDER BY order_date, id"
+     },
+     "columns": [
+      "id",
+      "order_date",
+      "amount",
+      "running"
+     ],
+     "result": [
+      [
+       "1",
+       "2024-06-01",
+       "25500",
+       "25500"
+      ],
+      [
+       "2",
+       "2024-06-15",
+       "500",
+       "26000"
+      ],
+      [
+       "3",
+       "2024-06-20",
+       "80000",
+       "106000"
+      ],
+      [
+       "4",
+       "2024-07-02",
+       "12000",
+       "118000"
+      ],
+      [
+       "5",
+       "2024-07-10",
+       "800",
+       "118800"
+      ],
+      [
+       "6",
+       "2024-07-11",
+       "65000",
+       "183800"
+      ],
+      [
+       "7",
+       "2024-07-30",
+       "500",
+       "184300"
+      ],
+      [
+       "8",
+       "2024-08-03",
+       "300",
+       "184600"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0+; on 5.7 a correlated subquery (slow) or variables.",
+    "mariadb": "10.2+.",
+    "postgresql": "All versions."
+   },
+   "related": [
+    "window_frame",
+    "moving_average",
+    "window_function"
+   ],
+   "fundamentals": [
+    "window_frames",
+    "aggregation"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/window-functions-frames.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "lag_lead",
+   "kind": "concept",
+   "title": {
+    "en": "LAG and LEAD",
+    "hinglish": "LAG aur LEAD",
+    "hindi": "LAG और LEAD"
+   },
+   "terms": [
+    [
+     "\\blag\\b"
+    ],
+    [
+     "\\blead\\b",
+     "(lag|window|sql|function|kya|what|over|previous|next)"
+    ],
+    [
+     "previous (row|record|value|order)"
+    ],
+    [
+     "(pichl\\w*|pehle wal\\w*) (row|value)"
+    ],
+    [
+     "next row"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is lag and lead in sql",
+     "how to get the previous row's value"
+    ],
+    "hinglish": [
+     "pichli row ki value kaise nikale",
+     "lag lead kya hai"
+    ],
+    "hindi": [
+     "LAG और LEAD क्या है"
+    ]
+   },
+   "answer": {
+    "en": "LAG(x) gives x from the row before in the window's order, LEAD(x) from the row after; LAG(x, 2) goes two rows back and LAG(x, 1, 0) gives 0 instead of NULL when there is no row. Use them for change since last time (amount - LAG(amount)) and for gaps. They need an ORDER BY in the window.",
+    "hinglish": "LAG(x) window ke kram mein pichli row ka x deta hai, LEAD(x) agli row ka; LAG(x, 1, 0) row na ho to NULL ki jagah 0. Pichli baar se badlaav (amount - LAG(amount)) ke liye. Window mein ORDER BY chahiye.",
+    "hindi": "LAG(x) पिछली row का x देता है, LEAD(x) अगली row का। window में ORDER BY चाहिए।"
+   },
+   "mistake": {
+    "en": "No ORDER BY in the window: MariaDB refuses it (4018) and PostgreSQL gives whatever row was read before (lab).",
+    "hinglish": "Window mein ORDER BY nahi: MariaDB error 4018, PostgreSQL koi bhi row.",
+    "hindi": "ORDER BY नहीं: MariaDB error 4018, PostgreSQL कोई भी row।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, order_date, amount,\n       LAG(amount) OVER (ORDER BY order_date, id) AS previous_amount,\n       amount - LAG(amount) OVER (ORDER BY order_date, id) AS amount_change\nFROM orders ORDER BY order_date, id"
+     },
+     "columns": [
+      "id",
+      "order_date",
+      "amount",
+      "previous_amount",
+      "amount_change"
+     ],
+     "result": [
+      [
+       "1",
+       "2024-06-01",
+       "25500",
+       "NULL",
+       "NULL"
+      ],
+      [
+       "2",
+       "2024-06-15",
+       "500",
+       "25500",
+       "-25000"
+      ],
+      [
+       "3",
+       "2024-06-20",
+       "80000",
+       "500",
+       "79500"
+      ],
+      [
+       "4",
+       "2024-07-02",
+       "12000",
+       "80000",
+       "-68000"
+      ],
+      [
+       "5",
+       "2024-07-10",
+       "800",
+       "12000",
+       "-11200"
+      ],
+      [
+       "6",
+       "2024-07-11",
+       "65000",
+       "800",
+       "64200"
+      ],
+      [
+       "7",
+       "2024-07-30",
+       "500",
+       "65000",
+       "-64500"
+      ],
+      [
+       "8",
+       "2024-08-03",
+       "300",
+       "500",
+       "-200"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0+.",
+    "mariadb": "10.2+; ORDER BY is required in the window (4018 without it).",
+    "postgresql": "All versions; runs without ORDER BY but the row is arbitrary."
+   },
+   "related": [
+    "window_function",
+    "gaps_and_islands"
+   ],
+   "fundamentals": [
+    "window_frames"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "window_frame",
+   "kind": "concept",
+   "title": {
+    "en": "The window frame (ROWS / RANGE)",
+    "hinglish": "Window frame (ROWS / RANGE)",
+    "hindi": "Window frame (ROWS / RANGE)"
+   },
+   "terms": [
+    [
+     "unbounded preceding"
+    ],
+    [
+     "rows between"
+    ],
+    [
+     "range between"
+    ],
+    [
+     "\\brows\\b",
+     "\\brange\\b",
+     "(window|frame|over|vs)"
+    ],
+    [
+     "window frames?"
+    ],
+    [
+     "frame (clause|kya)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is rows between unbounded preceding and current row",
+     "rows vs range in window functions"
+    ],
+    "hinglish": [
+     "window frame kya hota hai"
+    ],
+    "hindi": [
+     "window frame क्या है"
+    ]
+   },
+   "answer": {
+    "en": "The frame is the slice of the partition the function sees for the current row. ROWS counts rows (2 PRECEDING = the two rows before); RANGE counts values, so rows that tie on the ORDER BY are in or out together. With ORDER BY and no frame the default is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW (start to here, ties included); with no ORDER BY it is the whole partition.",
+    "hinglish": "Frame partition ka wo hissa hai jo current row ke liye function dekhta hai. ROWS rows ginta hai (2 PRECEDING = pichli do rows); RANGE values ginta hai, isliye barabar rows saath aati hain. ORDER BY ho aur frame na ho to default RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW.",
+    "hindi": "Frame partition का वह हिस्सा है जो function current row के लिए देखता है। ROWS rows गिनता है, RANGE values।"
+   },
+   "mistake": {
+    "en": "Relying on the default frame: running totals share one value across ties and LAST_VALUE returns the current row.",
+    "hinglish": "Default frame par bharosa: barabar rows ka ek total, aur LAST_VALUE current row.",
+    "hindi": "Default frame पर भरोसा: बराबर rows का एक total।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, order_id, quantity,\n       SUM(quantity) OVER (ORDER BY order_id) AS range_default,\n       SUM(quantity) OVER (ORDER BY order_id, id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS rows_frame\nFROM order_items WHERE order_id <= 2 ORDER BY order_id, id"
+     },
+     "columns": [
+      "id",
+      "order_id",
+      "quantity",
+      "range_default",
+      "rows_frame"
+     ],
+     "result": [
+      [
+       "1",
+       "1",
+       "1",
+       "4",
+       "1"
+      ],
+      [
+       "2",
+       "1",
+       "1",
+       "4",
+       "2"
+      ],
+      [
+       "10",
+       "1",
+       "2",
+       "4",
+       "4"
+      ],
+      [
+       "3",
+       "2",
+       "1",
+       "5",
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0+: ROWS and RANGE.",
+    "mariadb": "10.2+: ROWS and RANGE.",
+    "postgresql": "ROWS, RANGE and GROUPS, plus EXCLUDE."
+   },
+   "related": [
+    "running_total",
+    "last_value_frame",
+    "moving_average"
+   ],
+   "fundamentals": [
+    "window_frames"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/window-functions-frames.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "last_value_frame",
+   "kind": "why",
+   "title": {
+    "en": "Why LAST_VALUE gives the current row",
+    "hinglish": "LAST_VALUE current row kyun deta hai",
+    "hindi": "LAST_VALUE current row क्यों देता है"
+   },
+   "terms": [
+    [
+     "last.?value"
+    ],
+    [
+     "first.?value"
+    ],
+    [
+     "nth.?value"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why does last_value return the current row",
+     "what is first_value and last_value"
+    ],
+    "hinglish": [
+     "last_value galat value kyun deta hai"
+    ],
+    "hindi": [
+     "LAST_VALUE गलत value क्यों देता है"
+    ]
+   },
+   "answer": {
+    "en": "Because of the default frame: with ORDER BY and no frame, a window sees only the rows from the start up to the current row (and its ties), so the 'last' row it can see is the current one. Widen the frame: LAST_VALUE(x) OVER (PARTITION BY ... ORDER BY ... ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING), or use MAX / FIRST_VALUE with the order reversed.",
+    "hinglish": "Default frame ki wajah se: ORDER BY ho aur frame na ho to window shuru se current row tak hi dekhta hai, isliye 'aakhri' row current hi hai. Frame badhao: ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING.",
+    "hindi": "Default frame की वजह से window सिर्फ़ current row तक देखता है। Frame बढ़ाइए: ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING।"
+   },
+   "mistake": {
+    "en": "LAST_VALUE(salary) OVER (PARTITION BY department_id ORDER BY salary): every employee gets their own salary (lab, both).",
+    "hinglish": "Bina frame LAST_VALUE: har employee ko apni hi salary.",
+    "hindi": "बिना frame LAST_VALUE: हर employee को अपनी ही salary।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, department_id, salary,\n       LAST_VALUE(salary) OVER (PARTITION BY department_id ORDER BY salary) AS default_frame,\n       LAST_VALUE(salary) OVER (PARTITION BY department_id ORDER BY salary\n                                ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS whole_partition\nFROM employees ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "department_id",
+      "salary",
+      "default_frame",
+      "whole_partition"
+     ],
+     "result": [
+      [
+       "1",
+       "1",
+       "90000",
+       "90000",
+       "90000"
+      ],
+      [
+       "2",
+       "1",
+       "60000",
+       "60000",
+       "90000"
+      ],
+      [
+       "3",
+       "1",
+       "60000",
+       "60000",
+       "90000"
+      ],
+      [
+       "4",
+       "2",
+       "45000",
+       "45000",
+       "45000"
+      ],
+      [
+       "5",
+       "2",
+       "42000",
+       "42000",
+       "45000"
+      ],
+      [
+       "6",
+       "3",
+       "75000",
+       "75000",
+       "75000"
+      ],
+      [
+       "7",
+       "NULL",
+       "50000",
+       "50000",
+       "50000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0+.",
+    "mariadb": "10.2+.",
+    "postgresql": "All versions."
+   },
+   "related": [
+    "window_frame",
+    "window_function"
+   ],
+   "fundamentals": [
+    "window_frames"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "ntile",
+   "kind": "concept",
+   "title": {
+    "en": "NTILE (equal buckets)",
+    "hinglish": "NTILE (barabar buckets)",
+    "hindi": "NTILE (बराबर buckets)"
+   },
+   "terms": [
+    [
+     "ntile"
+    ],
+    [
+     "(quartiles?|deciles?|percentiles?|equal (groups|parts|buckets))"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is ntile in sql",
+     "how to split rows into 4 equal groups"
+    ],
+    "hinglish": [
+     "ntile kya karta hai"
+    ],
+    "hindi": [
+     "NTILE क्या है"
+    ]
+   },
+   "answer": {
+    "en": "NTILE(n) OVER (ORDER BY x) splits the ordered rows into n buckets of nearly equal size and gives each row its bucket number; when the rows don't divide evenly the first buckets get one row more (8 rows in 3 buckets: 3, 3, 2). Rows with the same x can land in different buckets, so it counts rows, not values.",
+    "hinglish": "NTILE(n) OVER (ORDER BY x) kram wali rows ko n lagbhag barabar buckets mein baant kar har row ko bucket number deta hai; barabar na bante ho to pehle buckets mein ek row zyada. Barabar x wali rows alag buckets mein ja sakti hain.",
+    "hindi": "NTILE(n) rows को n लगभग बराबर buckets में बाँटता है; पहले buckets में एक row ज़्यादा हो सकती है।"
+   },
+   "mistake": {
+    "en": "No ORDER BY in the window: the buckets are filled in any order.",
+    "hinglish": "Window mein ORDER BY nahi: buckets kisi bhi kram mein.",
+    "hindi": "ORDER BY नहीं: buckets किसी भी क्रम में।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount, NTILE(4) OVER (ORDER BY amount, id) AS quartile\nFROM orders ORDER BY amount, id"
+     },
+     "columns": [
+      "id",
+      "amount",
+      "quartile"
+     ],
+     "result": [
+      [
+       "8",
+       "300",
+       "1"
+      ],
+      [
+       "2",
+       "500",
+       "1"
+      ],
+      [
+       "7",
+       "500",
+       "2"
+      ],
+      [
+       "5",
+       "800",
+       "2"
+      ],
+      [
+       "4",
+       "12000",
+       "3"
+      ],
+      [
+       "1",
+       "25500",
+       "3"
+      ],
+      [
+       "6",
+       "65000",
+       "4"
+      ],
+      [
+       "3",
+       "80000",
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0+.",
+    "mariadb": "10.2+.",
+    "postgresql": "All versions; percentile_cont() for value percentiles."
+   },
+   "related": [
+    "rank_functions",
+    "window_function"
+   ],
+   "fundamentals": [
+    "window_frames",
+    "ranking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "gaps_and_islands",
+   "kind": "howto",
+   "title": {
+    "en": "Gaps and islands (consecutive runs)",
+    "hinglish": "Gaps and islands (lagatar runs)",
+    "hindi": "Gaps and islands (लगातार runs)"
+   },
+   "terms": [
+    [
+     "gaps?",
+     "islands?"
+    ],
+    [
+     "consecutive",
+     "(days|dates|rows|numbers|values|logins?|months)"
+    ],
+    [
+     "(lagatar|lagaatar|लगातार)"
+    ],
+    [
+     "(missing|gaps? in) (the )?(ids?|numbers|sequence|dates)"
+    ],
+    [
+     "streaks?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "gaps and islands problem in sql",
+     "how to find consecutive days"
+    ],
+    "hinglish": [
+     "lagatar din kaise nikale",
+     "missing ids kaise dhoondhe"
+    ],
+    "hindi": [
+     "लगातार दिन कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "Number the rows in order with ROW_NUMBER and subtract that number from the value (date minus row number): along a consecutive run the difference stays the same, and it jumps where a gap is. GROUP BY that difference gives one row per run (its start, end and length). For gaps, compare each row with LEAD(value): where the next value is more than one step away, a gap starts.",
+    "hinglish": "ROW_NUMBER se rows ko kram mein number do aur value (date) mein se wo number ghatao: lagatar run mein farak same rehta hai, gap par badal jaata hai. Us farak par GROUP BY se har run ki ek row (shuru, ant, lambai). Gap ke liye har row ko LEAD(value) se milao.",
+    "hindi": "ROW_NUMBER से number दीजिए और date में से वह number घटाइए: लगातार run में अंतर एक जैसा रहता है। उस अंतर पर GROUP BY।"
+   },
+   "mistake": {
+    "en": "Repeated values (two logins on the same day) break the trick: take DISTINCT dates first, or use DENSE_RANK.",
+    "hinglish": "Ek din mein do login: pehle DISTINCT dates lo, ya DENSE_RANK.",
+    "hindi": "एक दिन में दो login: पहले DISTINCT dates लीजिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "WITH days AS (\n  SELECT DATE '2024-06-01' AS d UNION ALL SELECT DATE '2024-06-02' UNION ALL SELECT DATE '2024-06-03'\n  UNION ALL SELECT DATE '2024-06-06' UNION ALL SELECT DATE '2024-06-07'\n),\ng AS (SELECT d, DATE_SUB(d, INTERVAL ROW_NUMBER() OVER (ORDER BY d) DAY) AS grp FROM days)\nSELECT MIN(d) AS run_start, MAX(d) AS run_end, COUNT(*) AS days FROM g GROUP BY grp ORDER BY run_start",
+      "postgresql": "WITH days AS (\n  SELECT DATE '2024-06-01' AS d UNION ALL SELECT DATE '2024-06-02' UNION ALL SELECT DATE '2024-06-03'\n  UNION ALL SELECT DATE '2024-06-06' UNION ALL SELECT DATE '2024-06-07'\n),\ng AS (SELECT d, d - CAST(ROW_NUMBER() OVER (ORDER BY d) AS INT) AS grp FROM days)\nSELECT MIN(d) AS run_start, MAX(d) AS run_end, COUNT(*) AS days FROM g GROUP BY grp ORDER BY run_start"
+     },
+     "columns": [
+      "run_start",
+      "run_end",
+      "days"
+     ],
+     "result": [
+      [
+       "2024-06-01",
+       "2024-06-03",
+       "3"
+      ],
+      [
+       "2024-06-06",
+       "2024-06-07",
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "DATE_SUB(d, INTERVAL rn DAY) (8.0+). Plain d - rn turns the date into a number (20240601 - 1).",
+    "mariadb": "Same as MySQL (10.2+).",
+    "postgresql": "date - integer gives a date."
+   },
+   "related": [
+    "lag_lead",
+    "row_number",
+    "generate_series"
+   ],
+   "fundamentals": [
+    "window_frames",
+    "time_ranges"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "moving_average",
+   "kind": "howto",
+   "title": {
+    "en": "Moving (rolling) average",
+    "hinglish": "Moving (rolling) average",
+    "hindi": "Moving (rolling) average"
+   },
+   "terms": [
+    [
+     "(moving|rolling|sliding) (average|avg|sum|total|mean)"
+    ],
+    [
+     "last \\d+ (days|rows|orders)",
+     "(average|avg)"
+    ],
+    [
+     "(moving|rolling|sliding)",
+     "(average|avg|mean)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to calculate a moving average in sql",
+     "how to calculate a rolling 7 day average"
+    ],
+    "hinglish": [
+     "moving average kaise nikale"
+    ],
+    "hindi": [
+     "moving average कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "AVG(x) OVER (ORDER BY day ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) averages each row with the 6 rows before it (7 rows). ROWS counts rows, so missing days shorten the window in time: join a calendar (a generated series of dates) first if every day must count. The first rows average fewer values.",
+    "hinglish": "AVG(x) OVER (ORDER BY day ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) har row ko pichli 6 rows ke saath average karta hai. ROWS rows ginta hai, isliye gayab din window chhota karte hain: har din chahiye to pehle calendar join karo.",
+    "hindi": "AVG(x) OVER (ORDER BY day ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) हर row को पिछली 6 rows के साथ average करता है।"
+   },
+   "mistake": {
+    "en": "Forgetting the frame: without ROWS BETWEEN ... the average runs from the very first row (a running average).",
+    "hinglish": "Frame bhoolna: shuru se ab tak ka average ban jaata hai.",
+    "hindi": "Frame भूलना: शुरू से अब तक का average बन जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, order_date, amount,\n       AVG(amount) OVER (ORDER BY order_date, id ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS avg_last_3\nFROM orders ORDER BY order_date, id"
+     },
+     "columns": [
+      "id",
+      "order_date",
+      "amount",
+      "avg_last_3"
+     ],
+     "result": [
+      [
+       "1",
+       "2024-06-01",
+       "25500",
+       "25500"
+      ],
+      [
+       "2",
+       "2024-06-15",
+       "500",
+       "13000"
+      ],
+      [
+       "3",
+       "2024-06-20",
+       "80000",
+       "35333.33"
+      ],
+      [
+       "4",
+       "2024-07-02",
+       "12000",
+       "30833.33"
+      ],
+      [
+       "5",
+       "2024-07-10",
+       "800",
+       "30933.33"
+      ],
+      [
+       "6",
+       "2024-07-11",
+       "65000",
+       "25933.33"
+      ],
+      [
+       "7",
+       "2024-07-30",
+       "500",
+       "22100"
+      ],
+      [
+       "8",
+       "2024-08-03",
+       "300",
+       "21933.33"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0+.",
+    "mariadb": "10.2+.",
+    "postgresql": "All versions; RANGE BETWEEN INTERVAL '6 days' PRECEDING AND CURRENT ROW counts days, not rows."
+   },
+   "related": [
+    "window_frame",
+    "running_total",
+    "generate_series"
+   ],
+   "fundamentals": [
+    "window_frames",
+    "time_ranges"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/window-functions-frames.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "window_in_where",
+   "kind": "why",
+   "title": {
+    "en": "Why a window function can't go in WHERE",
+    "hinglish": "WHERE mein window function kyun nahi chalta",
+    "hindi": "WHERE में window function क्यों नहीं चलता"
+   },
+   "terms": [
+    [
+     "(window|row.?number|rank|dense.?rank|over|lag|lead|ntile)",
+     "\\bwhere\\b"
+    ],
+    [
+     "filter\\w*",
+     "(window function|row.?number|dense.?rank|\\brank\\b)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why can't i use row_number in where",
+     "how to filter on a window function"
+    ],
+    "hinglish": [
+     "row_number ko where mein kyun use nahi kar sakte"
+    ],
+    "hindi": [
+     "WHERE में ROW_NUMBER क्यों नहीं चलता"
+    ]
+   },
+   "answer": {
+    "en": "A query is worked out in steps: FROM and joins, WHERE, GROUP BY, HAVING, then the window functions, then ORDER BY and LIMIT. When WHERE runs, the window's value doesn't exist yet, and neither does its SELECT name. Number the rows in a subquery or a CTE and filter outside: SELECT ... FROM (SELECT ..., ROW_NUMBER() OVER (...) AS rn FROM t) x WHERE rn <= 3.",
+    "hinglish": "Query steps mein banti hai: FROM, WHERE, GROUP BY, HAVING, phir window functions, phir ORDER BY / LIMIT. WHERE ke waqt window ki value (aur uska SELECT naam) hota hi nahi. Subquery ya CTE mein number karo aur bahar filter karo.",
+    "hindi": "Query कदमों में बनती है: FROM, WHERE, GROUP BY, HAVING, फिर window functions। WHERE के समय window की value होती ही नहीं।"
+   },
+   "mistake": {
+    "en": "WHERE rn = 1 in the same query: MariaDB 1054 Unknown column, PostgreSQL 42703; WHERE ROW_NUMBER() OVER (...) = 1: 4015 / 42P20.",
+    "hinglish": "Usi query mein WHERE rn = 1: error 1054 / 42703.",
+    "hindi": "उसी query में WHERE rn = 1: error 1054 / 42703।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, salary\nFROM (SELECT id, salary, ROW_NUMBER() OVER (ORDER BY salary DESC, id) AS rn FROM employees) AS ranked\nWHERE rn <= 3\nORDER BY rn"
+     },
+     "columns": [
+      "id",
+      "salary"
+     ],
+     "result": [
+      [
+       "1",
+       "90000"
+      ],
+      [
+       "6",
+       "75000"
+      ],
+      [
+       "2",
+       "60000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Error 1054 / 3593.",
+    "mariadb": "Error 1054 / 4015.",
+    "postgresql": "Error 42703 / 42P20."
+   },
+   "related": [
+    "row_number",
+    "window_function",
+    "where_vs_having"
+   ],
+   "fundamentals": [
+    "window_frames",
+    "filter_level"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "window_old_versions",
+   "kind": "concept",
+   "title": {
+    "en": "Window functions and CTEs on old versions",
+    "hinglish": "Purane versions mein window functions aur CTE",
+    "hindi": "पुराने versions में window functions और CTE"
+   },
+   "terms": [
+    [
+     "(mysql 5|5 [0-7]|version|versions|10 [01]|old|purane|पुराने)",
+     "(window|cte|ctes|with recursive|row.?number|over|lag|rank)"
+    ],
+    [
+     "(purane|old|older|पुराने)",
+     "(mysql|maria ?db)",
+     "(window|cte|ctes|row.?number|over|lag|rank)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does mysql 5.7 support window functions",
+     "is cte supported in mysql 5.7"
+    ],
+    "hinglish": [
+     "mysql 5.7 mein row_number chalta hai kya",
+     "purane mysql mein window function kaise likhe"
+    ],
+    "hindi": [
+     "MySQL 5.7 में window function चलता है क्या"
+    ]
+   },
+   "answer": {
+    "en": "No: window functions (OVER, ROW_NUMBER, LAG ...) and WITH / WITH RECURSIVE came in MySQL 8.0 and MariaDB 10.2; MySQL 5.x and MariaDB 10.0/10.1 give a syntax error (1064). PostgreSQL has had both for a long time. On an old version write the same thing with a correlated subquery (latest row per group), a derived table instead of a WITH, or a self-join for running totals.",
+    "hinglish": "Nahi: window functions aur WITH / WITH RECURSIVE MySQL 8.0 aur MariaDB 10.2 mein aaye; MySQL 5.x aur MariaDB 10.0/10.1 syntax error (1064) dete hain. Purane version mein correlated subquery, derived table ya self-join se likho.",
+    "hindi": "नहीं: window functions और WITH MySQL 8.0 और MariaDB 10.2 में आए; पुराने version में correlated subquery से लिखिए।"
+   },
+   "mistake": {
+    "en": "Running a query written for MySQL 8 on a 5.7 server: 1064 near '(PARTITION BY ...'. Check SELECT VERSION() first.",
+    "hinglish": "MySQL 8 wali query 5.7 par: error 1064. Pehle SELECT VERSION() dekho.",
+    "hindi": "MySQL 8 वाली query 5.7 पर: error 1064।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT customer_id, id, order_date\nFROM orders o\nWHERE order_date = (SELECT MAX(x.order_date) FROM orders x WHERE x.customer_id = o.customer_id)\nORDER BY customer_id"
+     },
+     "columns": [
+      "customer_id",
+      "id",
+      "order_date"
+     ],
+     "result": [
+      [
+       "1",
+       "2",
+       "2024-06-15"
+      ],
+      [
+       "2",
+       "7",
+       "2024-07-30"
+      ],
+      [
+       "3",
+       "5",
+       "2024-07-10"
+      ],
+      [
+       "6",
+       "6",
+       "2024-07-11"
+      ],
+      [
+       "8",
+       "8",
+       "2024-08-03"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "8.0+ for both (5.7: neither).",
+    "mariadb": "10.2+ for both.",
+    "postgresql": "Both in every supported version."
+   },
+   "related": [
+    "window_function",
+    "cte",
+    "latest_per_group"
+   ],
+   "fundamentals": [
+    "window_frames",
+    "engine_syntax"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/window-functions-usage.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions",
+    "https://dba.stackexchange.com/questions/tagged/window-functions",
+    "https://www.cybertec-postgresql.com/en/?p=5170"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

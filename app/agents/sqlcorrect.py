@@ -530,6 +530,18 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
         if sedits and not any(a < e[1] and e[0] < b for e in sedits for a, b, _n in edits):
             edits += sedits
 
+    # CASE, WITH and window functions (app/agents/sqlwin.py): first true WHEN wins, recursion must end, windows run last
+    from app.agents import sqlwin
+
+    for fnd, wedits in sqlwin.windows(sql, s, intent, Finding):
+        if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        if fnd.kind == "check" and _SURE_ONLY.get() and fnd.topic in _meaning_checks():
+            continue                                       # a definite mistake is fixed alone; the 'if you meant' rewrite waits
+        if wedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in wedits for a, b, _n in edits):
+            edits += wedits
+
     # changing data (app/agents/sqlchange.py): which rows, how often, what value, which column, engine syntax
     if not is_select:
         from app.agents import sqlchange
@@ -1225,8 +1237,13 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
     where = cl.get("where")
     if where:
         wtext = _no_subqueries(s[where[0]:where[1]])     # a name inside a subquery is that subquery's own column
+        from app.agents import sqlwin
+
+        win_names = sqlwin.window_names(s)                 # a window's name in WHERE: sqlwin's win_alias_where (wrapped, not repeated)
         for m in WORD.finditer(wtext):
             w = m.group(1)
+            if w.lower() in win_names:
+                continue
             if w.lower() in sel_aliases and not any(w.lower() == (x.alias or "").lower() for x in srcs) and \
                     not re.match(r"\s*\.", wtext[m.end():]) and not any(w.lower() == c.lower() for _q, c, _p in all_refs) and \
                     not re.search(rf"(?<![\w.]){re.escape(w)}(?!\w)", re.sub(r"\s+as\s+\S+\s*$", "", sel_aliases[w.lower()]["text"], flags=re.I), re.I):
@@ -1515,6 +1532,8 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
         per_row = []                     # AND-parts that use no total (SUM, COUNT, or a SELECT name for one)
         for a1, b1 in zip(cuts, cuts[1:]):
             part = htext[a1:b1]
+            if re.search(r"\bover\b", part, re.I):
+                continue                                  # a window function in HAVING: sqlwin's win_where
             if not AGG.search(part) and not any(w.lower() in totals for w in _bare(part, set())):
                 per_row.append(re.sub(r"(?i)^\s*and\s+|\s+and\s*$", "", sql[having[0] + a1:having[0] + b1]).strip())
         if per_row:
@@ -1573,6 +1592,16 @@ _ENGINE_NAME = {"mysql": "MySQL", "mariadb": "MariaDB", "postgres": "PostgreSQL"
 _LEARNED = None
 
 
+# an engine message about the lab itself (a full disk, a server limit, a table the drafted example made up) says nothing about
+# the query shape a learned rule detects: such a rule is not proven and is never shown (night 7: a 'recursive query with a
+# JOIN' rule claimed PostgreSQL refuses every recursive walk, from a disk-full error)
+_LAB_CODES = re.compile(r"^(53|57|58|08|1146$|42P01$|1049$|1045$|2002$|2003$|1040$)")
+
+
+def _lab_trouble(engines: dict) -> bool:
+    return all(_LAB_CODES.match(str(e.get("code", ""))) for e in engines.values())
+
+
 def learned_rules() -> list:
     """Verified rules with a verified pattern, from app/knowledge/sql_rules/learned.json (read once)."""
     global _LEARNED
@@ -1583,7 +1612,7 @@ def learned_rules() -> list:
         out = []
         try:
             for r in json.loads((Path(__file__).resolve().parents[1] / "knowledge" / "sql_rules" / "learned.json").read_text()):
-                if r.get("detect") and r.get("engines"):
+                if r.get("detect") and r.get("engines") and not _lab_trouble(r["engines"]):
                     try:
                         out.append({**r, "_rx": re.compile(r["detect"], re.I | re.S)})
                     except re.error:

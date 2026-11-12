@@ -449,3 +449,26 @@ class DbConnectLog(Base):
     ip: Mapped[str] = mapped_column(String(64), default="")
     ok: Mapped[bool] = mapped_column(Boolean, default=False)
     note: Mapped[str] = mapped_column(String(200), default="")
+
+
+class Enquiry(Base):
+    """Someone interested in Goal Engine filled the enquiry form. Kept to reply to them; deleted on request or after
+    a year (app/enquiry.py)."""
+    __tablename__ = "enquiries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(80))
+    email: Mapped[str] = mapped_column(String(190), index=True)
+    phone: Mapped[str] = mapped_column(String(30), default="")
+    company: Mapped[str] = mapped_column(String(120), default="")
+    role: Mapped[str] = mapped_column(String(30), default="")          # developer / dba / business / student / other
+    interest: Mapped[str] = mapped_column(String(200), default="[]")   # JSON list: dbaba / sheetu / website / automation / other
+    team: Mapped[str] = mapped_column(String(20), default="")          # just me / 2-10 / 11-50 / 51+
+    message: Mapped[str] = mapped_column(Text, default="")
+    source: Mapped[str] = mapped_column(String(60), default="")        # the page it came from
+    visitor_id: Mapped[str] = mapped_column(String(64), default="", index=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    status: Mapped[str] = mapped_column(String(12), default="new", index=True)   # new / talking / customer / closed / spam
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)                 # the admin's own note
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Talk to us · Goal Engine</title>
+  <meta name="description" content="Interested in Goal Engine for your team? Tell us what you need: DBaba for databases, Sheetu for Excel and Word, the website checker or automation agents.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/enquiry.css">
+  <script src="/static/enquiry.js" defer></script>
+</head>
+<body>
+  <header class="bar">
+    <a class="mark" href="/" aria-label="Goal Engine home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="16" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="24" cy="24" r="4"/><path d="M12 16h4l4-6M16 16l4 6"/></svg>
+      <span>Goal Engine</span>
+    </a>
+    <a class="back" href="/">Back to Goal Engine</a>
+  </header>
+
+  <main>
+    <section class="intro">
+      <p class="kicker">Talk to us</p>
+      <h1>Want Goal Engine for your work or your team?</h1>
+      <p class="lead">Tell us who you are and what you need. We read every enquiry ourselves and reply by email, usually within a day.</p>
+      <ul class="what">
+        <li><b>DBaba</b> fixes database errors, slow queries and SQL in MySQL, MariaDB and PostgreSQL.</li>
+        <li><b>DBaba workspace</b> is a private place for developers to paste an error, code or query.</li>
+        <li><b>Sheetu</b> repairs Excel and Word files, with proof and Undo.</li>
+        <li><b>Website checker</b> and <b>automation agents</b> watch things and do the routine work.</li>
+      </ul>
+    </section>
+
+    <form class="card" id="form" novalidate>
+      <div class="row two">
+        <label>Your name <span class="req" aria-hidden="true">*</span>
+          <input name="name" autocomplete="name" maxlength="80" required></label>
+        <label>Work email <span class="req" aria-hidden="true">*</span>
+          <input name="email" type="email" autocomplete="email" maxlength="190" required></label>
+      </div>
+      <div class="row two">
+        <label>Phone or WhatsApp <span class="opt">optional</span>
+          <input name="phone" type="tel" autocomplete="tel" maxlength="30"></label>
+        <label>Company <span class="opt">optional</span>
+          <input name="company" autocomplete="organization" maxlength="120"></label>
+      </div>
+      <div class="row two">
+        <label>You are
+          <select name="role">
+            <option value="">Choose…</option>
+            <option value="developer">Developer</option>
+            <option value="dba">Database admin (DBA)</option>
+            <option value="business">Business owner / manager</option>
+            <option value="analyst">Analyst / Excel user</option>
+            <option value="student">Student</option>
+            <option value="other">Other</option>
+          </select></label>
+        <label>Team size
+          <select name="team">
+            <option value="">Choose…</option>
+            <option value="just me">Just me</option>
+            <option value="2-10">2–10 people</option>
+            <option value="11-50">11–50 people</option>
+            <option value="51+">51 or more</option>
+          </select></label>
+      </div>
+      <fieldset class="row">
+        <legend>Interested in</legend>
+        <div class="picks">
+          <label class="pick"><input type="checkbox" name="interest" value="dbaba"><span>DBaba (databases, SQL)</span></label>
+          <label class="pick"><input type="checkbox" name="interest" value="workspace"><span>DBaba workspace</span></label>
+          <label class="pick"><input type="checkbox" name="interest" value="sheetu"><span>Sheetu (Excel, Word)</span></label>
+          <label class="pick"><input type="checkbox" name="interest" value="website"><span>Website checker</span></label>
+          <label class="pick"><input type="checkbox" name="interest" value="automation"><span>Automation agents</span></label>
+          <label class="pick"><input type="checkbox" name="interest" value="other"><span>Something else</span></label>
+        </div>
+      </fieldset>
+      <label class="row">What do you need?
+        <textarea name="message" rows="5" maxlength="4000" placeholder="For example: our team keeps hitting deadlocks on MySQL and we want a quick way to find the cause. Please don't paste passwords."></textarea></label>
+      <label class="hp" aria-hidden="true">Leave this empty <input name="website" tabindex="-1" autocomplete="off"></label>
+      <label class="consent"><input type="checkbox" name="consent">
+        <span>You may contact me about this enquiry. We keep it for a year at most, and delete it sooner if you ask.</span></label>
+      <p class="err" id="err" role="alert" hidden></p>
+      <div class="actions">
+        <button class="send" id="send" type="submit">Send enquiry</button>
+        <a class="privacy" href="/privacy">Privacy</a>
+      </div>
+    </form>
+
+    <section class="card done" id="done" hidden tabindex="-1">
+      <h2>Thank you, we've got it.</h2>
+      <p>We'll reply to <b id="doneEmail"></b> soon. Meanwhile you can keep using Goal Engine for free.</p>
+      <a class="send" href="/">Back to Goal Engine</a>
+    </section>
+  </main>
+</body>
+</html>

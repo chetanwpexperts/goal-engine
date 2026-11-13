@@ -586,6 +586,30 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  "schema_facts": {
+   "title_en": "Facts about the tables decide what a query does: look them up before guessing",
+   "title_hi": "Tables ke facts tay karte hain query kya karegi: andaza lagane se pehle dekho",
+   "rule_en": "Many query risks depend on facts the query text doesn't show: whether a column can be NULL (NOT IN, arithmetic, CONCAT, anti-joins), whether a column set is a key (a join that can repeat rows, ties before LIMIT, a scalar subquery with several rows), whether a column holds a time of day (BETWEEN up to a date), what type each side of a comparison is (a number against text), and which indexes exist. Without the schema these stay a 'check'. With it (CREATE TABLE scripts, a schema dump, migrations replayed in version order, read with each framework's own rule, e.g. a Laravel column is NOT NULL unless ->nullable()) each fact is looked up: the finding is verified, with the file:line that says it, or dropped, with the reason. A name the table doesn't have is a definite error. A table that was only partly read decides nothing.",
+   "rule_hi": "Query ke kai risk un baaton pe tike hain jo query text mein nahi dikhti: column NULL ho sakta hai ya nahi, columns key hain ya nahi, column mein time hai ya nahi, comparison ke dono taraf type kya hai, aur kaunse index hain. Schema ke bina ye 'check' rehte hain. Schema ke saath (CREATE TABLE, dump, version ke kram mein migrations, har framework ke apne niyam se, jaise Laravel column ->nullable() ke bina NOT NULL) har fact dekha jaata hai: finding pakki hoti hai (file:line ke saath) ya hat jaati hai (wajah ke saath). Table mein jo naam nahi wo pakki galti. Adhuri padhi table kuch tay nahi karti.",
+   "topics": [
+    "schema_column",
+    "schema_table",
+    "join_types",
+    "index_missing"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/information-schema-columns-table.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/infoschema-columns.html",
+    "https://www.postgresql.org/docs/current/typeconv-oper.html",
+    "https://laravel.com/docs/11.x/migrations",
+    "https://mariadb.com/kb/en/alter-table/",
+    "https://use-the-index-luke.com/sql/where-clause/obfuscation"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  }
 }

@@ -1374,5 +1374,11 @@
     "to": "clock_timestamp()"
    }
   ]
+ },
+ "schema_facts": {
+  "join_number_text": {"behaviour": "error", "code": "42883", "says": "PostgreSQL refuses integer = character varying (42883 operator does not exist); one side must be cast or, better, the types made the same.", "proven": ["postgresql"]},
+  "add_not_null_no_default": {"behaviour": "error", "code": "23502", "says": "ADD COLUMN ... NOT NULL without DEFAULT on a table with rows is refused (23502 column contains null values).", "proven": ["postgresql"]},
+  "unknown_column": {"behaviour": "error", "code": "42703", "says": "42703 column does not exist (unquoted names are folded to lower case first).", "proven": ["postgresql"]},
+  "fk_makes_index": {"behaviour": "no_index", "says": "A FOREIGN KEY gets no index of its own: create one on the referencing column.", "proven": ["postgresql"]}
  }
 }

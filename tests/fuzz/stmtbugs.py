@@ -52,7 +52,13 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         "pt_pg_funcs_my", "pt_date_minus", "pt_interval_week", "pt_cast_char", "pt_power",
         # night 10A: a query from code pasted alone: a placeholder inside quotes (the value never goes in) and a placeholder
         # where a name goes (FROM ? is refused, ORDER BY ? sorts by a constant); the fix is run with the value bound
-        "cp_like_quoted", "cp_dollar_quoted", "cp_order_param", "cp_from_param"]
+        "cp_like_quoted", "cp_dollar_quoted", "cp_order_param", "cp_from_param",
+        # night 10B: the project's own schema decides (the same tables, created on the test databases, given as the project's
+        # CREATE TABLE script): a column the table doesn't have (fixed to the close one), a text column compared with a number,
+        # a number joined to text, and findings the schema proves (a nullable column in NOT IN, a DATETIME in BETWEEN, a filter
+        # no index serves) or rules out (a NOT NULL column in NOT IN, a DATE in BETWEEN, a join on the parent's key under DISTINCT)
+        "ps_unknown_col", "ps_text_number", "ps_join_types", "ps_not_in_nullable", "ps_not_in_notnull", "ps_between_time",
+        "ps_between_date", "ps_distinct_parent", "ps_index_missing"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
@@ -91,11 +97,16 @@ TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": 
          "pt_brackets": "dialect", "pt_my_dates_pg": "dialect", "pt_my_funcs_pg": "dialect", "pt_pg_funcs_my": "dialect",
          "pt_date_minus": "date_math", "pt_interval_week": "interval_unit", "pt_cast_char": "cast_char", "pt_power": "power_xor",
          "cp_like_quoted": "quoted_placeholder", "cp_dollar_quoted": "quoted_placeholder", "cp_order_param": "placeholder_name",
-         "cp_from_param": "placeholder_name"}
+         "cp_from_param": "placeholder_name",
+         "ps_unknown_col": "schema_column", "ps_text_number": "implicit_cast", "ps_join_types": "join_types",
+         "ps_not_in_nullable": "not_in", "ps_not_in_notnull": "not_in", "ps_between_time": "date_range",
+         "ps_between_date": "date_range", "ps_distinct_parent": "distinct_join", "ps_index_missing": "index_missing"}
+# night 10B: the planted finding must be RULED OUT by the project's schema (absent, and listed as dropped with the reason)
+RULED_OUT = {"ps_not_in_notnull", "ps_between_date", "ps_distinct_parent"}
 NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join", "sum_distinct",
           "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order", "ch_insert_count",
           "sd_two_pk", "sd_list_col", "sd_repeat", "sd_parent_copy", "wf_no_order", "wf_nested", "wf_cte_cols",
-          "ix_keyset", "cp_order_param", "cp_from_param"}   # found is enough
+          "ix_keyset", "cp_order_param", "cp_from_param", "ps_join_types", "ps_index_missing"}   # found is enough
 # a 'check' (depends on engine, data or intent) whose suggested rewrite must do exactly what the person meant
 FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes", "pk_pk", "anti_nullable", "self_pairs",
                  "distinct_join", "sum_null", "avg_avg", "pct_total", "sub_sum_null", "all_null", "in_list_null", "not_in_outer",
@@ -103,7 +114,7 @@ FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_qu
                  "sd_date_text", "sd_number_text", "sd_code_number", "sd_no_pk", "sd_fk_index_pg", "sd_over_wide", "sd_timestamp",
                  "sd_reserved", "wf_case_else_sort", "wf_running_ties",
                  "ix_year", "ix_year_month", "ix_day", "ix_cast_day", "ix_format", "ix_arith", "ix_coalesce", "ix_left", "ix_or_join",
-                 "lk_skip_locked", "pt_power"}
+                 "lk_skip_locked", "pt_power", "ps_text_number", "ps_not_in_nullable", "ps_between_time"}
 
 
 def _cols(t, *kinds):
@@ -417,6 +428,8 @@ def make(seed: int):
         return _port_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("cp_"):
         return _param_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("ps_"):
+        return _project_bug(seed, bug, rnd, schema, tables, t, wrap, stmt)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -1564,17 +1577,28 @@ def _effect(eng, sql, table, pk):
 
 
 def check(item, engines: dict) -> list[str]:
-    from app.agents import sqlcorrect
+    from app.agents import sqlcorrect, sqlproject, sqlverify
 
     from app.agents.sql import request_words, unwrap
 
-    res = sqlcorrect.check(unwrap(item["broken"]), intent=request_words(item["broken"]), engine=item.get("engine"))
+    if item.get("project"):                       # night 10B: checked against the project's CREATE TABLE script
+        res = sqlverify.check(unwrap(item["broken"]), sqlproject.from_text(item["project"]), intent=request_words(item["broken"]),
+                              engine=item.get("engine"))
+    else:
+        res = sqlcorrect.check(unwrap(item["broken"]), intent=request_words(item["broken"]), engine=item.get("engine"))
     tag = f"{item['bug']} ({item['stmt']}) seed {item['seed']}"
     topics = {f["topic"] for f in res["findings"]}
     bad = []
     want = TOPIC[item["bug"]]
+    if item["bug"] in RULED_OUT:
+        if want in topics or want not in {d["topic"] for d in res.get("dropped", [])}:
+            bad.append(f"{tag}: not ruled out by the schema (found {sorted(topics)}, dropped {res.get('dropped')})\n{item['broken']}")
+        extra = [f["title_en"] for f in res["findings"] if f["kind"] in ("error", "wrong")]
+        return bad + ([f"{tag}: extra findings {extra}\n{item['broken']}"] if extra else [])
     if want not in topics:
         bad.append(f"{tag}: not found (found {sorted(topics)})\n{item['broken']}")
+    elif item.get("project") and not any(f["topic"] == want and f.get("schema") == "verified" for f in res["findings"]):
+        bad.append(f"{tag}: found but not verified with the project's schema\n{item['broken']}")
     extra = [f["title_en"] for f in res["findings"] if f["kind"] in ("error", "wrong") and f["topic"] != want]
     if extra:
         bad.append(f"{tag}: extra findings {extra}\n{item['broken']}")
@@ -1889,6 +1913,135 @@ def _param_bug(seed, bug, rnd, schema, tables, t):
     elif bug == "cp_dollar_quoted" or ph == "?":
         out["only"] = ["postgres"] if ph == "$1" else ["mysql"]   # unknown database: the fix is written for the placeholder's own family
     return out
+
+
+def _project_ddl(schema: dict, kind: str) -> str:
+    from tests.fuzz.db import _ddl
+
+    return ";\n".join(x for n in schema["order"] for x in _ddl(schema["tables"][n], kind)) + ";"
+
+
+def _typo(name: str, others: set, rnd):
+    """A misspelling of name that is close to it and to no other column (a swapped pair or a dropped letter)."""
+    import difflib
+
+    for _ in range(12):
+        i = rnd.randrange(1, len(name) - 1) if len(name) > 3 else 1
+        cand = name[:i] + name[i + 1] + name[i] + name[i + 2:] if rnd.random() < 0.5 and i + 1 < len(name) else name[:i] + name[i + 1:]
+        if cand.lower() == name.lower() or cand.lower() in {o.lower() for o in others} or not re.fullmatch(r"[A-Za-z_]\w*", cand):
+            continue
+        close = difflib.get_close_matches(cand.lower(), [o.lower() for o in others | {name}], n=2, cutoff=0.6)
+        if close[:1] == [name.lower()] and (len(close) == 1 or difflib.SequenceMatcher(None, cand.lower(), close[1]).ratio() <
+                                            difflib.SequenceMatcher(None, cand.lower(), close[0]).ratio()):
+            return cand
+    return None
+
+
+def _project_bug(seed, bug, rnd, schema, tables, t, wrap, stmt):
+    """Night 10B: the statement is checked with the project's own schema (the CREATE TABLE script of these very tables, as
+    the test databases have them). A fact the schema proves turns a 'check' into a verified one, a fact it rules out drops
+    the finding, and a name the schema doesn't have is an error with the close real name as the fix."""
+    pk, name = t["pk"], t["name"]
+    kind = rnd.choice(["mysql", "postgres"])
+    engine = rnd.choice(["mariadb", "postgresql"]) if bug != "ps_text_number" else rnd.choice(["mariadb", "postgresql", "mysql"])
+
+    def item(broken, truth, **kw):
+        out = {"seed": seed, "bug": bug, "stmt": kw.pop("stmt", "select"), "schema": schema, "table": kw.pop("table", name),
+               "broken": broken, "truth": truth, "engine": engine, "project": _project_ddl(schema, kind)}
+        out.update(kw)
+        return out
+
+    if bug == "ps_unknown_col":
+        cols = [c for c in t["cols"] if c["kind"] not in ("pk",) and len(c["name"]) >= 5]
+        if not cols:
+            return None
+        c = rnd.choice(cols)
+        typo = _typo(c["name"], {x["name"] for x in t["cols"] if x is not c}, rnd)
+        if not typo:
+            return None
+        return item(wrap(f"{typo} IS NOT NULL"), wrap(f"{c['name']} IS NOT NULL"), stmt=stmt)
+    if bug == "ps_text_number":
+        ph = [c for c in t["cols"] if c["kind"] == "phone"]
+        if not ph:
+            return None
+        c = ph[0]
+        v = _pick_value(t, c, rnd)
+        if v is None or str(v).startswith("0"):
+            return None
+        out = item(wrap(f"{c['name']} = {v}"), wrap(f"{c['name']} = '{v}'"), stmt=stmt)
+        if engine == "postgresql":
+            out["only"] = ["postgres"]
+        return out
+    if bug == "ps_join_types":
+        ph = [c for c in t["cols"] if c["kind"] in ("phone", "sku", "email", "name")]
+        if not ph:
+            return None
+        c = rnd.choice(ph)
+        other = rnd.choice([x for x in tables if x is not t] or [t])
+        broken = f"SELECT a.{pk}\nFROM {name} a\nJOIN {other['name']} b ON a.{c['name']} = b.{other['pk']}\nORDER BY a.{pk}"
+        return item(broken, broken)
+    if bug in ("ps_not_in_nullable", "ps_not_in_notnull"):
+        kids = [(x, c) for x in tables for c in x["cols"] if c["kind"] == "fk" and c.get("ref") == name and c["name"].lower() != "id"]
+        if not kids:
+            return None
+        child, fk = rnd.choice(kids)
+        if bug == "ps_not_in_notnull":
+            fk["not_null"] = True
+            k = child["cols"].index(fk)
+            for r in child["rows"]:
+                if r[k] is None:
+                    r[k] = 1
+        broken = f"SELECT {pk}\nFROM {name}\nWHERE {pk} NOT IN (SELECT {fk['name']} FROM {child['name']})\nORDER BY {pk}"
+        truth = (f"SELECT {pk}\nFROM {name}\nWHERE NOT EXISTS (SELECT 1 FROM {child['name']} x WHERE x.{fk['name']} = {name}.{pk})\n"
+                 f"ORDER BY {pk}")
+        return item(broken, truth)
+    if bug in ("ps_between_time", "ps_between_date"):
+        want = "datetime" if bug == "ps_between_time" else "date"
+        from app.agents.sqlcorrect import TIME_COL
+
+        cols = [c for c in t["cols"] if c["kind"] == want and (want == "datetime" or TIME_COL.search(c["name"]))]
+        if not cols:
+            return None
+        c = rnd.choice(cols)
+        v = _pick_value(t, c, rnd)
+        if v is None:
+            return None
+        import datetime as _d
+
+        day = v.date() if isinstance(v, _d.datetime) else v
+        start = day - _d.timedelta(days=rnd.randint(5, 60))
+        nxt = day + _d.timedelta(days=1)
+        broken = wrap(f"{c['name']} BETWEEN '{start}' AND '{day}'")
+        truth = wrap(f"{c['name']} >= '{start}' AND {c['name']} < '{nxt}'") if want == "datetime" else broken
+        return item(broken, truth, stmt=stmt)
+    if bug == "ps_distinct_parent":
+        fks = [c for c in t["cols"] if c["kind"] == "fk" and c.get("ref")]
+        if not fks:
+            return None
+        fk = rnd.choice(fks)
+        parent = schema["tables"][fk["ref"]]
+        shown = [c["name"] for c in t["cols"] if c["kind"] in ("cat", "int", "money")][:2] or [pk]
+        broken = (f"SELECT DISTINCT c.{pk}, {', '.join('c.' + x for x in shown if x != pk)}".rstrip(", ") +
+                  f"\nFROM {name} c\nJOIN {parent['name']} p ON p.{parent['pk']} = c.{fk['name']}\nORDER BY c.{pk}")
+        broken = broken.replace(f"c.{pk}, \n", f"c.{pk}\n")
+        return item(broken, broken)
+    if bug == "ps_index_missing":
+        indexed = {c for ix in t["indexes"] for c in ix} | {pk}
+        if kind == "mysql":
+            indexed |= {c for c, _p, _k in t["fks"]}
+        cols = [c for c in t["cols"] if c["kind"] in ("cat", "int", "email", "sku") and c["name"] not in indexed]
+        if not cols:
+            return None
+        c = rnd.choice(cols)
+        v = _pick_value(t, c, rnd)
+        if v is None:
+            return None
+        lit = str(v) if c["kind"] == "int" else "'" + str(v).replace("'", "''") + "'"
+        broken = f"SELECT {pk}\nFROM {name}\nWHERE {c['name']} = {lit}\nORDER BY {pk}"
+        out = item(broken, broken)
+        out["engine"] = "mariadb" if kind == "mysql" else "postgresql"
+        return out
+    return None
 
 
 def _bind(sql: str, values: list) -> str:

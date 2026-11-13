@@ -15,6 +15,8 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from app.agents.sqlverify import keep as schema_keep
+
 DIALECTS = Path(__file__).resolve().parent.parent / "dbknow" / "dialects"
 
 # money-like columns that are often left empty (no discount, no commission): NULL in a sum makes the sum NULL
@@ -244,12 +246,12 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
             seen.add(pos)
             op = sql[pos:end]
             new = f"COALESCE({op}, 0)"
-            out.append((F("check", "null_math", f"If {op} is NULL, the whole calculation is NULL", f"{op} NULL ho to poora hisaab NULL",
+            out += schema_keep((F("check", "null_math", f"If {op} is NULL, the whole calculation is NULL", f"{op} NULL ho to poora hisaab NULL",
                           f"{op} in: " + _expr_around(sql, pos, end)[:80],
                           f"Arithmetic with NULL gives NULL on every database, so a row with no {name} gets NULL instead of a number "
                           f"(and SUM/AVG then skip that row). If a missing {name} means 0, write {new}.",
                           f"NULL ke saath hisaab NULL deta hai, isliye bina {name} wali row ka result NULL. Agar khaali ka matlab 0 hai to {new}."),
-                        (pos, end, new)))
+                        (pos, end, new)), [("not_null", (m.group(1) or "").strip('.`"') or None, m.group(2).strip('`"'))])
 
     # 11. CONCAT with a part that is often missing: NULL for the whole value on MySQL/MariaDB
     if eng != "postgresql":
@@ -263,13 +265,14 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
                 pos = k + len(arg)
                 if _col(arg) in OPTIONAL_TEXT and re.fullmatch(r"[`\"]?[\w$.]+[`\"]?", arg):
                     new = f"COALESCE({arg}, '')"
-                    out.append((F("check", "concat", f"CONCAT(...) is NULL on MySQL/MariaDB when {arg} is NULL",
+                    out += schema_keep((F("check", "concat", f"CONCAT(...) is NULL on MySQL/MariaDB when {arg} is NULL",
                                   f"MySQL/MariaDB pe {arg} NULL ho to CONCAT(...) poora NULL", sql[m.start():b + 1][:90],
                                   f"On MySQL and MariaDB CONCAT returns NULL if any part is NULL, so a person with no {_col(arg)} gets no name "
                                   f"at all (PostgreSQL's CONCAT skips NULL parts). Write {new} inside CONCAT, or use CONCAT_WS(' ', ...), "
                                   f"which skips NULLs on all of them.",
                                   f"MySQL/MariaDB pe CONCAT ka ek hissa NULL ho to poora NULL. CONCAT ke andar {new} likho, ya CONCAT_WS(' ', ...)."),
-                                (k, k + len(arg), new)))
+                                (k, k + len(arg), new)), [("not_null", arg.split(".")[0].strip('`"') if "." in arg else None,
+                                                           arg.split(".")[-1].strip('`"'))])
 
     # 12. integer division: COUNT(...) / COUNT(...) is 0 on PostgreSQL for any share below 100%
     for m in re.finditer(r"\bcount\s*\(", s, re.I):
@@ -346,13 +349,14 @@ def _order_limit(sql, s, dep, eng, F) -> list:
                 and not any(re.search(r"\(", t) for _p, t in keys):
             q = (srcs[0].alias + ".") if srcs[0].alias and srcs[0].alias.lower() != srcs[0].name.split(".")[-1].lower() else ""
             end = oa + len(s[oa:ob].rstrip().rstrip(";").rstrip())
-            out.append((F("check", "stable_order", "Ties in the ORDER BY make the LIMIT pick rows at random",
+            out += schema_keep((F("check", "stable_order", "Ties in the ORDER BY make the LIMIT pick rows at random",
                           "ORDER BY mein barabari ho to LIMIT koi bhi row chun leta hai", sql[oa:end].strip()[:80],
                           f"If two rows have the same {', '.join(names)}, the database may return them in either order, so which of the "
                           f"tied rows make the cut (or land on the next page) can change between runs. End the ORDER BY with a unique "
                           f"column: ORDER BY {sql[oa:end].strip()}, {q}id (use your table's own key if it isn't id).",
                           f"Agar do rows ka {', '.join(names)} barabar ho to kram tay nahi, aur LIMIT mein kaunsi aayegi ye badal sakta hai. "
-                          f"Aakhir mein unique column jodo: ... , {q}id."), (end, end, f", {q}id")))
+                          f"Aakhir mein unique column jodo: ... , {q}id."), (end, end, f", {q}id")),
+                               [("unique", srcs[0].alias or srcs[0].name, names)])
     return out
 
 

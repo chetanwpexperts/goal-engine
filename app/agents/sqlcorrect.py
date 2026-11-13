@@ -782,31 +782,34 @@ def _workbook_traps(sql: str, s: str, is_select: bool, intent: str) -> list:
                 outer_q = f"{oa}.{x}"
         w = f" AND ({sql[m.start('w'):m.end('w')].strip()})" if m.group("w") else ""
         new = f"NOT EXISTS (SELECT 1 FROM {t} {ia} WHERE {ia}.{col} = {outer_q}{w})"
-        out.append((Finding("check", "not_in", f"NOT IN (SELECT {col} ...) returns nothing if {col} has a NULL",
+        out += _keep((Finding("check", "not_in", f"NOT IN (SELECT {col} ...) returns nothing if {col} has a NULL",
                             f"{col} mein ek bhi NULL ho to NOT IN (SELECT {col} ...) kuch nahi deta", sql[m.start():m.end()][:90],
                             f"x NOT IN (list) is true only when x differs from every value, and 'differs from NULL' is unknown, so one NULL "
                             f"in {t}.{col} makes the whole result empty, with no error (MySQL and PostgreSQL). NOT EXISTS ignores NULLs "
                             f"and returns the same rows otherwise: {new}.",
                             f"Ek NULL hone par NOT IN poora result khaali kar deta hai, bina error. NOT EXISTS NULL ko chhod deta hai: {new}."),
-                    (m.start(), m.end(), new)))
+                    (m.start(), m.end(), new)), [("not_null", m.group(4) or t, col)])
 
     # 11. BETWEEN 'day1' AND 'day2' on a date-time column misses everything after 00:00 on day2
     for m in re.finditer(r"(?<![\w$.:`\"])([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s+between\s+'(\d{4}-\d{2}-\d{2})'\s+and\s+'(\d{4}-\d{2}-\d{2})'",
                          sql, re.I):                       # (x::date BETWEEN ...: a day cast, not a time column)
         col = m.group(1).split(".")[-1].strip('`"')
-        if not TIME_COL.search(col):
-            continue
+        from app.agents.sqlverify import column_family
+
+        if not TIME_COL.search(col) and column_family(m.group(1).split(".")[0].strip('`"') if "." in m.group(1) else None, col) != "time":
+            continue                                       # the project's schema can say it holds a time even when the name doesn't
         try:
             nxt = (_dt.date.fromisoformat(m.group(3)) + _dt.timedelta(days=1)).isoformat()
         except ValueError:
             continue
         new = f"{m.group(1)} >= '{m.group(2)}' AND {m.group(1)} < '{nxt}'"
-        out.append((Finding("check", "date_range", f"BETWEEN ... AND '{m.group(3)}' stops at 00:00 on {m.group(3)}",
+        qual = m.group(1).split(".")[0].strip('`"') if "." in m.group(1) else None
+        out += _keep((Finding("check", "date_range", f"BETWEEN ... AND '{m.group(3)}' stops at 00:00 on {m.group(3)}",
                             f"BETWEEN ... AND '{m.group(3)}' {m.group(3)} ko 00:00 pe ruk jata hai", sql[m.start():m.end()],
                             f"If {col} stores a time too, '{m.group(3)}' means {m.group(3)} 00:00:00, so the rest of that day is left out. "
                             f"{new} covers the whole last day, and gives the same rows if {col} is a plain DATE.",
                             f"Agar {col} mein time bhi hai to aakhri din ka baaki hissa chhoot jata hai. {new} poora din leta hai."),
-                    (m.start(), m.end(), new)))
+                    (m.start(), m.end(), new)), [("has_time", qual, col)])
 
     # 12. 'ties must share rank' but ROW_NUMBER() gives tied rows different numbers
     if re.search(r"\bties?\b|\btied\b|same rank|share (?:the )?rank|barabar", said):
@@ -926,6 +929,13 @@ def _check(sql: str, _again: bool = False, intent: str = "") -> dict:
         if again.get("corrected"):
             out["corrected"] = again["corrected"]
     return out
+
+
+def _keep(pair, needs: list) -> list:
+    """The pair, unless the project's schema rules the finding out (app/agents/sqlverify.py, night 10B)."""
+    from app.agents.sqlverify import keep
+
+    return keep(pair, needs)
 
 
 def _check_once(sql: str, _again: bool = False, intent: str = "") -> dict:

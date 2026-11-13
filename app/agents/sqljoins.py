@@ -16,6 +16,8 @@ Returns [(Finding, edit or None)], edit = (start, end, new text) on the original
 
 import re
 
+from app.agents.sqlverify import keep as schema_keep
+
 # the engines each rule was reproduced on (tests/practice/test_night2.py, LAB) -- standing rule B
 PROVEN = {"cartesian": ["mariadb", "postgresql"], "join_key": ["mariadb", "postgresql"], "natural_join": ["mariadb", "postgresql"],
           "anti_join": ["mariadb", "postgresql"], "self_join": ["mariadb", "postgresql"], "distinct_join": ["mariadb", "postgresql"]}
@@ -298,7 +300,7 @@ def joins(sql: str, s: str, cl: dict, srcs: list, alias_of, items: list, intent:
             if col.lower() in ("id", mine.lower(), _key(x, refs_cols).lower()):
                 continue
             pos = where[0] + pa + m.start(1)
-            out.append((F("check", "anti_join", f"{x.alias}.{col} IS NULL is also true for matched rows with an empty {col}",
+            out += schema_keep((F("check", "anti_join", f"{x.alias}.{col} IS NULL is also true for matched rows with an empty {col}",
                           f"{x.alias}.{col} IS NULL match wali un rows pe bhi sach hai jinka {col} khali hai", line_of(pos),
                           f"To keep only the rows with NO {x.name} match, test a column that can't be NULL when a row matched: the "
                           f"join column {x.alias}.{mine} (it equals a real value whenever there is a match) or {x.alias}.id. "
@@ -306,7 +308,7 @@ def joins(sql: str, s: str, cl: dict, srcs: list, alias_of, items: list, intent:
                           f"{x.name} OR an empty {col}', keep it.",
                           f"Sirf bina match wali rows ke liye aisi column dekho jo match hone pe NULL na ho: join column "
                           f"{x.alias}.{mine} ya {x.alias}.id. {x.alias}.{col} asli row mein bhi khali ho sakti hai."),
-                        (pos - len(x.alias) - 1, pos + len(col), f"{x.alias}.{mine}")))
+                        (pos - len(x.alias) - 1, pos + len(col), f"{x.alias}.{mine}")), [("not_null", x.alias, col)])
 
     # ---- J6. self join on a shared value: each row meets itself, and every pair comes twice
     for i, x in enumerate(srcs):
@@ -363,7 +365,7 @@ def joins(sql: str, s: str, cl: dict, srcs: list, alias_of, items: list, intent:
                 ob_text = s[ob[0]:ob[1]] if ob else ""
                 if not re.search(rf"\b{re.escape(other.alias)}\.", ob_text, re.I):
                     new = _semi_join(sql, s, cl, first, other, where, wend, keep, cols)
-                    out.append((F("check", "distinct_join", f"DISTINCT is removing the copies the join with {other.name} made",
+                    out += schema_keep((F("check", "distinct_join", f"DISTINCT is removing the copies the join with {other.name} made",
                                   f"DISTINCT {other.name} ke join se bani copies hata raha hai", line_of(sel[0]),
                                   f"Joining {other.name} repeats each {first.name} row once per matching {other.name} row, and "
                                   f"DISTINCT then throws the copies away (after building and sorting them). If the question is "
@@ -371,7 +373,7 @@ def joins(sql: str, s: str, cl: dict, srcs: list, alias_of, items: list, intent:
                                   f"the copies. The rewrite returns the same rows.",
                                   f"{other.name} jodne se har {first.name} row har match pe repeat hoti hai, aur DISTINCT copies "
                                   f"phenk deta hai. Sawaal '{first.name} jinka {other.name} hai' ho to EXISTS seedha yahi kehta hai."),
-                                (0, len(sql), new) if new else None))
+                                (0, len(sql), new) if new else None), [("to_one", other.alias or other.name, None)])
     return out
 
 

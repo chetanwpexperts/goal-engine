@@ -89,7 +89,7 @@ Reading a whole project (nights 10A-10B, before the query-only nights, which get
   never edit. Queries built from pieces across functions, and ORM code, are reported as "found, couldn't read completely", never
   guessed. A `dbaba check <folder>` command for the same. Generator: realistic PHP / Laravel / WordPress / Node / Python files
   with planted wrong queries, found at the right file and line, quiet on ordinary strings, fixes proven on both databases.
-- [ ] **10B. Read the project's own schema.** CREATE TABLE scripts, schema dumps and migration files (Laravel, plain SQL
+- [x] **10B. Read the project's own schema.** CREATE TABLE scripts, schema dumps and migration files (Laravel, plain SQL
   migrations first) become the project's schema: tables, columns, types, NULLs, keys, indexes. Findings that depend on the
   schema are upgraded to verified (or dropped) for that project; index advice says what exists and what is missing.
 
@@ -370,3 +370,24 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   (42883), where id = ANY($1) with an array works; CONCAT('%', $1, '%') with an untyped parameter is refused on PostgreSQL
   (42P18) while '%' || $1 || '%' works; ESCAPED is a reserved word on MariaDB. Also fixed: a camelCase date column (DisbursedOn,
   MovedAt) is now read like disbursed_on / moved_at for date arithmetic (seen when the new families shifted the generator's seeds).
+- **Night 10B (13 Nov 2026).** The project's own schema, in `app/agents/sqlproject.py` (read only) and `app/agents/sqlverify.py`
+  (new fundamental `schema_facts`: a risk that depends on a fact about the tables is looked up, not guessed). Read in the order the
+  database sees it: schema dumps and plain .sql scripts first (mysqldump / pg_dump --schema-only / Laravel's database/schema
+  dump, whose migrations table says which migrations it already holds), then migrations by version (Flyway V1__ ... V10__ as
+  numbers, golang-migrate, dbmate / goose / sql-migrate 'up' parts only; undo files skipped) and Laravel migrations (up() only;
+  NOT NULL unless ->nullable(), timestamps() / softDeletes() / rememberToken() nullable, id(), foreignId()->constrained() with
+  Laravel's plural, morphs(), ->change(), renameColumn / dropColumn / index names). CREATE / ALTER (add, drop, modify, change,
+  rename, SET / DROP NOT NULL, keys, indexes) / CREATE INDEX / RENAME / DROP are replayed; what can't be read for sure (PHP
+  logic around the calls, CREATE TABLE ... AS / LIKE, an unknown method) marks the table partial, and nothing is decided from
+  it. A rule asks with holds(finding, needs) (not_null, has_time, unique, to_one, index): without a schema nothing changes; with
+  one the finding is dropped with its reason (NOT IN / anti-join / arithmetic / CONCAT over a NOT NULL column, BETWEEN on a
+  DATE, DISTINCT over a join on the parent's key, a scalar subquery tied on a UNIQUE column, ties on a unique ORDER BY) or
+  verified with the file:line that proves it; a DATETIME whose name doesn't look like a time now gets the BETWEEN check too.
+  New, only with the schema: a column the table doesn't have (`error`, fixed to the close name), a number joined to text
+  (`error` on PostgreSQL), a text column compared with a number (quoted in the fix), and index advice that says what exists
+  and what is missing (a FOREIGN KEY's own index on MySQL/MariaDB, none on PostgreSQL). `dbaba check` uses the project's
+  schema and lists what it ruled out; `dbaba schema <folder>` prints the schema as read. CREATE TABLE pasted with one query
+  in the chat checks the query against those tables. 17 concepts, 40-problem practice bank (the shop as a dump and as Laravel
+  migrations, which must agree), 9 stmtbugs families. Lab lessons worth keeping: MariaDB joins INT to VARCHAR by turning
+  '01' and '1abc' into 1 (warning 1292) while PostgreSQL refuses (42883); ADD COLUMN ... NOT NULL without DEFAULT fills old
+  rows with '' / 0 on MariaDB but is refused on PostgreSQL (23502); InnoDB adds an index for a foreign key, PostgreSQL doesn't.

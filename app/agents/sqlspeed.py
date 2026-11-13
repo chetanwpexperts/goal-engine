@@ -29,6 +29,8 @@ import datetime as _dt
 import re
 from decimal import Decimal, InvalidOperation
 
+from app.agents.sqlverify import keep as schema_keep
+
 # the engines each rule was reproduced on (tests/practice/test_night8.py, LAB) -- standing rule B
 PROVEN = {k: ["mariadb", "postgresql"] for k in ("sargable", "or_union", "keyset", "index_prefix", "index_range_first",
                                                   "implicit_cast")}
@@ -321,14 +323,15 @@ def _sargable(sql: str, s: str, F, eng) -> list:
             extra_en = " " + _says("like_prefix_index", eng)
         if fn in ("DATE", "YEAR", "LEFT") and eng != "postgresql":
             extra_en += " " + _rule("mysql", "optimizer_sargable").get("says", "")
-        out.append((F("check", "sargable", ten, thi, ev,
+        out += schema_keep((F("check", "sargable", ten, thi, ev,
                       f"An index holds {col} as it is stored, so a condition on {_short(sql[a:b], 40)} has to work out a new value for "
                       f"every row and can't use it (MariaDB shows type ALL or a full 'index' scan, PostgreSQL a Seq Scan). The same rows, "
                       f"said on the bare column ({why_en}): {new}. This returns exactly the same rows on MySQL, MariaDB and PostgreSQL, "
                       f"and an index on {col} can now be used.{extra_en}",
                       f"Index mein {col} waisa hi rakha hota hai jaisa store hai, isliye {_short(sql[a:b], 40)} har row ke liye nayi "
                       f"value banata hai aur index use nahi hota (poori table padhi jaati hai). Wahi rows seedhe column pe ({why_hi}): "
-                      f"{new}. Result bilkul wahi rahega, aur ab {col} ka index kaam aayega."), [(a, b, new)]))
+                      f"{new}. Result bilkul wahi rahega, aur ab {col} ka index kaam aayega."), [(a, b, new)]),
+                           [("index", col.split(".")[0].strip('`"') if "." in col else None, _bare(col))])
     return out
 
 

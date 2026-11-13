@@ -22334,6 +22334,1751 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "sql_injection",
+   "kind": "concept",
+   "title": {
+    "en": "SQL injection",
+    "hinglish": "SQL injection",
+    "hindi": "SQL इंजेक्शन"
+   },
+   "terms": [
+    [
+     "sql\\s*injection"
+    ],
+    [
+     "injection",
+     "(sql|query|quer\\w*|database|attack|kya|what)"
+    ],
+    [
+     "इंजेक्शन"
+    ],
+    [
+     "(string\\s+)?concatenat\\w*",
+     "(dangerous|unsafe|safe|risk\\w*|injection|khatar\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is sql injection",
+     "how to prevent sql injection",
+     "why is building a query with string concatenation dangerous"
+    ],
+    "hinglish": [
+     "sql injection kya hai",
+     "sql injection se kaise bache"
+    ],
+    "hindi": [
+     "SQL इंजेक्शन क्या है"
+    ]
+   },
+   "answer": {
+    "en": "When code builds a query by pasting a value into the SQL text, a value that contains a quote can end the string early and add SQL of its own: the database can't tell the developer's SQL from the user's text. The fix is not escaping by hand but keeping data and code apart: send the SQL with placeholders (?, $1, :name, %s) and the values separately, so a value is only ever a value. Names that can't be placeholders (a table, a sort column) are picked in code from a fixed list.",
+    "hinglish": "Jab code value ko seedha SQL text mein jodta hai, to value mein ek quote string ko pehle hi band karke apni SQL jod sakta hai: database ko pata nahi chalta kaun si SQL developer ki hai aur kaun sa user ka text. Ilaaj: placeholder (?, $1, :name, %s) wali SQL aur values alag bhejo, taaki value sirf value rahe. Table ya sort column jaise naam code mein allowed list se chuno.",
+    "hindi": "जब code value को सीधे SQL text में जोड़ता है, तो value का एक quote अपनी SQL जोड़ सकता है। इलाज: placeholder वाली SQL और values अलग भेजें।"
+   },
+   "mistake": {
+    "en": "Escaping or stripping quotes by hand, or trusting that a value 'comes from a dropdown': anyone can send any value. Use placeholders for every value.",
+    "hinglish": "Haath se quotes hatana ya ye maanna ki value 'dropdown se aati hai': koi bhi koi bhi value bhej sakta hai. Har value ke liye placeholder lagao.",
+    "hindi": "हाथ से quotes हटाना काफ़ी नहीं; हर value के लिए placeholder लगाएँ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "PREPARE find_customer FROM 'SELECT id, first_name FROM customers WHERE email = ?';\nSET @email = 'tara@mail.test';\nEXECUTE find_customer USING @email;\nDEALLOCATE PREPARE find_customer",
+      "postgresql": "PREPARE find_customer(text) AS SELECT id, first_name FROM customers WHERE email = $1;\nEXECUTE find_customer('tara@mail.test');\nDEALLOCATE find_customer"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "6",
+       "Tara"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "Server-side: PREPARE ... FROM '... ?' and EXECUTE ... USING @v; drivers (PDO, mysqli, mysql2, pymysql) use ? or %s. PDO emulates prepares by default but still quotes values safely.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Server-side: PREPARE name(type) AS ... $1 and EXECUTE name(value); drivers use $1 (node-pg), %s (psycopg) or ? (JDBC)."
+   },
+   "related": [
+    "prepared_statement",
+    "placeholders",
+    "escape_vs_prepare",
+    "dynamic_sql"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/sql-prepared-statements.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/prepared-statement",
+    "https://dba.stackexchange.com/questions/tagged/security",
+    "https://www.reddit.com/r/PHP/",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html",
+    "https://www.postgresql.org/docs/current/sql-prepare.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "prepared_statement",
+   "kind": "concept",
+   "title": {
+    "en": "Prepared statements (parameterised queries)",
+    "hinglish": "Prepared statement (parameterised query)",
+    "hindi": "Prepared statement"
+   },
+   "terms": [
+    [
+     "prepared\\s+statements?"
+    ],
+    [
+     "parameteri[sz]ed\\s+quer\\w*"
+    ],
+    [
+     "bind\\w*\\s+(parameters?|variables?|values?)"
+    ],
+    [
+     "parameter\\w*",
+     "query",
+     "(what|kya|why|kyun)"
+    ],
+    [
+     "प्रिपेयर्ड"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a prepared statement",
+     "what is a parameterized query",
+     "why use bind parameters"
+    ],
+    "hinglish": [
+     "prepared statement kya hota hai",
+     "parameterized query kya hai"
+    ],
+    "hindi": [
+     "prepared statement क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A prepared statement is SQL sent with placeholders where the values go; the values are sent separately and bound to the placeholders. The database reads the SQL once, so a value can never change what the query does (no SQL injection), the same statement can run many times with different values, and type handling is done by the driver. Placeholders stand only for values, never for table or column names.",
+    "hinglish": "Prepared statement mein SQL placeholders ke saath jaati hai aur values alag se bind hoti hain. Database SQL ek baar padhta hai, isliye value query ka kaam nahi badal sakti (SQL injection nahi), same statement alag values ke saath baar baar chal sakta hai. Placeholder sirf value ke liye hai, table ya column ke naam ke liye nahi.",
+    "hindi": "Prepared statement में SQL placeholders के साथ जाती है और values अलग bind होती हैं; value query नहीं बदल सकती।"
+   },
+   "mistake": {
+    "en": "Preparing the statement but still pasting the value into the SQL text: \"WHERE email = '$email'\" inside prepare() binds nothing and is as unsafe as before.",
+    "hinglish": "prepare() ke andar bhi value ko SQL text mein jodna: \"WHERE email = '$email'\" kuch bind nahi karta, pehle jaisa hi khatarnaak.",
+    "hindi": "prepare() के अंदर भी value को SQL text में जोड़ना: कुछ bind नहीं होता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "PREPARE find_customer FROM 'SELECT id, first_name FROM customers WHERE email = ?';\nSET @email = 'tara@mail.test';\nEXECUTE find_customer USING @email;\nDEALLOCATE PREPARE find_customer",
+      "postgresql": "PREPARE find_customer(text) AS SELECT id, first_name FROM customers WHERE email = $1;\nEXECUTE find_customer('tara@mail.test');\nDEALLOCATE find_customer"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "6",
+       "Tara"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "PREPARE stmt FROM '...?...'; EXECUTE stmt USING @v; DEALLOCATE PREPARE stmt. A prepared statement lives in one connection.",
+    "mariadb": "Same as MySQL; also EXECUTE IMMEDIATE '...' USING ... (10.2+).",
+    "postgresql": "PREPARE name(types) AS ... $1; EXECUTE name(values); DEALLOCATE name. Lives in one session."
+   },
+   "related": [
+    "sql_injection",
+    "placeholders",
+    "quoted_placeholder",
+    "placeholder_table_name"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/sql-prepared-statements.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/prepared-statement",
+    "https://dba.stackexchange.com/questions/tagged/security",
+    "https://www.reddit.com/r/PHP/",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html",
+    "https://www.postgresql.org/docs/current/sql-prepare.html",
+    "https://mariadb.com/kb/en/prepare-statement/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "placeholders",
+   "kind": "compare",
+   "title": {
+    "en": "Placeholder styles: ?, :name, $1, %s",
+    "hinglish": "Placeholder ke tareeke: ?, :name, $1, %s",
+    "hindi": "Placeholder के तरीके: ?, :name, $1, %s"
+   },
+   "terms": [
+    [
+     "placeholders?"
+    ],
+    [
+     "\\?",
+     "(vs|:name|\\$1|%s)"
+    ],
+    [
+     "\\$1",
+     "(vs|\\?|placeholder|mysql|postgres)"
+    ],
+    [
+     "%s",
+     "(placeholder|python|psycopg|pymysql|vs)"
+    ],
+    [
+     "प्लेसहोल्डर"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what are placeholders in sql",
+     "placeholder ? vs $1 vs %s",
+     "placeholders in postgresql"
+    ],
+    "hinglish": [
+     "placeholder kya hota hai sql mein",
+     "? aur $1 placeholder mein kya farak hai"
+    ],
+    "hindi": [
+     "SQL में placeholder क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A placeholder marks where a value goes in a parameterised query. The spelling belongs to the driver, not to SQL: ? is used by MySQL/MariaDB drivers, PDO, JDBC, mysql2 and SQLite; :name by PDO (named) and Oracle; $1, $2 by PostgreSQL itself and node-pg; %s (and %(name)s) by Python's pymysql and psycopg, even for numbers; %s / %d by WordPress's $wpdb->prepare. Mixing styles in one statement, or using one driver's style with another driver, fails.",
+    "hinglish": "Placeholder batata hai ki value kahan aayegi. Spelling driver ki hoti hai, SQL ki nahi: MySQL/MariaDB drivers, PDO, JDBC, mysql2 aur SQLite mein ?; PDO aur Oracle mein :name; PostgreSQL aur node-pg mein $1, $2; Python ke pymysql/psycopg mein %s (number ke liye bhi); WordPress $wpdb->prepare mein %s / %d. Ek statement mein styles milana mana hai.",
+    "hindi": "Placeholder बताता है कि value कहाँ आएगी: MySQL drivers में ?, PostgreSQL में $1, Python में %s।"
+   },
+   "mistake": {
+    "en": "Writing %d for a number in psycopg/pymysql (only %s is accepted), or $1 in a MySQL query (error 1064).",
+    "hinglish": "psycopg/pymysql mein number ke liye %d likhna (sirf %s chalta hai), ya MySQL query mein $1 (error 1064).",
+    "hindi": "psycopg में %d लिखना (सिर्फ़ %s चलता है), या MySQL में $1।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "PREPARE p FROM 'SELECT COUNT(*) AS n FROM orders WHERE customer_id = ? AND status = ?';\nSET @c = 1, @s = 'paid';\nEXECUTE p USING @c, @s;\nDEALLOCATE PREPARE p",
+      "postgresql": "PREPARE p(int, text) AS SELECT COUNT(*) AS n FROM orders WHERE customer_id = $1 AND status = $2;\nEXECUTE p(1, 'paid');\nDEALLOCATE p"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "Server PREPARE takes ?; PDO takes ? or :name (not both in one statement); mysqli takes ?.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "The server takes $1, $2 ... (a ? is a syntax error, 42601); psycopg uses %s, JDBC ?, node-pg $1."
+   },
+   "related": [
+    "prepared_statement",
+    "quoted_placeholder",
+    "sql_injection"
+   ],
+   "fundamentals": [
+    "code_parameters",
+    "engine_syntax"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-prepare.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/prepared-statement",
+    "https://dba.stackexchange.com/questions/tagged/security",
+    "https://www.reddit.com/r/PHP/",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html",
+    "https://dev.mysql.com/doc/refman/8.0/en/sql-prepared-statements.html",
+    "https://www.php.net/manual/en/pdo.prepare.php",
+    "https://www.psycopg.org/docs/usage.html#passing-parameters-to-sql-queries"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "quoted_placeholder",
+   "kind": "why",
+   "title": {
+    "en": "A placeholder inside quotes ('?', '%s', '$1')",
+    "hinglish": "Quotes ke andar placeholder ('?', '%s', '$1')",
+    "hindi": "Quotes के अंदर placeholder"
+   },
+   "terms": [
+    [
+     "placeholders?",
+     "(quote\\w*|inside|within|andar)"
+    ],
+    [
+     "'%\\?%'"
+    ],
+    [
+     "'\\?'"
+    ],
+    [
+     "'%s'"
+    ],
+    [
+     "'\\$1'"
+    ],
+    [
+     "(question mark|\\?)",
+     "(not replaced|not working|quotes)"
+    ],
+    [
+     "like '%",
+     "%'",
+     "(not work|kaam (kyun |kyu )?nahi|doesn.?t work|not replaced)"
+    ],
+    [
+     "'%\\s*%'",
+     "(kaam|work)"
+    ],
+    [
+     "quotes?",
+     "(%s|placeholder\\w*|\\$1)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why is a placeholder inside quotes not replaced",
+     "why does like '%?%' not work in a prepared statement",
+     "should i put quotes around %s"
+    ],
+    "hinglish": [
+     "quotes ke andar placeholder kaam kyun nahi karta",
+     "'%?%' kaam kyun nahi karta"
+    ],
+    "hindi": [
+     "quotes के अंदर placeholder काम क्यों नहीं करता"
+    ]
+   },
+   "answer": {
+    "en": "Inside quotes, ? or $1 or %s is just text: the database (or driver) sees the characters, not a placeholder, so the value never goes in. Lab: on MariaDB, binding a value to WHERE name = '?' is refused (1210 Incorrect arguments to EXECUTE) and without a value it matches only rows whose name is a question mark; on PostgreSQL WHERE name = '$1' quietly compares with the text $1. Python drivers quote the value themselves, so '%s' becomes ''Asha''. Write the placeholder bare; for LIKE build the pattern around it: CONCAT('%', ?, '%') on MySQL/MariaDB, '%' || $1 || '%' on PostgreSQL, or put the % into the value you bind.",
+    "hinglish": "Quotes ke andar ?, $1 ya %s sirf text hai: value andar jaati hi nahi. Lab: MariaDB pe WHERE name = '?' ko value bind karo to mana (1210), bina value ke sirf '?' naam wali rows; PostgreSQL pe WHERE name = '$1' chupchaap text $1 se compare karta hai. Python drivers khud quotes lagate hain, isliye '%s' ''Asha'' ban jaata hai. Placeholder bina quotes likho; LIKE ke liye MySQL pe CONCAT('%', ?, '%'), PostgreSQL pe '%' || $1 || '%', ya % value mein jod do.",
+    "hindi": "Quotes के अंदर placeholder सिर्फ़ text है; उसे बिना quotes लिखें, LIKE के लिए CONCAT('%', ?, '%') या '%' || $1 || '%'।"
+   },
+   "mistake": {
+    "en": "LIKE '%?%' in a prepared statement: it searches for a literal question mark. And CONCAT('%', $1, '%') on PostgreSQL: refused (42P18 could not determine data type of parameter $1); use || there.",
+    "hinglish": "Prepared statement mein LIKE '%?%': ye sach mein '?' akshar dhoondhta hai. PostgreSQL pe CONCAT('%', $1, '%') mana (42P18); wahan || lagao.",
+    "hindi": "LIKE '%?%' असल में '?' अक्षर ढूँढता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "PREPARE p FROM 'SELECT id, first_name FROM customers WHERE email LIKE CONCAT(''%'', ?, ''%'') ORDER BY id';\nSET @v = 'diya';\nEXECUTE p USING @v;\nDEALLOCATE PREPARE p",
+      "postgresql": "PREPARE p(text) AS SELECT id, first_name FROM customers WHERE email LIKE '%' || $1 || '%' ORDER BY id;\nEXECUTE p('diya');\nDEALLOCATE p"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "2",
+       "Diya"
+      ],
+      [
+       "7",
+       "Dev"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "'?' inside quotes is not a parameter: binding a value fails with 1210; CONCAT('%', ?, '%') works.",
+    "mariadb": "Same as MySQL (lab: 1210 Incorrect arguments to EXECUTE).",
+    "postgresql": "'$1' is text; CONCAT('%', $1, '%') is refused when the parameter has no type (42P18): '%' || $1 || '%' works."
+   },
+   "related": [
+    "placeholders",
+    "like_wildcards",
+    "prepared_statement"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/prepare.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/prepared-statement",
+    "https://dba.stackexchange.com/questions/tagged/security",
+    "https://www.reddit.com/r/PHP/",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html",
+    "https://www.postgresql.org/docs/current/sql-prepare.html",
+    "https://www.psycopg.org/docs/usage.html#the-problem-with-the-query-parameters"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "placeholder_table_name",
+   "kind": "why",
+   "title": {
+    "en": "Binding a table or column name",
+    "hinglish": "Table ya column ka naam bind karna",
+    "hindi": "Table या column का नाम bind करना"
+   },
+   "terms": [
+    [
+     "(table|column)\\s*name",
+     "(parameter|placeholder|bind|prepared|\\?)"
+    ],
+    [
+     "order\\s+by",
+     "(parameter|placeholder|bind|\\?|\\$1)"
+    ],
+    [
+     "(dynamic|variable)",
+     "(table|column)\\s*name"
+    ],
+    [
+     "order by",
+     "not (sort|sorting)"
+    ],
+    [
+     "order by",
+     "sort (kyun|kyu|kyon) nahi"
+    ],
+    [
+     "(table|column)",
+     "placeholder"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can i use a placeholder for a table name",
+     "why does order by ? not sort",
+     "how to use a dynamic column name in order by safely"
+    ],
+    "hinglish": [
+     "table name ko parameter bana sakte hain kya",
+     "order by ? sort kyun nahi karta"
+    ],
+    "hindi": [
+     "table का नाम placeholder से क्यों नहीं दे सकते"
+    ]
+   },
+   "answer": {
+    "en": "Placeholders carry values, never names. FROM ? is a syntax error on both engines (MariaDB 1064, PostgreSQL 42601). ORDER BY ? runs but is worse: the bound text 'name' is a constant, the same on every row, so nothing is sorted (lab: rows came back in storage order on both). To choose a table, column or ASC/DESC at run time, map the user's choice to one of a fixed list of allowed names in code and write that name into the SQL; values still go through placeholders.",
+    "hinglish": "Placeholder sirf value le jaata hai, naam nahi. FROM ? dono pe syntax error (MariaDB 1064, PostgreSQL 42601). ORDER BY ? chalta hai par sort nahi karta: bind kiya 'name' har row pe same constant hai (lab: dono pe rows storage order mein aayi). Table/column/ASC-DESC chunna ho to user ki choice ko code mein allowed list se milao aur wahi naam SQL mein likho.",
+    "hindi": "Placeholder सिर्फ़ value के लिए है; ORDER BY ? sort नहीं करता। नाम code में allowed list से चुनें।"
+   },
+   "mistake": {
+    "en": "Putting the user's sort column straight into the SQL text without checking it against a list: that is SQL injection.",
+    "hinglish": "User ka sort column bina list se check kiye SQL text mein daalna: ye SQL injection hai.",
+    "hindi": "बिना जाँचे user का column SQL में डालना SQL injection है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "PREPARE p FROM 'SELECT id, first_name FROM customers WHERE id IN (3, 4, 6, 8) ORDER BY ?, id';\nSET @c = 'first_name';\nEXECUTE p USING @c;\nDEALLOCATE PREPARE p",
+      "postgresql": "PREPARE p(text) AS SELECT id, first_name FROM customers WHERE id IN (3, 4, 6, 8) ORDER BY $1, id;\nEXECUTE p('first_name');\nDEALLOCATE p"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "3",
+       "Kabir"
+      ],
+      [
+       "4",
+       "Riya"
+      ],
+      [
+       "6",
+       "Tara"
+      ],
+      [
+       "8",
+       "Sara"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "FROM ? -> 1064; ORDER BY ? sorts by the constant (no sort).",
+    "mariadb": "Same as MySQL (lab-tested).",
+    "postgresql": "FROM $1 -> 42601; ORDER BY $1 sorts by the constant. format('%I', name) quotes an identifier inside a function."
+   },
+   "related": [
+    "placeholders",
+    "sql_injection",
+    "dynamic_sql",
+    "custom_sort"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/prepare.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/prepared-statement",
+    "https://dba.stackexchange.com/questions/tagged/security",
+    "https://www.reddit.com/r/PHP/",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html",
+    "https://www.postgresql.org/docs/current/sql-prepare.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "in_list_parameters",
+   "kind": "howto",
+   "title": {
+    "en": "A list of values in IN with placeholders",
+    "hinglish": "IN mein values ki list placeholder se",
+    "hindi": "IN में values की list placeholder से"
+   },
+   "terms": [
+    [
+     "\\bin\\b",
+     "(list|array|multiple)",
+     "(placeholders?|parameters?|prepared|bind\\w*)"
+    ],
+    [
+     "where\\s+in",
+     "(placeholders?|parameters?|prepared|bind\\w*|array)"
+    ],
+    [
+     "\\bany\\s*\\(",
+     "\\$1"
+    ],
+    [
+     "implode",
+     "\\bin\\b"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to pass a list to in with a prepared statement",
+     "how to bind an array in a where in clause",
+     "how to use where in with placeholders"
+    ],
+    "hinglish": [
+     "prepared statement mein IN list kaise pass kare",
+     "array ko where in mein kaise bind kare"
+    ],
+    "hindi": [
+     "prepared statement में IN list कैसे दें"
+    ]
+   },
+   "answer": {
+    "en": "One placeholder is one value. Binding the text '1,2,3' to IN (?) compares id with that one text: MariaDB turns it into the number 1 and matches only id 1 (warning 1292 Truncated incorrect DECIMAL value), PostgreSQL refuses (operator does not exist: integer = text). Build one placeholder per value (IN (?, ?, ?), generated from the list's length) and bind each value; on PostgreSQL you can also bind one array: WHERE id = ANY($1) with $1 an int[].",
+    "hinglish": "Ek placeholder = ek value. IN (?) ko '1,2,3' text bind karo to MariaDB use number 1 bana deta hai aur sirf id 1 milti hai (warning 1292), PostgreSQL mana karta hai (integer = text). List ki lambai jitne placeholder banao (IN (?, ?, ?)) aur har value bind karo; PostgreSQL pe ek array bhi bind kar sakte ho: WHERE id = ANY($1).",
+    "hindi": "एक placeholder = एक value; list के लिए IN (?, ?, ?) बनाएँ, PostgreSQL पर id = ANY($1)।"
+   },
+   "mistake": {
+    "en": "Binding implode(',', $ids) to a single ? (silently wrong on MariaDB), or pasting the joined list into the SQL text.",
+    "hinglish": "implode(',', $ids) ko ek ? pe bind karna (MariaDB pe chupchaap galat), ya list ko SQL text mein jodna.",
+    "hindi": "एक ? पर पूरी list bind करना गलत है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "PREPARE p FROM 'SELECT id FROM customers WHERE id IN (?, ?, ?) ORDER BY id';\nSET @a = 2, @b = 4, @c = 6;\nEXECUTE p USING @a, @b, @c;\nDEALLOCATE PREPARE p",
+      "postgresql": "PREPARE p(int[]) AS SELECT id FROM customers WHERE id = ANY($1) ORDER BY id;\nEXECUTE p('{2,4,6}');\nDEALLOCATE p"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "2"
+      ],
+      [
+       "4"
+      ],
+      [
+       "6"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "IN (?, ?, ?) with one value per placeholder; FIND_IN_SET(id, ?) also works but can't use an index.",
+    "mariadb": "Same as MySQL (lab: IN (?) bound to '1,2,3' matched only id 1, warning 1292).",
+    "postgresql": "id = ANY($1) with an array; IN ($1) bound to text is refused (42883)."
+   },
+   "related": [
+    "in_operator",
+    "placeholders",
+    "prepared_statement"
+   ],
+   "fundamentals": [
+    "code_parameters",
+    "values_types"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-comparisons.html#FUNCTIONS-COMPARISONS-ANY-SOME",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/prepared-statement",
+    "https://dba.stackexchange.com/questions/tagged/security",
+    "https://www.reddit.com/r/PHP/",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html",
+    "https://dev.mysql.com/doc/refman/8.0/en/prepare.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "like_with_parameter",
+   "kind": "howto",
+   "title": {
+    "en": "LIKE with a placeholder",
+    "hinglish": "LIKE placeholder ke saath",
+    "hindi": "LIKE placeholder के साथ"
+   },
+   "terms": [
+    [
+     "like",
+     "(placeholder|parameter|prepared|bind|pdo|\\$1|%s)"
+    ],
+    [
+     "search",
+     "(prepared|placeholder|parameter)"
+    ],
+    [
+     "like",
+     "parameter",
+     "escape"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to use like with a prepared statement",
+     "how to do a like search with a parameter in pdo",
+     "how to escape % in a like parameter"
+    ],
+    "hinglish": [
+     "like ko prepared statement mein kaise likhe",
+     "pdo mein like search kaise kare"
+    ],
+    "hindi": [
+     "prepared statement में LIKE कैसे लिखें"
+    ]
+   },
+   "answer": {
+    "en": "Keep the placeholder bare and add the wildcards around it: either in the value you bind ('%' . $term . '%'), or in SQL with CONCAT('%', ?, '%') on MySQL/MariaDB and '%' || $1 || '%' on PostgreSQL. If the search text may itself contain % or _, escape them in the value (backslash before each) so they match literally; MySQL/MariaDB and PostgreSQL both use \\ as the default LIKE escape.",
+    "hinglish": "Placeholder bina quotes rakho aur wildcard uske aas paas lagao: ya to bind ki value mein ('%' . $term . '%'), ya SQL mein MySQL/MariaDB pe CONCAT('%', ?, '%') aur PostgreSQL pe '%' || $1 || '%'. Search text mein khud % ya _ ho to value mein unke aage \\ lagao.",
+    "hindi": "Placeholder बिना quotes रखें; % value में जोड़ें या CONCAT('%', ?, '%') / '%' || $1 || '%' लिखें।"
+   },
+   "mistake": {
+    "en": "LIKE '%?%' (the ? is text), and forgetting that a % or _ typed by the user is a wildcard too.",
+    "hinglish": "LIKE '%?%' (? sirf text hai), aur bhoolna ki user ka likha % ya _ bhi wildcard hai.",
+    "hindi": "LIKE '%?%' लिखना गलत है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "PREPARE p FROM 'SELECT id, name FROM products WHERE name LIKE ? ORDER BY id';\nSET @v = '%laptop%';\nEXECUTE p USING @v;\nDEALLOCATE PREPARE p",
+      "postgresql": "PREPARE p(text) AS SELECT id, name FROM products WHERE lower(name) LIKE $1 ORDER BY id;\nEXECUTE p('%laptop%');\nDEALLOCATE p"
+     },
+     "columns": [
+      "id",
+      "name"
+     ],
+     "result": [
+      [
+       "3",
+       "Laptop Pro"
+      ],
+      [
+       "6",
+       "Laptop Air"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "CONCAT('%', ?, '%'); LIKE ignores case with the usual _ci collations.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "'%' || $1 || '%'; LIKE is case-sensitive (use ILIKE or lower())."
+   },
+   "related": [
+    "quoted_placeholder",
+    "like",
+    "like_wildcards",
+    "case_insensitive_search"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/string-comparison-functions.html#operator_like",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/prepared-statement",
+    "https://dba.stackexchange.com/questions/tagged/security",
+    "https://www.reddit.com/r/PHP/",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html",
+    "https://www.postgresql.org/docs/current/functions-matching.html#FUNCTIONS-LIKE"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "orm",
+   "kind": "compare",
+   "title": {
+    "en": "ORM (object-relational mapper)",
+    "hinglish": "ORM kya hai",
+    "hindi": "ORM क्या है"
+   },
+   "terms": [
+    [
+     "\\borm\\b"
+    ],
+    [
+     "object\\s*relational\\s*mapp\\w*"
+    ],
+    [
+     "(eloquent|hibernate|sequelize|sqlalchemy|typeorm|prisma|django orm)"
+    ],
+    [
+     "\\borm\\b",
+     "raw\\s+sql"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is an orm",
+     "orm vs raw sql",
+     "what does eloquent do"
+    ],
+    "hinglish": [
+     "orm kya hota hai",
+     "orm aur raw sql mein kya farak hai"
+    ],
+    "hindi": [
+     "ORM क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "An ORM maps tables to classes and rows to objects (Eloquent, Django ORM, SQLAlchemy, Hibernate, Sequelize, Prisma) and writes the SQL for you at run time, with placeholders. It saves code for everyday reads and writes; the SQL it sends is still SQL, so the same rules apply (indexes, N+1, totals at the right grain). To check what it really runs, log the SQL (Laravel toSql()/query log, Django connection.queries, SQLAlchemy echo=True) and read that. DBaba reports ORM calls in a project as found but not read, because the SQL only exists at run time.",
+    "hinglish": "ORM tables ko classes aur rows ko objects banata hai (Eloquent, Django ORM, SQLAlchemy, Hibernate, Sequelize, Prisma) aur SQL khud likhta hai, placeholders ke saath. Rozana ke kaam ke liye code bachta hai; jo SQL jaati hai wo SQL hi hai, isliye wahi niyam lagte hain (index, N+1, sahi grain). Asli SQL dekhne ke liye log karo (toSql(), connection.queries, echo=True).",
+    "hindi": "ORM tables को classes बनाता है और SQL खुद लिखता है; असली SQL देखने के लिए उसे log करें।"
+   },
+   "mistake": {
+    "en": "Loading a list and then touching a relation inside a loop: one query per row (N+1). Load the relation with the list (with() / select_related / include).",
+    "hinglish": "List load karke loop mein relation chhoona: har row pe ek query (N+1). Relation list ke saath load karo (with(), select_related).",
+    "hindi": "Loop में relation छूना: हर row पर एक query (N+1)।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, c.first_name FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.id IN (1, 2, 3) ORDER BY o.id"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "1",
+       "Aarav"
+      ],
+      [
+       "2",
+       "Aarav"
+      ],
+      [
+       "3",
+       "Diya"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "Every ORM supports MySQL; it sends ? placeholders.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Every ORM supports PostgreSQL; it sends $1 placeholders (or %s through psycopg)."
+   },
+   "related": [
+    "query_builder",
+    "n_plus_one",
+    "raw_query_laravel"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/connectors-apis.html",
+   "seen_at": [
+    "https://laravel.com/docs/eloquent",
+    "https://docs.djangoproject.com/en/stable/topics/db/queries/",
+    "https://docs.sqlalchemy.org/en/20/orm/",
+    "https://stackoverflow.com/questions/tagged/orm"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "query_builder",
+   "kind": "compare",
+   "title": {
+    "en": "Query builder vs raw SQL",
+    "hinglish": "Query builder aur raw SQL",
+    "hindi": "Query builder और raw SQL"
+   },
+   "terms": [
+    [
+     "query\\s*builder"
+    ],
+    [
+     "raw\\s+(sql|quer\\w*)",
+     "(vs|or|ya|orm|builder|when|kab)"
+    ],
+    [
+     "raw\\s+sql",
+     "instead"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a query builder",
+     "query builder vs raw sql",
+     "when should i use raw sql instead of the orm"
+    ],
+    "hinglish": [
+     "query builder kya hai",
+     "raw sql kab use kare"
+    ],
+    "hindi": [
+     "query builder क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A query builder (Laravel's DB::table, Knex, SQLAlchemy Core, jOOQ) builds SQL from method calls such as ->where('status', $s)->orderBy('id'): every value becomes a placeholder automatically. Raw SQL is the SQL text you write yourself (DB::select, pool.query, cursor.execute): best for complex reports, window functions and CTEs, and safe as long as values go through placeholders. The *Raw helpers (whereRaw, orderByRaw, DB::raw) put text straight into the SQL, so only fixed text or allow-listed names belong there.",
+    "hinglish": "Query builder (Laravel DB::table, Knex, SQLAlchemy Core) method calls se SQL banata hai aur har value apne aap placeholder banti hai. Raw SQL wo text hai jo tum khud likhte ho (DB::select, pool.query, cursor.execute): complex reports ke liye badhiya, bas values placeholder se jaayein. whereRaw / DB::raw text seedha SQL mein daalte hain: wahan sirf fixed text.",
+    "hindi": "Query builder method calls से SQL बनाता है; raw SQL आप खुद लिखते हैं, values placeholder से जाएँ।"
+   },
+   "mistake": {
+    "en": "whereRaw(\"name = '$name'\"): a raw helper with a value pasted in is SQL injection. Use whereRaw('name = ?', [$name]).",
+    "hinglish": "whereRaw(\"name = '$name'\"): raw helper mein value jodna SQL injection hai. whereRaw('name = ?', [$name]) likho.",
+    "hindi": "whereRaw में value जोड़ना SQL injection है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, status FROM orders WHERE status = 'paid' ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "status"
+     ],
+     "result": [
+      [
+       "1",
+       "paid"
+      ],
+      [
+       "3",
+       "paid"
+      ],
+      [
+       "5",
+       "paid"
+      ],
+      [
+       "7",
+       "paid"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "Builders quote names with backticks for MySQL.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Builders quote names with double quotes for PostgreSQL."
+   },
+   "related": [
+    "orm",
+    "raw_query_laravel",
+    "sql_injection"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/sql-prepared-statements.html",
+   "seen_at": [
+    "https://laravel.com/docs/queries",
+    "https://knexjs.org/guide/query-builder.html",
+    "https://stackoverflow.com/questions/tagged/query-builder"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "raw_query_laravel",
+   "kind": "howto",
+   "title": {
+    "en": "Raw SQL in Laravel",
+    "hinglish": "Laravel mein raw SQL",
+    "hindi": "Laravel में raw SQL"
+   },
+   "terms": [
+    [
+     "laravel",
+     "(raw|sql|db::select|query|statement)"
+    ],
+    [
+     "\\bdb\\s*:{0,2}\\s*(select|statement|raw|update|delete|insert)\\b"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to run a raw sql query in laravel",
+     "what does db::select do",
+     "db::raw vs db::select in laravel"
+    ],
+    "hinglish": [
+     "laravel mein raw query kaise chalaye",
+     "db::select kya karta hai"
+    ],
+    "hindi": [
+     "Laravel में raw query कैसे चलाएँ"
+    ]
+   },
+   "answer": {
+    "en": "Laravel runs SQL you write through the DB facade: DB::select('... where id = ?', [$id]) returns rows, DB::insert / DB::update / DB::delete return counts, DB::statement runs anything else. Use ? or :name placeholders with the values in the array. DB::raw('...') is an expression pasted into a builder query as text: never put a request value in it. toSql() and DB::listen / the query log show the SQL a builder or Eloquent call sends.",
+    "hinglish": "Laravel DB facade se tumhari SQL chalata hai: DB::select('... where id = ?', [$id]) rows deta hai, DB::insert/update/delete count, DB::statement baaki sab. Values array mein, SQL mein ? ya :name. DB::raw text seedha query mein daalta hai: usme request ki value kabhi nahi. toSql() / query log se builder ki SQL dikhti hai.",
+    "hindi": "Laravel में DB::select('... where id = ?', [$id]) लिखें; DB::raw में user की value न डालें।"
+   },
+   "mistake": {
+    "en": "DB::select(\"select * from users where email = '$email'\"): the string is built before Laravel sees it, so nothing is bound.",
+    "hinglish": "DB::select(\"... where email = '$email'\"): string Laravel se pehle ban jaati hai, kuch bind nahi hota.",
+    "hindi": "string में value जोड़कर DB::select देना: कुछ bind नहीं होता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, email FROM customers WHERE city = 'Delhi' ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "email"
+     ],
+     "result": [
+      [
+       "2",
+       "diya@mail.test"
+      ],
+      [
+       "7",
+       "diya@mail.test"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "The usual Laravel database; placeholders are sent as ? (PDO).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same API with DB_CONNECTION=pgsql; PDO turns ? into $1 for the server."
+   },
+   "related": [
+    "query_builder",
+    "orm",
+    "placeholders"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/sql-prepared-statements.html",
+   "seen_at": [
+    "https://www.php.net/manual/en/pdo.prepare.php",
+    "https://laravel.com/docs/database#running-queries",
+    "https://stackoverflow.com/questions/tagged/laravel"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "wpdb_prepare",
+   "kind": "howto",
+   "title": {
+    "en": "$wpdb->prepare in WordPress",
+    "hinglish": "WordPress mein $wpdb->prepare",
+    "hindi": "WordPress में $wpdb->prepare"
+   },
+   "terms": [
+    [
+     "wpdb"
+    ],
+    [
+     "wordpress",
+     "(query|sql|prepare|database)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to write a safe query in wordpress",
+     "what does wpdb prepare do",
+     "how to use $wpdb->get_results with a variable"
+    ],
+    "hinglish": [
+     "wordpress mein safe query kaise likhe",
+     "wpdb prepare kya karta hai"
+    ],
+    "hindi": [
+     "WordPress में safe query कैसे लिखें"
+    ]
+   },
+   "answer": {
+    "en": "$wpdb->prepare() fills %s (text), %d (integer), %f (float) and %i (a table/column name, WordPress 6.2+) with the values you pass, quoting and escaping them; then hand the result to get_results / get_row / get_var / query. Write %s without quotes (prepare adds them), double a literal % as %%, and write table names as {$wpdb->prefix}name or $wpdb->posts. WordPress runs on MySQL/MariaDB.",
+    "hinglish": "$wpdb->prepare() %s (text), %d (integer), %f aur %i (naam, WP 6.2+) ko di gayi values se bharta hai, quote aur escape karke; phir get_results / get_row / get_var / query ko do. %s bina quotes likho, literal % ko %% likho, table ka naam {$wpdb->prefix}name ya $wpdb->posts.",
+    "hindi": "$wpdb->prepare() %s, %d को values से भरता है; फिर get_results को दें।"
+   },
+   "mistake": {
+    "en": "$wpdb->get_results(\"... WHERE post_title = '$title'\"): no prepare, so the title goes straight into the SQL text.",
+    "hinglish": "$wpdb->get_results(\"... WHERE post_title = '$title'\"): prepare nahi, title seedha SQL mein.",
+    "hindi": "prepare के बिना value सीधे SQL में।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, name FROM products WHERE price > 1000 ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "name"
+     ],
+     "result": [
+      [
+       "1",
+       "Phone X"
+      ],
+      [
+       "2",
+       "Phone Lite"
+      ],
+      [
+       "3",
+       "Laptop Pro"
+      ],
+      [
+       "6",
+       "Laptop Air"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "WordPress's own database.",
+    "mariadb": "WordPress's own database too.",
+    "postgresql": "WordPress core doesn't run on PostgreSQL."
+   },
+   "related": [
+    "placeholders",
+    "sql_injection",
+    "prepared_statement"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/string-literals.html",
+   "seen_at": [
+    "https://developer.wordpress.org/reference/classes/wpdb/prepare/",
+    "https://wordpress.stackexchange.com/questions/tagged/wpdb"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "pdo_vs_mysqli",
+   "kind": "compare",
+   "title": {
+    "en": "PDO vs mysqli",
+    "hinglish": "PDO aur mysqli",
+    "hindi": "PDO और mysqli"
+   },
+   "terms": [
+    [
+     "\\bpdo\\b",
+     "mysqli"
+    ],
+    [
+     "\\bpdo\\b",
+     "(what|kya)"
+    ],
+    [
+     "mysqli",
+     "(what|kya|vs)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "pdo vs mysqli",
+     "what is pdo in php",
+     "should i use pdo or mysqli"
+    ],
+    "hinglish": [
+     "pdo aur mysqli mein kya farak hai",
+     "pdo kya hai"
+    ],
+    "hindi": [
+     "PDO और mysqli में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "Both are PHP's ways to talk to MySQL/MariaDB. PDO is one API for many databases (MySQL, PostgreSQL, SQLite, SQL Server), with ? or :name placeholders and exceptions on errors (the default since PHP 8). mysqli is MySQL-only, uses ? placeholders with bind_param types ('si'), and has a few MySQL extras (multi_query, async). Both are safe when values are bound; mysqli_query($link, \"... '$x'\") with a value pasted in is not.",
+    "hinglish": "Dono PHP se MySQL/MariaDB se baat karte hain. PDO kai databases ke liye ek API hai (MySQL, PostgreSQL, SQLite), ? ya :name placeholders aur errors pe exception. mysqli sirf MySQL ke liye, ? placeholders bind_param ('si') ke saath. Dono safe hain jab values bind hon; mysqli_query mein value jodna safe nahi.",
+    "hindi": "PDO कई databases के लिए है, mysqli सिर्फ़ MySQL; दोनों values bind करें तो safe हैं।"
+   },
+   "mistake": {
+    "en": "Using PDO but building the SQL with string concatenation, or mixing ? and :name in one statement (PDO refuses).",
+    "hinglish": "PDO use karna par SQL string jodkar banana, ya ek statement mein ? aur :name milana (PDO mana karta hai).",
+    "hindi": "PDO में ? और :name एक साथ मिलाना मना है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS n FROM customers WHERE city = 'Pune'"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "Both work; PDO DSN mysql:host=...;dbname=...;charset=utf8mb4.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Only PDO (pdo_pgsql) or the pg_* functions; mysqli is MySQL-only."
+   },
+   "related": [
+    "prepared_statement",
+    "placeholders",
+    "escape_vs_prepare"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://dev.mysql.com/doc/apis-php/en/apis-php-mysqlinfo.api.choosing.html",
+   "seen_at": [
+    "https://www.php.net/manual/en/book.pdo.php",
+    "https://www.php.net/manual/en/book.mysqli.php",
+    "https://stackoverflow.com/questions/tagged/pdo"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "escape_vs_prepare",
+   "kind": "compare",
+   "title": {
+    "en": "Escaping vs prepared statements",
+    "hinglish": "Escape karna ya prepared statement",
+    "hindi": "Escape करना या prepared statement"
+   },
+   "terms": [
+    [
+     "(real_escape_string|escape_string|addslashes|esc_sql|escap\\w*)",
+     "(prepare\\w*|placeholder|injection|vs|enough|kaafi|safe)"
+    ],
+    [
+     "mysqli_real_escape_string"
+    ],
+    [
+     "escap\\w*",
+     "quotes?"
+    ],
+    [
+     "escape",
+     "(काफ़ी|काफी|kaafi|enough)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "is mysqli_real_escape_string enough",
+     "escaping vs prepared statements",
+     "why not just escape quotes"
+    ],
+    "hinglish": [
+     "sql injection ke liye escape karna kaafi hai kya",
+     "mysqli_real_escape_string vs prepared statement"
+    ],
+    "hindi": [
+     "escape करना काफ़ी है क्या"
+    ]
+   },
+   "answer": {
+    "en": "Escaping only makes a value safe inside quotes, and only with the connection's real character set: a value pasted where no quotes are (WHERE id = $id, LIMIT $n, ORDER BY $col) is not protected at all, and one forgotten call is enough. A prepared statement keeps the value out of the SQL text entirely, so nothing can be forgotten or mis-escaped. Use placeholders for values; for numbers in code, cast them ((int)$id) if you must build text.",
+    "hinglish": "Escape sirf quotes ke andar value ko safe karta hai, aur sahi charset ke saath hi: jahan quotes nahi (WHERE id = $id, LIMIT $n, ORDER BY $col) wahan koi bachav nahi, aur ek bhoola hua call kaafi hai. Prepared statement value ko SQL text se bahar rakhta hai. Values ke liye placeholder lagao.",
+    "hindi": "Escape सिर्फ़ quotes के अंदर बचाता है; prepared statement value को SQL से बाहर रखता है।"
+   },
+   "mistake": {
+    "en": "mysqli_real_escape_string($link, $id) used for WHERE id = $id (no quotes): '1 OR 1=1' passes straight through.",
+    "hinglish": "WHERE id = $id (bina quotes) ke liye escape: '1 OR 1=1' seedha nikal jaata hai.",
+    "hindi": "बिना quotes वाली value पर escape बेकार है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT 'O''Brien' AS last_name"
+     },
+     "columns": [
+      "last_name"
+     ],
+     "result": [
+      [
+       "O'Brien"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "QUOTE() and mysqli_real_escape_string escape for quotes; NO_BACKSLASH_ESCAPES changes the rules.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "quote_literal() / format('%L'); with standard_conforming_strings on, backslash is an ordinary character."
+   },
+   "related": [
+    "sql_injection",
+    "prepared_statement",
+    "pdo_vs_mysqli"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://dev.mysql.com/doc/c-api/8.0/en/mysql-real-escape-string-quote.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/prepared-statement",
+    "https://dba.stackexchange.com/questions/tagged/security",
+    "https://www.reddit.com/r/PHP/",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html",
+    "https://www.php.net/manual/en/mysqli.real-escape-string.php"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "db_migration",
+   "kind": "concept",
+   "title": {
+    "en": "Database migrations",
+    "hinglish": "Database migration",
+    "hindi": "Database migration"
+   },
+   "terms": [
+    [
+     "migrations?"
+    ],
+    [
+     "schema",
+     "(version\\w*|change\\w*)",
+     "(code|git|deploy)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a database migration",
+     "what are migrations in laravel",
+     "how do migrations work"
+    ],
+    "hinglish": [
+     "migration kya hota hai",
+     "database migration kya hai"
+    ],
+    "hindi": [
+     "database migration क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A migration is a small, numbered file that changes the schema one step (create a table, add a column, add an index), with a way to undo it; the tool records which ones have run, so every copy of the database (yours, a colleague's, production) reaches the same structure in the same order. Laravel, Django, Rails, Flyway and Liquibase all work this way. Plain .sql migration files are SQL like any other and DBaba reads them in a project scan.",
+    "hinglish": "Migration ek chhoti numbered file hai jo schema ek kadam badalti hai (table banana, column ya index jodna), undo ke saath; tool yaad rakhta hai kaun si chal chuki, taaki har database copy same order mein same structure pe pahunche. Laravel, Django, Rails, Flyway, Liquibase sab aise kaam karte hain.",
+    "hindi": "Migration एक numbered file है जो schema को एक कदम बदलती है।"
+   },
+   "mistake": {
+    "en": "Editing a migration that has already run elsewhere: the change never reaches those databases. Add a new migration instead.",
+    "hinglish": "Jo migration kahin chal chuki usi ko badalna: wo change un databases tak kabhi nahi pahunchta. Nayi migration jodo.",
+    "hindi": "चल चुकी migration बदलना गलत है; नई migration जोड़ें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT, note VARCHAR(40))"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "DDL commits on its own: a failed migration can leave half its steps applied.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "DDL is transactional: a migration in one transaction rolls back completely on failure."
+   },
+   "related": [
+    "create_table",
+    "alter_table",
+    "online_ddl"
+   ],
+   "fundamentals": [
+    "code_parameters",
+    "table_keys"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-alter.html",
+   "seen_at": [
+    "https://laravel.com/docs/migrations",
+    "https://docs.djangoproject.com/en/stable/topics/migrations/",
+    "https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "dynamic_sql",
+   "kind": "concept",
+   "title": {
+    "en": "Dynamic SQL (building a query in pieces)",
+    "hinglish": "Dynamic SQL (query tukdon mein banana)",
+    "hindi": "Dynamic SQL"
+   },
+   "terms": [
+    [
+     "dynamic\\s+(sql|quer\\w*)"
+    ],
+    [
+     "(build|building|banana|bana)\\w*",
+     "quer\\w*",
+     "(pieces|dynamic\\w*|conditions?|filters?|tukd\\w*)"
+    ],
+    [
+     "optional\\s+(filters?|conditions?)"
+    ],
+    [
+     "where\\s+clause",
+     "dynamic\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is dynamic sql",
+     "how to build a query with optional filters safely",
+     "how to build a where clause dynamically"
+    ],
+    "hinglish": [
+     "dynamic sql kya hai",
+     "optional filter wali query kaise banaye"
+    ],
+    "hindi": [
+     "dynamic SQL क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Dynamic SQL is a query whose text is put together at run time, usually optional filters (add AND city = ? only when a city was chosen). Done safely, the code joins fixed SQL pieces it wrote itself and collects the values in a list that is bound to the placeholders; names come from an allow-list. A reviewer (or DBaba) can't read such a query from one string, so a scan reports it as 'built in pieces' instead of guessing; log the final SQL to check it.",
+    "hinglish": "Dynamic SQL wo query hai jiska text run time pe banta hai, aksar optional filters (city chuni ho tabhi AND city = ?). Safe tareeka: code apne likhe fixed SQL tukde jode aur values ek list mein rakhe jo placeholders se bind ho; naam allowed list se. Aisi query ek string se padhi nahi ja sakti, isliye scan use 'tukdon mein bani' batata hai.",
+    "hindi": "Dynamic SQL run time पर बनती है; fixed टुकड़े जोड़ें और values bind करें।"
+   },
+   "mistake": {
+    "en": "Joining the user's text into the WHERE pieces ($where[] = \"city = '$city'\") instead of adding a placeholder and a value.",
+    "hinglish": "User ka text WHERE ke tukdon mein jodna ($where[] = \"city = '$city'\") placeholder ki jagah.",
+    "hindi": "user का text सीधे WHERE में जोड़ना गलत है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM customers WHERE 1 = 1 AND city = 'Pune' ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ],
+      [
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "In procedures: PREPARE stmt FROM @sql; EXECUTE stmt USING ...",
+    "mariadb": "Also EXECUTE IMMEDIATE ... USING.",
+    "postgresql": "In PL/pgSQL: EXECUTE format('... %I ...', name) USING value."
+   },
+   "related": [
+    "sql_injection",
+    "placeholder_table_name",
+    "find_queries_in_code"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://www.postgresql.org/docs/current/plpgsql-statements.html#PLPGSQL-STATEMENTS-EXECUTING-DYN",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/prepared-statement",
+    "https://dba.stackexchange.com/questions/tagged/security",
+    "https://www.reddit.com/r/PHP/",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html",
+    "https://dev.mysql.com/doc/refman/8.0/en/sql-prepared-statements.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "find_queries_in_code",
+   "kind": "howto",
+   "title": {
+    "en": "Finding the SQL in a project's code",
+    "hinglish": "Project ke code mein SQL dhoondhna",
+    "hindi": "Project के code में SQL ढूँढना"
+   },
+   "terms": [
+    [
+     "(find|search|scan|check|dhoond\\w*|dhund\\w*)",
+     "(sql|quer\\w*)",
+     "(project|code|codebase|files?|folder|repo)"
+    ],
+    [
+     "(project|codebase|repo)",
+     "(sql|quer\\w*)",
+     "(check|scan)"
+    ],
+    [
+     "(ढूँढ|ढूंढ|खोज)\\w*",
+     "(sql|quer\\w*)",
+     "(project|code)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to find all sql queries in a project",
+     "how to check the sql queries in a codebase",
+     "how to scan a php project for sql mistakes"
+    ],
+    "hinglish": [
+     "project ke code mein sql queries kaise dhoondhe",
+     "codebase ki saari queries kaise check kare"
+    ],
+    "hindi": [
+     "project के code में SQL queries कैसे ढूँढें"
+    ]
+   },
+   "answer": {
+    "en": "SQL lives in .sql files and in strings handed to raw-query calls (mysqli_query, PDO, $wpdb, DB::select, cursor.execute, pool.query, prepareStatement). DBaba's project scan (dbaba check <folder>) walks the folder read-only, skips vendor/, node_modules/, .git and build output, reads each language's strings (heredocs, template strings, triple quotes, + / . concatenation), keeps only text with a real SQL shape, and checks each query: file:line, what's wrong, the corrected query. Placeholders are values; queries built in pieces and ORM calls are listed as found but not read, never guessed.",
+    "hinglish": "SQL .sql files mein aur raw-query calls ko di strings mein hoti hai (mysqli_query, PDO, $wpdb, DB::select, cursor.execute, pool.query). DBaba ka project scan (dbaba check <folder>) folder ko sirf padhta hai, vendor/ node_modules/ .git chhodta hai, har language ki strings padhta hai, sirf asli SQL shape wala text rakhta hai, aur har query ka file:line, galti aur sahi query batata hai. Tukdon mein bani query aur ORM calls 'mili par padhi nahi' mein aati hain.",
+    "hindi": "DBaba का project scan हर query का file:line, गलती और सही query बताता है।"
+   },
+   "mistake": {
+    "en": "grep for SELECT alone: it finds UI text like 'Select a file' and misses queries split over concatenated lines.",
+    "hinglish": "Sirf SELECT grep karna: 'Select a file' jaisa text milta hai aur jodi hui lines wali queries chhoot jaati hain.",
+    "hindi": "सिर्फ़ SELECT grep करना काफ़ी नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS n FROM orders WHERE status = 'paid'"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "Driver marks in code: mysqli_*, PDO mysql:, $wpdb, mysql2, pymysql, com.mysql.",
+    "mariadb": "Same drivers as MySQL.",
+    "postgresql": "Driver marks: pg_*, PDO pgsql:, pg (node), psycopg, org.postgresql."
+   },
+   "related": [
+    "dynamic_sql",
+    "orm",
+    "sql_injection"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/connectors-apis.html",
+   "seen_at": [
+    "https://www.php.net/manual/en/language.types.string.php#language.types.string.syntax.heredoc",
+    "https://stackoverflow.com/questions/tagged/static-analysis"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "connection_string",
+   "kind": "concept",
+   "title": {
+    "en": "Connection string (DSN)",
+    "hinglish": "Connection string (DSN)",
+    "hindi": "Connection string (DSN)"
+   },
+   "terms": [
+    [
+     "connection\\s*string"
+    ],
+    [
+     "\\bdsn\\b"
+    ],
+    [
+     "database_url"
+    ],
+    [
+     "data source name|\\bdsn\\b",
+     "(mysql|pdo|postgres\\w*|php|connection)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a connection string",
+     "what is a dsn in pdo",
+     "what is database_url"
+    ],
+    "hinglish": [
+     "connection string kya hota hai",
+     "dsn kya hai"
+    ],
+    "hindi": [
+     "connection string क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A connection string tells a driver where the database is and how to log in: host, port, database name, user, password, and options such as charset or SSL. Shapes differ: PDO mysql:host=db;port=3306;dbname=shop;charset=utf8mb4, PostgreSQL postgresql://user@db:5432/shop?sslmode=require, JDBC jdbc:mysql://db:3306/shop. Keep it out of code: read it from an environment variable or a secrets store, give each app its own least-privilege user, and use TLS off the local machine.",
+    "hinglish": "Connection string driver ko batata hai database kahan hai aur login kaise: host, port, database, user, password, charset ya SSL jaise options. Shape alag: PDO mysql:host=db;dbname=shop;charset=utf8mb4, PostgreSQL postgresql://user@db:5432/shop. Ise code mein mat rakho: environment variable ya secrets store se padho, har app ka apna kam-adhikar wala user.",
+    "hindi": "Connection string बताता है database कहाँ है और login कैसे; इसे code में न रखें।"
+   },
+   "mistake": {
+    "en": "A password committed in the code or in .env pushed to the repository; and connecting the app as root.",
+    "hinglish": "Password code mein commit karna ya .env repo mein push karna; aur app ko root se jodna.",
+    "hindi": "password code में रखना और root से जोड़ना गलत है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "SELECT DATABASE() IS NOT NULL AS connected",
+      "postgresql": "SELECT current_database() IS NOT NULL AS connected"
+     },
+     "columns": [
+      "connected"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "charset=utf8mb4 in the DSN; default port 3306.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "URI or key=value form; default port 5432; sslmode=require/verify-full for remote servers."
+   },
+   "related": [
+    "which_database",
+    "find_queries_in_code"
+   ],
+   "fundamentals": [
+    "code_parameters"
+   ],
+   "source": "https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING",
+   "seen_at": [
+    "https://www.php.net/manual/en/ref.pdo-mysql.connection.php",
+    "https://dev.mysql.com/doc/refman/8.0/en/connecting-using-uri-or-key-value-pairs.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "sql_comments",
+   "kind": "concept",
+   "title": {
+    "en": "Comments in SQL",
+    "hinglish": "SQL mein comments",
+    "hindi": "SQL में comments"
+   },
+   "terms": [
+    [
+     "comments?",
+     "(sql|mysql|postgres\\w*|maria\\s?db|query|quer\\w*)"
+    ],
+    [
+     "--",
+     "(comment|sql)"
+    ],
+    [
+     "\\bcomment\\s+(out|likh\\w*)"
+    ],
+    [
+     "--",
+     "/\\*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to write a comment in sql",
+     "why does a -- comment break a query built in code",
+     "what is the difference between -- and /* */"
+    ],
+    "hinglish": [
+     "sql mein comment kaise likhe",
+     "-- comment query kyun tod deta hai"
+    ],
+    "hindi": [
+     "SQL में comment कैसे लिखें"
+    ]
+   },
+   "answer": {
+    "en": "-- starts a comment that runs to the end of the line; /* ... */ can sit anywhere and span lines. MySQL/MariaDB also take # and need a space after -- (--x is not a comment there). In code, a query glued from several string pieces with no newline between them is one long line, so a -- comment in an early piece hides everything the later pieces add: the database never sees that WHERE or GROUP BY. End such a piece with \\n or use /* */.",
+    "hinglish": "-- line ke ant tak comment hai; /* ... */ kahin bhi, kai lines tak. MySQL/MariaDB # bhi lete hain aur -- ke baad space chahiye. Code mein bina newline jode tukdon wali query ek lambi line hai, isliye pehle tukde ka -- comment baaki sab chhupa deta hai: database WHERE ya GROUP BY dekhta hi nahi. Us tukde ke ant mein \\n do ya /* */ likho.",
+    "hindi": "-- line के अंत तक comment है; code में जुड़े टुकड़ों में यह बाकी query छुपा देता है।"
+   },
+   "mistake": {
+    "en": "\"SELECT ... FROM orders -- paid only \" + \"WHERE status = 'paid'\": the WHERE is part of the comment, so every order comes back.",
+    "hinglish": "\"... FROM orders -- paid only \" + \"WHERE status = 'paid'\": WHERE comment ka hissa hai, saare orders aa jaate hain.",
+    "hindi": "-- comment के बाद जुड़ा WHERE चलता ही नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS n FROM orders /* every order */ WHERE status = 'paid' -- paid only"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): parameters are @name (sp_executesql, ADO.NET); ODBC/JDBC drivers use ?.",
+    "oracle": "Notes only (not lab-tested here): bind variables are :name (or :1); JDBC uses ?.",
+    "sqlite": "Notes only (not lab-tested here): ?, ?NNN, :name, @name and $name are all accepted as parameters.",
+    "mysql": "--, # and /* */; -- needs a following space; /*! ... */ is run by MySQL as SQL.",
+    "mariadb": "Same as MySQL; /*M! ... */ is run by MariaDB.",
+    "postgresql": "-- and /* */ (nested /* */ allowed); # is an operator, not a comment."
+   },
+   "related": [
+    "find_queries_in_code",
+    "dynamic_sql"
+   ],
+   "fundamentals": [
+    "code_parameters",
+    "engine_syntax"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/comments.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/sql-syntax-lexical.html#SQL-SYNTAX-COMMENTS",
+    "https://mariadb.com/kb/en/comment-syntax/",
+    "https://stackoverflow.com/questions/tagged/sql"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

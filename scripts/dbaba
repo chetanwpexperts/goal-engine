@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# DBaba from the command line, read only:  scripts/dbaba check <folder or file> [--engine mysql|mariadb|postgresql] [--json]
+# Finds the SQL in a project's files (.sql, PHP, JS/TS, Python, Java), checks each query for the project's database and
+# prints file:line, what is wrong and the corrected query. Nothing in the folder is changed.
+cd "$(dirname "$0")/.." && exec "${PYTHON:-python3}" -m app.agents.sqlscan "$@"

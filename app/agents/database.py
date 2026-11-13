@@ -657,6 +657,11 @@ def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) ->
     if relation != "safety" and sqlport.is_request(text):
         return True                       # 'convert this query to PostgreSQL': written in that database's words
 
+    from app.agents import sqlscan
+
+    if relation != "safety" and sqlscan.code_paste(text) is not None:
+        return True                       # code with its queries in it: each query by its line (night 10A)
+
     if ANOTHER_RE.search(text or "") and not query_in(text):
         return True                       # the 'Check another query' tap: ask for it, don't repeat the last answer
 
@@ -747,6 +752,12 @@ def _engine_reply(db, goal, agent, eid: str, how: str, hi: bool, again: bool):
     waiting = data.pop("_db_wait", None)
     goal.slots = dumps(data)
     lang = _goal_lang(goal, hi)
+    from app.agents import sqlscan
+
+    if waiting and sqlscan.code_paste(waiting) is not None:   # pasted code was waiting for its database
+        db.commit()
+        reply, taps, _r = _code_turn(db, goal, waiting, hi)
+        return reply, taps, hi
     if waiting:                            # an error message was waiting for its database
         db.commit()
         reply, _o, _r = _error_turn(db, goal, waiting, hi, goal.visitor_id)
@@ -808,6 +819,10 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
 
     if sqlport.is_request(text):          # 'convert this query to PostgreSQL': the query in that database's own words
         return _translate_turn(db, goal, text, turn.hi)
+    from app.agents import sqlscan
+
+    if sqlscan.code_paste(text) is not None:   # code with several queries / a placeholder mistake: each query by its line
+        return _code_turn(db, goal, text, turn.hi)
     if query_in(text):                    # a pasted query is for the SQL checker, whatever else the message says
         return _check_pasted_query(db, goal, text, turn.hi)
 
@@ -843,6 +858,53 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
             ("Database juda hua hai, card mein check shuru karo." if has else "Bas batao database kahan hai; judte hi main khud check karke wajah aur fix dhoondhunga.") if turn.hi
             else ("Your database is connected; start the check on the card." if has else "Just tell me where your database is; once it's connected I'll check it myself and find the cause and the fix."))
     return reply, [], "agent_plan"
+
+
+def _code_turn(db: Session, goal: Goal, text: str, hi: bool):
+    """Code pasted in the chat (night 10A): every query in it, by its line, checked for the person's database (rule A: named,
+    remembered or chosen; else the driver the code uses, said as detected; else ask first). Read only."""
+    from app.agents import sqlscan
+    from app.dbknow import engines as E
+
+    words = "\n".join(ln for ln in text.splitlines() if ln.strip() and not sqlscan.code_lang(ln) and not re.search(r"[;{}()=]", ln))
+    lang = E.lang_of(words) if words and len(re.findall(r"\w+", words)) >= 2 else ("hinglish" if hi else "en")
+    if lang == "en" and hi:
+        lang = "hinglish"
+    eid, detected = None, None
+    named = E.named(words or "")
+    if named:                              # named in the message: only that database, remembered (rule A)
+        eid = E.remember(goal, named, "named")["id"]
+    else:
+        rec = E.remembered(goal)
+        if rec and rec.get("how") in ("named", "chosen"):
+            eid = rec["id"]
+    if eid is None:                        # the driver the code imports shows it (a backtick here is a JS string, not MySQL)
+        guess = sqlscan.code_paste(text)
+        eid = guess and guess.get("engine")
+        if eid:
+            detected = E.remember(goal, eid, "detected", "the database driver the code uses" if lang == "en" else "code ka driver")
+    if eid is None:
+        agent = goal_agent(db, goal) or create_agent(db, goal, detect_mode(text))
+        data = loads(goal.slots, {}) or {}
+        data["_db_wait"] = text[:8000]
+        goal.slots = dumps(data)
+        goal.pending = E.PENDING
+        goal.intent = "slow_db_query"
+        db.commit()
+        question, taps = E.ask(lang)
+        return question, taps, "agent_plan"
+    rep = sqlscan.code_paste(text, eid if eid in ("mysql", "mariadb", "postgresql") else None) or sqlscan.code_paste(text)
+    reply = sqlscan.paste_text(rep, lang)
+    reply += "\n\n" + (f"{E.label(eid)} ke liye check kiya." if lang != "en" else f"Checked for {E.label(eid)}.")
+    taps = []
+    if detected:
+        line, taps = E.detected_line(detected, lang)
+        reply += " " + line
+    goal.title = ("SQL in code: queries checked" if lang == "en" else "Code ki SQL queries check ki")[:200]
+    goal.intent = "slow_db_query"
+    goal.missing_info, goal.pending = "[]", None
+    db.commit()
+    return reply, taps, "agent_run"
 
 
 def _translate_turn(db: Session, goal: Goal, text: str, hi: bool, query: str | None = None):

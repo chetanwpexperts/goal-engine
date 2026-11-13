@@ -49,7 +49,10 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         # night 10: another database's words in the chosen one (rewritten in its own words, same values on that engine), and
         # spellings that run but mean something else there (date - date, INTERVAL '2' WEEK, CAST AS CHAR, ^)
         "pt_top", "pt_rownum", "pt_dateadd", "pt_datediff_ss", "pt_ss_funcs", "pt_brackets", "pt_my_dates_pg", "pt_my_funcs_pg",
-        "pt_pg_funcs_my", "pt_date_minus", "pt_interval_week", "pt_cast_char", "pt_power"]
+        "pt_pg_funcs_my", "pt_date_minus", "pt_interval_week", "pt_cast_char", "pt_power",
+        # night 10A: a query from code pasted alone: a placeholder inside quotes (the value never goes in) and a placeholder
+        # where a name goes (FROM ? is refused, ORDER BY ? sorts by a constant); the fix is run with the value bound
+        "cp_like_quoted", "cp_dollar_quoted", "cp_order_param", "cp_from_param"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
@@ -86,11 +89,13 @@ TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": 
          "lk_batch_delete": "batch_change", "lk_batch_update": "batch_change", "lk_skip_locked": "skip_locked", "lk_nplus": "n_plus_one",
          "pt_top": "dialect", "pt_rownum": "dialect", "pt_dateadd": "dialect", "pt_datediff_ss": "dialect", "pt_ss_funcs": "dialect",
          "pt_brackets": "dialect", "pt_my_dates_pg": "dialect", "pt_my_funcs_pg": "dialect", "pt_pg_funcs_my": "dialect",
-         "pt_date_minus": "date_math", "pt_interval_week": "interval_unit", "pt_cast_char": "cast_char", "pt_power": "power_xor"}
+         "pt_date_minus": "date_math", "pt_interval_week": "interval_unit", "pt_cast_char": "cast_char", "pt_power": "power_xor",
+         "cp_like_quoted": "quoted_placeholder", "cp_dollar_quoted": "quoted_placeholder", "cp_order_param": "placeholder_name",
+         "cp_from_param": "placeholder_name"}
 NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join", "sum_distinct",
           "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order", "ch_insert_count",
           "sd_two_pk", "sd_list_col", "sd_repeat", "sd_parent_copy", "wf_no_order", "wf_nested", "wf_cte_cols",
-          "ix_keyset"}   # found is enough
+          "ix_keyset", "cp_order_param", "cp_from_param"}   # found is enough
 # a 'check' (depends on engine, data or intent) whose suggested rewrite must do exactly what the person meant
 FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes", "pk_pk", "anti_nullable", "self_pairs",
                  "distinct_join", "sum_null", "avg_avg", "pct_total", "sub_sum_null", "all_null", "in_list_null", "not_in_outer",
@@ -410,6 +415,8 @@ def make(seed: int):
         return _lock_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("pt_"):
         return _port_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("cp_"):
+        return _param_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -1594,8 +1601,9 @@ def check(item, engines: dict) -> list[str]:
     for name, eng in engines.items():
         if item.get("only") and name not in item["only"]:
             continue                                   # the query shows its database (backticks): run it only there
+        run_fixed = _bind(fixed, item["bind"]) if item.get("bind") else fixed
         try:
-            if _effect(eng, fixed, item["table"], pk) != _effect(eng, item["truth"], item["table"], pk):
+            if _effect(eng, run_fixed, item["table"], pk) != _effect(eng, item["truth"], item["table"], pk):
                 bad.append(f"{tag}: on {name} the corrected statement does something else\n{fixed}")
         except Exception as exc:  # noqa: BLE001
             bad.append(f"{tag}: on {name} the corrected statement fails: {exc}\n{fixed}")
@@ -1844,6 +1852,61 @@ def _port_bug(seed, bug, rnd, schema, tables, t):
         words = f";\n\n{x} to the power {n}"
     return {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": name, "broken": broken + words, "truth": truth,
             "engine": target, "only": ["postgres"] if target == "postgresql" else ["mysql"]}
+
+
+def _param_bug(seed, bug, rnd, schema, tables, t):
+    """Night 10A: a query copied out of code with its placeholders. The value the code binds is known, so the corrected query
+    is run with it put in, and must return what the intended query returns."""
+    pk, name = t["pk"], t["name"]
+    texts = [c for c in t["cols"] if c["kind"] in ("cat", "name", "email", "sku")]
+    if bug == "cp_order_param":
+        cols = [c["name"] for c in t["cols"] if c["kind"] != "pk"][:2]
+        broken = f"SELECT {pk}, {', '.join(cols)}\nFROM {name}\nORDER BY {rnd.choice(['?', '$1', ':sort'])}"
+        return {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": name, "broken": broken, "truth": broken}
+    if bug == "cp_from_param":
+        broken = f"SELECT *\nFROM {rnd.choice(['?', '$1'])}\nWHERE {pk} = 1"
+        return {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": name, "broken": broken, "truth": broken}
+    if not texts:
+        return None
+    c = rnd.choice(texts)
+    vals = [r[t["cols"].index(c)] for r in t["rows"] if r[t["cols"].index(c)]]
+    if not vals:
+        return None
+    v = str(rnd.choice(vals))
+    piece = v[1:4] if len(v) > 4 else v
+    if "'" in piece or "%" in piece or "_" in piece or not piece.strip():
+        return None
+    target = rnd.choice(["mysql", "postgresql", None]) if bug == "cp_like_quoted" else rnd.choice(["postgresql", None])
+    ph = "?" if bug == "cp_like_quoted" else "$1"
+    # '%?' alone is how a query looks with its values hidden ('%?'), so only the shapes that can't be that are planted for ?
+    pat = rnd.choice(["%{}%", "{}%"] if ph == "?" else ["%{}%", "{}%", "%{}"])
+    broken = f"SELECT {pk}, {c['name']}\nFROM {name}\nWHERE {c['name']} LIKE '{pat.format(ph)}'\nORDER BY {pk}"
+    truth = f"SELECT {pk}, {c['name']}\nFROM {name}\nWHERE {c['name']} LIKE '{pat.format(piece)}'\nORDER BY {pk}"
+    out = {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": name, "broken": broken, "truth": truth,
+           "engine": target, "bind": [piece]}
+    if target:
+        out["only"] = ["postgres"] if target == "postgresql" else ["mysql"]
+    elif bug == "cp_dollar_quoted" or ph == "?":
+        out["only"] = ["postgres"] if ph == "$1" else ["mysql"]   # unknown database: the fix is written for the placeholder's own family
+    return out
+
+
+def _bind(sql: str, values: list) -> str:
+    """The values the code binds, put where the placeholders are (outside quotes), in order."""
+    out, k, q, i = [], 0, False, 0
+    while i < len(sql):
+        ch = sql[i]
+        if ch == "'":
+            q = not q
+        m = None if q else re.match(r"\?|\$\d+|%s|:[A-Za-z_]\w*", sql[i:])
+        if m and k < len(values):
+            out.append("'" + values[k].replace("'", "''") + "'")
+            k += 1
+            i += m.end()
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def run(count=200, seed=1, engines=None):

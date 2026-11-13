@@ -496,7 +496,7 @@ def _is_date(op: str, sql_op: str) -> str | None:
     if re.fullmatch(r"(?:now\s*\(\s*\)|current_timestamp(?:\s*\(\s*\))?|sysdate\s*\(\s*\)|localtimestamp)", o, re.I):
         return "time"
     if re.fullmatch(r"[A-Za-z_][\w$]*(?:\.[A-Za-z_][\w$]*)?", o):
-        col = o.split(".")[-1]
+        col = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", o.split(".")[-1])   # DisbursedOn / movedAt read like disbursed_on
         if DATE_NAME.search(col):
             return "date"
         if TIME_NAME.search(col):

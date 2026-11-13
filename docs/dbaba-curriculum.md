@@ -82,7 +82,7 @@ feed.
 
 Reading a whole project (nights 10A-10B, before the query-only nights, which get stronger once the real schema can be read):
 
-- [ ] **10A. Find the SQL in a project's files.** Walk a folder (skip vendor/, node_modules/, .git/, build output); find SQL in
+- [x] **10A. Find the SQL in a project's files.** Walk a folder (skip vendor/, node_modules/, .git/, build output); find SQL in
   .sql files and inside code strings (PHP incl. heredoc, JS/TS template strings, Python, Java) and raw-query calls
   (mysqli_query, PDO, $wpdb, DB::select / DB::statement, cursor.execute, pool.query ...); a string counts only with a real SQL
   shape; placeholders (?, :id, $1, %s, {$var}) are values. Report each finding as file:line with the corrected query; read only,
@@ -340,3 +340,33 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   GREATEST(1, NULL, 3) is NULL on MariaDB, 3 on PostgreSQL; LENGTH('ñab') is 4 on MariaDB, 3 on PostgreSQL; CAST('5.25' AS DECIMAL)
   is 5 on MariaDB; MariaDB 10.11 accepts FETCH FIRST n ROWS ONLY and TO_CHAR but refuses CAST AS TEXT / BIGINT / NUMERIC /
   TIMESTAMP / BOOLEAN and UPDATE ... RETURNING; INTERVAL '30' DAY (number quoted, unit outside) runs on both.
+- **Night 10A (13 Nov 2026).** The SQL in a project's files, in `app/agents/sqlscan.py` (new fundamental `code_parameters`:
+  values travel beside the SQL, never inside its text). A folder is walked read-only (vendor/, node_modules/, .git, build
+  output, caches, wp-admin / wp-includes and minified files skipped); .sql files are split the way the client runs them; PHP
+  (single / double quotes over several lines, heredoc, nowdoc, {$x} / $x->y interpolation), JS/TS (template strings with ${},
+  regex literals skipped), Python (triple quotes, adjacent literals, f-strings, % and .format templates) and Java (text blocks)
+  strings are read with their concatenation (. / +), and a string counts only with a real SQL shape (a lower- or title-case
+  'Select a file from the list' or 'Delete from cart' needs a raw-query call or an SQL-named variable around it, and prose words
+  in the select list or after FROM rule it out). A code piece inside the SQL is read by where it stands: a value (bound or not),
+  a name ({$wpdb->prefix}posts, FROM $table), or a fragment, which makes the query "found, couldn't read completely" like a query
+  appended with .= / += and ORM / query-builder calls; nothing is guessed. Findings come at file:line (the first real SQL
+  character, comments skipped) with the checker's own findings for the project's database (rule A: --engine named; else the
+  driver the file imports, so a pg pool in a PHP + MySQL project is PostgreSQL; else composer.json / package.json /
+  requirements / pom / .env DB_CONNECTION / wp-config / docker-compose, of which only the DB_CONNECTION line of .env is read;
+  else general SQL, said). New mistakes that exist because the SQL is in code: a placeholder inside quotes ('%?%', '?' with a
+  value bound, '%s' to pymysql / psycopg, '$1', ':name'; `wrong`, fixed to the bare placeholder, CONCAT('%', ?, '%') on
+  MySQL/MariaDB and '%' || $1 || '%' on PostgreSQL), a placeholder where a name goes (FROM ? `error`, ORDER BY ? `wrong`), a value
+  written into the SQL text by interpolation, concatenation or formatting (`check`, with the query rewritten with the driver's
+  placeholders and the values listed; a value forced to a number in code is quiet), and a -- comment in pieces joined without a
+  newline that swallows the rest (`wrong`, the newline put back). The plain-SQL checker gets the placeholder checks too ('?' alone
+  and '%?' stay quiet: that's how a query with hidden values looks). Code pasted in the chat with several queries, or one of these
+  mistakes, gets each query by its line. `scripts/dbaba check <folder>` prints the same and exits 1 on a definite mistake.
+  18 concepts, 37-problem practice bank, a project generator (tests/fuzz/codescan.py: PHP / WordPress / Laravel / Node mysql2
+  and pg / pymysql / psycopg / JDBC / .sql projects with every stmtbugs family and tonight's own planted at known lines, decoy
+  strings, valid queries, ORM calls and queries in pieces) and 4 stmtbugs families. Lab lessons worth keeping: MariaDB refuses a
+  value bound to WHERE name = '?' (1210 Incorrect arguments to EXECUTE) and, with nothing bound, matches only a literal '?';
+  PostgreSQL compares WHERE name = '$1' with the text $1; ORDER BY ? / $1 bound to a column name leaves the rows unsorted on both;
+  FROM ? is 1064 / 42601; IN (?) bound to '2,4,6' matches only id 2 on MariaDB (warning 1292) and is refused on PostgreSQL
+  (42883), where id = ANY($1) with an array works; CONCAT('%', $1, '%') with an untyped parameter is refused on PostgreSQL
+  (42P18) while '%' || $1 || '%' works; ESCAPED is a reserved word on MariaDB. Also fixed: a camelCase date column (DisbursedOn,
+  MovedAt) is now read like disbursed_on / moved_at for date arithmetic (seen when the new families shifted the generator's seeds).

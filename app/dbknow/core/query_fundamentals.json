@@ -70,6 +70,11 @@
    "id": "words",
    "en": "Is every function, operator and type written in this database's own words, and does each one mean here what it meant where it came from (dates, case, division, NULLs)?",
    "hi": "Kya har function, operator aur type is database ke apne shabdon mein hai, aur kya uska matlab yahan wahi hai jo wahan tha (dates, case, bhaag, NULL)?"
+  },
+  {
+   "id": "code",
+   "en": "If the query lives in code: is every value bound through a placeholder (not inside quotes, not standing for a name), and is the text the database receives the text you meant (no -- comment swallowing joined pieces)?",
+   "hi": "Agar query code mein hai: kya har value placeholder se bind hai (quotes ke andar nahi, naam ki jagah nahi), aur kya database tak wahi text pahunchta hai jo tumne socha (jode tukdon ko -- comment nigal na le)?"
   }
  ],
  "fundamentals": {
@@ -551,6 +556,31 @@
     "https://www.sqlite.org/lang_datefunc.html",
     "https://stackoverflow.com/questions/tagged/sql-server+mysql",
     "https://dba.stackexchange.com/questions/tagged/migration"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "code_parameters": {
+   "title_en": "SQL inside code: values travel beside the SQL, never inside its text",
+   "title_hi": "Code ke andar SQL: values SQL ke saath alag jaati hain, uske text ke andar nahi",
+   "rule_en": "A query in a program is a string the code hands to a driver. Its values belong in placeholders (?, $1, :name, %s) and are sent separately, so the database reads the SQL once and a value can't change what it does. Three things follow from that and can be checked from the text alone: a placeholder inside quotes is just characters (the value never goes in); a placeholder can't stand for a name (FROM ? is refused, ORDER BY ? sorts by a constant); and a value written into the SQL text by interpolation, concatenation or formatting is a risk (injection) unless it is forced to a number. A query is the text the database finally receives: pieces joined without a newline turn a -- comment into a comment over everything after it, and a query built across functions can't be read from one string, so it is reported as unread, never guessed.",
+   "rule_hi": "Program ki query ek string hai jo code driver ko deta hai. Values placeholder (?, $1, :name, %s) mein alag jaati hain, taaki database SQL ek baar padhe aur value uska kaam na badle. Isse text se hi teen baatein jaanchi ja sakti hain: quotes ke andar placeholder sirf akshar hai; placeholder naam nahi ho sakta (FROM ? mana, ORDER BY ? constant se sort); aur interpolation / jodne / format se SQL text mein likhi value khatra hai (injection), jab tak wo number na banayi gayi ho. Query wahi text hai jo database tak pahunchta hai: bina newline jude tukdon mein -- comment aage sab kuch comment bana deta hai, aur functions mein tukdon se bani query ek string se nahi padhi ja sakti, isliye use 'padhi nahi' batate hain, andaza nahi.",
+   "topics": [
+    "quoted_placeholder",
+    "placeholder_name",
+    "injection",
+    "comment_swallows"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/sql-prepared-statements.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/sql-prepare.html",
+    "https://mariadb.com/kb/en/prepare-statement/",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html",
+    "https://www.psycopg.org/docs/usage.html#passing-parameters-to-sql-queries",
+    "https://developer.wordpress.org/reference/classes/wpdb/prepare/",
+    "https://www.php.net/manual/en/pdo.prepare.php"
    ],
    "proven": [
     "mariadb",

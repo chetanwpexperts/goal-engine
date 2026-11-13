@@ -970,6 +970,12 @@ def _check_once(sql: str, _again: bool = False, intent: str = "") -> dict:
     slips, slip_edits = _value_slips(sql, s, known)
     more, more_edits = _statement_slips(sql, s, bool(re.match(r"[\s(]*(select|with)\b", s.lower())), intent)
     slips, slip_edits = slips + more, slip_edits + more_edits
+    from app.agents import sqlbasics, sqlscan
+
+    for p in sqlscan.plain_param_slips(sql, sqlbasics.CHOSEN.get()):   # a placeholder inside quotes / as a name (night 10A)
+        slips.append(Finding(p["kind"], p["topic"], p["title_en"], p["title_hi"], p["evidence"], p["fix_en"], p["fix_hi"]))
+        if p.get("edit"):
+            slip_edits.append(p["edit"])
     out = _check_select(sql, s, slip_edits, _again, intent)
     if out is None:                                   # not a plain SELECT: only the value checks apply
         order = {"error": 0, "wrong": 1, "check": 2}

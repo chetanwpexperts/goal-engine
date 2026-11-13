@@ -392,6 +392,12 @@
       d.append(el("pre", "reading-body", hi ? r.reading.hi : r.reading.en));
       wrap.append(d);
     }
+    if (r.blocks && (hi ? r.blocks.hi : r.blocks.en)) {                   // CTEs / derived tables / subqueries: the tree and each grain
+      const d = el("details", "reading");
+      d.append(el("summary", null, T(hi, "Blocks aur har block ka grain", "Blocks and the grain of each")));
+      d.append(el("pre", "reading-body", hi ? r.blocks.hi : r.blocks.en));
+      wrap.append(d);
+    }
     if (r.query_only && (hi ? r.query_only.hi : r.query_only.en)) {       // only the query: how sure, the inferred schema, what can't be proven
       const d = el("details", "reading");
       d.append(el("summary", null, T(hi, "Sirf query se kitna pakka (assumptions)", "From the query alone: how sure, and what to verify")));

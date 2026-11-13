@@ -81,8 +81,8 @@
   "grain": {
    "title_en": "Grain: what one row stands for",
    "title_hi": "Grain: ek row kis cheez ki hai",
-   "rule_en": "Every stage of a query has a grain (one row per order, per customer, per category). Totals, comparisons and ranks are only right when they are taken at the grain the question asks for; mixing two grains in one step is the most common silent mistake.",
-   "rule_hi": "Query ke har stage ka ek grain hota hai (har order, har customer, har category ki ek row). Total, compare aur rank tabhi sahi hain jab sawaal wale grain pe liye jaayein; ek step mein do grain milana sabse aam chhupi galti hai.",
+   "rule_en": "Every stage of a query has a grain (one row per order, per customer, per category). Totals, comparisons and ranks are only right when they are taken at the grain the question asks for; mixing two grains in one step is the most common silent mistake. In a long query every block has a grain of its own: each CTE, derived table, subquery and UNION part takes rows at one grain and hands them on at another. A block's own GROUP BY (or DISTINCT, or a total with no GROUP BY) proves which of its columns are unique, so a join on them keeps the grain; a join to a child moves it down, and every total after that join is re-checked (total the child before the join).",
+   "rule_hi": "Query ke har stage ka ek grain hota hai (har order, har customer, har category ki ek row). Total, compare aur rank tabhi sahi hain jab sawaal wale grain pe liye jaayein; ek step mein do grain milana sabse aam chhupi galti hai. Lambi query mein har block ka apna grain hota hai: har CTE, derived table, subquery aur UNION ka hissa rows ek grain pe leta hai aur doosre pe aage deta hai. Block ka apna GROUP BY (ya DISTINCT, ya bina GROUP BY ka total) sabit karta hai kaunse columns unique hain, isliye un pe join grain rakhta hai; child se join grain neeche le jaata hai, aur us join ke baad ka har total dobara check hota hai (child ka total join se pehle nikaalo).",
    "topics": [
     "group",
     "per_group",
@@ -90,7 +90,11 @@
     "distinct",
     "count_said"
    ],
-   "source": "https://dev.mysql.com/doc/refman/8.4/en/group-by-handling.html"
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/group-by-handling.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/with.html",
+    "https://www.postgresql.org/docs/current/queries-with.html"
+   ]
   },
   "cardinality": {
    "title_en": "Cardinality: one-to-many links multiply rows",
@@ -191,7 +195,8 @@
     "alias",
     "column",
     "order",
-    "having_alias"
+    "having_alias",
+    "cte_order"
    ],
    "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-alias.html"
   },

@@ -200,6 +200,9 @@ def _grain(srcs, alias_of, removed) -> str | None:
     (users u JOIN orders o ON u.id = o.customer_id lists orders). None when no single table is."""
     def is_key(al, col):
         t = next((x for x in srcs if (x.alias or "").lower() == al), None)
+        kb = _block_key(t, col)
+        if kb is not None:
+            return kb
         c = col.lower().replace("_", "")
         return c == "id" or bool(t and t.name and c in {x.replace("_", "") + "id" for x in _singulars(t.name)})
 
@@ -219,6 +222,22 @@ def _grain(srcs, alias_of, removed) -> str | None:
         if set(live) <= got:
             found.append(g)
     return found[0] if len(found) == 1 else None
+
+
+# night 12: the keys the query's own blocks prove (a CTE grouped by customer_id has one row per customer_id), set by check()
+BLOCK_KEYS = contextvars.ContextVar("dbaba_block_keys", default=None)
+
+
+def _block_key(src, col: str):
+    """True / False when the source is a CTE or derived table whose own GROUP BY / DISTINCT says whether col is unique in
+    it (app/agents/sqlblocks.py); None when it isn't one (the name rules decide)."""
+    bk = BLOCK_KEYS.get() or {}
+    if src is None or not bk:
+        return None
+    nm = (src.name or src.alias or "").split(".")[-1].strip('`"').lower()
+    if nm not in bk:
+        return None
+    return any(k <= {col.strip('`"').lower()} for k in bk[nm])
 
 
 def _no_subqueries(text: str) -> str:
@@ -894,6 +913,14 @@ def check(sql: str, _again: bool = False, intent: str = "", engine: str | None =
     statement; plain SELECTs are read in depth. engine: the database the answer is for (rule A), when known."""
     from app.agents.sqlbasics import CHOSEN
 
+    if BLOCK_KEYS.get() is None:                      # night 12: what the query's own blocks prove about their keys
+        from app.agents import sqlblocks
+
+        tok = BLOCK_KEYS.set(sqlblocks.keys(sql) if re.search(r"\(\s*select\b|^\s*with\b", _mask(sql), re.I) else {})
+        try:
+            return check(sql, _again, intent, engine)
+        finally:
+            BLOCK_KEYS.reset(tok)
     if engine is not None:
         token = CHOSEN.set(engine)
         try:
@@ -918,6 +945,13 @@ _SURE_ONLY = contextvars.ContextVar("dbaba_sure_only", default=False)
 
 def _check(sql: str, _again: bool = False, intent: str = "") -> dict:
     out = _check_once(sql, _again, intent)
+    if not _again and re.search(r"\(\s*select\b|^\s*with\b", _mask(sql), re.I):
+        from app.agents import sqlblocks
+
+        try:
+            out = sqlblocks.with_block_findings(sql, out)      # night 12: every CTE / derived table / UNION part checked too
+        except Exception:  # noqa: BLE001 - the blocks are an extra; the plain check still answers
+            pass
     fs = out.get("findings") or []
     if out.get("corrected") and any(f["kind"] in ("error", "wrong") for f in fs) and \
             any(f["kind"] == "check" and f["topic"] in _meaning_checks() for f in fs) and not _SURE_ONLY.get():
@@ -1492,6 +1526,9 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
         gbare = {w.lower() for w in _bare(gtext, set())}
         def is_key(al: str, col: str) -> bool:              # 'id', or students.student_id: the table's own key
             t = by_alias.get(al)
+            kb = _block_key(t, col)
+            if kb is not None:
+                return kb
             c = col.lower().replace("_", "")
             return c == "id" or bool(t and t.name and c in {x.replace("_", "") + "id" for x in _singulars(t.name)})
 
@@ -1587,7 +1624,27 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
             kids = [y for y in live if y != A and A in to_one_from({y}) and y not in mine]
             if len(kids) != 1 or any(y not in mine and y != A and y not in kids for y in live):
                 continue
+            from app.agents.sqlverify import holds
+
             k = by_alias[kids[0]]
+            if group and kids[0] in single:
+                continue                                     # grouped by the child's own key: one child row per group, nothing repeats
+            if k.kind == "from" and (by_alias[A].name or by_alias[A].alias):
+                # the child is the FROM table (FROM orders o JOIN spend s ON s.customer_id = o.customer_id): advice, no rewrite
+                ka = by_alias[A]
+                an = ka.name or ka.alias
+                fnd = Finding("check", "join_fanout", f"{fm.group(1).upper()}({fm.group(3)}.{fm.group(4)}) counts each {an} row once "
+                              f"per {k.name or k.alias} row", f"{fm.group(1).upper()}({fm.group(3)}.{fm.group(4)}) har {an} row ko har "
+                              f"{k.name or k.alias} row ke liye ginta hai", i["text"],
+                              f"Each {k.name or k.alias} row meets one {an} row, so a group with several {k.name or k.alias} rows of "
+                              f"the same {an} row adds that row's {fm.group(4)} several times. Group by {k.name or k.alias}'s own key, "
+                              f"or join {an} after totalling {k.name or k.alias} to {an}'s grain.",
+                              f"Har {k.name or k.alias} row ek {an} row se milti hai, isliye group mein ek hi {an} ki kai "
+                              f"{k.name or k.alias} rows hon to uska {fm.group(4)} kai baar judta hai. {k.name or k.alias} ki key se "
+                              f"group karo, ya {k.name or k.alias} ka total {an} ke grain pe nikaal ke jodo.")
+                if holds(fnd, []):
+                    F.append(fnd)
+                continue
             if k.kind not in ("join", "inner", "left") or not k.on or not k.name or not by_alias[A].name:
                 continue
             from app.agents.sqlverify import holds

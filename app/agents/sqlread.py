@@ -36,6 +36,9 @@ def _flat(t: str) -> str:
 
 
 def _is_key(src, col: str) -> bool:
+    kb = C._block_key(src, col)
+    if kb is not None:
+        return kb
     c = col.lower().replace("_", "")
     return c == "id" or bool(src and src.name and c in {x.replace("_", "") + "id" for x in C._singulars(src.name)})
 

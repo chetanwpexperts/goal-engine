@@ -592,9 +592,17 @@ def _with_reading(original: str, out: dict) -> dict:
             r = None
             out["reading"] = {"en": en["text"], "hi": hi["text"], "grain": en["grain"]}
         else:
-            r = sqlread.read_query(original)
+            from app.agents import sqlblocks
+            from app.agents.sqlcorrect import BLOCK_KEYS
+
+            tok = BLOCK_KEYS.set(sqlblocks.keys(original))
+            try:
+                r = sqlread.read_query(original)
+            finally:
+                BLOCK_KEYS.reset(tok)
         if r is not None:
             out["reading"] = {"en": sqlread.render(r, False), "hi": sqlread.render(r, True), "grain": r["grain"]}
+            _with_blocks(original, out)
     except Exception:  # noqa: BLE001 - the reading is an extra; never let it break the check
         return _with_confidence(original, out)
     funds = sqlread.fundamentals()["fundamentals"]
@@ -604,6 +612,26 @@ def _with_reading(original: str, out: dict) -> dict:
             f["basis"] = {"id": fid, "en": funds[fid]["title_en"], "hi": funds[fid]["title_hi"],
                           "rule_en": funds[fid]["rule_en"], "rule_hi": funds[fid]["rule_hi"]}
     return _with_confidence(original, out)
+
+
+def _with_blocks(original: str, out: dict) -> None:
+    """Night 12: a query with CTEs, derived tables, subqueries or UNION parts gets its dependency tree and the grain of every
+    block (app/agents/sqlblocks.py); from 30 lines on, the reading shows them too."""
+    from app.agents import sqlblocks
+
+    try:
+        if not re.search(r"\(\s*select\b|^\s*with\b", sqlblocks.C._mask(original), re.I):
+            return
+        g = sqlblocks.grain(original)
+        if len(g["blocks"]) < 2:
+            return
+        out["blocks"] = {"en": sqlblocks.tree(original), "hi": sqlblocks.tree(original, True), "lines": g["lines"],
+                         "blocks": [{k: v for k, v in b.items() if k not in ("start", "end")} for b in g["blocks"]]}
+        if g["lines"] >= 30 and out.get("reading"):
+            out["reading"]["en"] += "\n\nBlocks, how they depend on each other, and the grain of each:\n" + out["blocks"]["en"]
+            out["reading"]["hi"] += "\n\nBlocks, kaun kis pe tika hai, aur har block ka grain:\n" + out["blocks"]["hi"]
+    except Exception:  # noqa: BLE001 - the tree is an extra; never let it break the check
+        return
 
 
 def _with_confidence(original: str, out: dict) -> dict:

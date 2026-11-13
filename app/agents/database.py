@@ -1106,13 +1106,18 @@ def holds_conversation(db, goal, text: str, any_text: bool = False):
         a, run = _sql_agent(db, goal)     # 'now convert it to PostgreSQL': the checked query, in that database's words
         if run is not None and run.status == "done":
             return a
+    if text and not any_text and TREE_RE.search(text) and not re.match(r"\s*(what (is|are) (an? )?(query )?(block|dependency|cte)|"
+                                                                         r".*\bkya (hota|hoti|hote) (hai|hain)\s*$)", text, re.I):
+        a, run = _sql_agent(db, goal)     # 'show the dependency tree' after a check: that query's blocks (night 12)
+        if run is not None and run.status == "done":
+            return a
     if text and not any_text and concept_question(text) is not None:
         return None                       # 'what is a LEFT JOIN' after a check: a concept question, not about that query
     if (text or "").strip().startswith(("Why: ", "Kyun: ")) and not any_text:
         a, run = _sql_agent(db, goal)
         return a if run is not None and run.status == "done" else None
     if any_text or NEW_SQL_RE.search(text or "") or not (SQL_FOLLOW_RE.search(text or "") or DIFF_RE.search(text or "") or FEEDBACK_RE.search(text or "")
-                                                         or PROOF_RE.search(text or "")
+                                                         or PROOF_RE.search(text or "") or TREE_RE.search(text or "")
                                                          or READ_RE.search(text or "")
                                                          or WHY_RE.search(text or "") or DEV_FOLLOW_RE.search(text or "")):
         return None
@@ -1128,6 +1133,10 @@ PROOF_RE = re.compile(r"\b(can.?t|cannot|can not|could ?n.?t) (you )?(be )?(prov
                       r"\bconfidence\b|\bassum\w*|\binferred schema\b|\b(full|whole|complete) report\b|\bwhat (do|did) you assume\b|"
                       r"\bproven\b|\blikely risks?\b|\bneeds? (schema|execution)\b|\bkitna (pakka|sure|yakeen)\b|\bpakka (hai|h) kya\b|"
                       r"\bkya (maana|maan ke|assume)\b|कितना पक्का|पक्का है|मान (कर|के)", re.I)
+# 'show the dependency tree', 'grain of each block', 'har CTE ka grain': the blocks and their grain (night 12)
+TREE_RE = re.compile(r"\b(dependency|block|cte) tree\b|\btree\b.*\b(block|cte|query)s?\b|\b(blocks|ctes|stages)\b.*\bgrain\b|"
+                     r"\bgrain\b.*\b(each|every|per|har)\b.*\b(block|cte|stage|step)s?\b|\bhar (block|cte|stage)\b|"
+                     r"\b(show|list) (the |all )?(blocks|ctes)\b|\bwhich (cte|block)s? depends?\b|ब्लॉक", re.I)
 READ_RE = re.compile(r"\bwhat (does|is) (this|my|the) query (do|doing)\b|\bexplain (this|my|the) query\b(?!.*\b(slow|fast|speed)\b)|"
                      r"\bbreak (it|this|the query) down\b|\bstep by step\b|\bhow does (this|my|the) query work\b|\bread (this|my|the) query\b|"
                      r"\bquery (samjhao|samjha do|kya karti hai|kya karegi|kaise kaam karti)\b|\b(ye|yeh) query kya\b|\bfundamentals?\b|\bgrain\b", re.I)
@@ -1158,6 +1167,8 @@ def continue_turn(db, goal, agent, text: str):
         if raw.strip():
             reply, options, _rel = _translate_turn(db, goal, text, hi0, query=raw)
             return reply, options, hi0
+    if agent.recipe == "sql_review" and TREE_RE.search(text or "") and not FEEDBACK_RE.search(text or ""):
+        return _tree_turn(db, goal, agent, text)
     if agent.recipe == "sql_review" and PROOF_RE.search(text or "") and not FEEDBACK_RE.search(text or ""):
         return _proof_turn(db, goal, agent, text)
     if not FEEDBACK_RE.search(text or ""):
@@ -1190,6 +1201,29 @@ def continue_turn(db, goal, agent, text: str):
         reply += ("\n\nMaine ye query (values chhupa ke) seekhne ke liye rakh li hai, taaki aise sawaal aage behtar samjhun." if hi else
                   "\n\nI've kept this query (with its values hidden) to learn from, so questions like it get a better answer.")
     return reply, options, hi
+
+
+def _tree_turn(db, goal, agent, text: str):
+    """'Show the dependency tree' / 'grain of each block': the checked query's blocks (CTEs, derived tables, subqueries, UNION
+    parts), what each reads, and the grain going in and coming out of each, with the joins that change it."""
+    from app.agents.sql import analyze_sql
+    from app.ml.normalize import detect_language
+
+    hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
+    inputs = loads(agent.inputs, {}) or {}
+    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=_eng(inputs))
+    b = res.get("blocks")
+    if not b:
+        reading = (res.get("reading") or {}).get("hi" if hi else "en") or ""
+        return (("Is query mein ek hi block hai (koi CTE, derived table ya subquery nahi). Uska grain:\n" if hi else
+                 "This query is a single block (no CTE, derived table or subquery). Its grain:\n") + reading), [], hi
+    head = ("Blocks, kaun kis pe tika hai, aur har block ka grain (andar -> bahar):" if hi else
+            "The blocks, what each depends on, and the grain going in and out of each:")
+    tail = ("'!' wali join grain badalti hai: uske baad ke totals dobara check karo, ya join se pehle total nikaalo." if hi else
+            "A join marked '!' changes the grain: every total after it is re-checked; total before the join when it repeats rows.")
+    inputs["last_ask"] = "tree"
+    agent.inputs = dumps(inputs)
+    return f"{head}\n{b['hi' if hi else 'en']}\n\n{tail}", [], hi
 
 
 def _proof_turn(db, goal, agent, text: str):

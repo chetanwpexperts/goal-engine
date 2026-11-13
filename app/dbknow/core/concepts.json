@@ -27136,6 +27136,1442 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "query_blocks",
+   "kind": "concept",
+   "title": {
+    "en": "The blocks of a query",
+    "hinglish": "Query ke blocks",
+    "hindi": "Query के blocks"
+   },
+   "terms": [
+    [
+     "(query|sql) blocks?"
+    ],
+    [
+     "blocks?",
+     "(query|sql|cte)",
+     "(what|kya|मतलब|meaning)"
+    ],
+    [
+     "ब्लॉक",
+     "(query|क्वेरी)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a query block",
+     "what are the blocks of a sql query"
+    ],
+    "hinglish": [
+     "query block kya hota hai",
+     "sql query ke blocks kya hote hain"
+    ],
+    "hindi": [
+     "क्वेरी के ब्लॉक क्या होते हैं"
+    ]
+   },
+   "answer": {
+    "en": "A long query is built from SELECT blocks: the CTEs of its WITH, derived tables (a SELECT in FROM with an alias), subqueries in WHERE or SELECT (IN, EXISTS, a single value) and the parts of a UNION. Each block reads tables or other blocks and hands rows to the block that uses it. Reading a long query block by block, and saying what one row of each block stands for (its grain), is how you find the step where rows multiply or a total goes wrong; each CTE or derived table can be run on its own to see its rows.",
+    "hinglish": "Lambi query SELECT blocks se bani hoti hai: WITH ke CTEs, derived tables (FROM mein alias wala SELECT), WHERE ya SELECT mein subqueries (IN, EXISTS, ek value) aur UNION ke hisse. Har block tables ya doosre blocks padhta hai aur rows aage deta hai. Lambi query ko block-block padhna, aur har block ki ek row kya hai (grain) batana, wahi step dikhata hai jahan rows guna hoti hain ya total galat hota hai; har CTE ya derived table alag se chala ke uski rows dekh sakte ho.",
+    "hindi": "लंबी query CTE, derived table, subquery और UNION के हिस्सों से बनी होती है; हर block अलग से चलाकर देखा जा सकता है।"
+   },
+   "mistake": {
+    "en": "Debugging a long query only by its final result: the wrong number is made in one block, and only running the blocks one by one shows which.",
+    "hinglish": "Lambi query ko sirf aakhri result se debug karna: galat number kisi ek block mein banta hai, aur block-block chalane se hi pata chalta hai kaunsa.",
+    "hindi": "सिर्फ़ आख़िरी result से debug न करें; block एक-एक करके चलाएँ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH paid AS (SELECT customer_id, amount FROM orders WHERE status = 'paid') SELECT customer_id, SUM(amount) AS total FROM paid GROUP BY customer_id ORDER BY customer_id"
+     },
+     "columns": [
+      "customer_id",
+      "total"
+     ],
+     "result": [
+      [
+       "1",
+       "25500"
+      ],
+      [
+       "2",
+       "80500"
+      ],
+      [
+       "3",
+       "800"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "WITH needs MySQL 8.0+; derived tables work in every version.",
+    "mariadb": "WITH since MariaDB 10.2.",
+    "postgresql": "WITH has always been there (8.4+); a derived table's alias is optional from PostgreSQL 16."
+   },
+   "related": [
+    "cte",
+    "derived_table",
+    "subquery",
+    "dependency_tree"
+   ],
+   "fundamentals": [
+    "grain"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/with.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-with.html",
+    "https://mariadb.com/kb/en/with/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "dependency_tree",
+   "kind": "concept",
+   "title": {
+    "en": "A query's dependency tree",
+    "hinglish": "Query ka dependency tree",
+    "hindi": "Query का dependency tree"
+   },
+   "terms": [
+    [
+     "dependency tree",
+     "(query|sql|cte)"
+    ],
+    [
+     "dependency (tree|graph|order)"
+    ],
+    [
+     "(cte|ctes|blocks?)",
+     "depend\\w*"
+    ],
+    [
+     "(cte|block)",
+     "(kis pe|kispe) (tika|depend)"
+    ],
+    [
+     "निर्भर",
+     "(cte|block)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the dependency tree of a query",
+     "how to see which cte depends on which"
+    ],
+    "hinglish": [
+     "query ka dependency tree kya hai",
+     "kaunsa cte kis pe depend karta hai kaise samjhe"
+    ],
+    "hindi": [
+     "CTE एक दूसरे पर कैसे निर्भर होते हैं"
+    ]
+   },
+   "answer": {
+    "en": "The dependency tree says which block reads which: the main query reads some CTEs and derived tables, a CTE can read earlier CTEs, and a subquery belongs to the block it sits in. Draw it from the bottom (blocks that read only tables) to the top (the main query), and next to each block write its grain going in and coming out. A join that changes the grain (a parent joined to its children) marks the spot to check every total after it.",
+    "hinglish": "Dependency tree batata hai kaunsa block kise padhta hai: main query kuch CTEs aur derived tables padhti hai, ek CTE pehle wale CTEs padh sakta hai, aur subquery usi block ka hissa hai jismein wo hai. Neeche se banao (jo sirf tables padhte hain) upar tak (main query), aur har block ke saath uska andar aur bahar ka grain likho. Jo join grain badle (parent ko children se jodna), uske baad ke har total ko check karo.",
+    "hindi": "कौन सा block किसे पढ़ता है; नीचे से ऊपर बनाएँ और हर block का grain लिखें।"
+   },
+   "mistake": {
+    "en": "Changing one CTE without seeing who reads it: every block above it in the tree changes too.",
+    "hinglish": "Ek CTE badalna bina dekhe ki use kaun padhta hai: tree mein uske upar ka har block bhi badal jaata hai.",
+    "hindi": "CTE बदलने से पहले देखें कि उसे कौन पढ़ता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH paid AS (SELECT customer_id, amount FROM orders WHERE status = 'paid'), per_customer AS (SELECT customer_id, SUM(amount) AS total FROM paid GROUP BY customer_id) SELECT COUNT(*) AS customers, SUM(total) AS paid_total FROM per_customer"
+     },
+     "columns": [
+      "customers",
+      "paid_total"
+     ],
+     "result": [
+      [
+       "3",
+       "106800"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "MySQL 8.0+ runs the same tree.",
+    "mariadb": "Same as MySQL (10.2+).",
+    "postgresql": "EXPLAIN shows each CTE that is kept as a 'CTE Scan'; inlined ones disappear into the plan."
+   },
+   "related": [
+    "query_blocks",
+    "cte",
+    "grain",
+    "cte_order_matters"
+   ],
+   "fundamentals": [
+    "grain"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-with.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/with.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cte_order_matters",
+   "kind": "concept",
+   "title": {
+    "en": "The order of CTEs",
+    "hinglish": "CTEs ka order",
+    "hindi": "CTEs का क्रम"
+   },
+   "terms": [
+    [
+     "(order|sequence)",
+     "(cte|ctes)",
+     "(matter\\w*|important|zaroori|farak)"
+    ],
+    [
+     "(cte|ctes)",
+     "(defined|written|declared) (after|later|below)"
+    ],
+    [
+     "cte",
+     "baad mein"
+    ],
+    [
+     "cte",
+     "बाद में"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does the order of ctes matter",
+     "is a cte allowed to read a cte defined after it"
+    ],
+    "hinglish": [
+     "cte ka order matter karta hai kya",
+     "cte baad mein bane cte ko padh sakta hai kya"
+    ],
+    "hindi": [
+     "CTE बाद में बने CTE को पढ़ सकता है क्या"
+    ]
+   },
+   "answer": {
+    "en": "Yes. Without RECURSIVE, each CTE can read only the CTEs written above it: WITH a AS (SELECT ... FROM b), b AS (...) is refused (MySQL/MariaDB 1146 table doesn't exist, PostgreSQL 42P01) because b isn't defined yet when a is read. Write the CTEs in the order they are needed. The main query can read all of them. (WITH RECURSIVE lifts the rule, but use it only for a real recursive CTE.)",
+    "hinglish": "Haan. RECURSIVE ke bina har CTE sirf upar likhe CTEs padh sakta hai: WITH a AS (SELECT ... FROM b), b AS (...) mana hota hai (MySQL/MariaDB 1146, PostgreSQL 42P01) kyunki a padhte waqt b bana hi nahi. CTEs ko zaroorat ke kram mein likho. Main query sab padh sakti hai.",
+    "hindi": "हाँ; RECURSIVE के बिना CTE सिर्फ़ ऊपर लिखे CTE पढ़ सकता है।"
+   },
+   "mistake": {
+    "en": "Moving CTEs around while editing and leaving one above the CTE it reads.",
+    "hinglish": "Edit karte waqt CTEs aage-peeche karna aur kisi ko us CTE se upar chhod dena jise wo padhta hai.",
+    "hindi": "CTE को उस CTE से ऊपर न रखें जिसे वह पढ़ता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH b AS (SELECT id FROM orders WHERE status = 'paid'), a AS (SELECT id FROM b) SELECT COUNT(*) AS paid_orders FROM a"
+     },
+     "columns": [
+      "paid_orders"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "Forward reference: error 1146.",
+    "mariadb": "Lab: error 1146 (table doesn't exist).",
+    "postgresql": "Lab: 42P01 relation does not exist."
+   },
+   "related": [
+    "cte",
+    "multiple_ctes",
+    "recursive_cte",
+    "dependency_tree"
+   ],
+   "fundamentals": [
+    "names_scope"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/with.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-with.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "multiple_ctes",
+   "kind": "howto",
+   "title": {
+    "en": "Writing several CTEs in one query",
+    "hinglish": "Ek query mein kai CTE",
+    "hindi": "एक query में कई CTE"
+   },
+   "terms": [
+    [
+     "(multiple|several|many|more than one|kai)",
+     "(cte|ctes|with clauses?)"
+    ],
+    [
+     "कई",
+     "cte"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to write multiple ctes in one query",
+     "how to use several ctes together"
+    ],
+    "hinglish": [
+     "ek query mein multiple cte kaise likhe",
+     "kai cte ek saath kaise use kare"
+    ],
+    "hindi": [
+     "एक query में कई CTE कैसे लिखें"
+    ]
+   },
+   "answer": {
+    "en": "Write WITH once and separate the CTEs with commas: WITH a AS (...), b AS (... FROM a ...) SELECT ... FROM b. Each CTE can read the ones above it, and the main query can read all of them. Don't repeat WITH before the second CTE.",
+    "hinglish": "WITH ek baar likho aur CTEs ko comma se alag karo: WITH a AS (...), b AS (... FROM a ...) SELECT ... FROM b. Har CTE upar wale padh sakta hai, main query sab. Doosre CTE se pehle WITH dobara mat likho.",
+    "hindi": "WITH एक बार लिखें और CTE को comma से अलग करें।"
+   },
+   "mistake": {
+    "en": "Writing WITH a AS (...) WITH b AS (...): the second WITH is a syntax error (1064 / 42601).",
+    "hinglish": "WITH a AS (...) WITH b AS (...) likhna: doosra WITH syntax error hai (1064 / 42601).",
+    "hindi": "दूसरी बार WITH न लिखें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH paid AS (SELECT customer_id, amount FROM orders WHERE status = 'paid'), big AS (SELECT customer_id FROM paid WHERE amount >= 1000) SELECT customer_id FROM big ORDER BY customer_id"
+     },
+     "columns": [
+      "customer_id"
+     ],
+     "result": [
+      [
+       "1"
+      ],
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "MySQL 8.0+.",
+    "mariadb": "MariaDB 10.2+.",
+    "postgresql": "Same syntax."
+   },
+   "related": [
+    "cte",
+    "cte_order_matters",
+    "cte_referenced_twice"
+   ],
+   "fundamentals": [
+    "grain"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/with.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-with.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cte_referenced_twice",
+   "kind": "concept",
+   "title": {
+    "en": "Using one CTE twice",
+    "hinglish": "Ek CTE do baar use karna",
+    "hindi": "एक CTE दो बार"
+   },
+   "terms": [
+    [
+     "(cte|ctes)",
+     "(dobara|do baar|twice|two times|more than once|multiple times|again|reuse\\w*)"
+    ],
+    [
+     "cte",
+     "दो बार"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can i use a cte twice in a query",
+     "can a cte be referenced more than once"
+    ],
+    "hinglish": [
+     "ek cte do baar use kar sakte hai kya",
+     "cte ko query mein dobara use kar sakte hain kya"
+    ],
+    "hindi": [
+     "एक CTE दो बार इस्तेमाल कर सकते हैं क्या"
+    ]
+   },
+   "answer": {
+    "en": "Yes: a CTE is a named result the rest of the statement can read as many times as it likes, for example joined to itself (FROM a x JOIN a y ON ...). That is one of the reasons to use a CTE instead of repeating the same derived table. Whether it is computed once or once per use is up to the engine (see 'Is a CTE run once?').",
+    "hinglish": "Haan: CTE ek naam wala result hai jise baaki statement jitni baar chahe padh sakta hai, jaise khud se join (FROM a x JOIN a y ON ...). Isi liye wahi derived table baar baar likhne ki jagah CTE use karte hain. Ek baar banega ya har baar, ye engine pe hai.",
+    "hindi": "हाँ, CTE को जितनी बार चाहें पढ़ सकते हैं।"
+   },
+   "mistake": {
+    "en": "Copying the same subquery into three places instead of one CTE: when one copy is changed the others aren't, and the query quietly disagrees with itself.",
+    "hinglish": "Ek CTE ki jagah wahi subquery teen jagah copy karna: ek badli, baaki nahi, aur query khud se hi alag baat karne lagti hai.",
+    "hindi": "एक ही subquery तीन जगह copy न करें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH a AS (SELECT id FROM orders) SELECT COUNT(*) AS pairs FROM a x JOIN a y ON y.id = x.id"
+     },
+     "columns": [
+      "pairs"
+     ],
+     "result": [
+      [
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "Works in 8.0+.",
+    "mariadb": "Lab: works.",
+    "postgresql": "Lab: works; a CTE used twice is computed once (kept), unless NOT MATERIALIZED."
+   },
+   "related": [
+    "cte",
+    "cte_materialized",
+    "multiple_ctes"
+   ],
+   "fundamentals": [
+    "grain"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-with.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/with.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cte_materialized",
+   "kind": "concept",
+   "title": {
+    "en": "Is a CTE run once?",
+    "hinglish": "Kya CTE ek baar chalta hai?",
+    "hindi": "क्या CTE एक बार चलता है?"
+   },
+   "terms": [
+    [
+     "(cte|ctes|with)",
+     "(materiali[sz]\\w*|inlin\\w*|computed once|run once|executed once|ek baar|optimi[sz]ation fence)"
+    ],
+    [
+     "cte",
+     "एक बार"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "is a cte computed once or every time",
+     "is a cte materialized in postgresql"
+    ],
+    "hinglish": [
+     "cte ek baar chalta hai kya",
+     "cte materialized hota hai kya"
+    ],
+    "hindi": [
+     "CTE एक बार चलता है क्या"
+    ]
+   },
+   "answer": {
+    "en": "It depends on the engine. PostgreSQL 12+ inlines a CTE that is used once and has no side effects (like a derived table), and computes one used twice once; you can force it with AS MATERIALIZED / AS NOT MATERIALIZED. Before 12 every CTE was computed once and acted as a fence the planner couldn't see through. MySQL 8 and MariaDB merge a CTE into the query or build a temporary table, the optimizer chooses; MariaDB has no MATERIALIZED keyword (lab: 1064). The rows are the same either way; only speed differs.",
+    "hinglish": "Engine pe tika hai. PostgreSQL 12+ ek baar use hone wale CTE ko inline karta hai (derived table jaisa) aur do baar wale ko ek baar banata hai; AS MATERIALIZED / AS NOT MATERIALIZED se zabardasti kar sakte ho. 12 se pehle har CTE ek baar banta tha aur planner uske paar nahi dekh pata tha. MySQL 8 aur MariaDB CTE ko query mein mila dete hain ya temporary table banate hain, optimizer chunta hai; MariaDB mein MATERIALIZED keyword nahi (lab: 1064). Rows wahi rehti hain; sirf speed badalti hai.",
+    "hindi": "Engine पर निर्भर; rows वही रहती हैं, सिर्फ़ speed बदलती है।"
+   },
+   "mistake": {
+    "en": "Writing AS MATERIALIZED (PostgreSQL syntax) in a MariaDB/MySQL query: it is a syntax error there.",
+    "hinglish": "MariaDB/MySQL query mein AS MATERIALIZED (PostgreSQL syntax) likhna: wahan syntax error hai.",
+    "hindi": "MariaDB में MATERIALIZED न लिखें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH a AS (SELECT id, amount FROM orders) SELECT COUNT(*) AS big_orders FROM a WHERE amount > 1000"
+     },
+     "columns": [
+      "big_orders"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "The optimizer merges or materializes (derived_merge switch); no keyword.",
+    "mariadb": "Lab: AS MATERIALIZED -> 1064.",
+    "postgresql": "AS MATERIALIZED / AS NOT MATERIALIZED (12+); lab: AS MATERIALIZED runs."
+   },
+   "related": [
+    "cte",
+    "cte_referenced_twice",
+    "cte_vs_subquery",
+    "cte_vs_temp_table"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-with.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/with.html",
+    "https://mariadb.com/kb/en/non-recursive-common-table-expressions-overview/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "pre_aggregate",
+   "kind": "howto",
+   "title": {
+    "en": "Totalling before a join",
+    "hinglish": "Join se pehle total",
+    "hindi": "Join से पहले total"
+   },
+   "terms": [
+    [
+     "(total|sum|aggregat\\w*|count)",
+     "(before|pehle|first)",
+     "join\\w*"
+    ],
+    [
+     "pre[- ]?aggregat\\w*"
+    ],
+    [
+     "join",
+     "पहले",
+     "(total|sum)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to sum before joining",
+     "what is pre aggregation in sql",
+     "how to aggregate before a join to avoid double counting"
+    ],
+    "hinglish": [
+     "join se pehle sum kaise kare",
+     "pehle total phir join kaise kare"
+    ],
+    "hindi": [
+     "join से पहले total कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "When a join would repeat rows (a parent with its children), total each child table to the parent's grain first, in a derived table or a CTE, and join the totals: SELECT o.id, o.amount, i.qty FROM orders o JOIN (SELECT order_id, SUM(quantity) AS qty FROM order_items GROUP BY order_id) i ON i.order_id = o.id. Each side now has one row per order, so neither total is multiplied. Use LEFT JOIN to keep parents with no children (and COALESCE their total to 0).",
+    "hinglish": "Jab join rows dohraaye (parent aur uske children), har child table ka total pehle parent ke grain pe nikaalo, derived table ya CTE mein, phir totals jodo: SELECT o.id, o.amount, i.qty FROM orders o JOIN (SELECT order_id, SUM(quantity) AS qty FROM order_items GROUP BY order_id) i ON i.order_id = o.id. Ab dono taraf har order ki ek row, koi total guna nahi. Bina child wale parent rakhne ho to LEFT JOIN (aur total COALESCE se 0).",
+    "hindi": "पहले child table का total parent के grain पर निकालें, फिर join करें।"
+   },
+   "mistake": {
+    "en": "Fixing doubled totals with SUM(DISTINCT amount): two different orders with the same amount are then counted once.",
+    "hinglish": "Double totals ko SUM(DISTINCT amount) se theek karna: same amount wale do alag orders ek hi gine jaate hain.",
+    "hindi": "SUM(DISTINCT) से double total ठीक न करें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, o.amount, i.qty FROM orders o JOIN (SELECT order_id, SUM(quantity) AS qty FROM order_items GROUP BY order_id) i ON i.order_id = o.id WHERE o.id <= 3 ORDER BY o.id"
+     },
+     "columns": [
+      "id",
+      "amount",
+      "qty"
+     ],
+     "result": [
+      [
+       "1",
+       "25500",
+       "4"
+      ],
+      [
+       "2",
+       "500",
+       "1"
+      ],
+      [
+       "3",
+       "80000",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "Same on every engine.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same; a LATERAL subquery is another way."
+   },
+   "related": [
+    "join_sum_doubled",
+    "fan_out",
+    "chasm_trap",
+    "grain"
+   ],
+   "fundamentals": [
+    "grain",
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/derived-tables.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "fan_out",
+   "kind": "concept",
+   "title": {
+    "en": "Fan-out in a join",
+    "hinglish": "Join mein fan-out",
+    "hindi": "Join में fan-out"
+   },
+   "terms": [
+    [
+     "fan[- ]?out"
+    ],
+    [
+     "फैन"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is fan out in sql",
+     "what is a fan-out join"
+    ],
+    "hinglish": [
+     "fan out kya hota hai",
+     "join fan out kya hai"
+    ],
+    "hindi": [
+     "fan out क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "Fan-out is what a one-to-many join does to the rows: each row of the 'one' side comes back once per matching row of the 'many' side. Order 1 with three items becomes three rows. Totals of the many side are fine; totals of the one side (SUM(o.amount)) are multiplied. It is not an error, it is the grain moving down, so after such a join check every total, or total the child first.",
+    "hinglish": "Fan-out wo hai jo one-to-many join rows ke saath karta hai: 'one' side ki har row 'many' side ki har matching row ke liye ek baar aati hai. Teen items wala order 1 teen rows ban jaata hai. Many side ke total theek; one side ke total (SUM(o.amount)) guna ho jaate hain. Ye error nahi, grain neeche jaata hai, isliye aise join ke baad har total check karo, ya child ka total pehle nikaalo.",
+    "hindi": "One-to-many join में हर parent row हर child के लिए दोहराई जाती है; parent के total बढ़ जाते हैं।"
+   },
+   "mistake": {
+    "en": "Adding DISTINCT to hide the extra rows instead of fixing the grain: the totals underneath are still multiplied.",
+    "hinglish": "Grain theek karne ki jagah DISTINCT laga ke extra rows chhupana: neeche ke total phir bhi guna hain.",
+    "hindi": "DISTINCT से fan-out न छुपाएँ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, COUNT(*) AS rows_after_join, SUM(o.amount) AS summed_amount FROM orders o JOIN order_items i ON i.order_id = o.id WHERE o.id IN (1, 2) GROUP BY o.id ORDER BY o.id"
+     },
+     "columns": [
+      "id",
+      "rows_after_join",
+      "summed_amount"
+     ],
+     "result": [
+      [
+       "1",
+       "3",
+       "76500"
+      ],
+      [
+       "2",
+       "1",
+       "500"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "Same on every engine.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same on every engine."
+   },
+   "related": [
+    "join_duplicates",
+    "join_sum_doubled",
+    "pre_aggregate",
+    "grain"
+   ],
+   "fundamentals": [
+    "cardinality",
+    "grain"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/join.html",
+   "seen_at": [
+    "https://www.metabase.com/learn/grow-your-data-skills/learn-sql/debugging-sql/sql-logic-duplicated-data"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "chasm_trap",
+   "kind": "concept",
+   "title": {
+    "en": "The chasm trap (two child tables)",
+    "hinglish": "Chasm trap (do child tables)",
+    "hindi": "Chasm trap (दो child tables)"
+   },
+   "terms": [
+    [
+     "chasm"
+    ],
+    [
+     "(do|two|2)",
+     "child tables?"
+    ],
+    [
+     "(items|lines)",
+     "payments",
+     "(join|together|saath)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a chasm trap in sql",
+     "why are totals wrong when joining two child tables"
+    ],
+    "hinglish": [
+     "chasm trap kya hai",
+     "do child tables join karne pe total galat kyun"
+    ],
+    "hindi": [
+     "chasm trap क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Joining a parent to two child tables at once (orders with order_items and payments) pairs every item with every payment of the same order: 3 items x 2 payments = 6 rows, so SUM(quantity) doubles and SUM(payment amount) triples. Neither child is wrong; together they multiply each other. Total each child to the parent's grain first (a derived table or CTE per child) and join those totals.",
+    "hinglish": "Parent ko ek saath do child tables se jodna (orders, order_items aur payments) har item ko usi order ke har payment se jod deta hai: 3 items x 2 payments = 6 rows, isliye SUM(quantity) double aur SUM(payment) triple. Koi child galat nahi; saath mein ek doosre ko guna karte hain. Har child ka total pehle parent ke grain pe nikaalo (har child ka derived table ya CTE) aur wo totals jodo.",
+    "hindi": "दो child tables एक साथ join करने पर एक-दूसरे को गुणा करते हैं; पहले हर child का total निकालें।"
+   },
+   "mistake": {
+    "en": "Testing on orders that have one payment each: the totals match until the first order with two payments.",
+    "hinglish": "Aise orders pe test karna jinka ek hi payment hai: pehle do payment wale order tak total sahi lagte hain.",
+    "hindi": "एक payment वाले orders पर test करना काफ़ी नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, (SELECT SUM(quantity) FROM order_items i WHERE i.order_id = o.id) AS qty, (SELECT SUM(amount) FROM payments p WHERE p.order_id = o.id) AS paid FROM orders o WHERE o.id <= 2 ORDER BY o.id"
+     },
+     "columns": [
+      "id",
+      "qty",
+      "paid"
+     ],
+     "result": [
+      [
+       "1",
+       "4",
+       "25500"
+      ],
+      [
+       "2",
+       "1",
+       "450"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "Same on every engine.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same on every engine."
+   },
+   "related": [
+    "fan_out",
+    "pre_aggregate",
+    "join_sum_doubled"
+   ],
+   "fundamentals": [
+    "cardinality",
+    "grain"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/join.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "grain_change_join",
+   "kind": "concept",
+   "title": {
+    "en": "Does a join change the grain?",
+    "hinglish": "Kya join grain badalta hai?",
+    "hindi": "क्या join grain बदलता है?"
+   },
+   "terms": [
+    [
+     "join\\w*",
+     "(change|changes|badal\\w*|move\\w*)",
+     "grain"
+    ],
+    [
+     "grain",
+     "join"
+    ],
+    [
+     "ग्रेन",
+     "जॉइन"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does a join change the grain",
+     "does a join always change the grain"
+    ],
+    "hinglish": [
+     "join grain badalta hai kya",
+     "join ke baad grain badal jaata hai kya"
+    ],
+    "hindi": [
+     "join grain बदलता है क्या"
+    ]
+   },
+   "answer": {
+    "en": "It depends on which side is unique. Joining a row to at most one row of the other table (an order to its customer: customers.id is a key) keeps the grain. Joining a parent to its children (orders to order_items) moves the grain down to the child: one row per item. Joining on columns that are a key on neither side can multiply both ways. Inside one query, a CTE grouped by customer_id is unique on customer_id, so joining it on customer_id keeps the grain: that is proven by the query itself.",
+    "hinglish": "Ye is pe tika hai ki kaunsi side unique hai. Ek row ko doosri table ki zyada se zyada ek row se jodna (order ko uska customer: customers.id key) grain rakhta hai. Parent ko children se jodna (orders ko order_items) grain ko child pe le aata hai: har item ki ek row. Jo columns kisi taraf key nahi un pe join dono taraf guna kar sakta hai. Query ke andar customer_id se GROUP BY hua CTE customer_id pe unique hai, isliye us pe join grain rakhta hai: ye query khud sabit karti hai.",
+    "hindi": "जिस तरफ़ key है उस पर निर्भर; parent को children से जोड़ने पर grain child पर आ जाता है।"
+   },
+   "mistake": {
+    "en": "Assuming the grain stays the same because the row count looked fine on test data.",
+    "hinglish": "Test data pe rows sahi dikhi isliye maan lena ki grain wahi hai.",
+    "hindi": "Test data पर rows ठीक दिखें तो grain वही है, ऐसा न मानें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM orders) AS orders, (SELECT COUNT(*) FROM orders o JOIN customers c ON c.id = o.customer_id) AS with_customer, (SELECT COUNT(*) FROM orders o JOIN order_items i ON i.order_id = o.id) AS with_items"
+     },
+     "columns": [
+      "orders",
+      "with_customer",
+      "with_items"
+     ],
+     "result": [
+      [
+       "8",
+       "8",
+       "10"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "Same on every engine.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same on every engine."
+   },
+   "related": [
+    "grain",
+    "fan_out",
+    "join_cardinality",
+    "pre_aggregate"
+   ],
+   "fundamentals": [
+    "grain",
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/join.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "union_vs_union_all",
+   "kind": "compare",
+   "title": {
+    "en": "UNION vs UNION ALL",
+    "hinglish": "UNION vs UNION ALL",
+    "hindi": "UNION बनाम UNION ALL"
+   },
+   "terms": [
+    [
+     "\\bunion\\b(?!\\s+all)",
+     "union all"
+    ],
+    [
+     "union all",
+     "(kya hota|kya hai|what is|what does|meaning)"
+    ],
+    [
+     "यूनियन"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the difference between union and union all",
+     "union vs union all"
+    ],
+    "hinglish": [
+     "union aur union all mein kya farak hai",
+     "union all kya hota hai"
+    ],
+    "hindi": [
+     "union और union all में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "Both stack the rows of two SELECTs with the same number of columns. UNION then removes repeated rows (it sorts or hashes everything to find them); UNION ALL keeps every row and is cheaper. Use UNION ALL when the parts can't overlap or when repeats are real rows you want (two equal payments); use UNION only when you really want distinct rows. The column names come from the first SELECT.",
+    "hinglish": "Dono do SELECTs ki rows (same number of columns) ek ke neeche ek rakhte hain. UNION phir dohraayi rows hata deta hai (sab sort ya hash karke); UNION ALL har row rakhta hai aur sasta hai. Jab hisse overlap nahi kar sakte ya dohraayi rows asli hain (do barabar payments) to UNION ALL; sirf jab alag rows hi chahiye to UNION. Column naam pehle SELECT se aate hain.",
+    "hindi": "UNION repeat rows हटाता है; UNION ALL सब रखता है और सस्ता है।"
+   },
+   "mistake": {
+    "en": "Using UNION to combine payments: two equal payments of the same day collapse into one and the total comes out short.",
+    "hinglish": "Payments jodne ke liye UNION: same din ke do barabar payments ek ho jaate hain aur total kam aata hai.",
+    "hindi": "Payments जोड़ने के लिए UNION न लगाएँ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM (SELECT customer_id FROM orders UNION SELECT customer_id FROM orders) u) AS with_union, (SELECT COUNT(*) FROM (SELECT customer_id FROM orders UNION ALL SELECT customer_id FROM orders) v) AS with_union_all"
+     },
+     "columns": [
+      "with_union",
+      "with_union_all"
+     ],
+     "result": [
+      [
+       "5",
+       "16"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "UNION DISTINCT is the same as UNION.",
+    "mariadb": "Same as MySQL; INTERSECT and EXCEPT too (10.3+).",
+    "postgresql": "Same; INTERSECT and EXCEPT have ALL forms too."
+   },
+   "related": [
+    "or_vs_union",
+    "distinct",
+    "query_blocks"
+   ],
+   "fundamentals": [
+    "grain"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/union.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-union.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "debug_long_query",
+   "kind": "howto",
+   "title": {
+    "en": "Debugging a long query",
+    "hinglish": "Lambi query debug karna",
+    "hindi": "लंबी query debug करना"
+   },
+   "terms": [
+    [
+     "(debug\\w*|troubleshoot\\w*|break down|samjh\\w*)",
+     "(long|big|complex|large|lambi|badi|bada)",
+     "(quer\\w*|sql)"
+    ],
+    [
+     "लंबी",
+     "(query|क्वेरी)"
+    ],
+    [
+     "(galti|mistake|galat)",
+     "(badi|lambi|long|big|complex)",
+     "quer\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to debug a long sql query",
+     "how to troubleshoot a complex sql query"
+    ],
+    "hinglish": [
+     "lambi sql query kaise debug kare",
+     "badi query mein galti kaise dhoondhe"
+    ],
+    "hindi": [
+     "लंबी query कैसे debug करें"
+    ]
+   },
+   "answer": {
+    "en": "Go block by block, bottom up. Run each CTE or derived table on its own (SELECT * FROM it LIMIT 20, and SELECT COUNT(*) FROM it) and check its grain: is one row what you think it is? Then add the joins one at a time and watch the row count: a jump means the grain moved down (fan-out). Check totals right after the join that changes the grain. Keep a known small case (one customer) and compare each step with what you expect by hand.",
+    "hinglish": "Block-block, neeche se upar. Har CTE ya derived table alag chalao (SELECT * ... LIMIT 20 aur SELECT COUNT(*)) aur uska grain dekho: ek row wahi hai jo aap soch rahe ho? Phir joins ek-ek karke jodo aur row count dekho: achanak badhna matlab grain neeche gaya (fan-out). Grain badalne wale join ke turant baad totals check karo. Ek chhota jaana hua case (ek customer) rakho aur har step haath ke hisaab se milao.",
+    "hindi": "हर block अलग चलाएँ, row count देखें, joins एक-एक करके जोड़ें।"
+   },
+   "mistake": {
+    "en": "Changing several things at once and re-running the whole query: you can't tell which change fixed or broke it.",
+    "hinglish": "Ek saath kai cheezein badal ke poori query dobara chalana: pata nahi chalta kis badlaav ne theek kiya ya bigaada.",
+    "hindi": "एक साथ कई चीज़ें न बदलें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH paid AS (SELECT id, customer_id FROM orders WHERE status = 'paid') SELECT (SELECT COUNT(*) FROM paid) AS paid_orders, (SELECT COUNT(*) FROM paid p JOIN order_items i ON i.order_id = p.id) AS after_items_join"
+     },
+     "columns": [
+      "paid_orders",
+      "after_items_join"
+     ],
+     "result": [
+      [
+       "4",
+       "6"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "EXPLAIN ANALYZE (8.0.18+) shows the rows of each step.",
+    "mariadb": "ANALYZE SELECT shows r_rows per step.",
+    "postgresql": "EXPLAIN ANALYZE shows actual rows at each node."
+   },
+   "related": [
+    "query_blocks",
+    "rows_per_stage",
+    "fan_out",
+    "dependency_tree"
+   ],
+   "fundamentals": [
+    "grain"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-with.html",
+   "seen_at": [
+    "https://use-the-index-luke.com/sql/explain-plan"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "rows_per_stage",
+   "kind": "howto",
+   "title": {
+    "en": "Counting rows at each step",
+    "hinglish": "Har step pe rows ginna",
+    "hindi": "हर step पर rows गिनना"
+   },
+   "terms": [
+    [
+     "(count|kitni|how many)",
+     "rows",
+     "(each|every|har) (step|stage|join|block|cte)"
+    ],
+    [
+     "rows",
+     "(after|baad) (each|every|har)? ?join"
+    ],
+    [
+     "हर",
+     "(step|स्टेप)",
+     "rows"
+    ],
+    [
+     "har (step|stage|join|block)",
+     "rows"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to count rows at each step of a query",
+     "how to see how many rows each join adds"
+    ],
+    "hinglish": [
+     "har join ke baad kitni rows hain kaise dekhe",
+     "har step pe rows kaise gine"
+    ],
+    "hindi": [
+     "हर step पर कितनी rows हैं कैसे देखें"
+    ]
+   },
+   "answer": {
+    "en": "Wrap each stage in a COUNT(*): first the FROM table alone, then with the first join, then the second, and so on (SELECT COUNT(*) FROM orders o JOIN order_items i ON ...). If a count grows, that join moved the grain down; if it shrinks, an inner join dropped rows that had no match. COUNT(DISTINCT o.id) next to COUNT(*) shows how many parent rows you still have and how often they repeat.",
+    "hinglish": "Har stage ko COUNT(*) mein lapeto: pehle sirf FROM table, phir pehle join ke saath, phir doosre, aur aage (SELECT COUNT(*) FROM orders o JOIN order_items i ON ...). Ginti badhe to us join ne grain neeche kiya; ghate to inner join ne bina match wali rows hata di. COUNT(*) ke saath COUNT(DISTINCT o.id) batata hai kitne parent bache aur kitni baar dohraaye.",
+    "hindi": "हर join के बाद COUNT(*) और COUNT(DISTINCT parent id) देखें।"
+   },
+   "mistake": {
+    "en": "Counting only at the end: a join that adds rows and a filter that removes them can cancel out and hide both.",
+    "hinglish": "Sirf aakhir mein ginna: rows badhane wala join aur ghatane wala filter ek doosre ko kaat ke dono chhupa sakte hain.",
+    "hindi": "सिर्फ़ आख़िर में न गिनें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS rows_after_join, COUNT(DISTINCT o.id) AS orders FROM orders o JOIN order_items i ON i.order_id = o.id"
+     },
+     "columns": [
+      "rows_after_join",
+      "orders"
+     ],
+     "result": [
+      [
+       "10",
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "Same on every engine.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same on every engine."
+   },
+   "related": [
+    "debug_long_query",
+    "fan_out",
+    "grain"
+   ],
+   "fundamentals": [
+    "grain",
+    "cardinality"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/counting-rows.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-with.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "derived_table_alias",
+   "kind": "concept",
+   "title": {
+    "en": "Does a derived table need an alias?",
+    "hinglish": "Kya derived table ko alias chahiye?",
+    "hindi": "क्या derived table को alias चाहिए?"
+   },
+   "terms": [
+    [
+     "derived tables?",
+     "alias\\w*",
+     "(need|must|required|chahiye|zaroori|mandatory)"
+    ],
+    [
+     "every derived table must have its own alias"
+    ],
+    [
+     "derived table",
+     "alias"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does a derived table need an alias",
+     "why must every derived table have its own alias"
+    ],
+    "hinglish": [
+     "derived table ko alias dena zaroori hai kya",
+     "har derived table ko alias kyun chahiye"
+    ],
+    "hindi": [
+     "derived table को alias देना ज़रूरी है क्या"
+    ]
+   },
+   "answer": {
+    "en": "In MySQL and MariaDB, yes: SELECT COUNT(*) FROM (SELECT id FROM orders) is refused (MySQL 1248 'Every derived table must have its own alias'; MariaDB lab: 1064). PostgreSQL required it until version 15 and accepts it without one from 16 (lab: runs). Always give one (FROM (SELECT ...) AS t): it works everywhere and lets you name its columns.",
+    "hinglish": "MySQL aur MariaDB mein haan: SELECT COUNT(*) FROM (SELECT id FROM orders) mana hota hai (MySQL 1248, MariaDB lab: 1064). PostgreSQL 15 tak zaroori tha, 16 se bina alias ke chalta hai (lab: chalta hai). Hamesha alias do (FROM (SELECT ...) AS t): har jagah chalega.",
+    "hindi": "MySQL/MariaDB में ज़रूरी; PostgreSQL 16+ में नहीं; हमेशा alias दें।"
+   },
+   "mistake": {
+    "en": "Leaving the alias out because it works on PostgreSQL 16: the same query fails on MySQL, MariaDB and older PostgreSQL.",
+    "hinglish": "PostgreSQL 16 pe chal gaya isliye alias chhod dena: wahi query MySQL, MariaDB aur purane PostgreSQL pe fail.",
+    "hindi": "PostgreSQL 16 पर चलता है, फिर भी alias दें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS orders FROM (SELECT id FROM orders) AS t"
+     },
+     "columns": [
+      "orders"
+     ],
+     "result": [
+      [
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "Error 1248 without an alias.",
+    "mariadb": "Lab: 1064 without an alias.",
+    "postgresql": "Lab (16): runs without an alias; 15 and older: 42601."
+   },
+   "related": [
+    "derived_table",
+    "alias",
+    "query_blocks"
+   ],
+   "fundamentals": [
+    "names_scope",
+    "engine_syntax"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/derived-tables.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/release/16.0/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cte_vs_temp_table",
+   "kind": "compare",
+   "title": {
+    "en": "CTE vs temporary table",
+    "hinglish": "CTE vs temporary table",
+    "hindi": "CTE बनाम temporary table"
+   },
+   "terms": [
+    [
+     "(cte|ctes|with)",
+     "temp(orary)? tables?"
+    ],
+    [
+     "temp(orary)? tables?",
+     "(vs|or|ya|difference|farak)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "cte vs temporary table",
+     "should i use a cte or a temp table"
+    ],
+    "hinglish": [
+     "cte aur temporary table mein kya farak hai",
+     "cte ya temp table kaunsa use kare"
+    ],
+    "hindi": [
+     "CTE और temporary table में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "A CTE lives only inside one statement: it has no indexes of its own and is gone when the statement ends. A temporary table lives for the session: you fill it once, can add an index, read it from several statements, and see its row count. Use a CTE to make one query readable; use a temporary table when several statements need the same intermediate rows, or a big intermediate result needs an index.",
+    "hinglish": "CTE sirf ek statement ke andar rehta hai: apna index nahi, statement khatam to gaya. Temporary table poore session tak: ek baar bharo, index laga sakte ho, kai statements se padho, row count dekho. Ek query ko padhne layak banane ke liye CTE; jab kai statements ko wahi beech ki rows chahiye ya badi beech ki rows ko index chahiye to temporary table.",
+    "hindi": "CTE एक statement तक; temporary table session भर, index लग सकता है।"
+   },
+   "mistake": {
+    "en": "Expecting a CTE to keep its rows for the next statement: the next statement gets 'table doesn't exist'.",
+    "hinglish": "Agle statement ke liye CTE ki rows bachi rehne ki ummeed: agla statement 'table doesn't exist' paata hai.",
+    "hindi": "CTE अगले statement में नहीं रहता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40)); INSERT INTO demo_child VALUES (1, 1, 'a'), (2, 1, 'b'), (3, 2, 'c'); WITH per_parent AS (SELECT parent_id, COUNT(*) AS n FROM demo_child GROUP BY parent_id) SELECT parent_id, n FROM per_parent ORDER BY parent_id"
+     },
+     "columns": [
+      "parent_id",
+      "n"
+     ],
+     "result": [
+      [
+       "1",
+       "2"
+      ],
+      [
+       "2",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "CREATE TEMPORARY TABLE ...; a temporary table can't be opened twice in one query (error 1137).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "CREATE TEMP TABLE ...; ANALYZE it after filling so the planner knows its size."
+   },
+   "related": [
+    "cte",
+    "cte_materialized",
+    "view"
+   ],
+   "fundamentals": [
+    "grain"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-createtable.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/with.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "nested_with",
+   "kind": "concept",
+   "title": {
+    "en": "A WITH inside a CTE",
+    "hinglish": "CTE ke andar WITH",
+    "hindi": "CTE के अंदर WITH"
+   },
+   "terms": [
+    [
+     "(nested|inside|within|andar|contain\\w*)",
+     "(with|cte|ctes)",
+     "(cte|with|another)"
+    ],
+    [
+     "cte",
+     "अंदर"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can a cte contain another with",
+     "can i nest a with clause inside a cte"
+    ],
+    "hinglish": [
+     "cte ke andar with likh sakte hai kya",
+     "nested cte kaise likhe"
+    ],
+    "hindi": [
+     "CTE के अंदर WITH लिख सकते हैं क्या"
+    ]
+   },
+   "answer": {
+    "en": "Yes on MySQL 8, MariaDB and PostgreSQL: a CTE's body (or any subquery) may start with its own WITH, and those inner CTEs are visible only inside it. It is usually clearer to list every CTE at the top in order instead, so the dependency tree reads top to bottom.",
+    "hinglish": "MySQL 8, MariaDB aur PostgreSQL pe haan: CTE ki body (ya koi subquery) apne WITH se shuru ho sakti hai, aur wo andar ke CTE sirf usi ke andar dikhte hain. Aam taur pe saare CTE upar kram se likhna saaf rehta hai, taaki dependency tree upar se neeche padha jaaye.",
+    "hindi": "हाँ; पर सब CTE ऊपर क्रम से लिखना ज़्यादा साफ़ है।"
+   },
+   "mistake": {
+    "en": "Reading an inner CTE from outside its block: it doesn't exist there (1146 / 42P01).",
+    "hinglish": "Andar wale CTE ko bahar se padhna: wahan wo hota hi nahi (1146 / 42P01).",
+    "hindi": "अंदर वाला CTE बाहर नहीं दिखता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH a AS (WITH b AS (SELECT id FROM orders WHERE status = 'paid') SELECT COUNT(*) AS n FROM b) SELECT n AS paid_orders FROM a"
+     },
+     "columns": [
+      "paid_orders"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): WITH and derived tables work the same way; a derived table needs an alias; CTEs are inlined, not stored.",
+    "oracle": "Notes only (not lab-tested here): WITH (subquery factoring) is supported; the optimizer may inline it or keep it (the MATERIALIZE / INLINE hints).",
+    "sqlite": "Notes only (not lab-tested here): WITH and WITH RECURSIVE are supported; AS MATERIALIZED / NOT MATERIALIZED since 3.35.",
+    "mysql": "Allowed in 8.0+.",
+    "mariadb": "Lab: works.",
+    "postgresql": "Lab: works."
+   },
+   "related": [
+    "cte",
+    "multiple_ctes",
+    "dependency_tree"
+   ],
+   "fundamentals": [
+    "names_scope"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/with.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-with.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

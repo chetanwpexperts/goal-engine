@@ -99,7 +99,7 @@ label the rest, upgrade to verified when schema, EXPLAIN or data arrive.
 - [x] **11. Confidence classes and the inferred schema.** PROVEN / LIKELY RISK / NEEDS SCHEMA / NEEDS EXECUTION on every
   finding; an inferred schema (verified=false); "what can't be proven from the query alone"; index advice worded as "worth
   checking".
-- [ ] **12. Grain at every stage.** Blocks and their dependency tree; input/output grain per block; re-check totals after a
+- [x] **12. Grain at every stage.** Blocks and their dependency tree; input/output grain per block; re-check totals after a
   grain-changing join; tree and grain shown for 30+ line queries.
 - [ ] **13. Remaining structural checks.** Cartesian joins, ON that doesn't connect its tables, broken or repeated correlated
   subqueries, DISTINCT hiding duplicates, UNION vs UNION ALL, late filters, big OFFSET, functions on filtered columns,
@@ -414,3 +414,22 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   lessons worth keeping: MariaDB has no EXPLAIN ANALYZE (1064; ANALYZE SELECT adds r_rows) and PostgreSQL has no ANALYZE
   SELECT (42601); information_schema.columns lists TEMPORARY tables on PostgreSQL but not on MariaDB; plain EXPLAIN of a
   DELETE changes nothing on both.
+- **Night 12 (13 Nov 2026).** Blocks and the grain at every stage, in `app/agents/sqlblocks.py` (fundamental `grain`, now
+  with the block rule). A query is read as a tree of SELECT blocks: the CTEs of its WITH, derived tables (a bracket in FROM
+  with an alias), subqueries (IN / EXISTS / one value) and UNION / INTERSECT / EXCEPT parts, each with what it depends on. Every
+  block gets its input grain (what one row is after its FROM and joins), what each join does to it (keeps it, moves it down to
+  the child, multiplies both ways; "proven" when a block's own GROUP BY / DISTINCT / single total makes the ON columns unique,
+  "guessed from the column name" otherwise, listed as an assumption), its output grain, filters, totals, windows and final cut.
+  keys(sql) passes those proven keys to every check (a CTE grouped by customer_id is one row per customer_id; a block that only
+  passes another's rows on keeps its key), which removed a false 'multiplied' claim. Every CTE, derived table and UNION part
+  is now checked as a query of its own (correlated, LATERAL and recursive blocks excepted), each finding naming its block and
+  its fix put back in place: a total inside a CTE that its own child join multiplies was missed before. New: a CTE that reads
+  one written after it (error on both: 1146 / 42P01; the CTEs reordered), and a total of a coarser block joined back at a finer
+  grain (FROM orders JOIN per-customer totals, grouped by status: a likely risk). The tree and each block's grain are on the
+  card for any query with blocks, in the reading from 30 lines, and in the chat on "show the dependency tree" / "grain of each
+  block" / "har block ka grain". 16 concepts, 31-problem practice bank, 6 stmtbugs families (a quiet one: a join on a CTE's
+  own key must not be called a multiplier). Fixed on the way: the word-count rule called a CTE's rows "another table's", an
+  upsert column named like a function (floor) wasn't seen as ambiguous, a codescan generator wrote Java text blocks that
+  aren't Java, and a port generator could pick from an empty list. Lab lessons worth keeping: MariaDB refuses a derived table
+  without an alias (1064) while PostgreSQL 16 accepts it; AS MATERIALIZED is PostgreSQL only (1064 on MariaDB); a WITH inside a
+  CTE works on both.

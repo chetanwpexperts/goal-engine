@@ -817,7 +817,8 @@ def _insert(sql: str, s: str, intent: str, F) -> list:
                 for col, cs, ce, e, es, ee in _assignments(sql, s, a, b):
                     for m in re.finditer(rf"(?<![\w.$`\"])({NAME})(?![\w$]*\s*[.(])", s[es:ee]):
                         w = _uq(m.group(1))
-                        if w in _C().KW or w in ("excluded", "null", "true", "false") or re.match(r"\d", w) or \
+                        named = bool(cols) and w in {c for c, _t in cols}     # a column the INSERT lists (floor, year ...)
+                        if (w in _C().KW and not named) or w in ("excluded", "null", "true", "false") or re.match(r"\d", w) or \
                                 (cols and w not in {c for c, _t in cols} and w != _uq(col.split(".")[-1])):
                             continue
                         bare.append(m.group(1))

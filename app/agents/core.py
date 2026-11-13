@@ -99,11 +99,11 @@ def _sql_summary_text(result: dict, hi: bool) -> str:
     if not n and not idx and not result.get("rewritten"):
         note = (" Ye kaise chalti hai, uska note goal card mein hai." if hi else " A note on how it runs is in the goal card.") \
             if result.get("notes") else ""
-        return (f"Query check ki: koi problem nahi mili.{note}" if hi else f"Checked the query: no problems found.{note}")
+        return (f"Query check ki: koi problem nahi mili.{note}" if hi else f"Checked the query: no problems found.{note}") + ruled_out_text(result, hi)
     what = ("index lag sakte hain" if hi else "possible indexes") if idx and not result.get("indexes_verified") else (
         "index suggest kiye" if hi else f"index{'es' if idx != 1 else ''} suggested")
     return (f"Query check ki: {n} problem mili, {idx} {what}.{extra}" if hi
-            else f"Checked the query: {n} problem{'s' if n != 1 else ''} found, {idx} {what}.{extra}")
+            else f"Checked the query: {n} problem{'s' if n != 1 else ''} found, {idx} {what}.{extra}") + ruled_out_text(result, hi)
 
 
 def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up: bool = False) -> str:
@@ -151,7 +151,17 @@ def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up:
                    any(f["topic"] in ("count", "not_in", "date_range") for f in fs) else
                    ("Theek ki hui query card mein hai ('-- check' wale naam andaze se)." if hi else
                     "Corrected query is in the card ('-- check' marks names I guessed)."))
-    return "\n".join(out)
+    return "\n".join(out) + ("" if follow_up else ruled_out_text(result, hi))
+
+
+def ruled_out_text(result: dict, hi: bool) -> str:
+    """What the table structure the person gave rules out (night 10B): said once, briefly, so a risk that can't happen isn't
+    left hanging."""
+    ruled = result.get("ruled_out") or (result.get("correct") or {}).get("dropped") or []
+    if not ruled:
+        return ""
+    head = "\nAapki table structure se ye risk yahan nahi hai: " if hi else "\nYour table structure rules these out here: "
+    return head + "; ".join(f"{d['title_hi' if hi else 'title_en']} ({d['why_hi' if hi else 'why_en']})" for d in ruled[:3])
 
 
 def correctness_options(result: dict, hi: bool) -> list[str]:

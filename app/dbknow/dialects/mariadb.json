@@ -359,5 +359,11 @@
    "Aggregate": {"en": "totals worked out", "hi": "totals banaye"},
    "Limit:": {"en": "only the first rows are passed on", "hi": "sirf pehli rows aage"}
   }
+ },
+ "schema_facts": {
+  "join_number_text": {"behaviour": "silently_converts", "code": "1292", "says": "MariaDB turns the text side into a number for every row: '01', ' 2' and '1abc' all match 1 (warning 1292) and the text column's index can't be used.", "proven": ["mariadb"]},
+  "add_not_null_no_default": {"behaviour": "fills_empty", "says": "ADD COLUMN ... NOT NULL without DEFAULT on a table with rows gives the old rows '' (text) or 0 (numbers), with no error.", "proven": ["mariadb"]},
+  "unknown_column": {"behaviour": "error", "code": "1054", "says": "A column the table doesn't have: error 1054 (42S22) Unknown column.", "proven": ["mariadb"]},
+  "fk_makes_index": {"behaviour": "index_made", "says": "InnoDB creates an index for a FOREIGN KEY that has none (it shows in information_schema.statistics under the column's name).", "proven": ["mariadb"]}
  }
 }

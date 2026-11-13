@@ -24079,6 +24079,1535 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "describe_table",
+   "kind": "howto",
+   "title": {
+    "en": "Seeing a table's structure",
+    "hinglish": "Table ka structure dekhna",
+    "hindi": "Table की संरचना देखना"
+   },
+   "terms": [
+    [
+     "(describe|desc)\\b",
+     "table"
+    ],
+    [
+     "(table|tables)",
+     "(structure|columns|schema)",
+     "(see|show|view|check|dekh\\w*|dikha\\w*)"
+    ],
+    [
+     "table",
+     "structure"
+    ],
+    [
+     "टेबल",
+     "(संरचना|structure)"
+    ],
+    [
+     "table",
+     "संरचना"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to see the structure of a table",
+     "how do i describe a table in mysql",
+     "how to view the columns of a table"
+    ],
+    "hinglish": [
+     "table ka structure kaise dekhe",
+     "table ke columns kaise dekhein"
+    ],
+    "hindi": [
+     "table की संरचना कैसे देखें"
+    ]
+   },
+   "answer": {
+    "en": "A table's structure is its list of columns with their types, whether each may be NULL, defaults and keys. MySQL/MariaDB: DESCRIBE t (or SHOW COLUMNS FROM t), and SHOW CREATE TABLE t for the whole definition. PostgreSQL: \\d t in psql. On every database the standard place to ask is information_schema.columns, which you can query like any table.",
+    "hinglish": "Table ka structure matlab uske columns, unke types, NULL chal sakta hai ya nahi, default aur keys. MySQL/MariaDB: DESCRIBE t (ya SHOW COLUMNS FROM t), poori definition ke liye SHOW CREATE TABLE t. PostgreSQL: psql mein \\d t. Har database pe information_schema.columns se bhi pooch sakte ho.",
+    "hindi": "Table की संरचना यानी उसके columns, उनके types, NULL चल सकता है या नहीं, default और keys। MySQL/MariaDB: DESCRIBE t; PostgreSQL: psql में \\d t; हर database पर information_schema.columns।"
+   },
+   "mistake": {
+    "en": "Guessing from a query whether a column can be NULL or is a key: the structure says it for sure, so look it up before trusting a NULL or duplicate worry.",
+    "hinglish": "Query dekh ke andaza lagana ki column NULL ho sakta hai ya key hai: structure pakka batata hai, pehle wahi dekho.",
+    "hindi": "Query देखकर अंदाज़ा लगाना; संरचना पक्का बताती है, पहले उसे देखें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40));\nSELECT column_name AS col, is_nullable AS nullable FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'demo_child' ORDER BY ordinal_position",
+      "postgresql": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40));\nSELECT column_name AS col, is_nullable AS nullable FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'demo_child' ORDER BY ordinal_position"
+     },
+     "columns": [
+      "col",
+      "nullable"
+     ],
+     "result": [
+      [
+       "id",
+       "NO"
+      ],
+      [
+       "parent_id",
+       "NO"
+      ],
+      [
+       "note",
+       "YES"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "DESCRIBE t; SHOW CREATE TABLE t; information_schema.columns (filter on table_schema = DATABASE()).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "\\d t in psql (a psql command, not SQL); information_schema.columns or pg_attribute from any client."
+   },
+   "related": [
+    "show_create_table",
+    "information_schema",
+    "list_indexes"
+   ],
+   "fundamentals": [
+    "schema_facts"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/describe.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/infoschema-columns.html",
+    "https://mariadb.com/kb/en/describe/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "show_create_table",
+   "kind": "howto",
+   "title": {
+    "en": "Getting a table's CREATE statement",
+    "hinglish": "Table ka CREATE statement nikalna",
+    "hindi": "Table का CREATE statement निकालना"
+   },
+   "terms": [
+    [
+     "show create table"
+    ],
+    [
+     "create (table )?(statement|script|ddl|query)",
+     "(get|see|show|existing|nikal\\w*|dekh\\w*|export)"
+    ],
+    [
+     "ddl",
+     "(of|for|ka|ki) (a |the |an )?(existing )?table"
+    ],
+    [
+     "show",
+     "create table"
+    ],
+    [
+     "create statement",
+     "(निकाल\\w*|मौजूदा)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is show create table",
+     "how to get the create table statement of an existing table",
+     "how to export the ddl of a table"
+    ],
+    "hinglish": [
+     "existing table ka create table statement kaise nikale",
+     "show create table kya hai"
+    ],
+    "hindi": [
+     "मौजूदा table का create statement कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "SHOW CREATE TABLE t (MySQL/MariaDB) prints the exact CREATE TABLE that would rebuild the table: columns, types, NULL/NOT NULL, defaults, keys, indexes, foreign keys and options. PostgreSQL has no single SQL command for it; pg_dump --schema-only -t t mydb prints it. Paste that text to DBaba together with a query and the query is checked against your real columns, keys and indexes.",
+    "hinglish": "SHOW CREATE TABLE t (MySQL/MariaDB) wahi CREATE TABLE dikhata hai jo table dobara bana de: columns, types, NULL/NOT NULL, defaults, keys, indexes, foreign keys. PostgreSQL mein iske liye pg_dump --schema-only -t t mydb. Ye text query ke saath DBaba ko paste karo to query aapke asli columns, keys aur indexes se check hoti hai.",
+    "hindi": "SHOW CREATE TABLE t (MySQL/MariaDB) पूरा CREATE TABLE दिखाता है; PostgreSQL में pg_dump --schema-only -t t।"
+   },
+   "mistake": {
+    "en": "Copying the table definition from an old migration file instead: later migrations may have changed it. The live database (or the latest dump) is the truth.",
+    "hinglish": "Purani migration file se definition copy karna: baad ki migrations ne use badla ho sakta hai. Asli database (ya latest dump) sach hai.",
+    "hindi": "पुरानी migration से copy करना गलत है; असली database सच है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40));\nSELECT COUNT(*) AS cols FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'demo_child'",
+      "postgresql": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40));\nSELECT COUNT(*) AS cols FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'demo_child'"
+     },
+     "columns": [
+      "cols"
+     ],
+     "result": [
+      [
+       "3"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "SHOW CREATE TABLE t\\G in the mysql client; mysqldump --no-data db t for a file.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "pg_dump --schema-only -t t db; psql's \\d+ t shows it as a description, not a statement."
+   },
+   "related": [
+    "describe_table",
+    "schema_dump",
+    "create_table"
+   ],
+   "fundamentals": [
+    "schema_facts"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/show-create-table.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/app-pgdump.html",
+    "https://mariadb.com/kb/en/show-create-table/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "list_indexes",
+   "kind": "howto",
+   "title": {
+    "en": "Listing a table's indexes",
+    "hinglish": "Table ke indexes dekhna",
+    "hindi": "Table के indexes देखना"
+   },
+   "terms": [
+    [
+     "(list|show|see|view|check|find|dekh\\w*|dikha\\w*)",
+     "index(es)?",
+     "(table|exist\\w*|already|pehle se)"
+    ],
+    [
+     "show index"
+    ],
+    [
+     "pg_indexes"
+    ],
+    [
+     "इंडेक्स",
+     "(देख|दिखा)\\w*"
+    ],
+    [
+     "(list|show)",
+     "index(es)?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to see the indexes of a table",
+     "how to check which indexes already exist on a table",
+     "how to list indexes in postgres"
+    ],
+    "hinglish": [
+     "table ke index kaise dekhe",
+     "kaunse index pehle se hain kaise check kare"
+    ],
+    "hindi": [
+     "table के इंडेक्स कैसे देखें"
+    ]
+   },
+   "answer": {
+    "en": "MySQL/MariaDB: SHOW INDEX FROM t, or information_schema.statistics (one row per column of each index, in order). PostgreSQL: SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 't', or \\d t in psql. Read the column order: an index on (a, b) helps a filter on a, or on a and b, but not one on b alone. The primary key and UNIQUE constraints are indexes too.",
+    "hinglish": "MySQL/MariaDB: SHOW INDEX FROM t, ya information_schema.statistics. PostgreSQL: pg_indexes (indexname, indexdef) ya psql mein \\d t. Column ka kram dekho: (a, b) wala index a pe, ya a aur b pe filter mein kaam aata hai, sirf b pe nahi. Primary key aur UNIQUE bhi index hain.",
+    "hindi": "MySQL/MariaDB: SHOW INDEX FROM t; PostgreSQL: pg_indexes। (a, b) वाला index केवल b पर filter में काम नहीं आता।"
+   },
+   "mistake": {
+    "en": "Adding an index that already exists under another name (or whose columns lead an existing composite index): it costs writes and space and helps nothing.",
+    "hinglish": "Jo index pehle se kisi aur naam se hai (ya kisi composite index ke shuru mein hai) use phir lagana: likhna slow, fayda kuch nahi.",
+    "hindi": "पहले से मौजूद index दोबारा लगाना बेकार है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40));\nCREATE INDEX ix_dc_parent ON demo_child (parent_id);\nSELECT COUNT(DISTINCT index_name) AS indexes FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'demo_child'",
+      "postgresql": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40));\nCREATE INDEX ix_dc_parent ON demo_child (parent_id);\nSELECT COUNT(*) AS indexes FROM pg_indexes WHERE schemaname = current_schema() AND tablename = 'demo_child'"
+     },
+     "columns": [
+      "indexes"
+     ],
+     "result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "InnoDB also makes an index for every FOREIGN KEY that has none (lab: it shows up under the key's column name).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "A FOREIGN KEY gets no index on its own; pg_indexes shows only what you created (plus the primary key and UNIQUE ones)."
+   },
+   "related": [
+    "index",
+    "composite_index",
+    "fk_index"
+   ],
+   "fundamentals": [
+    "schema_facts"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/show-index.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/view-pg-indexes.html",
+    "https://mariadb.com/kb/en/show-index/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "list_tables",
+   "kind": "howto",
+   "title": {
+    "en": "Listing the tables of a database",
+    "hinglish": "Database ki tables ki list",
+    "hindi": "Database की tables की सूची"
+   },
+   "terms": [
+    [
+     "(list|show|see|all|saari|sari|sabhi)",
+     "tables",
+     "(database|db|schema)"
+    ],
+    [
+     "show tables"
+    ],
+    [
+     "सभी",
+     "टेबल"
+    ],
+    [
+     "\\\\dt"
+    ],
+    [
+     "(sari|saari|sabhi|all)",
+     "tables",
+     "list"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to list all tables in a database",
+     "how to show tables in postgres",
+     "what is show tables"
+    ],
+    "hinglish": [
+     "database ki saari tables kaise dekhe",
+     "sari tables ki list kaise nikale"
+    ],
+    "hindi": [
+     "database की सभी टेबल कैसे देखें"
+    ]
+   },
+   "answer": {
+    "en": "MySQL/MariaDB: SHOW TABLES (in the current database). PostgreSQL: \\dt in psql. Everywhere: information_schema.tables, filtered on the schema (table_schema = DATABASE() on MySQL, current_schema() or 'public' on PostgreSQL), with table_type = 'BASE TABLE' to leave out views.",
+    "hinglish": "MySQL/MariaDB: SHOW TABLES. PostgreSQL: psql mein \\dt. Har jagah: information_schema.tables, schema ke filter ke saath (MySQL pe table_schema = DATABASE(), PostgreSQL pe current_schema()), views hataane ke liye table_type = 'BASE TABLE'.",
+    "hindi": "MySQL/MariaDB: SHOW TABLES; PostgreSQL: \\dt; हर जगह information_schema.tables।"
+   },
+   "mistake": {
+    "en": "Forgetting the schema filter in information_schema.tables: you get the system's own tables (and other databases') mixed in.",
+    "hinglish": "information_schema.tables mein schema ka filter bhoolna: system ki aur doosre databases ki tables bhi aa jaati hain.",
+    "hindi": "Schema का filter भूलना; system tables भी आ जाती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40));\nSELECT COUNT(*) AS found FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'demo_child'",
+      "postgresql": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40));\nSELECT COUNT(*) AS found FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'demo_child'"
+     },
+     "columns": [
+      "found"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "SHOW TABLES; SHOW FULL TABLES also says which are views.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "\\dt (psql); SELECT tablename FROM pg_tables WHERE schemaname = 'public'."
+   },
+   "related": [
+    "describe_table",
+    "information_schema",
+    "what_is_schema"
+   ],
+   "fundamentals": [
+    "schema_facts"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/show-tables.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/infoschema-tables.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "information_schema",
+   "kind": "concept",
+   "title": {
+    "en": "information_schema",
+    "hinglish": "information_schema",
+    "hindi": "information_schema"
+   },
+   "terms": [
+    [
+     "information[_ ]schema"
+    ],
+    [
+     "(data dictionary|system catalog|catalog tables)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is information_schema",
+     "what is the information schema in mysql",
+     "what is a data dictionary in a database"
+    ],
+    "hinglish": [
+     "information_schema kya hai",
+     "information schema kya hota hai"
+    ],
+    "hindi": [
+     "information_schema क्या है"
+    ]
+   },
+   "answer": {
+    "en": "information_schema is a set of read-only views, defined by the SQL standard, that describe the database itself: tables, columns (type, NULL or not, default), constraints, keys and more. It is queried with ordinary SELECTs, so a check like 'does this column exist' or 'which columns allow NULL' is one query that works on MySQL, MariaDB and PostgreSQL alike. Each engine also has its own richer catalog (performance_schema / mysql on MySQL, pg_catalog on PostgreSQL).",
+    "hinglish": "information_schema SQL standard ke read-only views ka set hai jo database ke baare mein batata hai: tables, columns (type, NULL ya nahi, default), constraints, keys. Ise normal SELECT se padhte hain, isliye 'column hai ya nahi' ya 'kaunse columns NULL le sakte hain' ek hi query se MySQL, MariaDB aur PostgreSQL pe pata chalta hai.",
+    "hindi": "information_schema standard read-only views हैं जो database के tables, columns और keys बताते हैं; सामान्य SELECT से पढ़े जाते हैं।"
+   },
+   "mistake": {
+    "en": "Leaving out table_schema: the same table name in another database or schema shows up too.",
+    "hinglish": "table_schema ka filter na lagana: doosre database/schema ki same naam wali table bhi aa jaati hai.",
+    "hindi": "table_schema का filter न लगाना गलत है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40));\nSELECT column_name AS col, is_nullable AS nullable FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'demo_child' ORDER BY ordinal_position",
+      "postgresql": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40));\nSELECT column_name AS col, is_nullable AS nullable FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'demo_child' ORDER BY ordinal_position"
+     },
+     "columns": [
+      "col",
+      "nullable"
+     ],
+     "result": [
+      [
+       "id",
+       "NO"
+      ],
+      [
+       "parent_id",
+       "NO"
+      ],
+      [
+       "note",
+       "YES"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "Index details are in information_schema.statistics (MySQL-only view).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Names are folded to lower case; indexes are not in information_schema: use pg_indexes."
+   },
+   "related": [
+    "describe_table",
+    "list_tables",
+    "column_exists"
+   ],
+   "fundamentals": [
+    "schema_facts"
+   ],
+   "source": "https://www.postgresql.org/docs/current/information-schema.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/information-schema.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "column_exists",
+   "kind": "howto",
+   "title": {
+    "en": "Checking whether a column exists",
+    "hinglish": "Column hai ya nahi check karna",
+    "hindi": "Column है या नहीं जाँचना"
+   },
+   "terms": [
+    [
+     "column",
+     "(exists?|present|hai ya nahi|है या नहीं)"
+    ],
+    [
+     "कॉलम",
+     "(है या नहीं|मौजूद)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to check if a column exists in a table",
+     "how do i know whether a column exists",
+     "check if column exists in mysql"
+    ],
+    "hinglish": [
+     "column hai ya nahi kaise check kare",
+     "table mein column exist karta hai kaise pata kare"
+    ],
+    "hindi": [
+     "table में column है या नहीं कैसे पता करें"
+    ]
+   },
+   "answer": {
+    "en": "Ask information_schema.columns for that table and column name: a count of 1 means it exists. This works on every engine and in a migration script. When the database is not at hand, the project's own CREATE TABLE scripts and migrations say it too: DBaba reads them (dbaba schema <folder>) and calls a column the table doesn't have a definite mistake (MySQL/MariaDB error 1054, PostgreSQL 42703), with the closest real name as the fix.",
+    "hinglish": "information_schema.columns se us table aur column ka naam poocho: count 1 matlab hai. Har engine pe chalta hai. Database na ho to project ki CREATE TABLE scripts aur migrations bhi batati hain: DBaba unhe padhta hai (dbaba schema <folder>) aur jo column table mein nahi hai use pakki galti batata hai (1054 / 42703), sabse milta-julta asli naam fix ke roop mein.",
+    "hindi": "information_schema.columns में पूछें: count 1 यानी column है।"
+   },
+   "mistake": {
+    "en": "Comparing the name with the wrong case on PostgreSQL: unquoted names are stored in lower case, so look for 'customer_id', not 'Customer_ID'.",
+    "hinglish": "PostgreSQL pe naam galat case mein dhoondhna: bina quotes ke naam lower case mein save hote hain.",
+    "hindi": "PostgreSQL पर नाम lower case में होते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40));\nSELECT COUNT(*) AS found FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'demo_child' AND column_name = 'parent_id'",
+      "postgresql": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40));\nSELECT COUNT(*) AS found FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'demo_child' AND column_name = 'parent_id'"
+     },
+     "columns": [
+      "found"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "Unknown column -> error 1054 (42S22).",
+    "mariadb": "Same as MySQL; ALTER TABLE ... ADD COLUMN IF NOT EXISTS is MariaDB-only.",
+    "postgresql": "Unknown column -> 42703; ADD COLUMN IF NOT EXISTS works too."
+   },
+   "related": [
+    "information_schema",
+    "describe_table",
+    "alter_table"
+   ],
+   "fundamentals": [
+    "schema_facts"
+   ],
+   "source": "https://www.postgresql.org/docs/current/infoschema-columns.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/information-schema-columns-table.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "schema_dump",
+   "kind": "concept",
+   "title": {
+    "en": "Schema dump",
+    "hinglish": "Schema dump",
+    "hindi": "Schema dump"
+   },
+   "terms": [
+    [
+     "schema[ -]?(dump|only)"
+    ],
+    [
+     "(dump|export)",
+     "(structure|schema)",
+     "(without|no|bina) data"
+    ],
+    [
+     "no-data"
+    ],
+    [
+     "schema:dump"
+    ],
+    [
+     "schema",
+     "dump"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a schema dump",
+     "how to export only the structure without data",
+     "how to take a schema only backup in postgres"
+    ],
+    "hinglish": [
+     "schema dump kya hota hai",
+     "bina data ke sirf structure kaise export kare"
+    ],
+    "hindi": [
+     "schema dump क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A schema dump is a file of CREATE TABLE / CREATE INDEX / ALTER TABLE statements that rebuild the structure without the rows: mysqldump --no-data db > schema.sql, or pg_dump --schema-only db > schema.sql. Laravel's php artisan schema:dump writes one to database/schema/. It is the most complete picture of the schema a project can carry: DBaba reads it first, then the migrations newer than it, and checks the project's queries against the result.",
+    "hinglish": "Schema dump CREATE TABLE / CREATE INDEX / ALTER TABLE ki file hai jo bina rows ke structure bana de: mysqldump --no-data db > schema.sql, ya pg_dump --schema-only db > schema.sql. Laravel ka php artisan schema:dump database/schema/ mein likhta hai. DBaba pehle ise padhta hai, phir isse nayi migrations, aur project ki queries isse check karta hai.",
+    "hindi": "Schema dump बिना rows के structure बनाने वाली file है: mysqldump --no-data या pg_dump --schema-only।"
+   },
+   "mistake": {
+    "en": "Treating a schema dump as a backup: it has no data. A backup needs the rows too, and has to be restored once to be trusted.",
+    "hinglish": "Schema dump ko backup samajhna: isme data nahi hota. Backup mein rows bhi chahiye, aur ek baar restore karke dekhna chahiye.",
+    "hindi": "Schema dump backup नहीं है; उसमें data नहीं होता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40))"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "mysqldump --no-data --routines db (routines are left out unless asked).",
+    "mariadb": "mariadb-dump --no-data (same options).",
+    "postgresql": "pg_dump --schema-only (-s); pg_dump -s -t t for one table."
+   },
+   "related": [
+    "show_create_table",
+    "db_migration",
+    "migration_order"
+   ],
+   "fundamentals": [
+    "schema_facts"
+   ],
+   "source": "https://www.postgresql.org/docs/current/app-pgdump.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/mysqldump.html",
+    "https://laravel.com/docs/11.x/migrations"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "laravel_nullable",
+   "kind": "concept",
+   "title": {
+    "en": "NULL in Laravel migrations",
+    "hinglish": "Laravel migration mein NULL",
+    "hindi": "Laravel migration में NULL"
+   },
+   "terms": [
+    [
+     "laravel",
+     "(nullable|null)"
+    ],
+    [
+     "(migration|migrations)",
+     "nullable"
+    ],
+    [
+     "->nullable"
+    ],
+    [
+     "laravel",
+     "column",
+     "null"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "are laravel migration columns nullable by default",
+     "what does nullable do in a laravel migration",
+     "is a laravel string column null by default"
+    ],
+    "hinglish": [
+     "laravel migration mein nullable kya karta hai",
+     "laravel column default null hota hai kya"
+    ],
+    "hindi": [
+     "laravel migration में nullable क्या करता है"
+    ]
+   },
+   "answer": {
+    "en": "No: a column made by a Laravel migration is NOT NULL unless the chain says ->nullable(). The exceptions are the helpers made for optional values: timestamps() (created_at, updated_at), softDeletes() (deleted_at) and rememberToken() are nullable. Plain SQL is the other way round: a column may hold NULL unless it says NOT NULL. That is why DBaba reads Laravel migrations with Laravel's rule, so a NOT IN or an arithmetic NULL worry about a non-nullable column is dropped, and kept (verified) for a nullable one.",
+    "hinglish": "Nahi: Laravel migration ka column NOT NULL hota hai jab tak ->nullable() na likho. Optional values wale helpers alag hain: timestamps() (created_at, updated_at), softDeletes() (deleted_at) aur rememberToken() nullable hote hain. Plain SQL ulta hai: column NULL le sakta hai jab tak NOT NULL na likho. DBaba Laravel migrations isi niyam se padhta hai.",
+    "hindi": "नहीं: Laravel का column ->nullable() के बिना NOT NULL होता है; timestamps(), softDeletes(), rememberToken() nullable हैं। Plain SQL उल्टा है।"
+   },
+   "mistake": {
+    "en": "Adding ->nullable() in a later migration without ->change(): that declares a new column; to make an existing one nullable it is ->nullable()->change(), restating every other modifier you want to keep.",
+    "hinglish": "Baad ki migration mein ->change() ke bina ->nullable(): wo naya column banata hai; maujooda column ke liye ->nullable()->change(), baaki modifiers dobara likh ke.",
+    "hindi": "मौजूदा column के लिए ->nullable()->change() चाहिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id BIGINT PRIMARY KEY, email VARCHAR(255) NOT NULL, phone VARCHAR(20) NULL);\nINSERT INTO demo_child (id, email) VALUES (1, 'a@mail.test');\nSELECT id, phone FROM demo_child"
+     },
+     "columns": [
+      "id",
+      "phone"
+     ],
+     "result": [
+      [
+       "1",
+       "NULL"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "$table->string('email') becomes email VARCHAR(255) NOT NULL.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "The same migration gives email VARCHAR(255) NOT NULL on PostgreSQL; foreignId() becomes BIGINT (no UNSIGNED there)."
+   },
+   "related": [
+    "not_null_default",
+    "db_migration",
+    "null"
+   ],
+   "fundamentals": [
+    "schema_facts",
+    "null_logic"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/create-table.html",
+   "seen_at": [
+    "https://laravel.com/docs/11.x/migrations",
+    "https://www.postgresql.org/docs/current/ddl-constraints.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "schema_drift",
+   "kind": "concept",
+   "title": {
+    "en": "Schema drift",
+    "hinglish": "Schema drift",
+    "hindi": "Schema drift"
+   },
+   "terms": [
+    [
+     "schema drift"
+    ],
+    [
+     "drift",
+     "(schema|database|migrations?)"
+    ],
+    [
+     "(migrations?|schema)",
+     "(differ\\w*|mismatch\\w*|out of sync|match nahi)",
+     "(database|production|live|real)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is schema drift",
+     "what is it called when migrations and the live database differ",
+     "what is database schema drift"
+    ],
+    "hinglish": [
+     "schema drift kya hota hai",
+     "schema drift ka matlab kya hai"
+    ],
+    "hindi": [
+     "schema drift क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Schema drift is when the real database no longer matches what the project's files (migrations, schema dump) say: a column added by hand on production, an index dropped during an incident, a migration edited after it had already run. Queries then behave differently from what the code assumes. Compare them: dump the live structure (mysqldump --no-data / pg_dump -s) and diff it against the project's schema, then fix the difference with a new migration.",
+    "hinglish": "Schema drift matlab asli database project ki files (migrations, schema dump) se alag ho gaya: production pe haath se joda column, incident mein hataya index, chal chuki migration ko baad mein badalna. Live structure dump karo (mysqldump --no-data / pg_dump -s), project ke schema se milao, aur farak nayi migration se theek karo.",
+    "hindi": "Schema drift यानी असली database project की files से अलग हो गया; live dump को project के schema से मिलाएँ।"
+   },
+   "mistake": {
+    "en": "Fixing drift by hand on production again: the next fresh setup misses it. Every change goes through a migration.",
+    "hinglish": "Drift ko phir production pe haath se theek karna: agla naya setup use miss karega. Har change migration se.",
+    "hindi": "हर बदलाव migration से करें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40))"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "DDL commits on its own, so a half-run migration is a common source of drift.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "DDL is transactional: a migration in one transaction either fully applies or not at all."
+   },
+   "related": [
+    "db_migration",
+    "schema_dump",
+    "migration_order"
+   ],
+   "fundamentals": [
+    "schema_facts"
+   ],
+   "source": "https://www.postgresql.org/docs/current/app-pgdump.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/mysqldump.html",
+    "https://laravel.com/docs/11.x/migrations"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "down_migration",
+   "kind": "concept",
+   "title": {
+    "en": "Rolling back a migration",
+    "hinglish": "Migration rollback",
+    "hindi": "Migration rollback"
+   },
+   "terms": [
+    [
+     "(down|rollback|roll back|undo|revert)",
+     "migrations?"
+    ],
+    [
+     "migrations?",
+     "(wapas|vapas|undo)"
+    ],
+    [
+     "down\\(\\)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a down migration",
+     "how to rollback a migration",
+     "what does the down method do in a migration"
+    ],
+    "hinglish": [
+     "migration rollback kaise kare",
+     "down migration kya hota hai"
+    ],
+    "hindi": [
+     "migration rollback कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "A migration's 'up' part makes the change; its 'down' part undoes it (Laravel's down(), Flyway's U files, *.down.sql in golang-migrate, the -- migrate:down part in dbmate). Rolling back runs the down parts of the last batch in reverse order. Down parts are not the schema: DBaba reads only the up parts, in version order. Dropping a column in a down part loses its data for good, so rollbacks on production are rare; a new forward migration is the usual fix.",
+    "hinglish": "Migration ka 'up' hissa change karta hai, 'down' hissa use undo karta hai (Laravel ka down(), Flyway ki U files, *.down.sql, dbmate ka -- migrate:down). Rollback aakhri batch ke down hisse ulte kram mein chalata hai. DBaba schema ke liye sirf up hisse padhta hai. Down mein column drop karne se data hamesha ke liye jaata hai, isliye production pe aksar nayi forward migration se theek karte hain.",
+    "hindi": "'up' बदलाव करता है, 'down' उसे वापस लेता है; production पर आमतौर पर नई migration बेहतर है।"
+   },
+   "mistake": {
+    "en": "A down part that doesn't match its up part (drops the wrong index, forgets a column): the rollback leaves a schema no file describes.",
+    "hinglish": "Down jo up se mel na khaye (galat index drop, column bhool jaana): rollback aisa schema chhodta hai jo kisi file mein nahi.",
+    "hindi": "down और up मेल खाने चाहिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY);\nALTER TABLE demo_child ADD COLUMN note VARCHAR(40);\nALTER TABLE demo_child DROP COLUMN note;\nSELECT COUNT(*) AS cols FROM information_schema.columns WHERE table_name = 'demo_child'"
+     },
+     "columns": [
+      "cols"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "DDL can't be rolled back by a transaction; a failed up part may be half applied.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "A migration in a transaction rolls back by itself on failure; down is only for undoing a finished one."
+   },
+   "related": [
+    "db_migration",
+    "migration_order",
+    "alter_table"
+   ],
+   "fundamentals": [
+    "schema_facts"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-alter.html",
+   "seen_at": [
+    "https://laravel.com/docs/11.x/migrations",
+    "https://github.com/golang-migrate/migrate"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "migration_order",
+   "kind": "concept",
+   "title": {
+    "en": "The order migrations run in",
+    "hinglish": "Migrations ka kram",
+    "hindi": "Migrations का क्रम"
+   },
+   "terms": [
+    [
+     "migrations?",
+     "(order|sequence|kram|timestamp|version\\w*|क्रम)"
+    ],
+    [
+     "(flyway|liquibase|golang-migrate)",
+     "version\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the order of migrations",
+     "why do migration files start with a timestamp",
+     "how does the order of migrations work"
+    ],
+    "hinglish": [
+     "migrations ka order kya hota hai",
+     "migration file ke naam mein timestamp kyun hota hai"
+    ],
+    "hindi": [
+     "migrations का क्रम क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "By the version at the front of the file name: Laravel's 2024_01_31_120000_..., Flyway's V1__, V2__ ... (compared as numbers, so V10 comes after V9), golang-migrate's 0001_, 0002_. The tool records which versions have run and runs only the new ones, in order. Reading a project's schema means replaying them the same way: DBaba applies schema dumps first, then migrations by version, and a later one can rename, drop or change what an earlier one made.",
+    "hinglish": "File naam ke shuru ke version se: Laravel ka 2024_01_31_120000_..., Flyway ka V1__, V2__ (number ki tarah, V10 V9 ke baad), golang-migrate ka 0001_. Tool yaad rakhta hai kaunsi chal chuki aur sirf nayi kram se chalata hai. DBaba bhi pehle schema dump, phir migrations version ke kram mein lagata hai.",
+    "hindi": "File नाम के version के क्रम से; tool केवल नई migrations चलाता है।"
+   },
+   "mistake": {
+    "en": "Two migrations with versions that sort differently on another machine (no leading zeros, a hand-picked number already used): the order changes and a later ALTER hits a table that doesn't exist yet.",
+    "hinglish": "Do migrations ke version jo doosri machine pe alag kram mein aayein (bina leading zero, pehle se use number): kram badalta hai aur ALTER aisi table pe chalta hai jo abhi bani nahi.",
+    "hindi": "Version का गलत क्रम ALTER को तोड़ सकता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40))"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "Laravel records them in the migrations table.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Flyway records them in flyway_schema_history; same idea everywhere."
+   },
+   "related": [
+    "db_migration",
+    "down_migration",
+    "schema_dump"
+   ],
+   "fundamentals": [
+    "schema_facts"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-alter.html",
+   "seen_at": [
+    "https://documentation.red-gate.com/fd/migrations-184127470.html",
+    "https://laravel.com/docs/11.x/migrations"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "add_not_null_column",
+   "kind": "howto",
+   "title": {
+    "en": "Adding a NOT NULL column to a table with rows",
+    "hinglish": "Rows wali table mein NOT NULL column jodna",
+    "hindi": "Rows वाली table में NOT NULL column जोड़ना"
+   },
+   "terms": [
+    [
+     "(add\\w*|jod\\w*)",
+     "not null",
+     "column"
+    ],
+    [
+     "not null",
+     "column",
+     "(existing|rows|data|bhari)"
+    ],
+    [
+     "(contains null values|23502)"
+    ],
+    [
+     "new",
+     "not null column"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to add a not null column to a table that already has rows",
+     "why does postgres refuse a new not null column without a default",
+     "how to add a not null column to an existing table"
+    ],
+    "hinglish": [
+     "data wali table mein not null column kaise jode",
+     "existing table mein not null column kaise add kare"
+    ],
+    "hindi": [
+     "data वाली table में not null column कैसे जोड़ें"
+    ]
+   },
+   "answer": {
+    "en": "Give it a DEFAULT in the same statement: ALTER TABLE t ADD COLUMN status VARCHAR(10) NOT NULL DEFAULT 'new'. Every existing row gets the default. Without one the engines differ (lab): PostgreSQL refuses (23502, the column would contain NULLs), while MariaDB quietly fills the old rows with the type's empty value ('' for text, 0 for numbers), which then looks like real data. If the right value depends on the row, add the column as NULL, fill it with an UPDATE, then make it NOT NULL.",
+    "hinglish": "Usi statement mein DEFAULT do: ALTER TABLE t ADD COLUMN status VARCHAR(10) NOT NULL DEFAULT 'new'. Har purani row ko default mil jaata hai. Default ke bina engines alag hain (lab): PostgreSQL mana karta hai (23502), MariaDB chupchaap purani rows mein '' ya 0 bhar deta hai, jo asli data jaisa dikhta hai. Value row pe nirbhar ho to pehle NULL wala column, UPDATE se bharo, phir NOT NULL.",
+    "hindi": "उसी statement में DEFAULT दें; PostgreSQL बिना default के मना करता है (23502), MariaDB '' या 0 भर देता है।"
+   },
+   "mistake": {
+    "en": "Adding it without a DEFAULT on MySQL/MariaDB and trusting the result: every old row now says '' or 0, which no one entered.",
+    "hinglish": "MySQL/MariaDB pe bina DEFAULT jodna aur result pe bharosa: har purani row mein '' ya 0, jo kisi ne daala hi nahi.",
+    "hindi": "बिना DEFAULT के पुरानी rows में '' या 0 आ जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY);\nINSERT INTO demo_child VALUES (1);\nALTER TABLE demo_child ADD COLUMN status VARCHAR(10) NOT NULL DEFAULT 'new';\nSELECT id, status FROM demo_child"
+     },
+     "columns": [
+      "id",
+      "status"
+     ],
+     "result": [
+      [
+       "1",
+       "new"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "Strict mode or not, existing rows get the implicit default ('' / 0) when no DEFAULT is given.",
+    "mariadb": "Lab (10.11): no DEFAULT -> old rows get '' and 0, no error.",
+    "postgresql": "Lab (16): no DEFAULT on a table with rows -> ERROR 23502 column contains null values. With a constant DEFAULT it is instant (no table rewrite)."
+   },
+   "related": [
+    "not_null_default",
+    "alter_table",
+    "online_ddl"
+   ],
+   "fundamentals": [
+    "schema_facts",
+    "column_types"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-altertable.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/alter-table.html",
+    "https://mariadb.com/kb/en/alter-table/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "change_nullability",
+   "kind": "howto",
+   "title": {
+    "en": "Making a column NOT NULL or nullable",
+    "hinglish": "Column ko NOT NULL ya nullable banana",
+    "hindi": "Column को NOT NULL या nullable बनाना"
+   },
+   "terms": [
+    [
+     "(make|set|change|convert|bana\\w*|बना\\w*)",
+     "column",
+     "(not null|nullable|allow null|null allow)"
+    ],
+    [
+     "(set|drop) not null"
+    ],
+    [
+     "(remove|hata\\w*)",
+     "not null"
+    ],
+    [
+     "allow null",
+     "column"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to make a column not null",
+     "how to make an existing column nullable",
+     "how to allow null in a column"
+    ],
+    "hinglish": [
+     "column ko not null kaise banaye",
+     "column ko nullable kaise banaye"
+    ],
+    "hindi": [
+     "column को not null कैसे बनाएँ"
+    ]
+   },
+   "answer": {
+    "en": "PostgreSQL: ALTER TABLE t ALTER COLUMN c SET NOT NULL (or DROP NOT NULL). MySQL/MariaDB restate the whole column: ALTER TABLE t MODIFY c VARCHAR(40) NOT NULL (type and any DEFAULT included, or they are lost). Before SET NOT NULL, find and fill the NULLs: SELECT COUNT(*) FROM t WHERE c IS NULL, then an UPDATE. Afterwards queries can rely on it: NOT IN over c and arithmetic with c can't meet a NULL, and DBaba drops those warnings when it can see the schema.",
+    "hinglish": "PostgreSQL: ALTER TABLE t ALTER COLUMN c SET NOT NULL (ya DROP NOT NULL). MySQL/MariaDB mein poora column dobara likho: ALTER TABLE t MODIFY c VARCHAR(40) NOT NULL (type aur DEFAULT bhi, warna chhoot jaate hain). SET NOT NULL se pehle NULL dhoondh ke bharo: SELECT COUNT(*) FROM t WHERE c IS NULL, phir UPDATE.",
+    "hindi": "PostgreSQL: ALTER COLUMN c SET NOT NULL; MySQL/MariaDB: MODIFY में पूरा column दोबारा लिखें। पहले NULL भरें।"
+   },
+   "mistake": {
+    "en": "MODIFY with only the new NULL setting on MySQL/MariaDB: the DEFAULT, COMMENT and AUTO_INCREMENT not restated are silently removed.",
+    "hinglish": "MySQL/MariaDB pe MODIFY mein sirf NULL setting likhna: jo DEFAULT, COMMENT, AUTO_INCREMENT dobara nahi likhe wo chupchaap hat jaate hain.",
+    "hindi": "MODIFY में बाकी attributes दोबारा न लिखने से वे हट जाते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE demo_child (id INT PRIMARY KEY, note VARCHAR(40));\nINSERT INTO demo_child VALUES (1, NULL);\nUPDATE demo_child SET note = '' WHERE note IS NULL;\nALTER TABLE demo_child MODIFY note VARCHAR(40) NOT NULL;\nSELECT is_nullable AS nullable FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'demo_child' AND column_name = 'note'",
+      "postgresql": "CREATE TABLE demo_child (id INT PRIMARY KEY, note VARCHAR(40));\nINSERT INTO demo_child VALUES (1, NULL);\nUPDATE demo_child SET note = '' WHERE note IS NULL;\nALTER TABLE demo_child ALTER COLUMN note SET NOT NULL;\nSELECT is_nullable AS nullable FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'demo_child' AND column_name = 'note'"
+     },
+     "columns": [
+      "nullable"
+     ],
+     "result": [
+      [
+       "NO"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "MODIFY c TYPE NOT NULL (restate everything); with NULLs present strict mode refuses it.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "ALTER COLUMN c SET NOT NULL scans the table and refuses (23502) while a NULL remains."
+   },
+   "related": [
+    "not_null_default",
+    "alter_table",
+    "null"
+   ],
+   "fundamentals": [
+    "schema_facts",
+    "null_logic"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-altertable.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/alter-table.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "join_type_mismatch",
+   "kind": "concept",
+   "title": {
+    "en": "Joining columns of different types",
+    "hinglish": "Alag type ke columns pe join",
+    "hindi": "अलग type के columns पर join"
+   },
+   "terms": [
+    [
+     "join\\w*",
+     "(different|alag|अलग|mismatch\\w*)",
+     "types?"
+    ],
+    [
+     "join\\w*",
+     "(int|integer|number)",
+     "(varchar|text|string)"
+    ],
+    [
+     "operator does not exist",
+     "(integer|varchar|character)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what happens if i join an int column with a varchar column",
+     "why is joining columns of different types bad",
+     "what happens when you join on different data types"
+    ],
+    "hinglish": [
+     "alag type ke columns pe join karne se kya hota hai",
+     "int aur varchar column ka join galat kyun hai"
+    ],
+    "hindi": [
+     "अलग type के columns पर join करने से क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "Both sides of a join condition should have the same type, the one of the key they refer to. When a number is compared with text the engines differ (lab): PostgreSQL refuses (42883 operator does not exist: integer = character varying); MySQL/MariaDB turn every text value into a number, so '01', ' 2' and even '1abc' match 1 (warning 1292), and no index on the text column can be used. Give the referencing column the key's type; until then compare as text on both sides.",
+    "hinglish": "Join ke dono taraf same type hona chahiye, jis key ko wo point karta hai uska. Number ko text se milane pe engines alag (lab): PostgreSQL mana karta hai (42883); MySQL/MariaDB har text ko number bana dete hain, isliye '01', ' 2' aur '1abc' bhi 1 se milte hain (warning 1292), aur text column ka index use nahi hota. Column ka type key jaisa karo.",
+    "hindi": "Join के दोनों तरफ़ एक ही type हो; PostgreSQL मना करता है (42883), MySQL/MariaDB '1abc' को भी 1 से मिला देते हैं।"
+   },
+   "mistake": {
+    "en": "Fixing it with a cast on the key side (CAST(p.id AS CHAR)): it runs, but now the parent's index can't be used either. Change the column type instead.",
+    "hinglish": "Key side pe cast lagana: chalega, par parent ka index bhi kaam nahi aayega. Column ka type badlo.",
+    "hindi": "Cast से index बेकार हो जाता है; column का type बदलें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_ref VARCHAR(10));\nINSERT INTO demo_parent VALUES (1);\nINSERT INTO demo_child VALUES (1, '1'), (2, '01'), (3, '1abc');\nSELECT d.id FROM demo_parent p JOIN demo_child d ON CAST(p.id AS CHAR(10)) = d.parent_ref ORDER BY d.id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "Lab: INT = VARCHAR matched '1', '01' and '1abc' to 1, with warnings 1292.",
+    "mariadb": "Same as MySQL (lab: MariaDB 10.11).",
+    "postgresql": "Lab: ERROR 42883 operator does not exist: integer = character varying."
+   },
+   "related": [
+    "implicit_conversion",
+    "fk_index",
+    "data_types"
+   ],
+   "fundamentals": [
+    "schema_facts",
+    "values_types"
+   ],
+   "source": "https://www.postgresql.org/docs/current/typeconv-oper.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/type-conversion.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "what_is_schema",
+   "kind": "concept",
+   "title": {
+    "en": "What a schema is",
+    "hinglish": "Schema kya hota hai",
+    "hindi": "Schema क्या होता है"
+   },
+   "terms": [
+    [
+     "(what is|what's|kya hota|kya hai|meaning of|क्या)",
+     "(?<!_)(?<!information )schema(?! ?(dump|drift|only))"
+    ],
+    [
+     "schema",
+     "database",
+     "(difference|differ|farak|fark|vs)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a schema in a database",
+     "schema vs database",
+     "what is a database schema"
+    ],
+    "hinglish": [
+     "schema kya hota hai",
+     "database aur schema mein kya farak hai"
+    ],
+    "hindi": [
+     "schema क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "'Schema' means two things. (1) The design: the tables, columns, types, keys and indexes, written down as CREATE TABLE statements, a dump or migrations. (2) A namespace that holds tables. In MySQL/MariaDB a schema is the same thing as a database (CREATE SCHEMA = CREATE DATABASE). In PostgreSQL one database holds several schemas (public by default), and a table is schema.table.",
+    "hinglish": "'Schema' ke do matlab. (1) Design: tables, columns, types, keys aur indexes, CREATE TABLE, dump ya migrations mein likhe. (2) Tables rakhne wala namespace. MySQL/MariaDB mein schema aur database ek hi cheez hai. PostgreSQL mein ek database mein kai schemas hote hain (default public), aur table schema.table hoti hai.",
+    "hindi": "Schema = design (tables, columns, keys) या namespace; MySQL में schema = database, PostgreSQL में एक database में कई schemas।"
+   },
+   "mistake": {
+    "en": "On PostgreSQL, creating a table while search_path points at another schema: it exists, but queries that say just the name can't find it (42P01).",
+    "hinglish": "PostgreSQL pe search_path doosre schema pe ho aur table banana: table hai par sirf naam se query use dhoondh nahi paati (42P01).",
+    "hindi": "PostgreSQL में search_path का ध्यान रखें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40))"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "SCHEMA and DATABASE are synonyms; SELECT DATABASE() names the current one.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "SELECT current_schema(); SET search_path TO app, public; tables are schema.table."
+   },
+   "related": [
+    "information_schema",
+    "list_tables",
+    "sql_vs_database"
+   ],
+   "fundamentals": [
+    "schema_facts"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-schemas.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/create-database.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "unique_constraint_vs_index",
+   "kind": "compare",
+   "title": {
+    "en": "UNIQUE constraint vs unique index",
+    "hinglish": "UNIQUE constraint vs unique index",
+    "hindi": "UNIQUE constraint बनाम unique index"
+   },
+   "terms": [
+    [
+     "unique",
+     "constraint",
+     "index",
+     "(vs|versus|difference|farak|fark|or|ya)"
+    ],
+    [
+     "unique constraint vs unique index"
+    ],
+    [
+     "unique constraint",
+     "unique index"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "unique constraint vs unique index",
+     "what is the difference between a unique constraint and a unique index",
+     "is a unique constraint the same as a unique index"
+    ],
+    "hinglish": [
+     "unique constraint aur unique index mein kya farak hai",
+     "unique constraint vs unique index kya farak"
+    ],
+    "hindi": [
+     "unique constraint और unique index में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "In effect they are the same: a UNIQUE constraint is enforced by a unique index the database creates for it, and both refuse a second row with the same value (NULLs don't count as equal, so several NULLs are allowed). The constraint says the rule (it can be referenced by a foreign key, is listed among constraints); a plain unique index can be partial (WHERE ...) or on an expression on PostgreSQL. Either way, a key that picks one row means a join on it can't multiply rows, which DBaba uses to drop 'duplicate rows' warnings when it can see the schema.",
+    "hinglish": "Asar mein dono same hain: UNIQUE constraint ke liye database unique index banata hai, aur dono doosri same value wali row mana karte hain (NULL barabar nahi maane jaate). Constraint niyam kehta hai (foreign key use refer kar sakti hai); PostgreSQL pe unique index partial (WHERE ...) ya expression pe bhi ho sakta hai.",
+    "hindi": "दोनों का असर एक है; UNIQUE constraint के लिए unique index बनता है।"
+   },
+   "mistake": {
+    "en": "Adding both a UNIQUE constraint and a unique index on the same column: two identical indexes, double the write cost.",
+    "hinglish": "Ek column pe UNIQUE constraint aur unique index dono lagana: do ek jaise index, likhne ka kharcha double.",
+    "hindi": "दोनों लगाना दोहरा index बनाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TABLE demo_child (id INT PRIMARY KEY, email VARCHAR(80) UNIQUE);\nSELECT COUNT(DISTINCT index_name) AS indexes FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'demo_child'",
+      "postgresql": "CREATE TABLE demo_child (id INT PRIMARY KEY, email VARCHAR(80) UNIQUE);\nSELECT COUNT(*) AS indexes FROM pg_indexes WHERE schemaname = current_schema() AND tablename = 'demo_child'"
+     },
+     "columns": [
+      "indexes"
+     ],
+     "result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "UNIQUE KEY and UNIQUE INDEX are the same thing; the constraint name is the index name.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "CREATE UNIQUE INDEX can be partial or on an expression (lower(email)); UNIQUE NULLS NOT DISTINCT (15+) treats NULLs as equal."
+   },
+   "related": [
+    "unique",
+    "index",
+    "primary_key"
+   ],
+   "fundamentals": [
+    "schema_facts",
+    "table_keys"
+   ],
+   "source": "https://www.postgresql.org/docs/current/indexes-unique.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/create-index.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "orphan_rows",
+   "kind": "howto",
+   "title": {
+    "en": "Finding orphan rows",
+    "hinglish": "Orphan rows dhoondhna",
+    "hindi": "Orphan rows ढूँढना"
+   },
+   "terms": [
+    [
+     "orphan\\w*"
+    ],
+    [
+     "(rows?|records?)",
+     "(parent|customer)",
+     "(missing|doesn.?t exist|nahi hai|no longer exists)"
+    ],
+    [
+     "अनाथ"
+    ],
+    [
+     "(orders?|rows?|records?)",
+     "whose",
+     "(customer|parent)",
+     "(deleted|missing)"
+    ],
+    [
+     "parent",
+     "nahi hai",
+     "rows?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to find orphan rows",
+     "how to find orders whose customer was deleted",
+     "what are orphan records in a database"
+    ],
+    "hinglish": [
+     "orphan rows kaise dhoondhe",
+     "jinka parent nahi hai wo rows kaise nikale"
+    ],
+    "hindi": [
+     "orphan rows कैसे ढूँढें"
+    ]
+   },
+   "answer": {
+    "en": "An orphan is a child row whose parent key points at nothing (an order whose customer_id has no customer). Find them with an anti-join: SELECT o.id FROM orders o LEFT JOIN customers c ON c.id = o.customer_id WHERE o.customer_id IS NOT NULL AND c.id IS NULL. They happen when there is no FOREIGN KEY (or it is on a MyISAM table, which ignores it). After cleaning them up, add the foreign key so new ones can't appear.",
+    "hinglish": "Orphan wo child row hai jiski parent key kisi ko point nahi karti (order jiska customer_id kisi customer ka nahi). Anti-join se: SELECT o.id FROM orders o LEFT JOIN customers c ON c.id = o.customer_id WHERE o.customer_id IS NOT NULL AND c.id IS NULL. Ye tab hote hain jab FOREIGN KEY nahi hoti. Saaf karke foreign key lagao.",
+    "hindi": "Orphan वह child row है जिसका parent नहीं है; anti-join से ढूँढें और फिर foreign key लगाएँ।"
+   },
+   "mistake": {
+    "en": "Testing a nullable column of the parent (c.city IS NULL) instead of its key: customers that exist but have no city are listed as missing.",
+    "hinglish": "Parent ki key ki jagah nullable column (c.city IS NULL) dekhna: jo customers hain par city nahi, wo bhi gayab dikhte hain.",
+    "hindi": "Parent की key देखें, nullable column नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id FROM orders o LEFT JOIN customers c ON c.id = o.customer_id AND c.id <= 5 WHERE o.customer_id IS NOT NULL AND c.id IS NULL ORDER BY o.id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "6"
+      ],
+      [
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA views exist; sp_help 'table' and sys.columns / sys.indexes show the same.",
+    "oracle": "Notes only (not lab-tested here): the data dictionary views USER_TAB_COLUMNS, USER_INDEXES and USER_CONSTRAINTS; DESCRIBE in SQL*Plus.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t'), PRAGMA index_list('t'); the sqlite_schema table holds each CREATE statement.",
+    "mysql": "InnoDB enforces foreign keys; MyISAM accepts the syntax and ignores it.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "NOT EXISTS (SELECT 1 FROM customers c WHERE c.id = o.customer_id) gives the same rows."
+   },
+   "related": [
+    "anti_join",
+    "foreign_key",
+    "not_exists"
+   ],
+   "fundamentals": [
+    "schema_facts",
+    "outer_join"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/create-table-foreign-keys.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/ddl-constraints.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

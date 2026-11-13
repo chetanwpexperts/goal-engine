@@ -239,6 +239,11 @@ def analyze_sql(query: str, extra: str = "", engine: str | None = None) -> dict:
 def _analyze_sql(query: str, extra: str = "") -> dict:
     original = unwrap(query)
     said = request_words(query)
+    from app.agents import sqlverify
+
+    both = sqlverify.split_paste(original)            # CREATE TABLE ... ; then one query: the tables are the query's schema (10B)
+    if both:
+        original, extra = both[1], (extra + "\n" + both[0]).strip()
     if not original:
         return {"ok": False, "error": "No query given", "findings": []}
     from app.agents import sqllock
@@ -512,7 +517,7 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
         from app.agents import sqlchange
 
         out["preview"] = sqlchange.preview(_strip_comments(original).strip().rstrip(";"))
-    return _with_reading(original, _with_correctness(original, out, said))
+    return _with_reading(original, _with_correctness(original, out, said, extra))
 
 
 # a stored routine or a script that makes one (app/agents/sqlroutine.py)
@@ -531,16 +536,25 @@ def _analyze_other(original: str, said: str = "") -> dict:
 SEVERITY = {"error": 5, "wrong": 4, "check": 3}
 
 
-def _with_correctness(original: str, out: dict, said: str = "") -> dict:
+def _with_correctness(original: str, out: dict, said: str = "", extra: str = "") -> dict:
     """Is it right before is it fast: mistakes come first, and while the query is wrong there's no speed advice
     (indexes for a query that doesn't run, or returns wrong rows, help nobody). Speed comes when it's right, or on asking."""
     from app.agents import sqlcorrect
 
     try:
-        c = sqlcorrect.check(original, intent=said)
+        from app.agents import sqlproject, sqlverify
+
+        try:                                          # the tables given with the query decide what depends on them (10B)
+            sch = sqlproject.from_text(extra) if extra and re.search(r"\bcreate\s+table\b", extra, re.I) else None
+            c = sqlverify.check(original, sch, intent=said) if sch and sch["tables"] else None
+        except Exception:  # noqa: BLE001 - the schema is an extra; the plain check still answers
+            c = None
+        c = c or sqlcorrect.check(original, intent=said)
     except Exception:  # noqa: BLE001 - never let the correctness reader break the speed check
         c = {"findings": [], "corrected": None, "guesses": []}
     out["correct"] = c
+    if c.get("dropped"):
+        out["ruled_out"] = c["dropped"]
     broken = [f for f in c["findings"] if f["kind"] in ("error", "wrong")]
     if not c["findings"]:
         return out

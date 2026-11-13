@@ -18,6 +18,7 @@ Nothing is ever written to the project.
 Run: python -m app.agents.sqlscan check <folder> [--engine mysql|mariadb|postgresql]   (or: scripts/dbaba check <folder>)
 """
 
+import contextvars
 import json
 import os
 import re
@@ -60,7 +61,7 @@ SHAPE = re.compile(
 PROSE_WORDS = {"a", "an", "the", "your", "my", "our", "their", "his", "her", "this", "these", "those", "please", "you", "we",
                "here", "there", "below", "above", "list", "menu", "option", "options", "file", "files", "cart", "it", "them"}
 ORM = re.compile(
-    r"(?:\bDB\s*::\s*table\s*\(|\b(?!DB\b)[A-Z]\w*\s*::\s*(?:where|query|find|findOrFail|all|first|create|select|with|whereIn|orderBy)\s*\(|"
+    r"(?:\bDB\s*::\s*table\s*\(|\b(?!DB\b|Schema\b)[A-Z]\w*\s*::\s*(?:where|query|find|findOrFail|all|first|create|select|with|whereIn|orderBy)\s*\(|"
     r"\.objects\s*\.\s*(?:filter|get|all|exclude|annotate|values|select_related|aggregate|raw)\s*\(|\bsession\s*\.\s*query\s*\(|"
     r"\.(?:findAll|findOne|findByPk|findMany|findUnique|findFirst|createQueryBuilder|getRepository)\s*\(|\bknex\s*\(\s*['\"]|"
     r"@Query\s*\(|\.createQuery\s*\()")
@@ -89,6 +90,7 @@ class Found:
     engine: str | None = None
     parameterized: str | None = None   # the same query with each value written into the text turned into a placeholder
     values: list = field(default_factory=list)   # the code that gives each placeholder its value, in order
+    dropped: list = field(default_factory=list)  # findings the project's schema ruled out, with the reason (night 10B)
 
     def as_dict(self) -> dict:
         return self.__dict__.copy()
@@ -894,10 +896,20 @@ def _lines(sql_text: str) -> int:
     return sql_text.count("\n", 0, m.end() if m else 0)
 
 
+# the schema the project's own files create (night 10B, app/agents/sqlproject.py), while a project is scanned
+PROJECT: contextvars.ContextVar = contextvars.ContextVar("dbaba_project_schema", default=None)
+
+
 def _run_check(sql: str, engine: str | None) -> dict:
-    from app.agents import sqlcorrect
+    from app.agents import sqlcorrect, sqlverify
 
     try:
+        sch = PROJECT.get()
+        if sch and sch.get("tables"):
+            try:
+                return sqlverify.check(sql, sch, engine=engine)
+            except Exception:  # noqa: BLE001 - the schema is an extra; the plain check still answers
+                pass
         return sqlcorrect.check(sql, engine=engine)
     except Exception as exc:  # noqa: BLE001 - one query the checker can't read never stops the scan
         return {"findings": [], "corrected": None, "unreadable": str(exc)}
@@ -1035,7 +1047,7 @@ def _finish(path, line, sql, asm, res, mine, engine, driver: str = "?", wp: bool
     if corrected:
         corrected = _show(corrected, slots).strip()
     return Found(path, line, _dedent(_show(sql, slots).strip()), findings=fs, corrected=_dedent(corrected), engine=engine,
-                 parameterized=_dedent(params), values=values)
+                 parameterized=_dedent(params), values=values, dropped=res.get("dropped") or [])
 
 
 def _dedent(t: str | None) -> str | None:
@@ -1167,6 +1179,23 @@ def scan(root: str, engine: str | None = None) -> dict:
     how = "named" if engine else ""
     if not engine:
         engine, how = detect_engine(root) if os.path.isdir(root) else (None, "")
+    from app.agents import sqlproject
+
+    sch = sqlproject.read_project(root) if os.path.isdir(root) else sqlproject.empty()
+    token = PROJECT.set(sch)
+    try:
+        found, files = _scan_files(root, engine, named)
+    finally:
+        PROJECT.reset(token)
+    read = [f for f in found if f.kind == "read"]
+    return {"engine": engine, "engine_how": how if named else how, "files": files, "queries": len(read),
+            "unread": [f.as_dict() for f in found if f.kind == "unread"],
+            "with_findings": [f.as_dict() for f in read if f.findings], "clean": sum(1 for f in read if not f.findings),
+            "ruled_out": [{"file": f.file, "line": f.line, "dropped": f.dropped} for f in read if f.dropped],
+            "schema": {"summary": sqlproject.summary(sch), "tables": len(sch["tables"]), "files": sch["files"], "unread": sch["unread"]}}
+
+
+def _scan_files(root: str, engine, named):
     found = []
     files = 0
     for p in walk(root) if os.path.isdir(root) else [root]:
@@ -1180,10 +1209,7 @@ def scan(root: str, engine: str | None = None) -> dict:
         files += 1
         rel = os.path.relpath(p, root) if os.path.isdir(root) else os.path.basename(p)
         found += scan_text(rel, text, engine, named=bool(named))
-    read = [f for f in found if f.kind == "read"]
-    return {"engine": engine, "engine_how": how if named else how, "files": files, "queries": len(read),
-            "unread": [f.as_dict() for f in found if f.kind == "unread"],
-            "with_findings": [f.as_dict() for f in read if f.findings], "clean": sum(1 for f in read if not f.findings)}
+    return found, files
 
 
 ENGINE_NAMES = {"mysql": "MySQL", "mariadb": "MariaDB", "postgresql": "PostgreSQL"}
@@ -1197,13 +1223,21 @@ def report_text(rep: dict, lang: str = "en") -> str:
     else:
         lines.append(f"Database: not known ({rep['engine_how']}); findings are general SQL. Say --engine mysql | mariadb | "
                      "postgresql to get answers in your database's words.")
+    sch = rep.get("schema") or {}
+    if sch.get("tables"):
+        lines.append(f"Schema: {sch['summary']}; findings that depend on keys, types, NULLs or indexes are checked against it"
+                     + (f" ({len(sch['unread'])} schema statement(s) couldn't be read completely: dbaba schema <folder> lists them)."
+                        if sch.get("unread") else "."))
+    else:
+        lines.append("Schema: no CREATE TABLE scripts, schema dumps or migrations found, so what depends on keys, types, NULLs or "
+                     "indexes stays a 'check'.")
     lines.append(f"Read {rep['files']} files: {rep['queries']} queries read, {len(rep['with_findings'])} with something to "
                  f"fix or check, {len(rep['unread'])} found but not readable completely. Nothing was changed.")
     for f in rep["with_findings"]:
         lines.append("")
         lines.append(f"{f['file']}:{f['line']}")
         for g in f["findings"]:
-            lines.append(f"  [{g['kind']}] {g['title_en']}")
+            lines.append(f"  [{g['kind']}{', verified with the schema' if g.get('schema') == 'verified' else ''}] {g['title_en']}")
             if g.get("fix_en"):
                 lines.append(f"      {g['fix_en']}")
         if f.get("corrected"):
@@ -1212,6 +1246,12 @@ def report_text(rep: dict, lang: str = "en") -> str:
         if f.get("parameterized"):
             lines.append(f"  With placeholders (values: {', '.join(f['values'])}):")
             lines += ["    " + x for x in f["parameterized"].splitlines()]
+    if rep.get("ruled_out"):
+        lines.append("")
+        lines.append("Ruled out by the project's schema (not a problem here):")
+        for f in rep["ruled_out"]:
+            for d in f["dropped"]:
+                lines.append(f"  {f['file']}:{f['line']}  {d['title_en']}: {d['why_en']}")
     if rep["unread"]:
         lines.append("")
         lines.append("Found, couldn't read completely (not guessed):")
@@ -1222,6 +1262,15 @@ def report_text(rep: dict, lang: str = "en") -> str:
 
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "schema":                  # the schema the project's files create, as DBaba read it
+        from app.agents import sqlproject, sqlverify
+
+        if len(argv) < 2:
+            print("usage: dbaba schema <folder> [--json]")
+            return 2
+        sch = sqlproject.read_project(argv[1])
+        print(json.dumps(sch, indent=1, ensure_ascii=False) if "--json" in argv else sqlverify.schema_text(sch))
+        return 0
     if argv and argv[0] == "check":
         argv.pop(0)
     engine, as_json = None, False
@@ -1233,7 +1282,7 @@ def main(argv=None) -> int:
         as_json = True
         argv.remove("--json")
     if not argv:
-        print("usage: dbaba check <folder or file> [--engine mysql|mariadb|postgresql] [--json]")
+        print("usage: dbaba check <folder or file> [--engine mysql|mariadb|postgresql] [--json]\n       dbaba schema <folder> [--json]")
         return 2
     rep = scan(argv[0], engine)
     print(json.dumps(rep, indent=1, ensure_ascii=False) if as_json else report_text(rep))

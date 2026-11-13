@@ -208,7 +208,7 @@ SQLTYPE = {"mysql": {"pk": "INT NOT NULL", "fk": "INT", "int": "INT", "money": "
 
 def _ddl(t: dict, engine: str) -> list[str]:
     types = SQLTYPE[engine]
-    cols = ",\n  ".join(f"{c['name']} {types.get(c['kind'], 'VARCHAR(80)')}" for c in t["cols"])
+    cols = ",\n  ".join(f"{c['name']} {types.get(c['kind'], 'VARCHAR(80)')}{' NOT NULL' if c.get('not_null') else ''}" for c in t["cols"])
     out = [f"CREATE TABLE {t['name']} (\n  {cols},\n  PRIMARY KEY ({t['pk']})"
            + "".join(f",\n  FOREIGN KEY ({c}) REFERENCES {p} ({pk})" for c, p, pk in t["fks"])
            + ("\n) ENGINE=InnoDB" if engine == "mysql" else "\n)")]

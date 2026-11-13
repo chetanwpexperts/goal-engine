@@ -1120,5 +1120,11 @@
     "to": "LAST_INSERT_ID()"
    }
   ]
+ },
+ "schema_facts": {
+  "join_number_text": {"behaviour": "silently_converts", "code": "1292", "says": "MySQL compares a number with text as numbers: '01' and '1abc' match 1 (warning 1292), and no index on the text column is used.", "proven": ["mariadb"]},
+  "add_not_null_no_default": {"behaviour": "fills_empty", "says": "Old rows get the type's implicit default ('' / 0) when a NOT NULL column is added without DEFAULT.", "proven": ["mariadb"]},
+  "unknown_column": {"behaviour": "error", "code": "1054", "says": "Error 1054 (42S22) Unknown column.", "proven": ["mariadb"]},
+  "fk_makes_index": {"behaviour": "index_made", "says": "InnoDB creates an index for every FOREIGN KEY that has none.", "proven": ["mariadb"]}
  }
 }

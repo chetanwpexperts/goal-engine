@@ -27,6 +27,8 @@ Returns [(Finding, [edits])], edit = (start, end, new text) on the original quer
 
 import re
 
+from app.agents.sqlverify import keep as schema_keep
+
 # the engines each rule was reproduced on (tests/practice/test_night4.py, LAB) -- standing rule B
 PROVEN = {k: ["mariadb", "postgresql"] for k in (
     "exists_agg", "exists_uncorr", "sub_outer_col", "corr_self", "in_grouped_agg", "sub_columns", "scalar_rows", "sub_sum_null",
@@ -404,7 +406,7 @@ def subqueries(sql: str, s: str, intent: str, F) -> list:
                 tot = re.search(r"\btotal\b|\bsum\b|\bkitna\b|\bjod\b|\bkul\b", said)
                 if tot and not re.fullmatch(r".*\*", t):
                     edits = [(p, p + len(t), f"SUM({t})")]
-                out.append((F("check", "scalar_rows", f"The subquery in SELECT can return more than one row ({_flat(many)} is not a key)",
+                out += schema_keep((F("check", "scalar_rows", f"The subquery in SELECT can return more than one row ({_flat(many)} is not a key)",
                               f"SELECT wali subquery ek se zyada row de sakti hai ({_flat(many)} key nahi hai)", ev,
                               f"A subquery in the SELECT list must give one value per row. It is tied on {_flat(many)}, which many "
                               f"{inner.name} rows can share, so as soon as one outer row has two of them MySQL/MariaDB stop with error "
@@ -413,7 +415,8 @@ def subqueries(sql: str, s: str, intent: str, F) -> list:
                               f"one chosen row (ORDER BY ... LIMIT 1).",
                               f"SELECT ki subquery har row ke liye ek hi value de. Ye {_flat(many)} se judi hai jo kai {inner.name} rows "
                               f"mein ho sakta hai, isliye do milte hi MySQL/MariaDB error 1242 aur PostgreSQL 21000. Batao kaunsi ek value "
-                              f"chahiye: total (SUM / COUNT / MAX) ya ek chuni hui row (ORDER BY ... LIMIT 1)."), edits))
+                              f"chahiye: total (SUM / COUNT / MAX) ya ek chuni hui row (ORDER BY ... LIMIT 1)."), edits),
+                                   [("unique", inner.alias or inner.name, [_uq(many.split(".")[-1])])])
 
         # ---- S8. a correlated SUM in SELECT: NULL (not 0) when nothing matches
         if ctx == "scalar_select" and len(items) == 1 and re.match(r"\s*sum\s*\(", items[0][1], re.I) and orefs \
@@ -514,14 +517,15 @@ def subqueries(sql: str, s: str, intent: str, F) -> list:
                 if cond is not None and not ("order by" in cl or has_limit):
                     new = f"NOT EXISTS (SELECT 1 FROM {inner.name} {ia} WHERE {ia}.{im.group(2)} = {outer_q}{cond})"
                     start = blk["left"][0]
-                    out.append((F("check", "not_in_outer", f"{left_txt} NOT IN (SELECT id ...) drops the rows where {left_txt} is empty",
+                    oq = lm.group(1) or (blk["psrcs"][0].alias or blk["psrcs"][0].name if blk["psrcs"] else None)
+                    out += schema_keep((F("check", "not_in_outer", f"{left_txt} NOT IN (SELECT id ...) drops the rows where {left_txt} is empty",
                                   f"{left_txt} NOT IN (SELECT id ...) un rows ko hata deta hai jahan {left_txt} khaali hai", ev,
                                   f"For a row whose {lm.group(2)} is NULL, 'NULL is not in the list' is unknown, so NOT IN drops it with no "
                                   f"error, on every database (a row with no {inner.name} at all is left out). NOT EXISTS keeps such rows "
                                   f"and gives the same answer for the others: {new}.",
                                   f"Jis row ka {lm.group(2)} NULL hai uske liye NOT IN ka jawab unknown hai, isliye wo row chupchaap hat "
                                   f"jaati hai. NOT EXISTS aisi rows rakhta hai, baaki ka jawab wahi: {new}."),
-                                [(start, blk["b"] + 1, new)]))
+                                [(start, blk["b"] + 1, new)]), [("not_null", oq, _uq(lm.group(2)))])
 
     # ---- S14. x NOT IN (1, NULL) / x IN ('a', NULL): a NULL in a written list
     for m in re.finditer(rf"({QNAME})\s+(not\s+)?in\s*\(([^()]*)\)", s, re.I):
@@ -634,11 +638,11 @@ def semi_join(sql: str, s: str, cl: dict, srcs: list, items: list, intent: str, 
     new = f"{head}\nFROM {ptext}{where}{tail}"
     if not new.rstrip().endswith(";") and sql.rstrip().endswith(";"):
         new = new.rstrip() + ";"
-    return [(F("check", "semi_join", f"JOIN {c.name} repeats each {_one(noun)} once per matching {_one(_base(c.name))}",
+    return schema_keep((F("check", "semi_join", f"JOIN {c.name} repeats each {_one(noun)} once per matching {_one(_base(c.name))}",
                f"JOIN {c.name} har {_one(noun)} ko har milti {_one(_base(c.name))} ke liye dohraata hai", _short(sql[c.start:c.end]),
                f"A {_one(noun)} with two matching {c.name} rows comes out twice, because a join makes one row per matching pair "
                f"(one {_one(noun)} to many {c.name}). You only read {p.name}'s columns, so if you mean 'the {p.name} that have one', "
                f"ask that with EXISTS: each {_one(noun)} comes once, and no DISTINCT is needed.",
                f"Do milti {c.name} rows wala {_one(noun)} do baar aata hai, kyunki join har jodi ki ek row banata hai. Aap sirf "
                f"{p.name} ke columns padhte ho, to 'jin {p.name} ke paas hai' EXISTS se poocho: har {_one(noun)} ek baar."),
-             [(0, len(sql), new)])]
+             [(0, len(sql), new)]), [("to_one", c.alias or c.name, None)])

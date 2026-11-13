@@ -2256,5 +2256,1102 @@
    "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
   },
   "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using a non-existent column in a SELECT statement",
+  "why": "The 'address' column does not exist in the 'customers' table.",
+  "fix": "Replace 'address' with an existing column name.",
+  "bad_sql": "SELECT name, address FROM customers;",
+  "fixed_sql": "SELECT name, city FROM customers;",
+  "detect": "\\baddress\\b",
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'address' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'address' in 'SELECT'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column \"address\" does not exist"
+   }
+  },
+  "id": "64dfb9f95446",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using non-existent column",
+  "why": "The column 'address' does not exist in the 'customers' table. It should be 'city'.",
+  "fix": "Replace 'address' with 'city' or another existing column.",
+  "bad_sql": "SELECT name, address FROM customers",
+  "fixed_sql": "SELECT name, city FROM customers",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'address' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'address' in 'SELECT'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column \"address\" does not exist"
+   }
+  },
+  "id": "6e7c22bde603",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using aggregate function without GROUP BY",
+  "why": "The query uses an aggregate function (MAX) without a GROUP BY clause, which is invalid.",
+  "fix": "Add a GROUP BY clause that includes all non-aggregated columns.",
+  "bad_sql": "SELECT name, MAX(price) FROM products",
+  "fixed_sql": "SELECT name, MAX(price) FROM products GROUP BY name",
+  "detect": "\\bSELECT\\b\\s+[^\\s]+\\s+MAX\\(price\\)\\s+FROM\\s+products\\b(?!\\s+GROUP BY\\s+name)",
+  "engines": {
+   "mysql": {
+    "code": 1140,
+    "message": "In aggregated query without GROUP BY, expression #1 of SELECT list contains nonaggregated column 'ge.products.name'; this is incompatible with sql_mode=only_full_group_by"
+   },
+   "postgres": {
+    "code": "42803",
+    "message": "column \"products.name\" must appear in the GROUP BY clause or be used in an aggregate function"
+   }
+  },
+  "id": "57384a8697c3",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Cartesian product without join condition",
+  "why": "The query performs a Cartesian product without a join condition, which is not optimized using hash joins.",
+  "fix": "Add a join condition, such as customers.id = products.id.",
+  "bad_sql": "SELECT * FROM customers JOIN products WHERE customers.id > 50",
+  "fixed_sql": "SELECT * FROM customers JOIN products ON customers.id = products.id WHERE customers.id > 50",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"WHERE\""
+   }
+  },
+  "id": "00ad288615ce",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Missing Parentheses in Outer Join",
+  "why": "The query uses a comma instead of parentheses to separate the inner join and the outer join, which changes the result set.",
+  "fix": "Use parentheses to group the inner join with the outer join.",
+  "bad_sql": "SELECT * FROM customers LEFT JOIN orders ON customers.id = orders.customer_id, order_items ON orders.id = order_items.order_id",
+  "fixed_sql": "SELECT * FROM customers LEFT JOIN (orders LEFT JOIN order_items ON orders.id = order_items.order_id) ON customers.id = orders.customer_id",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ON orders.id = order_items.order_id' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'ON orders.id = order_items.order_id' at line 1"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"ON\""
+   }
+  },
+  "id": "e74e8510f30e",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect Order of Join Operations",
+  "why": "The query uses a comma instead of separate LEFT JOIN clauses, which changes the order of execution and the result set.",
+  "fix": "Use separate LEFT JOIN clauses for each join operation.",
+  "bad_sql": "SELECT * FROM customers LEFT JOIN (orders, order_items) ON customers.id = orders.customer_id AND orders.id = order_items.order_id",
+  "fixed_sql": "SELECT * FROM customers LEFT JOIN orders ON customers.id = orders.customer_id LEFT JOIN order_items ON orders.id = order_items.order_id",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \",\""
+   }
+  },
+  "id": "1d0e7933f81c",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect Use of Parentheses in Right Operand of Left Outer Join",
+  "why": "The query uses parentheses around the inner join in the right operand of the left outer join, which changes the result set.",
+  "fix": "Remove the parentheses around the inner join in the right operand of the left outer join.",
+  "bad_sql": "SELECT * FROM customers LEFT JOIN (orders, order_items) ON customers.id = orders.customer_id AND (orders.id = order_items.order_id OR order_items.qty > 0)",
+  "fixed_sql": "SELECT * FROM customers LEFT JOIN (orders LEFT JOIN order_items ON orders.id = order_items.order_id) ON customers.id = orders.customer_id AND (orders.id = order_items.order_id OR order_items.qty > 0)",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \",\""
+   }
+  },
+  "id": "1ea766fd3547",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect Use of Parentheses in Left Operand of Right Join",
+  "why": "The query uses parentheses around the outer join in the left operand of the right join, which changes the result set.",
+  "fix": "Remove the parentheses around the outer join in the left operand of the right join.",
+  "bad_sql": "SELECT * FROM (customers, orders) RIGHT JOIN order_items ON customers.id = orders.customer_id AND orders.id = order_items.order_id",
+  "fixed_sql": "SELECT * FROM customers RIGHT JOIN (orders LEFT JOIN order_items ON orders.id = order_items.order_id) ON customers.id = orders.customer_id AND orders.id = order_items.order_id",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \",\""
+   }
+  },
+  "id": "64f669917586",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Unnecessary Parentheses",
+  "why": "The parentheses are unnecessary and can be removed.",
+  "fix": "Remove the parentheses around the join expression.",
+  "bad_sql": "SELECT * FROM customers (LEFT JOIN orders ON customers.id = orders.customer_id)",
+  "fixed_sql": "SELECT * FROM customers LEFT JOIN orders ON customers.id = orders.customer_id",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '(LEFT JOIN orders ON customers.id = orders.customer_id)' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '(LEFT JOIN orders ON customers.id = orders.customer_id)' at line 1"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"JOIN\""
+   }
+  },
+  "id": "35ea03e1cca1",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect join order",
+  "why": "The query does not follow the correct order for outer and inner joins.",
+  "fix": "Ensure that outer tables are processed in the outer loop and inner tables in the inner loop.",
+  "bad_sql": "SELECT * FROM products AS p JOIN orders AS o ON p.id = o.product_id JOIN order_items AS oi ON o.id = oi.order_id WHERE oi.qty > 10",
+  "fixed_sql": "SELECT * FROM products AS p JOIN order_items AS oi ON p.id = oi.product_id JOIN orders AS o ON oi.order_id = o.id WHERE oi.qty > 10",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'o.product_id' in 'on clause'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'o.product_id' in 'ON'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column o.product_id does not exist"
+   }
+  },
+  "id": "87a4c96ede40",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Implicit GROUP BY sorting",
+  "why": "Implicit sorting under certain conditions is no longer performed in MySQL 8.4.",
+  "fix": "Specify an ORDER BY clause to produce a given sort order.",
+  "bad_sql": "SELECT customer_id, SUM(total) FROM orders GROUP BY customer_id ORDER BY NULL;",
+  "fixed_sql": "SELECT customer_id, SUM(total) FROM orders GROUP BY customer_id ORDER BY SUM(total);",
+  "detect": "\\bORDER BY\\s+NULL\\b",
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "non-integer constant in ORDER BY"
+   }
+  },
+  "id": "12a3e817717c",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Combining LIMIT with DISTINCT without proper optimization",
+  "why": "DISTINCT is used with LIMIT, but MySQL does not stop as soon as it finds the required unique rows.",
+  "fix": "Remove DISTINCT if not necessary, or ensure that the query is optimized for LIMIT usage.",
+  "bad_sql": "SELECT DISTINCT name FROM customers ORDER BY created_at LIMIT 10",
+  "fixed_sql": "SELECT name FROM customers ORDER BY created_at LIMIT 10",
+  "detect": "(?i)SELECT DISTINCT .* LIMIT",
+  "engines": {
+   "mysql": {
+    "code": 3065,
+    "message": "Expression #1 of ORDER BY clause is not in SELECT list, references column 'ge.customers.created_at' which is not in SELECT list; this is incompatible with DISTINCT"
+   },
+   "postgres": {
+    "code": "42P10",
+    "message": "for SELECT DISTINCT, ORDER BY expressions must appear in select list"
+   }
+  },
+  "id": "a6a971756607",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using GROUP BY without aggregation functions",
+  "why": "GROUP BY is used without aggregation functions, which is not allowed.",
+  "fix": "Add aggregation functions like COUNT, SUM, AVG, etc., to the SELECT clause.",
+  "bad_sql": "SELECT name, category FROM products GROUP BY name",
+  "fixed_sql": "SELECT name, category, COUNT(*) FROM products GROUP BY name, category",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1055,
+    "message": "Expression #2 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'ge.products.category' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by"
+   },
+   "postgres": {
+    "code": "42803",
+    "message": "column \"products.category\" must appear in the GROUP BY clause or be used in an aggregate function"
+   }
+  },
+  "id": "ded3df5477ab",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Unnecessary ORDER BY",
+  "why": "The query contains multiple ORDER BY clauses, which is redundant.",
+  "fix": "Remove unnecessary ORDER BY clauses.",
+  "bad_sql": "SELECT name FROM customers ORDER BY name ORDER BY created_at DESC",
+  "fixed_sql": "SELECT name FROM customers ORDER BY created_at DESC",
+  "detect": "(?i)ORDER\\s+BY\\s+[^\\s]+\\s+(ORDER\\s+BY\\s+[^\\s]+)",
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'ORDER BY created_at DESC' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'ORDER BY created_at DESC' at line 1"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"ORDER\""
+   }
+  },
+  "id": "c70e91abf48f",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using STRAIGHT_JOIN in the outer query",
+  "why": "The STRAIGHT_JOIN modifier must not be present.",
+  "fix": "Remove the STRAIGHT_JOIN keyword.",
+  "bad_sql": "SELECT STRAIGHT_JOIN id FROM orders WHERE customer_id IN (SELECT id FROM customers WHERE city = 'New York')",
+  "fixed_sql": "SELECT id FROM orders WHERE customer_id IN (SELECT id FROM customers WHERE city = 'New York')",
+  "detect": "\\bSTRAIGHT_JOIN\\b",
+  "engines": {
+   "postgres": {
+    "code": "42703",
+    "message": "column \"straight_join\" does not exist"
+   }
+  },
+  "id": "1474e505855b",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "BLOB Column in Subquery",
+  "why": "The inner expression cannot be a BLOB.",
+  "fix": "Replace the BLOB column with a non-BLOB column.",
+  "bad_sql": "SELECT * FROM customers WHERE (id, email) NOT IN (SELECT id, blob_column FROM products)",
+  "fixed_sql": "SELECT * FROM customers WHERE (id, email) NOT IN (SELECT id, name FROM products)",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'blob_column' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'blob_column' in 'SELECT'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column \"blob_column\" does not exist"
+   }
+  },
+  "id": "40945acf64c7",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "NULL IN (SELECT ...)",
+  "why": "The SQL standard interprets NULL as 'unknown value', so NULL IN (SELECT inner_expr ...) should evaluate to NULL if the SELECT produces any rows.",
+  "fix": "Use IS NULL instead of IN (SELECT NULL) when checking for NULL values.",
+  "bad_sql": "SELECT * FROM customers WHERE id IN (SELECT NULL)",
+  "fixed_sql": "SELECT * FROM customers WHERE id IS NULL",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "operator does not exist: integer = text"
+   }
+  },
+  "id": "b5f74cdaf82e",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect column count",
+  "why": "The query attempts to select a non-existent column.",
+  "fix": "Remove the non-existent column from the SELECT clause.",
+  "bad_sql": "SELECT id, name, email, city, created_at, non_existent_column FROM customers",
+  "fixed_sql": "SELECT id, name, email, city, created_at FROM customers",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'non_existent_column' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'non_existent_column' in 'SELECT'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column \"non_existent_column\" does not exist"
+   }
+  },
+  "id": "31fea4bbfd06",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Row size exceeds limit",
+  "why": "The query attempts to select a column that exceeds the row size limit.",
+  "fix": "Remove the large column from the SELECT clause.",
+  "bad_sql": "SELECT id, name, category, price, description FROM products",
+  "fixed_sql": "SELECT id, name, category, price FROM products",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'description' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'description' in 'SELECT'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column \"description\" does not exist"
+   }
+  },
+  "id": "291f8e6dbb5d",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect Bit Literal Usage",
+  "why": "The documentation states that to explicitly specify binary string context for bit literals, use a _binary introducer.",
+  "fix": "Use _binary to specify binary string context for bit literals.",
+  "bad_sql": "SELECT * FROM products WHERE category = b'Electronics';",
+  "fixed_sql": "SELECT * FROM products WHERE category = _binary 'Electronics';",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'b'Electronics'' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'b'Electronics'' at line 1"
+   }
+  },
+  "id": "4c6f27b6b55e",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using backticks for quoted identifiers unnecessarily",
+  "why": "If the identifier does not contain special characters or reserved keywords, it does not need to be quoted.",
+  "fix": "Remove the backticks if the identifier is not a reserved keyword or contains special characters.",
+  "bad_sql": "SELECT `id` FROM `customers` WHERE `id` = 1",
+  "fixed_sql": "SELECT id FROM customers WHERE id = 1",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"FROM\""
+   }
+  },
+  "id": "a9595be3e899",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Identifier Begins with Me or MeN",
+  "why": "The identifier '1e' begins with 'Me', which is not recommended according to the documentation.",
+  "fix": "Use a valid identifier that does not begin with 'Me' or 'MeN'. For example, '1e+3'.",
+  "bad_sql": "SELECT 1e FROM customers",
+  "fixed_sql": "SELECT 1e+3 FROM customers",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column '1e' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column '1e' in 'SELECT'"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "trailing junk after numeric literal at or near \"1e\""
+   }
+  },
+  "id": "c9df8aad3e50",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Comparing String and Numeric Values",
+  "why": "The city column is a string, but the query compares it to an integer.",
+  "fix": "Convert the integer to a string using quotes.",
+  "bad_sql": "SELECT * FROM customers WHERE city = 1;",
+  "fixed_sql": "SELECT * FROM customers WHERE city = '1';",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "operator does not exist: character varying = integer"
+   }
+  },
+  "id": "68a9f64b2fd4",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Comparing VARCHAR with INTEGER",
+  "why": "The email column is a VARCHAR, but the query compares it with an INTEGER.",
+  "fix": "Quote the value to ensure it is treated as a VARCHAR.",
+  "bad_sql": "SELECT * FROM customers WHERE email = 0;",
+  "fixed_sql": "SELECT * FROM customers WHERE email = '0';",
+  "detect": "\\bemail\\s*=\\s*\\d+",
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "operator does not exist: character varying = integer"
+   }
+  },
+  "id": "fea8835c7937",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Misuse of = as an assignment operator",
+  "why": "The = operator is being used as an assignment operator, which is incorrect in a SELECT statement.",
+  "fix": "Replace = with := if you intend to assign a value to a variable, or use = for comparison.",
+  "bad_sql": "SELECT id := 1 FROM customers",
+  "fixed_sql": "SELECT id = 1 FROM customers",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ':= 1 FROM customers' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near ':= 1 FROM customers' at line 1"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \":=\""
+   }
+  },
+  "id": "6c7864fb9586",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of || as a logical OR",
+  "why": "The || operator is being used as a logical OR, which is incorrect in a SELECT statement.",
+  "fix": "Replace || with OR for logical OR operations.",
+  "bad_sql": "SELECT * FROM customers WHERE city = 'New York' || city = 'Los Angeles'",
+  "fixed_sql": "SELECT * FROM customers WHERE city = 'New York' OR city = 'Los Angeles'",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"=\""
+   }
+  },
+  "id": "79a77d1a064b",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Misuse of XOR operator",
+  "why": "The XOR operator is not supported in MySQL and is being used incorrectly.",
+  "fix": "Use a combination of AND and OR to achieve the same result as XOR.",
+  "bad_sql": "SELECT * FROM customers WHERE city = 'New York' XOR city = 'Los Angeles'",
+  "fixed_sql": "SELECT * FROM customers WHERE (city = 'New York' AND city != 'Los Angeles') OR (city != 'New York' AND city = 'Los Angeles')",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"XOR\""
+   }
+  },
+  "id": "0c1a0c8057b1",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using ISNULL() instead of IS NULL",
+  "why": "ISNULL() is not a standard SQL function; use IS NULL instead.",
+  "fix": "Replace ISNULL() with IS NULL.",
+  "bad_sql": "SELECT * FROM customers WHERE ISNULL(email)",
+  "fixed_sql": "SELECT * FROM customers WHERE email IS NULL",
+  "detect": "\\bISNULL\\b",
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "function isnull(character varying) does not exist"
+   }
+  },
+  "id": "1e0962f85eff",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Implicit Type Conversion",
+  "why": "The city column is of type VARCHAR, but an integer is being compared to it.",
+  "fix": "Convert the integer to a string using CAST or convert the string to an integer using CAST.",
+  "bad_sql": "SELECT * FROM customers WHERE city = 123;",
+  "fixed_sql": "SELECT * FROM customers WHERE city = '123';",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "operator does not exist: character varying = integer"
+   }
+  },
+  "id": "e3bbea3b9b6f",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Misuse of <=> Operator",
+  "why": "The <=> operator returns 1 if both operands are NULL, but it does not handle NULL values correctly in this context.",
+  "fix": "Use the IS NULL operator to check for NULL values.",
+  "bad_sql": "SELECT * FROM employees WHERE salary <=> NULL;",
+  "fixed_sql": "SELECT * FROM employees WHERE salary IS NULL;",
+  "detect": "(?i)SELECT\\s+.*\\s+WHERE\\s+[^=<>!]+\\s+<=>\\s+NULL",
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "operator does not exist: numeric <=> unknown"
+   }
+  },
+  "id": "1f582638f32f",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Implicit Type Conversion",
+  "why": "Implicit type conversion may produce nonintuitive results.",
+  "fix": "Explicitly convert all values to the same type using explicit type casting functions if necessary.",
+  "bad_sql": "SELECT 'a' IN (0), 0 IN ('b')",
+  "fixed_sql": "SELECT 'a' IN ('0'), '0' IN ('b')",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "22P02",
+    "message": "invalid input syntax for type integer: \"a\""
+   }
+  },
+  "id": "121c26b2ddfa",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of IS NOT operator",
+  "why": "IS NOT operator should be used with TRUE, FALSE, or UNKNOWN.",
+  "fix": "Replace IS NOT FALSE with IS NOT NULL.",
+  "bad_sql": "SELECT * FROM employees WHERE salary IS NOT FALSE",
+  "fixed_sql": "SELECT * FROM employees WHERE salary IS NOT NULL",
+  "detect": "IS\\s*NOT\\s*FALSE",
+  "engines": {
+   "postgres": {
+    "code": "42804",
+    "message": "argument of IS NOT FALSE must be type boolean, not type numeric"
+   }
+  },
+  "id": "d6eb6c2ea0f3",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of IS operator",
+  "why": "IS operator should be used with TRUE, FALSE, or UNKNOWN.",
+  "fix": "Replace IS TRUE with IS NOT NULL.",
+  "bad_sql": "SELECT * FROM products WHERE category IS TRUE",
+  "fixed_sql": "SELECT * FROM products WHERE category IS NOT NULL",
+  "detect": "IS\\s*TRUE",
+  "engines": {
+   "postgres": {
+    "code": "42804",
+    "message": "argument of IS TRUE must be type boolean, not type character varying"
+   }
+  },
+  "id": "bd2f9cdbe55b",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of LIKE with escape character",
+  "why": "The escape character is incorrectly used within the LIKE pattern.",
+  "fix": "Escape the backslash by doubling it.",
+  "bad_sql": "SELECT * FROM customers WHERE name LIKE 'Dav\\'id' ESCAPE '\\'",
+  "fixed_sql": "SELECT * FROM customers WHERE name LIKE 'Dav\\id' ESCAPE '\\'",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"id\""
+   }
+  },
+  "id": "f39c113ffc3e",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of LIKE with escape character",
+  "why": "The escape character is not correctly specified.",
+  "fix": "Use a double backslash to escape the backslash.",
+  "bad_sql": "SELECT * FROM customers WHERE name LIKE 'O\\'Reilly'",
+  "fixed_sql": "SELECT * FROM customers WHERE name LIKE 'O\\Reilly'",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"Reilly\""
+   }
+  },
+  "id": "c6e55e263a8b",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of BINARY keyword",
+  "why": "The BINARY keyword is used to force binary comparison, which is not necessary if the collation is already binary.",
+  "fix": "Remove the BINARY keyword if the collation is already binary.",
+  "bad_sql": "SELECT * FROM products WHERE name LIKE BINARY 'apple'",
+  "fixed_sql": "SELECT * FROM products WHERE name LIKE 'apple'",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42704",
+    "message": "type \"binary\" does not exist"
+   }
+  },
+  "id": "4c97eced4d3a",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using LIKE with a non-constant escape sequence",
+  "why": "The escape sequence must be a constant at execution time.",
+  "fix": "Use a constant escape sequence or disable the NO_BACKSLASH_ESCAPES SQL mode.",
+  "bad_sql": "SELECT * FROM orders WHERE status LIKE 'pending' ESCAPE @var",
+  "fixed_sql": "SELECT * FROM orders WHERE status LIKE 'pending' ESCAPE '\\'",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42703",
+    "message": "column \"var\" does not exist"
+   }
+  },
+  "id": "ee2ca601fd91",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Mixed Geometry Types",
+  "why": "The arguments are a mix of geometry types.",
+  "fix": "Ensure all arguments are of the same geometry type.",
+  "bad_sql": "SELECT ST_Collect(location) FROM products;",
+  "fixed_sql": "SELECT ST_Collect(ST_GeomFromText('POINT(1 1)')) FROM products;",
+  "detect": "\\bST_Collect\\(location\\)",
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'location' in 'field list'"
+   }
+  },
+  "id": "d67a34956c80",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using ST_Collect() on non-spatial data",
+  "why": "ST_Collect() requires spatial data, not non-spatial data like product names.",
+  "fix": "Use ST_GeomFromText() to convert non-spatial data into spatial data.",
+  "bad_sql": "SELECT ST_AsText(ST_Collect(name)) AS result FROM products",
+  "fixed_sql": "SELECT ST_AsText(ST_Collect(ST_GeomFromText('POINT(0 0)'))) AS result",
+  "detect": "SELECT\\s+ST_AsText\\(ST_Collect\\(\\w+\\)\\)\\s+AS\\s+result\\s+FROM\\s+\\w+",
+  "engines": {
+   "mysql": {
+    "code": 3548,
+    "message": "There's no spatial reference system with SRID 1852794960."
+   }
+  },
+  "id": "babf9217119f",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using ST_Collect() with DISTINCT on non-spatial data",
+  "why": "ST_Collect(DISTINCT) requires spatial data, not non-spatial data like product names.",
+  "fix": "Use ST_GeomFromText() to convert non-spatial data into spatial data.",
+  "bad_sql": "SELECT ST_AsText(ST_Collect(DISTINCT name)) AS result FROM products",
+  "fixed_sql": "SELECT ST_AsText(ST_Collect(DISTINCT ST_GeomFromText('POINT(0 0)'))) AS result",
+  "detect": "SELECT\\s+ST_AsText\\(ST_Collect\\(DISTINCT\\s+\\w+\\)\\)\\s+AS\\s+result\\s+FROM\\s+\\w+",
+  "engines": {
+   "mysql": {
+    "code": 3548,
+    "message": "There's no spatial reference system with SRID 1852794960."
+   }
+  },
+  "id": "aeda4bd3074e",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using non-numeric arguments with SUM() and AVG()",
+  "why": "SUM() and AVG() expect numeric arguments, but 'status' is not numeric.",
+  "fix": "Use a numeric column like 'total' instead.",
+  "bad_sql": "SELECT AVG(status) FROM orders",
+  "fixed_sql": "SELECT AVG(total) FROM orders",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "function avg(character varying) does not exist"
+   }
+  },
+  "id": "acfebac5bba2",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using SET or ENUM values with SUM() or AVG()",
+  "why": "SET or ENUM values are cast to their underlying numeric values, but this might not be the intended behavior.",
+  "fix": "Use a numeric column like 'price' instead.",
+  "bad_sql": "SELECT AVG(category) FROM products",
+  "fixed_sql": "SELECT AVG(price) FROM products",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "function avg(character varying) does not exist"
+   }
+  },
+  "id": "7eb33fa00ce6",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Missing GROUP BY for aggregated columns",
+  "why": "When using aggregate functions, all non-aggregated columns in the SELECT clause must be included in the GROUP BY clause.",
+  "fix": "Add the missing columns to the GROUP BY clause.",
+  "bad_sql": "SELECT name, COUNT(*) FROM customers",
+  "fixed_sql": "SELECT name, COUNT(*) FROM customers GROUP BY name",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1140,
+    "message": "In aggregated query without GROUP BY, expression #1 of SELECT list contains nonaggregated column 'ge.customers.name'; this is incompatible with sql_mode=only_full_group_by"
+   },
+   "postgres": {
+    "code": "42803",
+    "message": "column \"customers.name\" must appear in the GROUP BY clause or be used in an aggregate function"
+   }
+  },
+  "id": "bfe22e9034f8",
+  "source": "refman-8.4.pdf",
+  "verified_at": "2026-10-31",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
  }
 ]

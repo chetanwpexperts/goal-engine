@@ -31,6 +31,10 @@ ENGINES = {                                   # how people name each database, a
 NOTES_ONLY = {"sqlserver", "oracle", "sqlite"}   # no lab-tested knowledge yet: their notes are general guidance
 
 SHAPES = [                                     # (shape, pattern) in the order they are tried
+    # 'how many types of joins', 'types of keys in sql', 'join ke kitne types hote hain', 'index के प्रकार': a kinds question
+    ("define", r"^(what are (the )?|list (the |all )?|name (the |all )?)?(different |main |all )?(types|kinds|categories|sorts) of\b|"
+               r"\bhow many (different )?(types|kinds|sorts)\b|\b(kitne|kitni|kaun kaun se|kaunse|konse) (types?|prakar|tarah|kism)\b|"
+               r"\b(types?|prakar|kism) (kitne|kitni|kaun|kya)\b|\bke (types|prakar)\b|\bkaun kaun (se|si|sa)\b|प्रकार|कौन कौन"),
     ("compare", r"^which (one )?is (better|faster|safer)\b|\b(better|behtar|faster|tez)\b.*\b(ya|or)\b|बेहतर.*या|"
                 r"\bsame (hai|hain|h|he|hote|hota)\b|\bsame as\b|एक ही (है|हैं)|\bmein\b.*\bya\b.*\bmein\b|में .*या.* में"),
     ("compare", r"\b(ya|or)\b.*\b(kaunsa|konsa|kaun sa|kaunsi|which)\b.*\b(better|behtar|faster|tez|sahi|accha|acha)\b"),

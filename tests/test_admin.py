@@ -211,7 +211,10 @@ def test_dbaba_knowledge_view(admin):
     assert k["dbaba"]["concepts"] > 50 and k["dbaba"]["phrasings"] > k["dbaba"]["concepts"]
     assert {e["name"] for e in k["dbaba"]["engines"]} >= {"MySQL", "PostgreSQL"}
     cur = k["curriculum"]
-    assert cur["total"] == 15 and 1 <= cur["done"] <= 15 and cur["nights"][0]["done"] and cur["nights"][0]["date"]
+    ids = [n["n"] for n in cur["nights"]]
+    assert {str(i) for i in range(1, 16)} <= set(ids) and cur["total"] == len(ids) and 1 <= cur["done"] <= cur["total"]
+    assert cur["nights"][0]["done"] and cur["nights"][0]["date"]
+    assert any(i.startswith("P") for i in ids) and "10A" in ids        # inserted nights and project blueprints count too
     assert "sqlaggs" in k["dbaba"]["checkers"]
     db = next(get_db())
     learning.report_miss(db, "database", "still wrong", "SELECT * FROM t WHERE a = '<v>'", "looked fine")

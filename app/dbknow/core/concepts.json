@@ -18036,15 +18036,13 @@
    "phrasings": {
     "en": [
      "what is a btree index",
-     "btree vs hash index",
-     "what are the types of indexes"
+     "btree vs hash index"
     ],
     "hinglish": [
-     "btree index kya hota hai",
-     "index ke types kya hote hain"
+     "btree index kya hota hai"
     ],
     "hindi": [
-     "index के प्रकार क्या होते हैं"
+     "btree और hash index में क्या अंतर है"
     ]
    },
    "answer": {
@@ -25267,7 +25265,7 @@
     [
      "join\\w*",
      "(different|alag|अलग|mismatch\\w*)",
-     "types?"
+     "types?(?! of joins?)"
     ],
     [
      "join\\w*",
@@ -28567,6 +28565,713 @@
    "source": "https://dev.mysql.com/doc/refman/8.0/en/with.html",
    "seen_at": [
     "https://www.postgresql.org/docs/current/queries-with.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "join_types",
+   "kind": "concept",
+   "title": {
+    "en": "The types of JOIN",
+    "hinglish": "JOIN ke types",
+    "hindi": "JOIN के प्रकार"
+   },
+   "terms": [
+    [
+     "(types|kinds) of joins?"
+    ],
+    [
+     "types of joins?",
+     "(what|how|list|different|kya|which)"
+    ],
+    [
+     "(types?|kinds?|sorts?|categor\\w*|prakar|kism|tarah|प्रकार)",
+     "joins?"
+    ],
+    [
+     "(types?|kinds?|sorts?|categor\\w*|prakar|kism|tarah|प्रकार)",
+     "जॉइन"
+    ],
+    [
+     "joins?",
+     "(kitne|kitni|how many)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how many types of joins in sql",
+     "what are the different types of joins",
+     "types of joins in mysql"
+    ],
+    "hinglish": [
+     "join ke kitne types hote hain",
+     "sql mein kitne prakar ke join hote hain"
+    ],
+    "hindi": [
+     "join के कितने प्रकार होते हैं"
+    ]
+   },
+   "answer": {
+    "en": "There are five kinds of join, plus two patterns built from them. (1) INNER JOIN: only rows that match on both sides. (2) LEFT JOIN: every row of the left table, with NULLs where the right has no match. (3) RIGHT JOIN: the same from the right side. (4) FULL OUTER JOIN: every row of both, matched where possible (PostgreSQL; MySQL/MariaDB don't have it, use LEFT JOIN UNION RIGHT JOIN). (5) CROSS JOIN: every row with every row. A SELF JOIN is any of these with the same table twice (employees and their manager). Patterns: a semi-join keeps rows that have a match (WHERE EXISTS), an anti-join keeps rows that have none (NOT EXISTS, or LEFT JOIN ... WHERE right.key IS NULL). NATURAL JOIN and JOIN ... USING are shorter ways to write the ON.",
+    "hinglish": "Join paanch tarah ke hote hain, aur do pattern. (1) INNER JOIN: sirf dono taraf match hone wali rows. (2) LEFT JOIN: left table ki har row, right mein match na ho to NULL. (3) RIGHT JOIN: yahi right se. (4) FULL OUTER JOIN: dono ki har row, jahan ho sake match (PostgreSQL mein; MySQL/MariaDB mein nahi, LEFT JOIN UNION RIGHT JOIN se banao). (5) CROSS JOIN: har row har row se. SELF JOIN inme se koi bhi join hai jisme same table do baar (employee aur uska manager). Pattern: semi-join match wali rows rakhta hai (WHERE EXISTS), anti-join bina match wali (NOT EXISTS, ya LEFT JOIN ... WHERE right.key IS NULL). NATURAL JOIN aur JOIN ... USING sirf ON likhne ke chhote tareeke hain.",
+    "hindi": "पाँच प्रकार: INNER, LEFT, RIGHT, FULL OUTER (MySQL में नहीं), CROSS; SELF JOIN और semi/anti-join इन्हीं से बनते हैं।"
+   },
+   "mistake": {
+    "en": "Using an INNER JOIN where every left row must stay (customers with no orders disappear), or adding a WHERE on the right table after a LEFT JOIN, which quietly turns it back into an INNER JOIN.",
+    "hinglish": "Jahan har left row chahiye wahan INNER JOIN (bina order wale customers gayab), ya LEFT JOIN ke baad right table pe WHERE lagana, jo use chupchaap INNER JOIN bana deta hai.",
+    "hindi": "LEFT JOIN के बाद right table पर WHERE लगाने से वह INNER JOIN बन जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM customers c JOIN orders o ON o.customer_id = c.id) AS inner_rows, (SELECT COUNT(*) FROM customers c LEFT JOIN orders o ON o.customer_id = c.id) AS left_rows, (SELECT COUNT(*) FROM customers c CROSS JOIN orders o) AS cross_rows"
+     },
+     "columns": [
+      "inner_rows",
+      "left_rows",
+      "cross_rows"
+     ],
+     "result": [
+      [
+       "8",
+       "11",
+       "64"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): the same kinds exist; SQL Server also has CROSS APPLY / OUTER APPLY.",
+    "oracle": "Notes only (not lab-tested here): the same kinds exist; Oracle also accepts its old (+) outer-join notation.",
+    "sqlite": "Notes only (not lab-tested here): INNER, LEFT, CROSS; RIGHT and FULL OUTER JOIN since 3.39.",
+    "mysql": "INNER, LEFT, RIGHT, CROSS, NATURAL, STRAIGHT_JOIN; no FULL OUTER JOIN.",
+    "mariadb": "Same as MySQL: no FULL OUTER JOIN.",
+    "postgresql": "All five, plus LATERAL joins (a subquery that can read the earlier tables)."
+   },
+   "related": [
+    "join",
+    "inner_join",
+    "left_join",
+    "right_join",
+    "full_join",
+    "cross_join",
+    "self_join",
+    "anti_join",
+    "semi_join"
+   ],
+   "fundamentals": [
+    "join_condition",
+    "outer_join"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/join.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-table-expressions.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "key_types",
+   "kind": "concept",
+   "title": {
+    "en": "The types of keys",
+    "hinglish": "Keys ke types",
+    "hindi": "Keys के प्रकार"
+   },
+   "terms": [
+    [
+     "(types?|kinds?|sorts?|categor\\w*|prakar|kism|tarah|प्रकार)",
+     "keys?"
+    ],
+    [
+     "keys?",
+     "(kitne|kitni|how many)"
+    ],
+    [
+     "(types?|kinds?|sorts?|categor\\w*|prakar|kism|tarah|प्रकार)",
+     "की"
+    ],
+    [
+     "kaun kaun (si|se|sa)",
+     "keys?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what are the types of keys in sql",
+     "how many types of keys in a database",
+     "types of keys in dbms"
+    ],
+    "hinglish": [
+     "sql mein keys ke kitne types hote hain",
+     "database mein kaun kaun si keys hoti hain"
+    ],
+    "hindi": [
+     "SQL में keys के प्रकार"
+    ]
+   },
+   "answer": {
+    "en": "Primary key: the column(s) that name each row, unique and never NULL, one per table. Foreign key: a column that points at another table's primary key (orders.customer_id -> customers.id) and stops orphans. Unique key: no two rows share it, but NULL is allowed (email). Composite key: a key made of several columns together (order_id + product_id). Candidate keys: every column set that could be the primary key; the one you pick is the primary, the rest are alternate keys (often UNIQUE). Super key: any set of columns that contains a key. Surrogate key: a made-up id (AUTO_INCREMENT / identity); natural key: a real-world value (an email, a PAN). Only primary, foreign and unique keys are things you create; the others are names for ideas.",
+    "hinglish": "Primary key: wo column(s) jo har row ko pehchaante hain, unique aur kabhi NULL nahi, har table mein ek. Foreign key: doosri table ki primary key ko point karne wala column (orders.customer_id -> customers.id), orphan rows rokta hai. Unique key: do rows mein same nahi, par NULL chalta hai (email). Composite key: kai columns mil ke key (order_id + product_id). Candidate keys: jo bhi primary key ban sakte the; chuni hui primary, baaki alternate (aksar UNIQUE). Super key: koi bhi column set jisme key ho. Surrogate key: banaya hua id (AUTO_INCREMENT); natural key: asli duniya ki value (email, PAN). Banate sirf primary, foreign aur unique hain; baaki naam hain.",
+    "hindi": "Primary, foreign, unique, composite, candidate/alternate, super, surrogate/natural keys।"
+   },
+   "mistake": {
+    "en": "Using a natural key that can change (an email, a phone) as the primary key: every foreign key pointing at it must change too.",
+    "hinglish": "Badalne wali natural key (email, phone) ko primary key banana: use point karne wali har foreign key bhi badalni padti hai.",
+    "hindi": "बदल सकने वाली value को primary key न बनाएँ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40) UNIQUE, FOREIGN KEY (parent_id) REFERENCES demo_parent (id)); SELECT constraint_type, COUNT(*) AS n FROM information_schema.table_constraints WHERE table_name = 'demo_child' AND constraint_type IN ('PRIMARY KEY', 'UNIQUE', 'FOREIGN KEY') GROUP BY constraint_type ORDER BY constraint_type"
+     },
+     "columns": [
+      "constraint_type",
+      "n"
+     ],
+     "result": [
+      [
+       "FOREIGN KEY",
+       "1"
+      ],
+      [
+       "PRIMARY KEY",
+       "1"
+      ],
+      [
+       "UNIQUE",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): the same kinds exist.",
+    "oracle": "Notes only (not lab-tested here): the same kinds exist.",
+    "sqlite": "Notes only (not lab-tested here): most of the same kinds exist.",
+    "mysql": "InnoDB enforces foreign keys; MyISAM ignores them.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "All enforced; a foreign key gets no index of its own."
+   },
+   "related": [
+    "primary_key",
+    "foreign_key",
+    "unique",
+    "composite_key",
+    "surrogate_natural_key"
+   ],
+   "fundamentals": [
+    "table_keys"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/create-table-foreign-keys.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/ddl-constraints.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "sql_command_types",
+   "kind": "concept",
+   "title": {
+    "en": "The types of SQL commands",
+    "hinglish": "SQL commands ke types",
+    "hindi": "SQL commands के प्रकार"
+   },
+   "terms": [
+    [
+     "(types?|kinds?|sorts?|categor\\w*|prakar|kism|tarah|प्रकार)",
+     "(sql )?(commands?|statements?|languages?)"
+    ],
+    [
+     "\\b(ddl|dml|dcl|tcl|dql)\\b"
+    ],
+    [
+     "(commands?|statements?)",
+     "(kitne|how many)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what are the types of sql commands",
+     "what is ddl dml dcl tcl",
+     "types of sql statements"
+    ],
+    "hinglish": [
+     "sql commands ke kitne types hote hain",
+     "ddl aur dml kya hota hai"
+    ],
+    "hindi": [
+     "SQL commands के प्रकार"
+    ]
+   },
+   "answer": {
+    "en": "SQL commands are grouped by what they do. DDL (data definition) changes structure: CREATE, ALTER, DROP, TRUNCATE, RENAME. DML (data manipulation) changes rows: INSERT, UPDATE, DELETE (and MERGE / upsert). DQL (data query) reads: SELECT. DCL (data control) gives and takes rights: GRANT, REVOKE. TCL (transaction control) groups changes: BEGIN / START TRANSACTION, COMMIT, ROLLBACK, SAVEPOINT. The difference matters: in MySQL/MariaDB a DDL statement commits the open transaction on its own and can't be rolled back; PostgreSQL can roll back most DDL.",
+    "hinglish": "SQL commands kaam ke hisaab se: DDL (structure badle): CREATE, ALTER, DROP, TRUNCATE, RENAME. DML (rows badle): INSERT, UPDATE, DELETE (aur MERGE / upsert). DQL (padhe): SELECT. DCL (adhikaar): GRANT, REVOKE. TCL (transaction): BEGIN / START TRANSACTION, COMMIT, ROLLBACK, SAVEPOINT. Farak zaroori hai: MySQL/MariaDB mein DDL khula transaction khud commit kar deta hai aur rollback nahi hota; PostgreSQL zyadatar DDL rollback kar leta hai.",
+    "hindi": "DDL, DML, DQL, DCL, TCL।"
+   },
+   "mistake": {
+    "en": "Running ALTER TABLE inside a transaction on MySQL/MariaDB and expecting ROLLBACK to undo it: the DDL already committed everything before it.",
+    "hinglish": "MySQL/MariaDB pe transaction ke andar ALTER TABLE chala ke ROLLBACK se wapas hone ki ummeed: DDL ne pehle ka sab commit kar diya.",
+    "hindi": "MySQL में DDL rollback नहीं होता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS paid_orders FROM orders WHERE status = 'paid'"
+     },
+     "columns": [
+      "paid_orders"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): the same kinds exist.",
+    "oracle": "Notes only (not lab-tested here): the same kinds exist.",
+    "sqlite": "Notes only (not lab-tested here): most of the same kinds exist.",
+    "mysql": "DDL commits implicitly (no rollback).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Most DDL is transactional: BEGIN; ALTER ...; ROLLBACK; undoes it."
+   },
+   "related": [
+    "delete_truncate_drop",
+    "transaction",
+    "alter_table",
+    "sql_intro"
+   ],
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-commands.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "constraint_types",
+   "kind": "concept",
+   "title": {
+    "en": "The types of constraints",
+    "hinglish": "Constraints ke types",
+    "hindi": "Constraints के प्रकार"
+   },
+   "terms": [
+    [
+     "(types?|kinds?|sorts?|categor\\w*|prakar|kism|tarah|प्रकार)",
+     "constraints?"
+    ],
+    [
+     "constraints?",
+     "(kitne|how many|kaun)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what are the types of constraints in sql",
+     "how many types of constraints"
+    ],
+    "hinglish": [
+     "sql mein constraints ke kitne types hain",
+     "constraints kaun kaun se hote hain"
+    ],
+    "hindi": [
+     "SQL में constraints के प्रकार"
+    ]
+   },
+   "answer": {
+    "en": "Constraints are rules the database checks on every write. NOT NULL: a value is required. UNIQUE: no two rows share it. PRIMARY KEY: UNIQUE + NOT NULL, the row's name. FOREIGN KEY: the value must exist in the parent table (with ON DELETE / ON UPDATE actions). CHECK: a condition each row must meet (price >= 0). DEFAULT: the value used when none is given (strictly a column default, usually listed with them). They keep bad data out at the source, whatever program writes it.",
+    "hinglish": "Constraints wo niyam hain jo database har write pe dekhta hai. NOT NULL: value zaroori. UNIQUE: do rows mein same nahi. PRIMARY KEY: UNIQUE + NOT NULL, row ka naam. FOREIGN KEY: value parent table mein honi chahiye (ON DELETE / ON UPDATE ke saath). CHECK: har row ki shart (price >= 0). DEFAULT: value na di ho to ye (column default, aksar saath gina jaata hai). Ye galat data ko shuru mein hi rokte hain, chahe koi bhi program likhe.",
+    "hindi": "NOT NULL, UNIQUE, PRIMARY KEY, FOREIGN KEY, CHECK, DEFAULT।"
+   },
+   "mistake": {
+    "en": "Relying on CHECK in MySQL before 8.0.16: it was parsed and silently ignored.",
+    "hinglish": "MySQL 8.0.16 se pehle CHECK pe bharosa: wo padha jaata tha par chupchaap ignore hota tha.",
+    "hindi": "पुराने MySQL में CHECK ignore होता था।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40) DEFAULT 'none' CHECK (note <> '')); INSERT INTO demo_child (id, parent_id) VALUES (1, 1); SELECT note FROM demo_child"
+     },
+     "columns": [
+      "note"
+     ],
+     "result": [
+      [
+       "none"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): the same kinds exist.",
+    "oracle": "Notes only (not lab-tested here): the same kinds exist.",
+    "sqlite": "Notes only (not lab-tested here): most of the same kinds exist.",
+    "mysql": "CHECK is enforced from 8.0.16.",
+    "mariadb": "CHECK enforced since 10.2.1.",
+    "postgresql": "All enforced; EXCLUDE constraints too."
+   },
+   "related": [
+    "not_null_default",
+    "check_constraint",
+    "unique",
+    "primary_key",
+    "foreign_key"
+   ],
+   "fundamentals": [
+    "table_keys"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/create-table-check-constraints.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "index_types",
+   "kind": "concept",
+   "title": {
+    "en": "The types of indexes",
+    "hinglish": "Index ke types",
+    "hindi": "Index के प्रकार"
+   },
+   "terms": [
+    [
+     "(types?|kinds?|sorts?|categor\\w*|prakar|kism|tarah|प्रकार)",
+     "index(es)?"
+    ],
+    [
+     "(types?|kinds?|sorts?|categor\\w*|prakar|kism|tarah|प्रकार)",
+     "indices"
+    ],
+    [
+     "(types?|kinds?|sorts?|categor\\w*|prakar|kism|tarah|प्रकार)",
+     "इंडेक्स"
+    ],
+    [
+     "index(es)?",
+     "(kitne|how many)",
+     "(types?|kinds?|prakar)"
+    ],
+    [
+     "kaun kaun (si|se|sa)",
+     "index(es)?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what are the types of indexes",
+     "how many types of index in mysql",
+     "what are the types of indexes"
+    ],
+    "hinglish": [
+     "index ke kitne types hote hain",
+     "kaun kaun se index hote hain",
+     "index ke types kya hote hain"
+    ],
+    "hindi": [
+     "index के प्रकार",
+     "index के प्रकार क्या होते हैं"
+    ]
+   },
+   "answer": {
+    "en": "By what they guarantee: a plain index (speed only), a UNIQUE index (no repeats), the PRIMARY KEY's index. By shape: single-column, composite (several columns, used from the left), covering (holds every column a query needs), partial (only rows matching a WHERE, PostgreSQL) and expression / functional (on LOWER(email) or a date part; PostgreSQL, MySQL 8.0.13+, MariaDB via a generated column). By structure: B-tree (the default everywhere: =, <, >, BETWEEN, ORDER BY, LIKE 'abc%'), hash (= only), full-text (word search), spatial (maps), and PostgreSQL's GIN (arrays, JSON, text search), GiST and BRIN (huge tables in date order). In InnoDB the table itself is stored in primary-key order (the clustered index).",
+    "hinglish": "Guarantee ke hisaab se: plain index (sirf speed), UNIQUE index (dohraav nahi), PRIMARY KEY ka index. Shakal se: single-column, composite (kai columns, left se use hota hai), covering (query ke saare columns isi mein), partial (sirf WHERE wali rows, PostgreSQL) aur expression (LOWER(email) jaise pe; PostgreSQL, MySQL 8.0.13+, MariaDB generated column se). Banawat se: B-tree (default: =, <, >, BETWEEN, ORDER BY, LIKE 'abc%'), hash (sirf =), full-text (shabd search), spatial (map), aur PostgreSQL ke GIN (array, JSON, text search), GiST aur BRIN (date kram mein badi tables). InnoDB mein table khud primary key ke kram mein rakhi jaati hai (clustered index).",
+    "hindi": "Plain, unique, primary; single, composite, covering, partial, expression; B-tree, hash, full-text, spatial, GIN/GiST/BRIN।"
+   },
+   "mistake": {
+    "en": "Adding an index for every column: each one slows every INSERT and UPDATE, and a composite index on (a, b) already serves queries on a alone.",
+    "hinglish": "Har column pe index: har ek har INSERT aur UPDATE ko slow karta hai, aur (a, b) ka composite index sirf a wali query ke kaam bhi aata hai.",
+    "hindi": "हर column पर index न लगाएँ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40)); CREATE INDEX ix_demo_child_parent ON demo_child (parent_id); CREATE UNIQUE INDEX ux_demo_child_pair ON demo_child (parent_id, note); INSERT INTO demo_child VALUES (1, 1, 'a'), (2, 1, 'b'); SELECT COUNT(*) AS rows_kept FROM demo_child"
+     },
+     "columns": [
+      "rows_kept"
+     ],
+     "result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): the same kinds exist.",
+    "oracle": "Notes only (not lab-tested here): the same kinds exist.",
+    "sqlite": "Notes only (not lab-tested here): most of the same kinds exist.",
+    "mysql": "InnoDB: B-tree (hash only adaptive, internal), FULLTEXT, SPATIAL; functional indexes from 8.0.13.",
+    "mariadb": "Same as MySQL; expression indexes via a generated column.",
+    "postgresql": "B-tree, hash, GIN, GiST, SP-GiST, BRIN; partial and expression indexes."
+   },
+   "related": [
+    "index",
+    "composite_index",
+    "covering_index",
+    "partial_index",
+    "expression_index",
+    "btree_vs_hash",
+    "fulltext_index",
+    "clustered_index"
+   ],
+   "fundamentals": [
+    "index_use"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/create-index.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/indexes-types.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "subquery_types",
+   "kind": "concept",
+   "title": {
+    "en": "The types of subqueries",
+    "hinglish": "Subquery ke types",
+    "hindi": "Subquery के प्रकार"
+   },
+   "terms": [
+    [
+     "(types?|kinds?|sorts?|categor\\w*|prakar|kism|tarah|प्रकार)",
+     "subquer\\w*"
+    ],
+    [
+     "subquer\\w*",
+     "(kitne|how many)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what are the types of subqueries",
+     "how many types of subquery in sql"
+    ],
+    "hinglish": [
+     "subquery ke kitne types hote hain",
+     "subquery kitne tarah ki hoti hai"
+    ],
+    "hindi": [
+     "subquery के प्रकार"
+    ]
+   },
+   "answer": {
+    "en": "By what they return: a scalar subquery gives one value (WHERE amount > (SELECT AVG(amount) FROM orders)); a column subquery gives a list (WHERE id IN (SELECT customer_id FROM orders)); a row subquery gives one row of several values; a table subquery, or derived table, sits in FROM with an alias. By how they run: a plain subquery runs on its own; a correlated subquery uses a column of the outer row (WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id)). EXISTS / NOT EXISTS only ask whether a row is there. A CTE (WITH) is a named subquery written up front.",
+    "hinglish": "Kya lautati hai uske hisaab se: scalar subquery ek value (WHERE amount > (SELECT AVG(amount) FROM orders)); column subquery ek list (WHERE id IN (SELECT customer_id FROM orders)); row subquery kai values ki ek row; table subquery ya derived table FROM mein alias ke saath. Kaise chalti hai: plain subquery khud chalti hai; correlated subquery bahar ki row ka column use karti hai (WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id)). EXISTS / NOT EXISTS sirf poochte hain row hai ya nahi. CTE (WITH) upar likha naam wala subquery hai.",
+    "hindi": "Scalar, column (IN), row, table/derived; plain और correlated; EXISTS।"
+   },
+   "mistake": {
+    "en": "A scalar subquery that can return two rows (= (SELECT id FROM ... WHERE city = 'Pune')): the database stops with an error the day a second row appears.",
+    "hinglish": "Aisi scalar subquery jo do rows de sakti hai (= (SELECT id FROM ... WHERE city = 'Pune')): jis din doosri row aayi, database error deta hai.",
+    "hindi": "Scalar subquery को एक से ज़्यादा row न देने दें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id FROM customers c WHERE c.id IN (SELECT customer_id FROM orders) AND EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id AND o.amount > (SELECT AVG(amount) FROM orders)) ORDER BY c.id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ],
+      [
+       "2"
+      ],
+      [
+       "6"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): the same kinds exist.",
+    "oracle": "Notes only (not lab-tested here): the same kinds exist.",
+    "sqlite": "Notes only (not lab-tested here): most of the same kinds exist.",
+    "mysql": "LIMIT inside IN (...) is refused (1235).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Also LATERAL subqueries in FROM."
+   },
+   "related": [
+    "subquery",
+    "scalar_subquery",
+    "correlated_subquery",
+    "derived_table",
+    "exists",
+    "cte"
+   ],
+   "fundamentals": [
+    "subquery_shape",
+    "correlation"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/subqueries.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/functions-subquery.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "window_function_types",
+   "kind": "concept",
+   "title": {
+    "en": "The types of window functions",
+    "hinglish": "Window functions ke types",
+    "hindi": "Window functions के प्रकार"
+   },
+   "terms": [
+    [
+     "(types?|kinds?|sorts?|categor\\w*|prakar|kism|tarah|प्रकार)",
+     "window (functions?|fn)"
+    ],
+    [
+     "window functions?",
+     "(kitne|how many|kaun kaun)"
+    ],
+    [
+     "kaun kaun (si|se|sa)",
+     "window functions?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what are the types of window functions",
+     "how many types of window functions are there"
+    ],
+    "hinglish": [
+     "window functions ke kitne types hain",
+     "kaun kaun se window functions hote hain"
+    ],
+    "hindi": [
+     "window functions के प्रकार"
+    ]
+   },
+   "answer": {
+    "en": "Three families, all with OVER (...). Ranking: ROW_NUMBER (1, 2, 3 even on ties), RANK (1, 1, 3), DENSE_RANK (1, 1, 2), NTILE(n) (buckets), PERCENT_RANK / CUME_DIST. Value (offset): LAG / LEAD (the row before / after), FIRST_VALUE, LAST_VALUE, NTH_VALUE. Aggregate: SUM, AVG, COUNT, MIN, MAX used with OVER, for running totals and per-group totals next to each row. PARTITION BY restarts the calculation per group, ORDER BY sets the order, and a frame (ROWS BETWEEN ...) says which rows count.",
+    "hinglish": "Teen parivaar, sab OVER (...) ke saath. Ranking: ROW_NUMBER (barabari pe bhi 1, 2, 3), RANK (1, 1, 3), DENSE_RANK (1, 1, 2), NTILE(n), PERCENT_RANK / CUME_DIST. Value: LAG / LEAD (pichli / agli row), FIRST_VALUE, LAST_VALUE, NTH_VALUE. Aggregate: SUM, AVG, COUNT, MIN, MAX OVER ke saath, running total aur har row ke saath group total. PARTITION BY har group pe dobara shuru karta hai, ORDER BY kram, aur frame (ROWS BETWEEN ...) batata hai kaunsi rows gini jaayein.",
+    "hindi": "Ranking, value (LAG/LEAD), aggregate (SUM OVER)।"
+   },
+   "mistake": {
+    "en": "LAST_VALUE with the default frame: it stops at the current row, so it returns the current row's value, not the last of the group.",
+    "hinglish": "Default frame ke saath LAST_VALUE: frame current row pe rukta hai, isliye current row ki hi value aati hai, group ki aakhri nahi.",
+    "hindi": "LAST_VALUE के साथ frame बताएँ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, salary, ROW_NUMBER() OVER (ORDER BY salary DESC, id) AS rn, RANK() OVER (ORDER BY salary DESC) AS rnk, DENSE_RANK() OVER (ORDER BY salary DESC) AS drnk FROM employees ORDER BY salary DESC, id"
+     },
+     "columns": [
+      "id",
+      "salary",
+      "rn",
+      "rnk",
+      "drnk"
+     ],
+     "result": [
+      [
+       "1",
+       "90000",
+       "1",
+       "1",
+       "1"
+      ],
+      [
+       "6",
+       "75000",
+       "2",
+       "2",
+       "2"
+      ],
+      [
+       "2",
+       "60000",
+       "3",
+       "3",
+       "3"
+      ],
+      [
+       "3",
+       "60000",
+       "4",
+       "3",
+       "3"
+      ],
+      [
+       "7",
+       "50000",
+       "5",
+       "5",
+       "4"
+      ],
+      [
+       "4",
+       "45000",
+       "6",
+       "6",
+       "5"
+      ],
+      [
+       "5",
+       "42000",
+       "7",
+       "7",
+       "6"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): the same kinds exist.",
+    "oracle": "Notes only (not lab-tested here): the same kinds exist.",
+    "sqlite": "Notes only (not lab-tested here): most of the same kinds exist.",
+    "mysql": "Window functions from 8.0.",
+    "mariadb": "From 10.2.",
+    "postgresql": "Also FILTER (WHERE ...) on aggregates and GROUPS frames."
+   },
+   "related": [
+    "window_function",
+    "rank_functions",
+    "row_number",
+    "lag_lead",
+    "running_total",
+    "window_frame"
+   ],
+   "fundamentals": [
+    "window_frames",
+    "ranking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-window.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/window-function-descriptions.html"
    ],
    "proven": [
     "mariadb",

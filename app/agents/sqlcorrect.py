@@ -587,6 +587,19 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
         if pedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in pedits for a, b, _n in edits):
             edits += pedits
 
+    # structure (app/agents/sqlstruct.py, night 13): correlation that never names the outer row or names the wrong one, the
+    # same subquery written twice, UNION vs UNION ALL, a CTE read twice and filtered outside, SELECT * across a join
+    from app.agents import sqlstruct
+
+    for fnd, tedits in sqlstruct.structure(sql, s, intent, Finding, is_select):
+        if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        if fnd.kind == "check" and _SURE_ONLY.get():
+            continue
+        if tedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in tedits for a, b, _n in edits):
+            edits += tedits
+
     # locks and big data (app/agents/sqllock.py): a huge change in batches, queue workers with SKIP LOCKED (offered, same rows)
     from app.agents import sqllock
 
@@ -1165,14 +1178,35 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                 "CROSS JOIN mein ON nahi hota (har row har row se judti hai). MySQL ise INNER JOIN maan leta hai, PostgreSQL error deta hai. "
                 "Matching chahiye to INNER JOIN likho.")
         if x.kind in ("join", "left", "right", "full", "cross", "inner") and not x.on and not x.using and x.kind != "cross":
-            add("wrong", "join", f"{x.name} {x.alias} is joined without ON", f"{x.name} {x.alias} bina ON ke joda hai",
-                line_of(x.start), "Without ON every row is paired with every row of this table (rows multiply). Add ON with the matching columns.",
-                "ON ke bina har row is table ki har row se judti hai (rows guna ho jaati hain). Matching columns ke saath ON lagao.")
+            from app.agents import sqlstruct                 # night 13: what each engine does, and the link the names suggest
+
+            fam, says = sqlstruct._says("join_without_on")
+            link = sqlstruct.guess_link(x, srcs[:i]) if x.name else None
+            add("error" if fam == "postgresql" else "wrong", "join", f"{x.name} {x.alias} is joined without ON",
+                f"{x.name} {x.alias} bina ON ke joda hai", line_of(x.start),
+                f"Without ON every row is paired with every row of this table (rows multiply). {says} Add ON with the matching "
+                "columns" + (f": ON {link} (guessed from the table names: check it)." if link else "."),
+                "ON ke bina har row is table ki har row se judti hai (rows guna ho jaati hain). Matching columns ke saath ON lagao"
+                + (f": ON {link} (table ke naamon se andaza: check karo)." if link else "."))
+            if link:
+                pos = x.start + len(s[x.start:x.end].rstrip())
+                edits.append((pos, pos, f" ON {link} /* check: guessed from the names */"))
+                guesses.append(f"ON {link}")
         if x.on and a and a not in x.refs and i > 0 and not x.lateral:
+            from app.agents import sqlstruct
+
+            hint = {r[0] for r in refs} & {(y.alias or "").lower() for y in srcs[:i]}
+            link = sqlstruct.guess_link(x, srcs[:i], hint) if x.name else None
+            plain = re.fullmatch(r"\s*[`\"]?\w+[`\"]?\.[`\"]?\w+[`\"]?\s*=\s*[`\"]?\w+[`\"]?\.[`\"]?\w+[`\"]?\s*", x.on or "")
             add("wrong", "join", f"The ON of {x.alias} doesn't mention {x.alias}", f"{x.alias} ke ON mein {x.alias} hai hi nahi",
                 line_of(x.on_start), f"An ON condition must connect {x.alias} to a table before it; this one doesn't, so every {x.alias} row "
-                "is paired with every row (rows multiply).",
-                f"ON ko {x.alias} ko pichli table se jodna chahiye; ye nahi jodta, isliye rows guna ho jaati hain.")
+                "is paired with every row (rows multiply)." + (f" The names suggest ON {link} (a guess: check it)." if link else ""),
+                f"ON ko {x.alias} ko pichli table se jodna chahiye; ye nahi jodta, isliye rows guna ho jaati hain."
+                + (f" Naamon se lagta hai: ON {link} (andaza: check karo)." if link else ""))
+            if link and plain:
+                end = x.on_start + len(sql[x.on_start:x.on_end].rstrip())
+                edits.append((x.on_start, end, f" {link} /* check: guessed from the names */"))
+                guesses.append(f"ON {link}")
         later = [q for q in x.refs if q != a and q in by_alias and q not in seen_aliases]
         for q in later:
             add("error", "join", f"The ON of {x.alias} uses {q} before {q} is joined", f"{x.alias} ke ON mein {q}, jo abhi joda nahi",
@@ -1713,6 +1747,52 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                 continue                                  # a window function in HAVING: sqlwin's win_where
             if not AGG.search(part) and not any(w.lower() in totals for w in _bare(part, set())):
                 per_row.append(re.sub(r"(?i)^\s*and\s+|\s+and\s*$", "", sql[having[0] + a1:having[0] + b1]).strip())
+        # night 13: a condition on a GROUP BY column gives the same rows in WHERE (both engines, lab), only later: a speed risk
+        gkeys = set()
+        if group:
+            for _o, g in _split_top(s[group[0]:group[1]]):
+                g = g.strip()
+                if re.fullmatch(r"(?:[`\"]?\w+[`\"]?\.)?[`\"]?\w+[`\"]?", g) and not (
+                        g.strip('`"').lower() in sel_aliases and sel_aliases[g.strip('`"').lower()]["text"].strip('`"').lower() != g.strip('`"').lower()):
+                    gkeys.add(re.sub(r"[`\"]", "", g).lower())
+        def _on_key(part: str) -> bool:
+            p = re.sub(r"'(?:[^']|'')*'", "''", part)
+            cols = [re.sub(r"[`\"]", "", f"{q}.{c}").lower() for q, c, _x in _qrefs(p)] + \
+                   [w.lower() for w in _bare(re.sub(r"[`\"]?\w+[`\"]?\.[`\"]?\w+[`\"]?", " ", p), set()) if not re.fullmatch(r"\d+", w)]
+            return bool(cols) and all(c in gkeys or c.split(".")[-1] in {k.split(".")[-1] for k in gkeys} and
+                                      (("." in c) == any("." in k for k in gkeys if k.split(".")[-1] == c.split(".")[-1]) or "." not in c)
+                                      for c in cols) and not re.search(r"\(\s*select\b", part, re.I)
+        per_row = [p.rstrip().rstrip(";").rstrip() for p in per_row]
+        on_key = [p for p in per_row if gkeys and _on_key(p)]
+        per_row = [p for p in per_row if p not in on_key]
+        if on_key:
+            hv = _short(" AND ".join(on_key))
+            cond = " AND ".join(on_key)
+            hk_edits = []
+            if not per_row and len(on_key) == len([1 for a1, b1 in zip(cuts, cuts[1:])
+                                                    if not re.search(r"\bover\b", htext[a1:b1], re.I)]) and "having" in cl:
+                hkw = re.search(r"\bhaving\s*$", s[:having[0]], re.I).start()
+                hend = having[0] + len(s[having[0]:having[1]].rstrip().rstrip(";").rstrip())
+                hk_edits.append((hkw, hend, ""))
+                if where:
+                    wend = where[0] + len(s[where[0]:where[1]].rstrip().rstrip(";").rstrip())
+                    hk_edits.append((where[0], where[0], " ("))
+                    hk_edits.append((wend, wend, f") AND {cond}"))
+                else:
+                    gkw = re.search(r"\bgroup\s+by\s*$", s[:group[0]], re.I).start()
+                    hk_edits.append((gkw, gkw, f"WHERE {cond} "))
+            add("check", "having_key", f"HAVING {hv} filters on a GROUP BY column: WHERE does it before grouping",
+                f"HAVING {hv} GROUP BY column pe filter hai: WHERE ise grouping se pehle karta hai",
+                "HAVING " + re.sub(r"\s+", " ", cond),
+                "This is valid and returns the right rows: every row of a group has the same value of a GROUP BY column. But "
+                "HAVING runs after every group was built, so rows that are thrown away were still read and grouped (a speed "
+                "risk). In WHERE the same condition removes them first and can use an index; the result is exactly the same "
+                "(lab: one row either way on MariaDB and PostgreSQL).",
+                "Ye sahi hai aur sahi rows deta hai: group ki har row mein GROUP BY column ki value ek hi hoti hai. Par HAVING "
+                "saare groups banne ke baad chalta hai, isliye phenki jaane wali rows bhi padhi aur group hoti hain (speed ka "
+                "risk). WHERE mein wahi condition unhe pehle hata deti hai aur index use kar sakti hai; result bilkul wahi.")
+            if hk_edits and not any(a < e[1] and e[0] < b for e in hk_edits for a, b, _n in edits):
+                edits += hk_edits
         if per_row:
             hv = _short(" AND ".join(per_row))
             add("wrong" if group else "check", "having", f"HAVING {hv} filters a per-row value",

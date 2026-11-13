@@ -141,13 +141,19 @@
   "filter_level": {
    "title_en": "WHERE filters rows, HAVING filters groups",
    "title_hi": "WHERE rows filter karta hai, HAVING groups",
-   "rule_en": "WHERE runs on single rows before any totals exist, so it can't use SUM()/COUNT() or names made in SELECT. A condition on a total belongs in HAVING after GROUP BY.",
-   "rule_hi": "WHERE totals banne se pehle ek-ek row pe chalta hai, isliye SUM()/COUNT() ya SELECT ke naam use nahi kar sakta. Total wali condition GROUP BY ke baad HAVING mein.",
+   "rule_en": "WHERE runs on single rows before any totals exist, so it can't use SUM()/COUNT() or names made in SELECT. A condition on a total belongs in HAVING after GROUP BY. A condition on a GROUP BY column gives the same rows in WHERE and in HAVING, but WHERE removes rows before the grouping (and can use an index). A CTE read twice is kept whole by PostgreSQL, so a filter on one use stays outside unless it is written AS NOT MATERIALIZED.",
+   "rule_hi": "WHERE totals banne se pehle ek-ek row pe chalta hai, isliye SUM()/COUNT() ya SELECT ke naam use nahi kar sakta. Total wali condition GROUP BY ke baad HAVING mein. GROUP BY column wali condition WHERE aur HAVING dono mein wahi rows deti hai, par WHERE grouping se pehle rows hata deta hai (aur index use kar sakta hai). Do baar padha CTE PostgreSQL poora rakhta hai, isliye ek use ka filter bahar rehta hai jab tak AS NOT MATERIALIZED na likho.",
    "topics": [
     "where",
-    "having"
+    "having",
+    "having_key",
+    "cte_filter_late"
    ],
-   "source": "https://dev.mysql.com/doc/refman/8.4/en/select.html"
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/select.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   },
   "subquery_shape": {
    "title_en": "A subquery is one value or a set",
@@ -189,16 +195,22 @@
   "names_scope": {
    "title_en": "Names belong to a scope",
    "title_hi": "Naam ek scope ke hote hain",
-   "rule_en": "Once a table has an alias, only the alias works; a column with no table in front is ambiguous when two joined tables have it; a name made in SELECT exists only for ORDER BY (and HAVING in MySQL), never for WHERE.",
-   "rule_hi": "Table ko alias dene ke baad sirf alias chalta hai; do tables mein same column ho to bina table ke naam ambiguous hai; SELECT mein banaya naam WHERE mein nahi chalta.",
+   "rule_en": "Once a table has an alias, only the alias works; a column with no table in front is ambiguous when two joined tables have it; a name made in SELECT exists only for ORDER BY (and HAVING in MySQL), never for WHERE. SELECT * over a join keeps every column of every table, so a name two tables share (id) comes out twice: MariaDB refuses that in a derived table or CTE (1060), PostgreSQL refuses only when the name is used (42702).",
+   "rule_hi": "Table ko alias dene ke baad sirf alias chalta hai; do tables mein same column ho to bina table ke naam ambiguous hai; SELECT mein banaya naam WHERE mein nahi chalta. Join pe SELECT * har table ke saare columns rakhta hai, isliye do tables ka common naam (id) do baar aata hai: MariaDB derived table / CTE mein mana karta hai (1060), PostgreSQL naam use karne pe (42702).",
    "topics": [
     "alias",
     "column",
     "order",
     "having_alias",
-    "cte_order"
+    "cte_order",
+    "star_dup",
+    "star_join"
    ],
-   "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-alias.html"
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-alias.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   },
   "ranking": {
    "title_en": "Ranking: windows, partitions and ties",
@@ -332,14 +344,17 @@
   "correlation": {
    "title_en": "A subquery reads its own FROM first",
    "title_hi": "Subquery pehle apna FROM padhti hai",
-   "rule_en": "A name inside a subquery is looked up in the subquery's own FROM first and only then in the query around it. A subquery is tied to the outer row (correlated) only through a name that belongs to the outer query; without one it gives the same answer for every row. So when the subquery reads the same table again, orders.customer_id inside it means the inner orders (x = x, always true) unless the inner copy gets a name of its own; a column of the outer row in the subquery's SELECT list just repeats the row's own value; and IN (SELECT MAX(y) ... GROUP BY g) gives values without saying which group they belong to, so a row matches any group's maximum, not its own. Compare the pair ((g, y) IN (SELECT g, MAX(y) ...)) or correlate on g.",
-   "rule_hi": "Subquery ke andar naam pehle uske apne FROM mein dhoondha jaata hai, phir bahar wali query mein. Subquery bahar ki row se tabhi judti hai (correlated) jab usme bahar wali query ka koi naam ho; warna har row ka ek hi jawab. Isliye wahi table dobara padhne par andar orders.customer_id andar wali orders hai (x = x, hamesha true) jab tak andar wali copy ko apna naam na do; SELECT list mein bahar ki row ka column bas usi row ki value dohraata hai; aur IN (SELECT MAX(y) ... GROUP BY g) values deta hai par ye nahi batata kis group ki, isliye row kisi bhi group ke max se match ho jaati hai. Jodi compare karo ((g, y) IN (SELECT g, MAX(y) ...)) ya g par correlate karo.",
+   "rule_en": "A name inside a subquery is looked up in the subquery's own FROM first and only then in the query around it. A subquery is tied to the outer row (correlated) only through a name that belongs to the outer query; without one it gives the same answer for every row. So when the subquery reads the same table again, orders.customer_id inside it means the inner orders (x = x, always true) unless the inner copy gets a name of its own; a column of the outer row in the subquery's SELECT list just repeats the row's own value; and IN (SELECT MAX(y) ... GROUP BY g) gives values without saying which group they belong to, so a row matches any group's maximum, not its own. Compare the pair ((g, y) IN (SELECT g, MAX(y) ...)) or correlate on g. A total in SELECT that names no outer column is one grand total repeated on every row; a condition that compares the inner table with itself (o.customer_id = o.id) never reaches the outer row; and a link column must be compared with the table it is named after (p.order_id = o.id, not c.id).",
+   "rule_hi": "Subquery ke andar naam pehle uske apne FROM mein dhoondha jaata hai, phir bahar wali query mein. Subquery bahar ki row se tabhi judti hai (correlated) jab usme bahar wali query ka koi naam ho; warna har row ka ek hi jawab. Isliye wahi table dobara padhne par andar orders.customer_id andar wali orders hai (x = x, hamesha true) jab tak andar wali copy ko apna naam na do; SELECT list mein bahar ki row ka column bas usi row ki value dohraata hai; aur IN (SELECT MAX(y) ... GROUP BY g) values deta hai par ye nahi batata kis group ki, isliye row kisi bhi group ke max se match ho jaati hai. Jodi compare karo ((g, y) IN (SELECT g, MAX(y) ...)) ya g par correlate karo. SELECT ka total jo bahar ka koi column nahi leta, har row pe wahi poora total hai; andar ki table ko khud se milane wali condition (o.customer_id = o.id) bahar ki row tak nahi pahunchti; aur link column ko usi table se milao jiske naam pe wo hai (p.order_id = o.id, c.id nahi).",
    "topics": [
     "exists_uncorr",
     "sub_outer_col",
     "corr_self",
     "in_grouped_agg",
-    "sub_key"
+    "sub_key",
+    "scalar_uncorr",
+    "corr_inner",
+    "corr_key"
    ],
    "source": "https://www.postgresql.org/docs/current/sql-expressions.html#SQL-SYNTAX-SCALAR-SUBQUERIES",
    "proven": [
@@ -630,6 +645,44 @@
     "https://www.postgresql.org/docs/current/using-explain.html",
     "https://dev.mysql.com/doc/refman/8.0/en/information-schema-columns-table.html",
     "https://use-the-index-luke.com/sql/explain-plan"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "set_operations": {
+   "title_en": "UNION removes repeats, UNION ALL keeps them",
+   "title_hi": "UNION repeats hatata hai, UNION ALL rakhta hai",
+   "rule_en": "UNION stacks the rows of its parts and then removes every repeated row, including repeats inside one part, which needs a sort or a hash of all rows. UNION ALL only stacks them. So UNION ALL returns the same rows exactly when no row can appear twice: the parts can't share a row (a constant column that differs per part, conditions that exclude each other) and each part has no repeats of its own (it lists a key, or has DISTINCT / GROUP BY on its columns). When each value is wanted once, UNION (or DISTINCT) is needed. Rows are compared with the column's collation: MariaDB's usual _ci collation counts 'A@x' and 'a@x' as one row, PostgreSQL doesn't.",
+   "rule_hi": "UNION parts ki rows jodta hai aur phir har repeat row hata deta hai, ek hi part ke andar ke repeats bhi, jiske liye saari rows ka sort ya hash chahiye. UNION ALL sirf jodta hai. Isliye UNION ALL bilkul wahi rows tab deta hai jab koi row do baar aa hi na sake: parts ki rows kabhi same na hon (har part mein alag constant column, ya aapas mein ulti conditions) aur har part mein apne repeats na hon (key, ya DISTINCT / GROUP BY). Har value ek baar chahiye to UNION (ya DISTINCT) zaroori hai. Rows column ke collation se compare hoti hain: MariaDB ka _ci 'A@x' aur 'a@x' ko ek maanta hai, PostgreSQL nahi.",
+   "topics": [
+    "union_all",
+    "union_all_dups"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-union.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/union/",
+    "https://dev.mysql.com/doc/refman/8.4/en/union.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "repeated_work": {
+   "title_en": "The same subquery written twice is worked out twice",
+   "title_hi": "Do baar likhi wahi subquery do baar chalti hai",
+   "rule_en": "Each copy of a subquery is its own piece of work: PostgreSQL makes one SubPlan (correlated) or InitPlan (not correlated) per copy, MariaDB one DEPENDENT SUBQUERY or SUBQUERY per copy. Work it out once instead: give a SELECT item a name and use the name in ORDER BY, wrap the query in a derived table to filter on that name (WHERE can't see SELECT names), or join a one-row derived table (CROSS JOIN) for a total without GROUP BY, which always has exactly one row. The rows don't change; only the work does, so it is a speed risk to check with EXPLAIN.",
+   "rule_hi": "Subquery ki har copy alag kaam hai: PostgreSQL har copy ka ek SubPlan / InitPlan banata hai, MariaDB har copy ka ek DEPENDENT SUBQUERY / SUBQUERY. Ek baar nikalo: SELECT item ko naam do aur ORDER BY mein naam lo, us naam pe filter ke liye query ko derived table mein rakho (WHERE SELECT ke naam nahi dekhta), ya bina GROUP BY ke total ke liye ek row ki derived table CROSS JOIN karo (wo hamesha ek hi row hoti hai). Rows nahi badalti, sirf kaam; isliye ye speed ka risk hai, EXPLAIN se dekho.",
+   "topics": [
+    "repeat_subquery",
+    "same_subquery"
+   ],
+   "source": "https://www.postgresql.org/docs/current/using-explain.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/subquery-cache/",
+    "https://mariadb.com/kb/en/condition-pushdown-into-derived-table-optimization/"
    ],
    "proven": [
     "mariadb",

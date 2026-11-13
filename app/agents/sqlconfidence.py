@@ -232,6 +232,18 @@ def _scope_table(pos: int, s: str, dep: list[int], marks, amap: dict) -> tuple[s
             break
         p, d = start, d - 1
     end = len(s) if d == 0 else C._close(s, start)
+    # night 13: a UNION / INTERSECT / EXCEPT part is its own block: a bare column belongs to its part's FROM, not the first one
+    cuts = [m for m in re.finditer(r"\b(?:union|intersect|except)\b(?:\s+(?:all|distinct)\b)?", s[start:end], re.I)
+            if dep[start + m.start()] == d]
+    if cuts:
+        lo, hi = start, end
+        for m in cuts:
+            if start + m.end() <= pos:
+                lo = start + m.end()
+            elif start + m.start() > pos:
+                hi = start + m.start()
+                break
+        start, end = lo, hi
     src = None
     for mp, md, cl in marks:
         if start <= mp < end and md == d and cl in ("from",):

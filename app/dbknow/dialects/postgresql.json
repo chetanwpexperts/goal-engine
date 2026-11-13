@@ -556,7 +556,13 @@
   "skip_locked": {"behaviour": "works", "says": "PostgreSQL 9.5+ has SKIP LOCKED (lab: job 2 at once); NOWAIT fails at once with 55P03 (could not obtain lock on row).", "proven": ["postgresql"]},
   "lock_scan": {"behaviour": "locks_matching", "says": "PostgreSQL locks only the rows it changes, so without an index it reads the whole table but doesn't block other rows (lab: the second session went on).", "proven": ["postgresql"]},
   "gap_locks": {"behaviour": "none", "says": "PostgreSQL takes no gap locks: an INSERT into a range another transaction updated goes on (lab).", "proven": ["postgresql"]},
-  "deadlock": {"behaviour": "error", "code": "40P01", "says": "PostgreSQL stops one with 40P01 (deadlock detected) after deadlock_timeout (1 s); its DETAIL names the two processes and transactions.", "proven": ["postgresql"]}
+  "deadlock": {"behaviour": "error", "code": "40P01", "says": "PostgreSQL stops one with 40P01 (deadlock detected) after deadlock_timeout (1 s); its DETAIL names the two processes and transactions.", "proven": ["postgresql"]},
+  "join_without_on": {"behaviour": "error", "code": "42601", "says": "PostgreSQL refuses JOIN without ON or USING (42601, syntax error); write CROSS JOIN when every pair is really wanted.", "proven": ["postgresql"]},
+  "star_dup_derived": {"behaviour": "works", "says": "PostgreSQL runs a derived table or CTE with the same column name twice, but refuses to use that name (42702, column reference is ambiguous).", "proven": ["postgresql"]},
+  "union_collation": {"behaviour": "works", "says": "PostgreSQL compares UNION rows exactly (its usual collation is case-sensitive): 'aarav@mail.test' and 'AARAV@mail.test' stay two rows.", "proven": ["postgresql"]},
+  "repeated_subquery": {"behaviour": "slow", "says": "PostgreSQL's EXPLAIN shows one SubPlan per copy, except that a copy in ORDER BY identical to a SELECT item shares that item's SubPlan.", "proven": ["postgresql"]},
+  "same_subquery": {"behaviour": "slow", "says": "PostgreSQL's EXPLAIN shows one InitPlan per copy (each worked out once, but each on its own).", "proven": ["postgresql"]},
+  "cte_read_twice": {"behaviour": "slow", "says": "PostgreSQL builds a CTE that is read twice once and keeps it, so a filter on one use stays outside (EXPLAIN: CTE Scan with the filter, after aggregating every row); AS NOT MATERIALIZED (12+) lets it in.", "proven": ["postgresql"]}
  },
  "proven": [
   "postgresql"

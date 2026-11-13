@@ -38,9 +38,10 @@
     "needs_schema": ["not_in", "not_in_outer", "anti_join", "sum_null", "avg_null", "sub_sum_null", "all_null", "null_math", "count",
                      "stable_order", "ties", "win_running_ties", "win_rank_ties", "scalar_rows", "date_range", "join_key", "division",
                      "implicit_cast", "sub_key", "timestamp_range", "in_list_null", "join_types", "schema_column", "schema_table",
-                     "sum_distinct", "nulls_order"],
+                     "sum_distinct", "nulls_order", "union_all"],
     "needs_execution": ["sargable", "or_union", "keyset", "keyset_offset", "leading_wildcard", "select_star", "index_prefix",
-                        "index_range_first", "batch_change", "skip_locked", "n_plus_one", "index_missing", "index"]
+                        "index_range_first", "batch_change", "skip_locked", "n_plus_one", "index_missing", "index",
+                        "repeat_subquery", "same_subquery", "having_key", "cte_filter_late", "star_join"]
   },
   "facts": {
     "not_null": {"en": "whether {col} can be NULL", "hi": "{col} NULL ho sakta hai ya nahi"},

@@ -29277,6 +29277,1610 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "on_condition_tables",
+   "kind": "concept",
+   "title": {
+    "en": "What an ON condition must connect",
+    "hinglish": "ON condition ko kya jodna chahiye",
+    "hindi": "ON condition क्या जोड़े"
+   },
+   "terms": [
+    [
+     "\\bon\\b (condition|clause)",
+     "(connect|link|jod\\w*|mention\\w*|tables?)"
+    ],
+    [
+     "on condition",
+     "join"
+    ],
+    [
+     "ON condition",
+     "join"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what does the on condition of a join do",
+     "which tables should the on condition mention"
+    ],
+    "hinglish": [
+     "join mein on condition kya karti hai",
+     "on condition mein kaun si tables likhna chahiye"
+    ],
+    "hindi": [
+     "join में ON condition क्या करती है"
+    ]
+   },
+   "answer": {
+    "en": "The ON of a join must tie the table being joined to a table already in the query: JOIN order_items i ON i.order_id = o.id. An ON that names only earlier tables (ON o.id = o.customer_id) or only the new one (ON i.qty > 0) filters but doesn't link, so every row of the new table meets every row before it (lab: 30 rows instead of 10). Filters on the joined table may sit in ON too, but next to the link (AND), not instead of it.",
+    "hinglish": "Join ka ON judne wali table ko query mein pehle se maujood table se jode: JOIN order_items i ON i.order_id = o.id. Jo ON sirf pichli tables ka naam le (ON o.id = o.customer_id) ya sirf nayi ka (ON i.qty > 0) wo filter karta hai par jodta nahi, isliye nayi table ki har row pehle ki har row se milti hai (lab: 10 ki jagah 30 rows). Judi table ke filters ON mein bhi reh sakte hain, par link ke saath (AND), uski jagah nahi.",
+    "hindi": "ON नई table को पहले वाली table से जोड़े: i.order_id = o.id।"
+   },
+   "mistake": {
+    "en": "Copying the previous join's condition into the next ON: it runs, but the new table is joined to nothing.",
+    "hinglish": "Pichle join ki condition agle ON mein copy karna: chalta hai, par nayi table kisi se nahi judti.",
+    "hindi": "पिछली condition copy न करें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS item_rows FROM customers c JOIN orders o ON o.customer_id = c.id JOIN order_items i ON i.order_id = o.id"
+     },
+     "columns": [
+      "item_rows"
+     ],
+     "result": [
+      [
+       "10"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): same rule.",
+    "oracle": "Notes only (not lab-tested here): same rule.",
+    "sqlite": "Notes only (not lab-tested here): same rule.",
+    "mysql": "Same.",
+    "mariadb": "Lab: an ON that skips the new table gave 30 rows instead of 10.",
+    "postgresql": "Lab: same, 30 rows."
+   },
+   "related": [
+    "join_without_on",
+    "join_duplicates",
+    "on_vs_where"
+   ],
+   "fundamentals": [
+    "join_condition"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/join.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-table-expressions.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "join_without_on",
+   "kind": "concept",
+   "title": {
+    "en": "JOIN without ON",
+    "hinglish": "Bina ON ke JOIN",
+    "hindi": "ON के बिना JOIN"
+   },
+   "terms": [
+    [
+     "join\\w*",
+     "(without|no|missing|bina|binaa|bagair) (an )?on\\b"
+    ],
+    [
+     "join\\w*",
+     "on (clause|condition)",
+     "(without|no|missing|bina|nahi|na ho)"
+    ],
+    [
+     "join",
+     "ON के बिना"
+    ],
+    [
+     "ON के बिना",
+     "join"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what happens if you join without on",
+     "can i write join without on condition"
+    ],
+    "hinglish": [
+     "join bina on ke kya hota hai",
+     "bina on ke join kar sakte hai kya"
+    ],
+    "hindi": [
+     "ON के बिना join करने से क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "MySQL and MariaDB accept JOIN (or INNER JOIN) with no ON and treat it as a cross join: every row with every row (lab: 64 rows from 8 x 8). PostgreSQL refuses it (42601, syntax error) and asks for ON, USING or an explicit CROSS JOIN. So always write the link, usually child.parent_id = parent.id.",
+    "hinglish": "MySQL aur MariaDB bina ON ka JOIN (ya INNER JOIN) maan lete hain aur use cross join ki tarah chalate hain: har row har row se (lab: 8 x 8 = 64 rows). PostgreSQL mana karta hai (42601, syntax error) aur ON, USING ya CROSS JOIN maangta hai. Isliye link hamesha likho, aam taur pe child.parent_id = parent.id.",
+    "hindi": "MySQL इसे cross join मानता है; PostgreSQL मना करता है (42601)।"
+   },
+   "mistake": {
+    "en": "Forgetting the ON on MySQL: there is no error, just far too many rows.",
+    "hinglish": "MySQL pe ON bhoolna: error nahi aata, bas bahut zyada rows aati hain.",
+    "hindi": "MySQL पर error नहीं आता, rows बहुत आती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS pairs FROM customers c CROSS JOIN orders o"
+     },
+     "columns": [
+      "pairs"
+     ],
+     "result": [
+      [
+       "64"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): JOIN needs ON (CROSS JOIN for every pair).",
+    "oracle": "Notes only (not lab-tested here): JOIN needs ON or USING.",
+    "sqlite": "Notes only (not lab-tested here): JOIN without ON is allowed and acts as a cross join.",
+    "mysql": "Runs as a cross join (no error).",
+    "mariadb": "Lab: runs, 64 rows.",
+    "postgresql": "Lab: refused, 42601."
+   },
+   "related": [
+    "on_condition_tables",
+    "cross_join",
+    "on_vs_where"
+   ],
+   "fundamentals": [
+    "join_condition"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/join.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-table-expressions.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "same_value_every_row",
+   "kind": "concept",
+   "title": {
+    "en": "A subquery that gives the same value on every row",
+    "hinglish": "Har row pe same value deni wali subquery",
+    "hindi": "हर row पर एक ही value"
+   },
+   "terms": [
+    [
+     "subquer\\w*",
+     "(same|ek hi|wahi|identical) (value|number|total|result|answer)"
+    ],
+    [
+     "subquer\\w*",
+     "(every|each|har|sab) rows?",
+     "(same|ek hi|wahi)"
+    ],
+    [
+     "subquery",
+     "एक ही"
+    ],
+    [
+     "subquer\\w*",
+     "(every|each|har) rows?",
+     "(same|wahi|ek hi)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why does my subquery return the same value for every row",
+     "why does a subquery give the same total on every row"
+    ],
+    "hinglish": [
+     "subquery har row pe same value kyun deti hai",
+     "subquery har row pe wahi total kyun deti hai"
+    ],
+    "hindi": [
+     "subquery हर row पर एक ही value क्यों देती है"
+    ]
+   },
+   "answer": {
+    "en": "A subquery only depends on the outer row if it names one of the outer row's columns. (SELECT SUM(o.amount) FROM orders o) reads all orders, so every customer gets the grand total. To get each customer's own total, tie it to the outer row: WHERE o.customer_id = c.id. Also check that the condition really reaches outside: o.customer_id = o.id compares orders with itself.",
+    "hinglish": "Subquery bahar ki row pe tabhi tikti hai jab wo bahar ki row ka koi column le. (SELECT SUM(o.amount) FROM orders o) saare orders padhti hai, isliye har customer ko poora total milta hai. Har customer ka apna total chahiye to bahar ki row se jodo: WHERE o.customer_id = c.id. Ye bhi dekho ki condition sach mein bahar jaati hai: o.customer_id = o.id orders ko khud se milata hai.",
+    "hindi": "Subquery को बाहर की row से जोड़ें: WHERE o.customer_id = c.id।"
+   },
+   "mistake": {
+    "en": "Writing the inner alias on both sides (o.customer_id = o.id): it runs, but never looks at the outer row.",
+    "hinglish": "Dono taraf andar wala alias likhna (o.customer_id = o.id): chalta hai, par bahar ki row dekhta hi nahi.",
+    "hindi": "दोनों तरफ़ अंदर वाला alias न लिखें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, (SELECT SUM(o.amount) FROM orders o WHERE o.customer_id = c.id) AS total FROM customers c ORDER BY c.id"
+     },
+     "columns": [
+      "id",
+      "total"
+     ],
+     "result": [
+      [
+       "1",
+       "26000"
+      ],
+      [
+       "2",
+       "80500"
+      ],
+      [
+       "3",
+       "12800"
+      ],
+      [
+       "4",
+       "NULL"
+      ],
+      [
+       "5",
+       "NULL"
+      ],
+      [
+       "6",
+       "65000"
+      ],
+      [
+       "7",
+       "NULL"
+      ],
+      [
+       "8",
+       "300"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same scoping rules.",
+    "oracle": "Notes only (not lab-tested here): Same.",
+    "sqlite": "Notes only (not lab-tested here): Same.",
+    "mysql": "Same.",
+    "mariadb": "Lab: without the link one value for all 8 customers; with it, each customer's own (NULL where none).",
+    "postgresql": "Lab: same as MariaDB."
+   },
+   "related": [
+    "correlated_subquery",
+    "scalar_subquery",
+    "correlation_condition"
+   ],
+   "fundamentals": [
+    "correlation"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/correlated-subqueries.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/functions-subquery.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "correlation_condition",
+   "kind": "concept",
+   "title": {
+    "en": "The link condition of a correlated subquery",
+    "hinglish": "Correlated subquery ki link condition",
+    "hindi": "Correlated subquery की link condition"
+   },
+   "terms": [
+    [
+     "correlat\\w*",
+     "subquer\\w*",
+     "(condition|alias|link)"
+    ],
+    [
+     "(outer|bahar\\w*)",
+     "(alias|table)",
+     "subquer\\w*"
+    ],
+    [
+     "correlated",
+     "condition"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how do i write the condition of a correlated subquery",
+     "which alias goes in a correlated subquery condition"
+    ],
+    "hinglish": [
+     "correlated subquery mein kaun sa alias likhe",
+     "subquery mein outer table ka alias kaise use kare"
+    ],
+    "hindi": [
+     "correlated subquery की condition कैसे लिखें"
+    ]
+   },
+   "answer": {
+    "en": "Put the inner table's link column on one side and the outer row's key on the other: (SELECT SUM(p.amount) FROM payments p WHERE p.order_id = o.id). The inner side is the table in the subquery's own FROM; the outer side must be an alias of the query around it. The link column is named after the table it points at (order_id -> orders), so it is compared with that table's id, not another table's.",
+    "hinglish": "Ek taraf andar wali table ka link column, doosri taraf bahar ki row ki key: (SELECT SUM(p.amount) FROM payments p WHERE p.order_id = o.id). Andar wali taraf subquery ki apni FROM ki table; bahar wali taraf bahar ki query ka alias. Link column usi table ke naam pe hota hai jise wo point karta hai (order_id -> orders), isliye use usi table ki id se milao, kisi aur ki nahi.",
+    "hindi": "अंदर की table का link column, बाहर की row की key: p.order_id = o.id।"
+   },
+   "mistake": {
+    "en": "p.order_id = c.id: a key compared with the wrong table's id, which pairs rows only when the numbers happen to match.",
+    "hinglish": "p.order_id = c.id: key ko galat table ki id se milana, rows sirf number milne pe judti hain.",
+    "hindi": "गलत table की id से न मिलाएँ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, (SELECT SUM(p.amount) FROM payments p WHERE p.order_id = o.id) AS paid FROM orders o ORDER BY o.id"
+     },
+     "columns": [
+      "id",
+      "paid"
+     ],
+     "result": [
+      [
+       "1",
+       "25500"
+      ],
+      [
+       "2",
+       "450"
+      ],
+      [
+       "3",
+       "79000"
+      ],
+      [
+       "4",
+       "NULL"
+      ],
+      [
+       "5",
+       "800"
+      ],
+      [
+       "6",
+       "NULL"
+      ],
+      [
+       "7",
+       "500"
+      ],
+      [
+       "8",
+       "NULL"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same.",
+    "oracle": "Notes only (not lab-tested here): Same.",
+    "sqlite": "Notes only (not lab-tested here): Same.",
+    "mysql": "Same.",
+    "mariadb": "Lab: paid per order (NULL where none).",
+    "postgresql": "Lab: same rows."
+   },
+   "related": [
+    "correlated_subquery",
+    "same_value_every_row",
+    "join_key"
+   ],
+   "fundamentals": [
+    "correlation"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/correlated-subqueries.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/functions-subquery.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "repeated_subquery",
+   "kind": "concept",
+   "title": {
+    "en": "The same subquery written twice",
+    "hinglish": "Wahi subquery do baar likhna",
+    "hindi": "एक ही subquery दो बार"
+   },
+   "terms": [
+    [
+     "(same|wahi|ek hi|identical|repeat\\w*|duplicate\\w*)",
+     "subquer\\w*",
+     "(twice|two times|again|do baar|dobara|multiple|repeat\\w*|select and where|avoid)"
+    ],
+    [
+     "subquery",
+     "दो बार"
+    ],
+    [
+     "subquery",
+     "दो बार"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to avoid repeating the same subquery in select and where",
+     "is it slow to write the same subquery twice"
+    ],
+    "hinglish": [
+     "same subquery do baar likhna slow hai kya",
+     "select aur where mein wahi subquery dobara kaise na likhe"
+    ],
+    "hindi": [
+     "एक ही subquery दो बार लिखना ठीक है क्या"
+    ]
+   },
+   "answer": {
+    "en": "Each copy is worked out on its own: PostgreSQL shows one SubPlan (or InitPlan) per copy, MariaDB one DEPENDENT SUBQUERY (or SUBQUERY) per copy. Work it out once: name it in SELECT and use the name in ORDER BY; to filter on it, wrap the query in a derived table (WHERE can't see SELECT names); a total that doesn't depend on the row can be a one-row derived table joined with CROSS JOIN. The rows stay the same.",
+    "hinglish": "Har copy alag se chalti hai: PostgreSQL har copy ka ek SubPlan (ya InitPlan) dikhata hai, MariaDB har copy ka ek DEPENDENT SUBQUERY (ya SUBQUERY). Ek baar nikalo: SELECT mein naam do aur ORDER BY mein wahi naam; us pe filter ke liye query ko derived table mein rakho (WHERE SELECT ke naam nahi dekhta); row pe na tikne wala total ek row ki derived table CROSS JOIN se. Rows wahi rehti hain.",
+    "hindi": "हर copy अलग चलती है; एक बार निकालें (derived table या CROSS JOIN)।"
+   },
+   "mistake": {
+    "en": "Changing one copy and forgetting the others: the query then filters on one thing and shows another.",
+    "hinglish": "Ek copy badalna aur baaki bhool jaana: query ek cheez pe filter karti hai aur doosri dikhati hai.",
+    "hindi": "एक copy बदलें तो बाकी भी।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT * FROM (SELECT c.id, (SELECT SUM(o.amount) FROM orders o WHERE o.customer_id = c.id) AS total FROM customers c) AS t WHERE total > 1000 ORDER BY total DESC"
+     },
+     "columns": [
+      "id",
+      "total"
+     ],
+     "result": [
+      [
+       "2",
+       "80500"
+      ],
+      [
+       "6",
+       "65000"
+      ],
+      [
+       "1",
+       "26000"
+      ],
+      [
+       "3",
+       "12800"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): CROSS APPLY can compute it once per row.",
+    "oracle": "Notes only (not lab-tested here): Scalar subquery caching may help; a WITH clause is clearer.",
+    "sqlite": "Notes only (not lab-tested here): Same idea; a derived table works.",
+    "mysql": "Same as MariaDB.",
+    "mariadb": "Lab: EXPLAIN shows three DEPENDENT SUBQUERY rows for three copies.",
+    "postgresql": "Lab: a copy in ORDER BY equal to a SELECT item shares its SubPlan; the WHERE copy gets its own."
+   },
+   "related": [
+    "scalar_subquery",
+    "derived_table",
+    "subquery_in_select_speed"
+   ],
+   "fundamentals": [
+    "repeated_work"
+   ],
+   "source": "https://www.postgresql.org/docs/current/using-explain.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/subquery-cache/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "union_columns",
+   "kind": "concept",
+   "title": {
+    "en": "The columns of a UNION",
+    "hinglish": "UNION ke columns",
+    "hindi": "UNION के columns"
+   },
+   "terms": [
+    [
+     "union",
+     "columns?",
+     "(same|match\\w*|number|count|ginti|order|names?|types?|barabar|rules?)"
+    ],
+    [
+     "union",
+     "कॉलम"
+    ],
+    [
+     "union",
+     "columns?",
+     "बराबर"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "do union columns have to match",
+     "what are the rules for union columns"
+    ],
+    "hinglish": [
+     "union mein columns ki ginti same kyun honi chahiye",
+     "union ke columns kaise match hote hai"
+    ],
+    "hindi": [
+     "UNION में columns बराबर क्यों होने चाहिए"
+    ]
+   },
+   "answer": {
+    "en": "Every part of a UNION must return the same number of columns (else MariaDB 1222, PostgreSQL 42601), and they are matched by position, not by name: the second column of each part lands in the second column of the result, whatever it is called. The result's names come from the first part. Matching types are needed on PostgreSQL (42804 for text with a number), while MariaDB converts quietly.",
+    "hinglish": "UNION ke har part ko utne hi columns dene hote hain (warna MariaDB 1222, PostgreSQL 42601), aur wo position se milte hain, naam se nahi: har part ka doosra column result ke doosre column mein aata hai, naam kuch bhi ho. Result ke naam pehle part se aate hain. PostgreSQL pe types milne chahiye (text aur number pe 42804), MariaDB chupchap badal deta hai.",
+    "hindi": "हर part में उतने ही columns, position से मिलते हैं, नाम पहले part से।"
+   },
+   "mistake": {
+    "en": "Listing the columns in a different order in the second part: the query runs and puts names under phone numbers.",
+    "hinglish": "Doosre part mein columns ka kram badal dena: query chalti hai aur naam phone ke neeche aa jaate hain.",
+    "hindi": "Columns का क्रम एक जैसा रखें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT first_name AS name, city AS place FROM customers WHERE id = 1 UNION ALL SELECT name, country FROM suppliers WHERE id = 1 ORDER BY name"
+     },
+     "columns": [
+      "name",
+      "place"
+     ],
+     "result": [
+      [
+       "Aarav",
+       "Pune"
+      ],
+      [
+       "Alpha Traders",
+       "India"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): same count needed; types are converted by precedence.",
+    "oracle": "Notes only (not lab-tested here): same count and compatible types (ORA-01789 / ORA-01790).",
+    "sqlite": "Notes only (not lab-tested here): same count; types are loose.",
+    "mysql": "1222 for a different number of columns.",
+    "mariadb": "Lab: 1222 for a different count; text and number are mixed silently.",
+    "postgresql": "Lab: 42601 for a different count; 42804 for text with a number."
+   },
+   "related": [
+    "union_vs_union_all",
+    "union_order_by",
+    "union_all_safe"
+   ],
+   "fundamentals": [
+    "set_operations"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-union.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.4/en/union.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "union_all_safe",
+   "kind": "concept",
+   "title": {
+    "en": "When UNION ALL gives the same rows as UNION",
+    "hinglish": "UNION ALL kab UNION jaisi rows deta hai",
+    "hindi": "UNION ALL कब सुरक्षित"
+   },
+   "terms": [
+    [
+     "union all",
+     "(instead of|in place of|ki jagah|replace)"
+    ],
+    [
+     "union all",
+     "(safe|same rows|same result|sahi)"
+    ],
+    [
+     "union all",
+     "सुरक्षित"
+    ],
+    [
+     "union all",
+     "(when|kab)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "when can i use union all instead of union",
+     "is union all safe in place of union"
+    ],
+    "hinglish": [
+     "union ki jagah union all kab use kar sakte hai",
+     "union all kab safe hai"
+    ],
+    "hindi": [
+     "UNION ALL कब सुरक्षित है"
+    ]
+   },
+   "answer": {
+    "en": "Exactly when no row could appear twice anyway: the parts can't share a row (a constant column that differs per part, like 'customer' / 'supplier', or conditions that exclude each other) AND each part has no repeated rows of its own (it lists a key such as id, or has DISTINCT / GROUP BY). Then UNION's sort or hash only costs time. If a part can repeat a row (cities of customers), UNION still removes those, so the results differ.",
+    "hinglish": "Tab, jab koi row waise bhi do baar aa hi na sake: parts ki rows kabhi same na hon (har part mein alag constant column, jaise 'customer' / 'supplier', ya ulti conditions) AUR har part mein apne repeats na hon (key jaise id, ya DISTINCT / GROUP BY). Tab UNION ka sort/hash sirf time leta hai. Agar ek part row dohra sakta hai (customers ke shehar), UNION unhe bhi hataata hai, to results alag honge.",
+    "hindi": "जब parts में row दोहराई न जा सके (key या अलग constant)।"
+   },
+   "mistake": {
+    "en": "Assuming a constant tag column is enough: UNION also removes repeats inside one part (7 rows vs 11 in the lab).",
+    "hinglish": "Sirf alag constant column kaafi samajhna: UNION ek part ke andar ke repeats bhi hataata hai (lab: 7 vs 11 rows).",
+    "hindi": "एक part के अंदर के repeats भी हटते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, 'customer' AS kind FROM customers UNION ALL SELECT id, 'supplier' FROM suppliers ORDER BY kind, id"
+     },
+     "columns": [
+      "id",
+      "kind"
+     ],
+     "result": [
+      [
+       "1",
+       "customer"
+      ],
+      [
+       "2",
+       "customer"
+      ],
+      [
+       "3",
+       "customer"
+      ],
+      [
+       "4",
+       "customer"
+      ],
+      [
+       "5",
+       "customer"
+      ],
+      [
+       "6",
+       "customer"
+      ],
+      [
+       "7",
+       "customer"
+      ],
+      [
+       "8",
+       "customer"
+      ],
+      [
+       "1",
+       "supplier"
+      ],
+      [
+       "2",
+       "supplier"
+      ],
+      [
+       "3",
+       "supplier"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same rules.",
+    "oracle": "Notes only (not lab-tested here): Same rules.",
+    "sqlite": "Notes only (not lab-tested here): Same rules.",
+    "mysql": "Same.",
+    "mariadb": "Lab: id + tag gives 11 rows both ways; city + tag gives 7 with UNION, 11 with UNION ALL.",
+    "postgresql": "Lab: same counts."
+   },
+   "related": [
+    "union_vs_union_all",
+    "distinct",
+    "union_case_insensitive"
+   ],
+   "fundamentals": [
+    "set_operations"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-union.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/union/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "union_case_insensitive",
+   "kind": "concept",
+   "title": {
+    "en": "Does UNION treat upper and lower case as the same?",
+    "hinglish": "UNION upper/lower case ko same maanta hai?",
+    "hindi": "UNION और case"
+   },
+   "terms": [
+    [
+     "union",
+     "case[- ]?(in)?sensitiv\\w*"
+    ],
+    [
+     "union",
+     "duplicat\\w*",
+     "case"
+    ],
+    [
+     "union",
+     "(upper|lower) ?case"
+    ],
+    [
+     "union",
+     "collation"
+    ],
+    [
+     "union",
+     "case",
+     "फर्क"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does union remove duplicates ignoring case",
+     "is union case sensitive"
+    ],
+    "hinglish": [
+     "union upper case lower case ko same maanta hai kya",
+     "union mein case sensitive hota hai kya"
+    ],
+    "hindi": [
+     "UNION में case का फर्क होता है क्या"
+    ]
+   },
+   "answer": {
+    "en": "UNION compares rows with each column's collation. MySQL and MariaDB usually use a case-insensitive (_ci) collation, so 'aarav@mail.test' and 'AARAV@mail.test' count as one row (lab: 9 e-mails); PostgreSQL's usual collation is exact, so they stay two (lab: 10). For the same answer everywhere, compare LOWER(email) in both parts.",
+    "hinglish": "UNION rows ko har column ke collation se compare karta hai. MySQL aur MariaDB aam taur pe case-insensitive (_ci) collation use karte hain, isliye 'aarav@mail.test' aur 'AARAV@mail.test' ek row (lab: 9 e-mails); PostgreSQL ka aam collation exact hai, isliye do rehti hain (lab: 10). Har jagah ek jaisa jawab chahiye to dono parts mein LOWER(email).",
+    "hindi": "MySQL में _ci collation case को एक मानता है; PostgreSQL नहीं।"
+   },
+   "mistake": {
+    "en": "Moving a query from MySQL to PostgreSQL and getting more rows: the collation, not the data, changed.",
+    "hinglish": "Query MySQL se PostgreSQL le jaana aur zyada rows aana: data nahi, collation badla.",
+    "hindi": "Collation बदलता है, data नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS emails FROM (SELECT LOWER(email) AS e FROM customers UNION SELECT LOWER(email) FROM suppliers) AS u"
+     },
+     "columns": [
+      "emails"
+     ],
+     "result": [
+      [
+       "9"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Follows the column collation (often case-insensitive).",
+    "oracle": "Notes only (not lab-tested here): Exact by default.",
+    "sqlite": "Notes only (not lab-tested here): Exact by default (BINARY), NOCASE if declared.",
+    "mysql": "Case-insensitive with the usual _ci collation.",
+    "mariadb": "Lab: 'aarav@' and 'AARAV@' are one row.",
+    "postgresql": "Lab: they are two rows."
+   },
+   "related": [
+    "union_vs_union_all",
+    "collation",
+    "case_insensitive_search"
+   ],
+   "fundamentals": [
+    "set_operations"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/union.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/collation.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "having_on_group_column",
+   "kind": "concept",
+   "title": {
+    "en": "A HAVING condition on a GROUP BY column",
+    "hinglish": "GROUP BY column pe HAVING condition",
+    "hindi": "GROUP BY column पर HAVING"
+   },
+   "terms": [
+    [
+     "having",
+     "group by (column|col)"
+    ],
+    [
+     "having",
+     "(non.?aggregate|without (an )?aggregate|bina aggregate)"
+    ],
+    [
+     "having",
+     "group by",
+     "column"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "is it ok to put a group by column condition in having",
+     "should a group by column filter go in having or where"
+    ],
+    "hinglish": [
+     "group by column wali condition having mein likh sakte hai kya",
+     "having mein bina aggregate ki condition likhna sahi hai kya"
+    ],
+    "hindi": [
+     "HAVING में GROUP BY column की condition लिखना ठीक है क्या"
+    ]
+   },
+   "answer": {
+    "en": "It is valid and gives the right rows: every row of a group has the same value of its GROUP BY columns. But HAVING runs after all groups were built, so rows that are thrown away were still read and grouped. In WHERE the same condition removes them first and can use an index; the result is identical (lab: one row both ways). Keep HAVING for conditions on totals.",
+    "hinglish": "Sahi hai aur sahi rows deta hai: group ki har row mein GROUP BY columns ki value ek hi hoti hai. Par HAVING saare groups banne ke baad chalta hai, isliye phenki jaane wali rows bhi padhi aur group hoti hain. WHERE mein wahi condition unhe pehle hata deti hai aur index use kar sakti hai; result bilkul wahi (lab: dono tarah ek row). HAVING totals wali conditions ke liye rakho.",
+    "hindi": "सही है, पर WHERE में रखें: पहले rows हटती हैं।"
+   },
+   "mistake": {
+    "en": "HAVING on a column that is NOT in GROUP BY: PostgreSQL refuses it (42803), MySQL without ONLY_FULL_GROUP_BY picks a value from any row.",
+    "hinglish": "HAVING mein aisa column jo GROUP BY mein nahi: PostgreSQL mana karta hai (42803), MySQL ONLY_FULL_GROUP_BY ke bina kisi bhi row ki value le leta hai.",
+    "hindi": "GROUP BY के बाहर का column न लें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT customer_id, SUM(amount) AS total FROM orders WHERE customer_id = 3 GROUP BY customer_id"
+     },
+     "columns": [
+      "customer_id",
+      "total"
+     ],
+     "result": [
+      [
+       "3",
+       "12800"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same; the optimizer often moves it for you.",
+    "oracle": "Notes only (not lab-tested here): Same.",
+    "sqlite": "Notes only (not lab-tested here): Same.",
+    "mysql": "Same.",
+    "mariadb": "Lab: same row from HAVING and WHERE.",
+    "postgresql": "Lab: same row; the planner often pushes a HAVING on a grouping key down by itself."
+   },
+   "related": [
+    "where_vs_having",
+    "having",
+    "filter_early"
+   ],
+   "fundamentals": [
+    "filter_level"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/select.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/sql-select.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "select_star_join",
+   "kind": "concept",
+   "title": {
+    "en": "SELECT * with a JOIN",
+    "hinglish": "JOIN ke saath SELECT *",
+    "hindi": "JOIN के साथ SELECT *"
+   },
+   "terms": [
+    [
+     "select ?\\*",
+     "join\\w*"
+    ],
+    [
+     "select star",
+     "join\\w*"
+    ],
+    [
+     "select all columns",
+     "join\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why avoid select * with a join",
+     "is select * bad in a join query"
+    ],
+    "hinglish": [
+     "join ke saath select * kyun nahi likhna chahiye",
+     "select * join mein galat hai kya"
+    ],
+    "hindi": [
+     "JOIN के साथ SELECT * क्यों नहीं"
+    ]
+   },
+   "answer": {
+    "en": "SELECT * over a join returns every column of every table: more data to read and send, no index alone can answer it, and a name both tables have (id, created_at) comes out twice, so code that reads columns by name gets only one of them. Inside a derived table or CTE MariaDB refuses the repeated name (1060), and PostgreSQL refuses as soon as you use it (42702). Name the columns, and rename clashes (o.id AS order_id).",
+    "hinglish": "Join pe SELECT * har table ke saare columns deta hai: zyada data padhna aur bhejna, koi index akela jawab nahi de sakta, aur jo naam dono tables mein hai (id, created_at) wo do baar aata hai, isliye naam se column padhne wala code sirf ek paata hai. Derived table ya CTE mein MariaDB dohraaya naam mana karta hai (1060), PostgreSQL use karte hi (42702). Columns ke naam likho aur takraav wale badlo (o.id AS order_id).",
+    "hindi": "Columns के नाम लिखें; दोहराए नाम बदलें।"
+   },
+   "mistake": {
+    "en": "Reading row['id'] after SELECT * FROM customers JOIN orders: it is one of the two ids, often not the one you meant.",
+    "hinglish": "SELECT * FROM customers JOIN orders ke baad row['id'] padhna: do id mein se ek milti hai, aksar galat wali.",
+    "hindi": "row['id'] गलत id हो सकती है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id AS customer_id, o.id AS order_id, o.amount FROM customers c JOIN orders o ON o.customer_id = c.id WHERE o.id = 1"
+     },
+     "columns": [
+      "customer_id",
+      "order_id",
+      "amount"
+     ],
+     "result": [
+      [
+       "1",
+       "1",
+       "25500"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same; a view or derived table with a repeated name is refused.",
+    "oracle": "Notes only (not lab-tested here): Same; a repeated name in a subquery is refused when referenced.",
+    "sqlite": "Notes only (not lab-tested here): Allows repeated names; the client may keep only one.",
+    "mysql": "Derived table / CTE: 1060.",
+    "mariadb": "Lab: 1060 Duplicate column name in a derived table and a CTE.",
+    "postgresql": "Lab: runs; t.id is refused (42702)."
+   },
+   "related": [
+    "select",
+    "duplicate_column_name",
+    "alias"
+   ],
+   "fundamentals": [
+    "names_scope"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/select.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-select-lists.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "duplicate_column_name",
+   "kind": "concept",
+   "title": {
+    "en": "Two columns with the same name in a subquery",
+    "hinglish": "Subquery mein ek naam ke do columns",
+    "hindi": "Subquery में एक नाम के दो columns"
+   },
+   "terms": [
+    [
+     "(two|2|do|same|ek hi) (columns?|column names?)",
+     "(same name|ek naam|same|naam)",
+     "(subquer\\w*|derived|cte|view)"
+    ],
+    [
+     "(same|duplicate|ek hi) column names?",
+     "(subquer\\w*|derived|cte|view)"
+    ],
+    [
+     "subquery",
+     "दो column"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can a subquery have two columns with the same name",
+     "why can't a derived table have the same column name twice"
+    ],
+    "hinglish": [
+     "subquery mein same naam ke do column ho sakte hai kya",
+     "derived table mein ek naam ke do columns ho sakte hai kya"
+    ],
+    "hindi": [
+     "subquery में एक नाम के दो column क्यों नहीं हो सकते"
+    ]
+   },
+   "answer": {
+    "en": "A derived table, CTE or view is used like a table, and a table can't have two columns with one name. MySQL and MariaDB refuse it straight away (1060, Duplicate column name); PostgreSQL builds it but refuses any use of the name (42702, ambiguous). It usually comes from SELECT * over a join. Give each column its own name with AS.",
+    "hinglish": "Derived table, CTE ya view table ki tarah use hota hai, aur table mein ek naam ke do columns nahi ho sakte. MySQL aur MariaDB turant mana karte hain (1060, Duplicate column name); PostgreSQL bana deta hai par naam use karte hi mana karta hai (42702, ambiguous). Ye aksar join pe SELECT * se hota hai. Har column ko AS se apna naam do.",
+    "hindi": "हर column को AS से अलग नाम दें।"
+   },
+   "mistake": {
+    "en": "Renaming in the outer query (t.id): too late, the clash is inside.",
+    "hinglish": "Bahar ki query mein naam badalna (t.id): der ho gayi, takraav andar hai.",
+    "hindi": "अंदर नाम बदलें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS n FROM (SELECT c.id AS customer_id, o.id AS order_id FROM customers c JOIN orders o ON o.customer_id = c.id) AS t"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Refused in a derived table or view.",
+    "oracle": "Notes only (not lab-tested here): Refused when referenced (ORA-00918).",
+    "sqlite": "Notes only (not lab-tested here): Accepted; the second name gets a suffix in views.",
+    "mysql": "1060.",
+    "mariadb": "Lab: 1060.",
+    "postgresql": "Lab: runs; using the name gives 42702."
+   },
+   "related": [
+    "select_star_join",
+    "derived_table",
+    "alias"
+   ],
+   "fundamentals": [
+    "names_scope"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/derived-tables.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-table-expressions.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "filter_early",
+   "kind": "concept",
+   "title": {
+    "en": "Filtering early",
+    "hinglish": "Pehle filter karna",
+    "hindi": "पहले filter करना"
+   },
+   "terms": [
+    [
+     "filter\\w*",
+     "(early|earlier|before|first|pehle|jaldi)",
+     "(join|group\\w*|cte|subquer\\w*|aggregat\\w*|quer(y|ies))"
+    ],
+    [
+     "filter",
+     "पहले"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "should i filter before or after grouping",
+     "does it help to filter early in a query"
+    ],
+    "hinglish": [
+     "filter pehle lagana chahiye ya group ke baad",
+     "cte se pehle filter kaise kare"
+    ],
+    "hindi": [
+     "filter पहले लगाना चाहिए क्या"
+    ]
+   },
+   "answer": {
+    "en": "A row removed early is not joined, grouped or sorted. Conditions on single rows go in WHERE (not HAVING); a condition on a derived table's or CTE's GROUP BY column can go inside it. Both MariaDB (10.2+) and PostgreSQL push such filters into a derived table by themselves (lab), but PostgreSQL keeps a CTE that is read twice whole, so the filter stays outside unless you write AS NOT MATERIALIZED. Moving a filter is only safe across GROUP BY on a grouping column, and never past LIMIT or a window function.",
+    "hinglish": "Pehle hati row join, group ya sort nahi hoti. Ek-ek row ki conditions WHERE mein (HAVING nahi); derived table ya CTE ke GROUP BY column ki condition uske andar ja sakti hai. MariaDB (10.2+) aur PostgreSQL dono derived table mein aise filter khud le jaate hain (lab), par PostgreSQL do baar padhe CTE ko poora rakhta hai, isliye filter bahar rehta hai jab tak AS NOT MATERIALIZED na likho. Filter ko GROUP BY ke paar sirf grouping column pe le jaana safe hai, LIMIT ya window function ke paar kabhi nahi.",
+    "hindi": "Rows जल्दी हटाएँ: WHERE में, या CTE के अंदर।"
+   },
+   "mistake": {
+    "en": "Moving a filter inside a subquery that has LIMIT or ROW_NUMBER(): the rows it picks change.",
+    "hinglish": "LIMIT ya ROW_NUMBER() wali subquery ke andar filter le jaana: chuni gayi rows badal jaati hain.",
+    "hindi": "LIMIT वाली subquery में filter न ले जाएँ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT customer_id, total FROM (SELECT customer_id, SUM(amount) AS total FROM orders WHERE customer_id = 3 GROUP BY customer_id) AS t"
+     },
+     "columns": [
+      "customer_id",
+      "total"
+     ],
+     "result": [
+      [
+       "3",
+       "12800"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): The optimizer pushes predicates into derived tables and CTEs (CTEs are inlined).",
+    "oracle": "Notes only (not lab-tested here): Predicate pushing is automatic in most cases.",
+    "sqlite": "Notes only (not lab-tested here): Pushes WHERE into subqueries in many cases.",
+    "mysql": "Derived condition pushdown from 8.0.22.",
+    "mariadb": "Lab: the outer filter appears inside the derived table (attached_condition) and in both copies of a CTE read twice.",
+    "postgresql": "Lab: pushed into a derived table; a CTE read twice is materialized and filtered outside unless NOT MATERIALIZED."
+   },
+   "related": [
+    "where_vs_having",
+    "cte_materialized",
+    "having_on_group_column"
+   ],
+   "fundamentals": [
+    "filter_level"
+   ],
+   "source": "https://mariadb.com/kb/en/condition-pushdown-into-derived-table-optimization/",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-with.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "query_review_checklist",
+   "kind": "concept",
+   "title": {
+    "en": "How to review a SQL query's structure",
+    "hinglish": "SQL query ka structure kaise check kare",
+    "hindi": "SQL query का structure कैसे जाँचें"
+   },
+   "terms": [
+    [
+     "(review|check|audit|jaanch\\w*|jaanche)",
+     "(sql )?quer(y|ies)",
+     "(structure|checklist|mistakes|step)"
+    ],
+    [
+     "query",
+     "checklist"
+    ],
+    [
+     "query",
+     "जाँच"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to review a sql query for mistakes",
+     "what is a good sql query review checklist"
+    ],
+    "hinglish": [
+     "sql query ka structure kaise check kare",
+     "query review karne ki checklist kya hai"
+    ],
+    "hindi": [
+     "SQL query की जाँच कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "Read it the way it runs. 1) Every joined table has a condition that ties it to one before it (else rows multiply). 2) Each ON connects the table it joins. 3) Each correlated subquery names the outer row, with the right alias. 4) Totals are taken at the right grain (no child join multiplying a parent's numbers; DISTINCT isn't hiding copies). 5) NULLs: NOT IN, = NULL, outer joins cancelled by WHERE. 6) UNION vs UNION ALL is what you mean. 7) Filters are as early as they can be. 8) Speed risks (a function on a filtered column, a leading %, a large OFFSET, the same subquery twice, SELECT * across joins) are confirmed with EXPLAIN before they are called slow.",
+    "hinglish": "Waise padho jaise ye chalti hai. 1) Har judi table ki condition use pichli table se jodti ho (warna rows guna). 2) Har ON usi table ko jodta ho jise wo join karta hai. 3) Har correlated subquery bahar ki row ka naam leti ho, sahi alias ke saath. 4) Totals sahi grain pe (child join parent ke numbers guna na kare; DISTINCT copies na chhupaye). 5) NULLs: NOT IN, = NULL, WHERE se cancel hua outer join. 6) UNION ya UNION ALL wahi jo aap chahte ho. 7) Filters jitna jaldi ho sake. 8) Speed ke risk (filter column pe function, shuru mein %, bada OFFSET, wahi subquery do baar, joins pe SELECT *) slow kehne se pehle EXPLAIN se pakke karo.",
+    "hindi": "Joins, correlation, grain, NULLs, UNION, filters, फिर EXPLAIN।"
+   },
+   "mistake": {
+    "en": "Calling a query slow from its text alone: speed depends on indexes, row counts and the plan, so it is a risk until EXPLAIN shows it.",
+    "hinglish": "Sirf text dekh ke query ko slow kehna: speed index, rows ki ginti aur plan pe tiki hai, EXPLAIN dikhane tak ye sirf risk hai.",
+    "hindi": "EXPLAIN से पहले सिर्फ़ risk है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, COUNT(o.id) AS orders FROM customers c LEFT JOIN orders o ON o.customer_id = c.id GROUP BY c.id ORDER BY c.id"
+     },
+     "columns": [
+      "id",
+      "orders"
+     ],
+     "result": [
+      [
+       "1",
+       "2"
+      ],
+      [
+       "2",
+       "2"
+      ],
+      [
+       "3",
+       "2"
+      ],
+      [
+       "4",
+       "0"
+      ],
+      [
+       "5",
+       "0"
+      ],
+      [
+       "6",
+       "1"
+      ],
+      [
+       "7",
+       "0"
+      ],
+      [
+       "8",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same checklist; use the actual execution plan.",
+    "oracle": "Notes only (not lab-tested here): Same; use DBMS_XPLAN.",
+    "sqlite": "Notes only (not lab-tested here): Same; EXPLAIN QUERY PLAN.",
+    "mysql": "EXPLAIN ANALYZE (8.0.18+).",
+    "mariadb": "Lab: ANALYZE SELECT (no EXPLAIN ANALYZE).",
+    "postgresql": "Lab: EXPLAIN ANALYZE."
+   },
+   "related": [
+    "debug_long_query",
+    "explain",
+    "confidence_classes"
+   ],
+   "fundamentals": [
+    "grain",
+    "join_condition",
+    "correlation"
+   ],
+   "source": "https://www.postgresql.org/docs/current/using-explain.html",
+   "seen_at": [
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "speed_risk",
+   "kind": "concept",
+   "title": {
+    "en": "A speed risk vs a wrong result",
+    "hinglish": "Speed risk vs galat result",
+    "hindi": "Speed risk और गलत result"
+   },
+   "terms": [
+    [
+     "(speed|performance|slow)",
+     "risk"
+    ],
+    [
+     "(slow|speed|performance)",
+     "(vs|versus|or|ya)",
+     "(wrong|galat|bug|incorrect)",
+     "(result|answer|rows?)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "is a speed risk the same as a bug",
+     "what is a performance risk in a query"
+    ],
+    "hinglish": [
+     "speed risk aur galat result mein kya farak hai",
+     "performance risk kya hota hai"
+    ],
+    "hindi": [
+     "speed risk क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A wrong result is proven by the query text (or the data): the rows are wrong on any database. A speed risk only says the shape can be slow (a function on a filtered column, a leading %, a big OFFSET, a subquery repeated, SELECT * across joins); whether it really is slow depends on the indexes, the number of rows and the plan the database picks, so it needs EXPLAIN (or a timed run) before anyone calls it a bottleneck. A speed rewrite must return exactly the same rows.",
+    "hinglish": "Galat result query ke text (ya data) se pakka hota hai: kisi bhi database pe rows galat. Speed risk sirf itna kehta hai ki ye shakal slow ho sakti hai (filter column pe function, shuru mein %, bada OFFSET, dohraayi subquery, joins pe SELECT *); sach mein slow hai ya nahi ye index, rows ki ginti aur database ke plan pe tika hai, isliye bottleneck kehne se pehle EXPLAIN (ya time naapna) chahiye. Speed wala rewrite bilkul wahi rows de.",
+    "hindi": "गलत result पक्का है; speed risk EXPLAIN से पक्का होता है।"
+   },
+   "mistake": {
+    "en": "Rewriting a correct query for speed in a way that changes its rows (moving a filter past LIMIT, UNION to UNION ALL with repeats).",
+    "hinglish": "Sahi query ko speed ke liye aise badalna ki rows badal jaayein (LIMIT ke paar filter, repeats ke saath UNION se UNION ALL).",
+    "hindi": "Speed के लिए rows न बदलें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM orders WHERE order_date >= '2024-07-01' AND order_date < '2024-08-01' ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "4"
+      ],
+      [
+       "5"
+      ],
+      [
+       "6"
+      ],
+      [
+       "7"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same idea; check the execution plan.",
+    "oracle": "Notes only (not lab-tested here): Same; DBMS_XPLAN.",
+    "sqlite": "Notes only (not lab-tested here): Same; EXPLAIN QUERY PLAN.",
+    "mysql": "EXPLAIN / EXPLAIN ANALYZE.",
+    "mariadb": "Lab: EXPLAIN / ANALYZE SELECT.",
+    "postgresql": "Lab: EXPLAIN (ANALYZE)."
+   },
+   "related": [
+    "sargable",
+    "explain",
+    "confidence_classes"
+   ],
+   "fundamentals": [
+    "proof_classes",
+    "index_use"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/using-explain.html",
+   "seen_at": [
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "subquery_in_select_speed",
+   "kind": "concept",
+   "title": {
+    "en": "Is a subquery in SELECT slow?",
+    "hinglish": "SELECT mein subquery slow hai kya?",
+    "hindi": "SELECT में subquery धीमी?"
+   },
+   "terms": [
+    [
+     "subquer\\w*",
+     "(in|inside|andar|mein|me|ke andar) (the )?select( list| clause)?",
+     "(slow|speed|fast|performance|dheemi|dheema|every row|each row|har row)"
+    ],
+    [
+     "subquery",
+     "select",
+     "धीमी"
+    ],
+    [
+     "select (ke andar|andar|mein|me)",
+     "subquer\\w*",
+     "(slow|speed|dheemi|dheema|every row|har row)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "is a subquery in select slow",
+     "does a subquery in the select list run for every row"
+    ],
+    "hinglish": [
+     "select mein subquery slow hoti hai kya",
+     "select ke andar subquery har row pe chalti hai kya"
+    ],
+    "hindi": [
+     "SELECT में subquery धीमी होती है क्या"
+    ]
+   },
+   "answer": {
+    "en": "A correlated subquery in SELECT is worked out for each outer row (PostgreSQL: a SubPlan per row; MariaDB: a DEPENDENT SUBQUERY, with a cache for repeated outer values). With an index on its link column (orders.customer_id) and a few hundred rows that is fine; over many rows without that index it can be slow, so check EXPLAIN. For many rows, a GROUP BY total in a derived table joined once (LEFT JOIN so rows with nothing stay) usually does less work and gives the same rows.",
+    "hinglish": "SELECT ki correlated subquery har bahar ki row ke liye nikalti hai (PostgreSQL: har row pe SubPlan; MariaDB: DEPENDENT SUBQUERY, dohraaye outer values ke liye cache). Link column (orders.customer_id) pe index ho aur kuch sau rows hon to theek hai; bahut rows bina index ke slow ho sakti hain, isliye EXPLAIN dekho. Bahut rows ke liye derived table mein GROUP BY total ek baar LEFT JOIN karo (khaali wali rows bhi rahengi): aam taur pe kam kaam, wahi rows.",
+    "hindi": "हर row पर चलती है; index हो तो ठीक, वरना derived table + LEFT JOIN।"
+   },
+   "mistake": {
+    "en": "Turning it into an INNER JOIN with GROUP BY: customers with no orders disappear (use LEFT JOIN), and SUM gives NULL, not 0, for them.",
+    "hinglish": "Ise INNER JOIN + GROUP BY banana: bina orders wale customers gayab (LEFT JOIN lo), aur unka SUM NULL aata hai, 0 nahi.",
+    "hindi": "LEFT JOIN लें, वरना rows गायब।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, t.total FROM customers c LEFT JOIN (SELECT customer_id, SUM(amount) AS total FROM orders GROUP BY customer_id) AS t ON t.customer_id = c.id ORDER BY c.id"
+     },
+     "columns": [
+      "id",
+      "total"
+     ],
+     "result": [
+      [
+       "1",
+       "26000"
+      ],
+      [
+       "2",
+       "80500"
+      ],
+      [
+       "3",
+       "12800"
+      ],
+      [
+       "4",
+       "NULL"
+      ],
+      [
+       "5",
+       "NULL"
+      ],
+      [
+       "6",
+       "65000"
+      ],
+      [
+       "7",
+       "NULL"
+      ],
+      [
+       "8",
+       "300"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same; OUTER APPLY is the per-row form.",
+    "oracle": "Notes only (not lab-tested here): Scalar subquery caching helps repeated values.",
+    "sqlite": "Notes only (not lab-tested here): Runs per row.",
+    "mysql": "Runs per row; MySQL 8.0.24+ can turn some into joins.",
+    "mariadb": "Lab: DEPENDENT SUBQUERY in EXPLAIN; subquery cache on by default.",
+    "postgresql": "Lab: SubPlan in EXPLAIN."
+   },
+   "related": [
+    "scalar_subquery",
+    "correlated_subquery",
+    "repeated_subquery"
+   ],
+   "fundamentals": [
+    "repeated_work",
+    "correlation"
+   ],
+   "source": "https://mariadb.com/kb/en/subquery-cache/",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/using-explain.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "union_order_by",
+   "kind": "howto",
+   "title": {
+    "en": "Sorting the result of a UNION",
+    "hinglish": "UNION ka result sort karna",
+    "hindi": "UNION का result sort करना"
+   },
+   "terms": [
+    [
+     "(order by|sort\\w*)",
+     "union"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to sort the result of a union",
+     "where does order by go in a union"
+    ],
+    "hinglish": [
+     "union ka result sort kaise kare",
+     "union mein order by kahan lagaye"
+    ],
+    "hindi": [
+     "UNION का result sort कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "Write one ORDER BY at the very end: it sorts the whole UNION result, using the column names (or positions) of the first SELECT. An ORDER BY inside one part is ignored by MariaDB unless that part also has LIMIT, and PostgreSQL needs the part in brackets to accept it at all. To keep the parts in their order, add a constant column (1 AS part, 2 AS part) and sort by it first.",
+    "hinglish": "Aakhir mein ek ORDER BY likho: wo poore UNION result ko sort karta hai, pehle SELECT ke column naam (ya positions) se. Ek part ke andar ka ORDER BY MariaDB ignore karta hai jab tak us part mein LIMIT na ho, aur PostgreSQL use bracket ke bina maanta hi nahi. Parts ka kram rakhna ho to ek constant column (1 AS part, 2 AS part) jodo aur pehle us pe sort karo.",
+    "hindi": "आखिर में एक ORDER BY लिखें।"
+   },
+   "mistake": {
+    "en": "Expecting the first part's rows to come first without sorting: UNION gives no order unless ORDER BY says so.",
+    "hinglish": "Bina sort ke pehle part ki rows pehle aane ki ummeed: ORDER BY ke bina UNION koi kram nahi deta.",
+    "hindi": "ORDER BY के बिना कोई क्रम नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT 1 AS part, id FROM customers WHERE city = 'Pune' UNION ALL SELECT 2, id FROM suppliers ORDER BY part, id"
+     },
+     "columns": [
+      "part",
+      "id"
+     ],
+     "result": [
+      [
+       "1",
+       "1"
+      ],
+      [
+       "1",
+       "5"
+      ],
+      [
+       "2",
+       "1"
+      ],
+      [
+       "2",
+       "2"
+      ],
+      [
+       "2",
+       "3"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same: one ORDER BY at the end.",
+    "oracle": "Notes only (not lab-tested here): Same.",
+    "sqlite": "Notes only (not lab-tested here): Same.",
+    "mysql": "Same; a part's own ORDER BY needs LIMIT to matter.",
+    "mariadb": "Lab: works.",
+    "postgresql": "Lab: works."
+   },
+   "related": [
+    "union_vs_union_all",
+    "order_by",
+    "custom_sort"
+   ],
+   "fundamentals": [
+    "set_operations"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/union.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-union.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

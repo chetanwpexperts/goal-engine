@@ -487,7 +487,9 @@ def _count_said(sql, s, cl, srcs, alias_of, items, said, F) -> list:
                     if kids and (cm.group(1) == "*" or (q and alias_of(q) != tal)):
                         key = J._key(target, {(alias_of(a), c) for a, c in re.findall(r"([A-Za-z_]\w*)\.(\w+)", s)})
                         counted = f"{target.alias or target.name}.{key}"
-                elif len(srcs) == 1 and srcs[0].name and J._one(J._base(srcs[0].name)) != noun:
+                elif len(srcs) == 1 and srcs[0].name and J._one(J._base(srcs[0].name)) != noun and \
+                        not re.search(rf"\b{re.escape(srcs[0].name.strip('`\"'))}\s*(\([^()]*\))?\s+as\s*\(", s, re.I):
+                    # (a CTE's rows are whatever its body makes them: night 12 reads them as a block, not as a table name)
                     x = srcs[0]
                     pre = f"{x.alias}." if x.alias and x.alias.lower() != x.name.split(".")[-1].strip('`"').lower() else ""
                     if col and _norm(col) == _norm(fk):

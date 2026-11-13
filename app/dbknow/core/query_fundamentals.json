@@ -81,8 +81,8 @@
   "grain": {
    "title_en": "Grain: what one row stands for",
    "title_hi": "Grain: ek row kis cheez ki hai",
-   "rule_en": "Every stage of a query has a grain (one row per order, per customer, per category). Totals, comparisons and ranks are only right when they are taken at the grain the question asks for; mixing two grains in one step is the most common silent mistake.",
-   "rule_hi": "Query ke har stage ka ek grain hota hai (har order, har customer, har category ki ek row). Total, compare aur rank tabhi sahi hain jab sawaal wale grain pe liye jaayein; ek step mein do grain milana sabse aam chhupi galti hai.",
+   "rule_en": "Every stage of a query has a grain (one row per order, per customer, per category). Totals, comparisons and ranks are only right when they are taken at the grain the question asks for; mixing two grains in one step is the most common silent mistake. In a long query every block has a grain of its own: each CTE, derived table, subquery and UNION part takes rows at one grain and hands them on at another. A block's own GROUP BY (or DISTINCT, or a total with no GROUP BY) proves which of its columns are unique, so a join on them keeps the grain; a join to a child moves it down, and every total after that join is re-checked (total the child before the join).",
+   "rule_hi": "Query ke har stage ka ek grain hota hai (har order, har customer, har category ki ek row). Total, compare aur rank tabhi sahi hain jab sawaal wale grain pe liye jaayein; ek step mein do grain milana sabse aam chhupi galti hai. Lambi query mein har block ka apna grain hota hai: har CTE, derived table, subquery aur UNION ka hissa rows ek grain pe leta hai aur doosre pe aage deta hai. Block ka apna GROUP BY (ya DISTINCT, ya bina GROUP BY ka total) sabit karta hai kaunse columns unique hain, isliye un pe join grain rakhta hai; child se join grain neeche le jaata hai, aur us join ke baad ka har total dobara check hota hai (child ka total join se pehle nikaalo).",
    "topics": [
     "group",
     "per_group",
@@ -90,7 +90,11 @@
     "distinct",
     "count_said"
    ],
-   "source": "https://dev.mysql.com/doc/refman/8.4/en/group-by-handling.html"
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/group-by-handling.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/with.html",
+    "https://www.postgresql.org/docs/current/queries-with.html"
+   ]
   },
   "cardinality": {
    "title_en": "Cardinality: one-to-many links multiply rows",
@@ -100,7 +104,8 @@
    "topics": [
     "join",
     "distinct_join",
-    "semi_join"
+    "semi_join",
+    "join_fanout"
    ],
    "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html"
   },
@@ -190,7 +195,8 @@
     "alias",
     "column",
     "order",
-    "having_alias"
+    "having_alias",
+    "cte_order"
    ],
    "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-alias.html"
   },
@@ -605,6 +611,25 @@
     "https://laravel.com/docs/11.x/migrations",
     "https://mariadb.com/kb/en/alter-table/",
     "https://use-the-index-luke.com/sql/where-clause/obfuscation"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "proof_classes": {
+   "title_en": "Say how sure you are: prove what the query text proves, label the rest",
+   "title_hi": "Kitna pakka hai ye batao: jo query text se sabit ho wo sabit karo, baaki ko label karo",
+   "rule_en": "With only the query, there is no schema, no index list, no data and no plan, so none of those may be invented. A finding is PROVEN when the SQL text alone decides it (the engine refuses it, '= NULL', an aggregate in WHERE, an alias that was never defined). It is a LIKELY RISK when the shape suggests it but the data or the intent decides (a one-to-many join before a total copies rows only when a parent really has several children). It NEEDS SCHEMA when a fact about the tables decides it (can the column be NULL, is it a key, does it hold a time of day, what type is it), and it NEEDS EXECUTION when it is about speed (indexes, row counts and the plan decide). What the query implies about the tables (tables, aliases, columns and their roles, a rough type only where a literal or a function shows it, links from the ON conditions) is written down as an inferred schema with verified=false, and every assumption comes with the read-only query that settles it. Index advice says 'worth checking whether an index exists', never 'the index is missing', until the indexes have been seen. When the schema, EXPLAIN or data arrive, each finding is upgraded to verified or dropped.",
+   "rule_hi": "Sirf query ho to schema, index list, data aur plan kuch nahi hota, isliye inme se kuch bhi gadha nahi jaata. Finding PAKKI tab hai jab sirf SQL text use tay kare (engine mana kare, '= NULL', WHERE mein aggregate, alias jo kabhi bana hi nahi). SHAYAD RISK tab jab shakal se lagta hai par data ya matlab tay karta hai (total se pehle one-to-many join tabhi rows copy karta hai jab parent ke sach mein kai child hon). TABLE STRUCTURE chahiye jab tables ka koi fact tay kare (column NULL ho sakta hai, key hai, time rakhta hai, type kya hai), aur EXPLAIN chahiye jab baat speed ki ho (index, rows ki ginti aur plan tay karte hain). Query se tables ke baare mein jo dikhta hai (tables, alias, columns aur unka kaam, type sirf jab literal ya function dikhaye, ON se links) wo inferred schema mein verified=false ke saath likha jaata hai, aur har assumption ke saath wo read-only query jo use tay kare. Index ki salah 'dekh lo index hai ya nahi' hoti hai, 'index missing hai' nahi, jab tak index dekhe na hon. Schema, EXPLAIN ya data aane par har finding pakki hoti hai ya hat jaati hai.",
+   "topics": [],
+   "source": "https://www.postgresql.org/docs/current/infoschema-columns.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/explain.html",
+    "https://mariadb.com/kb/en/analyze-statement/",
+    "https://www.postgresql.org/docs/current/using-explain.html",
+    "https://dev.mysql.com/doc/refman/8.0/en/information-schema-columns-table.html",
+    "https://use-the-index-luke.com/sql/explain-plan"
    ],
    "proven": [
     "mariadb",

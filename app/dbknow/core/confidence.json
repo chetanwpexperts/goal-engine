@@ -1,0 +1,52 @@
+{
+  "about": "How sure DBaba is of each finding when it has only the query text (night 11). Shared by every engine (standing rule B): the engine-specific commands that check a fact (EXPLAIN, the index list) are in each dialect file under 'verify'. A finding's class comes from what it depends on: nothing beyond the SQL text (proven), the data or the intent (likely risk), a fact about the tables (needs schema), or the running database (needs execution). Lab-proven on MariaDB and PostgreSQL in tests/practice/test_night11.py.",
+  "classes": {
+    "proven": {
+      "en": "Proven from the query",
+      "hi": "Query se pakka",
+      "why_en": "The SQL text alone shows it: the database refuses it, or it returns wrong rows on any data.",
+      "why_hi": "Sirf SQL text se dikhta hai: database ise mana karega, ya kisi bhi data pe galat rows dega."
+    },
+    "likely_risk": {
+      "en": "Likely risk",
+      "hi": "Shayad risk",
+      "why_en": "The shape of the query suggests it, but whether it bites depends on the data (how many rows match) or on what you meant.",
+      "why_hi": "Query ki shakal se lagta hai, par asar data (kitni rows milti hain) ya aapke matlab pe tika hai."
+    },
+    "needs_schema": {
+      "en": "Needs your table structure",
+      "hi": "Table structure chahiye",
+      "why_en": "It depends on a fact the query doesn't show: whether a column can be NULL, is a key, holds a time of day, or what type it is.",
+      "why_hi": "Ye us fact pe tika hai jo query mein nahi dikhta: column NULL ho sakta hai ya nahi, key hai ya nahi, time rakhta hai ya nahi, ya uska type."
+    },
+    "needs_execution": {
+      "en": "Needs EXPLAIN or a run",
+      "hi": "EXPLAIN ya run chahiye",
+      "why_en": "A speed risk: whether it is really slow depends on the indexes, the row counts and the plan the database picks.",
+      "why_hi": "Speed ka risk: sach mein slow hai ya nahi ye index, rows ki ginti aur database ke plan pe tika hai."
+    }
+  },
+  "order": ["proven", "likely_risk", "needs_schema", "needs_execution"],
+  "needs": {
+    "not_null": "needs_schema",
+    "has_time": "needs_schema",
+    "unique": "needs_schema",
+    "to_one": "likely_risk",
+    "index": "needs_execution"
+  },
+  "topics": {
+    "needs_schema": ["not_in", "not_in_outer", "anti_join", "sum_null", "avg_null", "sub_sum_null", "all_null", "null_math", "count",
+                     "stable_order", "ties", "win_running_ties", "win_rank_ties", "scalar_rows", "date_range", "join_key", "division",
+                     "implicit_cast", "sub_key", "timestamp_range", "in_list_null", "join_types", "schema_column", "schema_table",
+                     "sum_distinct", "nulls_order"],
+    "needs_execution": ["sargable", "or_union", "keyset", "keyset_offset", "leading_wildcard", "select_star", "index_prefix",
+                        "index_range_first", "batch_change", "skip_locked", "n_plus_one", "index_missing", "index"]
+  },
+  "facts": {
+    "not_null": {"en": "whether {col} can be NULL", "hi": "{col} NULL ho sakta hai ya nahi"},
+    "has_time": {"en": "whether {col} holds a time of day (DATETIME / TIMESTAMP) or only a date", "hi": "{col} mein time bhi hai (DATETIME / TIMESTAMP) ya sirf date"},
+    "unique": {"en": "whether ({col}) is unique in {table} (a PRIMARY KEY or UNIQUE)", "hi": "({col}) {table} mein unique hai ya nahi (PRIMARY KEY ya UNIQUE)"},
+    "to_one": {"en": "whether each row matches only one {table} row (is the join column a key of {table}?)", "hi": "har row ko sirf ek {table} row milti hai ya nahi ({table} ka join column key hai ya nahi)"},
+    "index": {"en": "whether an index starting with {col} exists", "hi": "{col} se shuru hone wala index hai ya nahi"}
+  }
+}

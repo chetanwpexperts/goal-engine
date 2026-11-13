@@ -1380,5 +1380,6 @@
   "add_not_null_no_default": {"behaviour": "error", "code": "23502", "says": "ADD COLUMN ... NOT NULL without DEFAULT on a table with rows is refused (23502 column contains null values).", "proven": ["postgresql"]},
   "unknown_column": {"behaviour": "error", "code": "42703", "says": "42703 column does not exist (unquoted names are folded to lower case first).", "proven": ["postgresql"]},
   "fk_makes_index": {"behaviour": "no_index", "says": "A FOREIGN KEY gets no index of its own: create one on the referencing column.", "proven": ["postgresql"]}
- }
+ },
+ "verify": {"nullable": "SELECT column_name, is_nullable, data_type FROM information_schema.columns WHERE table_name = '{table}' AND column_name IN ({cols})", "nulls_now": "SELECT COUNT(*) AS null_rows FROM {table} WHERE {col} IS NULL", "dupes": "SELECT {cols}, COUNT(*) AS n FROM {table} GROUP BY {cols} HAVING COUNT(*) > 1 LIMIT 5", "structure": "SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name = '{table}' ORDER BY ordinal_position", "indexes": "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = '{table}'", "plan": "EXPLAIN {query}", "plan_run": "EXPLAIN (ANALYZE, BUFFERS) {query}", "plan_run_note": "EXPLAIN ANALYZE really runs the statement; for UPDATE/DELETE wrap it in BEGIN; ... ROLLBACK; (in psql, \\d table shows the same structure).", "proven": ["postgresql"], "lab": "EXPLAIN ANALYZE, pg_indexes and information_schema.columns (temporary tables included) on PostgreSQL 16."}
 }

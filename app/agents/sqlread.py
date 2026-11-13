@@ -36,6 +36,9 @@ def _flat(t: str) -> str:
 
 
 def _is_key(src, col: str) -> bool:
+    kb = C._block_key(src, col)
+    if kb is not None:
+        return kb
     c = col.lower().replace("_", "")
     return c == "id" or bool(src and src.name and c in {x.replace("_", "") + "id" for x in C._singulars(src.name)})
 
@@ -156,8 +159,8 @@ def render(r: dict, hi: bool = False) -> str:
                                                              for t in r["tables"]))
     for k in r["links"]:
         if k["many_side"]:
-            many = (f" — ek {k['one_side']} ki kai {k['many_side']} rows" if hi else
-                    f" — one {k['one_side']} row, many {k['many_side']} rows")
+            many = (f" — ek {k['one_side']} ki kai {k['many_side']} rows (column naam se andaza, verified nahi)" if hi else
+                    f" — one {k['one_side']} row, many {k['many_side']} rows (guessed from the column names, not verified)")
         else:
             many = f" ({k['shape']})"
         L.append(f"{'Link' if not hi else 'Jod'}: {k['on']}{many}")

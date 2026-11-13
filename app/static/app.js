@@ -338,6 +338,11 @@
     return box;
   }
 
+  function confLabel(f, hi) {                     // the class of a finding (night 11): proven / likely risk / needs schema / needs EXPLAIN
+    if (!f.confidence) return "";
+    return " · " + (hi ? f.confidence.label_hi : f.confidence.label_en) + (f.confidence.verified ? " ✓" : "");
+  }
+
   function checkResult(run, w, hi) {
     const wrap = el("div", "result");
     const r = run.result || {};
@@ -356,13 +361,14 @@
         const fix = hi ? f.fix_hi : f.fix_en;
         if (corr) {                                   // one line each; the why opens on a tap
           const d = el("details");
-          d.append(el("summary", "t", hi ? f.title_hi : f.title_en));
+          d.append(el("summary", "t", (hi ? f.title_hi : f.title_en) + confLabel(f, hi)));
           if (fix) d.append(el("div", "f", fix));
           if (f.basis) d.append(el("div", "e", T(hi, "Buniyaad: ", "Fundamental: ") + (hi ? f.basis.hi : f.basis.en)));
+          if (f.confidence) d.append(el("div", "e", hi ? f.confidence.why_hi : f.confidence.why_en));
           if (f.evidence) d.append(el("div", "e", f.evidence));
           li.append(d);
         } else {
-          li.append(el("div", "t", hi ? f.title_hi : f.title_en));
+          li.append(el("div", "t", (hi ? f.title_hi : f.title_en) + confLabel(f, hi)));
           if (fix) li.append(el("div", "f", fix));
           if (f.basis) li.append(el("div", "e", T(hi, "Buniyaad: ", "Fundamental: ") + (hi ? f.basis.hi : f.basis.en)));
           if (f.evidence) li.append(el("div", "e", f.evidence));
@@ -384,6 +390,18 @@
       const d = el("details", "reading");
       d.append(el("summary", null, T(hi, "DBaba ne query aise padhi", "How DBaba read this query")));
       d.append(el("pre", "reading-body", hi ? r.reading.hi : r.reading.en));
+      wrap.append(d);
+    }
+    if (r.blocks && (hi ? r.blocks.hi : r.blocks.en)) {                   // CTEs / derived tables / subqueries: the tree and each grain
+      const d = el("details", "reading");
+      d.append(el("summary", null, T(hi, "Blocks aur har block ka grain", "Blocks and the grain of each")));
+      d.append(el("pre", "reading-body", hi ? r.blocks.hi : r.blocks.en));
+      wrap.append(d);
+    }
+    if (r.query_only && (hi ? r.query_only.hi : r.query_only.en)) {       // only the query: how sure, the inferred schema, what can't be proven
+      const d = el("details", "reading");
+      d.append(el("summary", null, T(hi, "Sirf query se kitna pakka (assumptions)", "From the query alone: how sure, and what to verify")));
+      d.append(el("pre", "reading-body", hi ? r.query_only.hi : r.query_only.en));
       wrap.append(d);
     }
     if (r.check_query) wrap.append(codeBox(w.check, r.check_query, w));

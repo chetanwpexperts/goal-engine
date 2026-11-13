@@ -58,7 +58,18 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         # a number joined to text, and findings the schema proves (a nullable column in NOT IN, a DATETIME in BETWEEN, a filter
         # no index serves) or rules out (a NOT NULL column in NOT IN, a DATE in BETWEEN, a join on the parent's key under DISTINCT)
         "ps_unknown_col", "ps_text_number", "ps_join_types", "ps_not_in_nullable", "ps_not_in_notnull", "ps_between_time",
-        "ps_between_date", "ps_distinct_parent", "ps_index_missing"]
+        "ps_between_date", "ps_distinct_parent", "ps_index_missing",
+        # night 11: query-only reasoning: every finding says how sure it is (proven / likely risk / needs schema / needs
+        # execution) and the schema read from the query never names a table or column the database doesn't have; planted: a
+        # parent total with one child table joined (a risk: offered EXISTS / no join, proven to give the intended totals),
+        # NOT IN over a nullable column (needs schema), '= NULL' (proven), ties before LIMIT (needs schema), an alias never
+        # defined (proven)
+        "qo_fanout", "qo_fanout_left", "qo_not_in", "qo_eq_null", "qo_ties", "qo_unknown_alias",
+        # night 12: blocks and the grain at every stage: a parent total multiplied by a child join INSIDE a CTE or a derived
+        # table (found in its block, EXISTS offered and proven), a CTE that reads one written after it (reordered, run), a
+        # block's total joined back at a finer grain (found), '= NULL' inside a CTE (fixed in place), and a join on the key a
+        # CTE's own GROUP BY proves (quiet: no multiplication may be claimed)
+        "gr_cte_fanout", "gr_derived_fanout", "gr_cte_order", "gr_cross", "gr_inner_eq_null", "gr_block_key"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
@@ -100,13 +111,33 @@ TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": 
          "cp_from_param": "placeholder_name",
          "ps_unknown_col": "schema_column", "ps_text_number": "implicit_cast", "ps_join_types": "join_types",
          "ps_not_in_nullable": "not_in", "ps_not_in_notnull": "not_in", "ps_between_time": "date_range",
-         "ps_between_date": "date_range", "ps_distinct_parent": "distinct_join", "ps_index_missing": "index_missing"}
+         "ps_between_date": "date_range", "ps_distinct_parent": "distinct_join", "ps_index_missing": "index_missing",
+         "qo_fanout": "join_fanout", "qo_fanout_left": "join_fanout", "qo_not_in": "not_in", "qo_eq_null": "null",
+         "qo_ties": "stable_order", "qo_unknown_alias": "alias",
+         "gr_cte_fanout": "join_fanout", "gr_derived_fanout": "join_fanout", "gr_cte_order": "cte_order", "gr_cross": "join_fanout",
+         "gr_inner_eq_null": "null", "gr_block_key": "join_fanout"}
+# night 12: a correct query: the planted topic must NOT be said, and no error / wrong at all
+QUIET = {"gr_block_key"}
+# night 11: the class the planted finding must carry (sqlconfidence.classify); and for every statement, every finding has one
+CLASS = {"gr_cte_fanout": "likely_risk", "gr_derived_fanout": "likely_risk", "gr_cte_order": "proven", "gr_cross": "likely_risk",
+         "gr_inner_eq_null": "proven",
+         "qo_fanout": "likely_risk", "qo_fanout_left": "likely_risk", "qo_not_in": "needs_schema", "qo_eq_null": "proven",
+         "qo_ties": "needs_schema", "qo_unknown_alias": "proven",
+         "eq_null_dml": "proven", "agg_in_where": "proven", "between_reversed": "proven", "or_value": "proven", "like_star": "proven",
+         "count_case": "proven", "wf_win_where": "proven", "wf_rec_keyword": "proven", "nested_agg": "proven",
+         "anti_nullable": "needs_schema", "not_in_outer": "needs_schema", "scalar_rows": "needs_schema", "limit_no_order": "needs_schema",
+         "distinct_join": "likely_risk", "semi_join": "likely_risk", "and_or": "likely_risk", "avg_avg": "likely_risk",
+         "self_pairs": "likely_risk", "like_contains": "likely_risk",
+         "ix_year": "needs_execution", "ix_year_month": "needs_execution", "ix_day": "needs_execution", "ix_left": "needs_execution",
+         "ix_arith": "needs_execution", "ix_coalesce": "needs_execution", "ix_format": "needs_execution", "ix_cast_day": "needs_execution",
+         "ix_or_join": "needs_execution", "ix_keyset": "needs_execution", "lk_batch_delete": "needs_execution",
+         "ps_not_in_nullable": "proven", "ps_between_time": "proven", "ps_unknown_col": "proven", "ps_index_missing": "needs_execution"}
 # night 10B: the planted finding must be RULED OUT by the project's schema (absent, and listed as dropped with the reason)
 RULED_OUT = {"ps_not_in_notnull", "ps_between_date", "ps_distinct_parent"}
 NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join", "sum_distinct",
           "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order", "ch_insert_count",
           "sd_two_pk", "sd_list_col", "sd_repeat", "sd_parent_copy", "wf_no_order", "wf_nested", "wf_cte_cols",
-          "ix_keyset", "cp_order_param", "cp_from_param", "ps_join_types", "ps_index_missing"}   # found is enough
+          "ix_keyset", "cp_order_param", "cp_from_param", "ps_join_types", "ps_index_missing", "qo_ties", "qo_unknown_alias", "gr_cross", "gr_block_key"}   # found is enough
 # a 'check' (depends on engine, data or intent) whose suggested rewrite must do exactly what the person meant
 FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes", "pk_pk", "anti_nullable", "self_pairs",
                  "distinct_join", "sum_null", "avg_avg", "pct_total", "sub_sum_null", "all_null", "in_list_null", "not_in_outer",
@@ -114,7 +145,8 @@ FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_qu
                  "sd_date_text", "sd_number_text", "sd_code_number", "sd_no_pk", "sd_fk_index_pg", "sd_over_wide", "sd_timestamp",
                  "sd_reserved", "wf_case_else_sort", "wf_running_ties",
                  "ix_year", "ix_year_month", "ix_day", "ix_cast_day", "ix_format", "ix_arith", "ix_coalesce", "ix_left", "ix_or_join",
-                 "lk_skip_locked", "pt_power", "ps_text_number", "ps_not_in_nullable", "ps_between_time"}
+                 "lk_skip_locked", "pt_power", "ps_text_number", "ps_not_in_nullable", "ps_between_time",
+                 "qo_fanout", "qo_fanout_left", "qo_not_in", "gr_cte_fanout", "gr_derived_fanout"}
 
 
 def _cols(t, *kinds):
@@ -430,6 +462,10 @@ def make(seed: int):
         return _param_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("ps_"):
         return _project_bug(seed, bug, rnd, schema, tables, t, wrap, stmt)
+    elif bug.startswith("qo_"):
+        return _query_only_bug(seed, bug, rnd, schema, tables, t, wrap, stmt)
+    elif bug.startswith("gr_"):
+        return _grain_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -1588,8 +1624,11 @@ def check(item, engines: dict) -> list[str]:
         res = sqlcorrect.check(unwrap(item["broken"]), intent=request_words(item["broken"]), engine=item.get("engine"))
     tag = f"{item['bug']} ({item['stmt']}) seed {item['seed']}"
     topics = {f["topic"] for f in res["findings"]}
-    bad = []
+    bad = _classes(item, res, tag)
     want = TOPIC[item["bug"]]
+    if item["bug"] in QUIET:
+        said = [f["title_en"] for f in res["findings"] if f["kind"] in ("error", "wrong") or f["topic"] == TOPIC[item["bug"]]]
+        return bad + ([f"{tag}: said about a correct query: {said}\n{item['broken']}"] if said else [])
     if item["bug"] in RULED_OUT:
         if want in topics or want not in {d["topic"] for d in res.get("dropped", [])}:
             bad.append(f"{tag}: not ruled out by the schema (found {sorted(topics)}, dropped {res.get('dropped')})\n{item['broken']}")
@@ -1862,6 +1901,8 @@ def _port_bug(seed, bug, rnd, schema, tables, t):
         broken = f"SELECT {pk}, {c} + INTERVAL '{n}' {u} AS d\nFROM {name}\nORDER BY {pk}"
     elif bug == "pt_cast_char":
         target = "postgresql"
+        if not texts + dates + nums:
+            return None
         x = rnd.choice(texts + dates + nums)
         truth = f"SELECT {pk}, CAST({x} AS VARCHAR) AS v\nFROM {name}\nORDER BY {pk}"
         broken = f"SELECT {pk}, CAST({x} AS CHAR) AS v\nFROM {name}\nORDER BY {pk}"
@@ -2041,6 +2082,177 @@ def _project_bug(seed, bug, rnd, schema, tables, t, wrap, stmt):
         out = item(broken, broken)
         out["engine"] = "mariadb" if kind == "mysql" else "postgresql"
         return out
+    return None
+
+
+def _classes(item, res, tag) -> list[str]:
+    """Night 11: every finding says how sure it is, the planted one with its expected class, and the schema read from the query
+    names only real tables and columns (a CTE / derived table is not a table; a bare column in a nested block may belong to
+    an outer table, so that one only needs to be a column of one of the query's tables)."""
+    from app.agents import sqlconfidence as K
+    from app.agents.sql import unwrap
+
+    sql = unwrap(item["broken"])
+    K.annotate_findings(res["findings"], sql)
+    bad = []
+    for f in res["findings"]:
+        c = (f.get("confidence") or {}).get("class")
+        if c not in ("proven", "likely_risk", "needs_schema", "needs_execution") or (f["kind"] == "error" and c != "proven"):
+            bad.append(f"{tag}: finding {f['title_en']!r} ({f['kind']}) has class {c}\n{item['broken']}")
+    want = CLASS.get(item["bug"])
+    planted = [f for f in res["findings"] if f["topic"] == TOPIC[item["bug"]]]
+    if want and planted and not any(f["confidence"]["class"] == want for f in planted):
+        bad.append(f"{tag}: planted {TOPIC[item['bug']]} has class {[f['confidence']['class'] for f in planted]}, want {want}\n{item['broken']}")
+    if item["stmt"] == "ddl" or re.match(r"\s*(create|delimiter|do)\b", sql, re.I):
+        return bad
+    real = {n.lower(): {c["name"].lower() for c in tt["cols"]} for n, tt in item["schema"]["tables"].items()}
+    inf = K.infer_schema(sql)
+    names = [x["name"] for x in inf["tables"]]
+    for x in inf["tables"]:
+        if x["name"] not in real:
+            bad.append(f"{tag}: the inferred schema invents table {x['name']}\n{item['broken']}")
+            continue
+        for c, info in x["columns"].items():
+            names_in_truth = re.sub(r"'(?:[^']|'')*'", "''", item["truth"] or "")
+            planted = not re.search(rf"(?<![\w$]){re.escape(c)}(?![\w$])", names_in_truth, re.I)    # the misspelt name / bare value itself
+            if info["verified"] or not (c in real[x["name"]] or planted or info.get("owner_guess") and any(c in real.get(n, ()) for n in names)):
+                bad.append(f"{tag}: the inferred schema invents {x['name']}.{c}\n{item['broken']}")
+    return bad
+
+
+def _query_only_bug(seed, bug, rnd, schema, tables, t, wrap, stmt):
+    """Night 11: mistakes judged from the query alone, each with the class it must carry."""
+    pk, name = t["pk"], t["name"]
+    engine = rnd.choice(["mariadb", "postgresql", None])
+
+    def item(broken, truth, **kw):
+        out = {"seed": seed, "bug": bug, "stmt": kw.pop("stmt", "select"), "schema": schema, "table": kw.pop("table", name),
+               "broken": broken, "truth": truth, "engine": engine}
+        out.update(kw)
+        return out
+
+    if bug in ("qo_fanout", "qo_fanout_left"):
+        pairs = [(schema["tables"][c["ref"]], x, c) for x in tables for c in x["cols"] if c["kind"] == "fk" and c.get("ref") != x["name"]]
+        pairs = [(p, x, c) for p, x, c in pairs if _cols(p, "int", "money")]
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        m = rnd.choice(_cols(p, "int", "money"))["name"]
+        g = rnd.choice([c for c in _cols(p, "cat", "int") + [c for c in p["cols"] if c["kind"] == "pk"] if c["name"] != m])["name"]
+        agg = rnd.choice(["SUM", "SUM", "COUNT"])          # (AVG over a nullable column is its own check: night 3)
+        kind = "LEFT JOIN" if bug == "qo_fanout_left" else "JOIN"
+        filt = rnd.random() < 0.4 and _cols(p, "int", "money")
+        where = f"\nWHERE p.{m} > 0" if filt else ""
+        broken = (f"SELECT p.{g}, {agg}(p.{m}) AS total\nFROM {p['name']} p\n{kind} {x['name']} c ON c.{fk['name']} = p.{p['pk']}"
+                  f"{where}\nGROUP BY p.{g}\nORDER BY p.{g}")
+        if bug == "qo_fanout":
+            cond = f"EXISTS (SELECT 1 FROM {x['name']} c WHERE c.{fk['name']} = p.{p['pk']})" + (f" AND p.{m} > 0" if filt else "")
+            truth = f"SELECT p.{g}, {agg}(p.{m}) AS total\nFROM {p['name']} p\nWHERE {cond}\nGROUP BY p.{g}\nORDER BY p.{g}"
+        else:
+            truth = f"SELECT p.{g}, {agg}(p.{m}) AS total\nFROM {p['name']} p{where}\nGROUP BY p.{g}\nORDER BY p.{g}"
+        return item(broken, truth, table=p["name"])
+    if bug == "qo_not_in":
+        kids = [(x, c) for x in tables for c in x["cols"] if c["kind"] == "fk" and c.get("ref") == name]
+        if not kids:
+            return None
+        child, fk = rnd.choice(kids)
+        broken = f"SELECT {pk}\nFROM {name}\nWHERE {pk} NOT IN (SELECT {fk['name']} FROM {child['name']})\nORDER BY {pk}"
+        truth = (f"SELECT {pk}\nFROM {name}\nWHERE NOT EXISTS (SELECT 1 FROM {child['name']} x WHERE x.{fk['name']} = {name}.{pk})\n"
+                 f"ORDER BY {pk}")
+        return item(broken, truth)
+    if bug == "qo_eq_null":
+        cols = [c for c in t["cols"] if c["kind"] not in ("pk",)]
+        if not cols:
+            return None
+        c = rnd.choice(cols)["name"]
+        op, right = rnd.choice([("=", "IS NULL"), ("!=", "IS NOT NULL"), ("<>", "IS NOT NULL")])
+        return item(f"SELECT {pk}\nFROM {name}\nWHERE {c} {op} NULL\nORDER BY {pk}", f"SELECT {pk}\nFROM {name}\nWHERE {c} {right}\nORDER BY {pk}")
+    if bug == "qo_ties":
+        cols = _cols(t, "cat", "int", "date")
+        if not cols:
+            return None
+        c = rnd.choice(cols)["name"]
+        broken = f"SELECT {pk}, {c}\nFROM {name}\nORDER BY {c} DESC\nLIMIT {rnd.randint(2, 5)}"
+        return item(broken, broken)
+    if bug == "qo_unknown_alias":
+        pairs = [(schema["tables"][c["ref"]], x, c) for x in tables for c in x["cols"] if c["kind"] == "fk" and c.get("ref") != x["name"]]
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        broken = (f"SELECT c.{x['pk']}, p.{p['pk']}\nFROM {x['name']} c\nJOIN {p['name']} p ON p.{p['pk']} = c.{fk['name']}\n"
+                  f"WHERE z.{fk['name']} IS NOT NULL\nORDER BY c.{x['pk']}")
+        return item(broken, broken)
+    return None
+
+
+def _grain_bug(seed, bug, rnd, schema, tables, t):
+    """Night 12: mistakes that live in one block of a query with CTEs / derived tables, or between blocks."""
+    engine = rnd.choice(["mariadb", "postgresql", None])
+    pairs = [(schema["tables"][c["ref"]], x, c) for x in tables for c in x["cols"] if c["kind"] == "fk" and c.get("ref") != x["name"]]
+
+    def item(broken, truth, table):
+        return {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": table, "broken": broken, "truth": truth,
+                "engine": engine}
+
+    if bug in ("gr_cte_fanout", "gr_derived_fanout"):
+        pairs = [(p, x, c) for p, x, c in pairs if _cols(p, "int", "money")]
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        m = rnd.choice(_cols(p, "int", "money"))["name"]
+        g = rnd.choice([c for c in _cols(p, "cat", "int") + [c for c in p["cols"] if c["kind"] == "pk"] if c["name"] != m])["name"]
+        agg = rnd.choice(["SUM", "COUNT"])
+        inner = f"SELECT p.{g}, {agg}(p.{m}) AS total FROM {p['name']} p JOIN {x['name']} c ON c.{fk['name']} = p.{p['pk']} GROUP BY p.{g}"
+        fixed = (f"SELECT p.{g}, {agg}(p.{m}) AS total FROM {p['name']} p WHERE EXISTS (SELECT 1 FROM {x['name']} c "
+                 f"WHERE c.{fk['name']} = p.{p['pk']}) GROUP BY p.{g}")
+        if bug == "gr_cte_fanout":
+            wrap = lambda body: f"WITH per_group AS (\n  {body}\n)\nSELECT {g}, total\nFROM per_group\nORDER BY {g}"  # noqa: E731
+        else:
+            wrap = lambda body: f"SELECT t.{g}, t.total\nFROM ({body}) t\nORDER BY t.{g}"  # noqa: E731
+        return item(wrap(inner), wrap(fixed), p["name"])
+    if bug == "gr_cte_order":
+        cols = [c for c in t["cols"] if c["kind"] in ("cat", "int", "money")]
+        if not cols:
+            return None
+        c = rnd.choice(cols)["name"]
+        pk = t["pk"]
+        a_def = f"a AS (SELECT {pk}, {c} FROM b)"
+        b_def = f"b AS (SELECT {pk}, {c} FROM {t['name']} WHERE {c} IS NOT NULL)"
+        main = f"SELECT {pk} FROM a ORDER BY {pk}"
+        return item(f"WITH {a_def},\n{b_def}\n{main}", f"WITH {b_def},\n{a_def}\n{main}", t["name"])
+    if bug == "gr_cross":
+        pairs = [(p, x, c) for p, x, c in pairs if _cols(p, "int", "money") and _cols(x, "cat")]
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        m = rnd.choice(_cols(p, "int", "money"))["name"]
+        cat = rnd.choice(_cols(x, "cat"))["name"]
+        broken = (f"WITH per_parent AS (SELECT {p['pk']} AS pid, SUM({m}) AS total FROM {p['name']} GROUP BY {p['pk']})\n"
+                  f"SELECT c.{cat}, SUM(pp.total) AS total\nFROM {x['name']} c\nJOIN per_parent pp ON pp.pid = c.{fk['name']}\n"
+                  f"GROUP BY c.{cat}\nORDER BY c.{cat}")
+        return item(broken, broken, x["name"])
+    if bug == "gr_inner_eq_null":
+        cols = [c for c in t["cols"] if c["kind"] not in ("pk",)]
+        if not cols:
+            return None
+        c = rnd.choice(cols)["name"]
+        pk = t["pk"]
+        op, right = rnd.choice([("=", "IS NULL"), ("!=", "IS NOT NULL"), ("<>", "IS NOT NULL")])
+        body = f"SELECT {pk} FROM {t['name']} WHERE {c} {{}}"
+        return item(f"WITH picked AS (\n  {body.format(op + ' NULL')}\n)\nSELECT {pk} FROM picked ORDER BY {pk}",
+                    f"WITH picked AS (\n  {body.format(right)}\n)\nSELECT {pk} FROM picked ORDER BY {pk}", t["name"])
+    if bug == "gr_block_key":
+        pairs = [(p, x, c) for p, x, c in pairs if _cols(x, "int", "money")]
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        m = rnd.choice(_cols(x, "int", "money"))["name"]
+        pm = (_cols(p, "int", "money") or [None])[0]
+        extra = f", SUM(p.{pm['name']}) AS parent_total" if pm and rnd.random() < 0.5 else ""
+        broken = (f"WITH per_parent AS (\n  SELECT {fk['name']}, SUM({m}) AS child_total, COUNT(*) AS n\n  FROM {x['name']}\n"
+                  f"  GROUP BY {fk['name']}\n)\nSELECT p.{p['pk']}, SUM(a.child_total) AS child_total{extra}\nFROM {p['name']} p\n"
+                  f"JOIN per_parent a ON a.{fk['name']} = p.{p['pk']}\nGROUP BY p.{p['pk']}\nORDER BY p.{p['pk']}")
+        return item(broken, broken, p["name"])
     return None
 
 

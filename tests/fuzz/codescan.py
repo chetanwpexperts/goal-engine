@@ -112,6 +112,8 @@ def _q(lang, sql, rnd):
         return ('"""' + body + '"""').split("\n"), 0
     if lang == "java":
         if rnd.random() < 0.5 and len(lines) > 1:
+            if lines[-1].endswith('"'):                 # "x"""" is not Java: the closing """ goes on its own line
+                return ['"""'] + ["            " + ln.replace("\\", "\\\\") for ln in lines] + ['            """'], 1
             return ['"""'] + ["            " + ln.replace("\\", "\\\\") for ln in lines[:-1]] + \
                 ["            " + lines[-1].replace("\\", "\\\\") + '"""'], 1
         out = []

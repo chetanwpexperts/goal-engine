@@ -470,8 +470,8 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
     check_query = None
     if indexes and not seen_structure:
         check_query = sqlspeed.check_query(list(dict.fromkeys(t.name.split(".")[-1] for t in tables)), eng)
-        add(2, "These columns need an index if they don't have one yet (I can't see your current indexes from the query alone)",
-            "In columns pe index chahiye agar pehle se nahi hai (sirf query se aapke maujooda index nahi dikhte)",
+        add(2, "Worth checking whether these columns have an index (I can't see your current indexes from the query alone)",
+            "Dekhne layak: in columns pe index hai ya nahi (sirf query se aapke index nahi dikhte)",
             "columns used in WHERE / JOIN / ORDER BY",
             "Run the check query first, or paste the SHOW CREATE TABLE output of these tables in the second box: "
             "then only the really missing indexes are listed.",
@@ -549,6 +549,7 @@ def _with_correctness(original: str, out: dict, said: str = "", extra: str = "")
             c = sqlverify.check(original, sch, intent=said) if sch and sch["tables"] else None
         except Exception:  # noqa: BLE001 - the schema is an extra; the plain check still answers
             c = None
+        out["_schema"] = sch if c else None           # the inferred schema is checked against these tables too (night 11)
         c = c or sqlcorrect.check(original, intent=said)
     except Exception:  # noqa: BLE001 - never let the correctness reader break the speed check
         c = {"findings": [], "corrected": None, "guesses": []}
@@ -591,18 +592,58 @@ def _with_reading(original: str, out: dict) -> dict:
             r = None
             out["reading"] = {"en": en["text"], "hi": hi["text"], "grain": en["grain"]}
         else:
-            r = sqlread.read_query(original)
+            from app.agents import sqlblocks
+            from app.agents.sqlcorrect import BLOCK_KEYS
+
+            tok = BLOCK_KEYS.set(sqlblocks.keys(original))
+            try:
+                r = sqlread.read_query(original)
+            finally:
+                BLOCK_KEYS.reset(tok)
         if r is not None:
             out["reading"] = {"en": sqlread.render(r, False), "hi": sqlread.render(r, True), "grain": r["grain"]}
+            _with_blocks(original, out)
     except Exception:  # noqa: BLE001 - the reading is an extra; never let it break the check
-        return out
+        return _with_confidence(original, out)
     funds = sqlread.fundamentals()["fundamentals"]
     for f in list(out.get("findings") or []) + list((out.get("correct") or {}).get("findings") or []):
         fid = sqlread.fundamental_of(f)
         if fid and "basis" not in f:
             f["basis"] = {"id": fid, "en": funds[fid]["title_en"], "hi": funds[fid]["title_hi"],
                           "rule_en": funds[fid]["rule_en"], "rule_hi": funds[fid]["rule_hi"]}
-    return out
+    return _with_confidence(original, out)
+
+
+def _with_blocks(original: str, out: dict) -> None:
+    """Night 12: a query with CTEs, derived tables, subqueries or UNION parts gets its dependency tree and the grain of every
+    block (app/agents/sqlblocks.py); from 30 lines on, the reading shows them too."""
+    from app.agents import sqlblocks
+
+    try:
+        if not re.search(r"\(\s*select\b|^\s*with\b", sqlblocks.C._mask(original), re.I):
+            return
+        g = sqlblocks.grain(original)
+        if len(g["blocks"]) < 2:
+            return
+        out["blocks"] = {"en": sqlblocks.tree(original), "hi": sqlblocks.tree(original, True), "lines": g["lines"],
+                         "blocks": [{k: v for k, v in b.items() if k not in ("start", "end")} for b in g["blocks"]]}
+        if g["lines"] >= 30 and out.get("reading"):
+            out["reading"]["en"] += "\n\nBlocks, how they depend on each other, and the grain of each:\n" + out["blocks"]["en"]
+            out["reading"]["hi"] += "\n\nBlocks, kaun kis pe tika hai, aur har block ka grain:\n" + out["blocks"]["hi"]
+    except Exception:  # noqa: BLE001 - the tree is an extra; never let it break the check
+        return
+
+
+def _with_confidence(original: str, out: dict) -> dict:
+    """How sure each finding is (proven / likely risk / needs schema / needs execution), the schema the query implies with
+    verified=false on every fact, and what the query alone can't prove (app/agents/sqlconfidence.py, night 11)."""
+    from app.agents import sqlconfidence
+
+    sch = out.pop("_schema", None)
+    try:
+        return sqlconfidence.annotate(original, out, sch)
+    except Exception:  # noqa: BLE001 - the confidence report is an extra; never let it break the check
+        return out
 
 
 # 'check' findings whose rewrite gives different rows when the query was right as written (COUNT(*) vs COUNT(col) ...)
@@ -618,7 +659,9 @@ MEANING_CHECKS = {"count", "not_in", "date_range", "concat", "like", "and_or", "
                   # night 8: offered, not applied: UNION ALL for an OR across tables, keyset paging (needs the last row's values)
                   "or_union", "keyset",
                   # night 9: offered, not applied: running a change in batches, SKIP LOCKED for queue workers
-                  "batch_change", "skip_locked"}
+                  "batch_change", "skip_locked",
+                  # night 11: a parent total with one child table joined: pre-aggregate / EXISTS is offered, never applied
+                  "join_fanout"}
 SPEED_OFFERS = {"or_union", "keyset", "batch_change", "skip_locked"}               # the same rows, a faster form: offered as 'try this', shown on the card
 
 

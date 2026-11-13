@@ -156,8 +156,8 @@ def render(r: dict, hi: bool = False) -> str:
                                                              for t in r["tables"]))
     for k in r["links"]:
         if k["many_side"]:
-            many = (f" — ek {k['one_side']} ki kai {k['many_side']} rows" if hi else
-                    f" — one {k['one_side']} row, many {k['many_side']} rows")
+            many = (f" — ek {k['one_side']} ki kai {k['many_side']} rows (column naam se andaza, verified nahi)" if hi else
+                    f" — one {k['one_side']} row, many {k['many_side']} rows (guessed from the column names, not verified)")
         else:
             many = f" ({k['shape']})"
         L.append(f"{'Link' if not hi else 'Jod'}: {k['on']}{many}")

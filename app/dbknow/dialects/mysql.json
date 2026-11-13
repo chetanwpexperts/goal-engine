@@ -1126,5 +1126,6 @@
   "add_not_null_no_default": {"behaviour": "fills_empty", "says": "Old rows get the type's implicit default ('' / 0) when a NOT NULL column is added without DEFAULT.", "proven": ["mariadb"]},
   "unknown_column": {"behaviour": "error", "code": "1054", "says": "Error 1054 (42S22) Unknown column.", "proven": ["mariadb"]},
   "fk_makes_index": {"behaviour": "index_made", "says": "InnoDB creates an index for every FOREIGN KEY that has none.", "proven": ["mariadb"]}
- }
+ },
+ "verify": {"nullable": "SELECT column_name, is_nullable, data_type FROM information_schema.columns WHERE table_name = '{table}' AND column_name IN ({cols})", "nulls_now": "SELECT COUNT(*) AS null_rows FROM {table} WHERE {col} IS NULL", "dupes": "SELECT {cols}, COUNT(*) AS n FROM {table} GROUP BY {cols} HAVING COUNT(*) > 1 LIMIT 5", "structure": "SHOW CREATE TABLE {table}", "indexes": "SHOW INDEX FROM {table}", "plan": "EXPLAIN {query}", "plan_run": "EXPLAIN ANALYZE {query}", "plan_run_note": "EXPLAIN ANALYZE (MySQL 8.0.18+) really runs a SELECT and shows the time and rows of each step; on a change statement use plain EXPLAIN.", "proven": ["mariadb"], "lab": "information_schema, SHOW INDEX and EXPLAIN were run on MariaDB 10.11 (the MySQL family); EXPLAIN ANALYZE is MySQL 8.0.18+ syntax (MySQL manual), MariaDB refuses it with 1064."}
 }

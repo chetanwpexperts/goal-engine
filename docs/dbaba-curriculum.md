@@ -96,7 +96,7 @@ Reading a whole project (nights 10A-10B, before the query-only nights, which get
 Query-only reasoning (nights 11-15): with only the pasted query, never invent schema facts; prove what the text proves,
 label the rest, upgrade to verified when schema, EXPLAIN or data arrive.
 
-- [ ] **11. Confidence classes and the inferred schema.** PROVEN / LIKELY RISK / NEEDS SCHEMA / NEEDS EXECUTION on every
+- [x] **11. Confidence classes and the inferred schema.** PROVEN / LIKELY RISK / NEEDS SCHEMA / NEEDS EXECUTION on every
   finding; an inferred schema (verified=false); "what can't be proven from the query alone"; index advice worded as "worth
   checking".
 - [ ] **12. Grain at every stage.** Blocks and their dependency tree; input/output grain per block; re-check totals after a
@@ -391,3 +391,26 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   migrations, which must agree), 9 stmtbugs families. Lab lessons worth keeping: MariaDB joins INT to VARCHAR by turning
   '01' and '1abc' into 1 (warning 1292) while PostgreSQL refuses (42883); ADD COLUMN ... NOT NULL without DEFAULT fills old
   rows with '' / 0 on MariaDB but is refused on PostgreSQL (23502); InnoDB adds an index for a foreign key, PostgreSQL doesn't.
+- **Night 11 (13 Nov 2026).** Query-only reasoning, in `app/agents/sqlconfidence.py` (new fundamental `proof_classes`; classes
+  and the facts they wait on in `app/dbknow/core/confidence.json`; each engine's check words in its dialect file under
+  `verify`, rule B). Every finding gets one class: PROVEN (the text decides it: refused, '= NULL', an aggregate in WHERE, an alias
+  never defined), LIKELY RISK (the data or the intent decides: copies after a one-to-many join, AND/OR, averages of averages),
+  NEEDS SCHEMA (NULLs, keys, a time of day, types) or NEEDS EXECUTION (speed: indexes, row counts, the plan). The class comes from
+  what the finding depends on (the needs recorded by night 10B's holds()), so the same rule is a risk without tables and
+  becomes verified (or is dropped) with them. The inferred schema is read from the query with verified=false on every fact:
+  tables and aliases, columns with their roles (join key, filter, grouping key, measure, output, sort, changed), a type only
+  where a literal or a function shows it ("probably a date"), a bare column given to a table only when its own block reads
+  exactly one (marked as a guess inside a nested block), links from ON with a direction guessed from the names. The report
+  (card, and the chat on "what can't you prove / how sure / kitna pakka / assumptions") follows the order: what it appears to
+  do, proven issues, likely risks, depends on your tables, performance risks, inferred schema, what can't be proven from the
+  query alone, the rewrite and why it is (or is not) the same rows, and read-only checks in that engine's words
+  (information_schema.columns, a GROUP BY ... HAVING COUNT(*) > 1 duplicate check, SHOW INDEX / pg_indexes, EXPLAIN ANALYZE on
+  MySQL and PostgreSQL but ANALYZE on MariaDB). Index advice now says "worth checking whether these columns have an index"
+  until the indexes are seen; the stage reading says a one-to-many link is "guessed from the column names". New rule found by
+  tonight's bank: a parent total with ONE child table joined (SUM(o.amount) after JOIN order_items) is a LIKELY RISK (to_one need;
+  the tables verify or drop it), with EXISTS (or no join, for a LEFT JOIN used nowhere else) offered. Fixed on the way:
+  EXTRACT(YEAR FROM d) / SUBSTRING(x FROM 2) and ON DUPLICATE KEY UPDATE / DO UPDATE SET were read as table names. 16 concepts,
+  35-problem practice bank, 6 stmtbugs families plus a class and no-invented-schema check on every generated statement. Lab
+  lessons worth keeping: MariaDB has no EXPLAIN ANALYZE (1064; ANALYZE SELECT adds r_rows) and PostgreSQL has no ANALYZE
+  SELECT (42601); information_schema.columns lists TEMPORARY tables on PostgreSQL but not on MariaDB; plain EXPLAIN of a
+  DELETE changes nothing on both.

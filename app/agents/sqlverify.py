@@ -55,6 +55,10 @@ def aliases(sql: str) -> dict:
     ctes = {m.group(1).lower() for m in re.finditer(r"(?:\bwith\s+(?:recursive\s+)?|,\s*)([A-Za-z_]\w*)\s*(?:\([^()]*\)\s*)?as\s*"
                                                      r"(?:not\s+)?(?:materialized\s+)?\(", s, re.I)}
     for m in re.finditer(r"\b(from|join|update|into|delete\s+from)\s+", s, re.I):
+        if m.group(1).lower() == "from" and _in_call(s, m.start()):
+            continue                                     # EXTRACT(YEAR FROM d), SUBSTRING(x FROM 2), TRIM(BOTH ' ' FROM x)
+        if m.group(1).lower() == "update" and re.search(r"\b(key|do)\s+$", s[max(0, m.start() - 8):m.start()], re.I):
+            continue                                     # ON DUPLICATE KEY UPDATE col = ..., ON CONFLICT ... DO UPDATE SET
         i = m.end()
         while True:
             seg = s[i:]
@@ -87,6 +91,22 @@ def aliases(sql: str) -> dict:
     for c in ctes:
         out[c] = None
     return out
+
+
+CALL_FROM = re.compile(r"(extract|substring|substr|trim|overlay|position)\s*\($", re.I)
+
+
+def _in_call(s: str, pos: int) -> bool:
+    """Is this FROM inside EXTRACT( / SUBSTRING( / TRIM( / OVERLAY( / POSITION( (a word of the function, not a table list)?"""
+    d = 0
+    for i in range(pos - 1, -1, -1):
+        if s[i] == ")":
+            d += 1
+        elif s[i] == "(":
+            if d == 0:
+                return bool(CALL_FROM.search(s[max(0, i - 12):i + 1]))
+            d -= 1
+    return False
 
 
 def _sources(amap: dict) -> set:

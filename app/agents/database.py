@@ -1112,6 +1112,7 @@ def holds_conversation(db, goal, text: str, any_text: bool = False):
         a, run = _sql_agent(db, goal)
         return a if run is not None and run.status == "done" else None
     if any_text or NEW_SQL_RE.search(text or "") or not (SQL_FOLLOW_RE.search(text or "") or DIFF_RE.search(text or "") or FEEDBACK_RE.search(text or "")
+                                                         or PROOF_RE.search(text or "")
                                                          or READ_RE.search(text or "")
                                                          or WHY_RE.search(text or "") or DEV_FOLLOW_RE.search(text or "")):
         return None
@@ -1122,6 +1123,11 @@ def holds_conversation(db, goal, text: str, any_text: bool = False):
 FEEDBACK_RE = re.compile(r"\b(wrong|incorrect|not (correct|right|working|resolved|solved|fixed|giving|the result|what i)|still (not|wrong|same)|"
                          r"does ?n.?t (do|work|fix|give)|did ?n.?t (do|work|fix|catch|find)|not able to (find|detect)|missed|"
                          r"galat|sahi nahi|theek nahi|kaam nahi|nahi hua|nahi pakda)\b", re.I)
+# 'what can't you prove', 'how sure are you', 'kitna pakka hai', 'assumptions?': the query-only report (night 11)
+PROOF_RE = re.compile(r"\b(can.?t|cannot|can not|could ?n.?t) (you )?(be )?(prove|proven|tell|know|see)\b|\bhow (sure|confident|certain)\b|"
+                      r"\bconfidence\b|\bassum\w*|\binferred schema\b|\b(full|whole|complete) report\b|\bwhat (do|did) you assume\b|"
+                      r"\bproven\b|\blikely risks?\b|\bneeds? (schema|execution)\b|\bkitna (pakka|sure|yakeen)\b|\bpakka (hai|h) kya\b|"
+                      r"\bkya (maana|maan ke|assume)\b|कितना पक्का|पक्का है|मान (कर|के)", re.I)
 READ_RE = re.compile(r"\bwhat (does|is) (this|my|the) query (do|doing)\b|\bexplain (this|my|the) query\b(?!.*\b(slow|fast|speed)\b)|"
                      r"\bbreak (it|this|the query) down\b|\bstep by step\b|\bhow does (this|my|the) query work\b|\bread (this|my|the) query\b|"
                      r"\bquery (samjhao|samjha do|kya karti hai|kya karegi|kaise kaam karti)\b|\b(ye|yeh) query kya\b|\bfundamentals?\b|\bgrain\b", re.I)
@@ -1152,6 +1158,8 @@ def continue_turn(db, goal, agent, text: str):
         if raw.strip():
             reply, options, _rel = _translate_turn(db, goal, text, hi0, query=raw)
             return reply, options, hi0
+    if agent.recipe == "sql_review" and PROOF_RE.search(text or "") and not FEEDBACK_RE.search(text or ""):
+        return _proof_turn(db, goal, agent, text)
     if not FEEDBACK_RE.search(text or ""):
         return _continue_turn(db, goal, agent, text)
     inputs = loads(agent.inputs, {}) or {}
@@ -1182,6 +1190,26 @@ def continue_turn(db, goal, agent, text: str):
         reply += ("\n\nMaine ye query (values chhupa ke) seekhne ke liye rakh li hai, taaki aise sawaal aage behtar samjhun." if hi else
                   "\n\nI've kept this query (with its values hidden) to learn from, so questions like it get a better answer.")
     return reply, options, hi
+
+
+def _proof_turn(db, goal, agent, text: str):
+    """'What can't you prove?' / 'kitna pakka hai': the query-only report for the checked query (app/agents/sqlconfidence.py):
+    how sure each finding is, the schema the query implies (verified=false), what can't be proven from the text, the rewrite
+    and why it is (or isn't) the same rows, and the read-only queries that settle the rest in that database's own words."""
+    from app.agents import sqlconfidence
+    from app.agents.sql import analyze_sql
+    from app.ml.normalize import detect_language
+
+    hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
+    inputs = loads(agent.inputs, {}) or {}
+    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=_eng(inputs))
+    rep = (res.get("query_only") or {}).get("hi" if hi else "en") or ""
+    if not rep:
+        return _continue_turn(db, goal, agent, text)
+    head = sqlconfidence.counts_line(res, hi)
+    inputs["last_ask"] = "proof"
+    agent.inputs = dumps(inputs)
+    return (head + "\n\n" + rep if head else rep), [], hi
 
 
 def _continue_turn(db, goal, agent, text: str):
@@ -1300,10 +1328,13 @@ def _optimized(query: str, explain: str, hi: bool) -> str:
     better = res.get("rewritten") if res.get("rewritten") and not (res.get("correct") or {}).get("corrected") else query
     out = [("Fast query:" if hi else "Optimized query:") + f"\n\n{better}"]
     if sp.get("indexes"):
-        out.append(("Ye index lagao (jo pehle se hain unhe chhod do):" if hi else "Add these indexes (skip any you already have):")
+        out.append((("Ye index lagao (jo pehle se hain unhe chhod do):" if hi else "Add these indexes (skip any you already have):")
+                    if res.get("indexes_verified") else
+                    ("Dekh lo ye index pehle se hain ya nahi; jo nahi hain sirf wahi lagao:" if hi else
+                     "Worth checking whether these indexes exist; add only the ones that don't:"))
                    + "\n\n" + "\n".join(sp["indexes"]))
     notes = [f["title_hi" if hi else "title_en"] for f in sp.get("findings") or []
-             if not f["title_en"].lower().startswith(("these columns need an index", "missing indexes"))][:3]
+             if not f["title_en"].lower().startswith(("worth checking whether these columns", "missing indexes"))][:3]
     out += [f"- {n}" for n in notes]
     return "\n\n".join(out)
 
@@ -1325,7 +1356,7 @@ SPEED_TOPICS = {"sargable", "or_union", "keyset", "keyset_offset", "leading_wild
 def _sql_reply(ask, query, better, changed, res, hi) -> str:
     notes = [n["hi" if hi else "en"] for n in res.get("notes", [])]
     fixes = [f for f in res.get("findings", [])
-             if not f["title_en"].lower().startswith(("these columns need an index", "missing indexes"))]
+             if not f["title_en"].lower().startswith(("worth checking whether these columns", "missing indexes"))]
     idx = res.get("indexes") or []
     parts = []
     if ask == "diff":
@@ -1377,8 +1408,8 @@ def _sql_reply(ask, query, better, changed, res, hi) -> str:
                              + "\n".join(f"- {f['fix_hi' if hi else 'fix_en']}" for f in fixes[:5]))
             return "\n\n".join(parts)
         if res.get("check_query"):
-            parts.append(("Is query ke liye ye index chahiye, agar pehle se nahi hain. Pehle ye chalao, dekho kaunse hain:" if hi else
-                          "This query needs these indexes, if you don't have them yet. First run this to see which you have:")
+            parts.append(("Dekhne layak: ye index pehle se hain ya nahi (sirf query se nahi dikhta). Pehle ye chalao, dekho kaunse hain:" if hi else
+                          "It's worth checking whether these indexes exist (the query alone can't show them). First run this to see which you have:")
                          + f"\n\n{res['check_query']}")
             parts.append(("Phir inme se sirf wo lagao jo upar nahi dikhe:" if hi else "Then add only the ones it doesn't show:")
                          + "\n\n" + "\n".join(idx))
@@ -1425,7 +1456,9 @@ def _sql_reply(ask, query, better, changed, res, hi) -> str:
             parts.append(("Phir inme se sirf wo lagao jo upar nahi dikhe:" if hi else "Then add only the ones it doesn't show:")
                          + "\n\n" + "\n".join(idx))
         else:
-            parts.append(("Ye index lagao:" if hi else "Add these indexes:") + "\n\n" + "\n".join(idx))
+            parts.append((("Ye index lagao:" if hi else "Add these indexes:") if res.get("indexes_verified") else
+                          ("Dekh lo ye index hain ya nahi, jo nahi wahi lagao:" if hi else
+                           "Worth checking whether these indexes exist; add the ones that don't:")) + "\n\n" + "\n".join(idx))
     if res.get("assumed_primary"):
         ap = res["assumed_primary"]
         parts.append(f"{', '.join(ap)} ko primary key maana (inpe pehle se index hota hai)." if hi else

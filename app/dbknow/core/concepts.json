@@ -25608,6 +25608,1534 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "join_cardinality",
+   "kind": "concept",
+   "title": {
+    "en": "Join cardinality: one match or many",
+    "hinglish": "Join cardinality: ek match ya kai",
+    "hindi": "Join cardinality: एक match या कई"
+   },
+   "terms": [
+    [
+     "(join|relationship|relation)",
+     "cardinality"
+    ],
+    [
+     "(one|ek) (row|match)",
+     "(or|ya) (many|kai)",
+     "join\\w*"
+    ],
+    [
+     "जॉइन",
+     "कार्डिनैलिटी"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is join cardinality",
+     "what is relationship cardinality in sql",
+     "join cardinality vs index cardinality"
+    ],
+    "hinglish": [
+     "join cardinality kya hai",
+     "join mein ek row ya kai row milti hain kaise pata kare"
+    ],
+    "hindi": [
+     "join cardinality क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Join cardinality says how many rows of one table match one row of the other: one-to-one, one-to-many or many-to-many. It decides whether a join keeps the row count or multiplies it: joining orders to their customer (each order has one customer) keeps one row per order, while joining customers to their orders gives one row per order, so a customer column repeats. The query text only shows the ON condition; whether the matched column is a key (PRIMARY KEY / UNIQUE) is a fact about the table. Check it before totalling after a join: SELECT col, COUNT(*) FROM t GROUP BY col HAVING COUNT(*) > 1. Index cardinality (the number of distinct values in an index) is a different idea with the same word.",
+    "hinglish": "Join cardinality batati hai ek table ki ek row se doosri ki kitni rows milti hain: one-to-one, one-to-many ya many-to-many. Isi se join rows ki ginti rakhta hai ya badha deta hai: orders ko unke customer se jodo to har order ki ek row; customers ko orders se jodo to har order ki ek row, customer ka column dohraata hai. Query text sirf ON dikhata hai; joda gaya column key hai ya nahi ye table ka fact hai. Join ke baad total se pehle check karo: SELECT col, COUNT(*) FROM t GROUP BY col HAVING COUNT(*) > 1. Index cardinality (index mein alag values ki ginti) alag cheez hai.",
+    "hindi": "Join cardinality बताती है कि एक row से दूसरी table की कितनी rows मिलती हैं (one-to-one, one-to-many, many-to-many); यही तय करता है कि join rows बढ़ाता है या नहीं।"
+   },
+   "mistake": {
+    "en": "Assuming one match per row because the column is called id or *_id: only a PRIMARY KEY or UNIQUE on the matched side makes it true, and then a SUM after the join counts some rows twice.",
+    "hinglish": "Naam id ya *_id hai isliye ek hi match maan lena: sirf matched side pe PRIMARY KEY ya UNIQUE ise sach banata hai, warna join ke baad SUM kuch rows do baar ginta hai.",
+    "hindi": "नाम id है इसलिए एक ही match मान लेना; सिर्फ़ PRIMARY KEY/UNIQUE इसे पक्का करता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS order_rows, COUNT(DISTINCT customer_id) AS customers FROM orders"
+     },
+     "columns": [
+      "order_rows",
+      "customers"
+     ],
+     "result": [
+      [
+       "8",
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "Same idea; SHOW INDEX FROM t shows the index Cardinality column, which is the other meaning (distinct values, an estimate).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same idea; pg_stats.n_distinct is the planner's estimate of distinct values (the index meaning)."
+   },
+   "related": [
+    "relationships",
+    "join_duplicates",
+    "join_sum_doubled",
+    "index_selectivity"
+   ],
+   "fundamentals": [
+    "cardinality",
+    "proof_classes"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/join.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+    "https://www.metabase.com/learn/grow-your-data-skills/learn-sql/debugging-sql/sql-logic-duplicated-data"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "is_column_unique",
+   "kind": "howto",
+   "title": {
+    "en": "Checking whether a column is unique",
+    "hinglish": "Column unique hai ya nahi kaise check kare",
+    "hindi": "Column unique है या नहीं कैसे देखें"
+   },
+   "terms": [
+    [
+     "(check|verify|confirm|find out|test|pata|dekh\\w*)",
+     "(column|values?)",
+     "unique"
+    ],
+    [
+     "(column|values?)",
+     "unique hai ya nahi"
+    ],
+    [
+     "कॉलम",
+     "यूनिक",
+     "(कैसे|पता|देख)"
+    ],
+    [
+     "column",
+     "unique",
+     "(कैसे|पता|देख)\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to check if a column is unique",
+     "how to verify that the values of a column are unique"
+    ],
+    "hinglish": [
+     "column unique hai ya nahi kaise pata kare",
+     "kaise check kare ki column ki values unique hain"
+    ],
+    "hindi": [
+     "column unique है या नहीं कैसे देखें"
+    ]
+   },
+   "answer": {
+    "en": "Two different questions. Is it unique by rule? Look for a PRIMARY KEY or UNIQUE constraint/index on exactly that column (SHOW INDEX FROM t on MySQL/MariaDB, pg_indexes on PostgreSQL): only that makes it unique forever. Is it unique in today's data? Group and count: SELECT col, COUNT(*) FROM t GROUP BY col HAVING COUNT(*) > 1 returns the repeated values (no rows = no repeats today). For text, mind the collation: MySQL/MariaDB compare case-insensitively by default, PostgreSQL does not, so group by LOWER(col) to see repeats that differ only in case.",
+    "hinglish": "Do alag sawaal. Niyam se unique hai? Us column pe PRIMARY KEY ya UNIQUE dekho (MySQL/MariaDB pe SHOW INDEX FROM t, PostgreSQL pe pg_indexes): sirf wahi hamesha unique rakhta hai. Aaj ke data mein unique hai? Group karke gino: SELECT col, COUNT(*) FROM t GROUP BY col HAVING COUNT(*) > 1 dohraayi values deta hai (koi row nahi = aaj dohraav nahi). Text ke liye collation: MySQL/MariaDB default mein case nahi dekhte, PostgreSQL dekhta hai, isliye LOWER(col) se group karo.",
+    "hindi": "Rule से unique? PRIMARY KEY/UNIQUE देखें। आज के data में? GROUP BY col HAVING COUNT(*) > 1 चलाएँ।"
+   },
+   "mistake": {
+    "en": "Treating 'no duplicates today' as a guarantee: without a UNIQUE constraint the next insert can repeat the value, and a join or IN that relied on it starts copying rows.",
+    "hinglish": "'Aaj duplicate nahi' ko guarantee maan lena: UNIQUE ke bina agla insert value dohra sakta hai, aur us pe tika join ya IN rows copy karne lagta hai.",
+    "hindi": "आज duplicate नहीं होना guarantee नहीं है; UNIQUE constraint लगाएँ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT LOWER(email) AS email, COUNT(*) AS n FROM customers GROUP BY LOWER(email) HAVING COUNT(*) > 1 ORDER BY 1"
+     },
+     "columns": [
+      "email",
+      "n"
+     ],
+     "result": [
+      [
+       "aarav@mail.test",
+       "2"
+      ],
+      [
+       "diya@mail.test",
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "Default collations (utf8mb4_0900_ai_ci) ignore case and accents, so 'A@x' and 'a@x' already count as the same in GROUP BY and in a UNIQUE index.",
+    "mariadb": "Default collations are case-insensitive too (utf8mb4_general_ci / uca1400_ai_ci).",
+    "postgresql": "Text comparison is case-sensitive; a unique index on LOWER(col) makes case-insensitive uniqueness a rule."
+   },
+   "related": [
+    "unique",
+    "find_duplicates",
+    "primary_key",
+    "list_indexes"
+   ],
+   "fundamentals": [
+    "table_keys",
+    "proof_classes"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/create-index.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/indexes-unique.html",
+    "https://dba.stackexchange.com/questions/tagged/unique-constraint"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "is_column_nullable",
+   "kind": "howto",
+   "title": {
+    "en": "Checking whether a column can be NULL",
+    "hinglish": "Column NULL ho sakta hai ya nahi kaise dekhe",
+    "hindi": "Column NULL हो सकता है या नहीं कैसे देखें"
+   },
+   "terms": [
+    [
+     "(column|field)",
+     "null",
+     "(accept\\w*|can be|nullable|ho sakta|ho sakti|rakh sakta)"
+    ],
+    [
+     "nullable",
+     "(column|check|kaise|how|what)"
+    ],
+    [
+     "कॉलम",
+     "(null|नल)",
+     "(हो सकता|कैसे)"
+    ],
+    [
+     "column",
+     "null",
+     "हो सकता"
+    ],
+    [
+     "(check|verify|see|know|find out|pata|dekh\\w*)",
+     "(column|field)",
+     "null"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to check if a column allows null",
+     "how to see whether a column is nullable"
+    ],
+    "hinglish": [
+     "column null ho sakta hai ya nahi kaise dekhe",
+     "nullable column kaise check kare"
+    ],
+    "hindi": [
+     "column NULL हो सकता है या नहीं कैसे देखें"
+    ]
+   },
+   "answer": {
+    "en": "By rule: information_schema.columns has IS_NULLABLE (YES/NO) on MySQL, MariaDB and PostgreSQL alike: SELECT column_name, is_nullable FROM information_schema.columns WHERE table_name = 't'. YES means the table accepts NULL there, whether or not any row has one yet. In today's data: SELECT COUNT(*) FROM t WHERE col IS NULL. It matters because NOT IN, arithmetic, CONCAT, SUM/AVG and anti-joins all behave differently when a NULL can appear; a query can't tell, so DBaba marks those findings 'needs your table structure'.",
+    "hinglish": "Niyam se: information_schema.columns mein IS_NULLABLE (YES/NO) hota hai, MySQL, MariaDB aur PostgreSQL teeno pe: SELECT column_name, is_nullable FROM information_schema.columns WHERE table_name = 't'. YES matlab table wahan NULL leti hai, chahe abhi koi row mein ho ya nahi. Aaj ke data mein: SELECT COUNT(*) FROM t WHERE col IS NULL. Ye zaroori hai kyunki NOT IN, hisaab, CONCAT, SUM/AVG aur anti-join NULL aane pe alag chalte hain; query se pata nahi chalta, isliye DBaba aise findings ko 'table structure chahiye' kehta hai.",
+    "hindi": "information_schema.columns का IS_NULLABLE देखें (YES/NO); आज के data में COUNT(*) WHERE col IS NULL।"
+   },
+   "mistake": {
+    "en": "Concluding 'never NULL' because no row has a NULL today: IS_NULLABLE = YES means the next insert may add one, and a NOT IN over that column then returns nothing.",
+    "hinglish": "Aaj koi NULL nahi isliye 'kabhi NULL nahi' maan lena: IS_NULLABLE = YES matlab agla insert NULL la sakta hai, phir us column pe NOT IN kuch nahi deta.",
+    "hindi": "आज NULL नहीं है तो हमेशा नहीं होगा, ऐसा न मानें; NOT NULL ही पक्का करता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40)); SELECT column_name, is_nullable FROM information_schema.columns WHERE table_name = 'demo_child' ORDER BY ordinal_position"
+     },
+     "columns": [
+      "column_name",
+      "is_nullable"
+     ],
+     "result": [
+      [
+       "id",
+       "NO"
+      ],
+      [
+       "parent_id",
+       "NO"
+      ],
+      [
+       "note",
+       "YES"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "information_schema.columns lists only permanent tables; SHOW CREATE TABLE shows NOT NULL / DEFAULT NULL too.",
+    "mariadb": "Lab: information_schema.columns doesn't list TEMPORARY tables (use SHOW CREATE TABLE for those).",
+    "postgresql": "information_schema.columns also lists temporary tables; in psql, \\d t shows 'not null' per column."
+   },
+   "related": [
+    "null",
+    "not_null_default",
+    "information_schema",
+    "not_in_null"
+   ],
+   "fundamentals": [
+    "null_logic",
+    "schema_facts",
+    "proof_classes"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/information-schema-columns-table.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/infoschema-columns.html",
+    "https://mariadb.com/kb/en/information-schema-columns-table/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "column_data_type",
+   "kind": "howto",
+   "title": {
+    "en": "Seeing a column's data type",
+    "hinglish": "Column ka data type kaise dekhe",
+    "hindi": "Column का data type कैसे देखें"
+   },
+   "terms": [
+    [
+     "(see|check|find out|know|show|dekh\\w*|pata)",
+     "(data ?type|type)",
+     "(column|field)"
+    ],
+    [
+     "कॉलम",
+     "(टाइप|type)",
+     "(कैसे|देख)\\w*"
+    ],
+    [
+     "column",
+     "type",
+     "(कैसे|देख)\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to see the data type of a column",
+     "how to check a column's type in sql"
+    ],
+    "hinglish": [
+     "column ka data type kaise dekhe",
+     "column ka type kaise pata kare"
+    ],
+    "hindi": [
+     "column का data type कैसे देखें"
+    ]
+   },
+   "answer": {
+    "en": "information_schema.columns.data_type works on MySQL, MariaDB and PostgreSQL: SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 't'. The names differ by engine: MySQL/MariaDB say int, varchar, datetime; PostgreSQL says integer, character varying, timestamp without time zone. SHOW CREATE TABLE t (MySQL/MariaDB) or \\d t (psql) show the full definition. A query only hints at a type (a column compared with 100 is probably a number); DBaba writes such hints as 'probably', never as the real type.",
+    "hinglish": "information_schema.columns.data_type MySQL, MariaDB aur PostgreSQL pe chalta hai: SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 't'. Naam alag hote hain: MySQL/MariaDB int, varchar, datetime; PostgreSQL integer, character varying, timestamp without time zone. Poori definition SHOW CREATE TABLE t (MySQL/MariaDB) ya \\d t (psql). Query sirf ishara deti hai (100 se compare = shayad number); DBaba use 'shayad' likhta hai, asli type nahi.",
+    "hindi": "information_schema.columns का data_type देखें; MySQL और PostgreSQL में type के नाम अलग हैं।"
+   },
+   "mistake": {
+    "en": "Guessing the type from the column name or from one value (a phone or a code compared with a number): text compared with a number is converted, rows are read one by one and '0123' = 123 matches.",
+    "hinglish": "Naam ya ek value se type ka andaza (phone ya code ko number se compare): text ko number se compare karne pe conversion hota hai, har row padhi jaati hai aur '0123' = 123 match ho jaata hai.",
+    "hindi": "नाम या एक value से type का अंदाज़ा न लगाएँ; information_schema देखें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40)); SELECT column_name FROM information_schema.columns WHERE table_name = 'demo_child' AND data_type IN ('int', 'integer') ORDER BY ordinal_position"
+     },
+     "columns": [
+      "column_name"
+     ],
+     "result": [
+      [
+       "id"
+      ],
+      [
+       "parent_id"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "DATA_TYPE is the bare name (int, varchar); COLUMN_TYPE has the full one (varchar(40), int unsigned).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "data_type says 'USER-DEFINED' for enums and domains (udt_name has the name); pg_typeof(expr) shows the type of any value."
+   },
+   "related": [
+    "data_types",
+    "information_schema",
+    "describe_table",
+    "implicit_conversion"
+   ],
+   "fundamentals": [
+    "values_types",
+    "schema_facts",
+    "proof_classes"
+   ],
+   "source": "https://www.postgresql.org/docs/current/infoschema-columns.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/information-schema-columns-table.html",
+    "https://dba.stackexchange.com/questions/tagged/information-schema"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "inferred_schema",
+   "kind": "concept",
+   "title": {
+    "en": "An inferred schema",
+    "hinglish": "Inferred schema",
+    "hindi": "Inferred schema"
+   },
+   "terms": [
+    [
+     "inferr?\\w*",
+     "schema"
+    ],
+    [
+     "schema",
+     "(from|se) (the |a )?query"
+    ],
+    [
+     "अनुमान",
+     "schema"
+    ],
+    [
+     "(what is|what's|kya hota|kya hai|meaning of|क्या)",
+     "inferr?\\w* schema"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is an inferred schema",
+     "what does inferred schema mean"
+    ],
+    "hinglish": [
+     "inferred schema kya hota hai",
+     "query se inferred schema kaise banta hai"
+    ],
+    "hindi": [
+     "inferred schema क्या है"
+    ]
+   },
+   "answer": {
+    "en": "An inferred schema is what a query reveals about the tables without seeing them: the table names and aliases, the columns each one is used with and their role (join key in ON, filter in WHERE, grouping key, measure inside SUM/COUNT, output, sort), a rough type only where a literal or a function shows it (compared with '2024-01-01' -> probably a date), and links from the ON conditions with a direction guessed from the names (orders.customer_id = customers.id looks like many orders -> one customer). Every fact is verified=false: keys, NULL rules, real types and indexes can't be read from a query. When CREATE TABLE, a schema dump or the database is available, each fact is confirmed or corrected.",
+    "hinglish": "Inferred schema wo hai jo query tables ko dekhe bina unke baare mein batati hai: table naam aur alias, kaunse column kis kaam mein (ON mein join key, WHERE mein filter, group key, SUM/COUNT ke andar measure, output, sort), type sirf jab literal ya function dikhaye ('2024-01-01' se compare -> shayad date), aur ON se links, naam se andaza lagayi disha (orders.customer_id = customers.id -> kai orders, ek customer). Har fact verified=false: key, NULL ka niyam, asli type aur index query se nahi padhe ja sakte. CREATE TABLE, dump ya database milte hi har fact pakka ya theek hota hai.",
+    "hindi": "Query से tables के बारे में जो दिखता है (columns, roles, links), verified=false के साथ।"
+   },
+   "mistake": {
+    "en": "Treating the inferred schema as the real one: a column called id may not be a key, a column compared with a number may be text, and an index can't be seen at all.",
+    "hinglish": "Inferred schema ko asli maan lena: id naam ka column key na ho, number se compare hua column text ho, aur index to dikhta hi nahi.",
+    "hindi": "अनुमानित schema को असली न मानें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.city, SUM(o.amount) AS total FROM customers c JOIN orders o ON o.customer_id = c.id WHERE o.status = 'paid' GROUP BY c.city ORDER BY c.city"
+     },
+     "columns": [
+      "city",
+      "total"
+     ],
+     "result": [
+      [
+       "Delhi",
+       "80500"
+      ],
+      [
+       "Mumbai",
+       "800"
+      ],
+      [
+       "Pune",
+       "25500"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "Confirm it with SHOW CREATE TABLE t (keys, NULL, types) and SHOW INDEX FROM t.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Confirm it with information_schema.columns and pg_indexes (or \\d t in psql)."
+   },
+   "related": [
+    "what_is_schema",
+    "describe_table",
+    "confidence_classes",
+    "join_key"
+   ],
+   "fundamentals": [
+    "proof_classes",
+    "schema_facts"
+   ],
+   "source": "https://www.postgresql.org/docs/current/infoschema-columns.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/show-create-table.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "confidence_classes",
+   "kind": "concept",
+   "title": {
+    "en": "Proven, likely risk, needs schema, needs execution",
+    "hinglish": "Proven, likely risk, needs schema, needs execution",
+    "hindi": "Proven, likely risk, needs schema, needs execution"
+   },
+   "terms": [
+    [
+     "proven",
+     "(likely|risk|schema|execution|mean\\w*|matlab)"
+    ],
+    [
+     "likely risk"
+    ],
+    [
+     "needs (schema|execution)"
+    ],
+    [
+     "(pakka|pakki)",
+     "(risk|galti|finding)",
+     "(farak|matlab|kya)"
+    ],
+    [
+     "पक्का",
+     "(risk|रिस्क)"
+    ],
+    [
+     "(difference|farak|fark|vs|mean\\w*|matlab)",
+     "proven",
+     "(needs schema|likely risk|needs execution)"
+    ],
+    [
+     "needs (schema|execution)",
+     "(matlab|mean\\w*|kya|what)"
+    ],
+    [
+     "needs schema",
+     "(matlab|mean\\w*|kya|what)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what does proven and likely risk mean",
+     "what is the difference between proven and needs schema",
+     "what does needs execution mean"
+    ],
+    "hinglish": [
+     "proven aur likely risk mein kya farak hai",
+     "needs schema ka matlab kya hai"
+    ],
+    "hindi": [
+     "proven और likely risk का मतलब क्या है"
+    ]
+   },
+   "answer": {
+    "en": "With only the query, DBaba says how sure each finding is. PROVEN: the SQL text alone decides it (the database refuses it, or '= NULL' can never be true). LIKELY RISK: the shape suggests it, but the data or your intent decides (a total after a one-to-many join is wrong only if a parent really has several children). NEEDS SCHEMA: a fact about the tables decides it (can the column be NULL, is it a key, does it hold a time of day). NEEDS EXECUTION: a speed risk; only the indexes, the row counts and EXPLAIN can say if it is slow. Paste CREATE TABLE or EXPLAIN output and findings become verified or are dropped.",
+    "hinglish": "Sirf query ho to DBaba har finding ke saath batata hai kitna pakka hai. PROVEN: sirf SQL text tay karta hai (database mana karega, ya '= NULL' kabhi sach nahi). LIKELY RISK: shakal se lagta hai par data ya aapka matlab tay karta hai (one-to-many join ke baad total tabhi galat jab parent ke sach mein kai child hon). NEEDS SCHEMA: table ka fact tay karta hai (column NULL ho sakta hai, key hai, time rakhta hai). NEEDS EXECUTION: speed ka risk; sirf index, rows ki ginti aur EXPLAIN bata sakte hain. CREATE TABLE ya EXPLAIN paste karo to findings pakki hoti hain ya hat jaati hain.",
+    "hindi": "PROVEN = query से पक्का; LIKELY RISK = data/मतलब पर टिका; NEEDS SCHEMA = table के fact पर; NEEDS EXECUTION = speed, EXPLAIN से।"
+   },
+   "mistake": {
+    "en": "Fixing a 'likely risk' or 'needs schema' finding blindly: the rewrite changes the result if the risk can't happen in your tables; check the fact first (the report gives the query to check it).",
+    "hinglish": "'Likely risk' ya 'needs schema' ko bina dekhe theek kar dena: agar aapki tables mein wo risk ho hi nahi sakta to rewrite result badal deta hai; pehle fact check karo (report mein uski query hai).",
+    "hindi": "Risk वाली finding को बिना जाँचे ठीक न करें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS rows_found FROM customers WHERE middle_name = NULL"
+     },
+     "columns": [
+      "rows_found"
+     ],
+     "result": [
+      [
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "'= NULL' gives no rows on every engine: that is why it is PROVEN.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same: '= NULL' is unknown for every row."
+   },
+   "related": [
+    "inferred_schema",
+    "why_schema_needed",
+    "why_explain_needed",
+    "query_assumptions"
+   ],
+   "fundamentals": [
+    "proof_classes"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-comparison.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/working-with-null.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "query_without_database",
+   "kind": "howto",
+   "title": {
+    "en": "Checking a query without the database",
+    "hinglish": "Database ke bina query check",
+    "hindi": "Database के बिना query check"
+   },
+   "terms": [
+    [
+     "(without|bina|no)",
+     "(database|db|connect\\w*|connection|schema|tables)",
+     "(check|review|verify|test|find mistakes)"
+    ],
+    [
+     "बिना",
+     "(डेटाबेस|database)",
+     "(check|चेक|जाँच)"
+    ],
+    [
+     "बिना",
+     "database"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can you check a query without connecting the database",
+     "how to check a sql query without a database"
+    ],
+    "hinglish": [
+     "bina database connect kiye query check ho sakti hai kya",
+     "database ke bina query kaise check kare"
+    ],
+    "hindi": [
+     "बिना database के query check हो सकती है क्या"
+    ]
+   },
+   "answer": {
+    "en": "Yes, up to what the text proves. From the query alone DBaba reads every stage, finds what is PROVEN (syntax the engine refuses, '= NULL', an aggregate in WHERE, an alias never defined), and lists the rest honestly: LIKELY RISKS (row copies after a join), what NEEDS SCHEMA (NULLs, keys, types) and what NEEDS EXECUTION (speed). It writes the schema the query implies with verified=false and gives read-only queries to settle each assumption. Paste CREATE TABLE or EXPLAIN output later and the findings become verified or are dropped.",
+    "hinglish": "Haan, jitna text sabit karta hai. Sirf query se DBaba har stage padhta hai, PROVEN galtiyan dhoondhta hai (engine jo syntax mana kare, '= NULL', WHERE mein aggregate, alias jo bana hi nahi), aur baaki imaandari se batata hai: LIKELY RISK (join ke baad rows copy), NEEDS SCHEMA (NULL, key, type) aur NEEDS EXECUTION (speed). Query jo schema dikhati hai wo verified=false ke saath likhta hai aur har assumption ke liye read-only query deta hai. Baad mein CREATE TABLE ya EXPLAIN paste karo to findings pakki ya khatam.",
+    "hindi": "हाँ, जितना query text साबित करता है; बाकी risk/assumption के रूप में बताया जाता है।"
+   },
+   "mistake": {
+    "en": "Expecting 'no problems found' to mean the query is right on your data: without the tables, a risk that depends on NULLs or keys stays a risk, not a pass.",
+    "hinglish": "'Koi problem nahi' ko ye maan lena ki aapke data pe query sahi hai: tables ke bina NULL ya key pe tika risk, risk hi rehta hai, pass nahi.",
+    "hindi": "बिना tables के 'कोई problem नहीं' का मतलब पक्का सही नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM departments WHERE id NOT IN (SELECT department_id FROM employees) ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": []
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "With a connection DBaba can also read SHOW CREATE TABLE and EXPLAIN (read-only).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "With a connection: information_schema, pg_indexes and EXPLAIN (read-only)."
+   },
+   "related": [
+    "confidence_classes",
+    "inferred_schema",
+    "query_assumptions",
+    "not_in_null"
+   ],
+   "fundamentals": [
+    "proof_classes"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/subquery-restrictions.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "why_schema_needed",
+   "kind": "why",
+   "title": {
+    "en": "Why the table structure is needed",
+    "hinglish": "Table structure kyun chahiye",
+    "hindi": "Table structure क्यों चाहिए"
+   },
+   "terms": [
+    [
+     "(why|kyun|kyu|kyon)",
+     "(table structure|schema|create table|show create)",
+     "(need\\w*|chahiye|ask\\w*|maang\\w*|required|matter)"
+    ],
+    [
+     "क्यों",
+     "(structure|स्ट्रक्चर|schema)"
+    ],
+    [
+     "(table structure|schema)",
+     "(क्यों|kyun|kyu|why)",
+     "(चाहिए|chahiye|need\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why does dbaba need the table structure",
+     "why is the create table needed to check a query"
+    ],
+    "hinglish": [
+     "table structure kyun chahiye query check ke liye",
+     "schema kyun maangte ho"
+    ],
+    "hindi": [
+     "table structure क्यों चाहिए"
+    ]
+   },
+   "answer": {
+    "en": "Because several mistakes depend on facts the query never states. NOT IN (subquery) returns nothing only if the subquery column can be NULL; BETWEEN ... AND '2024-01-31' loses the last day only if the column holds a time of day; a total after a join is doubled only if the joined column is not a key; ORDER BY ... LIMIT picks random rows only if the sort columns aren't unique. With CREATE TABLE (or SHOW CREATE TABLE / a schema dump) DBaba looks each fact up: the finding is verified, or dropped because it can't happen.",
+    "hinglish": "Kyunki kai galtiyan un facts pe tiki hain jo query kabhi nahi batati. NOT IN (subquery) tabhi kuch nahi deta jab subquery ka column NULL ho sake; BETWEEN ... AND '2024-01-31' aakhri din tabhi chhodta hai jab column mein time ho; join ke baad total tabhi double jab joda column key na ho; ORDER BY ... LIMIT random rows tabhi jab sort columns unique na hon. CREATE TABLE (ya SHOW CREATE TABLE / dump) se DBaba har fact dekh leta hai: finding pakki, ya hat jaati hai.",
+    "hindi": "कई ग़लतियाँ NULL, key, time जैसे facts पर टिकी हैं जो query में नहीं दिखते।"
+   },
+   "mistake": {
+    "en": "Pasting only the query and reading every 'needs schema' finding as a bug: some of them can't happen in your tables (a NOT NULL column in NOT IN is safe).",
+    "hinglish": "Sirf query paste karke har 'needs schema' ko bug samajhna: kuch aapki tables mein ho hi nahi sakte (NOT NULL column ka NOT IN safe hai).",
+    "hindi": "हर 'needs schema' finding bug नहीं होती।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT d.id FROM departments d WHERE NOT EXISTS (SELECT 1 FROM employees e WHERE e.department_id = d.id) ORDER BY d.id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "SHOW CREATE TABLE t gives everything at once (types, NULL, keys, indexes).",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "pg_dump --schema-only -t t, or \\d t in psql."
+   },
+   "related": [
+    "show_create_table",
+    "is_column_nullable",
+    "confidence_classes",
+    "not_in_vs_not_exists"
+   ],
+   "fundamentals": [
+    "schema_facts",
+    "proof_classes"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/show-create-table.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/app-pgdump.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "why_explain_needed",
+   "kind": "why",
+   "title": {
+    "en": "Why EXPLAIN is needed to judge speed",
+    "hinglish": "Speed ke liye EXPLAIN kyun chahiye",
+    "hindi": "Speed के लिए EXPLAIN क्यों चाहिए"
+   },
+   "terms": [
+    [
+     "(why|kyun|kyu|kyon)",
+     "explain",
+     "(need\\w*|chahiye|ask\\w*|maang\\w*|output|required)"
+    ],
+    [
+     "क्यों",
+     "(explain|एक्सप्लेन)"
+    ],
+    [
+     "(why|kyun)",
+     "(slow|speed|fast)",
+     "(sure|pakka|tell|bata\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why do you need the explain output",
+     "why is explain needed to judge the speed of a query"
+    ],
+    "hinglish": [
+     "explain output kyun chahiye",
+     "explain output kyun maangte ho"
+    ],
+    "hindi": [
+     "EXPLAIN क्यों चाहिए"
+    ]
+   },
+   "answer": {
+    "en": "Speed depends on things the query doesn't contain: which indexes exist, how many rows each table has, and the plan the optimizer picks from its statistics. A function on a filtered column, a leading-% LIKE or a big OFFSET are real risks, but on a 500-row table they cost nothing, and an index may already serve another part. EXPLAIN shows the plan (access type, index, estimated rows) without running the query; EXPLAIN ANALYZE (MySQL 8.0.18+, PostgreSQL) or ANALYZE (MariaDB) runs it and adds real rows and time. That is why DBaba calls speed findings risks until a plan proves them.",
+    "hinglish": "Speed un cheezon pe tiki hai jo query mein nahi: kaunse index hain, har table mein kitni rows hain, aur optimizer apne statistics se kaunsa plan chunta hai. Filter wale column pe function, shuru mein % wala LIKE ya bada OFFSET asli risk hain, par 500 rows ki table pe inka kharcha kuch nahi, aur koi index pehle se kaam kar raha ho sakta hai. EXPLAIN bina chalaye plan dikhata hai; EXPLAIN ANALYZE (MySQL 8.0.18+, PostgreSQL) ya ANALYZE (MariaDB) chala ke asli rows aur time. Isliye DBaba speed findings ko plan sabit karne tak risk kehta hai.",
+    "hindi": "Speed index, rows और plan पर टिकी है; EXPLAIN plan दिखाता है।"
+   },
+   "mistake": {
+    "en": "Adding every suggested index without looking at the plan: indexes that already exist get duplicated, and each extra index slows every INSERT and UPDATE.",
+    "hinglish": "Plan dekhe bina har sujhaya index laga dena: jo pehle se hain wo dohraaye jaate hain, aur har extra index har INSERT aur UPDATE ko slow karta hai.",
+    "hindi": "Plan देखे बिना हर index न लगाएँ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS july_orders FROM orders WHERE order_date >= '2024-07-01' AND order_date < '2024-08-01'"
+     },
+     "columns": [
+      "july_orders"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "EXPLAIN shows type (ALL = full scan), key and rows; EXPLAIN ANALYZE (8.0.18+) runs it.",
+    "mariadb": "No EXPLAIN ANALYZE (error 1064): use ANALYZE SELECT ..., which adds r_rows.",
+    "postgresql": "EXPLAIN shows Seq Scan / Index Scan with estimated rows; EXPLAIN (ANALYZE, BUFFERS) runs it."
+   },
+   "related": [
+    "explain",
+    "explain_analyze",
+    "sargable",
+    "index_not_used"
+   ],
+   "fundamentals": [
+    "index_use",
+    "proof_classes"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/explain.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/analyze-statement/",
+    "https://www.postgresql.org/docs/current/using-explain.html",
+    "https://use-the-index-luke.com/sql/explain-plan"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "join_key",
+   "kind": "concept",
+   "title": {
+    "en": "A join key",
+    "hinglish": "Join key",
+    "hindi": "Join key"
+   },
+   "terms": [
+    [
+     "join (key|column)s?"
+    ],
+    [
+     "(joining|matching) (key|column)"
+    ],
+    [
+     "जॉइन",
+     "(key|की)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a join key",
+     "what is a join column in sql"
+    ],
+    "hinglish": [
+     "join key kya hota hai",
+     "join column kya hai"
+    ],
+    "hindi": [
+     "join key क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A join key is the column (or columns) the ON condition matches between two tables: in orders o JOIN customers c ON c.id = o.customer_id the keys are o.customer_id and c.id. Usually one side is the parent's PRIMARY KEY and the other a FOREIGN KEY column in the child. Whether the join copies rows depends on the key side being unique; whether it is fast depends on an index on the child's column. Both sides should have the same type, or one is converted for every row.",
+    "hinglish": "Join key wo column (ya columns) hai jise ON do tables ke beech milata hai: orders o JOIN customers c ON c.id = o.customer_id mein o.customer_id aur c.id. Aam taur pe ek taraf parent ki PRIMARY KEY aur doosri taraf child ka FOREIGN KEY column. Join rows copy karega ya nahi ye key side ke unique hone pe tika hai; tez hoga ya nahi ye child ke column pe index pe. Dono taraf type same ho, warna har row pe conversion.",
+    "hindi": "ON में मिलाया गया column; आमतौर पर parent की PRIMARY KEY और child का FOREIGN KEY।"
+   },
+   "mistake": {
+    "en": "Joining on a column that only looks like the key (o.id = c.id instead of o.customer_id = c.id): the query runs and returns rows, just the wrong pairs.",
+    "hinglish": "Aise column pe join jo sirf key jaisa dikhe (o.customer_id = c.id ki jagah o.id = c.id): query chalti hai, rows bhi deti hai, bas galat jode.",
+    "hindi": "सिर्फ़ key जैसे दिखने वाले column पर join न करें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, c.first_name FROM orders o JOIN customers c ON c.id = o.customer_id WHERE o.id <= 3 ORDER BY o.id"
+     },
+     "columns": [
+      "id",
+      "first_name"
+     ],
+     "result": [
+      [
+       "1",
+       "Aarav"
+      ],
+      [
+       "2",
+       "Aarav"
+      ],
+      [
+       "3",
+       "Diya"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "InnoDB makes an index for a FOREIGN KEY column automatically.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "A FOREIGN KEY gets no index of its own: create one on the child's column."
+   },
+   "related": [
+    "join",
+    "foreign_key",
+    "primary_key",
+    "join_cardinality"
+   ],
+   "fundamentals": [
+    "join_condition",
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/join.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "grain",
+   "kind": "concept",
+   "title": {
+    "en": "The grain of a query",
+    "hinglish": "Query ka grain",
+    "hindi": "Query का grain"
+   },
+   "terms": [
+    [
+     "grain"
+    ],
+    [
+     "(one|ek) row per"
+    ],
+    [
+     "ग्रेन"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the grain of a query",
+     "what does grain mean in sql"
+    ],
+    "hinglish": [
+     "grain kya hota hai",
+     "query ka grain kya hai"
+    ],
+    "hindi": [
+     "query का grain क्या है"
+    ]
+   },
+   "answer": {
+    "en": "The grain is what one result row stands for: one row per order, per customer, per customer per month. Every stage can change it: a join to a child table moves it down (one row per order item), GROUP BY moves it up (one row per group). Totals are only right at the grain they were meant for: SUM(o.amount) after joining order_items adds each order once per item. Say the grain out loud before writing the SELECT, and total before joining when the join changes it.",
+    "hinglish": "Grain matlab ek result row kis cheez ki hai: har order ki ek row, har customer ki, har customer har mahine ki. Har stage ise badal sakta hai: child table se join neeche le jaata hai (har order item ki row), GROUP BY upar (har group ki row). Total sirf sahi grain pe sahi hota hai: order_items join ke baad SUM(o.amount) har order ko har item ke liye jodta hai. SELECT likhne se pehle grain bolo, aur join grain badle to join se pehle total karo.",
+    "hindi": "एक result row किस चीज़ की है: हर order, हर customer आदि।"
+   },
+   "mistake": {
+    "en": "Adding a child table to a report for one extra column: the grain silently drops to one row per child and every total above it grows.",
+    "hinglish": "Ek extra column ke liye report mein child table jod dena: grain chupchaap har child ki row ban jaata hai aur upar ke saare total badh jaate hain.",
+    "hindi": "एक column के लिए child table जोड़ने से grain बदल जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT customer_id, COUNT(*) AS orders FROM orders GROUP BY customer_id ORDER BY customer_id"
+     },
+     "columns": [
+      "customer_id",
+      "orders"
+     ],
+     "result": [
+      [
+       "1",
+       "2"
+      ],
+      [
+       "2",
+       "2"
+      ],
+      [
+       "3",
+       "2"
+      ],
+      [
+       "6",
+       "1"
+      ],
+      [
+       "8",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "Same on every engine.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same on every engine."
+   },
+   "related": [
+    "group_by",
+    "join_sum_doubled",
+    "join_cardinality",
+    "measure_dimension"
+   ],
+   "fundamentals": [
+    "grain",
+    "cardinality"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/group-by-handling.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "measure_dimension",
+   "kind": "compare",
+   "title": {
+    "en": "Measures and dimensions",
+    "hinglish": "Measure aur dimension",
+    "hindi": "Measure और dimension"
+   },
+   "terms": [
+    [
+     "measures?",
+     "dimensions?"
+    ],
+    [
+     "मेज़र",
+     "डाइमेंशन"
+    ],
+    [
+     "measures?",
+     "(kya|what|क्या|meaning)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the difference between a measure and a dimension",
+     "measure vs dimension in sql"
+    ],
+    "hinglish": [
+     "measure aur dimension mein kya farak hai",
+     "measure kya hota hai"
+    ],
+    "hindi": [
+     "measure और dimension में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "A dimension is what you group or filter by (status, city, month, product); a measure is the number you total (amount, quantity, price). In SQL the dimensions go in GROUP BY and the measures inside SUM/AVG/COUNT: SELECT status, SUM(amount) FROM orders GROUP BY status. Keys are neither: summing an id or grouping by a price is usually a sign the query mixed them up.",
+    "hinglish": "Dimension wo jis se group ya filter karte ho (status, city, mahina, product); measure wo number jiska total karte ho (amount, quantity, price). SQL mein dimension GROUP BY mein aur measure SUM/AVG/COUNT ke andar: SELECT status, SUM(amount) FROM orders GROUP BY status. Key dono nahi: id ka SUM ya price se GROUP BY aksar mix-up ka nishaan hai.",
+    "hindi": "Dimension = जिससे group करें; measure = जिसका total करें।"
+   },
+   "mistake": {
+    "en": "Averaging a measure that was already totalled at another grain (an AVG of per-customer sums is not the average order).",
+    "hinglish": "Doosre grain pe pehle se total hue measure ka average (per-customer sums ka AVG average order nahi).",
+    "hindi": "पहले से total हुए measure का AVG सही average नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT status, SUM(amount) AS total FROM orders GROUP BY status ORDER BY status"
+     },
+     "columns": [
+      "status",
+      "total"
+     ],
+     "result": [
+      [
+       "cancelled",
+       "12000"
+      ],
+      [
+       "paid",
+       "106800"
+      ],
+      [
+       "pending",
+       "65000"
+      ],
+      [
+       "shipped",
+       "800"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "Same on every engine.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same on every engine."
+   },
+   "related": [
+    "group_by",
+    "aggregates",
+    "grain",
+    "avg_of_averages"
+   ],
+   "fundamentals": [
+    "aggregation",
+    "grain"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/tutorial-agg.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "query_assumptions",
+   "kind": "concept",
+   "title": {
+    "en": "The hidden assumptions of a query",
+    "hinglish": "Query ki chhupi assumptions",
+    "hindi": "Query की छुपी assumptions"
+   },
+   "terms": [
+    [
+     "assum\\w*",
+     "(query|queries|sql)"
+    ],
+    [
+     "(hidden|chhupi|implicit)",
+     "assum\\w*"
+    ],
+    [
+     "(query|क्वेरी)",
+     "मान्यता"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what are the hidden assumptions in a sql query",
+     "what are the assumptions a sql query makes about the data"
+    ],
+    "hinglish": [
+     "sql query ki assumptions kya hoti hain",
+     "sql query ki chhupi assumptions kya hain"
+    ],
+    "hindi": [
+     "query की assumptions क्या होती हैं"
+    ]
+   },
+   "answer": {
+    "en": "Every query quietly assumes facts about the tables: that a joined column is a key (no row copies), that a column has no NULLs (NOT IN, arithmetic, CONCAT), that a date column has no time part (BETWEEN to a day), that the sort columns are unique (a stable LIMIT page), that a value is the type it is compared with. When an assumption is false the query still runs and returns wrong rows. Write them down and check each one in the database with a read-only query: duplicates with GROUP BY ... HAVING COUNT(*) > 1, NULLs with IS NULL, types and NULL rules in information_schema.columns.",
+    "hinglish": "Har query tables ke baare mein chupchaap kuch maanti hai: joda column key hai (rows copy nahi), column mein NULL nahi (NOT IN, hisaab, CONCAT), date column mein time nahi (din tak BETWEEN), sort columns unique hain (LIMIT ka stable page), value usi type ki hai jisse compare hui. Assumption galat ho to query phir bhi chalti hai aur galat rows deti hai. Unhe likho aur har ek ko read-only query se database mein check karo: duplicate GROUP BY ... HAVING COUNT(*) > 1 se, NULL IS NULL se, type aur NULL niyam information_schema.columns se.",
+    "hindi": "हर query key, NULL, type जैसे facts मान कर चलती है; उन्हें read-only query से जाँचें।"
+   },
+   "mistake": {
+    "en": "Testing only on data where the assumption happens to hold (each order with one item), then shipping a total that doubles once an order has two.",
+    "hinglish": "Sirf us data pe test karna jahan assumption sach hai (har order ka ek item), phir wo total chalana jo do item aate hi double ho jaata hai.",
+    "hindi": "सिर्फ़ ऐसे data पर test न करें जहाँ assumption सच है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT o.id, SUM(o.amount) AS summed_amount FROM orders o JOIN order_items i ON i.order_id = o.id WHERE o.id = 1 GROUP BY o.id"
+     },
+     "columns": [
+      "id",
+      "summed_amount"
+     ],
+     "result": [
+      [
+       "1",
+       "76500"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "Same on every engine; information_schema.columns and SHOW INDEX check the facts.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "Same on every engine; information_schema.columns and pg_indexes check the facts."
+   },
+   "related": [
+    "confidence_classes",
+    "inferred_schema",
+    "join_sum_doubled",
+    "not_in_null"
+   ],
+   "fundamentals": [
+    "proof_classes",
+    "cardinality",
+    "null_logic"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://www.metabase.com/learn/grow-your-data-skills/learn-sql/debugging-sql/sql-logic-duplicated-data"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "explain_without_running",
+   "kind": "concept",
+   "title": {
+    "en": "Does EXPLAIN run the query?",
+    "hinglish": "Kya EXPLAIN query chalata hai?",
+    "hindi": "क्या EXPLAIN query चलाता है?"
+   },
+   "terms": [
+    [
+     "explain",
+     "(execute\\w*|chala\\w*|chalta|runs?)"
+    ],
+    [
+     "एक्सप्लेन",
+     "चला\\w*"
+    ],
+    [
+     "explain",
+     "चलाता"
+    ],
+    [
+     "explain",
+     "(badal\\w*|change\\w*|बदल\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does explain run the query",
+     "does explain execute an update"
+    ],
+    "hinglish": [
+     "explain query chalata hai kya",
+     "explain se data badalta hai kya"
+    ],
+    "hindi": [
+     "EXPLAIN query चलाता है क्या"
+    ]
+   },
+   "answer": {
+    "en": "Plain EXPLAIN does not run the statement: it only shows the plan the optimizer would use, with estimated rows, so EXPLAIN UPDATE / DELETE changes nothing and is safe to try. EXPLAIN ANALYZE (PostgreSQL, MySQL 8.0.18+) and ANALYZE (MariaDB) DO run it to measure real rows and time; on a change statement that really changes rows, so wrap it in a transaction and roll back (PostgreSQL), or use plain EXPLAIN.",
+    "hinglish": "Sirf EXPLAIN statement nahi chalata: bas wo plan dikhata hai jo optimizer use karega, andazan rows ke saath, isliye EXPLAIN UPDATE / DELETE kuch nahi badalta. EXPLAIN ANALYZE (PostgreSQL, MySQL 8.0.18+) aur ANALYZE (MariaDB) SACH MEIN chalate hain asli rows aur time naapne ke liye; change statement pe rows sach mein badalti hain, isliye transaction mein chala ke rollback karo (PostgreSQL), ya sirf EXPLAIN.",
+    "hindi": "EXPLAIN नहीं चलाता; EXPLAIN ANALYZE / ANALYZE चलाता है।"
+   },
+   "mistake": {
+    "en": "Running EXPLAIN ANALYZE DELETE ... to 'just see the plan': the rows are deleted.",
+    "hinglish": "'Bas plan dekhne' ke liye EXPLAIN ANALYZE DELETE ... chalana: rows delete ho jaati hain.",
+    "hindi": "EXPLAIN ANALYZE DELETE सच में delete करता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40)); INSERT INTO demo_child VALUES (1, 1, 'a'), (2, 1, 'b'); EXPLAIN DELETE FROM demo_child; SELECT COUNT(*) AS still_there FROM demo_child"
+     },
+     "columns": [
+      "still_there"
+     ],
+     "result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "EXPLAIN works on SELECT, INSERT, UPDATE, DELETE, REPLACE; EXPLAIN ANALYZE only on SELECT-like statements and runs them.",
+    "mariadb": "ANALYZE UPDATE / DELETE really changes the rows (lab: EXPLAIN DELETE changed nothing).",
+    "postgresql": "EXPLAIN ANALYZE runs anything, changes included: BEGIN; EXPLAIN ANALYZE ...; ROLLBACK;"
+   },
+   "related": [
+    "explain",
+    "explain_analyze",
+    "why_explain_needed",
+    "preview_before_change"
+   ],
+   "fundamentals": [
+    "index_use",
+    "changes_safety"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-explain.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/explain.html",
+    "https://mariadb.com/kb/en/analyze-statement/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "unique_in_data_vs_constraint",
+   "kind": "compare",
+   "title": {
+    "en": "Unique in the data vs a UNIQUE constraint",
+    "hinglish": "Data mein unique vs UNIQUE constraint",
+    "hindi": "Data में unique बनाम UNIQUE constraint"
+   },
+   "terms": [
+    [
+     "(data|today|right now|currently|abhi|aaj)",
+     "(unique|duplicat\\w*)",
+     "(constraint|guarantee\\w*|always|hamesha|pakka|enough|हमेशा)"
+    ],
+    [
+     "डेटा",
+     "(यूनिक|unique)",
+     "(constraint|हमेशा)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "is having no duplicates in the data the same as a unique constraint",
+     "is a column always unique if the data has no duplicates"
+    ],
+    "hinglish": [
+     "data mein duplicate nahi hai to column hamesha unique hai kya",
+     "abhi unique hai to unique constraint zaroori hai kya"
+    ],
+    "hindi": [
+     "data में duplicate नहीं तो column हमेशा unique है क्या"
+    ]
+   },
+   "answer": {
+    "en": "No. A GROUP BY ... HAVING COUNT(*) > 1 that returns nothing describes today's rows only; the next INSERT can repeat a value. A PRIMARY KEY or UNIQUE constraint is a rule the database enforces on every write (MySQL 1062, PostgreSQL 23505 when broken) and also tells the optimizer that a join on it matches at most one row. DBaba treats 'unique in the data' as an observation and only a constraint as proof.",
+    "hinglish": "Nahi. Jo GROUP BY ... HAVING COUNT(*) > 1 kuch nahi deta wo sirf aaj ki rows batata hai; agla INSERT value dohra sakta hai. PRIMARY KEY ya UNIQUE constraint wo niyam hai jo database har write pe lagata hai (tootne pe MySQL 1062, PostgreSQL 23505), aur optimizer ko bhi batata hai ki us pe join zyada se zyada ek row milayega. DBaba 'data mein unique' ko observation maanta hai, sabut sirf constraint.",
+    "hindi": "नहीं; data आज का हाल है, constraint हमेशा का नियम।"
+   },
+   "mistake": {
+    "en": "Dropping DISTINCT or a pre-aggregation because a check found no duplicates today: the report breaks the first time two rows share the value.",
+    "hinglish": "Aaj duplicate nahi mila isliye DISTINCT ya pre-aggregation hata dena: jis din do rows same value layengi report toot jaayegi.",
+    "hindi": "आज duplicate नहीं, इस पर DISTINCT न हटाएँ।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE demo_child (id INT PRIMARY KEY, parent_id INT NOT NULL, note VARCHAR(40)); INSERT INTO demo_child VALUES (1, 1, 'a'); INSERT INTO demo_child VALUES (2, 1, 'a'); SELECT note, COUNT(*) AS n FROM demo_child GROUP BY note"
+     },
+     "columns": [
+      "note",
+      "n"
+     ],
+     "result": [
+      [
+       "a",
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "A UNIQUE index treats NULLs as distinct: several NULLs are allowed.",
+    "mariadb": "Same as MySQL.",
+    "postgresql": "NULLs are distinct in a UNIQUE constraint too, unless it says NULLS NOT DISTINCT (PostgreSQL 15+)."
+   },
+   "related": [
+    "unique",
+    "is_column_unique",
+    "primary_key",
+    "unique_constraint_vs_index"
+   ],
+   "fundamentals": [
+    "table_keys",
+    "proof_classes"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/create-index.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "estimated_vs_actual_rows",
+   "kind": "compare",
+   "title": {
+    "en": "Estimated rows vs actual rows in a plan",
+    "hinglish": "Plan mein estimated aur actual rows",
+    "hindi": "Plan में estimated और actual rows"
+   },
+   "terms": [
+    [
+     "estimat\\w*",
+     "actual",
+     "rows?"
+    ],
+    [
+     "(estimat\\w*|andaza)",
+     "rows?",
+     "(explain|plan)"
+    ],
+    [
+     "अनुमान",
+     "rows?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the difference between estimated rows and actual rows in explain",
+     "why are explain row estimates wrong"
+    ],
+    "hinglish": [
+     "explain mein estimated rows aur actual rows ka farak kya hai",
+     "explain ka rows andaza galat kyun hota hai"
+    ],
+    "hindi": [
+     "explain में estimated और actual rows में अंतर क्या है"
+    ]
+   },
+   "answer": {
+    "en": "EXPLAIN shows the optimizer's estimate of how many rows each step reads (MySQL/MariaDB 'rows', PostgreSQL 'rows=' in the cost part), worked out from table statistics without running anything. EXPLAIN ANALYZE (PostgreSQL, MySQL 8.0.18+) or ANALYZE (MariaDB, r_rows) runs the query and shows what really happened. A big gap means stale or too-coarse statistics: run ANALYZE TABLE t (MySQL/MariaDB) or ANALYZE t (PostgreSQL). The query text alone gives neither number, which is why speed findings wait for a plan.",
+    "hinglish": "EXPLAIN optimizer ka andaza dikhata hai ki har step kitni rows padhega (MySQL/MariaDB 'rows', PostgreSQL cost ke saath 'rows='), table statistics se, bina kuch chalaye. EXPLAIN ANALYZE (PostgreSQL, MySQL 8.0.18+) ya ANALYZE (MariaDB, r_rows) query chala ke asli dikhata hai. Bada farak = purane ya mote statistics: ANALYZE TABLE t (MySQL/MariaDB) ya ANALYZE t (PostgreSQL). Sirf query text se dono mein se koi number nahi milta, isliye speed findings plan ka intezaar karti hain.",
+    "hindi": "Estimated = statistics से अंदाज़ा; actual = चला कर; बड़ा फ़र्क = statistics पुराने।"
+   },
+   "mistake": {
+    "en": "Trusting the estimated rows of plain EXPLAIN as the real count: after a big load, the plan can be built for 100 rows when there are a million.",
+    "hinglish": "Sirf EXPLAIN ke andazan rows ko asli ginti maanna: bade load ke baad plan 100 rows ke liye bana ho sakta hai jab hain das lakh.",
+    "hindi": "EXPLAIN के अनुमान को असली गिनती न मानें।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS actual_rows FROM orders WHERE status = 'paid'"
+     },
+     "columns": [
+      "actual_rows"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): INFORMATION_SCHEMA.COLUMNS exists; SET SHOWPLAN_ALL ON shows a plan without running, SET STATISTICS PROFILE ON runs it.",
+    "oracle": "Notes only (not lab-tested here): USER_TAB_COLUMNS (NULLABLE, DATA_TYPE); EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY shows a plan without running.",
+    "sqlite": "Notes only (not lab-tested here): PRAGMA table_info('t') (notnull, type); EXPLAIN QUERY PLAN shows the plan.",
+    "mysql": "EXPLAIN 'rows' and 'filtered' are estimates; EXPLAIN ANALYZE shows 'actual ... rows='.",
+    "mariadb": "ANALYZE SELECT adds r_rows and r_filtered next to the estimates.",
+    "postgresql": "EXPLAIN ANALYZE prints 'rows=' estimated and 'actual ... rows=' side by side."
+   },
+   "related": [
+    "explain",
+    "explain_analyze",
+    "analyze_statistics",
+    "why_explain_needed"
+   ],
+   "fundamentals": [
+    "index_use",
+    "proof_classes"
+   ],
+   "source": "https://www.postgresql.org/docs/current/using-explain.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/explain-output.html",
+    "https://mariadb.com/kb/en/analyze-statement/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

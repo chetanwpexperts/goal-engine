@@ -1575,6 +1575,59 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                     f"(SELECT {fm.group(3)}.<key>, {fm.group(1).upper()}(...) ... GROUP BY ...) and join that.",
                     f"{by_alias[A].name} aur {o.name} dono ki ek group mein kai rows hain, isliye har row baar baar gini jaati hai aur "
                     f"{fm.group(1).upper()} bada aata hai. {by_alias[A].name} ka total alag subquery mein nikaal ke join karo.")
+        told = {f.evidence for f in F if f.topic == "group"}
+        for i in aggs:                                       # night 11: SUM(o.amount) with ONE child table joined (order_items)
+            fm = re.search(r"\b(sum|count|avg)\s*\(\s*(distinct\s+)?([A-Za-z_]\w*)\.(\w+)", i["text"], re.I)
+            if not fm or fm.group(2) or re.sub(r"\s+", " ", i["text"].strip()) in told:
+                continue
+            A = alias_of(fm.group(3))
+            if A not in by_alias:
+                continue
+            mine = to_one_from({A})
+            kids = [y for y in live if y != A and A in to_one_from({y}) and y not in mine]
+            if len(kids) != 1 or any(y not in mine and y != A and y not in kids for y in live):
+                continue
+            k = by_alias[kids[0]]
+            if k.kind not in ("join", "inner", "left") or not k.on or not k.name or not by_alias[A].name:
+                continue
+            from app.agents.sqlverify import holds
+
+            fnd = Finding("check", "join_fanout", f"{fm.group(1).upper()}({fm.group(3)}.{fm.group(4)}) counts each {by_alias[A].name} row "
+                          f"once per {k.name} row", f"{fm.group(1).upper()}({fm.group(3)}.{fm.group(4)}) har {by_alias[A].name} row ko "
+                          f"har {k.name} row ke liye ginta hai", i["text"],
+                          f"{k.name} is joined on its link to {by_alias[A].name} ({re.sub(chr(10), ' ', sql[k.on_start:k.on_end]).strip()}): a "
+                          f"{by_alias[A].name} row with several {k.name} rows comes back once per {k.name} row, so the "
+                          f"{fm.group(1).upper()} grows with them. Whether it happens depends on the data (one {k.name} row each "
+                          f"is safe), so it is a risk, not proven. Total {by_alias[A].name} on its own before joining {k.name}, or "
+                          f"use EXISTS when {k.name} only filters.",
+                          f"{k.name} {by_alias[A].name} ke link pe juda hai: jis {by_alias[A].name} row ki kai {k.name} rows hain wo "
+                          f"utni baar aati hai, isliye {fm.group(1).upper()} badh jaata hai. Ye data pe tika hai (har ek ki ek hi "
+                          f"{k.name} row ho to theek), isliye risk hai, pakka nahi. {k.name} jodne se pehle {by_alias[A].name} ka "
+                          f"total nikaalo, ya {k.name} sirf filter ho to EXISTS.")
+            if not holds(fnd, [("to_one", k.alias or k.name, None)]):
+                continue
+            F.append(fnd)
+            outside = s[:k.start] + " " * (k.end - k.start) + s[k.end:]
+            used = re.search(rf"(?<![\w.]){re.escape(k.alias or k.name)}\.", outside, re.I)
+            last = not any(y.start > k.start for y in srcs)
+            if used or not last:
+                continue                                     # the child is used elsewhere: only the advice, no rewrite
+            cond = sql[k.on_start:k.on_end].strip()
+            src_name = sql[k.start:k.end]
+            nm = re.search(rf"(?:join)\s+([`\"]?{re.escape(k.name)}[`\"]?(?:\s+(?:as\s+)?[`\"]?{re.escape(k.alias or '')}[`\"]?)?)\s+on\b", src_name, re.I)
+            if not nm:
+                continue
+            ex = f"EXISTS (SELECT 1 FROM {nm.group(1).strip()} WHERE {cond})"
+            wcl = cl.get("where")
+            if k.kind == "left":
+                edits.append((k.start, k.end, ""))           # a LEFT JOIN used nowhere else: the parent rows stay, once each
+            elif wcl:
+                edits.append((k.start, k.end, ""))
+                edits.append((wcl[0], wcl[0], f" {ex} AND ("))
+                wend = wcl[0] + len(s[wcl[0]:wcl[1]].rstrip().rstrip(";").rstrip())
+                edits.append((wend, wend, ")"))
+            else:
+                edits.append((k.start, k.end, f"WHERE {ex} "))
         for i in aggs:
             m = re.search(r"\bcount\s*\(\s*(distinct\s+)?([A-Za-z_]\w*)\.(\w+)\s*\)", i["text"], re.I)
             if m and not m.group(1) and (alias_of(m.group(2)), m.group(3).lower()) in gref:

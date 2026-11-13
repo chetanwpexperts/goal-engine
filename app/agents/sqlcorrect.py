@@ -522,6 +522,19 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
                              f"WHERE ek-ek row dekhta hai, totals se pehle: MySQL error 1111, PostgreSQL 'aggregate functions are not allowed "
                              f"in WHERE'. Total pe condition GROUP BY ke baad HAVING mein; UPDATE/DELETE mein subquery se compare karo."))
 
+    # portability (app/agents/sqlport.py): another database's words the chosen one refuses (rewritten in its own words), and
+    # spellings that run but mean something else there (date - date, INTERVAL '2' WEEK, CAST AS CHAR, ^)
+    from app.agents import sqlport
+
+    for fnd, pedits in sqlport.port(sql, s, intent, Finding, is_select):
+        if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        if fnd.kind == "check" and _SURE_ONLY.get():
+            continue
+        if pedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in pedits for a, b, _n in edits):
+            edits += pedits
+
     # subquery reasoning (app/agents/sqlsubq.py): shape (one value / a set / EXISTS), scope (the inner FROM first), NULLs
     from app.agents import sqlsubq
 
@@ -541,6 +554,31 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
             continue                                       # a definite mistake is fixed alone; the 'if you meant' rewrite waits
         if wedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in wedits for a, b, _n in edits):
             edits += wedits
+
+    # indexes and speed (app/agents/sqlspeed.py): a condition on the bare column, OR across two tables, deep OFFSET -> keyset.
+    # Each rewrite returns exactly the same rows (lab-proven); only the speed changes, so it is a 'check'
+    from app.agents import sqlspeed
+
+    for fnd, pedits in sqlspeed.speed(sql, s, intent, Finding, is_select):
+        if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        if _SURE_ONLY.get():
+            continue                                       # a definite mistake is fixed alone; the faster form comes after
+        if pedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in pedits for a, b, _n in edits):
+            edits += pedits
+
+    # locks and big data (app/agents/sqllock.py): a huge change in batches, queue workers with SKIP LOCKED (offered, same rows)
+    from app.agents import sqllock
+
+    for fnd, ledits in sqllock.locks(sql, s, intent, Finding, is_select):
+        if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        if _SURE_ONLY.get():
+            continue
+        if ledits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in ledits for a, b, _n in edits):
+            edits += ledits
 
     # changing data (app/agents/sqlchange.py): which rows, how often, what value, which column, engine syntax
     if not is_select:
@@ -753,7 +791,8 @@ def _workbook_traps(sql: str, s: str, is_select: bool, intent: str) -> list:
                     (m.start(), m.end(), new)))
 
     # 11. BETWEEN 'day1' AND 'day2' on a date-time column misses everything after 00:00 on day2
-    for m in re.finditer(r"([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s+between\s+'(\d{4}-\d{2}-\d{2})'\s+and\s+'(\d{4}-\d{2}-\d{2})'", sql, re.I):
+    for m in re.finditer(r"(?<![\w$.:`\"])([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s+between\s+'(\d{4}-\d{2}-\d{2})'\s+and\s+'(\d{4}-\d{2}-\d{2})'",
+                         sql, re.I):                       # (x::date BETWEEN ...: a day cast, not a time column)
         col = m.group(1).split(".")[-1].strip('`"')
         if not TIME_COL.search(col):
             continue
@@ -890,7 +929,13 @@ def _check(sql: str, _again: bool = False, intent: str = "") -> dict:
 
 
 def _check_once(sql: str, _again: bool = False, intent: str = "") -> dict:
-    from app.agents import sqlroutine
+    from app.agents import sqllock, sqlroutine
+
+    many = sqllock.n_plus_one(sql)
+    if many:                                          # the same statement once per value (N+1): one statement does the same work
+        one = many.pop("sql")
+        return {"findings": [Finding(many["kind"], many["topic"], many["title_en"], many["title_hi"], many["evidence"], many["fix_en"],
+                                     many["fix_hi"]).as_dict()], "corrected": one, "guesses": []}
 
     if sqlroutine.is_routine(sql):                    # CREATE PROCEDURE / FUNCTION / TRIGGER, DO: read as a routine (night 5)
         order = {"error": 0, "wrong": 1, "check": 2}
@@ -925,6 +970,12 @@ def _check_once(sql: str, _again: bool = False, intent: str = "") -> dict:
     slips, slip_edits = _value_slips(sql, s, known)
     more, more_edits = _statement_slips(sql, s, bool(re.match(r"[\s(]*(select|with)\b", s.lower())), intent)
     slips, slip_edits = slips + more, slip_edits + more_edits
+    from app.agents import sqlbasics, sqlscan
+
+    for p in sqlscan.plain_param_slips(sql, sqlbasics.CHOSEN.get()):   # a placeholder inside quotes / as a name (night 10A)
+        slips.append(Finding(p["kind"], p["topic"], p["title_en"], p["title_hi"], p["evidence"], p["fix_en"], p["fix_hi"]))
+        if p.get("edit"):
+            slip_edits.append(p["edit"])
     out = _check_select(sql, s, slip_edits, _again, intent)
     if out is None:                                   # not a plain SELECT: only the value checks apply
         order = {"error": 0, "wrong": 1, "check": 2}
@@ -1449,7 +1500,13 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                         single.add(al)
                         changed = True
         loose = []
+        # GROUP BY 1, 2: positions in the SELECT list (every engine reads them so); that SELECT item is grouped as a whole
+        ords = {int(x.strip()) for _p, x in _split_top(gtext) if x.strip().isdigit()}
+        # ... and GROUP BY a SELECT name (u in SELECT UPPER(c) u ... GROUP BY u): MySQL, MariaDB and PostgreSQL group by that item
+        named = {x.strip().strip('`"').lower() for _p, x in _split_top(gtext)} - {(x.alias or "").lower() for x in srcs}
         for i in plain:
+            if items.index(i) + 1 in ords or ((i.get("alias") or "").lower() in named and i.get("alias")):
+                continue
             if re.search(r"\bover\s*\(", i["text"], re.I):
                 continue                                 # a window: judged with its own rule (app/agents/sqlaggs.py, window_agg)
             for q, c, _p in _qrefs(i["text"]):

@@ -512,7 +512,7 @@
  ],
  "named": ["\\bmysql\\b", "\\bmysqli\\b", "माय\\s?एसक्यूएल"],
  "error_marks": ["\\bERROR \\d{4} \\(\\w{5}\\)", "your MySQL server version", "\\bmysqli?_sql_exception\\b"],
- "refuses": [{"id": "pg_cast_text", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*(?:text|varchar)\\b", "to": "CAST(\\1 AS CHAR)", "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS type), which works on every database.", "fix_hi": "CAST(x AS type) likho, ye har database pe chalta hai.", "proven": ["mariadb"]}, {"id": "pg_cast_int", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*(?:int|integer|bigint|int4|int8)\\b", "to": "CAST(\\1 AS SIGNED)", "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS SIGNED) (MySQL/MariaDB's integer cast).", "fix_hi": "CAST(x AS SIGNED) likho (MySQL/MariaDB ka integer cast).", "proven": ["mariadb"]}, {"id": "pg_cast_date", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*date\\b", "to": "CAST(\\1 AS DATE)", "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS DATE) (or DATE(x)).", "fix_hi": "CAST(x AS DATE) (ya DATE(x)) likho.", "proven": ["mariadb"]}, {"id": "pg_cast_other", "re": "::\\s*(?!(?:text|varchar|int|integer|bigint|int4|int8|date)\\b)[a-z]\\w*", "to": null, "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS type) with {db}'s type names (CHAR, SIGNED, DECIMAL(p,s), DATE, DATETIME).", "fix_hi": "CAST(x AS type) likho, {db} ke type naamon ke saath (CHAR, SIGNED, DECIMAL(p,s), DATE, DATETIME).", "proven": ["mariadb"]}, {"id": "ilike", "re": "\\bilike\\b", "to": "LIKE", "error": "error 1064, syntax error near 'ILIKE'", "title_en": "{db} has no ILIKE (that's PostgreSQL)", "title_hi": "{db} mein ILIKE nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use LIKE: with the usual case-insensitive (_ci) collation it already ignores case. On a _bin or _cs column, compare LOWER(col) LIKE LOWER('...').", "fix_hi": "LIKE likho: aam _ci collation pe ye pehle se case ignore karta hai. _bin/_cs column pe LOWER(col) LIKE LOWER('...').", "proven": ["mariadb"]}, {"id": "distinct_on", "re": "\\bdistinct\\s+on\\s*\\(", "to": null, "error": "error 1064, syntax error near 'ON ('", "title_en": "{db} has no DISTINCT ON (that's PostgreSQL)", "title_hi": "{db} mein DISTINCT ON nahi hota (wo PostgreSQL ka hai)", "fix_en": "For one row per group, number the rows with ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...) in a subquery and keep rn = 1 (MySQL 8 / MariaDB 10.2+).", "fix_hi": "Har group ki ek row ke liye subquery mein ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...) lagao aur rn = 1 rakho.", "proven": ["mariadb"]}, {"id": "nulls_last", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)((?:\\s+(?:asc|desc))?)\\s+nulls\\s+last\\b", "to": "\\1 IS NULL, \\1\\2", "error": "error 1064, syntax error near 'NULLS'", "title_en": "{db} has no NULLS LAST (that's PostgreSQL)", "title_hi": "{db} mein NULLS LAST nahi hota (wo PostgreSQL ka hai)", "fix_en": "Sort on 'x IS NULL' first (false before true), then on x.", "fix_hi": "Pehle 'x IS NULL' pe sort karo (false pehle), phir x pe.", "proven": ["mariadb"]}, {"id": "nulls_first", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)((?:\\s+(?:asc|desc))?)\\s+nulls\\s+first\\b", "to": "\\1 IS NOT NULL, \\1\\2", "error": "error 1064, syntax error near 'NULLS'", "title_en": "{db} has no NULLS FIRST (that's PostgreSQL)", "title_hi": "{db} mein NULLS FIRST nahi hota (wo PostgreSQL ka hai)", "fix_en": "Sort on 'x IS NOT NULL' first (NULL rows first), then on x.", "fix_hi": "Pehle 'x IS NOT NULL' pe sort karo (NULL rows pehle), phir x pe.", "proven": ["mariadb"]}, {"id": "top", "re": "\\bselect\\s+(?:distinct\\s+)?top\\s*\\(?\\s*\\d+\\s*\\)?", "to": null, "error": "error 1064, syntax error near 'TOP'", "title_en": "{db} has no TOP n (that's SQL Server)", "title_hi": "{db} mein TOP n nahi hota (wo SQL Server ka hai)", "fix_en": "Remove TOP n and end the query with ORDER BY ... LIMIT n.", "fix_hi": "TOP n hatao aur query ke aakhir mein ORDER BY ... LIMIT n likho.", "proven": ["mariadb"]}, {"id": "getdate", "re": "\\bgetdate\\s*\\(\\s*\\)", "to": "NOW()", "error": "error 1305, FUNCTION GETDATE does not exist", "title_en": "{db} has no GETDATE() (that's SQL Server)", "title_hi": "{db} mein GETDATE() nahi hota (wo SQL Server ka hai)", "fix_en": "Use NOW() (date and time) or CURDATE() (date only).", "fix_hi": "NOW() (date aur time) ya CURDATE() (sirf date) likho.", "proven": ["mariadb"]}, {"id": "string_agg", "re": "\\bstring_agg\\s*\\(", "to": null, "error": "error 1305, FUNCTION STRING_AGG does not exist", "title_en": "{db} has no STRING_AGG() (that's PostgreSQL / SQL Server)", "title_hi": "{db} mein STRING_AGG() nahi hota", "fix_en": "Use GROUP_CONCAT(col ORDER BY ... SEPARATOR ',').", "fix_hi": "GROUP_CONCAT(col ORDER BY ... SEPARATOR ',') likho.", "proven": ["mariadb"]}, {"id": "dollar_param", "re": "(?<![\\w$])\\$\\d+\\b", "to": null, "once": true, "error": "error 1064, syntax error near '$1'", "title_en": "{db} doesn't use $1 placeholders (that's PostgreSQL)", "title_hi": "{db} mein $1 placeholder nahi hote (wo PostgreSQL ke hain)", "fix_en": "MySQL/MariaDB drivers use ? (or named :name placeholders in PDO).", "fix_hi": "MySQL/MariaDB drivers ? (ya PDO mein :name) use karte hain.", "proven": ["mariadb"]}],
+ "refuses": [{"id": "pg_cast_text", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*(?:text|varchar)\\b", "to": "CAST(\\1 AS CHAR)", "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS type), which works on every database.", "fix_hi": "CAST(x AS type) likho, ye har database pe chalta hai.", "proven": ["mariadb"]}, {"id": "pg_cast_int", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*(?:int|integer|bigint|int4|int8)\\b", "to": "CAST(\\1 AS SIGNED)", "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS SIGNED) (MySQL/MariaDB's integer cast).", "fix_hi": "CAST(x AS SIGNED) likho (MySQL/MariaDB ka integer cast).", "proven": ["mariadb"]}, {"id": "pg_cast_date", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*date\\b", "to": "CAST(\\1 AS DATE)", "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS DATE) (or DATE(x)).", "fix_hi": "CAST(x AS DATE) (ya DATE(x)) likho.", "proven": ["mariadb"]}, {"id": "pg_cast_other", "re": "::\\s*(?!(?:text|varchar|int|integer|bigint|int4|int8|date)\\b)[a-z]\\w*", "to": null, "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS type) with {db}'s type names (CHAR, SIGNED, DECIMAL(p,s), DATE, DATETIME).", "fix_hi": "CAST(x AS type) likho, {db} ke type naamon ke saath (CHAR, SIGNED, DECIMAL(p,s), DATE, DATETIME).", "proven": ["mariadb"]}, {"id": "ilike", "re": "\\bilike\\b", "to": "LIKE", "error": "error 1064, syntax error near 'ILIKE'", "title_en": "{db} has no ILIKE (that's PostgreSQL)", "title_hi": "{db} mein ILIKE nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use LIKE: with the usual case-insensitive (_ci) collation it already ignores case. On a _bin or _cs column, compare LOWER(col) LIKE LOWER('...').", "fix_hi": "LIKE likho: aam _ci collation pe ye pehle se case ignore karta hai. _bin/_cs column pe LOWER(col) LIKE LOWER('...').", "proven": ["mariadb"]}, {"id": "distinct_on", "re": "\\bdistinct\\s+on\\s*\\(", "to": null, "error": "error 1064, syntax error near 'ON ('", "title_en": "{db} has no DISTINCT ON (that's PostgreSQL)", "title_hi": "{db} mein DISTINCT ON nahi hota (wo PostgreSQL ka hai)", "fix_en": "For one row per group, number the rows with ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...) in a subquery and keep rn = 1 (MySQL 8 / MariaDB 10.2+).", "fix_hi": "Har group ki ek row ke liye subquery mein ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...) lagao aur rn = 1 rakho.", "proven": ["mariadb"]}, {"id": "nulls_last", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)((?:\\s+(?:asc|desc))?)\\s+nulls\\s+last\\b", "to": "\\1 IS NULL, \\1\\2", "error": "error 1064, syntax error near 'NULLS'", "title_en": "{db} has no NULLS LAST (that's PostgreSQL)", "title_hi": "{db} mein NULLS LAST nahi hota (wo PostgreSQL ka hai)", "fix_en": "Sort on 'x IS NULL' first (false before true), then on x.", "fix_hi": "Pehle 'x IS NULL' pe sort karo (false pehle), phir x pe.", "proven": ["mariadb"]}, {"id": "nulls_first", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)((?:\\s+(?:asc|desc))?)\\s+nulls\\s+first\\b", "to": "\\1 IS NOT NULL, \\1\\2", "error": "error 1064, syntax error near 'NULLS'", "title_en": "{db} has no NULLS FIRST (that's PostgreSQL)", "title_hi": "{db} mein NULLS FIRST nahi hota (wo PostgreSQL ka hai)", "fix_en": "Sort on 'x IS NOT NULL' first (NULL rows first), then on x.", "fix_hi": "Pehle 'x IS NOT NULL' pe sort karo (NULL rows pehle), phir x pe.", "proven": ["mariadb"]}, {"id": "getdate", "re": "\\bgetdate\\s*\\(\\s*\\)", "to": "NOW()", "error": "error 1305, FUNCTION GETDATE does not exist", "title_en": "{db} has no GETDATE() (that's SQL Server)", "title_hi": "{db} mein GETDATE() nahi hota (wo SQL Server ka hai)", "fix_en": "Use NOW() (date and time) or CURDATE() (date only).", "fix_hi": "NOW() (date aur time) ya CURDATE() (sirf date) likho.", "proven": ["mariadb"]}, {"id": "dollar_param", "re": "(?<![\\w$])\\$\\d+\\b", "to": null, "once": true, "error": "error 1064, syntax error near '$1'", "title_en": "{db} doesn't use $1 placeholders (that's PostgreSQL)", "title_hi": "{db} mein $1 placeholder nahi hote (wo PostgreSQL ke hain)", "fix_en": "MySQL/MariaDB drivers use ? (or named :name placeholders in PDO).", "fix_hi": "MySQL/MariaDB drivers ? (ya PDO mein :name) use karte hain.", "proven": ["mariadb"]}, {"id": "brackets", "re": "(?<![\\w\\]\\)'])\\[([A-Za-z_][\\w ]*)\\]", "to": "`\\1`", "error": "error 1064, syntax error near '['", "title_en": "{db} doesn't quote names with [brackets] (that's SQL Server)", "title_hi": "{db} naam [brackets] mein nahi maanta (wo SQL Server ka hai)", "fix_en": "Quote a name with `backticks` (or leave a plain name bare).", "fix_hi": "Naam `backticks` mein likho (ya saadharan naam bina quote ke).", "proven": ["mariadb"]}, {"id": "sysdate_bare", "re": "\\bsysdate\\b(?!\\s*\\()", "to": "NOW()", "error": "error 1054, Unknown column 'SYSDATE'", "title_en": "{db} reads SYSDATE without () as a column (that's Oracle)", "title_hi": "{db} bina () ke SYSDATE ko column samajhta hai (wo Oracle ka hai)", "fix_en": "Use NOW() (or SYSDATE() with brackets).", "fix_hi": "NOW() likho.", "proven": ["mariadb"]}, {"id": "sysdatetime", "re": "\\b(?:sysdatetime|getutcdate)\\s*\\(\\s*\\)", "to": "NOW()", "error": "error 1305, FUNCTION does not exist", "title_en": "{db} has no SYSDATETIME() / GETUTCDATE() (that's SQL Server)", "title_hi": "{db} mein SYSDATETIME() nahi hota", "fix_en": "Use NOW() (UTC_TIMESTAMP() for UTC).", "fix_hi": "NOW() likho (UTC ke liye UTC_TIMESTAMP()).", "proven": ["mariadb"]}, {"id": "pg_regex", "re": "!~\\*?(?=\\s*')", "to": "NOT REGEXP", "error": "error 1064, syntax error near '!~'", "title_en": "{db} has no !~ operator (that's PostgreSQL)", "title_hi": "{db} mein !~ nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use NOT REGEXP (it ignores case with the usual _ci collation).", "fix_hi": "NOT REGEXP likho.", "proven": ["mariadb"]}, {"id": "pg_regex_match", "re": "(?<![!~\\w])~\\*?(?=\\s*')", "to": "REGEXP", "error": "error 1064, syntax error near '~'", "title_en": "{db} has no ~ regex operator (that's PostgreSQL)", "title_hi": "{db} mein ~ regex nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use REGEXP (it ignores case with the usual _ci collation, like PostgreSQL's ~*).", "fix_hi": "REGEXP likho.", "proven": ["mariadb"]}, {"id": "similar_to", "re": "\\bsimilar\\s+to\\b", "to": null, "error": "error 1064, syntax error near 'SIMILAR TO'", "title_en": "{db} has no SIMILAR TO (that's PostgreSQL)", "title_hi": "{db} mein SIMILAR TO nahi hota", "fix_en": "Use LIKE for % and _ patterns, or REGEXP for a regular expression (rewrite the pattern: SIMILAR TO's | and () mean the regex ones, but it must match the whole text, so add ^ and $).", "fix_hi": "LIKE ya REGEXP likho (pattern ke aage ^ aur peeche $).", "proven": ["mariadb"]}, {"id": "update_returning", "re": "^\\s*update\\b[\\s\\S]*?\\breturning\\b", "to": null, "once": true, "error": "error 1064, syntax error near 'RETURNING'", "title_en": "{db} has no UPDATE ... RETURNING (that's PostgreSQL)", "title_hi": "{db} mein UPDATE ... RETURNING nahi hota", "fix_en": "Run the UPDATE, then SELECT the same rows (same WHERE) inside the same transaction. (MariaDB 10.5+ has RETURNING for INSERT and DELETE only; MySQL has none.)", "fix_hi": "UPDATE ke baad usi transaction mein wahi rows SELECT karo.", "proven": ["mariadb"]}, {"id": "generate_series", "re": "\\bgenerate_series\\s*\\(", "to": null, "error": "error 1305, FUNCTION generate_series does not exist (1064 in FROM)", "title_en": "{db} has no generate_series() (that's PostgreSQL)", "title_hi": "{db} mein generate_series() nahi hota", "fix_en": "Make the numbers with a recursive WITH: WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM s WHERE n < 10) SELECT n FROM s (MariaDB also has seq_1_to_10 tables with its Sequence engine).", "fix_hi": "WITH RECURSIVE se numbers banao.", "proven": ["mariadb"]}],
  "query_marks": [
   "`[^`]+`",
   "\\blimit\\s+\\d+\\s*,\\s*\\d+",
@@ -556,7 +556,17 @@
   "case_mixed_types": {"behaviour": "converts", "says": "MySQL and MariaDB run it but turn the whole CASE column into text, so the numbers then sort and compare as text ('1000' before '50').", "proven": ["mariadb"]},
   "recursion_limit": {"behaviour": "error", "code": "3636", "says": "MySQL 8 stops after cte_max_recursion_depth (1000) rounds with error 3636 (Recursive query aborted after 1001 iterations); MariaDB stops after max_recursive_iterations (1000) rounds with NO error and returns only the rows made so far.", "proven": ["mariadb"], "source": "https://dev.mysql.com/doc/refman/8.0/en/with.html#common-table-expressions-recursion-limits"},
   "recursive_text_width": {"behaviour": "error", "code": "1406", "says": "MySQL and MariaDB size a text column from the anchor ('x' is one character, a VARCHAR(40) column is 40), and a longer value from the recursive part stops the query with error 1406 (Data too long for column) in strict mode.", "proven": ["mariadb"]},
-  "window_needs_order": {"behaviour": "error", "code": "4018", "says": "MariaDB refuses LAG, LEAD, RANK, DENSE_RANK, PERCENT_RANK and CUME_DIST without ORDER BY in the window (error 4018, No order list in window specification); MySQL 8 runs them in an arbitrary order.", "proven": ["mariadb"]}
+  "window_needs_order": {"behaviour": "error", "code": "4018", "says": "MariaDB refuses LAG, LEAD, RANK, DENSE_RANK, PERCENT_RANK and CUME_DIST without ORDER BY in the window (error 4018, No order list in window specification); MySQL 8 runs them in an arbitrary order.", "proven": ["mariadb"]},
+  "like_prefix_index": {"behaviour": "fast", "says": "On MySQL/MariaDB an ordinary index serves LIKE 'abc%' as a range (lab: type range on MariaDB 10.11).", "proven": ["mariadb"]},
+  "text_vs_number": {"behaviour": "silent", "code": "1292", "says": "MySQL/MariaDB turn every value of the column into a number to compare it, so the index can't be used (lab: type index / ALL) and '098...' and '98... ' match too (a 1292 note, no error).", "proven": ["mariadb"]},
+  "or_same_table": {"behaviour": "fast", "says": "MariaDB combines two indexes for an OR on one table (EXPLAIN: index_merge, Using union(a,b)).", "proven": ["mariadb"]},
+  "expression_index": {"behaviour": "versioned", "says": "MySQL 8.0.13+ can index an expression (INDEX ((LOWER(email)))). MariaDB 10.11 can't: add a virtual column (email_lc VARCHAR(80) AS (LOWER(email)) VIRTUAL, INDEX (email_lc)) and compare that column by name; the lab showed WHERE LOWER(email) = ... still reads the whole index.", "proven": ["mariadb"]},
+  "offset_reads": {"behaviour": "slow", "says": "MariaDB's EXPLAIN for ORDER BY id LIMIT 20 OFFSET 15000 shows rows = 15020: every skipped row is read.", "proven": ["mariadb"]},
+  "optimizer_sargable": {"behaviour": "versioned", "says": "MariaDB 11.1+ turns DATE(col) and YEAR(col) compared with a constant into a range on the index by itself (the CI run on MariaDB 11 also did it for LEFT(col, n) = 'abc'); MariaDB 10.11 and MySQL 8 don't (lab: 10.11 read the whole index). The bare-column form is fast on every version and on PostgreSQL.", "proven": ["mariadb"]},
+  "skip_locked": {"behaviour": "versioned", "says": "MySQL 8.0.1+ and MariaDB 10.6+ have SKIP LOCKED (lab: MariaDB 10.11 gave the second worker job 2 at once); NOWAIT on MariaDB fails at once with 1205 (MySQL 8: 3572).", "proven": ["mariadb"]},
+  "lock_scan": {"behaviour": "locks_scanned", "says": "MySQL/MariaDB (InnoDB) lock every index record the search reads: with no index on the WHERE's column that is every row, so a second session changing another row waits (lab: 1205 after the lock wait timeout).", "proven": ["mariadb"]},
+  "gap_locks": {"behaviour": "locks_gaps", "says": "Under REPEATABLE READ (the InnoDB default) a range change also locks the gaps: an INSERT into the range waits (lab: 1205).", "proven": ["mariadb"]},
+  "deadlock": {"behaviour": "error", "code": "1213", "says": "MySQL/MariaDB stop one of the two with 1213 (SQLSTATE 40001, Deadlock found when trying to get lock) and roll it back; SHOW ENGINE INNODB STATUS keeps the LATEST DETECTED DEADLOCK.", "proven": ["mariadb"]}
  },
  "proven": [
   "mariadb 10.11 (MySQL-compatible behaviour of these rules)"
@@ -750,6 +760,365 @@
   "foreign_options": [],
   "proven": [
    "mariadb"
+  ]
+ },
+ "explain": {
+  "about": "MySQL and MariaDB EXPLAIN: one row per table, in join order. type says how that table's rows are found; rows is the estimate (MariaDB ANALYZE adds r_rows, the real count, and r_filtered).",
+  "proven": ["mariadb"],
+  "access": {
+   "SYSTEM": {"en": "the table has one row", "hi": "table mein ek hi row hai"},
+   "CONST": {"en": "at most one row, found by the primary key or a unique key compared with a value, read once", "hi": "primary/unique key se zyada se zyada ek row, ek hi baar"},
+   "EQ_REF": {"en": "one row for each row before it, by its primary or unique key (the best join step)", "hi": "pichli har row ke liye primary/unique key se ek row (sabse achha join)"},
+   "REF": {"en": "the rows with one value of an index (a non-unique index, or a key prefix)", "hi": "index ki ek value wali rows"},
+   "REF_OR_NULL": {"en": "like ref, plus the rows where the column IS NULL", "hi": "ref jaisa, saath mein NULL wali rows"},
+   "FULLTEXT": {"en": "a FULLTEXT index search", "hi": "FULLTEXT index se search"},
+   "RANGE": {"en": "a stretch of an index (>, <, BETWEEN, IN, LIKE 'abc%')", "hi": "index ka ek hissa (>, <, BETWEEN, IN, LIKE 'abc%')"},
+   "INDEX_MERGE": {"en": "two or more indexes read and their rows combined (an OR or AND across indexed columns)", "hi": "do ya zyada index padh ke rows milaayi"},
+   "INDEX": {"en": "the whole index is read, entry by entry (cheaper than the table, but every entry)", "hi": "poora index entry-entry padha jaata hai"},
+   "ALL": {"en": "every row of the table is read and checked (a full table scan)", "hi": "table ki har row padh ke check hoti hai (full table scan)"},
+   "UNIQUE_SUBQUERY": {"en": "an IN subquery answered by a unique index lookup", "hi": "IN subquery unique index se"},
+   "INDEX_SUBQUERY": {"en": "an IN subquery answered by an index lookup", "hi": "IN subquery index se"}
+  },
+  "extra": {
+   "Using index condition": {"en": "part of the WHERE is checked inside the index before reading the row", "hi": "WHERE ka hissa row padhne se pehle index mein check"},
+   "Using index for group-by": {"en": "groups read straight from the index", "hi": "groups seedha index se"},
+   "Using index": {"en": "everything needed is in the index (covering): the table itself isn't read", "hi": "saara data index mein hai (covering): table nahi padhi"},
+   "Using where": {"en": "rows are checked against the WHERE after they are read", "hi": "rows padhne ke baad WHERE se check"},
+   "Using filesort": {"en": "rows are sorted after they are found, not read in index order", "hi": "rows milne ke baad sort hoti hain"},
+   "Using temporary": {"en": "a temporary table holds the groups or distinct rows", "hi": "groups ke liye temporary table"},
+   "Using join buffer": {"en": "this table has no usable index for the join, so rows are matched in batches", "hi": "join ke liye index nahi, rows batch mein milaayi jaati hain"},
+   "Using union": {"en": "rows from two indexes are combined (index merge for an OR)", "hi": "do index ki rows milaayi (OR ke liye)"},
+   "Impossible WHERE": {"en": "the WHERE can never be true: no row is read", "hi": "WHERE kabhi true nahi: koi row nahi padhi"},
+   "Range checked for each record": {"en": "no good index is known in advance; one is chosen again for every row before it", "hi": "pichli har row ke liye index naye sire se chuna jaata hai"}
+  },
+  "tree": {
+   "Table scan on": {"en": "every row of the table is read", "hi": "table ki har row padhi jaati hai"},
+   "Index scan on": {"en": "the whole index is read in order", "hi": "poora index kram se padha jaata hai"},
+   "Covering index scan on": {"en": "the whole index is read; the table itself isn't needed", "hi": "poora index padha, table nahi"},
+   "Index lookup on": {"en": "rows with one value of an index", "hi": "index ki ek value wali rows"},
+   "Single-row index lookup on": {"en": "one row by a unique key", "hi": "unique key se ek row"},
+   "Covering index lookup on": {"en": "rows with one value, read from the index alone", "hi": "ek value ki rows, sirf index se"},
+   "Index range scan on": {"en": "a stretch of an index", "hi": "index ka ek hissa"},
+   "Filter:": {"en": "rows checked against a condition after they are read", "hi": "padhne ke baad condition se check"},
+   "Nested loop": {"en": "for each row of the first input, the matching rows of the second are looked up", "hi": "pehle input ki har row ke liye doosre ki matching rows"},
+   "Inner hash join": {"en": "one side is put in a hash table and the other side probes it", "hi": "ek taraf hash table, doosri usme dhoondhti hai"},
+   "Sort:": {"en": "rows sorted after they are found", "hi": "rows milne ke baad sort"},
+   "Aggregate": {"en": "totals worked out", "hi": "totals banaye"},
+   "Limit:": {"en": "only the first rows are passed on", "hi": "sirf pehli rows aage"}
+  }
+ },
+ "port": {
+  "about": "What MySQL/MariaDB refuse from other databases' SQL and how to say it in their words; and their interval, date-format and cast words. Every entry was run on MariaDB 10.11 (lab: tests/practice/test_night10.py).",
+  "interval": {
+   "literal": "INTERVAL {n} {UNIT}",
+   "expr": "INTERVAL ({n}) {UNIT}",
+   "units": {},
+   "error": "error 1064, syntax error near ''7 days''"
+  },
+  "rows": {
+   "top_error": "error 1064, syntax error near 'TOP'",
+   "rownum_error": "error 1054, Unknown column 'ROWNUM'"
+  },
+  "date_codes": {
+   "%Y": "year4",
+   "%y": "year2",
+   "%m": "month2",
+   "%c": "month",
+   "%d": "day2",
+   "%e": "day",
+   "%H": "hour24",
+   "%h": "hour12",
+   "%I": "hour12",
+   "%i": "minute",
+   "%s": "second",
+   "%S": "second",
+   "%M": "monthname",
+   "%b": "monthabbr",
+   "%W": "dayname",
+   "%a": "dayabbr",
+   "%j": "dayofyear",
+   "%p": "ampm",
+   "%T": "time24"
+  },
+  "cast_refused": [
+   "text",
+   "bigint",
+   "timestamp",
+   "double precision",
+   "numeric",
+   "boolean",
+   "varchar",
+   "smallint",
+   "real"
+  ],
+  "cast_types": {
+   "text": "CHAR",
+   "varchar": "CHAR",
+   "nvarchar": "CHAR{size}",
+   "nchar": "CHAR{size}",
+   "char": "CHAR{size}",
+   "bigint": "SIGNED",
+   "int": "SIGNED",
+   "integer": "SIGNED",
+   "smallint": "SIGNED",
+   "timestamp": "DATETIME",
+   "datetime2": "DATETIME",
+   "double precision": "DOUBLE",
+   "float": "DOUBLE",
+   "real": "DOUBLE",
+   "numeric": "DECIMAL{size}",
+   "decimal": "DECIMAL{size}",
+   "boolean": null,
+   "date": "DATE",
+   "datetime": "DATETIME",
+   "time": "TIME"
+  },
+  "cast_error": "error 1064, syntax error near the type name",
+  "cast_manual_en": "MySQL/MariaDB cast to CHAR, SIGNED, UNSIGNED, DECIMAL(p,s), DOUBLE, DATE, DATETIME or TIME; for a true/false value compare instead (x <> 0).",
+  "special": {
+   "string_agg": {
+    "from": "PostgreSQL / SQL Server",
+    "error": "error 1305, FUNCTION STRING_AGG does not exist",
+    "fix_en": "GROUP_CONCAT joins a group's values (ORDER BY and SEPARATOR inside it).",
+    "fix_hi": "GROUP_CONCAT group ki values jodta hai (ORDER BY aur SEPARATOR andar).",
+    "manual_en": "Use GROUP_CONCAT(col ORDER BY ... SEPARATOR ',').",
+    "manual_hi": "GROUP_CONCAT(col ORDER BY ... SEPARATOR ',') likho.",
+    "proven": [
+     "mariadb"
+    ]
+   },
+   "convert": {
+    "from": "SQL Server",
+    "error": "error 1064, syntax error (MySQL's CONVERT takes the value first)",
+    "fix_en": "CAST(value AS type) says it in MySQL/MariaDB words (their CONVERT is CONVERT(value, type)).",
+    "fix_hi": "CAST(value AS type) likho.",
+    "manual_en": "Write CAST(value AS type) with a MySQL/MariaDB type (CHAR, SIGNED, DECIMAL(p,s), DATE, DATETIME).",
+    "manual_hi": "CAST(value AS type) likho.",
+    "proven": [
+     "mariadb"
+    ]
+   }
+  },
+  "calls": [
+   {
+    "fn": "dateadd",
+    "args": [
+     3
+    ],
+    "from": "SQL Server",
+    "error": "error 1305, FUNCTION DATEADD does not exist",
+    "fix_en": "DATE_ADD(date, INTERVAL n UNIT) adds to a date.",
+    "fix_hi": "DATE_ADD(date, INTERVAL n UNIT) likho.",
+    "proven": [
+     "mariadb"
+    ],
+    "to": "DATE_ADD({2}, {IV:1:U0})"
+   },
+   {
+    "fn": "datediff",
+    "args": [
+     3
+    ],
+    "from": "SQL Server",
+    "error": "error 1582, Incorrect parameter count in the call to native function 'DATEDIFF'",
+    "fix_en": "MySQL/MariaDB's DATEDIFF(end, start) takes two dates and gives days; other units come from TIMESTAMPDIFF(unit, start, end), which counts whole units (SQL Server counts the boundaries crossed: from 31 Dec to 1 Jan is 1 year there, 0 here).",
+    "fix_hi": "DATEDIFF(end, start) din deta hai; baaki units TIMESTAMPDIFF(unit, start, end).",
+    "proven": [
+     "mariadb"
+    ],
+    "by": {
+     "DAY": "DATEDIFF({2}, {1})",
+     "*": "TIMESTAMPDIFF({U0}, {1}, {2})"
+    },
+    "by_arg": 0,
+    "by_unit": true
+   },
+   {
+    "fn": "datepart",
+    "args": [
+     2
+    ],
+    "from": "SQL Server",
+    "error": "error 1305, FUNCTION DATEPART does not exist",
+    "fix_en": "EXTRACT(part FROM date) works on MySQL, MariaDB and PostgreSQL alike.",
+    "fix_hi": "EXTRACT(part FROM date) har jagah chalta hai.",
+    "proven": [
+     "mariadb"
+    ],
+    "to": "EXTRACT({U0} FROM {1})"
+   },
+   {
+    "fn": "len",
+    "args": [
+     1
+    ],
+    "from": "SQL Server",
+    "error": "error 1305, FUNCTION LEN does not exist",
+    "fix_en": "CHAR_LENGTH counts characters (LEN also ignores trailing spaces; wrap in TRIM if that matters).",
+    "fix_hi": "CHAR_LENGTH characters ginta hai.",
+    "proven": [
+     "mariadb"
+    ],
+    "to": "CHAR_LENGTH({0})"
+   },
+   {
+    "fn": "charindex",
+    "args": [
+     2,
+     3
+    ],
+    "from": "SQL Server",
+    "error": "error 1305, FUNCTION CHARINDEX does not exist",
+    "fix_en": "LOCATE(text_to_find, text) takes the same arguments in the same order.",
+    "fix_hi": "LOCATE(dhoondhna, text) wahi kram.",
+    "proven": [
+     "mariadb"
+    ],
+    "by": {
+     "*": "LOCATE({0}, {1})"
+    }
+   },
+   {
+    "fn": "iif",
+    "args": [
+     3
+    ],
+    "from": "SQL Server",
+    "error": "error 1305, FUNCTION IIF does not exist",
+    "fix_en": "IF(condition, then, else) is the same on MySQL/MariaDB (CASE WHEN works everywhere).",
+    "fix_hi": "IF(condition, then, else) likho.",
+    "proven": [
+     "mariadb"
+    ],
+    "to": "IF({0}, {1}, {2})"
+   },
+   {
+    "fn": "strpos",
+    "args": [
+     2
+    ],
+    "from": "PostgreSQL",
+    "error": "error 1305, FUNCTION STRPOS does not exist",
+    "fix_en": "LOCATE takes the text to find FIRST: STRPOS(text, x) = LOCATE(x, text) (POSITION(x IN text) works on both).",
+    "fix_hi": "LOCATE mein dhoondhne wala text pehle aata hai.",
+    "proven": [
+     "mariadb"
+    ],
+    "to": "LOCATE({1}, {0})"
+   },
+   {
+    "fn": "split_part",
+    "args": [
+     3
+    ],
+    "from": "PostgreSQL",
+    "error": "error 1305, FUNCTION SPLIT_PART does not exist",
+    "fix_en": "SUBSTRING_INDEX(text, sep, 1) is the part before the first separator, like SPLIT_PART(text, sep, 1).",
+    "fix_hi": "SUBSTRING_INDEX(text, sep, 1) likho.",
+    "proven": [
+     "mariadb"
+    ],
+    "by": {
+     "1": "SUBSTRING_INDEX({0}, {1}, 1)"
+    },
+    "by_arg": 2,
+    "manual_en": "For the n-th part write SUBSTRING_INDEX(SUBSTRING_INDEX(text, sep, n), sep, -1), and check rows with fewer parts (SPLIT_PART gives '' there).",
+    "manual_hi": "n-th hissa: SUBSTRING_INDEX(SUBSTRING_INDEX(text, sep, n), sep, -1)."
+   },
+   {
+    "fn": "random",
+    "args": [
+     0
+    ],
+    "from": "PostgreSQL / SQLite",
+    "error": "error 1305, FUNCTION RANDOM does not exist",
+    "fix_en": "RAND() gives a random number from 0 to 1.",
+    "fix_hi": "RAND() likho.",
+    "proven": [
+     "mariadb"
+    ],
+    "to": "RAND()"
+   },
+   {
+    "fn": "newid",
+    "args": [
+     0
+    ],
+    "from": "SQL Server",
+    "error": "error 1305, FUNCTION NEWID does not exist",
+    "fix_en": "UUID() makes a new UUID.",
+    "fix_hi": "UUID() likho.",
+    "proven": [
+     "mariadb"
+    ],
+    "to": "UUID()"
+   },
+   {
+    "fn": "gen_random_uuid",
+    "args": [
+     0
+    ],
+    "from": "PostgreSQL",
+    "error": "error 1305, FUNCTION GEN_RANDOM_UUID does not exist",
+    "fix_en": "UUID() makes a new UUID.",
+    "fix_hi": "UUID() likho.",
+    "proven": [
+     "mariadb"
+    ],
+    "to": "UUID()"
+   },
+   {
+    "fn": "date_trunc",
+    "args": [
+     2
+    ],
+    "from": "PostgreSQL",
+    "error": "error 1305, FUNCTION DATE_TRUNC does not exist",
+    "fix_en": "The first day of the month / year is built from the date's own parts.",
+    "fix_hi": "Mahine/saal ka pehla din date ke hisson se banta hai.",
+    "proven": [
+     "mariadb"
+    ],
+    "by": {
+     "'month'": "CAST(DATE_FORMAT({1}, '%Y-%m-01') AS DATE)",
+     "'year'": "CAST(DATE_FORMAT({1}, '%Y-01-01') AS DATE)",
+     "'day'": "CAST({1} AS DATE)"
+    },
+    "by_arg": 0,
+    "manual_en": "For a week, hour or quarter, build the start from the date's parts (e.g. DATE_SUB(d, INTERVAL WEEKDAY(d) DAY) for the Monday).",
+    "manual_hi": "Week/hour ke liye date ke hisson se shuruaat banao."
+   },
+   {
+    "fn": "to_date",
+    "args": [
+     2
+    ],
+    "from": "PostgreSQL / Oracle",
+    "error": "error 1305, FUNCTION TO_DATE does not exist",
+    "fix_en": "STR_TO_DATE reads text as a date with MySQL's % format codes.",
+    "fix_hi": "STR_TO_DATE % codes ke saath likho.",
+    "proven": [
+     "mariadb"
+    ],
+    "to": "STR_TO_DATE({0}, {F1})",
+    "fmt_from": "postgresql",
+    "manual_en": "Use STR_TO_DATE(text, '%d-%m-%Y') with MySQL's % codes (%Y year, %m month, %d day, %H hour, %i minute).",
+    "manual_hi": "STR_TO_DATE(text, '%d-%m-%Y') likho."
+   },
+   {
+    "fn": "lastval",
+    "args": [
+     0
+    ],
+    "from": "PostgreSQL",
+    "error": "error 1064 / 1305",
+    "fix_en": "LAST_INSERT_ID() gives the id this connection inserted last.",
+    "fix_hi": "LAST_INSERT_ID() likho.",
+    "proven": [
+     "mariadb"
+    ],
+    "to": "LAST_INSERT_ID()"
+   }
   ]
  }
 }

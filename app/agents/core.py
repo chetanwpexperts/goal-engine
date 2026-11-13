@@ -75,11 +75,11 @@ def _sql_summary(result: dict, hi: bool) -> str:
         from app.dbknow import engines
 
         lang = rec.get("lang") or ("hinglish" if hi else "en")
-        extra = engines.detected_line(rec, lang)[0] or engines.notes_line(rec["id"], lang)   # 'not sure': each finding names its engines
+        extra = engines.detected_line(rec, lang)[0] or engines.notes_line(rec["id"], lang, result.get("notes_for", ""))   # 'not sure': each finding names its engines
         if rec.get("how") in ("named", "chosen", "remembered") and rec["id"] != engines.NOT_SURE and not extra:
             extra = (f"Checked for {engines.label(rec['id'])}." if lang == "en" else f"{engines.label(rec['id'])} ke liye check kiya.")
         elif engines.notes_only(rec["id"]) and rec.get("how") == "detected":
-            extra = engines.detected_line(rec, lang)[0] + "\n" + engines.notes_line(rec["id"], lang)
+            extra = engines.detected_line(rec, lang)[0] + "\n" + engines.notes_line(rec["id"], lang, result.get("notes_for", ""))
         if extra:
             text = f"{text}\n\n{extra}"
     return text
@@ -143,6 +143,9 @@ def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up:
         out.append(("Har database pe chalne wali query card mein hai." if hi else
                     "A version that runs on every database is in the card.") if not n_err + n_wrong and
                    all(f["topic"] == "same_table" for f in fs) else
+                   ("Tez roop card mein hai: rows wahi, bas index kaam aa sakta hai (EXPLAIN se milao)." if hi else
+                    "The faster form is in the card: the same rows, written so an index can be used (compare with EXPLAIN).")
+                   if not n_err + n_wrong and all(f["topic"] in ("sargable", "or_union", "keyset") for f in fs) else
                    ("Agar aapka matlab yahi tha, to wo query card mein hai." if hi else
                     "If that's what you meant, the query for it is in the card.") if not n_err + n_wrong and
                    any(f["topic"] in ("count", "not_in", "date_range") for f in fs) else

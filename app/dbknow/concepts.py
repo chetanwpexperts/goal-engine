@@ -51,6 +51,8 @@ SHAPES = [                                     # (shape, pattern) in the order t
     ("when", r"^should (i|we|you|one)\b|\bshould (a|an|the|this)? ?\w+ (go|be put|be written)\b|\b(karna|karni|karne|lagana|likhna) chahiye\b|"
              r"\bchahiye kya\b"),
     ("howto", r"^can (i|we|you|one)\b|^is (it|there a way) (possible )?to\b"),
+    # 'how many days between two dates': a general how-much question (never one about their own data: 'how many orders did we get')
+    ("howto", r"^how (many|much)\b(?!.*\b(my|our|we|i|me|us|mera|meri|mere|hamar\w*|humar\w*|apn\w*)\b)"),
     ("define", r"^(does|do|is|are|will)\b.*\b(matter|matters|same|different|allowed|possible|a database|a language|faster|slower|"
                r"better|quicker)\b|"
                r"^(is|are) \w+( \w+)? (a|an)\b|^(is|are|does|do)\b.*\bby default\b|\b(hai|h|hain|karta hai|karti hai) kya\s*$|(है|हैं|करता है) क्या\s*$|मायने रखता"),
@@ -62,7 +64,8 @@ SHAPES = [                                     # (shape, pattern) in the order t
     ("puzzle", r"\b(gives?|returns?|shows?|giving|returning) (random|different|wrong|duplicate|extra|null|zero|0|same)\b|"
                r"\b(gives?|returns?|shows?|comes?) .*\b(twice|two times|double)\b"),
     ("task", r"^(find|remove|delete|get rid of|show|list|count|get|write|make|combine|merge|replace|join|sort|search)\b"),
-    ("when", r"\b(when (to|should i|do we|do i|would you) use|where (to|should i) use|why (use|do we use|should i use|would i use|is .* used)|"
+    ("when", r"^when (should|to|do|would) (i|we|you|one)\b|\bkab (kare|karein|karen|karna chahiye)\b|"
+             r"\b(when (to|should i|do we|do i|would you) use|where (to|should i) use|why (use|do we use|should i use|would i use|is .* used)|"
              r"what is .* used for|use of|uses of|kab use|kab (karte|karna|lagate|lagana)|kyun use|kyu use|kis liye)\b|कब (इस्तेमाल|उपयोग)|क्यों (इस्तेमाल|उपयोग)"),
 ]
 # a general yes/no question ('is mysql case sensitive', 'does a foreign key create an index'): answered when its words name a
@@ -78,6 +81,11 @@ OWN_WORK = re.compile(
     r"time(d)? ?out|exception|warning|broken|hang(s|ing)?|nahi chal\w*|kaam nahi|atak\w*|dheem\w*|dhire)\b|"
     r"\b(sqlstate|errno|err(or)? ?code)\b|\b[0-9]{4,5}\b|एरर|त्रुटि|धीम|काम नहीं|चल नहीं|"
     r"(ये|यह|इस|इसे|इसको|मेरी|मेरा|हमारी|ऊपर वाली)\s*(sql\s*)?(क्वेरी|query|स्टेटमेंट)", re.I)
+SLOW = re.compile(r"\bslow(ly|er|s)?\b|\bdheem\w*|\bdhire\b|धीम\w*|\btime(d)? ?outs?\b", re.I)   # symptoms: work only with their own thing
+SLOW_TOPIC = re.compile(r"\bslow[- ]quer(y|ies)(\s+log)?\b|\bslow log\b", re.I)
+OWN_THING = re.compile(r"\b(my|our|this|mera|meri|mere|hamara|hamari|humara|apna|apni|ye|yeh|iss|query|queries|"
+                       r"database|databases|db|site|website|app|application|server|page|report|reports|api|system|login|dashboard)\b|"
+                       r"मेरा|मेरी|मेरे|हमारा|हमारी|ये|यह|इस|क्वेरी|डेटाबेस|साइट", re.I)
 # another field's file (a spreadsheet's duplicates are the office agent's work)
 OTHER_FIELD = re.compile(r"\b(excel|spreadsheets?|sheets?|xlsx?|csv|vlookup|xlookup|pivot table|word file|docx|google sheets?)\b|एक्सेल|शीट", re.I)
 # the words that make an unknown 'what is X' a question about databases (so it is answered honestly here, not elsewhere)
@@ -171,11 +179,20 @@ def _is_work(text: str) -> bool:
 
         facts = reasoning.evidence(text)
         # a question that only NAMES a setting ('what is ONLY_FULL_GROUP_BY') is a concept; a pasted message or code is work
-        if facts and not all(re.fullmatch(r"[A-Za-z_]+", f.get("proof", "")) for f in facts.values()):
+        if facts and not all(re.fullmatch(r"[A-Za-z_]+|[A-Za-z_]+(?: [A-Za-z_]+){1,3}", f.get("proof", "")) for f in facts.values()):
             return True
     except Exception:  # noqa: BLE001
         pass
-    return bool(OWN_WORK.search(text or "") or OTHER_FIELD.search(text or ""))
+    if OTHER_FIELD.search(text or ""):
+        return True
+    if OWN_WORK.search(text or ""):
+        # 'slow' alone in a general question ('why is a big OFFSET slow', 'do indexes slow down inserts', 'how to find slow
+        # queries') is a lesson; with the person's own query, database, site or app it is their problem, for the checker
+        rest = SLOW_TOPIC.sub(" ", text or "")
+        if OWN_WORK.search(SLOW.sub(" ", rest)) or (SLOW.search(rest) and OWN_THING.search(rest)):
+            return True
+        return False
+    return False
 
 
 def match(text: str) -> dict | None:

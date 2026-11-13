@@ -39,7 +39,20 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         # stand, frames, ties, PARTITION BY said in words, ORDER BY they need, nesting)
         "wf_case_order", "wf_case_and", "wf_case_null", "wf_case_else_sort", "wf_rec_keyword", "wf_rec_no_stop", "wf_win_where",
         "wf_win_alias", "wf_last_value", "wf_running_ties", "wf_partition_said", "wf_nth_rank", "wf_ties_rank", "wf_no_order",
-        "wf_nested", "wf_cte_cols"]
+        "wf_nested", "wf_cte_cols",
+        # night 8: speed rewrites that must return exactly the same rows (a condition on the bare column, OR across two tables
+        # as UNION ALL, deep OFFSET as keyset paging)
+        "ix_year", "ix_year_month", "ix_day", "ix_cast_day", "ix_format", "ix_arith", "ix_coalesce", "ix_left", "ix_or_join",
+        "ix_keyset",
+        # night 9: locks and big data (a huge change said in words -> batches; queue workers -> SKIP LOCKED; N+1 -> one statement)
+        "lk_batch_delete", "lk_batch_update", "lk_skip_locked", "lk_nplus",
+        # night 10: another database's words in the chosen one (rewritten in its own words, same values on that engine), and
+        # spellings that run but mean something else there (date - date, INTERVAL '2' WEEK, CAST AS CHAR, ^)
+        "pt_top", "pt_rownum", "pt_dateadd", "pt_datediff_ss", "pt_ss_funcs", "pt_brackets", "pt_my_dates_pg", "pt_my_funcs_pg",
+        "pt_pg_funcs_my", "pt_date_minus", "pt_interval_week", "pt_cast_char", "pt_power",
+        # night 10A: a query from code pasted alone: a placeholder inside quotes (the value never goes in) and a placeholder
+        # where a name goes (FROM ? is refused, ORDER BY ? sorts by a constant); the fix is run with the value bound
+        "cp_like_quoted", "cp_dollar_quoted", "cp_order_param", "cp_from_param"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
@@ -70,16 +83,27 @@ TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": 
          "wf_case_else_sort": "case_no_else", "wf_rec_keyword": "cte_recursive_kw", "wf_rec_no_stop": "cte_no_stop",
          "wf_win_where": "win_where", "wf_win_alias": "win_alias_where", "wf_last_value": "win_last_value",
          "wf_running_ties": "win_running_ties", "wf_partition_said": "win_partition_said", "wf_nth_rank": "win_rank_ties",
-         "wf_ties_rank": "ties", "wf_no_order": "win_no_order", "wf_nested": "win_nested", "wf_cte_cols": "cte_columns"}
+         "wf_ties_rank": "ties", "wf_no_order": "win_no_order", "wf_nested": "win_nested", "wf_cte_cols": "cte_columns",
+         "ix_year": "sargable", "ix_year_month": "sargable", "ix_day": "sargable", "ix_cast_day": "sargable", "ix_format": "sargable",
+         "ix_arith": "sargable", "ix_coalesce": "sargable", "ix_left": "sargable", "ix_or_join": "or_union", "ix_keyset": "keyset",
+         "lk_batch_delete": "batch_change", "lk_batch_update": "batch_change", "lk_skip_locked": "skip_locked", "lk_nplus": "n_plus_one",
+         "pt_top": "dialect", "pt_rownum": "dialect", "pt_dateadd": "dialect", "pt_datediff_ss": "dialect", "pt_ss_funcs": "dialect",
+         "pt_brackets": "dialect", "pt_my_dates_pg": "dialect", "pt_my_funcs_pg": "dialect", "pt_pg_funcs_my": "dialect",
+         "pt_date_minus": "date_math", "pt_interval_week": "interval_unit", "pt_cast_char": "cast_char", "pt_power": "power_xor",
+         "cp_like_quoted": "quoted_placeholder", "cp_dollar_quoted": "quoted_placeholder", "cp_order_param": "placeholder_name",
+         "cp_from_param": "placeholder_name"}
 NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join", "sum_distinct",
           "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order", "ch_insert_count",
-          "sd_two_pk", "sd_list_col", "sd_repeat", "sd_parent_copy", "wf_no_order", "wf_nested", "wf_cte_cols"}   # found is enough
+          "sd_two_pk", "sd_list_col", "sd_repeat", "sd_parent_copy", "wf_no_order", "wf_nested", "wf_cte_cols",
+          "ix_keyset", "cp_order_param", "cp_from_param"}   # found is enough
 # a 'check' (depends on engine, data or intent) whose suggested rewrite must do exactly what the person meant
 FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes", "pk_pk", "anti_nullable", "self_pairs",
                  "distinct_join", "sum_null", "avg_avg", "pct_total", "sub_sum_null", "all_null", "in_list_null", "not_in_outer",
                  "semi_join", "ch_set_sub_null",
                  "sd_date_text", "sd_number_text", "sd_code_number", "sd_no_pk", "sd_fk_index_pg", "sd_over_wide", "sd_timestamp",
-                 "sd_reserved", "wf_case_else_sort", "wf_running_ties"}
+                 "sd_reserved", "wf_case_else_sort", "wf_running_ties",
+                 "ix_year", "ix_year_month", "ix_day", "ix_cast_day", "ix_format", "ix_arith", "ix_coalesce", "ix_left", "ix_or_join",
+                 "lk_skip_locked", "pt_power"}
 
 
 def _cols(t, *kinds):
@@ -385,6 +409,14 @@ def make(seed: int):
         return _schema_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("wf_"):
         return _win_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("ix_"):
+        return _speed_bug(seed, bug, rnd, schema, tables, t, wrap, stmt)
+    elif bug.startswith("lk_"):
+        return _lock_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("pt_"):
+        return _port_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("cp_"):
+        return _param_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -1213,6 +1245,310 @@ def _win_bug(seed, bug, rnd, schema, tables, t):
     return item
 
 
+def _speed_bug(seed, bug, rnd, schema, tables, t, wrap, stmt):
+    """Night 8: the same rows, written so no index can serve them. truth = the form on the bare column (or the same query: the
+    rewrite must give exactly its rows)."""
+    import datetime as dt
+
+    pk, name = t["pk"], t["name"]
+
+    def col(*kinds):
+        cs = [c for c in t["cols"] if c["kind"] in kinds]
+        return rnd.choice(cs) if cs else None
+
+    def vals(c):
+        k = t["cols"].index(c)
+        return [r[k] for r in t["rows"] if r[k] is not None]
+
+    engine, only = None, None
+    if bug in ("ix_year", "ix_year_month", "ix_format"):
+        c = col("date", "datetime")
+        if c is None or not vals(c):
+            return None
+        d = rnd.choice(vals(c))
+        y, m, cn = d.year, d.month, c["name"]
+        nxt = f"{y + (m == 12)}-{m % 12 + 1:02d}-01"
+        if bug == "ix_year":
+            op = rnd.choice(["=", ">=", "<", ">", "<="])
+            form = rnd.choice(["YEAR({c})", "EXTRACT(YEAR FROM {c})"]).format(c=cn)
+            truth_c = {"=": f"{cn} >= '{y}-01-01' AND {cn} < '{y + 1}-01-01'", ">=": f"{cn} >= '{y}-01-01'",
+                       "<": f"{cn} < '{y}-01-01'", ">": f"{cn} >= '{y + 1}-01-01'", "<=": f"{cn} < '{y + 1}-01-01'"}[op]
+            broken_c = f"{form} {op} {y}"
+        elif bug == "ix_year_month":
+            a, b = rnd.choice([("YEAR({c})", "MONTH({c})"), ("EXTRACT(YEAR FROM {c})", "EXTRACT(MONTH FROM {c})")])
+            parts = [f"{a.format(c=cn)} = {y}", f"{b.format(c=cn)} = {m}"]
+            rnd.shuffle(parts)
+            broken_c = " AND ".join(parts)
+            truth_c = f"{cn} >= '{y}-{m:02d}-01' AND {cn} < '{nxt}'"
+        else:
+            if rnd.random() < 0.5:
+                broken_c, engine = f"DATE_FORMAT({cn}, '%Y-%m') = '{y}-{m:02d}'", "mariadb"
+            else:
+                broken_c, engine = f"TO_CHAR({cn}, 'YYYY-MM') = '{y}-{m:02d}'", "postgresql"
+            truth_c = f"{cn} >= '{y}-{m:02d}-01' AND {cn} < '{nxt}'"
+        truth, broken = wrap(truth_c), wrap(broken_c)
+    elif bug in ("ix_day", "ix_cast_day"):
+        c = col("datetime", "date")
+        if c is None or not vals(c):
+            return None
+        d = rnd.choice(vals(c))
+        day = d.date() if isinstance(d, dt.datetime) else d
+        cn = c["name"]
+        one = dt.timedelta(days=1)
+        form = ("DATE({c})" if bug == "ix_day" else rnd.choice(["CAST({c} AS DATE)", "{c}::date"])).format(c=cn)
+        if "::" in form:
+            engine = "postgresql"
+        if rnd.random() < 0.3:
+            d2 = day + dt.timedelta(days=rnd.randint(1, 60))
+            broken_c = f"{form} BETWEEN '{day}' AND '{d2}'"
+            truth_c = f"{cn} >= '{day}' AND {cn} < '{d2 + one}'"
+        else:
+            op = rnd.choice(["=", ">=", "<", ">", "<="])
+            broken_c = f"{form} {op} '{day}'"
+            truth_c = {"=": f"{cn} >= '{day}' AND {cn} < '{day + one}'", ">=": f"{cn} >= '{day}'", "<": f"{cn} < '{day}'",
+                       ">": f"{cn} >= '{day + one}'", "<=": f"{cn} < '{day + one}'"}[op]
+        truth, broken = wrap(truth_c), wrap(broken_c)
+    elif bug == "ix_arith":
+        c = col("int")
+        if c is None or not vals(c):
+            return None
+        v, k, cn = rnd.choice(vals(c)), rnd.randint(1, 20), c["name"]
+        op = rnd.choice(["=", ">", "<", ">=", "<=", "<>"])
+        sign = rnd.choice(["+", "-", "*", "lead"])
+        broken_c = {"+": f"{cn} + {k} {op} {v + k}", "-": f"{cn} - {k} {op} {v - k}", "*": f"{cn} * {k} {op} {v * k}",
+                    "lead": f"{k} + {cn} {op} {v + k}"}[sign]
+        truth, broken = wrap(f"{cn} {op} {v}"), wrap(broken_c)
+    elif bug == "ix_coalesce":
+        c = col("int", "money")
+        if c is None or not vals(c):
+            return None
+        v, cn = rnd.choice(vals(c)), c["name"]
+        d = rnd.choice([0, v])
+        op = rnd.choice(["=", ">", "<", ">=", "<=", "<>"])
+        fn = rnd.choice(["COALESCE", "IFNULL"])
+        if fn == "IFNULL":
+            engine, only = "mariadb", None
+        truth = wrap(f"({cn} {op} {v} OR ({cn} IS NULL AND {d} {op} {v}))")
+        broken = wrap(f"{fn}({cn}, {d}) {op} {v}")
+    elif bug == "ix_left":
+        c = col("name", "cat", "text")
+        if c is None:
+            return None
+        vs = [v for v in vals(c) if isinstance(v, str) and re.fullmatch(r"[A-Za-z][A-Za-z ]*", v)]
+        if not vs:
+            return None
+        v = rnd.choice(vs)
+        n = rnd.randint(1, min(5, len(v)))
+        pre = v[:n]
+        if pre.endswith(" "):
+            return None
+        form = rnd.choice(["LEFT({c}, {n})", "SUBSTRING({c}, 1, {n})", "SUBSTR({c}, 1, {n})"]).format(c=c["name"], n=n)
+        truth, broken = wrap(f"{c['name']} LIKE '{pre}%'"), wrap(f"{form} = '{pre}'")
+    elif bug == "ix_or_join":
+        fks = [c for c in t["cols"] if c["kind"] == "fk"]
+        if not fks:
+            return None
+        fk = rnd.choice(fks)
+        parent = schema["tables"][fk["ref"]]
+        mine = [c for c in t["cols"] if c["kind"] in ("cat", "int") and vals(c)]
+        theirs = [c for c in parent["cols"] if c["kind"] in ("cat", "int", "name")]
+        if not mine or not theirs:
+            return None
+        a, b = rnd.choice(mine), rnd.choice(theirs)
+        pv = [r[parent["cols"].index(b)] for r in parent["rows"] if r[parent["cols"].index(b)] is not None]
+        if not pv:
+            return None
+        lit = lambda x: f"'{x}'" if isinstance(x, str) else str(x)  # noqa: E731
+        sides = [f"t.{a['name']} = {lit(rnd.choice(vals(a)))}", f"p.{b['name']} = {lit(rnd.choice(pv))}"]
+        rnd.shuffle(sides)
+        join = rnd.choice(["JOIN", "LEFT JOIN"])
+        truth = broken = (f"SELECT t.{pk}, p.{parent['pk']} AS parent_key\nFROM {name} t\n{join} {parent['name']} p ON p.{parent['pk']} = t.{fk['name']}\n"
+                          f"WHERE {sides[0]} OR {sides[1]}")
+        stmt = "select"
+    else:                                                      # ix_keyset
+        off = rnd.choice([1000, 2500, 10000, 50000])
+        n = rnd.choice([10, 20, 25, 50])
+        desc = rnd.random() < 0.4
+        ordered = [c for c in t["cols"] if c["kind"] in ("date", "datetime", "int")]
+        by = [pk] if rnd.random() < 0.5 or not ordered else [rnd.choice(ordered)["name"], pk]
+        order = ", ".join(f"{x} DESC" if desc else x for x in by)
+        form = rnd.choice(["LIMIT {n} OFFSET {o}", "LIMIT {o}, {n}"]).format(n=n, o=off)
+        if "," in form:
+            engine = "mariadb"
+        truth = broken = f"SELECT {', '.join(dict.fromkeys([pk] + by))}\nFROM {name}\nORDER BY {order}\n{form}"
+        item = {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": name, "broken": broken, "truth": truth,
+                "keyset": {"by": by, "order": order, "n": n}}
+        if engine:
+            item["engine"] = engine
+        return item
+    item = {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": name, "broken": broken, "truth": truth}
+    if engine:
+        item["engine"] = engine
+    if only:
+        item["only"] = only
+    return item
+
+
+def _check_keyset(item, engines, tag) -> list[str]:
+    """Keyset gives the page OFFSET gives: the same query with a small OFFSET (the tables are small), rewritten by the same code,
+    with the last row of the page before it put in place of the placeholders (what the app remembers)."""
+    from app.agents import sqlspeed
+
+    ks, pk, table = item["keyset"], item["schema"]["tables"][item["table"]]["pk"], item["table"]
+    eng_word = {"postgresql": "postgresql", "mariadb": "mysql"}.get(item.get("engine") or "")
+    where = " AND ".join(f"{c} IS NOT NULL" for c in ks["by"])
+    cols = ", ".join(dict.fromkeys([pk] + ks["by"]))
+    bad = []
+    for off in (7, 20):
+        q = f"SELECT {cols} FROM {table} WHERE {where} ORDER BY {ks['order']} LIMIT {ks['n']} OFFSET {off}"
+        got = sqlspeed.keyset_sql(q, eng_word, min_offset=0)
+        if not got:
+            return [f"{tag}: no keyset rewrite for\n{q}"]
+        for name, eng in engines.items():
+            page = [tuple(map(str, r)) for r in eng.run(q)]
+            last = eng.run(f"SELECT {', '.join(ks['by'])} FROM {table} WHERE {where} ORDER BY {ks['order']} LIMIT 1 OFFSET {off - 1}")
+            if not last:
+                continue
+            sql = got[0]
+            for c, v in sorted(zip(ks["by"], last[0]), key=lambda x: -len(x[0])):
+                sql = sql.replace(f":last_{c.lower()}", str(v) if isinstance(v, int) else f"'{v}'")
+            try:
+                if [tuple(map(str, r)) for r in eng.run(sql)] != page:
+                    bad.append(f"{tag}: on {name} keyset gives another page\n{sql}")
+            except Exception as exc:  # noqa: BLE001
+                eng.rollback()
+                bad.append(f"{tag}: on {name} keyset fails: {exc}\n{sql}")
+    return bad
+
+
+def _lock_bug(seed, bug, rnd, schema, tables, t):
+    """Night 9: a huge change said in words (batches), queue workers (SKIP LOCKED), the same statement per value (N+1)."""
+    pk, name = t["pk"], t["name"]
+    rows = t["rows"]
+
+    def vals(c):
+        k = t["cols"].index(c)
+        return [r[k] for r in rows if r[k] is not None]
+
+    lit = lambda x: f"'{x}'" if not isinstance(x, (int, float)) and not hasattr(x, "as_tuple") else str(x)  # noqa: E731
+    conds = []
+    for c in t["cols"]:
+        if c["kind"] in ("cat", "int", "date", "money") and vals(c):
+            v = rnd.choice(vals(c))
+            op = "=" if c["kind"] == "cat" else rnd.choice(["<", ">=", "="])
+            conds.append(f"{c['name']} {op} {lit(v)}")
+    if not conds:
+        return None
+    cond = rnd.choice(conds)
+    engine = rnd.choice(["mariadb", "postgresql"])
+    only = ["mysql"] if engine == "mariadb" else ["postgres"]
+    words = rnd.choice(["the table has 20 million rows and this times out", "huge table, it locks everything", "lakhs of rows, ye atak jata hai",
+                        "very big table", "takes hours on production"])
+    parent = any(c.get("ref") == name for tt in tables for c in tt["cols"])   # rows other tables point at: a DELETE is refused
+    if bug == "lk_batch_delete":
+        if parent:
+            return None
+        truth = f"DELETE FROM {name}\nWHERE {cond}"
+        broken = f"{truth};\n\n{words}"
+        stmt = "delete"
+    elif bug == "lk_batch_update":
+        sets = [c for c in t["cols"] if c["kind"] in ("cat", "int") and c["name"] not in cond and vals(c)]
+        if not sets:
+            return None
+        c = rnd.choice(sets)
+        v = rnd.choice(vals(c)) if rnd.random() < 0.8 else None
+        truth = f"UPDATE {name}\nSET {c['name']} = {'NULL' if v is None else lit(v)}\nWHERE {cond}"
+        broken = f"{truth};\n\n{words}"
+        stmt = "update"
+    elif bug == "lk_skip_locked":
+        n = rnd.choice([1, 1, 2, 5])
+        truth = f"SELECT {pk}\nFROM {name}\nWHERE {cond}\nORDER BY {pk}\nLIMIT {n}\nFOR UPDATE"
+        broken = truth + ";\n\n" + rnd.choice(["several workers pick the next job", "job queue with parallel workers", "do worker ek saath agla task lete hain"])
+        stmt, only = "select", None
+        engine = rnd.choice([None, "mariadb", "postgresql"])
+    else:                                                      # lk_nplus
+        k = rnd.randint(3, 6)
+        ids = rnd.sample(range(1, len(rows) + 1), min(k, len(rows)))
+        cols = [c["name"] for c in t["cols"] if c["kind"] != "pk"][:2] or [pk]
+        form = rnd.choice(["select", "select", "update"] + ([] if parent else ["delete"]))
+        if form == "select":
+            parts = [f"SELECT {', '.join(cols)} FROM {name} WHERE {pk} = {i}" for i in ids]
+        elif form == "update":
+            sets = [c for c in t["cols"] if c["kind"] in ("cat", "int") and vals(c)]
+            if not sets:
+                return None
+            c = rnd.choice(sets)
+            v = lit(rnd.choice(vals(c)))
+            parts = [f"UPDATE {name} SET {c['name']} = {v} WHERE {pk} = {i}" for i in ids]
+        else:
+            parts = [f"DELETE FROM {name} WHERE {pk} = {i}" for i in ids]
+        truth = broken = ";\n".join(parts) + ";"
+        return {"seed": seed, "bug": bug, "stmt": form, "schema": schema, "table": name, "broken": broken, "truth": truth, "parts": parts}
+    item = {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": name, "broken": broken, "truth": truth}
+    if engine:
+        item["engine"] = engine
+    if only:
+        item["only"] = only
+    return item
+
+
+def _check_lock(item, engines, res, tag) -> list[str]:
+    """Batches: run the batched form with 3 rows a batch until it changes nothing: the same table as the single statement.
+    N+1: the combined statement returns / changes exactly what the separate ones did."""
+    import re as _re
+
+    from app.agents import sqllock
+
+    pk, table = item["schema"]["tables"][item["table"]]["pk"], item["table"]
+    bad = []
+    fixed = res.get("corrected")
+    if not fixed:
+        return [f"{tag}: nothing offered\n{item['broken']}"]
+    for name, eng in engines.items():
+        if item.get("only") and name not in item["only"]:
+            continue
+        eng.begin()
+        try:
+            if item["bug"].startswith("lk_batch"):
+                eng.run(item["truth"])
+                want = Counter(tuple(map(str, r)) for r in eng.run(f"SELECT * FROM {table} ORDER BY {pk}"))
+                eng.rollback()
+                eng.begin()
+                sql = _re.sub(rf"LIMIT {sqllock.BATCH}\b", "LIMIT 3", fixed.rstrip().rstrip(";"))
+                for _ in range(200):
+                    cur = eng.conn.cursor()
+                    cur.execute(sql)
+                    n = cur.rowcount
+                    cur.close()
+                    if not n:
+                        break
+                else:
+                    bad.append(f"{tag}: on {name} the batches never end\n{sql}")
+                got = Counter(tuple(map(str, r)) for r in eng.run(f"SELECT * FROM {table} ORDER BY {pk}"))
+            elif item["stmt"] == "select":
+                want = set()
+                for p in item["parts"]:
+                    want |= {tuple(map(str, r)) for r in eng.run(p)}
+                rows = [tuple(map(str, r)) for r in eng.run(fixed)]
+                width = len(next(iter(want))) if want else 0
+                got = {r[-width:] for r in rows} if width else set(rows)
+            else:
+                for p in item["parts"]:
+                    eng.run(p)
+                want = Counter(tuple(map(str, r)) for r in eng.run(f"SELECT * FROM {table} ORDER BY {pk}"))
+                eng.rollback()
+                eng.begin()
+                eng.run(fixed)
+                got = Counter(tuple(map(str, r)) for r in eng.run(f"SELECT * FROM {table} ORDER BY {pk}"))
+            if got != want:
+                bad.append(f"{tag}: on {name} the offer does something else\n{fixed}")
+        except Exception as exc:  # noqa: BLE001
+            bad.append(f"{tag}: on {name} the offer fails: {exc}\n{fixed}")
+        finally:
+            eng.rollback()
+    return bad
+
+
 def _effect(eng, sql, table, pk):
     """What a statement does: the rows a SELECT returns, or the table after an UPDATE/DELETE (rolled back afterwards)."""
     eng.begin()
@@ -1247,6 +1583,10 @@ def check(item, engines: dict) -> list[str]:
     sure = any(f["topic"] == want and f["kind"] in ("error", "wrong") for f in res["findings"])
     if item["bug"] in FIX_THE_CHECK:
         sure = True
+    if item["bug"] in ("lk_batch_delete", "lk_batch_update", "lk_nplus"):
+        return bad + ([] if bad else _check_lock(item, engines, res, tag))
+    if item["bug"] == "ix_keyset" and not bad:
+        return bad + _check_keyset(item, engines, tag)
     if item["bug"] in NO_FIX or not sure:
         return bad
     fixed = res["corrected"]
@@ -1261,12 +1601,312 @@ def check(item, engines: dict) -> list[str]:
     for name, eng in engines.items():
         if item.get("only") and name not in item["only"]:
             continue                                   # the query shows its database (backticks): run it only there
+        run_fixed = _bind(fixed, item["bind"]) if item.get("bind") else fixed
         try:
-            if _effect(eng, fixed, item["table"], pk) != _effect(eng, item["truth"], item["table"], pk):
+            if _effect(eng, run_fixed, item["table"], pk) != _effect(eng, item["truth"], item["table"], pk):
                 bad.append(f"{tag}: on {name} the corrected statement does something else\n{fixed}")
         except Exception as exc:  # noqa: BLE001
             bad.append(f"{tag}: on {name} the corrected statement fails: {exc}\n{fixed}")
     return bad
+
+
+def _port_bug(seed, bug, rnd, schema, tables, t):
+    """Night 10: another database's words in the chosen database (truth = the same statement in its own words, run only on
+    that engine), and spellings that run there but mean something else."""
+    pk, name = t["pk"], t["name"]
+    col = lambda *kinds: [c["name"] for c in t["cols"] if c["kind"] in kinds]   # noqa: E731
+    nums, dates, texts = col("int", "money"), col("date", "datetime"), col("cat", "name", "email", "sku")
+    days = col("date")
+    my = rnd.choice(["mariadb", "mysql"])
+    target = rnd.choice([my, "postgresql"])
+    words = ""
+    unit_my = {"day": "DAY", "month": "MONTH", "year": "YEAR", "week": "WEEK"}
+
+    def pg_iv(n, u):
+        return f"INTERVAL '{n * 7}' DAY" if u == "week" else f"INTERVAL '{n}' {unit_my[u]}"
+
+    def iv(n, u, eng):
+        return f"INTERVAL {n} {unit_my[u]}" if eng != "postgresql" else pg_iv(n, u)
+
+    if bug == "pt_top":
+        if not nums:
+            return None
+        n, m = rnd.randint(1, 6), rnd.choice(nums)
+        d = rnd.choice(["", " DESC"])
+        truth = f"SELECT {pk}, {m}\nFROM {name}\nORDER BY {m}{d}, {pk}\nLIMIT {n}"
+        broken = f"SELECT TOP {n} {pk}, {m}\nFROM {name}\nORDER BY {m}{d}, {pk}"
+        if rnd.random() < 0.3:
+            broken = f"SELECT TOP ({n}) {pk}, {m}\nFROM {name}\nORDER BY {m}{d}, {pk};"
+    elif bug == "pt_rownum":
+        if not nums:
+            return None
+        n, m = rnd.randint(1, 6), rnd.choice(nums)
+        op, k = rnd.choice([("<=", n), ("<", n + 1)])
+        extra = rnd.random() < 0.5
+        cond = f"{m} > 0" if extra else ""
+        truth = f"SELECT {pk}, {m}\nFROM {name}\n" + (f"WHERE {cond}\n" if extra else "") + f"ORDER BY {m} DESC, {pk}\nLIMIT {n}"
+        broken = (f"SELECT {pk}, {m}\nFROM {name}\nWHERE " + (f"{cond} AND " if extra else "") + f"ROWNUM {op} {k}\nORDER BY {m} DESC, {pk}")
+    elif bug == "pt_dateadd":
+        if not dates:
+            return None
+        c, u, n = rnd.choice(dates), rnd.choice(["day", "month", "year", "week"]), rnd.randint(1, 40)
+        ss_u = rnd.choice({"day": ["day", "dd", "d"], "month": ["month", "mm"], "year": ["year", "yyyy"], "week": ["week", "wk"]}[u])
+        if target == "postgresql":
+            new = f"({c} + {pg_iv(n, u)})"
+        else:
+            new = f"DATE_ADD({c}, {iv(n, u, target)})"
+        if rnd.random() < 0.5:
+            truth = f"SELECT {pk}, {new} AS due\nFROM {name}\nORDER BY {pk}"
+            broken = f"SELECT {pk}, DATEADD({ss_u}, {n}, {c}) AS due\nFROM {name}\nORDER BY {pk}"
+        else:
+            truth = f"SELECT {pk}\nFROM {name}\nWHERE {new} > '2026-03-01'\nORDER BY {pk}"
+            broken = f"SELECT {pk}\nFROM {name}\nWHERE DATEADD({ss_u}, {n}, {c}) > '2026-03-01'\nORDER BY {pk}"
+    elif bug == "pt_datediff_ss":
+        if not dates:
+            return None
+        c = rnd.choice(dates)
+        ref = "'2026-12-31'"
+        new = (f"DATEDIFF({ref}, {c})" if target != "postgresql" else f"(CAST({ref} AS DATE) - CAST({c} AS DATE))")
+        truth = f"SELECT {pk}, {new} AS age_days\nFROM {name}\nORDER BY {pk}"
+        broken = f"SELECT {pk}, DATEDIFF(day, {c}, {ref}) AS age_days\nFROM {name}\nORDER BY {pk}"
+    elif bug == "pt_ss_funcs":
+        kind = rnd.choice(["len", "charindex", "iif", "datepart", "getdate", "convert"])
+        if kind in ("len", "charindex") and not texts or kind in ("iif", "convert") and not nums or kind in ("datepart", "getdate") and not dates:
+            return None
+        if kind == "len":
+            c = rnd.choice(texts)
+            new = f"CHAR_LENGTH({c})" if target != "postgresql" else f"LENGTH({c})"
+            broken_e, truth_e = f"LEN({c})", new
+        elif kind == "charindex":
+            c = rnd.choice(texts)
+            ch = rnd.choice(["a", "e", "i", "o", "-"])
+            truth_e = f"LOCATE('{ch}', {c})" if target != "postgresql" else f"POSITION('{ch}' IN {c})"
+            broken_e = f"CHARINDEX('{ch}', {c})"
+        elif kind == "iif":
+            m = rnd.choice(nums)
+            lim = rnd.randint(1, 500)
+            truth_e = f"IF({m} > {lim}, 'big', 'small')" if target != "postgresql" else f"CASE WHEN {m} > {lim} THEN 'big' ELSE 'small' END"
+            broken_e = f"IIF({m} > {lim}, 'big', 'small')"
+        elif kind == "datepart":
+            c = rnd.choice(dates)
+            u = rnd.choice(["year", "month", "day"])
+            truth_e = f"EXTRACT({u.upper()} FROM {c})"
+            broken_e = f"DATEPART({rnd.choice({'year': ['year', 'yyyy'], 'month': ['month', 'mm'], 'day': ['day', 'dd']}[u])}, {c})"
+        elif kind == "getdate":
+            c = rnd.choice(dates)
+            truth = f"SELECT {pk}\nFROM {name}\nWHERE {c} < {'NOW()' if target != 'postgresql' else 'now()'}\nORDER BY {pk}"
+            broken = f"SELECT {pk}\nFROM {name}\nWHERE {c} < GETDATE()\nORDER BY {pk}"
+        else:
+            m = rnd.choice(nums)
+            truth_e = f"CAST({m} AS SIGNED)" if target != "postgresql" else f"CAST({m} AS INTEGER)"
+            broken_e = f"CONVERT(INT, {m})"
+        if kind != "getdate":
+            truth = f"SELECT {pk}, {truth_e} AS v\nFROM {name}\nORDER BY {pk}"
+            broken = f"SELECT {pk}, {broken_e} AS v\nFROM {name}\nORDER BY {pk}"
+    elif bug == "pt_brackets":
+        cs = [c["name"] for c in t["cols"] if c["kind"] != "pk"][:2]
+        if not cs:
+            return None
+        q = (lambda x: f"`{x}`") if target != "postgresql" else (lambda x: x)
+        truth = f"SELECT {q(pk)}, {', '.join(q(x) for x in cs)}\nFROM {q(name)}\nORDER BY {q(pk)}"
+        broken = f"SELECT [{pk}], {', '.join('[' + x + ']' for x in cs)}\nFROM [{name}]\nORDER BY [{pk}]"
+    elif bug == "pt_my_dates_pg":
+        target = "postgresql"
+        if not dates:
+            return None
+        c = rnd.choice(dates)
+        kind = rnd.choice(["date_add", "date_sub", "interval", "datediff", "year", "month", "day"])
+        n, u = rnd.randint(1, 60), rnd.choice(["day", "month", "year"])
+        if kind == "date_add":
+            truth_e, broken_e = f"({c} + {pg_iv(n, u)})", f"DATE_ADD({c}, INTERVAL {n} {unit_my[u]})"
+        elif kind == "date_sub":
+            truth_e, broken_e = f"({c} - {pg_iv(n, u)})", f"DATE_SUB({c}, INTERVAL {n} {unit_my[u]})"
+        elif kind == "interval":
+            truth_e, broken_e = f"{c} - {pg_iv(n, u)}", f"{c} - INTERVAL {n} {unit_my[u]}"
+        elif kind == "datediff":
+            truth_e, broken_e = f"(CAST('2026-12-31' AS DATE) - CAST({c} AS DATE))", f"DATEDIFF('2026-12-31', {c})"
+        else:
+            truth_e, broken_e = f"EXTRACT({kind.upper()} FROM {c})", f"{kind.upper()}({c})"
+        if kind in ("year", "month") and rnd.random() < 0.5:
+            v = 2025 if kind == "year" else rnd.randint(1, 12)
+            truth = f"SELECT {pk}\nFROM {name}\nWHERE {truth_e} = {v}\nORDER BY {pk}"
+            broken = f"SELECT {pk}\nFROM {name}\nWHERE {broken_e} = {v}\nORDER BY {pk}"
+        else:
+            truth = f"SELECT {pk}, {truth_e} AS v\nFROM {name}\nORDER BY {pk}"
+            broken = f"SELECT {pk}, {broken_e} AS v\nFROM {name}\nORDER BY {pk}"
+    elif bug == "pt_my_funcs_pg":
+        target = "postgresql"
+        kind = rnd.choice(["if", "locate", "instr", "ucase", "substring_index", "group_concat", "date_format", "convert", "div",
+                           "regexp", "dual"])
+        need = {"if": nums, "locate": texts, "instr": texts, "ucase": texts, "substring_index": texts, "group_concat": texts,
+                "date_format": dates, "convert": nums, "div": col("int"), "regexp": texts, "dual": [1]}[kind]
+        if not need:
+            return None
+        x = rnd.choice(need)
+        if kind == "if":
+            truth_e, broken_e = f"CASE WHEN {x} > 100 THEN 1 ELSE 0 END", f"IF({x} > 100, 1, 0)"
+        elif kind == "locate":
+            truth_e, broken_e = f"POSITION('a' IN {x})", f"LOCATE('a', {x})"
+        elif kind == "instr":
+            truth_e, broken_e = f"POSITION('e' IN {x})", f"INSTR({x}, 'e')"
+        elif kind == "ucase":
+            truth_e, broken_e = f"UPPER({x})", f"UCASE({x})"
+        elif kind == "substring_index":
+            sep = rnd.choice(["@", " ", "-"])
+            truth_e, broken_e = f"SPLIT_PART({x}, '{sep}', 1)", f"SUBSTRING_INDEX({x}, '{sep}', 1)"
+        elif kind == "date_format":
+            f_my, f_pg = rnd.choice([("%Y-%m", "YYYY-MM"), ("%d/%m/%Y", "DD/MM/YYYY"), ("%b %Y", "Mon YYYY"), ("%Y", "YYYY")])
+            truth_e, broken_e = f"to_char({x}, '{f_pg}')", f"DATE_FORMAT({x}, '{f_my}')"
+        elif kind == "convert":
+            truth_e, broken_e = f"CAST({x} AS BIGINT)", f"CONVERT({x}, SIGNED)"
+        elif kind == "div":
+            truth_e, broken_e = f"DIV({x}, 3)", f"{x} DIV 3"
+        if kind == "group_concat":
+            g = rnd.choice([c["name"] for c in t["cols"] if c["kind"] in ("cat", "fk")] or [pk])
+            sep = rnd.choice(["", " SEPARATOR '; '"])
+            truth = (f"SELECT {g}, string_agg(CAST({x} AS TEXT), {repr(sep[12:-1]) if sep else repr(',')} ORDER BY {x})\nFROM {name}\n"
+                     f"GROUP BY {g}\nORDER BY {g}").replace('"', "'")
+            broken = f"SELECT {g}, GROUP_CONCAT({x} ORDER BY {x}{sep})\nFROM {name}\nGROUP BY {g}\nORDER BY {g}"
+            if g == x:
+                return None
+        elif kind == "regexp":
+            truth = f"SELECT {pk}\nFROM {name}\nWHERE {x} ~* '^[a-m]'\nORDER BY {pk}"
+            broken = f"SELECT {pk}\nFROM {name}\nWHERE {x} REGEXP '^[a-m]'\nORDER BY {pk}"
+        elif kind == "dual":
+            n = rnd.randint(1, 99)
+            truth, broken = f"SELECT {n} AS one", f"SELECT {n} AS one FROM DUAL"
+        else:
+            truth = f"SELECT {pk}, {truth_e} AS v\nFROM {name}\nORDER BY {pk}"
+            broken = f"SELECT {pk}, {broken_e} AS v\nFROM {name}\nORDER BY {pk}"
+    elif bug == "pt_pg_funcs_my":
+        target = my
+        kind = rnd.choice(["strpos", "split_part", "date_trunc", "string_agg", "interval", "cast_text", "regex", "to_date"])
+        need = {"strpos": texts, "split_part": texts, "date_trunc": dates, "string_agg": texts, "interval": dates, "cast_text": nums,
+                "regex": texts, "to_date": [1]}[kind]
+        if not need:
+            return None
+        x = rnd.choice(need)
+        if kind == "strpos":
+            truth_e, broken_e = f"LOCATE('a', {x})", f"STRPOS({x}, 'a')"
+        elif kind == "split_part":
+            truth_e, broken_e = f"SUBSTRING_INDEX({x}, '@', 1)", f"SPLIT_PART({x}, '@', 1)"
+        elif kind == "date_trunc":
+            u, f = rnd.choice([("month", "%Y-%m-01"), ("year", "%Y-01-01")])
+            truth_e, broken_e = f"CAST(DATE_FORMAT({x}, '{f}') AS DATE)", f"DATE_TRUNC('{u}', {x})"
+        elif kind == "interval":
+            n, u = rnd.randint(1, 60), rnd.choice(["day", "month", "year"])
+            truth_e, broken_e = f"{x} + INTERVAL {n} {unit_my[u]}", f"{x} + INTERVAL '{n} {u}s'"
+        elif kind == "cast_text":
+            truth_e, broken_e = f"CAST({x} AS CHAR)", f"CAST({x} AS TEXT)"
+        elif kind == "to_date":
+            d = f"{rnd.randint(1, 28):02d}-{rnd.randint(1, 12):02d}-2025"
+            truth_e, broken_e = f"STR_TO_DATE('{d}', '%d-%m-%Y')", f"TO_DATE('{d}', 'DD-MM-YYYY')"
+        if kind == "string_agg":
+            g = rnd.choice([c["name"] for c in t["cols"] if c["kind"] in ("cat", "fk")] or [pk])
+            if g == x:
+                return None
+            truth = f"SELECT {g}, GROUP_CONCAT({x} ORDER BY {x} SEPARATOR '; ')\nFROM {name}\nGROUP BY {g}\nORDER BY {g}"
+            broken = f"SELECT {g}, string_agg({x}, '; ' ORDER BY {x})\nFROM {name}\nGROUP BY {g}\nORDER BY {g}"
+        elif kind == "regex":
+            truth = f"SELECT {pk}\nFROM {name}\nWHERE {x} REGEXP '^[a-m]'\nORDER BY {pk}"
+            broken = f"SELECT {pk}\nFROM {name}\nWHERE {x} ~* '^[a-m]'\nORDER BY {pk}"
+        else:
+            truth = f"SELECT {pk}, {truth_e} AS v\nFROM {name}\nORDER BY {pk}"
+            broken = f"SELECT {pk}, {broken_e} AS v\nFROM {name}\nORDER BY {pk}"
+    elif bug == "pt_date_minus":
+        target = my
+        dd = [c for c in days if re.search(r"(?:^|_)(?:date|dob|birthday)$|_on$|date$|[a-z](?:On|Date)$", c, re.I)]
+        if not dd:
+            return None
+        c = rnd.choice(dd)
+        if rnd.random() < 0.5:
+            truth = f"SELECT {pk}, DATEDIFF('2026-12-31', {c}) AS days_left\nFROM {name}\nORDER BY {pk}"
+            broken = f"SELECT {pk}, CAST('2026-12-31' AS DATE) - {c} AS days_left\nFROM {name}\nORDER BY {pk}"
+            truth = truth.replace("DATEDIFF('2026-12-31'", "DATEDIFF(CAST('2026-12-31' AS DATE)")
+        else:
+            n = rnd.randint(1, 90)
+            op = rnd.choice(["-", "+"])
+            truth = f"SELECT {pk}, {c} {op} INTERVAL {n} DAY AS d\nFROM {name}\nORDER BY {pk}"
+            broken = f"SELECT {pk}, {c} {op} {n} AS d\nFROM {name}\nORDER BY {pk}"
+    elif bug == "pt_interval_week":
+        target = "postgresql"
+        if not dates:
+            return None
+        c, n, u = rnd.choice(dates), rnd.randint(1, 9), rnd.choice(["WEEK", "QUARTER"])
+        good = f"INTERVAL '{n * 7}' DAY" if u == "WEEK" else f"INTERVAL '{n * 3}' MONTH"
+        truth = f"SELECT {pk}, {c} + {good} AS d\nFROM {name}\nORDER BY {pk}"
+        broken = f"SELECT {pk}, {c} + INTERVAL '{n}' {u} AS d\nFROM {name}\nORDER BY {pk}"
+    elif bug == "pt_cast_char":
+        target = "postgresql"
+        x = rnd.choice(texts + dates + nums)
+        truth = f"SELECT {pk}, CAST({x} AS VARCHAR) AS v\nFROM {name}\nORDER BY {pk}"
+        broken = f"SELECT {pk}, CAST({x} AS CHAR) AS v\nFROM {name}\nORDER BY {pk}"
+    else:                                                 # pt_power
+        target = my
+        ints = col("int")
+        if not ints:
+            return None
+        x, n = rnd.choice(ints), rnd.randint(2, 3)
+        truth = f"SELECT {pk}, POWER({x}, {n}) AS p\nFROM {name}\nORDER BY {pk}"
+        broken = f"SELECT {pk}, {x} ^ {n} AS p\nFROM {name}\nORDER BY {pk}"
+        words = f";\n\n{x} to the power {n}"
+    return {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": name, "broken": broken + words, "truth": truth,
+            "engine": target, "only": ["postgres"] if target == "postgresql" else ["mysql"]}
+
+
+def _param_bug(seed, bug, rnd, schema, tables, t):
+    """Night 10A: a query copied out of code with its placeholders. The value the code binds is known, so the corrected query
+    is run with it put in, and must return what the intended query returns."""
+    pk, name = t["pk"], t["name"]
+    texts = [c for c in t["cols"] if c["kind"] in ("cat", "name", "email", "sku")]
+    if bug == "cp_order_param":
+        cols = [c["name"] for c in t["cols"] if c["kind"] != "pk"][:2]
+        broken = f"SELECT {pk}, {', '.join(cols)}\nFROM {name}\nORDER BY {rnd.choice(['?', '$1', ':sort'])}"
+        return {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": name, "broken": broken, "truth": broken}
+    if bug == "cp_from_param":
+        broken = f"SELECT *\nFROM {rnd.choice(['?', '$1'])}\nWHERE {pk} = 1"
+        return {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": name, "broken": broken, "truth": broken}
+    if not texts:
+        return None
+    c = rnd.choice(texts)
+    vals = [r[t["cols"].index(c)] for r in t["rows"] if r[t["cols"].index(c)]]
+    if not vals:
+        return None
+    v = str(rnd.choice(vals))
+    piece = v[1:4] if len(v) > 4 else v
+    if "'" in piece or "%" in piece or "_" in piece or not piece.strip():
+        return None
+    target = rnd.choice(["mysql", "postgresql", None]) if bug == "cp_like_quoted" else rnd.choice(["postgresql", None])
+    ph = "?" if bug == "cp_like_quoted" else "$1"
+    # '%?' alone is how a query looks with its values hidden ('%?'), so only the shapes that can't be that are planted for ?
+    pat = rnd.choice(["%{}%", "{}%"] if ph == "?" else ["%{}%", "{}%", "%{}"])
+    broken = f"SELECT {pk}, {c['name']}\nFROM {name}\nWHERE {c['name']} LIKE '{pat.format(ph)}'\nORDER BY {pk}"
+    truth = f"SELECT {pk}, {c['name']}\nFROM {name}\nWHERE {c['name']} LIKE '{pat.format(piece)}'\nORDER BY {pk}"
+    out = {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": name, "broken": broken, "truth": truth,
+           "engine": target, "bind": [piece]}
+    if target:
+        out["only"] = ["postgres"] if target == "postgresql" else ["mysql"]
+    elif bug == "cp_dollar_quoted" or ph == "?":
+        out["only"] = ["postgres"] if ph == "$1" else ["mysql"]   # unknown database: the fix is written for the placeholder's own family
+    return out
+
+
+def _bind(sql: str, values: list) -> str:
+    """The values the code binds, put where the placeholders are (outside quotes), in order."""
+    out, k, q, i = [], 0, False, 0
+    while i < len(sql):
+        ch = sql[i]
+        if ch == "'":
+            q = not q
+        m = None if q else re.match(r"\?|\$\d+|%s|:[A-Za-z_]\w*", sql[i:])
+        if m and k < len(values):
+            out.append("'" + values[k].replace("'", "''") + "'")
+            k += 1
+            i += m.end()
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def run(count=200, seed=1, engines=None):

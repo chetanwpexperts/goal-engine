@@ -109,7 +109,17 @@
   "case_mixed_types": {"behaviour": "converts", "says": "MySQL and MariaDB run it but turn the whole CASE column into text, so the numbers then sort and compare as text ('1000' before '50').", "proven": ["mariadb"]},
   "recursion_limit": {"behaviour": "silent", "code": "3636", "says": "MariaDB stops after max_recursive_iterations (1000) rounds with NO error and returns only the rows made so far (in the lab, a series to 2000 returned 1001 rows).", "proven": ["mariadb"], "source": "https://mariadb.com/kb/en/server-system-variables/#max_recursive_iterations"},
   "recursive_text_width": {"behaviour": "error", "code": "1406", "says": "MySQL and MariaDB size a text column from the anchor ('x' is one character, a VARCHAR(40) column is 40), and a longer value from the recursive part stops the query with error 1406 (Data too long for column) in strict mode.", "proven": ["mariadb"]},
-  "window_needs_order": {"behaviour": "error", "code": "4018", "says": "MariaDB refuses LAG, LEAD, RANK, DENSE_RANK, PERCENT_RANK and CUME_DIST without ORDER BY in the window (error 4018, No order list in window specification).", "proven": ["mariadb"]}
+  "window_needs_order": {"behaviour": "error", "code": "4018", "says": "MariaDB refuses LAG, LEAD, RANK, DENSE_RANK, PERCENT_RANK and CUME_DIST without ORDER BY in the window (error 4018, No order list in window specification).", "proven": ["mariadb"]},
+  "like_prefix_index": {"behaviour": "fast", "says": "On MySQL/MariaDB an ordinary index serves LIKE 'abc%' as a range (lab: type range on MariaDB 10.11).", "proven": ["mariadb"]},
+  "text_vs_number": {"behaviour": "silent", "code": "1292", "says": "MySQL/MariaDB turn every value of the column into a number to compare it, so the index can't be used (lab: type index / ALL) and '098...' and '98... ' match too (a 1292 note, no error).", "proven": ["mariadb"]},
+  "or_same_table": {"behaviour": "fast", "says": "MariaDB combines two indexes for an OR on one table (EXPLAIN: index_merge, Using union(a,b)).", "proven": ["mariadb"]},
+  "expression_index": {"behaviour": "versioned", "says": "MySQL 8.0.13+ can index an expression (INDEX ((LOWER(email)))). MariaDB 10.11 can't: add a virtual column (email_lc VARCHAR(80) AS (LOWER(email)) VIRTUAL, INDEX (email_lc)) and compare that column by name; the lab showed WHERE LOWER(email) = ... still reads the whole index.", "proven": ["mariadb"]},
+  "offset_reads": {"behaviour": "slow", "says": "MariaDB's EXPLAIN for ORDER BY id LIMIT 20 OFFSET 15000 shows rows = 15020: every skipped row is read.", "proven": ["mariadb"]},
+  "optimizer_sargable": {"behaviour": "versioned", "says": "MariaDB 11.1+ turns DATE(col) and YEAR(col) compared with a constant into a range on the index by itself (the CI run on MariaDB 11 also did it for LEFT(col, n) = 'abc'); MariaDB 10.11 and MySQL 8 don't (lab: 10.11 read the whole index). The bare-column form is fast on every version and on PostgreSQL.", "proven": ["mariadb"]},
+  "skip_locked": {"behaviour": "versioned", "says": "MySQL 8.0.1+ and MariaDB 10.6+ have SKIP LOCKED (lab: MariaDB 10.11 gave the second worker job 2 at once); NOWAIT on MariaDB fails at once with 1205 (MySQL 8: 3572).", "proven": ["mariadb"]},
+  "lock_scan": {"behaviour": "locks_scanned", "says": "MySQL/MariaDB (InnoDB) lock every index record the search reads: with no index on the WHERE's column that is every row, so a second session changing another row waits (lab: 1205 after the lock wait timeout).", "proven": ["mariadb"]},
+  "gap_locks": {"behaviour": "locks_gaps", "says": "Under REPEATABLE READ (the InnoDB default) a range change also locks the gaps: an INSERT into the range waits (lab: 1205).", "proven": ["mariadb"]},
+  "deadlock": {"behaviour": "error", "code": "1213", "says": "MySQL/MariaDB stop one of the two with 1213 (SQLSTATE 40001, Deadlock found when trying to get lock) and roll it back; SHOW ENGINE INNODB STATUS keeps the LATEST DETECTED DEADLOCK.", "proven": ["mariadb"]}
  },
  "proven": [
   "mariadb"
@@ -304,5 +314,50 @@
   "proven": [
    "mariadb"
   ]
+ },
+ "explain": {
+  "about": "MySQL and MariaDB EXPLAIN: one row per table, in join order. type says how that table's rows are found; rows is the estimate (MariaDB ANALYZE adds r_rows, the real count, and r_filtered).",
+  "proven": ["mariadb"],
+  "access": {
+   "SYSTEM": {"en": "the table has one row", "hi": "table mein ek hi row hai"},
+   "CONST": {"en": "at most one row, found by the primary key or a unique key compared with a value, read once", "hi": "primary/unique key se zyada se zyada ek row, ek hi baar"},
+   "EQ_REF": {"en": "one row for each row before it, by its primary or unique key (the best join step)", "hi": "pichli har row ke liye primary/unique key se ek row (sabse achha join)"},
+   "REF": {"en": "the rows with one value of an index (a non-unique index, or a key prefix)", "hi": "index ki ek value wali rows"},
+   "REF_OR_NULL": {"en": "like ref, plus the rows where the column IS NULL", "hi": "ref jaisa, saath mein NULL wali rows"},
+   "FULLTEXT": {"en": "a FULLTEXT index search", "hi": "FULLTEXT index se search"},
+   "RANGE": {"en": "a stretch of an index (>, <, BETWEEN, IN, LIKE 'abc%')", "hi": "index ka ek hissa (>, <, BETWEEN, IN, LIKE 'abc%')"},
+   "INDEX_MERGE": {"en": "two or more indexes read and their rows combined (an OR or AND across indexed columns)", "hi": "do ya zyada index padh ke rows milaayi"},
+   "INDEX": {"en": "the whole index is read, entry by entry (cheaper than the table, but every entry)", "hi": "poora index entry-entry padha jaata hai"},
+   "ALL": {"en": "every row of the table is read and checked (a full table scan)", "hi": "table ki har row padh ke check hoti hai (full table scan)"},
+   "UNIQUE_SUBQUERY": {"en": "an IN subquery answered by a unique index lookup", "hi": "IN subquery unique index se"},
+   "INDEX_SUBQUERY": {"en": "an IN subquery answered by an index lookup", "hi": "IN subquery index se"}
+  },
+  "extra": {
+   "Using index condition": {"en": "part of the WHERE is checked inside the index before reading the row", "hi": "WHERE ka hissa row padhne se pehle index mein check"},
+   "Using index for group-by": {"en": "groups read straight from the index", "hi": "groups seedha index se"},
+   "Using index": {"en": "everything needed is in the index (covering): the table itself isn't read", "hi": "saara data index mein hai (covering): table nahi padhi"},
+   "Using where": {"en": "rows are checked against the WHERE after they are read", "hi": "rows padhne ke baad WHERE se check"},
+   "Using filesort": {"en": "rows are sorted after they are found, not read in index order", "hi": "rows milne ke baad sort hoti hain"},
+   "Using temporary": {"en": "a temporary table holds the groups or distinct rows", "hi": "groups ke liye temporary table"},
+   "Using join buffer": {"en": "this table has no usable index for the join, so rows are matched in batches", "hi": "join ke liye index nahi, rows batch mein milaayi jaati hain"},
+   "Using union": {"en": "rows from two indexes are combined (index merge for an OR)", "hi": "do index ki rows milaayi (OR ke liye)"},
+   "Impossible WHERE": {"en": "the WHERE can never be true: no row is read", "hi": "WHERE kabhi true nahi: koi row nahi padhi"},
+   "Range checked for each record": {"en": "no good index is known in advance; one is chosen again for every row before it", "hi": "pichli har row ke liye index naye sire se chuna jaata hai"}
+  },
+  "tree": {
+   "Table scan on": {"en": "every row of the table is read", "hi": "table ki har row padhi jaati hai"},
+   "Index scan on": {"en": "the whole index is read in order", "hi": "poora index kram se padha jaata hai"},
+   "Covering index scan on": {"en": "the whole index is read; the table itself isn't needed", "hi": "poora index padha, table nahi"},
+   "Index lookup on": {"en": "rows with one value of an index", "hi": "index ki ek value wali rows"},
+   "Single-row index lookup on": {"en": "one row by a unique key", "hi": "unique key se ek row"},
+   "Covering index lookup on": {"en": "rows with one value, read from the index alone", "hi": "ek value ki rows, sirf index se"},
+   "Index range scan on": {"en": "a stretch of an index", "hi": "index ka ek hissa"},
+   "Filter:": {"en": "rows checked against a condition after they are read", "hi": "padhne ke baad condition se check"},
+   "Nested loop": {"en": "for each row of the first input, the matching rows of the second are looked up", "hi": "pehle input ki har row ke liye doosre ki matching rows"},
+   "Inner hash join": {"en": "one side is put in a hash table and the other side probes it", "hi": "ek taraf hash table, doosri usme dhoondhti hai"},
+   "Sort:": {"en": "rows sorted after they are found", "hi": "rows milne ke baad sort"},
+   "Aggregate": {"en": "totals worked out", "hi": "totals banaye"},
+   "Limit:": {"en": "only the first rows are passed on", "hi": "sirf pehli rows aage"}
+  }
  }
 }

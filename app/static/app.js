@@ -372,7 +372,14 @@
       wrap.append(ul);
     }
     if (r.rewritten && !corr) wrap.append(codeBox(w.rewritten, r.rewritten, w));
-    if (r.suggested) wrap.append(codeBox(T(hi, "Agar aapka matlab yahi tha", "If that's what you meant"), r.suggested, w));
+    if (r.suggested) wrap.append(codeBox(r.suggested_kind === "speed" ? T(hi, "Tez roop, wahi rows (EXPLAIN se milao)", "Faster form, same rows (compare with EXPLAIN)")
+                                                                      : T(hi, "Agar aapka matlab yahi tha", "If that's what you meant"), r.suggested, w));
+    if (r.plan && (hi ? r.plan.hi : r.plan.en)) {                         // a pasted EXPLAIN, read step by step
+      const d = el("details", "reading");
+      d.append(el("summary", null, T(hi, "DBaba ne plan aise padha", "How DBaba read the plan")));
+      d.append(el("pre", "reading-body", hi ? r.plan.hi : r.plan.en));
+      wrap.append(d);
+    }
     if (r.reading && (hi ? r.reading.hi : r.reading.en)) {                 // the query read stage by stage
       const d = el("details", "reading");
       d.append(el("summary", null, T(hi, "DBaba ne query aise padhi", "How DBaba read this query")));

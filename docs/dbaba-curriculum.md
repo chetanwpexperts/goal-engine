@@ -72,17 +72,17 @@ feed.
   numbers stored as text, utf8 vs utf8mb4, over-wide types; advising a better structure.
 - [x] **7. CASE, CTEs, windows.** CASE order and missing ELSE, recursive CTEs that must stop, window frames and ties in
   running totals, LAG/LEAD, NTILE, gaps and islands, versions without window functions.
-- [ ] **8. Indexes and EXPLAIN.** Reading EXPLAIN on both engines, composite indexes and the leftmost prefix, sargable
+- [x] **8. Indexes and EXPLAIN.** Reading EXPLAIN on both engines, composite indexes and the leftmost prefix, sargable
   rewrites, OR -> UNION ALL, keyset pagination, covering indexes; every speed rewrite proven to return the same rows.
-- [ ] **9. Concurrency and large data.** Deadlocks, lock waits, long transactions, batching huge changes, N+1; a deadlock
+- [x] **9. Concurrency and large data.** Deadlocks, lock waits, long transactions, batching huge changes, N+1; a deadlock
   and a lock wait reproduced in the lab.
-- [ ] **10. Mixed hard problems and portability.** Long CTE-heavy queries end to end; LIMIT/OFFSET/FETCH/TOP,
+- [x] **10. Mixed hard problems and portability.** Long CTE-heavy queries end to end; LIMIT/OFFSET/FETCH/TOP,
   IFNULL/COALESCE/NVL/ISNULL, dates, upsert, case, identities; Oracle / SQL Server / SQLite recognised and answered as notes.
   Final exam: 50 generated problems and 100 basic questions, all passing.
 
 Reading a whole project (nights 10A-10B, before the query-only nights, which get stronger once the real schema can be read):
 
-- [ ] **10A. Find the SQL in a project's files.** Walk a folder (skip vendor/, node_modules/, .git/, build output); find SQL in
+- [x] **10A. Find the SQL in a project's files.** Walk a folder (skip vendor/, node_modules/, .git/, build output); find SQL in
   .sql files and inside code strings (PHP incl. heredoc, JS/TS template strings, Python, Java) and raw-query calls
   (mysqli_query, PDO, $wpdb, DB::select / DB::statement, cursor.execute, pool.query ...); a string counts only with a real SQL
   shape; placeholders (?, :id, $1, %s, {$var}) are values. Report each finding as file:line with the corrected query; read only,
@@ -267,3 +267,106 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   (4018) but runs NTILE and ROW_NUMBER; FIRST_VALUE() OVER () returned different rows on the two engines; ROW_NUMBER numbered two
   tied rows the other way round on each; a CASE mixing 'none' with a numeric column is text on MariaDB (sorted '1000.00' <
   '50.00') and 22P02 on PostgreSQL.
+- **Night 8 (12 Nov 2026).** Indexes and speed in `app/agents/sqlspeed.py`, EXPLAIN in `app/agents/sqlexplain.py` (new fundamental
+  `index_use`: an index finds rows only by the bare column, from its first column on; a speed rewrite must return exactly the same
+  rows, and a plan is the proof). Rules ('check', never 'error'/'wrong'): a function or arithmetic around a filtered column (YEAR,
+  EXTRACT, DATE, CAST AS DATE, ::date, DATE_FORMAT, TO_CHAR, YEAR + MONTH, + - * on a number, COALESCE / IFNULL, LEFT / SUBSTRING)
+  rewritten on the bare column (a date range, the number moved across, `c = v [OR c IS NULL]`, `LIKE 'abc%'`) and applied as the
+  faster form; an OR across two tables of a join offered as UNION ALL with `(first) IS NOT TRUE` (same rows, each part with its
+  own index); a deep OFFSET offered as keyset paging (`:last_<col>` placeholders, expanded form on MySQL/MariaDB, row comparison
+  on PostgreSQL) when the sort ends with the row's key. With the structure pasted: a composite index whose first column isn't
+  filtered, a range on the first column of (a, b), a text column compared with a number. EXPLAIN plans read step by step in MySQL /
+  MariaDB table, `\G` and tree forms and PostgreSQL text (with or without ANALYZE): full scans, an index that existed but wasn't
+  picked, a filter that wraps the column, joins with no index (join buffer, nested loop over a Seq Scan, a Join Filter over every
+  pair), filesort / temporary, sorts and hashes spilled to disk, estimates 10x off, heap fetches, DEPENDENT SUBQUERY; a pasted plan
+  in the chat is read in its engine's words (detected from the format), with its query checked beside it. Index commands follow
+  rule A (`CREATE INDEX` and `pg_indexes` on PostgreSQL; `ALTER TABLE ... ADD INDEX` was a syntax error there). Engine facts in
+  the dialect files (`like_prefix_index`, `text_vs_number`, `or_same_table`, `expression_index`, `offset_reads`, and an `explain`
+  section with what each access type / plan node means). A general 'why is a big OFFSET slow' is now a lesson, while 'my query is
+  slow' still goes to the checker, and 'slow queries kaise dhoondhe' no longer gets the website-speed steps. 23 concepts, 39-problem
+  practice bank, 10 generator families. Lab lessons worth keeping (20,000 rows, ANALYZEd): YEAR(), DATE(), EXTRACT(), qty + 1,
+  COALESCE() and LEFT() made MariaDB read the whole index (or the table) and PostgreSQL Seq Scan, the bare-column forms used the index
+  on both; PostgreSQL guessed 100 rows for 7,362 behind EXTRACT(); an OR on two indexed columns of one table is already fast
+  (MariaDB index_merge, PostgreSQL BitmapOr), across two joined tables it read both in full; PostgreSQL 16 under C.UTF-8 does NOT use
+  a plain index for `LIKE 'abc%'` (varchar_pattern_ops does); MariaDB matches '09812345678' and '9812345678 ' for `phone = 9812345678`
+  (PostgreSQL 42883); MariaDB 10.11 doesn't use a virtual column's index for the same expression unless the query names the column;
+  MariaDB's EXPLAIN for OFFSET 15000 shows rows = 15020; a temporary table has no statistics in PostgreSQL until ANALYZE.
+- **Night 9 (12 Nov 2026).** Locks and big data in `app/agents/sqllock.py` (new fundamental `locking`: a change locks its rows until
+  its transaction ends, and whoever needs them waits). Rules ('check', offered, never applied): a huge UPDATE / DELETE said in words
+  ('30 million rows', 'lakhs', 'times out', 'huge table') offered in batches of 5,000 in the database's own words (LIMIT on
+  MySQL/MariaDB, a ctid subquery on PostgreSQL), an UPDATE only when it sets plain values, with a guard so rows already done stop
+  matching (OR across columns; `SET x = x + 1` gets key-range advice instead); queue workers taking the next job with FOR UPDATE
+  offered SKIP LOCKED; the same statement sent once per value (an N+1 log: SELECT / UPDATE / DELETE by one value, or single-row
+  INSERTs) turned into one statement with IN (...) (the key column added to a SELECT) or one multi-row INSERT, skipped when the
+  value sits inside an OR / NOT. With the structure pasted: an UPDATE / DELETE / FOR UPDATE with no index on its WHERE locks every
+  row it reads on MySQL/MariaDB (only reads them on PostgreSQL). A pasted deadlock report (MariaDB/MySQL's LATEST DETECTED
+  DEADLOCK, PostgreSQL's DETAIL) is read in the chat: the statements, the table, the victim, gap locks, and the fix (one order
+  everywhere, short transactions, an index, retry the victim). Engine facts in the dialect files (`skip_locked`, `lock_scan`,
+  `gap_locks`, `deadlock`). A general 'what is lock wait timeout' is now a lesson ('timeout' alone is a symptom only with the person's
+  own query, page or database), a define question that only names a state ('what is idle in transaction') is answered, and 'when
+  should I ...' / 'kab kare' are when-questions. 18 concepts, 31-problem practice bank plus a live two-session lab, 4 generator
+  families. Lab lessons worth keeping: opposite-order updates gave MariaDB 1213 (SQLSTATE 40001) and PostgreSQL 40P01 (DETAIL
+  'Process A waits for ShareLock on transaction X; blocked by process B'); a lock wait ended in 1205 / 55P03; MariaDB blocked a change
+  of another row behind an UPDATE whose WHERE had no index (PostgreSQL didn't), and blocked an INSERT into a range another
+  transaction updated (gap lock, REPEATABLE READ; PostgreSQL didn't); FOR UPDATE made the second worker wait, SKIP LOCKED gave it job 2
+  at once; MariaDB's NOWAIT fails at once with 1205 (not MySQL's 3572), PostgreSQL's with 55P03; a plain read saw the committed 100
+  while a writer held 999; a WHERE that names a plpgsql word first ('raise prices ...') after a ';' is read as SQL, so it isn't taken
+  as the person's words.
+- **Night 10 (12 Nov 2026).** Portability in `app/agents/sqlport.py` (new fundamental `portability`: one SQL language, each
+  database's own words; a translation keeps the meaning, not just the spelling). For the database named, chosen or detected
+  (rule A), another database's words are found and rewritten in its own: SQL Server's TOP (moved to LIMIT at the end of that
+  SELECT), DATEADD / DATEDIFF(unit, ...) / DATEPART / LEN / CHARINDEX / IIF / CONVERT(type, x) / GETDATE() / [brackets]; Oracle's
+  ROWNUM (LIMIT, with the note that ROWNUM is given before ORDER BY), bare SYSDATE, FROM DUAL; MySQL's DATE_ADD / DATE_SUB /
+  INTERVAL 7 DAY / DATEDIFF / TIMESTAMPDIFF / YEAR() / IF() / LOCATE / INSTR / UCASE / SUBSTRING_INDEX / GROUP_CONCAT (ORDER BY and
+  SEPARATOR kept) / DATE_FORMAT and STR_TO_DATE (format codes translated, never guessed) / CONVERT(x, SIGNED) / DIV / REGEXP /
+  CAST AS SIGNED or DATETIME on PostgreSQL; PostgreSQL's STRPOS / SPLIT_PART / DATE_TRUNC / string_agg / to_date / INTERVAL '7 days'
+  / ~* / CAST AS TEXT or BIGINT or TIMESTAMP on MySQL/MariaDB. Calls are rewritten innermost first (DATEADD(day, 1, GETDATE())).
+  Spellings that run but mean something else: date - date and date +/- n on MySQL/MariaDB (`wrong`, DATEDIFF / INTERVAL n DAY;
+  a `check` naming both meanings when the database isn't known), PostgreSQL's INTERVAL 'n' WEEK / QUARTER, CAST(x AS CHAR) on
+  PostgreSQL (CHAR(1)), and ^ on MySQL/MariaDB (XOR; POWER offered). 'Convert this query to PostgreSQL' (with the query, or after
+  a check) is a translation in the chat: the query in the target's words, each change, definite mistakes fixed on the way, what
+  couldn't be translated, and the meaning a translation can't remove (case-sensitive comparison, integer division, NULL in
+  CONCAT / GREATEST, LENGTH in bytes, NULL sort order, GROUP_CONCAT's length limit); the target is remembered (rule A). SQL Server,
+  Oracle and SQLite targets get notes only (`note_marks` pick the notes that speak to the query); SQLite's notes were run on
+  SQLite 3.53. Engine words live in the dialect files' new `port` sections (calls with templates, interval words, date-format
+  codes, cast type names) and `refuses`. Also fixed: GROUP BY 1 and GROUP BY a SELECT name were called 'columns that aren't
+  grouped' (a false alarm on every engine), and 'how many days between two dates' (how many / how much) is now a question shape.
+  22 concepts, 51-problem practice bank (each proven on the target, and where the wrong query is valid at home, proven to return
+  what it returned there), 13 generator families. Final exam: 50 generated problems from all ten nights' families and 100 basic
+  questions across the whole pack, all passing. Lab lessons worth keeping: MariaDB computes DATE '2024-02-03' - DATE '2024-01-25' as
+  78 (two YYYYMMDD numbers) and DATE '2024-03-01' - 1 as 20240300, with no warning; PostgreSQL's SELECT d + INTERVAL '2' WEEK
+  gives d + 2 seconds in a column named week (its INTERVAL qualifier has no WEEK / QUARTER; elsewhere a syntax error); CAST(x AS
+  CHAR) is CHAR(1) on PostgreSQL ('2024-06-01' -> '2') and CHAR(n) pads with spaces; 2 ^ 3 is 1 on MariaDB and 8 on PostgreSQL;
+  GREATEST(1, NULL, 3) is NULL on MariaDB, 3 on PostgreSQL; LENGTH('ñab') is 4 on MariaDB, 3 on PostgreSQL; CAST('5.25' AS DECIMAL)
+  is 5 on MariaDB; MariaDB 10.11 accepts FETCH FIRST n ROWS ONLY and TO_CHAR but refuses CAST AS TEXT / BIGINT / NUMERIC /
+  TIMESTAMP / BOOLEAN and UPDATE ... RETURNING; INTERVAL '30' DAY (number quoted, unit outside) runs on both.
+- **Night 10A (13 Nov 2026).** The SQL in a project's files, in `app/agents/sqlscan.py` (new fundamental `code_parameters`:
+  values travel beside the SQL, never inside its text). A folder is walked read-only (vendor/, node_modules/, .git, build
+  output, caches, wp-admin / wp-includes and minified files skipped); .sql files are split the way the client runs them; PHP
+  (single / double quotes over several lines, heredoc, nowdoc, {$x} / $x->y interpolation), JS/TS (template strings with ${},
+  regex literals skipped), Python (triple quotes, adjacent literals, f-strings, % and .format templates) and Java (text blocks)
+  strings are read with their concatenation (. / +), and a string counts only with a real SQL shape (a lower- or title-case
+  'Select a file from the list' or 'Delete from cart' needs a raw-query call or an SQL-named variable around it, and prose words
+  in the select list or after FROM rule it out). A code piece inside the SQL is read by where it stands: a value (bound or not),
+  a name ({$wpdb->prefix}posts, FROM $table), or a fragment, which makes the query "found, couldn't read completely" like a query
+  appended with .= / += and ORM / query-builder calls; nothing is guessed. Findings come at file:line (the first real SQL
+  character, comments skipped) with the checker's own findings for the project's database (rule A: --engine named; else the
+  driver the file imports, so a pg pool in a PHP + MySQL project is PostgreSQL; else composer.json / package.json /
+  requirements / pom / .env DB_CONNECTION / wp-config / docker-compose, of which only the DB_CONNECTION line of .env is read;
+  else general SQL, said). New mistakes that exist because the SQL is in code: a placeholder inside quotes ('%?%', '?' with a
+  value bound, '%s' to pymysql / psycopg, '$1', ':name'; `wrong`, fixed to the bare placeholder, CONCAT('%', ?, '%') on
+  MySQL/MariaDB and '%' || $1 || '%' on PostgreSQL), a placeholder where a name goes (FROM ? `error`, ORDER BY ? `wrong`), a value
+  written into the SQL text by interpolation, concatenation or formatting (`check`, with the query rewritten with the driver's
+  placeholders and the values listed; a value forced to a number in code is quiet), and a -- comment in pieces joined without a
+  newline that swallows the rest (`wrong`, the newline put back). The plain-SQL checker gets the placeholder checks too ('?' alone
+  and '%?' stay quiet: that's how a query with hidden values looks). Code pasted in the chat with several queries, or one of these
+  mistakes, gets each query by its line. `scripts/dbaba check <folder>` prints the same and exits 1 on a definite mistake.
+  18 concepts, 37-problem practice bank, a project generator (tests/fuzz/codescan.py: PHP / WordPress / Laravel / Node mysql2
+  and pg / pymysql / psycopg / JDBC / .sql projects with every stmtbugs family and tonight's own planted at known lines, decoy
+  strings, valid queries, ORM calls and queries in pieces) and 4 stmtbugs families. Lab lessons worth keeping: MariaDB refuses a
+  value bound to WHERE name = '?' (1210 Incorrect arguments to EXECUTE) and, with nothing bound, matches only a literal '?';
+  PostgreSQL compares WHERE name = '$1' with the text $1; ORDER BY ? / $1 bound to a column name leaves the rows unsorted on both;
+  FROM ? is 1064 / 42601; IN (?) bound to '2,4,6' matches only id 2 on MariaDB (warning 1292) and is refused on PostgreSQL
+  (42883), where id = ANY($1) with an array works; CONCAT('%', $1, '%') with an untyped parameter is refused on PostgreSQL
+  (42P18) while '%' || $1 || '%' works; ESCAPED is a reserved word on MariaDB. Also fixed: a camelCase date column (DisbursedOn,
+  MovedAt) is now read like disbursed_on / moved_at for date arithmetic (seen when the new families shifted the generator's seeds).

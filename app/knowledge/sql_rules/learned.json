@@ -3353,5 +3353,511 @@
    "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
   },
   "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect use of GROUP BY with non-aggregated column",
+  "why": "The GROUP BY clause includes an aggregate function (AVG(price)) when using a non-aggregated column (name).",
+  "fix": "Remove aggregate functions from the GROUP BY clause.",
+  "bad_sql": "SELECT name, AVG(price) FROM products GROUP BY category, AVG(price)",
+  "fixed_sql": "SELECT category, AVG(price) FROM products GROUP BY category",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1056,
+    "message": "Can't group on 'AVG(price)'"
+   },
+   "mariadb": {
+    "code": 1111,
+    "message": "Invalid use of group function"
+   },
+   "postgres": {
+    "code": "42803",
+    "message": "aggregate functions are not allowed in GROUP BY"
+   }
+  },
+  "id": "dcf8fa174651",
+  "source": "https://mariadb.com/kb/en/group-by/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using HAVING with a non-aggregate column",
+  "why": "The HAVING clause is applied after GROUP BY and allows only aggregate data.",
+  "fix": "Use the WHERE clause for filtering non-aggregate columns.",
+  "bad_sql": "SELECT name, COUNT(*) FROM customers HAVING name = 'John'",
+  "fixed_sql": "SELECT name, COUNT(*) FROM customers GROUP BY name HAVING name = 'John'",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1140,
+    "message": "In aggregated query without GROUP BY, expression #1 of SELECT list contains nonaggregated column 'ge.customers.name'; this is incompatible with sql_mode=only_full_group_by"
+   },
+   "postgres": {
+    "code": "42803",
+    "message": "column \"customers.name\" must appear in the GROUP BY clause or be used in an aggregate function"
+   }
+  },
+  "id": "bc45e09cbd66",
+  "source": "https://mariadb.com/kb/en/group-by/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using ORDER BY with GROUP BY without Aggregation",
+  "why": "The ORDER BY clause is used with GROUP BY but no aggregation function is applied to the non-grouped column 'name'.",
+  "fix": "Include 'name' in the GROUP BY clause or apply an aggregation function to it.",
+  "bad_sql": "SELECT category, name FROM products GROUP BY category ORDER BY name",
+  "fixed_sql": "SELECT category, name FROM products GROUP BY category, name ORDER BY name",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1055,
+    "message": "Expression #2 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'ge.products.name' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by"
+   },
+   "postgres": {
+    "code": "42803",
+    "message": "column \"products.name\" must appear in the GROUP BY clause or be used in an aggregate function"
+   }
+  },
+  "id": "d32d52d99f0d",
+  "source": "https://mariadb.com/kb/en/order-by/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using ORDER BY with a non-existing column",
+  "why": "The ORDER BY clause refers to a column 'non_existing_column' that does not exist in the 'products' table.",
+  "fix": "Correct the column name in the ORDER BY clause to match an existing column in the table.",
+  "bad_sql": "SELECT category, non_existing_column FROM products ORDER BY non_existing_column",
+  "fixed_sql": "SELECT category, name FROM products ORDER BY name",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'non_existing_column' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'non_existing_column' in 'SELECT'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column \"non_existing_column\" does not exist"
+   }
+  },
+  "id": "5b3238f09133",
+  "source": "https://mariadb.com/kb/en/order-by/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using ORDER BY with a subquery that returns multiple columns",
+  "why": "The ORDER BY clause uses a subquery that returns multiple columns, which is not allowed.",
+  "fix": "Use a single column in the subquery or correct the subquery to return a single column.",
+  "bad_sql": "SELECT category FROM products ORDER BY (SELECT name FROM products)",
+  "fixed_sql": "SELECT category FROM products ORDER BY name",
+  "detect": "(?i)SELECT\\s+[^\\s]+\\s+FROM\\s+[^\\s]+\\s+ORDER\\s+BY\\s+\\(\\s*SELECT\\s+[^\\s]+\\s+FROM\\s+[^\\s]+\\s*\\)",
+  "engines": {
+   "mysql": {
+    "code": 1242,
+    "message": "Subquery returns more than 1 row"
+   },
+   "mariadb": {
+    "code": 1242,
+    "message": "Subquery returns more than 1 row"
+   },
+   "postgres": {
+    "code": "21000",
+    "message": "more than one row returned by a subquery used as an expression"
+   }
+  },
+  "id": "605356d73916",
+  "source": "https://mariadb.com/kb/en/order-by/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using non-existent column",
+  "why": "The query attempts to select a column that does not exist in the 'customers' table.",
+  "fix": "Remove the non-existent column from the SELECT clause.",
+  "bad_sql": "SELECT id, name, non_existent_column FROM customers",
+  "fixed_sql": "SELECT id, name FROM customers",
+  "detect": "(?i)SELECT.*\\bnon_existent_column\\b",
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'non_existent_column' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'non_existent_column' in 'SELECT'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column \"non_existent_column\" does not exist"
+   }
+  },
+  "id": "7954eafacdb1",
+  "source": "https://mariadb.com/kb/en/joining-tables-with-join-clauses/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Missing ON Clause",
+  "why": "The query does not specify a join condition, which results in a Cartesian product.",
+  "fix": "Add an ON clause to specify the join condition.",
+  "bad_sql": "SELECT * FROM orders JOIN order_items;",
+  "fixed_sql": "SELECT * FROM orders JOIN order_items ON orders.id = order_items.order_id;",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at end of input"
+   }
+  },
+  "id": "2a10988d8736",
+  "source": "https://mariadb.com/kb/en/joining-tables-with-join-clauses/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Ambiguous Column Names",
+  "why": "The query does not specify which table's 'name' column to use, leading to ambiguity.",
+  "fix": "Specify the table name before the column name.",
+  "bad_sql": "SELECT name FROM customers JOIN orders;",
+  "fixed_sql": "SELECT customers.name FROM customers JOIN orders ON customers.id = orders.customer_id;",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at end of input"
+   }
+  },
+  "id": "4687a40e04ee",
+  "source": "https://mariadb.com/kb/en/joining-tables-with-join-clauses/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using DISTINCT without select_expr",
+  "why": "The query uses DISTINCT without specifying any columns to select.",
+  "fix": "Specify at least one column in the SELECT clause.",
+  "bad_sql": "SELECT DISTINCT FROM customers",
+  "fixed_sql": "SELECT DISTINCT name FROM customers",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'FROM customers' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'FROM customers' at line 1"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"FROM\""
+   }
+  },
+  "id": "263fa6f9fe44",
+  "source": "https://mariadb.com/kb/en/select/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect Use of Aggregate Functions in WHERE Clause",
+  "why": "Aggregate functions like COUNT cannot be used directly in the WHERE clause.",
+  "fix": "Use the HAVING clause instead of the WHERE clause for aggregate functions.",
+  "bad_sql": "SELECT name FROM customers WHERE COUNT(id) > 10",
+  "fixed_sql": "SELECT name FROM customers GROUP BY name HAVING COUNT(id) > 10",
+  "detect": "SELECT\\s+([a-zA-Z0-9_]+)\\s+FROM\\s+([a-zA-Z0-9_]+)\\s+WHERE\\s+COUNT\\s*\\(\\s*([a-zA-Z0-9_]+)\\s*\\)\\s*",
+  "engines": {
+   "mysql": {
+    "code": 1111,
+    "message": "Invalid use of group function"
+   },
+   "mariadb": {
+    "code": 1111,
+    "message": "Invalid use of group function"
+   },
+   "postgres": {
+    "code": "42803",
+    "message": "aggregate functions are not allowed in WHERE"
+   }
+  },
+  "id": "ccdeaa8d6b95",
+  "source": "https://mariadb.com/kb/en/select/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Missing FROM Clause",
+  "why": "The SELECT statement must include a FROM clause to specify the table(s) from which to retrieve data.",
+  "fix": "Add a FROM clause with the appropriate table name.",
+  "bad_sql": "SELECT name",
+  "fixed_sql": "SELECT name FROM customers",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1054,
+    "message": "Unknown column 'name' in 'field list'"
+   },
+   "mariadb": {
+    "code": 1054,
+    "message": "Unknown column 'name' in 'SELECT'"
+   },
+   "postgres": {
+    "code": "42703",
+    "message": "column \"name\" does not exist"
+   }
+  },
+  "id": "53a7a1695b30",
+  "source": "https://mariadb.com/kb/en/select/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect table name",
+  "why": "The query specifies a non-existent table name 'product'.",
+  "fix": "Replace 'product' with the correct table name 'products'.",
+  "bad_sql": "SELECT name FROM product",
+  "fixed_sql": "SELECT name FROM products",
+  "detect": "\\bSELECT\\b.*\\bproduct\\b",
+  "engines": {
+   "mysql": {
+    "code": 1146,
+    "message": "Table 'ge.product' doesn't exist"
+   },
+   "mariadb": {
+    "code": 1146,
+    "message": "Table 'ge.product' doesn't exist"
+   },
+   "postgres": {
+    "code": "42P01",
+    "message": "relation \"product\" does not exist"
+   }
+  },
+  "id": "0a11bd279cfb",
+  "source": "https://mariadb.com/kb/en/select/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Missing UNION keyword",
+  "why": "The queries are not combined with UNION, so the results are not combined.",
+  "fix": "Add UNION between the SELECT statements.",
+  "bad_sql": "SELECT id, name FROM customers SELECT id, name FROM employees",
+  "fixed_sql": "SELECT id, name FROM customers UNION SELECT id, name FROM employees",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'SELECT id, name FROM employees' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'SELECT id, name FROM employees' at line 1"
+   },
+   "postgres": {
+    "code": "42601",
+    "message": "syntax error at or near \"SELECT\""
+   }
+  },
+  "id": "f668d35cfd79",
+  "source": "https://mariadb.com/kb/en/union/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using HIGH_PRIORITY inside a UNION query",
+  "why": "Specifying a query as HIGH_PRIORITY does not work inside a UNION. If applied to the first SELECT, it is ignored.",
+  "fix": "Remove the HIGH_PRIORITY keyword.",
+  "bad_sql": "SELECT id FROM customers HIGH_PRIORITY UNION SELECT id FROM employees",
+  "fixed_sql": "SELECT id FROM customers UNION SELECT id FROM employees",
+  "detect": "\\bHIGH_PRIORITY\\b",
+  "engines": {
+   "mysql": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'HIGH_PRIORITY UNION SELECT id FROM employees' at line 1"
+   },
+   "mariadb": {
+    "code": 1064,
+    "message": "You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'HIGH_PRIORITY UNION SELECT id FROM employees' at line 1"
+   }
+  },
+  "id": "7164fe90731d",
+  "source": "https://mariadb.com/kb/en/union/",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using aggregate functions with GROUP BY on non-aggregated columns",
+  "why": "The GROUP BY clause includes non-aggregated columns (name) in addition to aggregated columns (AVG(price), category).",
+  "fix": "Remove non-aggregated columns from the GROUP BY clause.",
+  "bad_sql": "SELECT AVG(price), category FROM products GROUP BY name",
+  "fixed_sql": "SELECT AVG(price), category FROM products GROUP BY category",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1055,
+    "message": "Expression #2 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'ge.products.category' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by"
+   },
+   "postgres": {
+    "code": "42803",
+    "message": "column \"products.category\" must appear in the GROUP BY clause or be used in an aggregate function"
+   }
+  },
+  "id": "51d43edbd044",
+  "source": "https://www.postgresql.org/docs/16/functions-aggregate.html",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Using ANY with a subquery that does not return a Boolean value",
+  "why": "The ANY operator expects a subquery that returns a single row with a Boolean value, but the subquery returns a non-Boolean value.",
+  "fix": "Ensure the subquery returns a single row with a Boolean value or use an appropriate operator like IN.",
+  "bad_sql": "SELECT id FROM customers WHERE id = ANY((SELECT name FROM orders))",
+  "fixed_sql": "SELECT id FROM customers WHERE id IN (SELECT customer_id FROM orders)",
+  "detect": null,
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "operator does not exist: integer = character varying"
+   }
+  },
+  "id": "c2b968c87b61",
+  "source": "https://www.postgresql.org/docs/16/functions-aggregate.html",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Incorrect ordered-set aggregate usage with array",
+  "why": "The percentile_cont function with an array of fractions requires each fraction to be of type double precision and the ordered-set argument must be of a sortable type.",
+  "fix": "Cast each fraction and the ordered-set argument to double precision using the :: operator.",
+  "bad_sql": "SELECT percentile_cont(0.5, 0.75) WITHIN GROUP (ORDER BY price) FROM products",
+  "fixed_sql": "SELECT percentile_cont(ARRAY[0.5::double precision, 0.75::double precision]) WITHIN GROUP (ORDER BY price::double precision) FROM products",
+  "detect": "(?i)percentile_cont\\s*\\(\\s*0\\.5\\s*,\\s*0\\.75\\s*\\)\\s*WITHIN GROUP\\s*\\(\\s*ORDER BY\\s*price\\s*\\)",
+  "engines": {
+   "postgres": {
+    "code": "42883",
+    "message": "function percentile_cont(numeric, numeric, numeric) does not exist"
+   }
+  },
+  "id": "17d29d578125",
+  "source": "https://www.postgresql.org/docs/16/functions-aggregate.html",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
+ },
+ {
+  "title": "Missing Window Function",
+  "why": "The AVG function is not a window function, but it's being used without the OVER clause.",
+  "fix": "Add the OVER () clause to make it a window function.",
+  "bad_sql": "SELECT name, AVG(price) FROM products",
+  "fixed_sql": "SELECT name, AVG(price) OVER () FROM products",
+  "detect": null,
+  "engines": {
+   "mysql": {
+    "code": 1140,
+    "message": "In aggregated query without GROUP BY, expression #1 of SELECT list contains nonaggregated column 'ge.products.name'; this is incompatible with sql_mode=only_full_group_by"
+   },
+   "postgres": {
+    "code": "42803",
+    "message": "column \"products.name\" must appear in the GROUP BY clause or be used in an aggregate function"
+   }
+  },
+  "id": "7247873d6870",
+  "source": "https://www.postgresql.org/docs/16/functions-aggregate.html",
+  "verified_at": "2026-11-13",
+  "versions": {
+   "mysql": "8.4.13",
+   "mariadb": "11.4.13-MariaDB-ubu2404",
+   "postgres": "PostgreSQL 16.15 (Debian 16.15-1.pgdg13+"
+  },
+  "model": "qwen2.5-coder:7b"
  }
 ]

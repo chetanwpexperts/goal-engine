@@ -819,3 +819,25 @@ body.typing .talk-cta { visibility: hidden; }
   .talk svg { display: block; }
   .talk { width: 40px; padding: 0; justify-content: center; }
 }
+
+/* a concept answer: the worked examples beside the explanation */
+.concept-card { display: flex; flex-direction: column; gap: 10px; }
+.concept-kicker { margin: 0; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: #6A6FA0; }
+.concept-title { margin: 0 0 4px; font-size: 20px; color: #141A38; }
+.concept-label { margin: 6px 0 0; font-weight: 600; }
+.concept-step { margin: 6px 0 0; font-size: 14px; font-weight: 600; color: #3B4170; }
+.concept-card .grid { max-height: 320px; overflow: auto; border: 1px solid #E4E7F5; border-radius: 12px; }
+.concept-card .grid table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.concept-card .grid th, .concept-card .grid td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #EEF0F8; }
+.concept-card .grid th { background: #F5F6FC; position: sticky; top: 0; }
+.concept-diffs .say-list { margin: 4px 0 0; padding-left: 18px; }
+.concept-diffs li { margin: 4px 0; }
+/* the tap row over the conversation: a soft backing so it never sits on top of text unreadably */
+body[data-state="active"] .options { padding: 8px 10px; border-radius: 18px; background: rgba(246, 247, 252, .92);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 10px 30px -20px rgba(64, 72, 160, .45); }
+/* the Copy button sits above the query, never on top of its first line */
+.code pre { padding-top: 38px; }
+/* the side panel never taller than the room above the input box, so scrolling the chat to its end never pushes it up */
+@media (min-width: 900px) {
+  .machine { max-height: calc(100dvh - 76px - 160px - var(--opts, 0px)); }
+}

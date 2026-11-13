@@ -72,6 +72,7 @@ class Goal(Base):
             "next_action": {"type": self.next_action_type, "description": self.next_action},
             "updates": self.updates,
             "intent": self.intent or "",
+            "card": (loads(self.slots, {}) or {}).get("_card") if self.slots else None,   # an answer's examples, for the side panel
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

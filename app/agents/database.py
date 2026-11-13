@@ -633,6 +633,9 @@ def _concept_turn(db: Session, goal: Goal, text: str, hi: bool, m: dict):
             m = {**m, "engine": rec["id"]}
     reply, taps = concepts.answer(m, text)
     c = m["concept"]
+    slots = loads(goal.slots, {}) or {}
+    slots["_card"] = concepts.card(m, text)           # the worked examples, for the side panel of the page
+    goal.slots = dumps(slots)
     if c is None:                         # a database concept we don't know yet: said honestly, and kept to learn
         try:
             from app import learning

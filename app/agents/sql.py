@@ -179,6 +179,28 @@ def _clause(sql: str, start: str, stops: tuple[str, ...]) -> str:
     return m.group(1).strip() if m else ""
 
 
+def _all_wheres(sql: str) -> str:
+    """The WHERE of every block (CTEs, derived tables, UNION parts, subqueries), each read in its own block, joined by newlines."""
+    if not re.search(r"\(\s*select\b|^\s*with\b|\bunion\b", sql, re.I):
+        return ""
+    from app.agents import sqlblocks
+    from app.agents.sqlcorrect import _clauses, _depths
+
+    try:
+        bl = sqlblocks.blocks(sql)
+    except Exception:  # noqa: BLE001 - an odd query: the first WHERE only
+        return ""
+    out = []
+    for b in bl:
+        if b.get("branches"):
+            continue
+        own = sqlblocks._mask_children(sql, b["start"], b["end"])
+        cl = _clauses(own, _depths(own))
+        if "where" in cl:
+            out.append(sql[b["start"] + cl["where"][0]:b["start"] + cl["where"][1]])
+    return "\n".join(out)
+
+
 def _tables(sql: str) -> list[Table]:
     tables: list[Table] = []
     for m in re.finditer(r"\b(?:from|join)\s+([`\"\w.]+)(?:\s+(?:as\s+)?([`\w]+))?", sql, re.I):
@@ -298,7 +320,8 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
             "no WHERE clause", "Add a WHERE condition and test it with SELECT first.",
             "WHERE condition lagao aur pehle SELECT se test karo.")
 
-    func = re.findall(r"\b(date|year|month|lower|upper|trim|substring|cast|concat|ifnull|coalesce)\s*\(\s*([`\w.]+)", where, re.I)
+    every_where = _all_wheres(sql) or where           # night 15: the filters of every block (a CTE's WHERE too), not only the first
+    func = re.findall(r"\b(date|year|month|lower|upper|trim|substring|cast|concat|ifnull|coalesce)\s*\(\s*([`\w.]+)", every_where, re.I)
     rewritten = rewrite(original)
     reported = set()
     for f, c in func:
@@ -322,7 +345,7 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
                         "Saaf value alag column mein rakho (ya usi expression pe index) aur us column ko seedha compare karo.")
         add(3, f"{f}() on a column in WHERE blocks the index", f"WHERE mein column pe {f}() index ko rok deta hai",
             f"{f}({c}) in WHERE", fen, fhi, "sargable")
-    if re.search(r"\blike\s+'%\?'", where, re.I):
+    if re.search(r"\blike\s+'%\?'", every_where, re.I):
         pg_trgm = ("On PostgreSQL a trigram index finds exactly the same rows: CREATE EXTENSION pg_trgm; then CREATE INDEX ... USING gin "
                    "(column gin_trgm_ops).")
         fulltext = ("On MySQL/MariaDB a FULLTEXT index with MATCH ... AGAINST searches whole words, which is a different search "
@@ -512,7 +535,8 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
            "indexes_verified": bool(seen_structure), "assumed_primary": skipped, "notes": notes,
            "rewritten": rewritten if rewritten != original else None, "tables": [t.name for t in tables]}
     if plan:
-        out["plan"] = {"engine": plan["engine"], "en": sqlexplain.render(plan), "hi": sqlexplain.render(plan, True)}
+        out["plan"] = {"engine": plan["engine"], "en": sqlexplain.render(plan), "hi": sqlexplain.render(plan, True),
+                       "steps": [{k: st.get(k) for k in ("table", "alias", "access", "key", "rows")} for st in plan["steps"]]}
     if not is_select:                                 # see the rows first (fundamental 'changes_safety'): app/agents/sqlchange.py
         from app.agents import sqlchange
 
@@ -634,6 +658,11 @@ def _with_blocks(original: str, out: dict) -> None:
         g = sqlblocks.grain(original)
         if len(g["blocks"]) < 2:
             return
+        sqlblocks.locate(original, (out.get("correct") or {}).get("findings"))   # night 15: which block each mistake is in
+        by_title = {f["title_en"]: f.get("block") for f in (out.get("correct") or {}).get("findings") or [] if f.get("block")}
+        for f in out.get("findings") or []:
+            if isinstance(f, dict) and by_title.get(f.get("title_en")) and not f.get("block"):
+                f["block"] = by_title[f["title_en"]]
         out["blocks"] = {"en": sqlblocks.tree(original), "hi": sqlblocks.tree(original, True), "lines": g["lines"],
                          "blocks": [{k: v for k, v in b.items() if k not in ("start", "end")} for b in g["blocks"]]}
         if g["lines"] >= 30 and out.get("reading"):

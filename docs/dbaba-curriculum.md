@@ -106,9 +106,9 @@ label the rest, upgrade to verified when schema, EXPLAIN or data arrive.
   leading wildcards, SELECT * across joins; speed findings are risks, not guarantees.
 - [x] **14. Safe rewrites with proof.** Pre-aggregate repeated correlated subqueries, IN <-> EXISTS, compute once, UNION ->
   UNION ALL only when safe, OFFSET -> keyset; each states what must stay the same and is proven on both databases.
-- [ ] **15. Big-query exam.** Generated 100-300 line queries with planted mistakes: dependency tree, grain per block, the
+- [x] **15. Big-query exam.** Generated 100-300 line queries with planted mistakes: dependency tree, grain per block, the
   planted findings with the right confidence class, a proven rewrite; the same query with CREATE TABLE / EXPLAIN upgrades or
-  drops inferred findings.
+  drops inferred findings. (tests/fuzz/bigq.py: 19 families; a pasted EXPLAIN confirms a speed risk or rules it out.)
 
 ## After night 15
 

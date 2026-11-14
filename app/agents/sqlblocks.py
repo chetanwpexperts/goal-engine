@@ -167,8 +167,9 @@ def _select_items(sql: str, s: str, a: int, b: int) -> tuple[list[dict], dict]:
             am = re.search(rf"\s+(?:as\s+)?({NAME})\s*$", raw, re.I)
             expr = raw[:am.start()].strip() if am and not re.fullmatch(rf"(?:{NAME}\.)?{NAME}", raw) else raw
             name = _uq(am.group(1)) if am and expr != raw else _uq(raw.split(".")[-1]) if re.fullmatch(rf"(?:{NAME}\.)?{NAME}", raw) else None
+            own_t = own[x + p:x + p + len(t)]               # the item's own text: a total inside its (SELECT ...) is the subquery's
             items.append({"text": re.sub(r"\s+", " ", raw), "expr": re.sub(r"\s+", " ", expr), "name": name,
-                          "agg": bool(C.AGG.search(C._mask(expr))) and not re.search(r"\bover\s*\(", expr, re.I)})
+                          "agg": bool(C.AGG.search(C._mask(own_t))) and not re.search(r"\bover\s*\(", own_t, re.I)})
     return items, cl
 
 
@@ -197,6 +198,34 @@ def keys(sql: str) -> dict:
     return out
 
 
+def columns(sql: str) -> dict:
+    """{block name: set of its output column names} for CTEs and derived tables whose SELECT names every column (night 15):
+    what the query itself proves a block has, so 'x.units and x.returned_units: two columns, or one?' is never asked of a
+    block that plainly makes both. A block with * or an unnamed expression is left out (its columns aren't all known)."""
+    out = {}
+    try:
+        bl = blocks(sql)
+    except Exception:  # noqa: BLE001 - an odd query: nothing known
+        return {}
+    s = C._mask(sql)
+    ctes = {c["name"]: c["cols"] for c in _ctes(s)[0]}
+    for blk in bl:
+        if blk["kind"] not in ("cte", "derived"):
+            continue
+        if ctes.get(blk["name"]):
+            out[blk["name"]] = set(ctes[blk["name"]])
+            continue
+        first = blk["id"]
+        if blk.get("branches"):
+            first = blk["branches"][0]
+            blk = next(b for b in bl if b["id"] == first)
+        items, _cl = _select_items(sql, s, blk["start"], blk["end"])
+        names = [i["name"] for i in items]
+        if items and all(names) and not any(i["expr"].endswith("*") for i in items):
+            out[_uq(blk["name"] or "")] = set(names)
+    return out
+
+
 def _block_key(sql: str, s: str, blk: dict, known: dict | None = None):
     items, cl = _select_items(sql, s, blk["start"], blk["end"])
     if not items or "from" not in cl:
@@ -216,8 +245,9 @@ def _block_key(sql: str, s: str, blk: dict, known: dict | None = None):
         if re.search(r"\b(rollup|cube|grouping\s+sets)\b", g, re.I):
             return None
         gcols = []
+        g0 = blk["start"] + cl["group by"][0]
         for _p, t in C._split_top(g):
-            t = t.strip()
+            t = sql[g0 + _p:g0 + _p + len(t)].strip()        # the real text: a grouped expression's brackets aren't blanked
             if t.isdigit() and 0 < int(t) <= len(items):
                 nm = items[int(t) - 1]["name"]
             else:
@@ -395,6 +425,8 @@ def tree(sql: str, hi: bool = False) -> str:
                 show(d, depth + 1, seen | {bid})
     if "main" in by:
         show("main", 0, set())
+    for name in unused_ctes(sql):                            # night 15: said in the tree too, where a reader looks for it
+        L.append(f"- CTE {name}: " + ("koi ise nahi padhta (result tak nahi pahunchta)" if hi else "nothing reads it (it never reaches the result)"))
     return "\n".join(L)
 
 
@@ -428,7 +460,7 @@ def cte_order(sql: str):
         left.remove(ready[0])
     by = {c["name"]: c for c in ctes}
     defs = [sql[by[n]["head"]:by[n]["end"] + 1].strip() for n in order]
-    lead = re.match(r"\s*with\s+", sql, re.I).group(0)
+    lead = sql[:re.match(r"\s*with\s+", s, re.I).end()]        # a comment above the WITH stays where it was
     return late, lead + ",\n".join(defs) + "\n" + sql[main_at:].lstrip()
 
 
@@ -475,6 +507,17 @@ def with_block_findings(sql: str, out: dict) -> dict:
             base = fixed or sql
             if base.count(text) == 1:
                 fixed = base.replace(text, inner.strip().rstrip(";"))
+    for name in unused_ctes(sql):                            # night 15: a CTE nothing reads (often a join that was forgotten)
+        if ("cte_unused", f"CTE {name} is never read") in have:
+            continue
+        mine.append({"kind": "check", "topic": "cte_unused", "title_en": f"CTE {name} is never read",
+                     "title_hi": f"CTE {name} kahin padha nahi jaata", "evidence": f"WITH {name} AS (...)", "block": name,
+                     "fix_en": f"Nothing in the query reads {name}: neither the main query nor another CTE uses it, so its rows never "
+                               f"reach the result (MariaDB and PostgreSQL still check its table and column names, but don't run it). "
+                               f"If its numbers were meant to be in the report, join it where they belong; if not, delete it.",
+                     "fix_hi": f"Query mein {name} ko koi nahi padhta: na main query, na koi aur CTE, isliye uski rows result tak nahi "
+                               f"pahunchti (MariaDB aur PostgreSQL naam check karte hain, par chalate nahi). Uske numbers report mein "
+                               f"chahiye the to use sahi jagah join karo; nahi to hata do.", "needs": []})
     co = cte_order(sql)
     if co:
         late, fixed_order = co
@@ -499,3 +542,62 @@ def with_block_findings(sql: str, out: dict) -> dict:
     if fixed:
         out["corrected"] = fixed
     return out
+
+
+def locate(sql: str, findings: list) -> None:
+    """Night 15: a finding the whole-query check made (no block named) gets the block its evidence is written in, when that
+    text is in exactly one innermost block that isn't the main query: 'In CTE paid_orders' tells a reader of a 200-line query
+    where to look. The block goes in f['block'] and in front of the evidence; the title stays as it was."""
+    try:
+        bl = blocks(sql)
+    except Exception:  # noqa: BLE001 - an odd query: nothing located
+        return
+    if len(bl) < 2:
+        return
+    flat = lambda x: re.sub(r"\s+", " ", x or "").strip().lower()  # noqa: E731
+    for f in findings or []:
+        if not isinstance(f, dict) or f.get("block") or not f.get("kind"):
+            continue
+        ev = flat(re.sub(r"^\s*(and|or|where|on)\s+", "", f.get("evidence") or "", flags=re.I))
+        if len(ev) < 6:
+            continue
+        where = []
+        for b in bl:
+            if b.get("branches"):
+                continue
+            own = list(sql[b["start"]:b["end"]])
+            for k in bl:                                     # the blocks inside it are their own: blanked out
+                if k is not b and b["start"] <= k["start"] and k["end"] <= b["end"] and (k["start"], k["end"]) != (b["start"], b["end"]):
+                    own[k["start"] - b["start"]:k["end"] - b["start"]] = " " * (k["end"] - k["start"])
+            own = "".join(own)
+            if ev in flat(own):
+                where.append(b)
+        if len(where) == 1 and where[0]["kind"] in ("cte", "derived", "branch"):
+            f["block"] = where[0]["id"]
+            if not (f.get("evidence") or "").startswith("["):
+                f["evidence"] = f"[{_label(where[0])}] " + (f.get("evidence") or "")
+
+
+def unused_ctes(sql: str) -> list[str]:
+    """The CTEs nothing reads: not the main query, not a CTE the main query reaches (directly or through others). A CTE
+    that changes data (PostgreSQL's WITH d AS (DELETE ... RETURNING ...)) runs anyway and is left out."""
+    try:
+        bl = blocks(sql)
+    except Exception:  # noqa: BLE001
+        return []
+    s = C._mask(sql)
+    by = {b["id"]: b for b in bl}
+    ctes = [b for b in bl if b["kind"] == "cte"]
+    if not ctes or "main" not in by:
+        return []
+    seen, todo = set(), ["main"]
+    while todo:
+        bid = todo.pop()
+        if bid in seen or bid not in by:
+            continue
+        seen.add(bid)
+        b = by[bid]
+        todo += list(b.get("branches") or []) + list(b["depends"])
+        todo += [k["id"] for k in bl if k["parent"] == bid and k["kind"] != "cte"]
+    return [c["name"] for c in ctes if c["id"] not in seen and
+            not re.match(r"\s*(insert|update|delete|merge)\b", s[c["start"]:c["end"]], re.I)]

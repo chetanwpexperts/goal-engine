@@ -160,8 +160,14 @@ def ruled_out_text(result: dict, hi: bool) -> str:
     ruled = result.get("ruled_out") or (result.get("correct") or {}).get("dropped") or []
     if not ruled:
         return ""
-    head = "\nAapki table structure se ye risk yahan nahi hai: " if hi else "\nYour table structure rules these out here: "
-    return head + "; ".join(f"{d['title_hi' if hi else 'title_en']} ({d['why_hi' if hi else 'why_en']})" for d in ruled[:3])
+    out = ""
+    for by, (h_hi, h_en) in (("schema", ("Aapki table structure se ye risk yahan nahi hai: ", "Your table structure rules these out here: ")),
+                             ("plan", ("Aapke EXPLAIN plan mein ye speed risk nahi dikhta: ", "Your EXPLAIN plan rules these out: "))):
+        part = [d for d in ruled if (d.get("by") or "schema") == by]
+        if part:
+            out += "\n" + (h_hi if hi else h_en) + "; ".join(f"{d['title_hi' if hi else 'title_en']} ({d['why_hi' if hi else 'why_en']})"
+                                                         for d in part[:3])
+    return out
 
 
 def correctness_options(result: dict, hi: bool) -> list[str]:

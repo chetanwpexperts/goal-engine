@@ -360,7 +360,8 @@ def joins(sql: str, s: str, cl: dict, srcs: list, alias_of, items: list, intent:
     # ---- J7. DISTINCT used to remove the copies a join made
     sel = cl.get("select")
     if sel and re.match(r"\s*distinct\b", s[sel[0]:sel[1]], re.I) and "group by" not in cl and not any(i["agg"] for i in items):
-        cols = [re.fullmatch(r"(?:distinct\s+)?[`\"]?([A-Za-z_]\w*)[`\"]?\.[`\"]?(\w+|\*)[`\"]?", i["text"].strip(), re.I) for i in items]
+        cols = [re.fullmatch(r"(?:distinct\s+)?[`\"]?([A-Za-z_]\w*)[`\"]?\.[`\"]?(\w+|\*)[`\"]?"
+                             r"(?:\s+(?:as\s+)?[`\"]?[A-Za-z_]\w*[`\"]?)?", i["text"].strip(), re.I) for i in items]   # a renamed column too
         if cols and all(cols) and len({alias_of(c.group(1)) for c in cols}) == 1 and len(srcs) == 2:
             keep = alias_of(cols[0].group(1))
             first, other = srcs[0], srcs[1]

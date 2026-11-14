@@ -226,6 +226,8 @@ def _grain(srcs, alias_of, removed) -> str | None:
 
 # night 12: the keys the query's own blocks prove (a CTE grouped by customer_id has one row per customer_id), set by check()
 BLOCK_KEYS = contextvars.ContextVar("dbaba_block_keys", default=None)
+# night 15: the output columns each CTE / derived table plainly makes (sqlblocks.columns), set with BLOCK_KEYS
+BLOCK_COLS = contextvars.ContextVar("dbaba_block_cols", default=None)
 
 
 def _block_key(src, col: str):
@@ -238,6 +240,72 @@ def _block_key(src, col: str):
     if nm not in bk:
         return None
     return any(k <= {col.strip('`"').lower()} for k in bk[nm])
+
+
+def _where_to_having(sql: str, flat: str, wm, rest: str, stop) -> list | None:
+    """Night 15: SELECT ... WHERE <a total's condition> [AND <row conditions>] GROUP BY ...: the total's condition moves to
+    HAVING (where it is checked once per group, after the totals exist), the row conditions stay in WHERE. Proven the same on
+    MariaDB and PostgreSQL (tests/practice/test_night15.py): what the person wrote is refused by both, and HAVING is the one
+    place a condition on a total can mean anything. None when it isn't that plain (an OR between the parts, no GROUP BY, a
+    HAVING with an OR of its own)."""
+    if not stop or not re.match(r"group\s+by\b", rest[stop.start():], re.I):
+        return None
+    b0, b1 = wm.end(), wm.end() + stop.start()
+    body = flat[b0:b1]
+    d = _depths(body)
+    if any(d[m.start()] == 0 for m in re.finditer(r"\bor\b", body, re.I)):
+        return None
+    cuts = [0] + [m.end() for m in re.finditer(r"\band\b", body, re.I) if d[m.start()] == 0 and
+                  not re.search(r"\bbetween\s+\S+\s*$", body[:m.start()], re.I)] + [len(body)]
+    terms = []
+    for x, y in zip(cuts, cuts[1:]):
+        txt = re.sub(r"^\s*and\b|\band\s*$", "", sql[b0 + x:b0 + y], flags=re.I).strip()
+        if txt:
+            terms.append(txt)
+    moved = [x for x in terms if AGG.search(_mask(x))]
+    kept = [x for x in terms if x not in moved]
+    if not moved:
+        return None
+    g0 = b1
+    tail = flat[g0:]
+    end = re.search(r"\bhaving\b|\border\s+by\b|\blimit\b|\bunion\b|;|$", tail[8:], re.I)
+    at = g0 + 8 + end.start()
+    edits = []
+    if re.match(r"having\b", tail[8 + end.start():], re.I):
+        h0 = at + len("having")
+        hend = re.search(r"\border\s+by\b|\blimit\b|\bunion\b|;|$", flat[h0:], re.I)
+        h1 = h0 + hend.start()
+        if re.search(r"\bor\b", flat[h0:h1], re.I):
+            return None
+        h1 = h0 + len(sql[h0:h1].rstrip())
+        edits.append((h1, h1, " AND " + " AND ".join(moved)))
+    else:
+        at = g0 + 8 + len(sql[g0 + 8:at].rstrip())
+        edits.append((at, at, " HAVING " + " AND ".join(moved)))
+    w0 = wm.start()
+    edits.append((w0, b1, ("WHERE " + " AND ".join(kept) + " ") if kept else ""))
+    return edits
+
+
+def _fold_fanout(F: list) -> None:
+    """Three or more totals that the same child table repeats (SUM(f.amount), SUM(f.paid), SUM(f.units) ... each once per
+    order_items row) are one mistake with one cure (total the parent before the join): said once, naming the totals."""
+    groups = {}
+    for f in F:
+        if f.topic == "join_fanout":
+            m = re.search(r"counts each (.+) row once per (.+) row$", f.title_en)
+            if m:
+                groups.setdefault(m.groups(), []).append(f)
+    for (parent, child), fs in groups.items():
+        if len(fs) < 3:
+            continue
+        names = [re.match(r"(\S+\(.*?\))", f.title_en).group(1) for f in fs]
+        first = fs[0]
+        first.title_en = f"{', '.join(names[:2])} and {len(names) - 2} more count each {parent} row once per {child} row"
+        first.title_hi = f"{', '.join(names[:2])} aur {len(names) - 2} aur: har {parent} row ko har {child} row ke liye ginte hain"
+        first.evidence = "; ".join(names)
+        for f in fs[1:]:
+            F.remove(f)
 
 
 def _no_subqueries(text: str) -> str:
@@ -540,6 +608,9 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
                              f"in HAVING after GROUP BY; in UPDATE/DELETE, compare with a subquery, e.g. salary < (SELECT AVG(salary) FROM ...).",
                              f"WHERE ek-ek row dekhta hai, totals se pehle: MySQL error 1111, PostgreSQL 'aggregate functions are not allowed "
                              f"in WHERE'. Total pe condition GROUP BY ke baad HAVING mein; UPDATE/DELETE mein subquery se compare karo."))
+            hv = _where_to_having(sql, flat, wm, rest, stop) if is_select else None
+            if hv:
+                edits.extend(hv)
 
     # portability (app/agents/sqlport.py): another database's words the chosen one refuses (rewritten in its own words), and
     # spellings that run but mean something else there (date - date, INTERVAL '2' WEEK, CAST AS CHAR, ^)
@@ -945,11 +1016,14 @@ def check(sql: str, _again: bool = False, intent: str = "", engine: str | None =
     if BLOCK_KEYS.get() is None:                      # night 12: what the query's own blocks prove about their keys
         from app.agents import sqlblocks
 
-        tok = BLOCK_KEYS.set(sqlblocks.keys(sql) if re.search(r"\(\s*select\b|^\s*with\b", _mask(sql), re.I) else {})
+        nested = bool(re.search(r"\(\s*select\b|^\s*with\b", _mask(sql), re.I))
+        tok = BLOCK_KEYS.set(sqlblocks.keys(sql) if nested else {})
+        tok2 = BLOCK_COLS.set(sqlblocks.columns(sql) if nested else {})
         try:
             return check(sql, _again, intent, engine)
         finally:
             BLOCK_KEYS.reset(tok)
+            BLOCK_COLS.reset(tok2)
     if engine is not None:
         token = CHOSEN.set(engine)
         try:
@@ -1461,7 +1535,15 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
     for q, c, p in all_refs:
         cols_by.setdefault(alias_of(q), {}).setdefault(c.lower(), []).append((q, c, p))
     shown = {re.sub(r"\s+", "", i["text"]).lower() for i in items}
+    made = BLOCK_COLS.get() or {}
     for al, cols in cols_by.items():
+        src = next((x for x in srcs if (x.alias or x.name or "").strip('`"').lower() == al), None)
+        bname = (src.name or "").split(".")[-1].strip('`"').lower() if src is not None and src.name else al
+        if made and bname not in made:                     # the alias of a table inside a CTE: its FROM / JOIN names it
+            fm = re.search(rf"\b(?:from|join)\s+[`\"]?([A-Za-z_][\w$]*)[`\"]?\s+(?:as\s+)?{re.escape(al)}\b", s, re.I)
+            bname = fm.group(1).lower() if fm else bname
+        if bname in made and all(c in made[bname] for c in cols):
+            continue                                       # a block of this query plainly makes every one of these columns
         done = set()
         for c in sorted(cols):
             for d in sorted(cols):
@@ -1735,6 +1817,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                 edits.append((wend, wend, ")"))
             else:
                 edits.append((k.start, k.end, f"WHERE {ex} "))
+        _fold_fanout(F)                                      # night 15: one finding for many totals over the same join
         for i in aggs:
             m = re.search(r"\bcount\s*\(\s*(distinct\s+)?([A-Za-z_]\w*)\.(\w+)\s*\)", i["text"], re.I)
             if m and not m.group(1) and (alias_of(m.group(2)), m.group(3).lower()) in gref:

@@ -300,6 +300,7 @@ def port(sql: str, s: str, intent: str, F, is_select: bool) -> list:
         out += _top_rows(sql, s, fam, E.label(chosen), F)
         out += _intervals(sql, s, fam, E.label(chosen), F)
         out += _casts(sql, s, fam, E.label(chosen), F)
+        out += _engine_syntax(sql, s, chosen, E.label(chosen), F)
     out += _date_math(sql, s, fam, E.label(chosen) if fam else "", F)
     out += _power(sql, s, fam, F)
     merged: dict = {}                                     # YEAR(d) in SELECT and in GROUP BY: one finding, both rewritten
@@ -310,6 +311,92 @@ def port(sql: str, s: str, intent: str, F, is_select: bool) -> list:
         else:
             merged[key] = (f, list(edits))
     return list(merged.values())
+
+
+def _engine_syntax(sql: str, s: str, eid: str, name: str, F) -> list:
+    """Night 15: syntax one engine refuses though its family accepts it (the engine's own 'syntax_refused' facts; MariaDB has
+    LAG/LEAD with a default and WITH in front of UPDATE / DELETE / INSERT). The detection and the rewrite are general."""
+    try:
+        facts = dialect(eid).get("syntax_refused") or {}
+    except FileNotFoundError:
+        return []
+    out = []
+    if "lag_default" in facts:
+        r = facts["lag_default"]
+        for m in re.finditer(r"\b(lag|lead)\s*\(", s, re.I):
+            op = m.end() - 1
+            cl = _close(s, op)
+            if cl < 0:
+                continue
+            args = _args(sql[op + 1:cl])
+            if len(args) != 3:
+                continue
+            om = re.match(r"\s*over\s*(\(|[A-Za-z_]\w*)", s[cl + 1:], re.I)
+            if not om:
+                continue
+            end = (_close(s, cl + 1 + om.end() - 1) + 1) if om.group(1) == "(" else cl + 1 + om.end()
+            fn = m.group(1).upper()
+            over = sql[cl + 1:end].strip()
+            new = f"COALESCE({fn}({args[0].strip()}, {args[1].strip()}) {over}, {args[2].strip()})"
+            ev = re.sub(r"\s+", " ", sql[m.start():end])[:90]
+            out.append((F("error", "dialect", f"{name} has no default argument in {fn}()", f"{name} mein {fn}() ka default argument nahi",
+                          ev, f"{name} refuses it ({r['error']}). {r['says_en']} Write the default outside: {new}. It is the same except "
+                          f"when the earlier row exists and its value is itself NULL (COALESCE turns that into the default too).",
+                          f"{name} ise mana karta hai ({r['error']}). {r['says_hi']} Default bahar likho: {new}. Farak sirf tab jab "
+                          f"pichhli row hai par uski value khud NULL hai (COALESCE use bhi default bana deta hai)."),
+                        [(m.start(), end, new)]))
+    if "cte_before_change" in facts and re.match(r"\s*with\b", s, re.I):
+        from app.agents import sqlblocks
+
+        ctes, main_at = sqlblocks._ctes(s)
+        km = re.match(r"\s*(update|delete|insert|replace)\b", s[main_at:], re.I)
+        if ctes and km:
+            r = facts["cte_before_change"]
+            defs = sql[re.match(r"\s*with\s+", s, re.I).end():main_at].strip().rstrip(",").strip()
+            lead = sql[:re.match(r"\s*", s).end()]
+            body = sql[main_at:].strip()
+            bs = s[main_at:].strip()
+            names = [c["name"] for c in ctes]
+            new = None
+            verb = km.group(1).lower()
+            if verb in ("insert", "replace"):
+                sm = re.search(r"\bselect\b", bs, re.I)
+                if sm and C_depth(bs, sm.start()) == 0 and not re.search(r"\bvalues\b", bs[:sm.start()], re.I):
+                    new = lead + body[:sm.start()] + "WITH " + defs + "\n" + body[sm.start():]
+            else:
+                subs = []
+                for m in re.finditer(r"\(\s*select\b", bs, re.I):
+                    cl = _close(bs, m.start())
+                    inner = bs[m.start():cl]
+                    if any(re.search(rf"\b(from|join)\s+[`\"]?{re.escape(n)}[`\"]?(?![\w$])", inner, re.I) for n in names):
+                        if not any(a <= m.start() < b for a, b in subs):
+                            subs.append((m.start(), cl))
+                outside = list(bs)
+                for a, b in subs:
+                    outside[a:b] = " " * (b - a)
+                outside = "".join(outside)
+                if subs and not any(re.search(rf"\b(from|join|update|using)\s+[`\"]?{re.escape(n)}[`\"]?(?![\w$])", outside, re.I)
+                                    or re.search(rf",\s*[`\"]?{re.escape(n)}[`\"]?(?![\w$])", outside, re.I) for n in names):
+                    text = body
+                    for a, _b in sorted(subs, reverse=True):
+                        text = text[:a + 1] + "WITH " + defs + " " + text[a + 1:].lstrip()
+                    new = lead + text
+            ev = re.sub(r"\s+", " ", sql[:main_at].strip())[:60] + " " + km.group(1).upper() + " ..."
+            out.append((F("error", "dialect", f"{name} doesn't take WITH in front of {km.group(1).upper()}",
+                          f"{name} {km.group(1).upper()} ke aage WITH nahi leta", ev,
+                          f"{name} refuses it ({r['error']}). {r['says_en']}" + (" The rewrite does exactly that; the rows changed are the "
+                                                                                 "same." if new else " Here the CTE is used outside a "
+                                                                                 "subquery: write it as a derived table there."),
+                          f"{name} ise mana karta hai ({r['error']}). {r['says_hi']}" + (" Rewrite yahi karta hai; wahi rows badalti hain."
+                                                                                         if new else "")),
+                        [(0, len(sql), new)] if new else []))
+    return out
+
+
+def C_depth(s: str, i: int) -> int:
+    from app.agents.sqlcorrect import _depths
+
+    return _depths(s)[i] if i < len(s) else 0
 
 
 def _foreign_calls(sql: str, fam: str, name: str, F) -> list:

@@ -39,6 +39,8 @@ jobs:
         run: bash lab/up.sh
       - name: Smoke test
         run: python3 lab/smoke.py
+      - name: Lab cases (what each engine really does; read back by the nightly run)
+        run: python3 lab/cases.py
       - name: Remove the lab databases
         if: always()
         run: bash lab/down.sh

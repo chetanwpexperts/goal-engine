@@ -1,0 +1,10 @@
+{"setup": [
+  {"insert": "customers", "documents": [{"_id": 1, "city": "Pune"}, {"_id": 2, "city": "Delhi"}]},
+  {"insert": "orders", "documents": [{"_id": 1, "customer_id": 1, "amount": 25500}, {"_id": 2, "customer_id": 1, "amount": 500},
+                                       {"_id": 3, "customer_id": 2, "amount": 80000}, {"_id": 4, "customer_id": 9, "amount": 100}]}
+ ],
+ "run": [
+  {"aggregate": "orders", "pipeline": [{"$group": {"_id": "$customer_id", "total": {"$sum": "$amount"}}}, {"$sort": {"_id": 1}}], "cursor": {}},
+  {"aggregate": "orders", "pipeline": [{"$lookup": {"from": "customers", "localField": "customer_id", "foreignField": "_id", "as": "c"}},
+                                       {"$match": {"c": {"$size": 0}}}, {"$project": {"_id": 1}}], "cursor": {}}
+ ]}

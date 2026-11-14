@@ -110,6 +110,25 @@ label the rest, upgrade to verified when schema, EXPLAIN or data arrive.
   planted findings with the right confidence class, a proven rewrite; the same query with CREATE TABLE / EXPLAIN upgrades or
   drops inferred findings. (tests/fuzz/bigq.py: 19 families; a pasted EXPLAIN confirms a speed risk or rules it out.)
 
+## New databases (after night 15, in this order)
+
+SQL Server, Oracle and MongoDB run on the night lab on our own server (docs/lab-server.md): the nightly run writes lab cases in
+lab/cases/<engine>/, pushes its branch, and reads what each engine really did from the `lab` job's log (between
+LAB-RESULTS-BEGIN and LAB-RESULTS-END). SQLite runs right in the nightly sandbox (Python's sqlite3). Only what the lab shows
+becomes a rule; an engine stops being "notes only" (rule A) once its own lab-proven knowledge covers the basics.
+
+- [ ] **E1. SQLite (3-4 nights).** Its own dialect file; loose column types (type affinity), no RIGHT/FULL JOIN in older
+  versions, date functions (date(), strftime), ALTER TABLE limits, || for text, LIMIT/OFFSET; its error messages; every
+  query rule re-checked on it; concepts for SQLite questions.
+- [ ] **E2. SQL Server (6-8 nights).** TOP / OFFSET-FETCH, ISNULL vs COALESCE, GETDATE, [brackets], string + concatenation,
+  MERGE and OUTPUT, identity, its error numbers (Msg 207, 208, 515, 2627, 8152 ...), T-SQL procedures, the plan format,
+  NOLOCK and snapshot isolation; each lab-run on the server.
+- [ ] **E3. Oracle (6-8 nights).** ROWNUM vs FETCH FIRST, NVL / NVL2, DUAL, sequences and identity, '' IS NULL, MERGE,
+  PL/SQL blocks, ORA- error codes, DATE holding a time, the plan format; each lab-run on the server.
+- [ ] **E4. MongoDB (12-15 nights).** A new reader for queries and aggregation pipelines ($match, $group, $lookup, $unwind,
+  $project), its own fundamentals (documents, embed vs reference, array fan-out after $unwind, index use and explain, pipeline
+  order, the 16 MB document limit), its errors, and its own concepts; its own sub-agent per rule B.
+
 ## After night 15
 
 Real users' feed first, then the weakest area the generators or feed show, then in order: vacuum and bloat (PostgreSQL),

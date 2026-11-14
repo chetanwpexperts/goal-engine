@@ -326,6 +326,10 @@ def joins(sql: str, s: str, cl: dict, srcs: list, alias_of, items: list, intent:
         k = _key(x, refs_cols) if _key(x, refs_cols) != "id" else _key(twin, refs_cols)
         if same[0].group(2).lower() == k.lower():
             continue                                                  # joined on its own key: each row with itself, on purpose
+        from app.agents.sqlcorrect import _block_key
+
+        if _block_key(x, same[0].group(2)):
+            continue                                                  # night 13: a CTE's own GROUP BY makes it the key
         idcmp = re.search(rf"[`\"]?({re.escape(twin.alias)}|{re.escape(x.alias)})[`\"]?\.[`\"]?{k}[`\"]?\s*(<>|!=|<|>|<=|>=)\s*"
                           rf"[`\"]?({re.escape(twin.alias)}|{re.escape(x.alias)})[`\"]?\.[`\"]?{k}\b", both, re.I)
         col = same[0].group(2)

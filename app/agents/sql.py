@@ -353,11 +353,11 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
                              "(index_merge) aur PostgreSQL (BitmapOr) do index milaate hain. Ek ka bhi index na ho to poori table "
                              "padhi jaati hai, isliye dono pe index lagao (UNION ALL se tab fayda nahi)."}
     if re.search(r"\bnot\s+in\s*\(\s*select\b", low):
-        add(2, "NOT IN (SELECT ...) is slow and breaks on NULLs", "NOT IN (SELECT ...) slow hai aur NULL pe galat",
+        add(2, "NOT IN (SELECT ...) can be slow and breaks on NULLs", "NOT IN (SELECT ...) slow ho sakta hai aur NULL pe galat",
             "NOT IN subquery", "Use NOT EXISTS (or LEFT JOIN ... WHERE x IS NULL).", "NOT EXISTS (ya LEFT JOIN ... WHERE x IS NULL) use karo.")
     select_list = _clause(sql, "select", ("from",))
     if re.search(r"\(\s*select\b", select_list, re.I):
-        add(3, "Subquery inside SELECT runs once per row", "SELECT ke andar subquery har row ke liye chalti hai",
+        add(3, "Subquery inside SELECT can run once per row (a speed risk)", "SELECT ke andar subquery har row ke liye chal sakti hai (speed ka risk)",
             "correlated subquery in the column list", "Replace it with a JOIN plus GROUP BY.", "JOIN aur GROUP BY se badlo.")
     if "order by rand()" in low:
         add(3, "ORDER BY RAND() sorts the whole table", "ORDER BY RAND() poori table sort karta hai", "ORDER BY RAND()",
@@ -661,8 +661,12 @@ MEANING_CHECKS = {"count", "not_in", "date_range", "concat", "like", "and_or", "
                   # night 9: offered, not applied: running a change in batches, SKIP LOCKED for queue workers
                   "batch_change", "skip_locked",
                   # night 11: a parent total with one child table joined: pre-aggregate / EXISTS is offered, never applied
-                  "join_fanout"}
-SPEED_OFFERS = {"or_union", "keyset", "batch_change", "skip_locked"}               # the same rows, a faster form: offered as 'try this', shown on the card
+                  "join_fanout",
+                  # night 13: offered, not applied: the outer row named in a subquery, the subquery worked out once, UNION ALL /
+                  # UNION, a filter moved before the grouping, a CTE read twice left unmaterialized
+                  "scalar_uncorr", "corr_inner", "corr_key", "repeat_subquery", "same_subquery", "union_all", "union_all_dups",
+                  "having_key", "cte_filter_late"}
+SPEED_OFFERS = {"or_union", "keyset", "batch_change", "skip_locked", "repeat_subquery", "same_subquery", "having_key", "cte_filter_late"}               # the same rows, a faster form: offered as 'try this', shown on the card
 
 
 def _is_select(low: str) -> bool:

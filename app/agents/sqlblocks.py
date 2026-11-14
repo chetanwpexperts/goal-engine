@@ -458,7 +458,8 @@ def with_block_findings(sql: str, out: dict) -> dict:
         if not re.match(r"\s*(select|with)\b", C._mask(text), re.I):
             continue
         res = C.check(text, True)
-        new = [f for f in res.get("findings") or [] if (f["topic"], f["title_en"]) not in have and f["topic"] != "learned"]
+        new = [f for f in res.get("findings") or [] if (f["topic"], f["title_en"]) not in have and f["topic"] != "learned"
+               and f["topic"] != "star_join"]                # a block's * only feeds the query around it (star_dup says the rest)
         if not new:
             continue
         for f in new:

@@ -1390,7 +1390,7 @@ def _norm(q: str) -> str:
 
 
 SPEED_TOPICS = {"sargable", "or_union", "keyset", "keyset_offset", "leading_wildcard", "select_star", "index_prefix", "index_range_first",
-                "implicit_cast"}
+                "implicit_cast", "repeat_subquery", "same_subquery", "having_key", "cte_filter_late", "star_join"}
 
 
 def _sql_reply(ask, query, better, changed, res, hi) -> str:

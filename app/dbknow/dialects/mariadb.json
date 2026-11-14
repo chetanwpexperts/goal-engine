@@ -119,7 +119,13 @@
   "skip_locked": {"behaviour": "versioned", "says": "MySQL 8.0.1+ and MariaDB 10.6+ have SKIP LOCKED (lab: MariaDB 10.11 gave the second worker job 2 at once); NOWAIT on MariaDB fails at once with 1205 (MySQL 8: 3572).", "proven": ["mariadb"]},
   "lock_scan": {"behaviour": "locks_scanned", "says": "MySQL/MariaDB (InnoDB) lock every index record the search reads: with no index on the WHERE's column that is every row, so a second session changing another row waits (lab: 1205 after the lock wait timeout).", "proven": ["mariadb"]},
   "gap_locks": {"behaviour": "locks_gaps", "says": "Under REPEATABLE READ (the InnoDB default) a range change also locks the gaps: an INSERT into the range waits (lab: 1205).", "proven": ["mariadb"]},
-  "deadlock": {"behaviour": "error", "code": "1213", "says": "MySQL/MariaDB stop one of the two with 1213 (SQLSTATE 40001, Deadlock found when trying to get lock) and roll it back; SHOW ENGINE INNODB STATUS keeps the LATEST DETECTED DEADLOCK.", "proven": ["mariadb"]}
+  "deadlock": {"behaviour": "error", "code": "1213", "says": "MySQL/MariaDB stop one of the two with 1213 (SQLSTATE 40001, Deadlock found when trying to get lock) and roll it back; SHOW ENGINE INNODB STATUS keeps the LATEST DETECTED DEADLOCK.", "proven": ["mariadb"]},
+  "join_without_on": {"behaviour": "works", "says": "MySQL/MariaDB run JOIN or INNER JOIN without ON as a cross join (lab: 8 customers x 8 orders = 64 rows, no error).", "proven": ["mariadb"]},
+  "star_dup_derived": {"behaviour": "error", "code": "1060", "says": "MySQL/MariaDB refuse a derived table or CTE whose SELECT * over a join has the same column name twice (error 1060, Duplicate column name).", "proven": ["mariadb"]},
+  "union_collation": {"behaviour": "works", "says": "MySQL/MariaDB compare UNION rows with the column's collation: under the usual _ci collation 'aarav@mail.test' and 'AARAV@mail.test' are one row (lab: 9 e-mails vs PostgreSQL's 10).", "proven": ["mariadb"]},
+  "repeated_subquery": {"behaviour": "slow", "says": "MariaDB's EXPLAIN shows one DEPENDENT SUBQUERY per copy (its subquery cache may remember results for repeated outer values).", "proven": ["mariadb"]},
+  "same_subquery": {"behaviour": "slow", "says": "MariaDB's EXPLAIN shows one SUBQUERY per copy.", "proven": ["mariadb"]},
+  "cte_read_twice": {"behaviour": "works", "says": "MariaDB pushes a filter on a CTE's GROUP BY column into each copy it reads (EXPLAIN FORMAT=JSON: attached_condition inside both), and refuses AS NOT MATERIALIZED (1064).", "proven": ["mariadb"]}
  },
  "proven": [
   "mariadb"

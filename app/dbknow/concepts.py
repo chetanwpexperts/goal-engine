@@ -71,6 +71,14 @@ SHAPES = [                                     # (shape, pattern) in the order t
     ("when", r"^when (should|to|do|would) (i|we|you|one)\b|\bkab (kare|karein|karen|karna chahiye)\b|"
              r"\b(when (to|should i|do we|do i|would you) use|where (to|should i) use|why (use|do we use|should i use|would i use|is .* used)|"
              r"what is .* used for|use of|uses of|kab use|kab (karte|karna|lagate|lagana)|kyun use|kyu use|kis liye)\b|कब (इस्तेमाल|उपयोग)|क्यों (इस्तेमाल|उपयोग)"),
+    # night 13: 'when can I use X instead of Y', 'X kab safe hai', 'where does ORDER BY go', 'which alias goes in ...', 'is it ok
+    # to ...', 'is X case sensitive or not': general question shapes (never a pasted query or someone's own problem: _is_work)
+    ("when", r"^when (can|could|is|are|does|do|should) \w+|\bkab (safe|sahi|chalega|chalta|theek|thik)\b|कब (सुरक्षित|सही|ठीक)"),
+    ("howto", r"^where (does|do|should|can|to) \w+|\bkahan (lagaye|lagayein|likhe|likhein|lagana|likhna|lagate|likhte|aata|jaata)\b|"
+              r"कहाँ (लगाएँ|लिखें)"),
+    ("define", r"^which (alias|aliases|columns?|tables?|condition|keyword|clause) (goes|go|should|to|do|is|are)\b|\b(kaun sa|kaunsa|konsa) (alias|column)\b"),
+    ("when", r"^(is it|does it) (ok|okay|fine|bad|good|safe|wrong|better|help|matter|right)\b|\b(likhna|lagana|karna) (sahi|theek|thik) hai\b|"
+             r"ठीक है क्या|चाहिए क्या"),
 ]
 # a general yes/no question ('is mysql case sensitive', 'does a foreign key create an index'): answered when its words name a
 # known concept; never when it is about their own work ('should I add an index' after a query is a follow-up), and never a

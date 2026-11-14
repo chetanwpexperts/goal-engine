@@ -47,7 +47,7 @@ HOWTOS: list[HowTo] = [
            "Check whether you appear in the top 3 and on the map. If not, your listing is weak.",
            "Look at the top 3: how many reviews and photos they have. That's the level to reach.")),
     HowTo("reviews", "Reviews kaise badhaye",
-          r"review",
+          r"^(?!.*\b(sql|query|queries|code|schema|database)\b).*review",     # 'how to review a sql query' is not about customer reviews
           ("Google listing kholo aur \"Ask for reviews\" / \"Share review form\" se apna review link copy karo.",
            "Har khush customer ko bill ke baad WhatsApp pe ye link bhejo: \"Aapko service kaisi lagi? 1 minute ka review de dijiye.\"",
            "Counter pe QR code laga do jo isi link pe le jaaye.",

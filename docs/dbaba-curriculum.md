@@ -101,7 +101,7 @@ label the rest, upgrade to verified when schema, EXPLAIN or data arrive.
   checking".
 - [x] **12. Grain at every stage.** Blocks and their dependency tree; input/output grain per block; re-check totals after a
   grain-changing join; tree and grain shown for 30+ line queries.
-- [ ] **13. Remaining structural checks.** Cartesian joins, ON that doesn't connect its tables, broken or repeated correlated
+- [x] **13. Remaining structural checks.** Cartesian joins, ON that doesn't connect its tables, broken or repeated correlated
   subqueries, DISTINCT hiding duplicates, UNION vs UNION ALL, late filters, big OFFSET, functions on filtered columns,
   leading wildcards, SELECT * across joins; speed findings are risks, not guarantees.
 - [ ] **14. Safe rewrites with proof.** Pre-aggregate repeated correlated subqueries, IN <-> EXISTS, compute once, UNION ->
@@ -433,3 +433,27 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   aren't Java, and a port generator could pick from an empty list. Lab lessons worth keeping: MariaDB refuses a derived table
   without an alias (1064) while PostgreSQL 16 accepts it; AS MATERIALIZED is PostgreSQL only (1064 on MariaDB); a WITH inside a
   CTE works on both.
+- **Night 13 (13 Nov 2026).** The remaining structural checks, in `app/agents/sqlstruct.py` (fundamentals `correlation`,
+  `filter_level`, `names_scope`, and two new ones: `set_operations`, `repeated_work`; what each engine does in the dialect files'
+  query_rules: join_without_on, star_dup_derived, union_collation, repeated_subquery, same_subquery, cte_read_twice). New
+  findings: a total in SELECT that never names the outer row (every row gets the grand total; the link offered, its column a
+  guess from the names), a correlation that compares the inner table with itself (o.customer_id = o.id) or a link column with the
+  wrong outer table (p.order_id = c.id while orders o is outside), the same correlated subquery written again (worked out once:
+  ORDER BY by its name, a derived table to filter on it) and the same uncorrelated one (a one-row CROSS JOIN), UNION whose parts
+  can't share a row because a constant column differs (UNION ALL offered, with the condition that each part has no repeats of
+  its own: needs the table structure), UNION ALL when the person asked for each row once (UNION offered), a HAVING condition on
+  a GROUP BY column (was wrongly called 'wrong'; now a speed risk with WHERE offered, the same rows), a CTE read twice and
+  filtered outside (PostgreSQL: AS NOT MATERIALIZED applied), and SELECT * across a join (a repeated column name proven from the
+  query is an error on MariaDB inside a derived table / CTE, a risk on PostgreSQL; at the top level a speed risk). JOIN without ON
+  is now an error on PostgreSQL and 'wrong' on MariaDB (it runs as a cross join), and both it and an ON that doesn't mention its
+  table get the link the names suggest, marked as a guess. Speed findings say "can" and carry the needs-execution class. Fixed on
+  the way: a self join on a CTE's own GROUP BY key was called 'pairs with itself'; the inferred schema gave a UNION part's bare
+  columns to the first part's table; "how to review a sql query" reached the customer-reviews how-to. New question shapes: "when
+  can I ...", "where does ... go", "which alias/table ...", "is it ok to ...", "... chahiye kya". 16 concepts, 42-problem practice
+  bank, 10 stmtbugs families. Lab lessons worth keeping: MariaDB runs JOIN without ON as a cross join (64 rows) while PostgreSQL
+  refuses it (42601); UNION compares with the collation, so 'aarav@' and 'AARAV@' are one row on MariaDB and two on PostgreSQL;
+  UNION also removes repeats inside one part (7 rows vs 11); SELECT * over a join inside a derived table or CTE is 1060 on MariaDB
+  and runs on PostgreSQL until the name is used (42702); PostgreSQL shares a SubPlan between a SELECT item and an identical ORDER
+  BY expression but not a WHERE copy, MariaDB shows a DEPENDENT SUBQUERY per copy; both push an outer filter into a grouped
+  derived table, MariaDB into both uses of a CTE too, PostgreSQL not into a CTE read twice unless NOT MATERIALIZED (1064 on
+  MariaDB); a SELECT alias in HAVING without GROUP BY runs on MariaDB, 42703 on PostgreSQL.

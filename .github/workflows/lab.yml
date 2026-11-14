@@ -21,9 +21,15 @@ jobs:
     runs-on: [self-hosted, dbaba-lab]
     timeout-minutes: 120             # a stuck run can't keep the databases up into the day
     steps:
-      - uses: actions/checkout@v4
+      - name: Get the code (plain git, no outside actions run on the server)
+        run: |
+          rm -rf ./* ./.[!.]* 2>/dev/null || true
+          git init -q . && git fetch -q --depth 1 "https://github.com/${GITHUB_REPOSITORY}.git" "${GITHUB_SHA}" && git checkout -q FETCH_HEAD
       - name: A fresh password for this run only
-        run: echo "LAB_PW=Lab_$(openssl rand -hex 12)A1!" >> "$GITHUB_ENV"
+        run: |
+          PW="Lab_$(openssl rand -hex 12)A1!"
+          echo "::add-mask::$PW"
+          echo "LAB_PW=$PW" >> "$GITHUB_ENV"
       - name: Drivers
         run: |
           python3 -m venv .labenv

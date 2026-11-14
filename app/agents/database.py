@@ -635,6 +635,9 @@ def _concept_turn(db: Session, goal: Goal, text: str, hi: bool, m: dict):
     c = m["concept"]
     slots = loads(goal.slots, {}) or {}
     slots["_card"] = concepts.card(m, text)           # the worked examples, for the side panel of the page
+    if slots["_card"]:                                 # ... and the earlier answers' examples, so each answer keeps its own
+        keep = [x for x in slots.get("_cards") or [] if x.get("title") != slots["_card"]["title"]]
+        slots["_cards"] = (keep + [slots["_card"]])[-12:]
     goal.slots = dumps(slots)
     if c is None:                         # a database concept we don't know yet: said honestly, and kept to learn
         try:

@@ -60,3 +60,15 @@ def test_a_concept_answer_carries_its_examples_for_the_side_panel(client, ml_mod
     assert card["examples"][0]["preview"]["sql"] and [d["engine"] for d in card["engines"]] == ["MySQL"]   # the named database only
     r = say(client, "kaun kaun se window functions hote hain")
     assert r["goal"]["card"]["lang"] == "hinglish" and r["goal"]["card"]["id"] == "window_function_types"
+
+
+def test_earlier_answers_keep_their_examples(client, ml_mode):
+    """Asked from the live site: after a second question the first answer's examples were gone. The goal keeps each concept
+    answer's parts (the latest 12, one per title), so every answer in the chat can show its own examples again."""
+    fresh(client)
+    say(client, "how many types of join in mysql?")
+    r = say(client, "what is a left join", )
+    titles = [c["title"] for c in r["goal"]["cards"]]
+    assert titles == ["The types of JOIN", "LEFT JOIN"] and r["goal"]["card"]["title"] == "LEFT JOIN"
+    r = say(client, "how many types of join in mysql?")
+    assert [c["title"] for c in r["goal"]["cards"]] == ["LEFT JOIN", "The types of JOIN"]     # asked again: once, as the latest

@@ -1899,9 +1899,62 @@
   // side by side only where there is room for two columns; on a phone the whole answer stays in the chat
   const sideBySide = () => window.matchMedia("(min-width: 900px)").matches;
 
-  function renderConcept(c) {
+  // every concept answer keeps its own examples: the panel shows the answer that is being read (the latest one, the one
+  // scrolled to, or the one whose "Example" button was tapped)
+  const knownCards = new Map();
+  function rememberCards(goal) {
+    for (const c of (goal && goal.cards) || []) knownCards.set(c.title, c);
+    if (goal && goal.card) knownCards.set(goal.card.title, goal.card);
+  }
+  function cardFor(text) {
+    const first = String(text || "").split("\n", 1)[0];
+    const c = knownCards.get(first);
+    return c && String(text).startsWith(c.title + "\n") ? c : null;
+  }
+  let shownCard = null;
+  let quietUntil = 0;                               // a new answer is being scrolled into view: don't switch while it moves
+  // as the chat scrolls, the panel follows: it shows the examples of the question being read (the last question whose
+  // top has passed 45% of the screen; its answer's examples)
+  function followScroll() {
+    if (Date.now() < quietUntil || !sideBySide()) return;
+    const answers = [...thread.querySelectorAll(".concept-answer")];
+    if (!answers.length) return;
+    const line = window.innerHeight * 0.45;
+    let pick = answers[0];
+    for (const a of answers) {
+      let q = a.previousElementSibling;
+      while (q && !q.classList.contains("turn-user")) q = q.previousElementSibling;
+      if ((q || a).getBoundingClientRect().top <= line) pick = a;
+    }
+    if (pick._card !== shownCard) renderConcept(pick._card, pick);
+  }
+  let scrollTick = 0;
+  window.addEventListener("scroll", () => {
+    if (scrollTick) return;
+    scrollTick = requestAnimationFrame(() => { scrollTick = 0; followScroll(); });
+  }, { passive: true });
+  // a concept answer in the chat: the explanation, with a button that brings its examples to the panel
+  function addConceptAnswer(text, trace) {
+    const c = sideBySide() ? cardFor(text) : null;
+    if (!c) return addMachine(text, trace);
+    const box = addMachine(conceptTheory(c), trace);
+    box.classList.add("concept-answer");
+    box._card = c;
+    const hi = c.lang !== "en";
+    const b = el("button", "linkish concept-show", T(hi, `${c.labels.example} aur result dekho →`, `${c.labels.example} and result →`));
+    b.type = "button";
+    b.addEventListener("click", () => { quietUntil = Date.now() + 800; renderConcept(c, box); });
+    box.append(b);
+    return box;
+  }
+
+  function renderConcept(c, answerBox) {
     const box = $("#agents");
     if (!c || !c.examples) return;
+    for (const old of box.querySelectorAll(".concept-card")) old.remove();
+    shownCard = c;
+    for (const a of thread.querySelectorAll(".concept-answer.showing")) a.classList.remove("showing");
+    if (answerBox) answerBox.classList.add("showing");
     const hi = c.lang !== "en";
     const w = W(hi ? "hi" : "en");
     const card = el("div", "agent concept-card");
@@ -1935,10 +1988,6 @@
     if (side) side.scrollTop = 0;                   // a new answer's examples start at their top
   }
 
-  // a stored concept answer: show the explanation only when its examples are on the panel beside it
-  function machineText(text, card) {
-    return card && card.title && String(text || "").startsWith(card.title + "\n") ? conceptTheory(card) : text;
-  }
 
   async function refreshGoal() {
     if (!currentGoalId) return;
@@ -2033,16 +2082,22 @@
     try {
       const data = await api("/api/message", { method: "POST", body: JSON.stringify({ text, goal_id: currentGoalId }) });
       wait.remove();
-      const card = data.relation === "concept" && data.goal && sideBySide() ? data.goal.card : null;
+      const concept = data.relation === "concept" && data.goal && !(data.agents || []).length;
       if (data.goal) {
         currentGoalId = data.goal.id;
         lastLang = data.goal.detected_language === "English" ? "en" : "hi";
+        rememberCards(data.goal);
         renderUnderstood(data.goal);
         renderAgents(data.agents || []);
-        if (card && !(data.agents || []).length) renderConcept(card);
       }
-      const box = addMachine(card && !(data.agents || []).length ? machineText(data.reply, card) : data.reply, traceFor(data));
-      if (card) requestAnimationFrame(() => { const side = $("#machine"); if (side) side.scrollTop = 0; });
+      const box = concept ? addConceptAnswer(data.reply, traceFor(data)) : addMachine(data.reply, traceFor(data));
+      if (box._card) {
+        quietUntil = Date.now() + 1500;             // the new answer scrolls into view: it stays the one shown
+        renderConcept(box._card, box);
+        requestAnimationFrame(() => { const side = $("#machine"); if (side) side.scrollTop = 0; });
+      } else if ((data.agents || []).length || !concept) {
+        shownCard = null;
+      }
       if (data.offer_expert && data.goal) box.append(expertOffer(data.goal, text, data.goal.detected_language !== "English"));
       if (data.next && data.next.length) box.append(nextChips(data.next, lastLang !== "en"));
       showOptions(data.options || []);
@@ -2671,14 +2726,16 @@
     currentGoalId = id;
     setActive();
     thread.replaceChildren();
-    const card = !(data.agents || []).length && sideBySide() ? data.goal.card : null;
+    const plain = (data.agents || []).length > 0;
+    rememberCards(data.goal);
+    let last = null;
     for (const m of data.messages) {
       if (m.role === "user") thread.append(el("p", "turn-user", m.text));
-      else addMachine(machineText(m.text, card));
+      else { const b = plain ? addMachine(m.text) : addConceptAnswer(m.text); if (b._card) last = b; }
     }
     renderUnderstood(data.goal);
     renderAgents(data.agents || []);
-    if (card) renderConcept(card);
+    if (last) renderConcept(last._card, last);
   }
 
   $("#open-goals").addEventListener("click", async () => {
@@ -2727,10 +2784,12 @@
       if (!state.messages.length) setIdle();          // remembered a chat that isn't there any more (new chat, logout, deleted)
       if (state.messages.length) {
         setActive();
-        const card = state.current && !(state.agents || []).length && sideBySide() ? state.current.card : null;
+        const plain = (state.agents || []).length > 0;
+        rememberCards(state.current);
+        let last = null;
         for (const m of state.messages) {
           if (m.role === "user") thread.append(el("p", "turn-user", m.text));
-          else addMachine(machineText(m.text, card));
+          else { const b = plain ? addMachine(m.text) : addConceptAnswer(m.text); if (b._card) last = b; }
         }
         if (state.current) {
           currentGoalId = state.current.id;
@@ -2738,7 +2797,7 @@
           renderUnderstood(state.current);
         }
         renderAgents(state.agents || []);
-        if (card) renderConcept(card);
+        if (last) renderConcept(last._card, last);
         typeExamples();
       }
     } catch (_) { /* offline first load: the page still works */ }

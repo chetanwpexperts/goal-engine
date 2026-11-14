@@ -15,7 +15,7 @@ Between runs the lab uses no memory or CPU; only the downloaded images stay on d
 ## Fences
 - A separate user, `dbaba-lab`, runs the runner. It is not root and never gets the site's or the database's passwords.
 - Every lab port is bound to 127.0.0.1: nothing is reachable from outside the server.
-- Memory caps: SQL Server 2 GB, Oracle 2 GB, MongoDB 1 GB (5 GB at most, only during the run). CPU caps too.
+- Caps: SQL Server 2 GB / 1 CPU, Oracle 2 GB / 1 CPU, MongoDB 1 GB / 0.5 CPU: at most 5 GB and 2.5 of the 4 CPUs, only during the run.
 - Only made-up test data goes in. A new random password is made for every run.
 - The workflow never runs for pull requests, so a pull request from someone else's fork can't run code on the server.
 - Note: being in the `docker` group gives a user power close to root on that machine. That is why the user is separate and

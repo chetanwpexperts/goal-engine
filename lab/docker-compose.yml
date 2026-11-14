@@ -1,7 +1,8 @@
 # The lab databases DBaba is tested against at night, beside MariaDB and PostgreSQL (docs/lab-server.md).
 # Only made-up test data ever goes in. Every port is bound to 127.0.0.1, so nothing is reachable from outside the server,
 # and each database has a hard memory and CPU cap so the live site always keeps enough. up.sh starts them, down.sh removes
-# them (volumes included) after every run: between runs they use no memory at all.
+# them (volumes included) after every run: between runs they use no memory at all. Sized for a 4-CPU, 15 GB server that also
+# runs the live site: at most 5 GB and 2.5 CPUs together, so at least 1.5 CPUs and about 4 GB stay free for the site.
 name: dbaba-lab
 services:
   sqlserver:
@@ -13,7 +14,7 @@ services:
       MSSQL_MEMORY_LIMIT_MB: "1536"
     ports: ["127.0.0.1:14330:1433"]
     mem_limit: 2g
-    cpus: 1.5
+    cpus: 1
     networks: [lab]
   oracle:
     # Oracle Database Free, packaged by a long-standing community maintainer (the official image needs an Oracle login)
@@ -24,14 +25,14 @@ services:
       APP_USER_PASSWORD: ${LAB_PW:?set LAB_PW}
     ports: ["127.0.0.1:15210:1521"]
     mem_limit: 2g
-    cpus: 1.5
+    cpus: 1
     networks: [lab]
   mongo:
     image: mongo:7.0
     command: ["--wiredTigerCacheSizeGB", "0.25"]
     ports: ["127.0.0.1:27170:27017"]
     mem_limit: 1g
-    cpus: 1
+    cpus: 0.5
     networks: [lab]
 networks:
   lab: {}

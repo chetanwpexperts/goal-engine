@@ -1071,6 +1071,192 @@
    "engines": [
     "postgresql"
    ]
+  },
+  "aggregate_misuse": {
+   "layer": "parser",
+   "family": "any",
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.6
+   },
+   "prior": 0.1,
+   "shown_by": "aggregate_misuse",
+   "title_en": "A total (SUM, COUNT, AVG ...) is used where rows are still being picked",
+   "title_hi": "Total (SUM, COUNT, AVG ...) us jagah use hua jahan abhi rows chuni ja rahi hain",
+   "why_en": "WHERE looks at one row at a time, before any group or total exists, so a total can't be tested there. Conditions on totals belong in HAVING, after GROUP BY; in UPDATE/DELETE compare with a subquery that works the total out first.",
+   "why_hi": "WHERE ek-ek row dekhta hai, group ya total banne se pehle, isliye wahan total check nahi ho sakta. Total wali condition GROUP BY ke baad HAVING mein jaati hai; UPDATE/DELETE mein pehle subquery se total nikaal kar compare karo.",
+   "confirm_en": "The query runs with the total's condition in HAVING (or against a subquery).",
+   "confirm_hi": "Total wali condition HAVING (ya subquery) mein rakhne se query chalegi.",
+   "prevent_en": "Remember the order a query is worked out in: FROM, WHERE (rows), GROUP BY, HAVING (groups), SELECT, ORDER BY.",
+   "prevent_hi": "Query ka kram yaad rakho: FROM, WHERE (rows), GROUP BY, HAVING (groups), SELECT, ORDER BY.",
+   "needs": [],
+   "short_en": "A total used in WHERE",
+   "short_hi": "WHERE mein total"
+  },
+  "value_count_mismatch": {
+   "layer": "parser",
+   "family": "any",
+   "explains": {
+    "save_fails": 1.0,
+    "query_error": 0.6
+   },
+   "prior": 0.15,
+   "shown_by": "value_count_mismatch",
+   "title_en": "The INSERT gives a different number of values than columns",
+   "title_hi": "INSERT mein columns aur values ki ginti alag hai",
+   "why_en": "An INSERT pairs values with columns by position: one value for each named column, or, with no column list, one for every column of the table in its order. A missing or extra value (often a new column added to the table, or a comma inside an unquoted value) breaks the pairing, so the database refuses the row.",
+   "why_hi": "INSERT values ko columns se position ke hisaab se jodta hai: har naam wale column ke liye ek value, ya column list na ho to table ke har column ke liye ek. Ek value kam ya zyada (aksar table mein naya column jud gaya, ya bina quote ki value mein comma) ho to row mana ho jaati hai.",
+   "confirm_en": "Count the columns and the values: with the same count (and a column list) the INSERT goes in.",
+   "confirm_hi": "Columns aur values gino: barabar hon (aur column list ho) to INSERT chalega.",
+   "prevent_en": "Always name the columns in an INSERT (INSERT INTO t (a, b) VALUES (?, ?)), so adding a column to the table later doesn't break it.",
+   "prevent_hi": "INSERT mein hamesha columns ke naam likho (INSERT INTO t (a, b) VALUES (?, ?)), taaki baad mein naya column judne se ye na toote.",
+   "needs": [],
+   "short_en": "Columns and values don't match in number",
+   "short_hi": "Columns aur values ki ginti alag"
+  },
+  "table_exists": {
+   "layer": "schema",
+   "family": "any",
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.8
+   },
+   "prior": 0.1,
+   "shown_by": "table_exists",
+   "title_en": "A table named {table} already exists",
+   "title_hi": "{table} naam ki table pehle se hai",
+   "why_en": "CREATE TABLE refuses a name that is already taken in the same database (or schema). It usually means a setup script or migration ran a second time, or two scripts create the same table.",
+   "why_hi": "CREATE TABLE pehle se liya hua naam mana karta hai. Aksar setup script ya migration dobara chal gayi, ya do scripts ek hi table bana rahi hain.",
+   "confirm_en": "List the tables: the name is there already; with IF NOT EXISTS (or a migration that runs once) the script goes through.",
+   "confirm_hi": "Tables ki list dekho: naam pehle se hai; IF NOT EXISTS (ya ek baar chalne wali migration) se script chalegi.",
+   "prevent_en": "Write setup scripts so they can run twice (CREATE TABLE IF NOT EXISTS) and keep one migration per change that runs once.",
+   "prevent_hi": "Setup scripts aise likho ki do baar chal sakein (CREATE TABLE IF NOT EXISTS), aur har badlaav ki ek migration jo ek hi baar chale.",
+   "needs": [],
+   "short_en": "A table with that name already exists",
+   "short_hi": "Us naam ki table pehle se hai"
+  },
+  "db_file_locked": {
+   "layer": "transactions",
+   "family": "any",
+   "engines": [
+    "sqlite"
+   ],
+   "explains": {
+    "lock_problem": 1.0,
+    "save_fails": 0.8,
+    "random_fail": 0.6,
+    "slow": 0.3
+   },
+   "prior": 0.2,
+   "shown_by": "db_file_locked",
+   "title_en": "The database file is locked by another connection that is writing",
+   "title_hi": "Database file ko doosra connection likhte waqt lock kiye hue hai",
+   "why_en": "SQLite lets only one connection write to the file at a time. While another connection (another process, thread, or a transaction your own code left open) holds the write lock, a second writer gets 'database is locked' at once unless a busy timeout makes it wait. WAL mode lets readers keep reading meanwhile, but still allows only one writer.",
+   "why_hi": "SQLite ek waqt mein sirf ek connection ko file mein likhne deta hai. Jab doosra connection (doosra process, thread, ya aapke code ki khuli chhodi transaction) write lock pakde hai, to doosra writer turant 'database is locked' paata hai, jab tak busy timeout use intezaar na karaye.",
+   "confirm_en": "With a busy timeout and short transactions (or WAL mode), the same work finishes without 'database is locked'.",
+   "confirm_hi": "Busy timeout aur chhoti transactions (ya WAL mode) ke saath wahi kaam bina 'database is locked' ke poora hota hai.",
+   "prevent_en": "Set a busy timeout on every connection, use WAL mode for apps with readers and a writer, keep write transactions short and always commit or roll back (also on errors), and start read-then-write transactions with BEGIN IMMEDIATE. Many writers at once need a client-server database.",
+   "prevent_hi": "Har connection pe busy timeout, readers aur writer wale apps ke liye WAL mode, write transactions chhoti aur hamesha commit ya rollback (error pe bhi), aur padh-kar-likhne wali transaction BEGIN IMMEDIATE se shuru karo. Ek saath bahut writers ke liye client-server database chahiye.",
+   "needs": [],
+   "short_en": "Another connection holds the database file's write lock",
+   "short_hi": "Doosra connection database file ka write lock pakde hai"
+  },
+  "file_readonly": {
+   "layer": "gateway",
+   "family": "any",
+   "engines": [
+    "sqlite"
+   ],
+   "explains": {
+    "save_fails": 1.0,
+    "query_error": 0.4
+   },
+   "prior": 0.1,
+   "shown_by": "file_readonly",
+   "title_en": "The database file can't be written",
+   "title_hi": "Database file mein likha nahi ja sakta",
+   "why_en": "SQLite writes to the database file and creates a journal (-journal or -wal) next to it, so the app's user needs write permission on the file AND on its folder. A file copied in by another user (root, a deploy step), a read-only mount, or a connection opened read-only all end in this error.",
+   "why_hi": "SQLite database file mein likhta hai aur uske paas journal (-journal ya -wal) banata hai, isliye app ke user ko file AUR uske folder dono pe likhne ki permission chahiye. Doosre user (root, deploy step) ki copy ki hui file, read-only mount, ya read-only khula connection, sab yahi error dete hain.",
+   "confirm_en": "After the app's user owns (or can write) both the file and its folder, the write goes through.",
+   "confirm_hi": "App ke user ko file aur folder dono pe likhne ki permission milte hi write chalega.",
+   "prevent_en": "Keep the database in a folder the app's user owns, and don't copy it in as another user.",
+   "prevent_hi": "Database aise folder mein rakho jo app ke user ka ho, aur use doosre user se copy mat karo.",
+   "needs": [],
+   "short_en": "The database file (or its folder) isn't writable",
+   "short_hi": "Database file (ya folder) likhne layak nahi"
+  },
+  "cannot_open_file": {
+   "layer": "gateway",
+   "family": "any",
+   "engines": [
+    "sqlite"
+   ],
+   "explains": {
+    "cant_connect": 1.0,
+    "wont_run": 0.6
+   },
+   "prior": 0.15,
+   "shown_by": "cannot_open_file",
+   "title_en": "The database file can't be opened at that path",
+   "title_hi": "Us path pe database file khul nahi rahi",
+   "why_en": "SQLite opens (or creates) a file at the path it is given. A folder in the path that doesn't exist, a relative path read from a different working directory, or no permission on the folder makes the open fail. (A wrong path to a folder that DOES exist silently creates a new, empty database instead, and the next query says 'no such table'.)",
+   "why_hi": "SQLite diye gaye path pe file kholta (ya banata) hai. Path ka koi folder na ho, relative path kisi aur folder se padha jaye, ya folder pe permission na ho to file nahi khulti. (Galat path par folder maujood ho to chupchaap nayi khaali database ban jaati hai, aur agli query 'no such table' kehti hai.)",
+   "confirm_en": "With an absolute path to an existing folder the app can write, the database opens.",
+   "confirm_hi": "Maujood folder ka absolute path (jismein app likh sake) dene se database khulegi.",
+   "prevent_en": "Build the path from the app's own folder (not the current directory), create the folder at setup, and check the file exists before opening it when it must already exist.",
+   "prevent_hi": "Path app ke apne folder se banao (current directory se nahi), setup pe folder banao, aur jo file pehle se honi chahiye uska hona kholne se pehle check karo.",
+   "needs": [],
+   "short_en": "The database file's path can't be opened",
+   "short_hi": "Database file ka path khul nahi raha"
+  },
+  "file_corrupt": {
+   "layer": "resources",
+   "family": "any",
+   "engines": [
+    "sqlite"
+   ],
+   "explains": {
+    "crash": 1.0,
+    "query_error": 0.6,
+    "wont_run": 0.6
+   },
+   "prior": 0.05,
+   "shown_by": "file_corrupt",
+   "title_en": "The file isn't a healthy SQLite database",
+   "title_hi": "File sahi SQLite database nahi hai",
+   "why_en": "'database disk image is malformed' means pages inside the file are damaged (a copy taken while the app was writing, a crash on a disk that ignores flushes, deleting the -wal file, or another program writing into it). 'file is not a database' means the path points at some other file, or at an encrypted database opened without its key.",
+   "why_hi": "'database disk image is malformed' ka matlab file ke andar ke pages kharab hain (app likh rahi thi tab copy li, crash, -wal file delete ki, ya kisi aur program ne likha). 'file is not a database' ka matlab path kisi aur file ka hai, ya encrypted database bina key ke khola.",
+   "confirm_en": "PRAGMA integrity_check returns ok on the recovered (or correct) file.",
+   "confirm_hi": "Theek ki hui (ya sahi) file pe PRAGMA integrity_check 'ok' deta hai.",
+   "prevent_en": "Back up with the backup API or VACUUM INTO (never by copying a live file), keep the -wal and -shm files with the database, and let only SQLite write the file.",
+   "prevent_hi": "Backup API ya VACUUM INTO se backup lo (chalti file copy karke kabhi nahi), -wal aur -shm files database ke saath rakho, aur file mein sirf SQLite ko likhne do.",
+   "needs": [],
+   "short_en": "The database file is damaged or isn't a database",
+   "short_hi": "Database file kharab hai ya database hi nahi"
+  },
+  "alter_not_supported": {
+   "layer": "parser",
+   "family": "any",
+   "engines": [
+    "sqlite"
+   ],
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.8
+   },
+   "prior": 0.1,
+   "shown_by": "alter_not_supported",
+   "title_en": "SQLite's ALTER TABLE can't make this change",
+   "title_hi": "SQLite ka ALTER TABLE ye badlaav nahi kar sakta",
+   "why_en": "SQLite's ALTER TABLE only renames a table or a column, adds a column, or drops one (from 3.35). Changing a column's type, default or NOT NULL, adding a PRIMARY KEY or UNIQUE column, or adding a NOT NULL column without a default all need the table rebuilt: a new table with the new definition, the rows copied over, the old one dropped and the new one renamed.",
+   "why_hi": "SQLite ka ALTER TABLE sirf table ya column ka naam badalta hai, column jodta hai, ya hata deta hai (3.35 se). Column ka type, default ya NOT NULL badalna, PRIMARY KEY ya UNIQUE column jodna, ya bina default ka NOT NULL column jodna, in sab ke liye table dobara banani padti hai: nayi definition ki table, rows copy, purani drop, nayi ka naam badlo.",
+   "confirm_en": "PRAGMA table_info(table) shows the new definition after the rebuild, and the row count is the same as before.",
+   "confirm_hi": "Rebuild ke baad PRAGMA table_info(table) nayi definition dikhata hai, aur rows ki ginti pehle jitni hai.",
+   "prevent_en": "Do the rebuild inside one transaction with foreign keys switched off, and run PRAGMA foreign_key_check before committing.",
+   "prevent_hi": "Rebuild ek transaction mein, foreign keys band karke karo, aur commit se pehle PRAGMA foreign_key_check chalao.",
+   "needs": [],
+   "short_en": "A table change SQLite's ALTER TABLE can't do",
+   "short_hi": "Table ka badlaav jo SQLite ka ALTER TABLE nahi karta"
   }
  }
 }

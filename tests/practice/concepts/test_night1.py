@@ -60,7 +60,8 @@ def test_the_pack_is_complete():
         assert all(c["phrasings"][k] for k in ("en", "hinglish", "hindi")), c["id"]
         for k in ("en", "hinglish", "hindi"):
             assert c["answer"][k] and c["mistake"][k], (c["id"], k)
-        assert c["source"].startswith(("https://dev.mysql.com/", "https://www.postgresql.org/docs/", "https://mariadb.com/kb/")), c["id"]
+        own = {"sqlite": ("https://www.sqlite.org/",)}.get(c.get("engine"), ())    # an engine's own concept: its official docs (E1)
+        assert c["source"].startswith(("https://dev.mysql.com/", "https://www.postgresql.org/docs/", "https://mariadb.com/kb/") + own), c["id"]
         assert set(c["proven"]) >= {"mariadb", "postgresql"} and c["examples"], c["id"]
         assert all(r in ids for r in c["related"]), c["id"]
         for ex in c["examples"]:                      # every example was run in the lab: its result (or change) is kept

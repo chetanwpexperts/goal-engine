@@ -34297,6 +34297,1760 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "sqlite_type_affinity",
+   "kind": "concept",
+   "title": {
+    "en": "Type affinity in SQLite (flexible typing)",
+    "hinglish": "SQLite mein type affinity (lachila typing)",
+    "hindi": "SQLite में type affinity"
+   },
+   "terms": [
+    [
+     "affinity"
+    ],
+    [
+     "flexible",
+     "typ\\w*"
+    ],
+    [
+     "typeof"
+    ],
+    [
+     "sqlite3?",
+     "(integer|int|number)",
+     "(text|string)"
+    ],
+    [
+     "sqlite3?",
+     "(wrong|galat|any) types?"
+    ],
+    [
+     "sqlite3?",
+     "(column|data) ?types?"
+    ],
+    [
+     "एसक्यूलाइट",
+     "टाइप"
+    ],
+    [
+     "sqlite3?",
+     "टाइप"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is type affinity in sqlite",
+     "why does sqlite accept text in an integer column"
+    ],
+    "hinglish": [
+     "sqlite mein type affinity kya hai",
+     "sqlite integer column mein text kaise chala gaya"
+    ],
+    "hindi": [
+     "SQLite में type affinity क्या है"
+    ]
+   },
+   "answer": {
+    "en": "In SQLite the type you give a column is a preference (its affinity), not a rule. Each value carries its own type: NULL, INTEGER, REAL, TEXT or BLOB. An INTEGER column turns '42' into the number 42, but keeps 'hello' as text, with no error; typeof(x) shows what is really stored. The affinity is read from the type's name: INT anywhere -> INTEGER; CHAR, CLOB or TEXT -> TEXT; BLOB or no type -> BLOB; REAL, FLOA, DOUB -> REAL; anything else (NUMERIC, DECIMAL, DATE, BOOLEAN) -> NUMERIC. When wrong types must be refused, use a STRICT table (3.37+) or CHECK (typeof(col) = 'integer').",
+    "hinglish": "SQLite mein column ka type ek pasand (affinity) hai, niyam nahi. Har value apna type rakhti hai: NULL, INTEGER, REAL, TEXT ya BLOB. INTEGER column '42' ko number 42 bana deta hai, par 'hello' ko text hi rakh leta hai, bina error; typeof(x) batata hai asal mein kya rakha hai. Galat type mana karwana ho to STRICT table (3.37+) ya CHECK (typeof(col) = 'integer') lagao.",
+    "hindi": "SQLite में column का type एक पसंद (affinity) है, नियम नहीं। INTEGER column में 'hello' भी बिना error के text बनकर रह जाता है; typeof(x) असली type बताता है। गलत type रोकना हो तो STRICT table या CHECK लगाइए।"
+   },
+   "mistake": {
+    "en": "Trusting the declared type: a number saved as text compares as text ('10' < '9' is true), and VARCHAR(3) doesn't stop a longer value.",
+    "hinglish": "Declared type pe bharosa: text mein rakha number text ki tarah compare hota hai ('10' < '9' sach), aur VARCHAR(3) lambi value nahi rokta.",
+    "hindi": "Declared type पर भरोसा: text में रखा number text की तरह compare होता है, और VARCHAR(3) लंबी value नहीं रोकता।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_aff (n INTEGER, code VARCHAR(3), d DATE);\nINSERT INTO t_aff VALUES ('42', 'ABCDEF', '2024-01-05'), ('hello', 'X', 2024);\nSELECT n, typeof(n), code, typeof(d) FROM t_aff"
+     },
+     "columns": [
+      "n",
+      "typeof(n)",
+      "code",
+      "typeof(d)"
+     ],
+     "result": [
+      [
+       "42",
+       "integer",
+       "ABCDEF",
+       "text"
+      ],
+      [
+       "hello",
+       "text",
+       "X",
+       "integer"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): '42' became the integer 42, 'hello' stayed text, VARCHAR(3) kept 'ABCDEF', and a DATE column holds text or numbers as given.",
+    "mysql": "Lab (MariaDB 10.11, strict mode is the default): 'hello' into INT is refused (1366) and a too-long VARCHAR value too (1406).",
+    "mariadb": "Lab: 'hello' into INT -> 1366; 'abcdef' into VARCHAR(3) -> 1406.",
+    "postgresql": "Lab (PostgreSQL 16): 'hello' into integer is refused (22P02) and a too-long varchar value too (22001).",
+    "sqlserver": "Notes only (not lab-tested here): Column types are enforced.",
+    "oracle": "Notes only (not lab-tested here): Column types are enforced."
+   },
+   "fundamentals": [
+    "column_types",
+    "values_types"
+   ],
+   "related": [
+    "sqlite_strict",
+    "sqlite_dates",
+    "data_types"
+   ],
+   "source": "https://www.sqlite.org/datatype3.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_strict",
+   "kind": "concept",
+   "title": {
+    "en": "STRICT tables in SQLite",
+    "hinglish": "SQLite mein STRICT table",
+    "hindi": "SQLite में STRICT table"
+   },
+   "terms": [
+    [
+     "strict",
+     "tables?"
+    ],
+    [
+     "sqlite3?",
+     "strict"
+    ],
+    [
+     "sqlite3?",
+     "refuse\\w*",
+     "(wrong )?types?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a strict table in sqlite",
+     "how to make sqlite refuse wrong types"
+    ],
+    "hinglish": [
+     "sqlite mein strict table kya hai",
+     "sqlite strict table kaise banaye"
+    ],
+    "hindi": [
+     "SQLite में STRICT table क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Adding STRICT after a CREATE TABLE's closing bracket (SQLite 3.37+) makes SQLite enforce the column types: INTEGER, INT, REAL, TEXT, BLOB or ANY are the only type names allowed, and a value that can't be converted losslessly is refused ('cannot store TEXT value in INTEGER column'). '12' still goes into an INTEGER column as 12. Use it for new tables when you want a client-server database's discipline; an older SQLite can't open a database that has STRICT tables.",
+    "hinglish": "CREATE TABLE ke bracket ke baad STRICT likhne se (SQLite 3.37+) SQLite column ke type lagu karta hai: sirf INTEGER, INT, REAL, TEXT, BLOB, ANY naam chalte hain, aur jo value bina nuksan ke na badle wo mana hoti hai. '12' phir bhi INTEGER mein 12 ban jaata hai. Purana SQLite STRICT table wali database nahi khol pata.",
+    "hindi": "CREATE TABLE के बाद STRICT लिखने से (SQLite 3.37+) column के type लागू होते हैं: गलत type की value मना हो जाती है।"
+   },
+   "mistake": {
+    "en": "Writing DATE, VARCHAR(20) or DECIMAL in a STRICT table: they are refused ('unknown datatype'); dates go in TEXT there.",
+    "hinglish": "STRICT table mein DATE, VARCHAR(20) ya DECIMAL likhna: mana hota hai ('unknown datatype'); dates TEXT mein rakho.",
+    "hindi": "STRICT table में DATE या VARCHAR(20) लिखना: मना होता है; dates TEXT में रखिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_strict (id INTEGER PRIMARY KEY, qty INTEGER, note TEXT) STRICT;\nINSERT INTO t_strict (qty, note) VALUES ('12', 'ok');\nSELECT qty, typeof(qty) FROM t_strict"
+     },
+     "columns": [
+      "qty",
+      "typeof(qty)"
+     ],
+     "result": [
+      [
+       "12",
+       "integer"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): '12' was stored as 12; 'abc', 1.5 or a BLOB in qty gave 'cannot store ... value in INTEGER column'; a DATE column in a STRICT table gave 'unknown datatype'.",
+    "mysql": "Lab (MariaDB 10.11): types are always enforced (strict mode is the default).",
+    "mariadb": "Lab: types are always enforced.",
+    "postgresql": "Lab (PostgreSQL 16): types are always enforced.",
+    "sqlserver": "Notes only (not lab-tested here): Types are always enforced.",
+    "oracle": "Notes only (not lab-tested here): Types are always enforced."
+   },
+   "fundamentals": [
+    "column_types",
+    "values_types"
+   ],
+   "related": [
+    "sqlite_type_affinity",
+    "check_constraint"
+   ],
+   "source": "https://www.sqlite.org/stricttables.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_dates",
+   "kind": "concept",
+   "title": {
+    "en": "How SQLite stores dates",
+    "hinglish": "SQLite mein dates kaise rakhi jaati hain",
+    "hindi": "SQLite में dates कैसे रखी जाती हैं"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "dates?"
+    ],
+    [
+     "sqlite3?",
+     "(datetime|timestamp)"
+    ],
+    [
+     "sqlite3?",
+     "(tareekh|tarikh)"
+    ],
+    [
+     "एसक्यूलाइट",
+     "(तारीख|date)"
+    ],
+    [
+     "sqlite3?",
+     "date",
+     "(type|store\\w*|save|rakh\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how are dates stored in sqlite",
+     "does sqlite have a date type"
+    ],
+    "hinglish": [
+     "sqlite mein date kaise store hoti hai",
+     "sqlite mein date type hota hai kya"
+    ],
+    "hindi": [
+     "SQLite में date कैसे रखी जाती है"
+    ]
+   },
+   "answer": {
+    "en": "SQLite has no date type. Store dates as ISO text ('2024-06-15' or '2024-06-15 10:30:00'): that text sorts and compares in date order, and SQLite's date functions read it. (They also read Julian day numbers and, with 'unixepoch', Unix seconds.) date(x) gives 'YYYY-MM-DD', datetime(x) 'YYYY-MM-DD HH:MM:SS', and both give NULL for text they can't read. Keep one format in a column: '2024-07-01' and '2024-07-01 00:00:00' are different texts and don't compare equal.",
+    "hinglish": "SQLite mein date type nahi hota. Dates ISO text mein rakho ('2024-06-15' ya '2024-06-15 10:30:00'): ye text date ke kram mein sort aur compare hota hai, aur SQLite ke date functions ise padhte hain. date(x) 'YYYY-MM-DD' deta hai, datetime(x) 'YYYY-MM-DD HH:MM:SS', aur na padh paane wale text pe NULL. Ek column mein ek hi format rakho.",
+    "hindi": "SQLite में date type नहीं होता। Dates ISO text ('2024-06-15') में रखिए: वह सही क्रम में sort होता है और date functions उसे पढ़ते हैं।"
+   },
+   "mistake": {
+    "en": "Storing '15/06/2024' (it sorts by day, and date() gives NULL for it), or writing CAST(x AS DATE): that gives only the year, 2024.",
+    "hinglish": "'15/06/2024' jaisa rakhna (din ke hisaab se sort hota hai, aur date() NULL deta hai), ya CAST(x AS DATE) likhna: sirf saal 2024 aata hai.",
+    "hindi": "'15/06/2024' जैसा रखना (date() NULL देता है), या CAST(x AS DATE) लिखना: सिर्फ़ साल आता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT date('2024-06-15 10:30:00') AS d, datetime('2024-06-15') AS dt, date('15/06/2024') AS bad, CAST('2024-06-15' AS DATE) AS cast_date, '2024-07-01' = '2024-07-01 00:00:00' AS same_text"
+     },
+     "columns": [
+      "d",
+      "dt",
+      "bad",
+      "cast_date",
+      "same_text"
+     ],
+     "result": [
+      [
+       "2024-06-15",
+       "2024-06-15 00:00:00",
+       "NULL",
+       "2024",
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): date('15/06/2024') is NULL; CAST('2024-01-05' AS DATE) is 2024; '2024-07-01' >= '2024-07-01 00:00:00' is false.",
+    "mysql": "Lab (MariaDB 10.11): DATE and DATETIME types; CAST('2024-01-05' AS DATE) is 2024-01-05.",
+    "mariadb": "Lab: CAST('2024-01-05' AS DATE) is 2024-01-05.",
+    "postgresql": "Lab (PostgreSQL 16): date and timestamp types; CAST('2024-01-05' AS DATE) is 2024-01-05.",
+    "sqlserver": "Notes only (not lab-tested here): DATE, DATETIME2 types.",
+    "oracle": "Notes only (not lab-tested here): DATE (holds a time too) and TIMESTAMP types."
+   },
+   "fundamentals": [
+    "column_types",
+    "time_ranges"
+   ],
+   "related": [
+    "sqlite_date_modifiers",
+    "sqlite_strftime",
+    "dates_as_text"
+   ],
+   "source": "https://www.sqlite.org/lang_datefunc.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_date_modifiers",
+   "kind": "concept",
+   "title": {
+    "en": "Adding days or months to a date in SQLite",
+    "hinglish": "SQLite mein date mein din ya mahine jodna",
+    "hindi": "SQLite में date में दिन या महीने जोड़ना"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "(add|jod\\w*|plus|badha\\w*|minus|subtract|ghata\\w*|जोड़\\w*|घटा\\w*)",
+     "(days?|months?|years?|weeks?|hours?|din|mahin\\w*|saal|दिन|महीन\\w*)"
+    ],
+    [
+     "sqlite3?",
+     "modifiers?"
+    ],
+    [
+     "start of month"
+    ],
+    [
+     "sqlite3?",
+     "interval"
+    ],
+    [
+     "sqlite3?",
+     "(date_add|dateadd)"
+    ],
+    [
+     "sqlite3?",
+     "(pehla|pehle|first|aakhri|last) (din|day)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to add days to a date in sqlite",
+     "what is the date_add equivalent in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein date mein 7 din kaise jode",
+     "sqlite mein mahine ka pehla din kaise nikale"
+    ],
+    "hindi": [
+     "SQLite में date में दिन कैसे जोड़ें"
+    ]
+   },
+   "answer": {
+    "en": "SQLite has no INTERVAL and no DATE_ADD. Its date functions take modifiers after the date: date(d, '+7 days'), date(d, '-1 months'), datetime(d, '+2 hours'), date(d, 'start of month'), date(d, 'start of month', '+1 months', '-1 day') for the month's last day. For an amount from a column build the text: date(d, n || ' days'). date() keeps the date only; datetime() keeps the time.",
+    "hinglish": "SQLite mein INTERVAL aur DATE_ADD nahi hote. Date functions date ke baad modifier lete hain: date(d, '+7 days'), date(d, '-1 months'), datetime(d, '+2 hours'), date(d, 'start of month'). Column se amount ho to text banao: date(d, n || ' days'). date() sirf date rakhta hai, datetime() time bhi.",
+    "hindi": "SQLite में INTERVAL नहीं होता: date(d, '+7 days'), date(d, 'start of month') जैसे modifier लिखिए।"
+   },
+   "mistake": {
+    "en": "Month-ends: SQLite rolls over (2024-01-31 + 1 month = 2024-03-02) where MySQL keeps the month (2024-02-29); add the 'floor' modifier (3.46+) for MySQL's answer. And '+' || n with a negative n gives '+-3 days', which is NULL.",
+    "hinglish": "Mahine ka aakhri din: SQLite aage chala jaata hai (2024-01-31 + 1 month = 2024-03-02), MySQL 2024-02-29 deta hai; 'floor' modifier (3.46+) lagao. Aur '+' || n mein n negative ho to '+-3 days' NULL deta hai.",
+    "hindi": "महीने का आखिरी दिन: SQLite 2024-03-02 देता है, MySQL 2024-02-29; 'floor' modifier (3.46+) लगाइए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT date('2024-01-31', '+7 days') AS week_later, date('2024-01-31', '+1 months') AS month_later, date('2024-06-15', 'start of month') AS first_day, date('2024-06-15', 'start of month', '+1 months', '-1 day') AS last_day, datetime('2024-06-15 10:00:00', '+2 hours') AS two_hours"
+     },
+     "columns": [
+      "week_later",
+      "month_later",
+      "first_day",
+      "last_day",
+      "two_hours"
+     ],
+     "result": [
+      [
+       "2024-02-07",
+       "2024-03-02",
+       "2024-06-01",
+       "2024-06-30",
+       "2024-06-15 12:00:00"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): '+1 months' from 2024-01-31 gave 2024-03-02 ('floor' gives 2024-02-29); date(d, '+-3 days') gave NULL.",
+    "mysql": "Lab (MariaDB 10.11): DATE_ADD(d, INTERVAL 7 DAY); 2024-01-31 + 1 MONTH = 2024-02-29.",
+    "mariadb": "Lab: DATE_ADD('2024-01-31', INTERVAL 1 MONTH) = 2024-02-29.",
+    "postgresql": "Lab (PostgreSQL 16): d + INTERVAL '7 days'; 2024-01-31 + 1 month = 2024-02-29.",
+    "sqlserver": "Notes only (not lab-tested here): DATEADD(day, 7, d).",
+    "oracle": "Notes only (not lab-tested here): d + 7, ADD_MONTHS(d, 1)."
+   },
+   "fundamentals": [
+    "time_ranges",
+    "portability"
+   ],
+   "related": [
+    "sqlite_dates",
+    "sqlite_julianday",
+    "add_to_date"
+   ],
+   "source": "https://www.sqlite.org/lang_datefunc.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_strftime",
+   "kind": "concept",
+   "title": {
+    "en": "strftime: formatting dates and taking their parts in SQLite",
+    "hinglish": "strftime: SQLite mein date ka format aur hissa",
+    "hindi": "strftime: SQLite में date का format"
+   },
+   "terms": [
+    [
+     "strftime"
+    ],
+    [
+     "sqlite3?",
+     "(format|formatting)"
+    ],
+    [
+     "sqlite3?",
+     "(year|month|saal|mahina)",
+     "(from|nikal\\w*|extract|get)"
+    ],
+    [
+     "sqlite3?",
+     "date_format"
+    ],
+    [
+     "sqlite3?",
+     "(year|month|extract)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is strftime in sqlite",
+     "how to get the year from a date in sqlite"
+    ],
+    "hinglish": [
+     "strftime kya hai",
+     "sqlite mein date se mahina kaise nikale"
+    ],
+    "hindi": [
+     "SQLite में strftime क्या है"
+    ]
+   },
+   "answer": {
+    "en": "strftime(format, date) writes a date with codes: %Y year, %m month, %d day, %H hour, %M minute, %S second, %j day of the year, %w weekday (0 = Sunday), %s Unix seconds. It is SQLite's DATE_FORMAT, and also its YEAR() / MONTH() / EXTRACT: CAST(strftime('%Y', d) AS INTEGER) gives the year as a number. The result is text ('06'), so cast it before comparing with a number.",
+    "hinglish": "strftime(format, date) codes se date likhta hai: %Y saal, %m mahina, %d din, %H ghanta, %M minute, %S second, %w hafte ka din. Ye SQLite ka DATE_FORMAT bhi hai aur YEAR() / MONTH() bhi: CAST(strftime('%Y', d) AS INTEGER) saal number mein. Result text hota hai ('06'), number se compare se pehle cast karo.",
+    "hindi": "strftime(format, date): %Y साल, %m महीना, %d दिन, %M minute; result text होता है, number के लिए CAST कीजिए।"
+   },
+   "mistake": {
+    "en": "Writing MySQL's codes: %i is not the minute on SQLite (%M is), month names (%b, %M as a name) don't exist, and an unknown code makes the whole result NULL.",
+    "hinglish": "MySQL ke codes likhna: SQLite pe minute %M hai (%i nahi), mahine ke naam ka code nahi hota, aur anjaan code se poora result NULL.",
+    "hindi": "MySQL के codes लिखना: SQLite में minute %M है; अनजान code से result NULL।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT strftime('%d/%m/%Y', order_date) AS shown, CAST(strftime('%Y', order_date) AS INTEGER) AS y, strftime('%m', order_date) AS m FROM orders WHERE id <= 3 ORDER BY id"
+     },
+     "columns": [
+      "shown",
+      "y",
+      "m"
+     ],
+     "result": [
+      [
+       "01/06/2024",
+       "2024",
+       "06"
+      ],
+      [
+       "15/06/2024",
+       "2024",
+       "06"
+      ],
+      [
+       "20/06/2024",
+       "2024",
+       "06"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): strftime('%Y-%m', d) gave '2024-06'; strftime('%y', d) gave NULL (no such code there).",
+    "mysql": "Lab (MariaDB 10.11): DATE_FORMAT(d, '%d/%m/%Y'), YEAR(d).",
+    "mariadb": "Lab: DATE_FORMAT(d, '%d/%m/%Y'); %i is the minute.",
+    "postgresql": "Lab (PostgreSQL 16): to_char(d, 'DD/MM/YYYY'), EXTRACT(YEAR FROM d).",
+    "sqlserver": "Notes only (not lab-tested here): FORMAT(d, 'dd/MM/yyyy'), YEAR(d), DATEPART.",
+    "oracle": "Notes only (not lab-tested here): TO_CHAR(d, 'DD/MM/YYYY'), EXTRACT(YEAR FROM d)."
+   },
+   "fundamentals": [
+    "time_ranges",
+    "portability"
+   ],
+   "related": [
+    "sqlite_dates",
+    "format_date",
+    "date_parts"
+   ],
+   "source": "https://www.sqlite.org/lang_datefunc.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_julianday",
+   "kind": "concept",
+   "title": {
+    "en": "Days between two dates in SQLite (julianday)",
+    "hinglish": "SQLite mein do dates ke beech din (julianday)",
+    "hindi": "SQLite में दो dates के बीच दिन"
+   },
+   "terms": [
+    [
+     "julianday"
+    ],
+    [
+     "sqlite3?",
+     "(between|beech|difference|farak|fark|diff|बीच)",
+     "(dates?|din|days?|दिन)"
+    ],
+    [
+     "sqlite3?",
+     "datediff"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to get days between two dates in sqlite",
+     "what is julianday in sqlite"
+    ],
+    "hinglish": [
+     "julianday kya hota hai",
+     "sqlite mein do dates ke beech din kaise nikale"
+    ],
+    "hindi": [
+     "SQLite में दो dates के बीच दिन कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "julianday(d) turns a date into a day number (with the time as a fraction), so julianday(end) - julianday(start) is the days between them: 9.0 for 2024-01-25 to 2024-02-03. Times give fractions: multiply by 24 for hours, or use strftime('%s', end) - strftime('%s', start) for seconds. CAST(... AS INTEGER) keeps whole days.",
+    "hinglish": "julianday(d) date ko din-number bana deta hai (time fraction mein), isliye julianday(end) - julianday(start) beech ke din deta hai: 2024-01-25 se 2024-02-03 tak 9.0. Ghante ke liye 24 se guna karo; poore din ke liye CAST(... AS INTEGER).",
+    "hindi": "julianday(end) - julianday(start) दो dates के बीच के दिन देता है।"
+   },
+   "mistake": {
+    "en": "Subtracting the dates directly: '2024-02-03' - '2024-01-25' is 0 on SQLite (only the leading years are subtracted), with no error.",
+    "hinglish": "Dates ko seedha ghatana: SQLite pe '2024-02-03' - '2024-01-25' = 0 aata hai (sirf saal ghatte hain), bina error.",
+    "hindi": "सीधे घटाना: '2024-02-03' - '2024-01-25' SQLite पर 0 देता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT o.id, p.paid_at, o.order_date, julianday(p.paid_at) - julianday(o.order_date) AS days, p.paid_at - o.order_date AS wrong FROM orders o JOIN payments p ON p.order_id = o.id ORDER BY o.id, p.id"
+     },
+     "columns": [
+      "id",
+      "paid_at",
+      "order_date",
+      "days",
+      "wrong"
+     ],
+     "result": [
+      [
+       "1",
+       "2024-06-01",
+       "2024-06-01",
+       "0",
+       "0"
+      ],
+      [
+       "2",
+       "2024-06-16",
+       "2024-06-15",
+       "1",
+       "0"
+      ],
+      [
+       "3",
+       "2024-06-21",
+       "2024-06-20",
+       "1",
+       "0"
+      ],
+      [
+       "3",
+       "2024-06-28",
+       "2024-06-20",
+       "8",
+       "0"
+      ],
+      [
+       "5",
+       "2024-07-10",
+       "2024-07-10",
+       "0",
+       "0"
+      ],
+      [
+       "7",
+       "2024-07-30",
+       "2024-07-30",
+       "0",
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): julianday('2024-02-03') - julianday('2024-01-25') = 9.0; '2024-02-03' - '2024-01-25' = 0.",
+    "mysql": "Lab (MariaDB 10.11): DATEDIFF(end, start) = 9; date - date gives a wrong number (night 10).",
+    "mariadb": "Lab: DATEDIFF(end, start).",
+    "postgresql": "Lab (PostgreSQL 16): end - start on dates = 9.",
+    "sqlserver": "Notes only (not lab-tested here): DATEDIFF(day, start, end).",
+    "oracle": "Notes only (not lab-tested here): end - start (days, with fractions)."
+   },
+   "fundamentals": [
+    "time_ranges",
+    "portability"
+   ],
+   "related": [
+    "sqlite_dates",
+    "date_difference"
+   ],
+   "source": "https://www.sqlite.org/lang_datefunc.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_now",
+   "kind": "concept",
+   "title": {
+    "en": "Today's date and the current time in SQLite",
+    "hinglish": "SQLite mein aaj ki date aur abhi ka time",
+    "hindi": "SQLite में आज की तारीख और अभी का समय"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "(current|today'?s?|todays|aaj|now|आज)",
+     "(date|time|tareekh|tarikh|तारीख)"
+    ],
+    [
+     "sqlite3?",
+     "now"
+    ],
+    [
+     "sqlite3?",
+     "localtime"
+    ],
+    [
+     "sqlite3?",
+     "(utc|time ?zone)"
+    ],
+    [
+     "sqlite3?",
+     "(curdate|getdate)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to get the current date in sqlite",
+     "does sqlite have a now function"
+    ],
+    "hinglish": [
+     "sqlite mein aaj ki date kaise nikale",
+     "sqlite mein now() kaise likhe"
+    ],
+    "hindi": [
+     "SQLite में आज की तारीख कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "SQLite has no NOW(), CURDATE() or GETDATE(). Use date('now') for today, datetime('now') for the date and time, time('now') for the time, or the keywords CURRENT_DATE / CURRENT_TIMESTAMP. All of them are in UTC; add 'localtime' (datetime('now', 'localtime')) for the computer's local time. A DEFAULT CURRENT_TIMESTAMP column stores UTC too, so compare UTC with UTC.",
+    "hinglish": "SQLite mein NOW(), CURDATE() ya GETDATE() nahi. Aaj ke liye date('now'), date-time ke liye datetime('now'), ya CURRENT_DATE / CURRENT_TIMESTAMP. Ye sab UTC mein hain; local time ke liye datetime('now', 'localtime'). DEFAULT CURRENT_TIMESTAMP bhi UTC rakhta hai.",
+    "hindi": "SQLite में NOW() नहीं: date('now') / datetime('now') लिखिए (UTC में; local के लिए 'localtime')।"
+   },
+   "mistake": {
+    "en": "Comparing UTC times with local ones: a row saved with CURRENT_TIMESTAMP (UTC) checked against datetime('now', 'localtime') is off by your time zone (5.5 hours in India).",
+    "hinglish": "UTC aur local time mila dena: CURRENT_TIMESTAMP (UTC) se saved row ko datetime('now', 'localtime') se compare karna time zone jitna galat (India mein 5.5 ghante).",
+    "hindi": "UTC और local time मिलाना: India में 5.5 घंटे का फ़र्क आ जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT date('now') = CURRENT_DATE AS same_day, datetime('now') = CURRENT_TIMESTAMP AS same_time, typeof(datetime('now', 'localtime')) AS local_type"
+     },
+     "columns": [
+      "same_day",
+      "same_time",
+      "local_type"
+     ],
+     "result": [
+      [
+       "1",
+       "1",
+       "text"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): date('now') equals CURRENT_DATE and datetime('now') equals CURRENT_TIMESTAMP; NOW() gave 'no such function: NOW'.",
+    "mysql": "Lab (MariaDB 10.11): NOW(), CURDATE() in the session's time zone.",
+    "mariadb": "Lab: NOW() and CURDATE() exist.",
+    "postgresql": "Lab (PostgreSQL 16): now(), CURRENT_DATE in the session's TimeZone.",
+    "sqlserver": "Notes only (not lab-tested here): GETDATE(), SYSDATETIME().",
+    "oracle": "Notes only (not lab-tested here): SYSDATE, SYSTIMESTAMP."
+   },
+   "fundamentals": [
+    "time_ranges",
+    "portability"
+   ],
+   "related": [
+    "sqlite_dates",
+    "current_datetime"
+   ],
+   "source": "https://www.sqlite.org/lang_datefunc.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_rowid",
+   "kind": "concept",
+   "title": {
+    "en": "rowid and INTEGER PRIMARY KEY in SQLite",
+    "hinglish": "SQLite mein rowid aur INTEGER PRIMARY KEY",
+    "hindi": "SQLite में rowid और INTEGER PRIMARY KEY"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "rowid"
+    ],
+    [
+     "rowid"
+    ],
+    [
+     "sqlite3?",
+     "integer primary key"
+    ],
+    [
+     "integer primary key"
+    ],
+    [
+     "sqlite3?",
+     "auto ?_?increment\\w*"
+    ],
+    [
+     "sqlite3?",
+     "(auto id|ids?)",
+     "(null|empty|khaali)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is rowid in sqlite",
+     "how to make an auto increment id in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein rowid kya hota hai",
+     "sqlite mein auto increment id kaise banaye"
+    ],
+    "hindi": [
+     "SQLite में rowid क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Every ordinary SQLite table has a hidden whole-number key, the rowid. A column declared exactly INTEGER PRIMARY KEY becomes that rowid: leave it out of an INSERT and it numbers itself (largest + 1). AUTOINCREMENT only adds that ids are never reused after deletes (it keeps a counter in sqlite_sequence), at a small cost. INSERT ... RETURNING id (3.35+) or last_insert_rowid() gives the new id.",
+    "hinglish": "Har aam SQLite table mein ek chhupi number key hoti hai, rowid. Jo column theek INTEGER PRIMARY KEY likha ho wo rowid ban jaata hai: INSERT mein chhod do to khud number ban jaata hai. AUTOINCREMENT sirf ye pakka karta hai ki delete ke baad id dobara na mile. Nayi id ke liye INSERT ... RETURNING id (3.35+) ya last_insert_rowid().",
+    "hindi": "हर SQLite table में छुपी number key rowid होती है; ठीक INTEGER PRIMARY KEY लिखा column वही बन जाता है और अपने-आप number लेता है।"
+   },
+   "mistake": {
+    "en": "Writing INT PRIMARY KEY, SERIAL or INT AUTO_INCREMENT: SQLite accepts them, but the column is not the rowid, so an INSERT without it stores NULL ids (lab), with no error.",
+    "hinglish": "INT PRIMARY KEY, SERIAL ya INT AUTO_INCREMENT likhna: SQLite maan leta hai, par column rowid nahi banta, isliye bina id ke INSERT NULL id rakhta hai (lab), bina error.",
+    "hindi": "INT PRIMARY KEY या INT AUTO_INCREMENT लिखना: id NULL रह जाती है (lab), बिना error।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_good (id INTEGER PRIMARY KEY, n TEXT);\nCREATE TABLE t_bad (id INT AUTO_INCREMENT PRIMARY KEY, n TEXT);\nINSERT INTO t_good (n) VALUES ('a'), ('b');\nINSERT INTO t_bad (n) VALUES ('a'), ('b');\nSELECT 'good' AS t, id, n FROM t_good UNION ALL SELECT 'bad', id, n FROM t_bad"
+     },
+     "columns": [
+      "t",
+      "id",
+      "n"
+     ],
+     "result": [
+      [
+       "good",
+       "1",
+       "a"
+      ],
+      [
+       "good",
+       "2",
+       "b"
+      ],
+      [
+       "bad",
+       "NULL",
+       "a"
+      ],
+      [
+       "bad",
+       "NULL",
+       "b"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): INTEGER PRIMARY KEY gave 1, 2; INT PRIMARY KEY, SERIAL and INT AUTO_INCREMENT PRIMARY KEY all gave NULL, NULL.",
+    "mysql": "Lab (MariaDB 10.11): INT AUTO_INCREMENT PRIMARY KEY numbers itself.",
+    "mariadb": "Lab: AUTO_INCREMENT numbers itself.",
+    "postgresql": "Lab (PostgreSQL 16): GENERATED ... AS IDENTITY (or serial) numbers itself.",
+    "sqlserver": "Notes only (not lab-tested here): IDENTITY(1,1).",
+    "oracle": "Notes only (not lab-tested here): GENERATED AS IDENTITY (12c+) or a sequence."
+   },
+   "fundamentals": [
+    "table_keys"
+   ],
+   "related": [
+    "auto_increment",
+    "primary_key",
+    "sqlite_type_affinity"
+   ],
+   "source": "https://www.sqlite.org/autoinc.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_foreign_keys",
+   "kind": "concept",
+   "title": {
+    "en": "Foreign keys in SQLite are off until you turn them on",
+    "hinglish": "SQLite mein foreign key tab tak band jab tak chalu na karo",
+    "hindi": "SQLite में foreign key चालू करनी पड़ती है"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "foreign keys?"
+    ],
+    [
+     "sqlite3?",
+     "(fk|references)"
+    ],
+    [
+     "foreign_keys"
+    ],
+    [
+     "sqlite3?",
+     "(orphan|parent)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why is my sqlite foreign key not enforced",
+     "how to enable foreign keys in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein foreign key kaam kyun nahi karti",
+     "sqlite mein foreign key kaise chalu kare"
+    ],
+    "hindi": [
+     "SQLite में foreign key कैसे चालू करें"
+    ]
+   },
+   "answer": {
+    "en": "SQLite stores your FOREIGN KEY rules but checks them only on connections that run PRAGMA foreign_keys = ON, and that setting is off by default and lasts only for that connection. So every connection the app opens must turn it on (outside a transaction). With it off, a child row can point at a parent that doesn't exist, with no error. PRAGMA foreign_key_check lists rows that already point nowhere.",
+    "hinglish": "SQLite FOREIGN KEY ke niyam rakhta hai par sirf un connections pe check karta hai jo PRAGMA foreign_keys = ON chalate hain; ye default mein band hai aur sirf usi connection tak rehta hai. Isliye app ka har connection ise chalu kare. Band ho to child row aisi parent ki taraf ishara kar sakti hai jo hai hi nahi, bina error. PRAGMA foreign_key_check aisi rows dikhata hai.",
+    "hindi": "SQLite में foreign key हर connection पर PRAGMA foreign_keys = ON से चालू करनी पड़ती है; बंद हो तो गलत row बिना error के चली जाती है।"
+   },
+   "mistake": {
+    "en": "Turning it on once in a database tool and expecting the app to be protected: it is per connection, so the app's own connections stay unchecked.",
+    "hinglish": "Ek tool mein ek baar chalu karke sochna ki app bhi surakshit hai: ye har connection ka alag hai, app ke connections bina check ke rehte hain.",
+    "hindi": "एक tool में एक बार चालू करना काफ़ी नहीं: यह हर connection का अलग होता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_parent (id INTEGER PRIMARY KEY);\nCREATE TABLE t_child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES t_parent(id));\nINSERT INTO t_child (parent_id) VALUES (99);\nSELECT (SELECT foreign_keys FROM pragma_foreign_keys) AS fk_on, COUNT(*) AS orphans FROM t_child WHERE parent_id NOT IN (SELECT id FROM t_parent)"
+     },
+     "columns": [
+      "fk_on",
+      "orphans"
+     ],
+     "result": [
+      [
+       "0",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): with foreign_keys off the orphan row went in; with it ON the same INSERT and deleting a parent with children both gave 'FOREIGN KEY constraint failed'.",
+    "mysql": "Lab (MariaDB 10.11, InnoDB): always checked (1452 / 1451).",
+    "mariadb": "Lab: always checked on InnoDB tables (1452 / 1451).",
+    "postgresql": "Lab (PostgreSQL 16): always checked (23503).",
+    "sqlserver": "Notes only (not lab-tested here): Always checked.",
+    "oracle": "Notes only (not lab-tested here): Always checked."
+   },
+   "fundamentals": [
+    "table_keys"
+   ],
+   "related": [
+    "foreign_key",
+    "sqlite_pragma"
+   ],
+   "source": "https://www.sqlite.org/foreignkeys.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_database_locked",
+   "kind": "concept",
+   "title": {
+    "en": "'database is locked' in SQLite",
+    "hinglish": "SQLite mein 'database is locked'",
+    "hindi": "SQLite में 'database is locked'"
+   },
+   "terms": [
+    [
+     "database is locked"
+    ],
+    [
+     "sqlite3?",
+     "locked"
+    ],
+    [
+     "sqlite3?",
+     "lock\\w*"
+    ],
+    [
+     "busy_timeout"
+    ],
+    [
+     "sqlite_busy"
+    ],
+    [
+     "sqlite3?",
+     "(concurren\\w*|writers?)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what does database is locked mean in sqlite",
+     "why does sqlite say database is locked"
+    ],
+    "hinglish": [
+     "database is locked kya hota hai sqlite",
+     "sqlite database lock kyun ho jata hai"
+    ],
+    "hindi": [
+     "SQLite में database is locked का क्या मतलब है"
+    ]
+   },
+   "answer": {
+    "en": "SQLite is one file, and only one connection can write to it at a time. When another connection (another process, a thread, or a transaction your own code left open) holds the write lock, a second writer gets 'database is locked' (SQLITE_BUSY) at once unless it was told to wait. Set a busy timeout on every connection (PRAGMA busy_timeout = 5000, or the driver's timeout), keep write transactions short, always commit or roll back, use WAL mode so readers don't wait, and start read-then-write transactions with BEGIN IMMEDIATE.",
+    "hinglish": "SQLite ek file hai, aur ek waqt mein ek hi connection usmein likh sakta hai. Doosra connection (process, thread, ya aapki khuli chhodi transaction) write lock pakde ho to doosre writer ko turant 'database is locked' milta hai, jab tak use intezaar karna na bataya ho. Har connection pe busy timeout (PRAGMA busy_timeout = 5000), chhoti transactions, hamesha commit/rollback, WAL mode, aur padh-kar-likhne wali transaction BEGIN IMMEDIATE se.",
+    "hindi": "SQLite में एक समय में एक ही connection लिख सकता है; busy timeout, छोटी transactions और WAL mode से 'database is locked' रुकता है।"
+   },
+   "mistake": {
+    "en": "Leaving a transaction open (a cursor not finished, an exception without rollback): every other writer is locked out until that connection ends.",
+    "hinglish": "Transaction khuli chhod dena (cursor poora nahi, exception pe rollback nahi): baaki sab writers tab tak band.",
+    "hindi": "Transaction खुली छोड़ देना: बाकी सब writers रुक जाते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "PRAGMA busy_timeout = 5000;\nSELECT * FROM pragma_busy_timeout"
+     },
+     "columns": [
+      "timeout"
+     ],
+     "result": [
+      [
+       "5000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): with one connection holding BEGIN IMMEDIATE, a second one's INSERT (timeout 0) gave 'database is locked' (SQLITE_BUSY) while its SELECT still read; with a 2-second timeout it waited and succeeded.",
+    "mysql": "Lab (MariaDB 10.11): rows are locked, not the whole database; a wait ends with 1205 (lock wait timeout).",
+    "mariadb": "Lab: row locks; 1205 after innodb_lock_wait_timeout.",
+    "postgresql": "Lab (PostgreSQL 16): row locks; lock_timeout ends a wait with 55P03.",
+    "sqlserver": "Notes only (not lab-tested here): Row and page locks.",
+    "oracle": "Notes only (not lab-tested here): Row locks; readers never wait."
+   },
+   "fundamentals": [
+    "locking"
+   ],
+   "related": [
+    "sqlite_wal",
+    "lock_wait_timeout",
+    "deadlock"
+   ],
+   "source": "https://www.sqlite.org/lockingv3.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_wal",
+   "kind": "concept",
+   "title": {
+    "en": "WAL mode in SQLite",
+    "hinglish": "SQLite ka WAL mode",
+    "hindi": "SQLite का WAL mode"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "wal"
+    ],
+    [
+     "wal mode"
+    ],
+    [
+     "journal_mode"
+    ],
+    [
+     "write ahead"
+    ],
+    [
+     "sqlite3?",
+     "journal"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is wal mode in sqlite",
+     "should i use journal_mode wal"
+    ],
+    "hinglish": [
+     "sqlite mein wal mode kya hai",
+     "wal mode kab lagana chahiye"
+    ],
+    "hindi": [
+     "SQLite में WAL mode क्या है"
+    ]
+   },
+   "answer": {
+    "en": "In WAL (write-ahead log) mode a writer appends its changes to a -wal file next to the database instead of rewriting the file in place, so readers keep reading the last committed data while one connection writes. Turn it on once with PRAGMA journal_mode = WAL (it is stored in the database file). It still allows only one writer at a time, needs the -wal and -shm files kept with the database, and doesn't work on network file shares.",
+    "hinglish": "WAL mode mein writer apne badlaav database ke paas -wal file mein jodta hai, file ko wahin nahi likhta, isliye ek connection ke likhte waqt readers pichhla committed data padhte rehte hain. Ek baar PRAGMA journal_mode = WAL se chalu karo (database file mein yaad rehta hai). Phir bhi ek waqt mein ek hi writer; -wal aur -shm files database ke saath rakho; network share pe nahi chalta.",
+    "hindi": "WAL mode में लिखते समय भी readers पढ़ते रहते हैं; PRAGMA journal_mode = WAL से एक बार चालू कीजिए; फिर भी एक ही writer।"
+   },
+   "mistake": {
+    "en": "Copying only the .db file of a WAL database while the app runs: the latest commits can still be in the -wal file. Back up with the backup API or VACUUM INTO.",
+    "hinglish": "Chalti app mein WAL database ki sirf .db file copy karna: naye commits -wal file mein ho sakte hain. Backup API ya VACUUM INTO se backup lo.",
+    "hindi": "चलती app में सिर्फ़ .db file copy करना: नए commits -wal file में रह जाते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "PRAGMA journal_mode;\nPRAGMA journal_mode = WAL;\nSELECT * FROM pragma_journal_mode"
+     },
+     "columns": [
+      "journal_mode"
+     ],
+     "result": [
+      [
+       "wal"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): a file database starts in 'delete' mode and becomes 'wal'; in WAL a reader read the committed rows while a writer held its lock, and a second writer still got 'database is locked'.",
+    "mysql": "Lab (MariaDB 10.11): InnoDB always keeps a redo log; readers don't wait for writers.",
+    "mariadb": "Lab: readers don't wait for writers (MVCC).",
+    "postgresql": "Lab (PostgreSQL 16): always writes WAL; readers don't wait for writers.",
+    "sqlserver": "Notes only (not lab-tested here): Transaction log; RCSI for non-blocking reads.",
+    "oracle": "Notes only (not lab-tested here): Redo logs; readers never wait."
+   },
+   "fundamentals": [
+    "locking"
+   ],
+   "related": [
+    "sqlite_database_locked",
+    "sqlite_pragma"
+   ],
+   "source": "https://www.sqlite.org/wal.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_alter_table",
+   "kind": "concept",
+   "title": {
+    "en": "Changing a table in SQLite (ALTER TABLE limits)",
+    "hinglish": "SQLite mein table badalna (ALTER TABLE ki seema)",
+    "hindi": "SQLite में table बदलना"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "alter"
+    ],
+    [
+     "sqlite3?",
+     "(modify|change)",
+     "column"
+    ],
+    [
+     "sqlite3?",
+     "column",
+     "type"
+    ],
+    [
+     "sqlite3?",
+     "(drop|rename|add)",
+     "column"
+    ],
+    [
+     "sqlite3?",
+     "column",
+     "(badl\\w*|hata\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to change a column type in sqlite",
+     "why can't sqlite alter table modify a column"
+    ],
+    "hinglish": [
+     "sqlite mein column ka type kaise badle",
+     "sqlite mein alter table se column type kyun nahi badalta"
+    ],
+    "hindi": [
+     "SQLite में column का type कैसे बदलें"
+    ]
+   },
+   "answer": {
+    "en": "SQLite's ALTER TABLE does four things: RENAME TO (the table), RENAME COLUMN (3.25+), ADD COLUMN, DROP COLUMN (3.35+). It can't change a column's type, default, NOT NULL or CHECK, and can't add a PRIMARY KEY or UNIQUE column. For those, rebuild: in one transaction with foreign keys off, CREATE TABLE new with the new definition, INSERT INTO new SELECT ... FROM old, DROP the old table, ALTER TABLE new RENAME TO old, recreate its indexes and triggers, run PRAGMA foreign_key_check, COMMIT.",
+    "hinglish": "SQLite ka ALTER TABLE chaar kaam karta hai: table ka naam badalna, column ka naam badalna (3.25+), column jodna, column hatana (3.35+). Type, default, NOT NULL badalna ya PRIMARY KEY/UNIQUE column jodna nahi. Uske liye table dobara banao: nayi definition ki table, rows copy, purani drop, nayi ka naam badlo, indexes wapas banao, sab ek transaction mein.",
+    "hindi": "SQLite का ALTER TABLE type नहीं बदल सकता: नई table बनाइए, rows copy, पुरानी drop, नाम बदलिए।"
+   },
+   "mistake": {
+    "en": "ADD COLUMN ... NOT NULL without a DEFAULT: refused ('Cannot add a NOT NULL column with default value NULL'); give it a default.",
+    "hinglish": "ADD COLUMN ... NOT NULL bina DEFAULT: mana hota hai; default do.",
+    "hindi": "बिना DEFAULT का NOT NULL column जोड़ना मना है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_price (id INTEGER PRIMARY KEY, price TEXT);\nINSERT INTO t_price (price) VALUES ('10.50'), ('7');\nBEGIN;\nCREATE TABLE t_price_new (id INTEGER PRIMARY KEY, price REAL NOT NULL DEFAULT 0);\nINSERT INTO t_price_new (id, price) SELECT id, CAST(price AS REAL) FROM t_price;\nDROP TABLE t_price;\nALTER TABLE t_price_new RENAME TO t_price;\nCOMMIT;\nSELECT id, price, typeof(price) FROM t_price ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "price",
+      "typeof(price)"
+     ],
+     "result": [
+      [
+       "1",
+       "10.5",
+       "real"
+      ],
+      [
+       "2",
+       "7",
+       "real"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): ALTER TABLE ... MODIFY / ALTER COLUMN TYPE gave a syntax error; ADD COLUMN NOT NULL without default, a PRIMARY KEY or a UNIQUE column were refused; DROP COLUMN worked.",
+    "mysql": "Lab (MariaDB 10.11): ALTER TABLE t MODIFY col type works.",
+    "mariadb": "Lab: MODIFY / CHANGE work.",
+    "postgresql": "Lab (PostgreSQL 16): ALTER TABLE t ALTER COLUMN col TYPE type works.",
+    "sqlserver": "Notes only (not lab-tested here): ALTER TABLE t ALTER COLUMN col type.",
+    "oracle": "Notes only (not lab-tested here): ALTER TABLE t MODIFY (col type)."
+   },
+   "fundamentals": [
+    "schema_facts",
+    "engine_syntax"
+   ],
+   "related": [
+    "alter_table",
+    "sqlite_strict"
+   ],
+   "source": "https://www.sqlite.org/lang_altertable.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_list_tables",
+   "kind": "concept",
+   "title": {
+    "en": "Listing tables and columns in SQLite",
+    "hinglish": "SQLite mein tables aur columns ki list",
+    "hindi": "SQLite में tables और columns की सूची"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "(list|show|see|all|saari|sari|sabhi|सभी|सारी)",
+     "tables?"
+    ],
+    [
+     "sqlite_master"
+    ],
+    [
+     "sqlite_schema"
+    ],
+    [
+     "table_info"
+    ],
+    [
+     "sqlite3?",
+     "(describe|show tables)"
+    ],
+    [
+     "sqlite3?",
+     "columns?",
+     "(see|show|list|dekh\\w*|देख\\w*)"
+    ],
+    [
+     "sqlite3?",
+     "tables?",
+     "(dekh\\w*|list|देख\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to list tables in sqlite",
+     "how to see the columns of a table in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein saari tables kaise dekhe",
+     "sqlite mein table ke columns kaise dekhe"
+    ],
+    "hindi": [
+     "SQLite में सभी tables कैसे देखें"
+    ]
+   },
+   "answer": {
+    "en": "SQLite keeps every table, index, view and trigger, with its CREATE statement, in sqlite_master (also called sqlite_schema from 3.33): SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name. PRAGMA table_info(t) (or SELECT * FROM pragma_table_info('t')) lists a table's columns, types, NOT NULL, defaults and key; PRAGMA index_list(t) its indexes. In the sqlite3 command line, .tables and .schema t say the same.",
+    "hinglish": "SQLite har table, index, view aur trigger ko uske CREATE ke saath sqlite_master mein rakhta hai: SELECT name FROM sqlite_master WHERE type = 'table'. PRAGMA table_info(t) table ke columns, types, NOT NULL, default aur key dikhata hai. sqlite3 command line mein .tables aur .schema t.",
+    "hindi": "SQLite में SELECT name FROM sqlite_master WHERE type = 'table' से tables, और PRAGMA table_info(t) से columns दिखते हैं।"
+   },
+   "mistake": {
+    "en": "Typing SHOW TABLES or DESCRIBE t: those are MySQL's; SQLite says 'near \"SHOW\": syntax error'.",
+    "hinglish": "SHOW TABLES ya DESCRIBE t likhna: ye MySQL ke hain; SQLite syntax error deta hai.",
+    "hindi": "SHOW TABLES या DESCRIBE लिखना: ये MySQL के हैं, SQLite में syntax error।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
+     },
+     "columns": [
+      "name"
+     ],
+     "result": [
+      [
+       "categories"
+      ],
+      [
+       "customers"
+      ],
+      [
+       "departments"
+      ],
+      [
+       "employees"
+      ],
+      [
+       "order_items"
+      ],
+      [
+       "orders"
+      ],
+      [
+       "payments"
+      ],
+      [
+       "products"
+      ],
+      [
+       "returns"
+      ],
+      [
+       "suppliers"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "sqlite": "SELECT name, type, \"notnull\", pk FROM pragma_table_info('orders') ORDER BY cid"
+     },
+     "columns": [
+      "name",
+      "type",
+      "notnull",
+      "pk"
+     ],
+     "result": [
+      [
+       "id",
+       "INT",
+       "0",
+       "1"
+      ],
+      [
+       "customer_id",
+       "INT",
+       "0",
+       "0"
+      ],
+      [
+       "order_date",
+       "DATE",
+       "0",
+       "0"
+      ],
+      [
+       "status",
+       "VARCHAR(20)",
+       "0",
+       "0"
+      ],
+      [
+       "amount",
+       "DECIMAL(10,2)",
+       "0",
+       "0"
+      ],
+      [
+       "shipping",
+       "DECIMAL(10,2)",
+       "0",
+       "0"
+      ],
+      [
+       "discount",
+       "DECIMAL(10,2)",
+       "0",
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): SHOW TABLES and DESCRIBE gave syntax errors; sqlite_master and pragma_table_info answered.",
+    "mysql": "Lab (MariaDB 10.11): SHOW TABLES; DESCRIBE t.",
+    "mariadb": "Lab: SHOW TABLES; DESCRIBE t.",
+    "postgresql": "Lab (PostgreSQL 16): information_schema.tables / columns (psql: \\dt, \\d t).",
+    "sqlserver": "Notes only (not lab-tested here): sys.tables, sp_help t.",
+    "oracle": "Notes only (not lab-tested here): USER_TABLES, DESC t."
+   },
+   "fundamentals": [
+    "schema_facts"
+   ],
+   "related": [
+    "list_tables",
+    "describe_table",
+    "sqlite_pragma"
+   ],
+   "source": "https://www.sqlite.org/schematab.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_upsert",
+   "kind": "compare",
+   "title": {
+    "en": "INSERT OR IGNORE, INSERT OR REPLACE and ON CONFLICT in SQLite",
+    "hinglish": "SQLite mein INSERT OR IGNORE, OR REPLACE aur ON CONFLICT",
+    "hindi": "SQLite में INSERT OR IGNORE और ON CONFLICT"
+   },
+   "terms": [
+    [
+     "insert or (ignore|replace)"
+    ],
+    [
+     "sqlite3?",
+     "upsert"
+    ],
+    [
+     "sqlite3?",
+     "on conflict"
+    ],
+    [
+     "sqlite3?",
+     "(insert ignore|on duplicate)"
+    ],
+    [
+     "sqlite3?",
+     "(duplicate|already)",
+     "insert"
+    ],
+    [
+     "sqlite3?",
+     "insert",
+     "(or|ya|या) update"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "insert or replace vs upsert in sqlite",
+     "how to insert or update in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein insert ya update ek saath kaise kare",
+     "insert or ignore kya karta hai sqlite"
+    ],
+    "hindi": [
+     "SQLite में insert या update एक साथ कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "INSERT OR IGNORE skips a row that breaks a UNIQUE, NOT NULL or CHECK rule (not only duplicates). INSERT OR REPLACE (and REPLACE INTO) deletes the clashing row and inserts the new one: columns you didn't send are lost and it gets a new rowid. The real upsert (3.24+) is INSERT ... ON CONFLICT (col) DO UPDATE SET x = excluded.x, where excluded is the row you tried to insert; DO NOTHING skips only that clash. From 3.35 the (col) may be left out.",
+    "hinglish": "INSERT OR IGNORE wo row chhod deta hai jo UNIQUE, NOT NULL ya CHECK tode (sirf duplicate nahi). INSERT OR REPLACE purani row delete karke nayi daalta hai: na bheje columns kho jaate hain aur rowid naya. Asli upsert (3.24+): INSERT ... ON CONFLICT (col) DO UPDATE SET x = excluded.x; excluded = jo row daalni thi.",
+    "hindi": "असली upsert: INSERT ... ON CONFLICT (col) DO UPDATE SET x = excluded.x; INSERT OR REPLACE पुरानी row हटा देता है।"
+   },
+   "mistake": {
+    "en": "Using INSERT OR REPLACE to update one column: the other columns of that row become NULL or their defaults.",
+    "hinglish": "Ek column update karne ke liye INSERT OR REPLACE: us row ke baaki columns NULL ya default ho jaate hain.",
+    "hindi": "एक column बदलने के लिए INSERT OR REPLACE: बाकी columns NULL हो जाते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_stock (sku TEXT PRIMARY KEY, qty INTEGER, note TEXT);\nINSERT INTO t_stock VALUES ('A1', 5, 'shelf 3');\nINSERT INTO t_stock (sku, qty) VALUES ('A1', 2) ON CONFLICT (sku) DO UPDATE SET qty = qty + excluded.qty;\nINSERT OR REPLACE INTO t_stock (sku, qty) VALUES ('B1', 1);\nINSERT OR REPLACE INTO t_stock (sku, qty) VALUES ('B1', 9);\nSELECT sku, qty, note FROM t_stock ORDER BY sku"
+     },
+     "columns": [
+      "sku",
+      "qty",
+      "note"
+     ],
+     "result": [
+      [
+       "A1",
+       "7",
+       "shelf 3"
+      ],
+      [
+       "B1",
+       "9",
+       "NULL"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): ON CONFLICT ... DO UPDATE kept the row's other columns; ON CONFLICT DO UPDATE without (col) worked; INSERT IGNORE / ON DUPLICATE KEY gave syntax errors.",
+    "mysql": "Lab (MariaDB 10.11): INSERT ... ON DUPLICATE KEY UPDATE x = VALUES(x); INSERT IGNORE.",
+    "mariadb": "Lab: ON DUPLICATE KEY UPDATE; INSERT IGNORE.",
+    "postgresql": "Lab (PostgreSQL 16): INSERT ... ON CONFLICT (col) DO UPDATE SET x = EXCLUDED.x (the target is required for DO UPDATE).",
+    "sqlserver": "Notes only (not lab-tested here): MERGE.",
+    "oracle": "Notes only (not lab-tested here): MERGE."
+   },
+   "fundamentals": [
+    "changes_safety",
+    "engine_syntax"
+   ],
+   "related": [
+    "upsert",
+    "insert_ignore_replace"
+   ],
+   "source": "https://www.sqlite.org/lang_upsert.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_pragma",
+   "kind": "concept",
+   "title": {
+    "en": "PRAGMA in SQLite",
+    "hinglish": "SQLite mein PRAGMA",
+    "hindi": "SQLite में PRAGMA"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "pragmas?"
+    ],
+    [
+     "pragmas?"
+    ],
+    [
+     "प्राग्मा"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is pragma in sqlite",
+     "what are the important pragmas in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein pragma kya hota hai",
+     "sqlite mein kaun kaun se pragma zaroori hain"
+    ],
+    "hindi": [
+     "SQLite में PRAGMA क्या है"
+    ]
+   },
+   "answer": {
+    "en": "PRAGMA is SQLite's own command for reading or changing a setting, or asking about the database: PRAGMA name; reads it, PRAGMA name = value; sets it. Many last only for the connection (foreign_keys, busy_timeout), so the app sets them every time it connects; some are stored in the file (journal_mode = WAL, user_version). Useful ones: foreign_keys = ON, busy_timeout = 5000, journal_mode = WAL, table_info(t), index_list(t), integrity_check, foreign_key_check. Most can also be read as tables: SELECT * FROM pragma_table_info('t').",
+    "hinglish": "PRAGMA SQLite ka apna command hai setting padhne/badalne ya database ke baare mein poochne ke liye: PRAGMA name; padhta hai, PRAGMA name = value; badalta hai. Kai sirf us connection tak rehte hain (foreign_keys, busy_timeout), isliye app har connect pe lagaye; kuch file mein rehte hain (journal_mode = WAL). Kaam ke: foreign_keys = ON, busy_timeout = 5000, journal_mode = WAL, table_info(t), integrity_check.",
+    "hindi": "PRAGMA SQLite की settings पढ़ने/बदलने का command है; कई सिर्फ़ उसी connection तक रहते हैं।"
+   },
+   "mistake": {
+    "en": "Setting foreign_keys or busy_timeout once in a tool and expecting it to stay: those last only for that connection.",
+    "hinglish": "foreign_keys ya busy_timeout ek baar tool mein set karke sochna ki rahega: wo sirf us connection tak hai.",
+    "hindi": "foreign_keys एक बार set करके सोचना कि हमेशा रहेगा: वह सिर्फ़ उसी connection तक है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT (SELECT foreign_keys FROM pragma_foreign_keys) AS foreign_keys, (SELECT journal_mode FROM pragma_journal_mode) AS journal_mode, (SELECT COUNT(*) FROM pragma_table_info('orders')) AS order_columns"
+     },
+     "columns": [
+      "foreign_keys",
+      "journal_mode",
+      "order_columns"
+     ],
+     "result": [
+      [
+       "0",
+       "delete",
+       "7"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): foreign_keys is 0 and journal_mode 'delete' on a new connection to a file database.",
+    "mysql": "Lab (MariaDB 10.11): settings are SET [GLOBAL|SESSION] variables; SHOW VARIABLES reads them.",
+    "mariadb": "Lab: SET / SHOW VARIABLES.",
+    "postgresql": "Lab (PostgreSQL 16): SET / SHOW, and postgresql.conf.",
+    "sqlserver": "Notes only (not lab-tested here): SET options and sp_configure.",
+    "oracle": "Notes only (not lab-tested here): ALTER SESSION / ALTER SYSTEM."
+   },
+   "fundamentals": [
+    "engine_syntax"
+   ],
+   "related": [
+    "sqlite_foreign_keys",
+    "sqlite_wal",
+    "sqlite_list_tables"
+   ],
+   "source": "https://www.sqlite.org/pragma.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_case_compare",
+   "kind": "concept",
+   "title": {
+    "en": "Upper and lower case in SQLite comparisons (=, LIKE, GLOB)",
+    "hinglish": "SQLite mein bade-chhote akshar (=, LIKE, GLOB)",
+    "hindi": "SQLite में बड़े-छोटे अक्षर"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "case"
+    ],
+    [
+     "sqlite3?",
+     "case ?sensitive"
+    ],
+    [
+     "sqlite3?",
+     "glob"
+    ],
+    [
+     "glob"
+    ],
+    [
+     "nocase"
+    ],
+    [
+     "sqlite3?",
+     "(ilike|like)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "is sqlite case sensitive",
+     "what is glob in sqlite"
+    ],
+    "hinglish": [
+     "sqlite case sensitive hai kya",
+     "sqlite mein like aur glob mein farak"
+    ],
+    "hindi": [
+     "SQLite case sensitive है क्या"
+    ]
+   },
+   "answer": {
+    "en": "In SQLite = compares text exactly, so 'Asha' = 'asha' is false. LIKE ignores case, but only for the letters A-Z ('Ásha' LIKE 'á%' is false). GLOB is case-sensitive and uses * and ? like file names ('[0-9]*' starts with a digit). For case-insensitive =, add COLLATE NOCASE to the comparison or the column (again A-Z only), or compare lower() of both. There is no ILIKE.",
+    "hinglish": "SQLite mein = text ko bilkul waisa compare karta hai: 'Asha' = 'asha' false. LIKE case ignore karta hai par sirf A-Z ke liye. GLOB case-sensitive hai aur * ? file naam ki tarah. Case ignore karke = ke liye COLLATE NOCASE ya dono ka lower(). ILIKE nahi hai.",
+    "hindi": "SQLite में = case देखता है, LIKE सिर्फ़ A-Z के लिए case नहीं देखता, GLOB case-sensitive है।"
+   },
+   "mistake": {
+    "en": "Expecting = to ignore case as it does on MySQL's default collation: on SQLite the row isn't found.",
+    "hinglish": "Ye sochna ki = MySQL ki tarah case ignore karega: SQLite pe row nahi milti.",
+    "hindi": "यह सोचना कि = MySQL की तरह case नहीं देखेगा: SQLite पर row नहीं मिलती।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT 'Asha' = 'asha' AS eq, 'Asha' LIKE 'a%' AS like_ci, 'Asha' GLOB 'a*' AS glob_cs, 'Asha' = 'asha' COLLATE NOCASE AS nocase, 'Ásha' LIKE 'á%' AS accented"
+     },
+     "columns": [
+      "eq",
+      "like_ci",
+      "glob_cs",
+      "nocase",
+      "accented"
+     ],
+     "result": [
+      [
+       "0",
+       "1",
+       "0",
+       "1",
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): 'a' = 'A' is 0, 'a' LIKE 'A' is 1, 'Ásha' LIKE 'á%' is 0.",
+    "mysql": "Lab (MariaDB 10.11, default collation): 'Asha' = 'asha' and 'Asha' LIKE 'a%' are both 1.",
+    "mariadb": "Lab: = and LIKE ignore case on the default collation.",
+    "postgresql": "Lab (PostgreSQL 16): 'Asha' = 'asha' and 'Asha' LIKE 'a%' are both false; ILIKE ignores case.",
+    "sqlserver": "Notes only (not lab-tested here): Depends on the collation (usually case-insensitive).",
+    "oracle": "Notes only (not lab-tested here): Case-sensitive by default."
+   },
+   "fundamentals": [
+    "values_types",
+    "engine_syntax"
+   ],
+   "related": [
+    "case_insensitive_search",
+    "like",
+    "sqlite_type_affinity"
+   ],
+   "source": "https://www.sqlite.org/lang_expr.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
   }
  ]
 }

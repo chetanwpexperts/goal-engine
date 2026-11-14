@@ -120,6 +120,17 @@ becomes a rule; an engine stops being "notes only" (rule A) once its own lab-pro
 - [ ] **E1. SQLite (3-4 nights).** Its own dialect file; loose column types (type affinity), no RIGHT/FULL JOIN in older
   versions, date functions (date(), strftime), ALTER TABLE limits, || for text, LIMIT/OFFSET; its error messages; every
   query rule re-checked on it; concepts for SQLite questions.
+  - [x] Night 1: its own error messages in the diagnoser (command line and driver formats, the file-level ones: locked,
+    read-only, can't open, full, damaged), detection from its words and errors, the other databases' words it refuses with
+    rewrites run on SQLite (dates, text functions, TOP / FETCH, ::casts, INSERT IGNORE, ON DUPLICATE KEY, SHOW TABLES ...),
+    date arithmetic that runs but means something else (CAST AS DATE, date - date, date + n), 16 concepts.
+  - [ ] Night 2: types and tables: type affinity in comparisons ('1' = 1, dates of two shapes), STRICT tables, INT PRIMARY
+    KEY / AUTO_INCREMENT / SERIAL giving NULL ids, VARCHAR(n) not enforced, foreign keys off, ALTER TABLE rebuilds: the
+    CREATE TABLE checker on SQLite.
+  - [ ] Night 3: every existing query rule re-checked on SQLite in the lab (NULLs, joins, bare columns in GROUP BY, integer
+    division, LIMIT, subqueries, windows, upserts) and kept or recorded as different in sqlite.json; EXPLAIN QUERY PLAN.
+  - [ ] Night 4: transactions and locking (BEGIN IMMEDIATE, WAL, busy timeout), a practice exam across the nights, and
+    SQLite stops being notes-only.
 - [ ] **E2. SQL Server (6-8 nights).** TOP / OFFSET-FETCH, ISNULL vs COALESCE, GETDATE, [brackets], string + concatenation,
   MERGE and OUTPUT, identity, its error numbers (Msg 207, 208, 515, 2627, 8152 ...), T-SQL procedures, the plan format,
   NOLOCK and snapshot isolation; each lab-run on the server.

@@ -84,6 +84,14 @@ def _inside_null_fn(sql: str, pos: int) -> bool:
     return False
 
 
+def _own_port(chosen: str | None) -> bool:
+    """A database whose refused words come from its own dialect file rather than the MySQL/PostgreSQL families (SQLite)."""
+    from app.dbknow import engines as E
+
+    fam = E.syntax_family(chosen)
+    return bool(fam) and fam not in ("mysql", "postgresql")
+
+
 def _sql_server(s: str) -> bool:
     if CHOSEN.get() == "sqlserver":
         return True
@@ -143,8 +151,8 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
         a = m.end() - 1
         b = _close(s, a)
         args = _split_args(sql[a + 1:b])
-        if len(args) != 2 or tsql:
-            continue
+        if len(args) != 2 or tsql or _own_port(CHOSEN.get()):
+            continue                                   # (a database with its own port knowledge says it as a dialect finding)
         new = f"COALESCE({args[0]}, {args[1]})"
         out.append((F("error", "null_fn", "ISNULL(x, y) is SQL Server only: use COALESCE", "ISNULL(x, y) sirf SQL Server ka hai: COALESCE lagao",
                       sql[m.start():b + 1][:90],
@@ -481,7 +489,7 @@ def _expr_around(sql: str, a: int, b: int) -> str:
     return re.sub(r"\s+", " ", sql[x + 1:y]).strip()
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=8)
 def _refuses(fam: str) -> list:
     data = json.loads((DIALECTS / f"{fam}.json").read_text(encoding="utf-8"))
     return [{**r, "_re": re.compile(r["re"], re.I)} for r in data.get("refuses", [])]
@@ -493,13 +501,20 @@ def _foreign_syntax(sql: str, s: str, F) -> list:
     from app.dbknow import engines as E
 
     chosen = CHOSEN.get()
-    fam = E.family(chosen)
+    fam = E.syntax_family(chosen)
     if not fam:
         return []
     name = E.label(chosen)
     out = []
     for r in _refuses(fam):
+        if r.get("unless") and re.search(r["unless"], s, re.I):
+            continue                                 # a wider form of it is in the query (OFFSET ... FETCH): that entry says it
+        after = re.search(r["after"], s, re.I) if r.get("after") else None
+        if r.get("after") and not after:
+            continue                                 # only inside that clause (VALUES(col) after ON DUPLICATE KEY UPDATE)
         for m in r["_re"].finditer(s):
+            if after and m.start() < after.end():
+                continue
             if r.get("not_inside_function") and _inside_null_fn(sql, m.start()):
                 continue
             ev = sql[m.start():m.end()]

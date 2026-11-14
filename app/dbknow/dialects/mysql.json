@@ -14,6 +14,9 @@
   "mysql-bin"
  ],
  "codes": {
+  "1111": "aggregate_misuse",
+  "1136": "value_count_mismatch",
+  "1050": "table_exists",
   "1064": "syntax_error",
   "1146": "unknown_table",
   "1054": "unknown_column",
@@ -65,6 +68,9 @@
   "\\((\\d{4}),"
  ],
  "messages": [
+  {"cause": "aggregate_misuse", "re": "Invalid use of group function"},
+  {"cause": "value_count_mismatch", "re": "Column count doesn't match value count at row (?P<row>\\d+)"},
+  {"cause": "table_exists", "re": "Table '(?:(?P<db>[\\w$]+)\\.)?(?P<table>[^']+)' already exists"},
   {
    "cause": "source_log_purged",
    "re": "Got fatal error 1236 from (?:master|source) when reading data from binary log: '(?:Could not find first log file name in binary log index file|[^']*purged[^']*)'"
@@ -239,6 +245,9 @@
   }
  ],
  "fix": {
+  "aggregate_misuse": ["SELECT customer_id, SUM(amount) AS total\nFROM orders\nGROUP BY customer_id\nHAVING SUM(amount) > 1000;   -- the condition on the total goes in HAVING", "-- In UPDATE/DELETE compare with a derived table (MySQL can't read the table it changes in a plain subquery):\nDELETE FROM t WHERE amount < (SELECT a FROM (SELECT AVG(amount) AS a FROM t) AS x);"],
+  "value_count_mismatch": ["-- Name the columns and give one value for each, in the same order:\nINSERT INTO {table} (col1, col2) VALUES (?, ?);"],
+  "table_exists": ["CREATE TABLE IF NOT EXISTS {table} (...);", "-- or see what is already there:\nSHOW CREATE TABLE {table};"],
   "syntax_error": [
    "-- Look just before \"{token}\": a missing comma, an unclosed ' or ( , or a keyword from another database.\n-- MySQL uses `backticks` for names and 'single quotes' for text; LIMIT offset, count is fine here."
   ],
@@ -523,7 +532,7 @@
   "\\bdelete\\s+[\\w`]+(?:\\s*,\\s*[\\w`]+)*\\s+from\\b",
   "\\bon\\s+duplicate\\s+key\\s+update\\b",
   "\\binsert\\s+ignore\\b",
-  "\\breplace\\s+into\\b",
+  "(?<!or )(?<!OR )\\breplace\\s+into\\b",
   "(?m)^\\s*delimiter\\s+\\S+"
  ],
  "query_rules": {

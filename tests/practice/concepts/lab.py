@@ -1,5 +1,5 @@
 """The lab for the concepts pack: every example query in app/dbknow/core/concepts.json is run on MariaDB/MySQL and on
-PostgreSQL against the practice schema (tests/practice/schema.py). The result kept with the example is what both engines
+PostgreSQL against the practice schema (tests/practice/schema.py); a SQLite example (E1) runs on SQLite (Python's sqlite3). The result kept with the example is what both engines
 returned; an example whose engines disagree (when it is meant to be the same) is a failure.
 
 Read-only examples run on the temporary practice tables. Examples that change data run, then the tables are rebuilt.
@@ -112,14 +112,65 @@ def run_example(eng, ex: dict) -> dict:
     return out
 
 
+def run_sqlite(ex: dict) -> dict:
+    """E1: a SQLite example (its 'sql' has only a 'sqlite' version) run on a fresh SQLite file with the practice tables;
+    several statements run in order, the last rows read are the result."""
+    import os
+    import tempfile
+
+    from app.agents.sqlroutine import split_script
+
+    d = tempfile.mkdtemp()
+    path = os.path.join(d, "lab.db")
+    conn = S.sqlite_db(path)
+    try:
+        out = (None, 0)
+        for stmt in split_script(ex["sql"]["sqlite"]):
+            cur = conn.execute(stmt)
+            if cur.description:
+                out = ([x[0] for x in cur.description], [[S.norm(v) for v in r] for r in cur.fetchall()])
+            elif out[0] is None:
+                out = (None, cur.rowcount)
+        return {"result": out}
+    finally:
+        conn.close()
+        for f in os.listdir(d):
+            os.remove(os.path.join(d, f))
+        os.rmdir(d)
+
+
+def check_sqlite(data: dict, write: bool) -> list[str]:
+    """The SQLite examples: each one's stored result must be what SQLite returns now."""
+    bad = []
+    for c in data["concepts"]:
+        for k, ex in enumerate(c["examples"]):
+            if set(ex.get("sql") or {}) != {"sqlite"}:
+                continue
+            try:
+                cols, res = run_sqlite(ex)["result"]
+            except Exception as exc:  # noqa: BLE001
+                bad.append(f"{c['id']} example {k}: fails on SQLite: {exc}")
+                continue
+            want = {"columns": cols, "result": res} if cols else {"changed": res}
+            stored = {key: ex.get(key) for key in want}
+            if stored != want:
+                if write:
+                    ex.update(want)
+                else:
+                    bad.append(f"{c['id']} example {k}: stored result differs from SQLite: {stored} vs {want}")
+    return bad
+
+
 def check(write: bool = False) -> list[str]:
     engines = S.engines()
     if len(engines) < 2:
         return ["needs both MariaDB/MySQL and PostgreSQL running"]
     data = json.loads(K.PACK.read_text(encoding="utf-8"))
-    bad = []
+    bad = check_sqlite(data, write)
     for c in data["concepts"]:
         for k, ex in enumerate(c["examples"]):
+            if set(ex.get("sql") or {}) == {"sqlite"}:
+                continue                                   # run on SQLite above
             got = {}
             for kind, eng in engines.items():
                 try:

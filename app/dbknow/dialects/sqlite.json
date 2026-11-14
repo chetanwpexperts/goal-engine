@@ -2,7 +2,7 @@
   "name": "SQLite",
   "notes_only": true,
   "family": "relational",
-  "about": "No lab-tested knowledge yet: DBaba recognises SQLite from its words or error format and answers with general SQL reasoning plus the notes below.",
+  "about": "SQLite (E1 in docs/dbaba-curriculum.md). Lab-tested on SQLite 3.53 (Python's sqlite3) and the 3.45 command line: its own error messages (the diagnoser), the other databases' words it refuses with their SQLite rewrites, and date arithmetic that runs but means something else. The other query checks are general SQL reasoning until E1's later nights re-check them on SQLite.",
   "named": [
     "\\bsqlite3?\\b",
     "एसक्यूलाइट"
@@ -11,13 +11,31 @@
     "\\bautoincrement\\b",
     "\\bpragma\\s+\\w+",
     "\\bglob\\s+'",
-    "\\bsqlite_master\\b"
+    "\\bsqlite_master\\b",
+    "\\bsqlite_schema\\b",
+    "\\bstrftime\\s*\\(",
+    "\\bjulianday\\s*\\(",
+    "\\bunixepoch\\s*\\(",
+    "\\btypeof\\s*\\(",
+    "\\binsert\\s+or\\s+(?:replace|ignore|abort|fail|rollback)\\b",
+    "\\bwithout\\s+rowid\\b",
+    "\\blast_insert_rowid\\s*\\(",
+    "\\bpragma_table_info\\b"
   ],
   "weak_marks": [],
   "error_marks": [
     "\\bsqlite3\\.\\w+Error\\b",
     "\\bSQLITE_[A-Z]+\\b",
-    "\\bno such (table|column):"
+    "\\bno such (table|column):",
+    "\\b(?:UNIQUE|NOT NULL|CHECK|FOREIGN KEY) constraint failed\\b",
+    "\\bdatabase is locked\\b",
+    "\\bError: (?:in prepare|stepping), ",
+    "\\b(?:Parse|Runtime) error near line \\d+:",
+    "\\bSQLite\\w*Exception\\b",
+    "\\bno such function: \\w+",
+    "\\bnear \"[^\"\\n]{1,40}\": syntax error\\b",
+    "\\battempt to write a readonly database\\b",
+    "\\bdatabase disk image is malformed\\b"
   ],
   "notes": {
     "limit": "LIMIT n OFFSET m works as on MySQL/PostgreSQL.",
@@ -39,7 +57,9 @@
     "boolean": "No BOOLEAN type: TRUE and FALSE are 1 and 0."
   },
   "source": "https://www.sqlite.org/lang.html",
-  "proven": [],
+  "proven": [
+    "sqlite"
+  ],
   "note_marks": {
     "limit": "\\blimit\\b",
     "null_fn": "\\b(ifnull|nvl|isnull|coalesce)\\s*\\(",
@@ -199,5 +219,1305 @@
       ]
     }
   ],
-  "lab_about": "These notes were run on SQLite 3.53 (Python's sqlite3) by tests/practice/test_night10.py; SQLite stays notes-only until it has its own rules."
+  "lab_about": "These notes were run on SQLite 3.53 (Python's sqlite3) by tests/practice/test_night10.py; SQLite stays notes-only until it has its own rules.",
+  "own_formats": true,
+  "words": [
+    "sqlite",
+    "sqlite3"
+  ],
+  "code_patterns": [
+    "\\b(SQLITE_[A-Z]+(?:_[A-Z]+)*)\\b"
+  ],
+  "codes": {
+    "SQLITE_CONSTRAINT_UNIQUE": "duplicate_key",
+    "SQLITE_CONSTRAINT_PRIMARYKEY": "duplicate_key",
+    "SQLITE_CONSTRAINT_NOTNULL": "not_null",
+    "SQLITE_CONSTRAINT_CHECK": "check_violation",
+    "SQLITE_CONSTRAINT_FOREIGNKEY": "fk_missing_parent",
+    "SQLITE_BUSY": "db_file_locked",
+    "SQLITE_BUSY_SNAPSHOT": "db_file_locked",
+    "SQLITE_BUSY_TIMEOUT": "db_file_locked",
+    "SQLITE_READONLY": "file_readonly",
+    "SQLITE_READONLY_DIRECTORY": "file_readonly",
+    "SQLITE_CANTOPEN": "cannot_open_file",
+    "SQLITE_FULL": "disk_full",
+    "SQLITE_CORRUPT": "file_corrupt",
+    "SQLITE_NOTADB": "file_corrupt",
+    "SQLITE_MISMATCH": "bad_value_type"
+  },
+  "style": [
+    "\\bError: (?:in prepare|stepping), ",
+    "\\b(?:Parse|Runtime) error near line \\d+:",
+    "\\bsqlite3\\.\\w+Error\\b",
+    "\\bSQLITE_[A-Z]+\\b",
+    "\\bSQLite\\w*Exception\\b",
+    "\\bSqliteException\\b"
+  ],
+  "messages": [
+    {
+      "cause": "alter_not_supported",
+      "re": "Cannot add a (?P<what>NOT NULL column with default value NULL|PRIMARY KEY column|UNIQUE column)"
+    },
+    {
+      "cause": "alter_not_supported",
+      "re": "near \\\"(?P<token>MODIFY|CHANGE|TYPE)\\\": syntax error"
+    },
+    {
+      "cause": "reserved_word",
+      "re": "near \\\"(?P<token>order|group|default|check|index|table|values|references|transaction|limit|unique|primary)\\\": syntax error"
+    },
+    {
+      "cause": "syntax_error",
+      "re": "near \\\"(?P<token>[^\\\"]{0,60})\\\": syntax error"
+    },
+    {
+      "cause": "syntax_error",
+      "re": "\\bincomplete input\\b|unrecognized token: \\\"?(?P<token>[^\\\"\\n]{0,30})"
+    },
+    {
+      "cause": "unknown_table",
+      "re": "no such table: (?:(?P<db>[\\w$]+)\\.)?(?P<table>[\\w$]+)"
+    },
+    {
+      "cause": "unknown_column",
+      "re": "no such column: (?:(?P<prefix>[\\w$]+)\\.)?(?P<column>[\\w$]+)"
+    },
+    {
+      "cause": "ambiguous_column",
+      "re": "ambiguous column name: (?:[\\w$]+\\.)*(?P<column>[\\w$]+)"
+    },
+    {
+      "cause": "unknown_function",
+      "re": "no such function: (?P<token>[\\w$]+)"
+    },
+    {
+      "cause": "aggregate_misuse",
+      "re": "misuse of aggregate(?: function)?:? (?P<token>\\w+)\\(\\)"
+    },
+    {
+      "cause": "duplicate_key",
+      "re": "UNIQUE constraint failed: (?P<key>(?P<table>[\\w$]+)\\.(?P<column>[\\w$]+)(?:, [\\w$]+\\.[\\w$]+)*)"
+    },
+    {
+      "cause": "not_null",
+      "re": "NOT NULL constraint failed: (?P<table>[\\w$]+)\\.(?P<column>[\\w$]+)"
+    },
+    {
+      "cause": "check_violation",
+      "re": "CHECK constraint failed: (?P<constraint>[^\\n(']{1,80}?)(?=\\s*\\(|\\s*$|\\s*\\n|')"
+    },
+    {
+      "cause": "fk_missing_parent",
+      "re": "FOREIGN KEY constraint failed"
+    },
+    {
+      "cause": "bad_value_type",
+      "re": "\\bdatatype mismatch\\b|cannot store (?P<got>TEXT|REAL|BLOB|INT|INTEGER) value in (?P<want>\\w+) column (?P<table>[\\w$]+)\\.(?P<column>[\\w$]+)"
+    },
+    {
+      "cause": "value_count_mismatch",
+      "re": "table (?P<table>[\\w$]+) has (?P<want>\\d+) columns but (?P<got>\\d+) values were supplied|\\b\\d+ values for \\d+ columns\\b|all VALUES must have the same number of terms"
+    },
+    {
+      "cause": "table_exists",
+      "re": "\\btable \"?(?P<table>[\\w$]+)\"? already exists"
+    },
+    {
+      "cause": "db_file_locked",
+      "re": "\\bdatabase is locked\\b|\\bdatabase table is locked\\b"
+    },
+    {
+      "cause": "file_readonly",
+      "re": "attempt to write a readonly database"
+    },
+    {
+      "cause": "cannot_open_file",
+      "re": "unable to open database(?: file|\\s+\\\"(?P<path>[^\\\"]+)\\\")"
+    },
+    {
+      "cause": "disk_full",
+      "re": "database or disk is full"
+    },
+    {
+      "cause": "file_corrupt",
+      "re": "database disk image is malformed|file is not a database|file is encrypted or is not a database"
+    }
+  ],
+  "fix": {
+    "syntax_error": [
+      "-- Look just before \"{token}\": a missing comma, an unclosed ' or (, or words from another database.\n-- SQLite has no SHOW TABLES / DESCRIBE (use sqlite_master / PRAGMA table_info), no FOR UPDATE, no INTERVAL, no TOP n (use LIMIT n), no ::casts (use CAST(x AS type)).\n-- 'incomplete input' means the statement ends too early: a missing ) or END, or an unclosed quote."
+    ],
+    "reserved_word": [
+      "-- Put the name in double quotes wherever it is used:\nSELECT \"{word}\" FROM ...;\n-- or rename it once (SQLite 3.25+):\nALTER TABLE {table} RENAME COLUMN \"{word}\" TO {word}_value;"
+    ],
+    "unknown_table": [
+      "SELECT name FROM sqlite_master WHERE type IN ('table', 'view') AND name LIKE '%{table_hint}%';",
+      "-- Check which FILE the app opened: a wrong or relative path silently creates a new, empty database.\nPRAGMA database_list;"
+    ],
+    "unknown_column": [
+      "SELECT name, type FROM pragma_table_info('{table}');",
+      "-- Text values go in 'single quotes'; \"double quotes\" are for names."
+    ],
+    "ambiguous_column": [
+      "-- Put the table (or its alias) in front of the column:\nSELECT t1.{column}, ... FROM t1 JOIN t2 ON ... WHERE t1.{column} = ...;"
+    ],
+    "unknown_function": [
+      "-- SQLite's own words: NOW() -> datetime('now'), CURDATE() -> date('now'), DATE_ADD(d, INTERVAL 7 DAY) -> date(d, '+7 days'),\n-- DATEDIFF(a, b) -> julianday(a) - julianday(b), YEAR(d) -> strftime('%Y', d), DATE_FORMAT -> strftime, LEFT(s, n) -> substr(s, 1, n),\n-- LOCATE / CHARINDEX -> instr(s, x), LEN / CHAR_LENGTH -> length, GREATEST / LEAST -> max(a, b) / min(a, b), NVL / ISNULL -> IFNULL",
+      "-- Paste the query and say it is SQLite: I'll rewrite each call."
+    ],
+    "aggregate_misuse": [
+      "SELECT customer_id, SUM(amount) AS total\nFROM orders\nGROUP BY customer_id\nHAVING SUM(amount) > 1000;   -- the condition on the total goes in HAVING",
+      "-- In UPDATE/DELETE compare with a subquery:\nDELETE FROM t WHERE amount < (SELECT AVG(amount) FROM t);"
+    ],
+    "duplicate_key": [
+      "-- See the row that already has it:\nSELECT * FROM {table} WHERE {column} = ?;",
+      "-- Save without failing when it already exists (upsert, SQLite 3.24+):\nINSERT INTO {table} ({column}, ...) VALUES (...)\nON CONFLICT ({column}) DO UPDATE SET ... = excluded....;   -- or DO NOTHING",
+      "-- INSERT OR REPLACE deletes the old row first: its other columns and its rowid are lost. Prefer the upsert above."
+    ],
+    "not_null": [
+      "-- Send a value for {column} from the app (an empty form field often arrives as NULL),\n-- or give the column a DEFAULT: SQLite can't change a column's default with ALTER TABLE, so rebuild the table with it."
+    ],
+    "check_violation": [
+      "-- The rule that failed: {constraint}\n-- See the table's rules:\nSELECT sql FROM sqlite_master WHERE type = 'table' AND name = '{table}';"
+    ],
+    "fk_missing_parent": [
+      "-- This connection checks foreign keys (PRAGMA foreign_keys = ON). SQLite's message doesn't say which side failed:\n-- adding/changing a child row -> its parent row must exist first; deleting/changing a parent -> child rows still point to it.\nPRAGMA foreign_key_list({table});",
+      "-- Rows that point nowhere, in every table:\nPRAGMA foreign_key_check;"
+    ],
+    "fk_has_children": [
+      "-- Rows in another table still point to this one; find them:\nPRAGMA foreign_key_check;\n-- delete or move them first, or declare the link with ON DELETE CASCADE / SET NULL (a table rebuild in SQLite)."
+    ],
+    "bad_value_type": [
+      "-- 'datatype mismatch': an INTEGER PRIMARY KEY (the rowid) takes only whole numbers; send one, or leave it out for a new id.\n-- 'cannot store ... value in ... column': a STRICT table refusing another type; convert it first, e.g. CAST(? AS INTEGER)."
+    ],
+    "value_count_mismatch": [
+      "-- Name the columns and give one value for each, in the same order:\nINSERT INTO {table} (col1, col2) VALUES (?, ?);",
+      "-- See the table's columns in order:\nSELECT name FROM pragma_table_info('{table}');"
+    ],
+    "table_exists": [
+      "CREATE TABLE IF NOT EXISTS {table} (...);",
+      "SELECT sql FROM sqlite_master WHERE name = '{table}';"
+    ],
+    "disk_full": [
+      "-- SQLite needs free space for the file AND its journal. Check the disk, and any page limit:\nPRAGMA page_count;\nPRAGMA max_page_count;",
+      "-- Space freed by DELETE stays inside the file until (needs free disk about the file's size):\nVACUUM;"
+    ],
+    "db_file_locked": [
+      "-- Wait for the lock instead of failing at once (milliseconds, per connection):\nPRAGMA busy_timeout = 5000;",
+      "-- Let readers keep reading while one connection writes:\nPRAGMA journal_mode = WAL;",
+      "-- A transaction that reads and then writes: take the write lock at the start, and keep it short\nBEGIN IMMEDIATE;\n-- ... reads and writes ...\nCOMMIT;"
+    ],
+    "file_readonly": [
+      "-- The app's user must be able to write the file AND its folder (SQLite creates a -journal / -wal file next to it):\n-- ls -l app.db ; ls -ld <its folder>   then fix the owner or permissions for that user",
+      "-- Also check the connection isn't opened read-only (mode=ro in a file: URI)."
+    ],
+    "cannot_open_file": [
+      "-- Use an absolute path to a folder that exists and the app can write; a relative path depends on where the app was started.\n-- e.g. sqlite3.connect('/srv/app/data/app.db')"
+    ],
+    "file_corrupt": [
+      "PRAGMA integrity_check;",
+      "-- Save what can be read into a new file (sqlite3 command line, 3.29+):\n-- sqlite3 broken.db \".recover\" | sqlite3 fixed.db",
+      "-- 'file is not a database': the path points at another file, or at an encrypted database opened without its key."
+    ],
+    "alter_not_supported": [
+      "-- SQLite's ALTER TABLE can only RENAME TO, RENAME COLUMN, ADD COLUMN, DROP COLUMN (3.35+). Anything else is a rebuild:\nPRAGMA foreign_keys = OFF;\nBEGIN;\nCREATE TABLE {table}_new (... the new definition ...);\nINSERT INTO {table}_new (cols) SELECT cols FROM {table};\nDROP TABLE {table};\nALTER TABLE {table}_new RENAME TO {table};\nPRAGMA foreign_key_check;\nCOMMIT;\nPRAGMA foreign_keys = ON;",
+      "-- A NOT NULL column can be added with a default: ALTER TABLE {table} ADD COLUMN c TEXT NOT NULL DEFAULT '';"
+    ]
+  },
+  "refuses": [
+    {
+      "id": "pg_cast_text",
+      "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*(?:text|varchar|character\\s+varying)\\b",
+      "to": "CAST(\\1 AS TEXT)",
+      "error": "unrecognized token: \":\"",
+      "title_en": "{db} has no :: cast (that's PostgreSQL)",
+      "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)",
+      "fix_en": "Use CAST(x AS type), which works on every database.",
+      "fix_hi": "CAST(x AS type) likho, ye har database pe chalta hai.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "pg_cast_int",
+      "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*(?:int|integer|bigint|smallint|int4|int8)\\b",
+      "to": "CAST(\\1 AS INTEGER)",
+      "error": "unrecognized token: \":\"",
+      "title_en": "{db} has no :: cast (that's PostgreSQL)",
+      "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)",
+      "fix_en": "Use CAST(x AS INTEGER).",
+      "fix_hi": "CAST(x AS INTEGER) likho.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "pg_cast_num",
+      "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*(?:numeric|decimal|real|float8?|double\\s+precision)\\b",
+      "to": "CAST(\\1 AS REAL)",
+      "error": "unrecognized token: \":\"",
+      "title_en": "{db} has no :: cast (that's PostgreSQL)",
+      "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)",
+      "fix_en": "Use CAST(x AS REAL) for a number with a fraction.",
+      "fix_hi": "CAST(x AS REAL) likho.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "pg_cast_date",
+      "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*date\\b",
+      "to": "date(\\1)",
+      "error": "unrecognized token: \":\"",
+      "title_en": "{db} has no :: cast (that's PostgreSQL)",
+      "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)",
+      "fix_en": "Use date(x): it gives the YYYY-MM-DD text. (Don't write CAST(x AS DATE) on SQLite: it gives only the year, 2024.)",
+      "fix_hi": "date(x) likho (CAST(x AS DATE) SQLite pe sirf saal deta hai).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "pg_cast_ts",
+      "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*(?:timestamp|timestamptz)\\b",
+      "to": "datetime(\\1)",
+      "error": "unrecognized token: \":\"",
+      "title_en": "{db} has no :: cast (that's PostgreSQL)",
+      "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)",
+      "fix_en": "Use datetime(x): it gives the YYYY-MM-DD HH:MM:SS text.",
+      "fix_hi": "datetime(x) likho.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "pg_cast_other",
+      "re": "::\\s*(?!(?:text|varchar|character|int|integer|bigint|smallint|int4|int8|numeric|decimal|real|float8?|double|date|timestamp|timestamptz)\\b)[a-z]\\w*",
+      "to": null,
+      "error": "unrecognized token: \":\"",
+      "title_en": "{db} has no :: cast (that's PostgreSQL)",
+      "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)",
+      "fix_en": "Use CAST(x AS type) with a type SQLite understands (TEXT, INTEGER, REAL, NUMERIC, BLOB).",
+      "fix_hi": "CAST(x AS type) likho (TEXT, INTEGER, REAL, NUMERIC, BLOB).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "ilike",
+      "re": "\\bilike\\b",
+      "to": "LIKE",
+      "error": "near \"ILIKE\": syntax error",
+      "title_en": "{db} has no ILIKE (that's PostgreSQL)",
+      "title_hi": "{db} mein ILIKE nahi hota (wo PostgreSQL ka hai)",
+      "fix_en": "Use LIKE: on SQLite it already ignores case for the letters A-Z (not for letters like é or ा: compare lower() of both, or use a NOCASE column).",
+      "fix_hi": "LIKE likho: SQLite pe ye A-Z ke liye pehle se case ignore karta hai.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "from_dual",
+      "re": "\\s+from\\s+dual\\b",
+      "to": "",
+      "error": "no such table: DUAL",
+      "title_en": "{db} has no DUAL table (that's Oracle / MySQL)",
+      "title_hi": "{db} mein DUAL table nahi hoti",
+      "fix_en": "A SELECT without FROM works on SQLite: drop FROM DUAL.",
+      "fix_hi": "FROM DUAL hata do: SQLite pe bina FROM ka SELECT chalta hai.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "sysdate_bare",
+      "re": "\\bsysdate\\b(?!\\s*\\()",
+      "to": "datetime('now')",
+      "error": "no such column: SYSDATE",
+      "title_en": "{db} has no SYSDATE (that's Oracle)",
+      "title_hi": "{db} mein SYSDATE nahi hota (wo Oracle ka hai)",
+      "fix_en": "Use datetime('now') (in UTC; datetime('now', 'localtime') for the computer's local time).",
+      "fix_hi": "datetime('now') likho (UTC mein).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "offset_fetch",
+      "re": "\\boffset\\s+(\\d+)\\s+rows?\\s+fetch\\s+(?:first|next)\\s+(\\d+)\\s+rows?\\s+only\\b",
+      "to": "LIMIT \\2 OFFSET \\1",
+      "error": "near \"ROWS\": syntax error",
+      "title_en": "{db} has no OFFSET ... FETCH (that's SQL Server / Oracle)",
+      "title_hi": "{db} mein OFFSET ... FETCH nahi hota",
+      "fix_en": "SQLite pages with LIMIT n OFFSET m (LIMIT first).",
+      "fix_hi": "SQLite mein LIMIT n OFFSET m likho (LIMIT pehle).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "fetch_first",
+      "re": "\\bfetch\\s+(?:first|next)\\s+(\\d+)\\s+rows?\\s+only\\b",
+      "to": "LIMIT \\1",
+      "error": "near \"FETCH\": syntax error",
+      "title_en": "{db} has no FETCH FIRST (that's the SQL standard / Oracle / SQL Server)",
+      "title_hi": "{db} mein FETCH FIRST nahi hota",
+      "fix_en": "Use LIMIT n at the end of the query.",
+      "fix_hi": "Query ke aakhir mein LIMIT n likho.",
+      "proven": [
+        "sqlite"
+      ],
+      "unless": "\\boffset\\s+\\d+\\s+rows?\\s+fetch\\b"
+    },
+    {
+      "id": "for_update",
+      "re": "\\s+for\\s+update(?:\\s+of\\s+[\\w.,\\s]+?)?(?:\\s+(?:nowait|skip\\s+locked))?(?=\\s*(?:;|$|\\)))",
+      "to": "",
+      "error": "near \"FOR\": syntax error",
+      "title_en": "{db} has no SELECT ... FOR UPDATE",
+      "title_hi": "{db} mein SELECT ... FOR UPDATE nahi hota",
+      "fix_en": "SQLite locks the whole database file for a write, not rows: start the transaction with BEGIN IMMEDIATE (it takes the write lock at once), then read and write, then COMMIT.",
+      "fix_hi": "SQLite rows nahi, poori file lock karta hai: transaction BEGIN IMMEDIATE se shuru karo, phir padho-likho, phir COMMIT.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "insert_ignore",
+      "re": "\\binsert\\s+ignore\\b",
+      "to": "INSERT OR IGNORE",
+      "error": "near \"IGNORE\": syntax error",
+      "title_en": "{db} has no INSERT IGNORE (that's MySQL/MariaDB)",
+      "title_hi": "{db} mein INSERT IGNORE nahi hota (wo MySQL/MariaDB ka hai)",
+      "fix_en": "SQLite says INSERT OR IGNORE. Like INSERT IGNORE it skips rows that break UNIQUE, NOT NULL or CHECK rules, not only duplicates; ON CONFLICT (col) DO NOTHING skips only that conflict.",
+      "fix_hi": "SQLite mein INSERT OR IGNORE likho (ye bhi duplicate ke alawa NOT NULL / CHECK todne wali rows chhod deta hai).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "on_duplicate",
+      "re": "\\bon\\s+duplicate\\s+key\\s+update\\b",
+      "to": "ON CONFLICT DO UPDATE SET",
+      "error": "near \"DUPLICATE\": syntax error",
+      "title_en": "{db} has no ON DUPLICATE KEY UPDATE (that's MySQL/MariaDB)",
+      "title_hi": "{db} mein ON DUPLICATE KEY UPDATE nahi hota",
+      "fix_en": "SQLite's upsert is ON CONFLICT DO UPDATE SET, and the new row's values are excluded.col (MySQL's VALUES(col)). Without a column list after ON CONFLICT it needs SQLite 3.35+; name the unique column, ON CONFLICT (email), for older versions.",
+      "fix_hi": "SQLite ka upsert ON CONFLICT DO UPDATE SET hai, aur nayi row ki value excluded.col (MySQL ka VALUES(col)).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "values_fn",
+      "re": "\\bvalues\\s*\\(\\s*([A-Za-z_]\\w*)\\s*\\)",
+      "to": "excluded.\\1",
+      "error": "no such function: VALUES",
+      "title_en": "{db} has no VALUES(col) in an upsert (that's MySQL/MariaDB)",
+      "title_hi": "{db} mein upsert ke andar VALUES(col) nahi hota",
+      "fix_en": "The new row's value is excluded.col on SQLite.",
+      "fix_hi": "SQLite pe nayi row ki value excluded.col hai.",
+      "proven": [
+        "sqlite"
+      ],
+      "after": "\\bon\\s+duplicate\\s+key\\s+update\\b"
+    },
+    {
+      "id": "truncate",
+      "re": "^\\s*truncate\\s+(?:table\\s+)?([A-Za-z_][\\w$]*)",
+      "to": "DELETE FROM \\1",
+      "error": "near \"TRUNCATE\": syntax error",
+      "title_en": "{db} has no TRUNCATE",
+      "title_hi": "{db} mein TRUNCATE nahi hota",
+      "fix_en": "DELETE FROM t with no WHERE empties the table (SQLite does it quickly). An AUTOINCREMENT counter keeps counting unless its row in sqlite_sequence is deleted too.",
+      "fix_hi": "Bina WHERE ka DELETE FROM t table khaali karta hai.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "show_tables",
+      "re": "^\\s*show\\s+(?:full\\s+)?tables\\b[^;]*",
+      "to": "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+      "error": "near \"SHOW\": syntax error",
+      "title_en": "{db} has no SHOW TABLES (that's MySQL/MariaDB)",
+      "title_hi": "{db} mein SHOW TABLES nahi hota",
+      "fix_en": "The tables are listed in sqlite_master (the command line also has .tables).",
+      "fix_hi": "Tables sqlite_master mein milti hain (command line pe .tables).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "describe",
+      "re": "^\\s*(?:describe|desc|show\\s+columns\\s+from)\\s+([A-Za-z_][\\w$]*)\\s*;?\\s*$",
+      "to": "PRAGMA table_info(\\1)",
+      "error": "near \"DESCRIBE\": syntax error",
+      "title_en": "{db} has no DESCRIBE / SHOW COLUMNS (that's MySQL/MariaDB)",
+      "title_hi": "{db} mein DESCRIBE nahi hota",
+      "fix_en": "PRAGMA table_info(t) lists the columns, their types, NOT NULL, defaults and the key.",
+      "fix_hi": "PRAGMA table_info(t) columns dikhata hai.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "update_join",
+      "re": "^\\s*update\\s+[A-Za-z_][\\w$]*(?:\\s+(?:as\\s+)?[A-Za-z_]\\w*)?\\s+(?:inner\\s+|left\\s+(?:outer\\s+)?)?join\\b",
+      "to": null,
+      "error": "near the alias or JOIN: syntax error",
+      "title_en": "{db} has no UPDATE ... JOIN (that's MySQL/MariaDB)",
+      "title_hi": "{db} mein UPDATE ... JOIN nahi hota",
+      "fix_en": "Write UPDATE t SET col = ... FROM other WHERE other.key = t.key (SQLite 3.33+), or SET col = (SELECT ... FROM other WHERE other.key = t.key) on older versions.",
+      "fix_hi": "UPDATE t SET col = ... FROM other WHERE other.key = t.key likho (SQLite 3.33+).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "delete_join",
+      "re": "^\\s*delete\\s+[A-Za-z_]\\w*(?:\\s*,\\s*[A-Za-z_]\\w*)*\\s+from\\b",
+      "to": null,
+      "error": "near the table name: syntax error",
+      "title_en": "{db} has no DELETE t FROM t JOIN ... (that's MySQL/MariaDB)",
+      "title_hi": "{db} mein DELETE t FROM ... JOIN nahi hota",
+      "fix_en": "Write DELETE FROM t WHERE key IN (SELECT t.key FROM t JOIN other ON ... WHERE ...).",
+      "fix_hi": "DELETE FROM t WHERE key IN (SELECT ...) likho.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_column",
+      "re": "\\balter\\s+table\\s+[A-Za-z_][\\w$]*\\s+(?:modify|change|alter)\\b(?!\\s+column\\s+[\\w$]+\\s+rename\\b)",
+      "to": null,
+      "error": "near \"MODIFY\" (or \"ALTER\"): syntax error",
+      "title_en": "{db}'s ALTER TABLE can't change a column",
+      "title_hi": "{db} ka ALTER TABLE column nahi badal sakta",
+      "fix_en": "SQLite's ALTER TABLE only renames, adds or drops (3.35+) columns. To change a type, default or NOT NULL, rebuild the table: CREATE TABLE t_new (...), INSERT INTO t_new SELECT ... FROM t, DROP TABLE t, ALTER TABLE t_new RENAME TO t, all in one transaction with foreign keys off.",
+      "fix_hi": "SQLite ka ALTER TABLE sirf naam badalta, column jodta ya hataata hai. Type badalne ke liye table dobara banao (nayi table, rows copy, purani drop, rename).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "regexp",
+      "re": "\\b(?:not\\s+)?(?:regexp|rlike)\\b(?!\\s*\\()",
+      "to": null,
+      "error": "no such function: REGEXP",
+      "title_en": "{db} has no built-in REGEXP",
+      "title_hi": "{db} mein REGEXP apne aap nahi hota",
+      "fix_en": "SQLite parses REGEXP but has no function behind it unless the app adds one (Python: conn.create_function('regexp', 2, ...)). For simple patterns use LIKE ('a%' starts with a) or GLOB ('[0-9]*' starts with a digit, case-sensitive).",
+      "fix_hi": "SQLite mein REGEXP ka function app ko jodna padta hai. Saade patterns ke liye LIKE ya GLOB likho.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "div",
+      "re": "(?<![\\w.])([A-Za-z_][\\w.]*|\\d+(?:\\.\\d+)?)\\s+div\\s+([A-Za-z_][\\w.]*|\\d+(?:\\.\\d+)?)\\b",
+      "to": "CAST(\\1 / \\2 AS INTEGER)",
+      "error": "near \"DIV\": syntax error",
+      "title_en": "{db} has no DIV operator (that's MySQL/MariaDB)",
+      "title_hi": "{db} mein DIV nahi hota",
+      "fix_en": "CAST(a / b AS INTEGER) keeps the whole part, toward zero, as DIV does (lab: 7 DIV 2 = 3, -7 DIV 2 = -3 on MariaDB and the rewrite on SQLite).",
+      "fix_hi": "CAST(a / b AS INTEGER) likho (DIV ki tarah poora hissa).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "mod_word",
+      "re": "(?<![\\w.])([A-Za-z_][\\w.]*|\\d+)\\s+mod\\s+([A-Za-z_][\\w.]*|\\d+)\\b",
+      "to": "\\1 % \\2",
+      "error": "near \"MOD\": syntax error",
+      "title_en": "{db} has no MOD operator word (that's MySQL/MariaDB)",
+      "title_hi": "{db} mein MOD shabd nahi hota",
+      "fix_en": "Use a % b. On SQLite % works on whole numbers (7.5 % 2 is 1.0, not 1.5): for fractions use mod(a, b) where the math functions are built in (3.35+).",
+      "fix_hi": "a % b likho (SQLite pe % poore numbers pe chalta hai).",
+      "proven": [
+        "sqlite"
+      ]
+    }
+  ],
+  "port": {
+    "about": "What SQLite refuses from other databases' SQL and how to say it in its words; its date modifiers and strftime codes. Every entry was run on SQLite 3.53 (Python's sqlite3; lab: tests/practice/test_e1_sqlite1.py).",
+    "interval": {
+      "error": "near \"<n>\": syntax error (INTERVAL n DAY) / no such column: INTERVAL (INTERVAL '7 days')"
+    },
+    "rows": {
+      "top_error": "near \"<n>\": syntax error",
+      "rownum_error": "no such column: ROWNUM"
+    },
+    "date_codes": {
+      "%Y": "year4",
+      "%m": "month2",
+      "%d": "day2",
+      "%H": "hour24",
+      "%M": "minute",
+      "%S": "second",
+      "%j": "dayofyear",
+      "%H:%M:%S": "time24"
+    },
+    "cast_types": {
+      "text": "TEXT",
+      "varchar": "TEXT",
+      "nvarchar": "TEXT",
+      "char": "TEXT",
+      "nchar": "TEXT",
+      "int": "INTEGER",
+      "integer": "INTEGER",
+      "bigint": "INTEGER",
+      "smallint": "INTEGER",
+      "signed": "INTEGER",
+      "unsigned": "INTEGER",
+      "decimal": "REAL",
+      "numeric": "REAL",
+      "float": "REAL",
+      "double": "REAL",
+      "real": "REAL"
+    },
+    "special": {
+      "position": {
+        "from": "MySQL / PostgreSQL",
+        "error": "no such table: <the text after IN> (SQLite reads IN as a list)",
+        "fix_en": "instr(text, part) gives where the part starts (0 when it isn't there).",
+        "fix_hi": "instr(text, part) likho.",
+        "manual_en": "Write instr(text, part).",
+        "manual_hi": "instr(text, part) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "title_en": "{db} has no POSITION(part IN text)",
+        "title_hi": "{db} mein POSITION(part IN text) nahi hota"
+      },
+      "extract": {
+        "from": "MySQL / PostgreSQL",
+        "error": "near \"FROM\": syntax error",
+        "fix_en": "strftime gives a part of a date as text ('%Y' year, '%m' month, '%d' day, '%H' hour, '%M' minute); CAST it to INTEGER for a number.",
+        "fix_hi": "strftime('%Y', d) likho, number ke liye CAST(... AS INTEGER).",
+        "manual_en": "Write CAST(strftime('%Y', d) AS INTEGER) (or '%m', '%d', '%H', '%M').",
+        "manual_hi": "CAST(strftime('%Y', d) AS INTEGER) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "title_en": "{db} has no EXTRACT(part FROM date)",
+        "title_hi": "{db} mein EXTRACT(part FROM date) nahi hota"
+      },
+      "greatest": {
+        "from": "MySQL / PostgreSQL / Oracle",
+        "error": "no such function: GREATEST",
+        "fix_en": "max() with two or more arguments gives the biggest of them (NULL if any of them is NULL, as on MySQL; PostgreSQL's GREATEST skips NULLs).",
+        "fix_hi": "max(a, b, ...) likho (koi NULL ho to NULL).",
+        "manual_en": "Write max(a, b, ...).",
+        "manual_hi": "max(a, b, ...) likho.",
+        "proven": [
+          "sqlite"
+        ]
+      },
+      "least": {
+        "from": "MySQL / PostgreSQL / Oracle",
+        "error": "no such function: LEAST",
+        "fix_en": "min() with two or more arguments gives the smallest (NULL if any of them is NULL, as on MySQL; PostgreSQL's LEAST skips NULLs).",
+        "fix_hi": "min(a, b, ...) likho.",
+        "manual_en": "Write min(a, b, ...).",
+        "manual_hi": "min(a, b, ...) likho.",
+        "proven": [
+          "sqlite"
+        ]
+      },
+      "right": {
+        "from": "MySQL / SQL Server",
+        "error": "no such function: RIGHT",
+        "fix_en": "substr(text, -n) takes the last n characters.",
+        "fix_hi": "substr(text, -n) aakhri n akshar deta hai.",
+        "manual_en": "Write substr(text, -n).",
+        "manual_hi": "substr(text, -n) likho.",
+        "proven": [
+          "sqlite"
+        ]
+      },
+      "group_concat": {
+        "from": "MySQL/MariaDB",
+        "error": "near \"SEPARATOR\": syntax error",
+        "fix_en": "SQLite's group_concat takes the separator as a second argument (and ORDER BY inside it from 3.44).",
+        "fix_hi": "SQLite ka group_concat separator doosre argument mein leta hai.",
+        "manual_en": "group_concat(DISTINCT x) can't take a separator on SQLite: join DISTINCT values from a subquery, group_concat(x, ';') over SELECT DISTINCT ...",
+        "manual_hi": "DISTINCT ke saath separator nahi chalta: subquery mein DISTINCT karke group_concat(x, ';') likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "title_en": "{db}'s group_concat has no SEPARATOR word (that's MySQL/MariaDB)",
+        "title_hi": "{db} ke group_concat mein SEPARATOR shabd nahi hota"
+      },
+      "convert": {
+        "from": "SQL Server / MySQL",
+        "error": "no such function: CONVERT",
+        "fix_en": "CAST(value AS type) with a SQLite type (TEXT, INTEGER, REAL); date(x) for a date.",
+        "fix_hi": "CAST(value AS type) likho.",
+        "manual_en": "Write CAST(value AS TEXT / INTEGER / REAL), or date(x) / datetime(x) for dates.",
+        "manual_hi": "CAST(value AS type) likho.",
+        "proven": [
+          "sqlite"
+        ]
+      }
+    },
+    "calls": [
+      {
+        "fn": "now",
+        "args": [
+          0
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: NOW",
+        "fix_en": "SQLite's clock words are datetime('now'), date('now') and time('now'). They are in UTC, like SQLite's CURRENT_TIMESTAMP defaults; add 'localtime', datetime('now', 'localtime'), if your stored times are local.",
+        "fix_hi": "SQLite mein datetime('now') / date('now') likho (UTC mein; local time ke liye datetime('now', 'localtime')).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "datetime('now')"
+      },
+      {
+        "fn": "curdate",
+        "args": [
+          0
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: CURDATE",
+        "fix_en": "SQLite's clock words are datetime('now'), date('now') and time('now'). They are in UTC, like SQLite's CURRENT_TIMESTAMP defaults; add 'localtime', datetime('now', 'localtime'), if your stored times are local.",
+        "fix_hi": "SQLite mein datetime('now') / date('now') likho (UTC mein; local time ke liye datetime('now', 'localtime')).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "date('now')"
+      },
+      {
+        "fn": "curtime",
+        "args": [
+          0
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: CURTIME",
+        "fix_en": "SQLite's clock words are datetime('now'), date('now') and time('now'). They are in UTC, like SQLite's CURRENT_TIMESTAMP defaults; add 'localtime', datetime('now', 'localtime'), if your stored times are local.",
+        "fix_hi": "SQLite mein datetime('now') / date('now') likho (UTC mein; local time ke liye datetime('now', 'localtime')).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "time('now')"
+      },
+      {
+        "fn": "current_date",
+        "args": [
+          0
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "near \"(\": syntax error",
+        "fix_en": "CURRENT_DATE works on SQLite without brackets (in UTC).",
+        "fix_hi": "CURRENT_DATE bina brackets ke likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "date('now')"
+      },
+      {
+        "fn": "getdate",
+        "args": [
+          0
+        ],
+        "from": "SQL Server",
+        "error": "no such function: GETDATE",
+        "fix_en": "SQLite's clock words are datetime('now'), date('now') and time('now'). They are in UTC, like SQLite's CURRENT_TIMESTAMP defaults; add 'localtime', datetime('now', 'localtime'), if your stored times are local.",
+        "fix_hi": "SQLite mein datetime('now') / date('now') likho (UTC mein; local time ke liye datetime('now', 'localtime')).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "datetime('now')"
+      },
+      {
+        "fn": "sysdatetime",
+        "args": [
+          0
+        ],
+        "from": "SQL Server",
+        "error": "no such function: SYSDATETIME",
+        "fix_en": "SQLite's clock words are datetime('now'), date('now') and time('now'). They are in UTC, like SQLite's CURRENT_TIMESTAMP defaults; add 'localtime', datetime('now', 'localtime'), if your stored times are local.",
+        "fix_hi": "SQLite mein datetime('now') / date('now') likho (UTC mein; local time ke liye datetime('now', 'localtime')).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "datetime('now')"
+      },
+      {
+        "fn": "getutcdate",
+        "args": [
+          0
+        ],
+        "from": "SQL Server",
+        "error": "no such function: GETUTCDATE",
+        "fix_en": "SQLite's clock words are datetime('now'), date('now') and time('now'). They are in UTC, like SQLite's CURRENT_TIMESTAMP defaults; add 'localtime', datetime('now', 'localtime'), if your stored times are local.",
+        "fix_hi": "SQLite mein datetime('now') / date('now') likho (UTC mein; local time ke liye datetime('now', 'localtime')).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "datetime('now')"
+      },
+      {
+        "fn": "sysdate",
+        "args": [
+          0
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: SYSDATE",
+        "fix_en": "SQLite's clock words are datetime('now'), date('now') and time('now'). They are in UTC, like SQLite's CURRENT_TIMESTAMP defaults; add 'localtime', datetime('now', 'localtime'), if your stored times are local.",
+        "fix_hi": "SQLite mein datetime('now') / date('now') likho (UTC mein; local time ke liye datetime('now', 'localtime')).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "datetime('now')"
+      },
+      {
+        "fn": "unix_timestamp",
+        "args": [
+          0
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: UNIX_TIMESTAMP",
+        "fix_en": "strftime('%s', x) gives the seconds since 1970 (as text: CAST it to INTEGER).",
+        "fix_hi": "CAST(strftime('%s', x) AS INTEGER) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "CAST(strftime('%s', 'now') AS INTEGER)"
+      },
+      {
+        "fn": "unix_timestamp",
+        "args": [
+          1
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: UNIX_TIMESTAMP",
+        "fix_en": "strftime('%s', x) gives the seconds since 1970 (as text: CAST it to INTEGER).",
+        "fix_hi": "CAST(strftime('%s', x) AS INTEGER) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "CAST(strftime('%s', {0}) AS INTEGER)"
+      },
+      {
+        "fn": "date_add",
+        "args": [
+          2
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "near \"<n>\": syntax error",
+        "fix_en": "SQLite adds to a date with a modifier: date(d, '+7 days') (datetime(d, ...) keeps the time). Month-ends differ: MySQL keeps the month (2024-01-31 + 1 month = 2024-02-29), SQLite rolls over (2024-03-02) unless you add the 'floor' modifier (3.46+).",
+        "fix_hi": "SQLite mein date(d, '+7 days') likho (time rakhna ho to datetime(d, ...)).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "{DT0}({0}, {MODARG1})",
+        "manual_en": "Write date(d, '+n days') (or months / years / hours); for an amount from a column: date(d, n || ' days')."
+      },
+      {
+        "fn": "adddate",
+        "args": [
+          2
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "near \"<n>\": syntax error",
+        "fix_en": "SQLite adds to a date with a modifier: date(d, '+7 days') (datetime(d, ...) keeps the time). Month-ends differ: MySQL keeps the month (2024-01-31 + 1 month = 2024-02-29), SQLite rolls over (2024-03-02) unless you add the 'floor' modifier (3.46+).",
+        "fix_hi": "SQLite mein date(d, '+7 days') likho (time rakhna ho to datetime(d, ...)).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "{DT0}({0}, {MODARG1})",
+        "manual_en": "Write date(d, '+n days'); for an amount from a column: date(d, n || ' days')."
+      },
+      {
+        "fn": "date_sub",
+        "args": [
+          2
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "near \"<n>\": syntax error",
+        "fix_en": "SQLite adds to a date with a modifier: date(d, '+7 days') (datetime(d, ...) keeps the time). Month-ends differ: MySQL keeps the month (2024-01-31 + 1 month = 2024-02-29), SQLite rolls over (2024-03-02) unless you add the 'floor' modifier (3.46+).",
+        "fix_hi": "SQLite mein date(d, '+7 days') likho (time rakhna ho to datetime(d, ...)).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "{DT0}({0}, {MODNEG1})",
+        "manual_en": "Write date(d, '-n days'); for an amount from a column: date(d, -n || ' days')."
+      },
+      {
+        "fn": "subdate",
+        "args": [
+          2
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "near \"<n>\": syntax error",
+        "fix_en": "SQLite adds to a date with a modifier: date(d, '+7 days') (datetime(d, ...) keeps the time). Month-ends differ: MySQL keeps the month (2024-01-31 + 1 month = 2024-02-29), SQLite rolls over (2024-03-02) unless you add the 'floor' modifier (3.46+).",
+        "fix_hi": "SQLite mein date(d, '+7 days') likho (time rakhna ho to datetime(d, ...)).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "{DT0}({0}, {MODNEG1})",
+        "manual_en": "Write date(d, '-n days')."
+      },
+      {
+        "fn": "dateadd",
+        "args": [
+          3
+        ],
+        "from": "SQL Server",
+        "error": "no such column: <the date part>",
+        "fix_en": "SQLite adds to a date with a modifier: date(d, '+7 days') (datetime(d, ...) keeps the time). Month-ends differ: MySQL keeps the month (2024-01-31 + 1 month = 2024-02-29), SQLite rolls over (2024-03-02) unless you add the 'floor' modifier (3.46+).",
+        "fix_hi": "SQLite mein date(d, '+7 days') likho (time rakhna ho to datetime(d, ...)).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "{DT2}({2}, {MOD:1:U0})",
+        "manual_en": "Write date(d, '+n days') (or months / years / hours)."
+      },
+      {
+        "fn": "datediff",
+        "args": [
+          2
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: DATEDIFF",
+        "fix_en": "julianday(a) - julianday(b) gives the days between two dates; date() first drops the times, as MySQL's DATEDIFF does.",
+        "fix_hi": "julianday(a) - julianday(b) din deta hai.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "CAST(julianday(date({0})) - julianday(date({1})) AS INTEGER)"
+      },
+      {
+        "fn": "datediff",
+        "args": [
+          3
+        ],
+        "from": "SQL Server",
+        "error": "no such column: <the date part>",
+        "fix_en": "julianday(end) - julianday(start) gives the days between two dates.",
+        "fix_hi": "julianday(end) - julianday(start) din deta hai.",
+        "proven": [
+          "sqlite"
+        ],
+        "by": {
+          "DAY": "CAST(julianday(date({2})) - julianday(date({1})) AS INTEGER)"
+        },
+        "by_arg": 0,
+        "by_unit": true,
+        "manual_en": "SQL Server counts the hour / minute boundaries crossed; on SQLite work it out from strftime('%s', end) - strftime('%s', start) seconds and say which you mean."
+      },
+      {
+        "fn": "timestampdiff",
+        "args": [
+          3
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: TIMESTAMPDIFF",
+        "fix_en": "Whole units between two times, from their seconds since 1970: (strftime('%s', end) - strftime('%s', start)) / 3600 for hours.",
+        "fix_hi": "Seconds ka farak nikaal kar unit se bhaag do.",
+        "proven": [
+          "sqlite"
+        ],
+        "by": {
+          "SECOND": "(CAST(strftime('%s', {2}) AS INTEGER) - CAST(strftime('%s', {1}) AS INTEGER))",
+          "MINUTE": "(CAST(strftime('%s', {2}) AS INTEGER) - CAST(strftime('%s', {1}) AS INTEGER)) / 60",
+          "HOUR": "(CAST(strftime('%s', {2}) AS INTEGER) - CAST(strftime('%s', {1}) AS INTEGER)) / 3600",
+          "DAY": "(CAST(strftime('%s', {2}) AS INTEGER) - CAST(strftime('%s', {1}) AS INTEGER)) / 86400"
+        },
+        "by_arg": 0,
+        "by_unit": true,
+        "manual_en": "For months or years compare strftime('%Y', ...) * 12 + strftime('%m', ...) of both ends."
+      },
+      {
+        "fn": "year",
+        "args": [
+          1
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: YEAR",
+        "fix_en": "strftime('%Y', d) gives the year as text; CAST it to INTEGER for a number.",
+        "fix_hi": "CAST(strftime('%Y', d) AS INTEGER) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "CAST(strftime('%Y', {0}) AS INTEGER)"
+      },
+      {
+        "fn": "month",
+        "args": [
+          1
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: MONTH",
+        "fix_en": "strftime('%m', d) gives the month as text ('06'); CAST it to INTEGER for a number.",
+        "fix_hi": "CAST(strftime('%m', d) AS INTEGER) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "CAST(strftime('%m', {0}) AS INTEGER)"
+      },
+      {
+        "fn": "day",
+        "args": [
+          1
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: DAY",
+        "fix_en": "strftime('%d', d) gives the day of the month.",
+        "fix_hi": "CAST(strftime('%d', d) AS INTEGER) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "CAST(strftime('%d', {0}) AS INTEGER)"
+      },
+      {
+        "fn": "dayofmonth",
+        "args": [
+          1
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: DAYOFMONTH",
+        "fix_en": "strftime('%d', d) gives the day of the month.",
+        "fix_hi": "CAST(strftime('%d', d) AS INTEGER) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "CAST(strftime('%d', {0}) AS INTEGER)"
+      },
+      {
+        "fn": "hour",
+        "args": [
+          1
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: HOUR",
+        "fix_en": "strftime('%H', t) gives the hour (00-23).",
+        "fix_hi": "CAST(strftime('%H', t) AS INTEGER) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "CAST(strftime('%H', {0}) AS INTEGER)"
+      },
+      {
+        "fn": "minute",
+        "args": [
+          1
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: MINUTE",
+        "fix_en": "strftime('%M', t) gives the minute (on SQLite %M is the minute, not the month name).",
+        "fix_hi": "CAST(strftime('%M', t) AS INTEGER) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "CAST(strftime('%M', {0}) AS INTEGER)"
+      },
+      {
+        "fn": "datepart",
+        "args": [
+          2
+        ],
+        "from": "SQL Server",
+        "error": "no such column: <the date part>",
+        "fix_en": "strftime gives a part of a date ('%Y', '%m', '%d', '%H', '%M').",
+        "fix_hi": "strftime('%Y', d) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "by": {
+          "YEAR": "CAST(strftime('%Y', {1}) AS INTEGER)",
+          "MONTH": "CAST(strftime('%m', {1}) AS INTEGER)",
+          "DAY": "CAST(strftime('%d', {1}) AS INTEGER)",
+          "HOUR": "CAST(strftime('%H', {1}) AS INTEGER)",
+          "MINUTE": "CAST(strftime('%M', {1}) AS INTEGER)"
+        },
+        "by_arg": 0,
+        "by_unit": true
+      },
+      {
+        "fn": "date_format",
+        "args": [
+          2
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: DATE_FORMAT",
+        "fix_en": "strftime(format, date) with SQLite's codes (%Y year, %m month, %d day, %H hour, %M minute, %S second; MySQL's %i minute is %M here).",
+        "fix_hi": "strftime(format, date) likho (%i ki jagah %M).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "strftime({F1}, {0})",
+        "fmt_from": "mysql",
+        "manual_en": "SQLite's strftime has no month or day names (%b, %M, %W): build them with CASE strftime('%m', d) WHEN '01' THEN 'Jan' ... END."
+      },
+      {
+        "fn": "to_char",
+        "args": [
+          2
+        ],
+        "from": "PostgreSQL / Oracle",
+        "error": "no such function: TO_CHAR",
+        "fix_en": "strftime(format, date) with SQLite's codes (YYYY -> %Y, MM -> %m, DD -> %d, HH24 -> %H, MI -> %M, SS -> %S).",
+        "fix_hi": "strftime(format, date) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "strftime({F1}, {0})",
+        "fmt_from": "postgresql",
+        "manual_en": "SQLite's strftime has no month or day names: build them with CASE."
+      },
+      {
+        "fn": "date_trunc",
+        "args": [
+          2
+        ],
+        "from": "PostgreSQL",
+        "error": "no such function: DATE_TRUNC",
+        "fix_en": "date(d, 'start of month') / 'start of year' gives the first day; date(d) drops the time.",
+        "fix_hi": "date(d, 'start of month') likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "by": {
+          "'month'": "date({1}, 'start of month')",
+          "'year'": "date({1}, 'start of year')",
+          "'day'": "date({1})"
+        },
+        "manual_en": "For weeks: date(d, 'weekday 1', '-7 days') gives the Monday on or before d."
+      },
+      {
+        "fn": "nvl",
+        "args": [
+          2
+        ],
+        "from": "Oracle",
+        "error": "no such function: NVL",
+        "fix_en": "IFNULL(x, y) (or COALESCE) gives y when x is NULL.",
+        "fix_hi": "IFNULL(x, y) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "IFNULL({0}, {1})"
+      },
+      {
+        "fn": "isnull",
+        "args": [
+          2
+        ],
+        "from": "SQL Server",
+        "error": "near \"ISNULL\": syntax error",
+        "fix_en": "IFNULL(x, y) gives y when x is NULL (on SQLite ISNULL is the word for 'x IS NULL').",
+        "fix_hi": "IFNULL(x, y) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "IFNULL({0}, {1})"
+      },
+      {
+        "fn": "isnull",
+        "args": [
+          1
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "near \"ISNULL\": syntax error",
+        "fix_en": "x IS NULL gives 1 or 0, as MySQL's ISNULL(x) does.",
+        "fix_hi": "x IS NULL likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "({0} IS NULL)"
+      },
+      {
+        "fn": "left",
+        "args": [
+          2
+        ],
+        "from": "MySQL / SQL Server",
+        "error": "no such function: LEFT",
+        "fix_en": "substr(text, 1, n) takes the first n characters.",
+        "fix_hi": "substr(text, 1, n) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "substr({0}, 1, {1})"
+      },
+      {
+        "fn": "len",
+        "args": [
+          1
+        ],
+        "from": "SQL Server",
+        "error": "no such function: LEN",
+        "fix_en": "length(text) counts the characters (SQL Server's LEN also drops trailing spaces: rtrim first if that matters).",
+        "fix_hi": "length(text) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "length({0})"
+      },
+      {
+        "fn": "char_length",
+        "args": [
+          1
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: CHAR_LENGTH",
+        "fix_en": "length(text) counts characters on SQLite.",
+        "fix_hi": "length(text) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "length({0})"
+      },
+      {
+        "fn": "character_length",
+        "args": [
+          1
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: CHARACTER_LENGTH",
+        "fix_en": "length(text) counts characters on SQLite.",
+        "fix_hi": "length(text) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "length({0})"
+      },
+      {
+        "fn": "ucase",
+        "args": [
+          1
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: UCASE",
+        "fix_en": "upper(text).",
+        "fix_hi": "upper(text) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "upper({0})"
+      },
+      {
+        "fn": "lcase",
+        "args": [
+          1
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: LCASE",
+        "fix_en": "lower(text).",
+        "fix_hi": "lower(text) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "lower({0})"
+      },
+      {
+        "fn": "locate",
+        "args": [
+          2
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: LOCATE",
+        "fix_en": "instr(text, part) gives where the part starts (0 when absent); the text comes first.",
+        "fix_hi": "instr(text, part) likho (text pehle).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "instr({1}, {0})"
+      },
+      {
+        "fn": "charindex",
+        "args": [
+          2
+        ],
+        "from": "SQL Server",
+        "error": "no such function: CHARINDEX",
+        "fix_en": "instr(text, part) gives where the part starts (0 when absent); the text comes first.",
+        "fix_hi": "instr(text, part) likho (text pehle).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "instr({1}, {0})"
+      },
+      {
+        "fn": "strpos",
+        "args": [
+          2
+        ],
+        "from": "PostgreSQL",
+        "error": "no such function: STRPOS",
+        "fix_en": "instr(text, part) gives where the part starts.",
+        "fix_hi": "instr(text, part) likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "instr({0}, {1})"
+      },
+      {
+        "fn": "rand",
+        "args": [
+          0
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: RAND",
+        "fix_en": "random() gives a big random whole number on SQLite; divided as here it is a number from 0 to 1 like RAND() (ORDER BY random() alone is enough to shuffle).",
+        "fix_hi": "random() likho (0 se 1 ke liye upar jaisa bhaag).",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "(random() / 18446744073709551616.0 + 0.5)"
+      },
+      {
+        "fn": "last_insert_id",
+        "args": [
+          0
+        ],
+        "from": "MySQL/MariaDB",
+        "error": "no such function: LAST_INSERT_ID",
+        "fix_en": "last_insert_rowid() gives the id of the row this connection inserted last (or use INSERT ... RETURNING id, 3.35+).",
+        "fix_hi": "last_insert_rowid() likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "last_insert_rowid()"
+      },
+      {
+        "fn": "lastval",
+        "args": [
+          0
+        ],
+        "from": "PostgreSQL",
+        "error": "no such function: LASTVAL",
+        "fix_en": "last_insert_rowid() gives the id of the row this connection inserted last.",
+        "fix_hi": "last_insert_rowid() likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "last_insert_rowid()"
+      },
+      {
+        "fn": "scope_identity",
+        "args": [
+          0
+        ],
+        "from": "SQL Server",
+        "error": "no such function: SCOPE_IDENTITY",
+        "fix_en": "last_insert_rowid() gives the id of the row this connection inserted last.",
+        "fix_hi": "last_insert_rowid() likho.",
+        "proven": [
+          "sqlite"
+        ],
+        "to": "last_insert_rowid()"
+      }
+    ]
+  },
+  "proven_parts": {
+    "en": "its error messages, the other databases' words it refuses (with rewrites run on SQLite) and its date arithmetic",
+    "hi": "iske error messages, doosre databases ke shabd jo ye mana karta hai (SQLite pe chalaye rewrites ke saath), aur date ka hisaab"
+  }
 }

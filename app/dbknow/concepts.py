@@ -28,7 +28,8 @@ ENGINES = {                                   # how people name each database, a
     "oracle": (r"\boracle\b|\bpl/?sql\b", "Oracle"),
     "sqlite": (r"\bsqlite3?\b", "SQLite"),
 }
-NOTES_ONLY = {"sqlserver", "oracle", "sqlite"}   # no lab-tested knowledge yet: their notes are general guidance
+NOTES_ONLY = {"sqlserver", "oracle", "sqlite"}   # no lab-tested knowledge yet: their notes are general guidance (unless the
+                                                # concept itself was proven on that engine: SQLite's own concepts, E1)
 
 SHAPES = [                                     # (shape, pattern) in the order they are tried
     # 'how many types of joins', 'types of keys in sql', 'join ke kitne types hote hain', 'index के प्रकार': a kinds question
@@ -230,12 +231,17 @@ def match(text: str) -> dict | None:
         pair = [(s, c) for s, c in scored if s and c.get("kind") == "compare"]
         if pair and pair[0][0] >= top * 0.6:
             top, best = pair[0]
+    eng = engine_named(text)
+    if top and eng:                             # a database's own concept answers a question that names that database (E1)
+        own = [(s, c) for s, c in scored if s and c.get("engine") == eng]
+        if own and own[0][0] >= top * 0.6:
+            top, best = own[0]
     if top and sh == "task" and best.get("kind") != "howto":
         return None                             # 'list all indexes': a job on their database, not a lesson
     if top and sh == "puzzle" and PERSONAL.search(t):
         return None                             # 'my join returns duplicates': their own problem, for the checker
     if top:
-        return {"concept": best, "shape": sh, "engine": engine_named(text)}
+        return {"concept": best, "shape": sh, "engine": eng}
     if sh in ("define", "compare", "when") and DB_MARK.search(t) and not PERSONAL.search(t):
         return {"concept": None, "shape": sh, "engine": engine_named(text)}
     return None
@@ -273,17 +279,17 @@ LABELS = {
            "First look at what will change (preview)", "change": "Then the change (run it inside a transaction; keep a backup)",
            "notes": "general SQL guidance, not lab-tested on", "related": "Related", "unknown":
            "I don't have a checked answer for that concept yet, so I won't guess. I've noted the question so DBaba learns it.",
-           "near": "Closest things I can explain now:", "for": "for", "lab": "run on MariaDB and PostgreSQL"},
+           "near": "Closest things I can explain now:", "for": "for", "lab": "run on MariaDB and PostgreSQL", "lab_sqlite": "run on SQLite"},
     "hinglish": {"example": "Example", "result": "Result", "mistake": "Aam galti", "engines": "Database ka farak", "preview":
                  "Pehle dekho kya badlega (preview)", "change": "Phir badlaav (transaction mein chalao; backup rakho)",
                  "notes": "general SQL samajh, lab mein test nahi hua:", "related": "Ye bhi dekho", "unknown":
                  "Is concept ka jaancha hua jawab abhi mere paas nahi hai, isliye andaza nahi lagaunga. Sawaal note kar liya hai taaki DBaba ise seekhe.",
-                 "near": "Abhi ye samjha sakta hoon:", "for": "", "lab": "MariaDB aur PostgreSQL pe chalaya"},
+                 "near": "Abhi ye samjha sakta hoon:", "for": "", "lab": "MariaDB aur PostgreSQL pe chalaya", "lab_sqlite": "SQLite pe chalaya"},
     "hindi": {"example": "उदाहरण", "result": "नतीजा", "mistake": "आम गलती", "engines": "डेटाबेस का फ़र्क", "preview":
               "पहले देखिए क्या बदलेगा (preview)", "change": "फिर बदलाव (transaction में चलाइए; backup रखिए)",
               "notes": "सामान्य SQL समझ, लैब में जाँचा नहीं गया:", "related": "यह भी देखें", "unknown":
               "इस concept का जाँचा हुआ जवाब अभी मेरे पास नहीं है, इसलिए अंदाज़ा नहीं लगाऊँगा। सवाल नोट कर लिया है ताकि DBaba इसे सीखे।",
-              "near": "अभी ये समझा सकता हूँ:", "for": "", "lab": "MariaDB और PostgreSQL पर चलाया"},
+              "near": "अभी ये समझा सकता हूँ:", "for": "", "lab": "MariaDB और PostgreSQL पर चलाया", "lab_sqlite": "SQLite पर चलाया"},
 }
 
 
@@ -292,6 +298,8 @@ def _sql_for(ex: dict, engine: str | None) -> list[tuple[str, str]]:
     sql = ex.get("sql") or {}
     if "all" in sql:
         return [("", sql["all"])]
+    if set(sql) == {"sqlite"}:                        # a SQLite concept's example (E1): written in SQLite's own words
+        return [("", sql["sqlite"])]
     fam = {"mysql": "mysql", "mariadb": "mysql", "postgresql": "postgresql"}.get(engine or "")
     if fam and fam in sql:
         return [("", sql[fam])]
@@ -332,7 +340,8 @@ def answer(m: dict, text: str) -> tuple[str, list[str]]:
             out.append("")
             out.append(f"{L['change']}:")
         else:
-            out.append(f"{L['example']}{(' — ' + head) if head else ''} ({L['lab']}):")
+            ran = L["lab_sqlite"] if set(ex.get("sql") or {}) == {"sqlite"} else L["lab"]
+            out.append(f"{L['example']}{(' — ' + head) if head else ''} ({ran}):")
         for lab, q in _sql_for(ex, eng):
             out.append((f"-- {lab}\n" if lab else "") + q)
         if ex.get("result") is not None:
@@ -345,8 +354,9 @@ def answer(m: dict, text: str) -> tuple[str, list[str]]:
     if notes:
         if eng and eng in notes:
             label = ENGINES[eng][1]
-            pre = f"{label} ({L['notes']} {label})" if eng in NOTES_ONLY and lang == "en" else (
-                f"{label} ({L['notes']})" if eng in NOTES_ONLY else label)
+            notes_only = eng in NOTES_ONLY and eng not in c.get("proven", [])
+            pre = f"{label} ({L['notes']} {label})" if notes_only and lang == "en" else (
+                f"{label} ({L['notes']})" if notes_only else label)
             out += ["", f"{L['engines']} — {pre}: {notes[eng]}"]
         elif eng in NOTES_ONLY:
             out += ["", f"{L['engines']} — {ENGINES[eng][1]}: " + (
@@ -355,6 +365,8 @@ def answer(m: dict, text: str) -> tuple[str, list[str]]:
                 "इसके लैब में जाँचे notes अभी नहीं हैं; ऊपर का जवाब सामान्य SQL है।")]
         else:
             keys = [k for k in ("mysql", "mariadb", "postgresql") if k in notes]
+            if "sqlite" in c.get("proven", []) and "sqlite" in notes:
+                keys = ["sqlite"] + keys                  # a SQLite concept: its own (lab-tested) note first
             if eng:
                 keys = [eng] + [k for k in keys if k != eng] if eng in notes else keys
             out += ["", f"{L['engines']}:"] + [f"- {ENGINES[k][1]}: {notes[k]}" for k in keys]
@@ -386,9 +398,12 @@ def card(m: dict, text: str) -> dict | None:
         exs.append(item)
     notes = c.get("engines") or {}
     keys = [k for k in ("mysql", "mariadb", "postgresql") if k in notes]
+    if "sqlite" in c.get("proven", []) and "sqlite" in notes:
+        keys = ["sqlite"] + keys
     if eng and eng in notes:
         keys = [eng]
     diffs = [{"engine": ENGINES[k][1], "note": notes[k]} for k in keys]
     return {"id": c["id"], "lang": lang, "title": c["title"].get(lang) or c["title"]["en"], "answer": c["answer"][lang],
             "mistake": c["mistake"][lang], "examples": exs, "engines": diffs,
-            "labels": {k: L[k] for k in ("example", "result", "mistake", "engines", "preview", "change", "lab")}}
+            "labels": {**{k: L[k] for k in ("example", "result", "mistake", "engines", "preview", "change", "lab")},
+                       **({"lab": L["lab_sqlite"]} if exs and all(set(e.get("sql") or {}) == {"sqlite"} for e in c.get("examples", [])) else {})}}

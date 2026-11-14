@@ -12,6 +12,7 @@
 Everything one engine owns (how it is named, its syntax marks, its error format) is in its dialect file
 (app/dbknow/dialects/<engine>.json: 'named', 'query_marks', 'weak_marks', 'error_marks'); this file only reasons over them.
 SQL Server, Oracle and SQLite are 'notes_only': recognised, answered with general SQL reasoning plus notes, and said so.
+SQLite's errors and its refused syntax are lab-tested already (E1 night 1, syntax_family), so its notes line says which.
 """
 
 import json
@@ -49,6 +50,15 @@ def label(eid: str | None) -> str:
 
 def notes_only(eid: str | None) -> bool:
     return bool(eid in ORDER and dialect(eid).get("notes_only"))
+
+
+def syntax_family(eid: str | None) -> str | None:
+    """Whose words the portability checks use (another database's syntax this one refuses, with rewrites in its own words):
+    the family for MySQL/MariaDB/PostgreSQL, and an engine's own id once its dialect file has lab-proven 'port' knowledge
+    (SQLite from E1 night 1) while its other query rules are still general reasoning."""
+    if eid in FAMILY:
+        return FAMILY[eid]
+    return eid if eid in ORDER and dialect(eid).get("port") and eid in dialect(eid).get("proven", []) else None
 
 
 def family(eid: str | None) -> str | None:
@@ -257,10 +267,18 @@ def notes_line(eid: str, lang: str, sql: str = "") -> str:
     from app.agents.sqlport import notes_for
 
     notes = " ".join(n for n, _h in notes_for(eid, sql))
+    part = d.get("proven_parts")                   # an engine part-way through its nights: say which parts are lab-tested
     if lang == "en":
+        if part:
+            return (f"{d['name']}: lab-tested on {d['name']} so far: {part['en']}. The other checks above are general SQL reasoning "
+                    f"(true on every database); anything said about MySQL/PostgreSQL behaviour may not apply. {d['name']} notes (from "
+                    f"its docs, not yet lab-tested as rules): {notes}")
         return (f"{d['name']}: DBaba has no lab-tested {d['name']} knowledge yet. The checks above are general SQL reasoning "
                 f"(true on every database); anything said about MySQL/PostgreSQL behaviour doesn't apply. {d['name']} notes (from its "
                 f"docs, not lab-tested): {notes}")
+    if part:
+        return (f"{d['name']}: abhi tak {d['name']} pe lab-tested: {part['hi']}. Baaki checks general SQL reasoning hain (har database pe "
+                f"sach); MySQL/PostgreSQL wali baatein yahan shayad lagu na hon. {d['name']} notes (docs se): {notes}")
     return (f"{d['name']}: iska lab-tested knowledge abhi nahi hai. Upar ke checks general SQL reasoning hain (har database pe sach); "
             f"MySQL/PostgreSQL wali baatein yahan lagu nahi. {d['name']} notes (docs se, lab mein test nahi): {notes}")
 

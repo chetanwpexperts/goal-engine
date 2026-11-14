@@ -324,6 +324,61 @@ class Engine:
                                        "AND table_name = %s", (table,))]
 
 
+class SqliteEngine(Engine):
+    """E1 (SQLite): the same tables in an in-memory SQLite database (Python's sqlite3), dates stored as SQLite keeps them:
+    'YYYY-MM-DD' / 'YYYY-MM-DD HH:MM:SS' text, money as REAL. Only statements written for SQLite run here."""
+
+    def __init__(self):
+        super().__init__({"type": "sqlite"})
+
+    def open(self):
+        import sqlite3
+
+        self.conn = sqlite3.connect(":memory:", isolation_level=None)
+        return self
+
+    def run(self, sql, params=None, many=None):
+        cur = self.conn.cursor()
+        try:
+            if many is not None:
+                cur.executemany(sql.replace("%s", "?"), [tuple(_sqlite_value(v) for v in r) for r in many])
+                return None
+            cur.execute(sql, params) if params else cur.execute(sql)
+            return cur.fetchall() if cur.description else cur.rowcount
+        finally:
+            cur.close()
+
+    def begin(self):
+        self.run("BEGIN")
+
+    def create(self, schema):
+        names = schema["order"]
+        self.drop(names)
+        self.begin()
+        for n in names:
+            t = schema["tables"][n]
+            for stmt in _ddl(t, "postgres"):           # INTEGER / NUMERIC / DATE / TIMESTAMP: SQLite takes them as type preferences
+                self.run(stmt)
+            ph = ", ".join(["%s"] * len(t["cols"]))
+            self.run(f"INSERT INTO {n} VALUES ({ph})", many=[tuple(r) for r in t["rows"]])
+        self.commit()
+
+    def drop(self, names):
+        self.rollback()
+        for n in reversed(names):
+            self.run(f"DROP TABLE IF EXISTS {n}")
+
+
+def _sqlite_value(v):
+    if isinstance(v, Decimal):
+        return float(v)
+    if isinstance(v, dt.datetime):
+        return f"{v:%Y-%m-%d %H:%M:%S}"
+    if isinstance(v, dt.date):
+        return f"{v:%Y-%m-%d}"
+    return v
+
+
 def engines_up() -> dict:
     out = {}
     for cfg in (MYSQL, PG):

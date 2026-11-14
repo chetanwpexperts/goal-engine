@@ -17,6 +17,7 @@
   "pg_xlog"
  ],
  "codes": {
+  "42P07": "table_exists",
   "42601": "syntax_error",
   "42P01": "unknown_table",
   "42703": "unknown_column",
@@ -58,6 +59,9 @@
   "ERRCODE[_ ]?\\w*:?\\s*([0-9A-Z]{5})"
  ],
  "messages": [
+  {"cause": "aggregate_misuse", "re": "aggregate functions are not allowed in (?P<clause>WHERE|JOIN conditions|GROUP BY)"},
+  {"cause": "value_count_mismatch", "re": "INSERT has more (?:expressions than target columns|target columns than expressions)"},
+  {"cause": "table_exists", "re": "relation \"(?P<table>[^\"]+)\" already exists"},
   {
    "cause": "wal_archive_failing",
    "re": "archive command failed with exit code (?P<code>\\d+)|archiving write-ahead log file \\\"(?P<wal>[0-9A-F]{24})\\\" failed too many times|archive command (?:was terminated|failed) by signal"
@@ -212,6 +216,9 @@
   }
  ],
  "fix": {
+  "aggregate_misuse": ["SELECT customer_id, SUM(amount) AS total\nFROM orders\nGROUP BY customer_id\nHAVING SUM(amount) > 1000;   -- the condition on the total goes in HAVING", "-- In UPDATE/DELETE compare with a subquery:\nDELETE FROM t WHERE amount < (SELECT AVG(amount) FROM t);"],
+  "value_count_mismatch": ["-- Name the columns and give one value for each, in the same order:\nINSERT INTO {table} (col1, col2) VALUES ($1, $2);"],
+  "table_exists": ["CREATE TABLE IF NOT EXISTS {table} (...);", "-- or see what is already there:\nSELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table}';"],
   "syntax_error": [
    "-- Look just before \"{token}\": a missing comma, an unclosed ' or ( , or MySQL-only syntax.\n-- PostgreSQL: 'single quotes' for text, \"double quotes\" only for names, no `backticks`; LIMIT n OFFSET m (not LIMIT m, n)."
   ],

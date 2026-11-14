@@ -69,6 +69,19 @@ def build(eng) -> None:
         eng.run(f"INSERT INTO {name} VALUES ({ph})", many=rows)
 
 
+def sqlite_db(path: str):
+    """E1: the same practice tables in a fresh SQLite database file (Python's sqlite3), for the SQLite concepts and practice
+    bank. A file, not :memory:, so journal modes (WAL) behave as they do for an app."""
+    import sqlite3
+
+    conn = sqlite3.connect(path, isolation_level=None)
+    for name in ORDER:
+        cols, rows_ = TABLES[name]
+        conn.execute(f"CREATE TABLE {name} ({', '.join(cols)}, PRIMARY KEY (id))")
+        conn.executemany(f"INSERT INTO {name} VALUES ({', '.join(['?'] * len(cols))})", rows_)
+    return conn
+
+
 def engines() -> dict:
     """{'mysql': Engine, 'postgres': Engine} with the practice tables built; engines that aren't running are left out."""
     out = {}

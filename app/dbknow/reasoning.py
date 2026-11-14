@@ -24,7 +24,7 @@ HERE = Path(__file__).resolve().parent
 CORE = HERE / "core"
 DIALECTS = HERE / "dialects"
 LEXICON = str(CORE / "lexicon.json")
-ENGINE_NAMES = {"mysql": "MySQL", "mariadb": "MariaDB", "postgresql": "PostgreSQL"}
+ENGINE_NAMES = {"mysql": "MySQL", "mariadb": "MariaDB", "postgresql": "PostgreSQL", "sqlite": "SQLite"}
 
 
 # ------------------------------------------------------------------ knowledge
@@ -65,8 +65,9 @@ def dialect(name: str) -> dict:
 
 
 def engines() -> list[str]:
-    """The databases with lab-tested error knowledge (notes-only dialects, like SQL Server for now, are left out)."""
-    return sorted(p.stem for p in DIALECTS.glob("*.json") if not _raw(p.stem).get("notes_only"))
+    """The databases with lab-tested error knowledge: their own message formats ('messages'). A dialect that is still
+    notes-only for queries can already have them (SQLite: E1 night 1); SQL Server / Oracle have none yet."""
+    return sorted(p.stem for p in DIALECTS.glob("*.json") if _raw(p.stem).get("messages"))
 
 
 # ------------------------------------------------------------------ reading what was pasted
@@ -80,6 +81,8 @@ def which_engine(text: str, found_in: list[str], facts: dict | None = None) -> s
         return named[0]
     if not found_in:
         return None
+    if len(found_in) == 1 and dialect(found_in[0]).get("own_formats"):
+        return found_in[0]                                # only this database words its errors this way ('database is locked')
     score = {}
     for e in found_in:
         d = dialect(e)
@@ -100,7 +103,7 @@ def which_engine(text: str, found_in: list[str], facts: dict | None = None) -> s
 def evidence(text: str) -> dict:
     """cause -> fact {seen, proof, entities, engine}. Message formats and codes are the database's own notation."""
     facts: dict[str, dict] = {}
-    order = ["postgresql", "mariadb", "mysql"]
+    order = ["postgresql", "mariadb", "mysql"] + [e for e in engines() if e not in ("postgresql", "mariadb", "mysql")]
     for name in order:
         d = dialect(name)
         for m in d["messages"]:
@@ -130,8 +133,16 @@ def evidence(text: str) -> dict:
     if plan:
         facts["full_scan"] = plan
     # a specific reading wins over the general one it is a case of
-    if "reserved_word" in facts:
-        facts.pop("syntax_error", None)
+    if "reserved_word" in facts or "value_count_mismatch" in facts or "alter_not_supported" in facts:
+        facts.pop("syntax_error", None)                   # (PostgreSQL files a value-count slip under 42601, a syntax error)
+    if "alter_not_supported" in facts:
+        facts.pop("reserved_word", None)
+    if "aggregate_misuse" in facts:
+        facts.pop("group_by_strict", None)                # PostgreSQL files it under 42803 too
+    fk = facts.get("fk_missing_parent")
+    if fk and fk.get("engines") == {"sqlite"} and "fk_has_children" not in facts and \
+            re.search(r"\bdelete\s+from\b|\bupdate\s+[\w\"`]+\s+set\b|\bdrop\s+table\b|\b(?:delet|remov)\w*|\bhata", text or "", re.I):
+        facts["fk_has_children"] = facts.pop("fk_missing_parent")   # SQLite's message doesn't say which side: the statement does
     if "charset_mismatch" in facts:
         facts.pop("bad_value_type", None)
     if "ssl_required" in facts:
@@ -308,7 +319,8 @@ def report(result: dict, hi: bool, signed_in: bool = False, can_connect: bool = 
         proof = fact.get("live_proof") or fact.get("proof")
         if proof:
             lines.append(f"- {'Saboot' if hi else 'Proof'}: {proof}")
-        targets = [e] if eng else ["mysql", "postgresql"]
+        own = sorted(fact.get("engines") or [])
+        targets = [e] if eng else own if own and not set(own) & {"mysql", "mariadb", "postgresql"} else ["mysql", "postgresql"]
         for te in targets:                                       # database not known: the fix for each, labelled
             fixes = dialect(te).get("fix", {}).get(x["cause"])
             if fixes:

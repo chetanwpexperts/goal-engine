@@ -51,6 +51,18 @@ class Finding:
         return self.__dict__.copy()
 
 
+def _no_scalar_minmax(t: str) -> str:
+    """max(a, b) / min(a, b) with two or more arguments is the bigger / smaller of those values in each row (SQLite; the
+    others refuse it), never a total: renamed (same length) so the total checks don't read it as MAX() / MIN() of a column."""
+    out = t
+    for m in reversed(list(re.finditer(r"\b(max|min)\s*\(", t, re.I))):
+        a = m.end() - 1
+        b = _close(t, a)
+        if b > a and any(d == 0 and ch == "," for d, ch in zip(_depths(t[a + 1:b]), t[a + 1:b])):
+            out = out[:m.start()] + ("mx_" if m.group(1).lower() == "max" else "mn_") + out[m.start() + 3:]   # same length
+    return out
+
+
 def _mask(sql: str) -> str:
     """Same length as the query: strings keep their quotes but their insides become x, comments become spaces."""
     out, i, n = list(sql), 0, len(sql)
@@ -598,7 +610,7 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
         rest = flat[wm.end():]
         stop = re.search(r"\bgroup\s+by\b|\border\s+by\b|\bhaving\b|\blimit\b|\bunion\b|;", rest, re.I)
         wtext = rest[:stop.start()] if stop else rest
-        am = AGG.search(wtext)
+        am = AGG.search(_no_scalar_minmax(wtext))
         if am:
             fn = am.group(1).upper()
             F.append(Finding("error", "where", f"{fn}() can't be used in WHERE", f"WHERE mein {fn}() nahi chalta",
@@ -1184,7 +1196,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
         if alias and re.fullmatch(r"[`\"]?\w+[`\"]?\.[`\"]?\w+[`\"]?", t):
             alias = ""
         items.append({"text": t, "alias": alias, "start": sel_a + off + (len(txt) - len(txt.lstrip())),
-                      "end": sel_a + off + len(txt.rstrip()), "agg": bool(AGG.search(_no_subqueries(t))) and " over" not in _no_subqueries(t).lower()})
+                      "end": sel_a + off + len(txt.rstrip()), "agg": bool(AGG.search(_no_scalar_minmax(_no_subqueries(t)))) and " over" not in _no_subqueries(t).lower()})
     sel_aliases = {i["alias"].lower(): i for i in items if i["alias"]}
 
     # ------------------------------------------------ 1. names: aliases that don't exist, tables used by name after an alias

@@ -287,6 +287,10 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
     if re.match(r"^\s*(insert|replace)\b", head, re.I) or ROUTINE_RE.match(head) or sqlschema.is_schema(head):
         return _analyze_other(original, said)        # INSERT / REPLACE / CREATE PROCEDURE, FUNCTION, TRIGGER: correctness only
     if not re.match(r"^\s*(\(|with\b|select\b|update\b|delete\b)", head, re.I):
+        if re.match(r"^\s*(truncate|show|describe|desc|alter)\b", head, re.I):
+            other = _analyze_other(original, said)    # another database's command the chosen one refuses (SHOW TABLES on SQLite)
+            if any(f["topic"] == "dialect" for f in other.get("correct", {}).get("findings", [])):
+                return other
         return {"ok": False, "error": "This checker works on SELECT, UPDATE, DELETE, INSERT queries, on procedures, functions "
                                       "and triggers, and on CREATE TABLE designs", "findings": []}
     sql = _mask_strings(_strip_comments(original))

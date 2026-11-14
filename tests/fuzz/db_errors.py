@@ -83,6 +83,38 @@ PG = {  # PostgreSQL: (sqlstate, message, detail)
     "checkpoints_too_frequent": lambda r: ("00000", "checkpoints are occurring too frequently (12 seconds apart)", ""),
     "replication_stopped": lambda r: ("23505", f"duplicate key value violates unique constraint \"{r['t']}_pkey\"\nCONTEXT:  processing remote data for replication origin \"pg_16393\" during message type \"INSERT\" for replication target relation \"public.{r['t']}\"", f"Key (id)=({r['v']}) already exists."),
 }
+LITE = {  # SQLite: (extended result code name, message), each produced on SQLite 3.53 (Python's sqlite3) or the 3.45 command line
+    "duplicate_key": lambda r: ("SQLITE_CONSTRAINT_UNIQUE", f"UNIQUE constraint failed: {r['t']}.{r['c']}"),
+    "not_null": lambda r: ("SQLITE_CONSTRAINT_NOTNULL", f"NOT NULL constraint failed: {r['t']}.{r['c']}"),
+    "check_violation": lambda r: ("SQLITE_CONSTRAINT_CHECK", f"CHECK constraint failed: {r['c']} >= 0"),
+    "fk_missing_parent": lambda r: ("SQLITE_CONSTRAINT_FOREIGNKEY", "FOREIGN KEY constraint failed"),
+    "bad_value_type": lambda r: ("SQLITE_MISMATCH", "datatype mismatch"),
+    "unknown_table": lambda r: ("SQLITE_ERROR", f"no such table: {r['t']}x"),
+    "unknown_column": lambda r: ("SQLITE_ERROR", f"no such column: {r['c']}x"),
+    "ambiguous_column": lambda r: ("SQLITE_ERROR", "ambiguous column name: id"),
+    "syntax_error": lambda r: ("SQLITE_ERROR", f"near \"{r['t']}\": syntax error"),
+    "reserved_word": lambda r: ("SQLITE_ERROR", "near \"order\": syntax error"),
+    "unknown_function": lambda r: ("SQLITE_ERROR", "no such function: NOW"),
+    "aggregate_misuse": lambda r: ("SQLITE_ERROR", "misuse of aggregate function SUM()"),
+    "value_count_mismatch": lambda r: ("SQLITE_ERROR", f"table {r['t']} has 4 columns but 3 values were supplied"),
+    "table_exists": lambda r: ("SQLITE_ERROR", f"table {r['t']} already exists"),
+    "alter_not_supported": lambda r: ("SQLITE_ERROR", "Cannot add a NOT NULL column with default value NULL"),
+    "db_file_locked": lambda r: ("SQLITE_BUSY", "database is locked"),
+    "file_readonly": lambda r: ("SQLITE_READONLY", "attempt to write a readonly database"),
+    "cannot_open_file": lambda r: ("SQLITE_CANTOPEN", "unable to open database file"),
+    "disk_full": lambda r: ("SQLITE_FULL", "database or disk is full"),
+    "file_corrupt": lambda r: ("SQLITE_CORRUPT", "database disk image is malformed"),
+}
+LITE_WRAP = [
+    "sqlite3.{cls}: {msg}",
+    "Error: in prepare, {msg}",
+    "Error: stepping, {msg} (19)",
+    "Runtime error near line 4: {msg} (19)",
+    "SQLSTATE[HY000]: General error: 1 {msg} (Connection: sqlite, SQL: insert into \"{t}\" (\"{c}\") values (?))",
+    "{code}: {msg}",
+    "android.database.sqlite.SQLiteException: {msg} (code 1 {code})",
+    "Microsoft.Data.Sqlite.SqliteException (0x80004005): SQLite Error 19: '{msg}'.",
+]
 MY_WRAP = [
     "ERROR {code} ({state}): {msg}",
     "SQLSTATE[{state}]: Integrity constraint violation: {code} {msg}",
@@ -103,7 +135,8 @@ PG_WRAP = [
 ]
 SAY = ["", "", "ye error aa raha hai", "getting this error on my website", "order save karte waqt ye aata hai", "help, what does this mean?",
        "pls fix", "kya karu iska", "our app shows this since morning", "client ki site pe ye aa gaya", "after deploy we get"]
-ENGINE_SAY = {"mysql": ["", "", "mysql", "MySQL 8"], "mariadb": ["MariaDB", "mariadb 10.11"], "postgresql": ["", "postgres", "PostgreSQL 16"]}
+ENGINE_SAY = {"mysql": ["", "", "mysql", "MySQL 8"], "mariadb": ["MariaDB", "mariadb 10.11"], "postgresql": ["", "postgres", "PostgreSQL 16"],
+              "sqlite": ["", "", "sqlite", "SQLite 3"]}
 PLAIN = {  # descriptions without any error text -> the likely causes must include it (never claimed as found)
     "too_many_connections": ["site pe bahut log aate hi database connect nahi hota, connection limit wali problem lagti hai",
                              "too many users and the app cant connect to db"],
@@ -114,6 +147,7 @@ PLAIN = {  # descriptions without any error text -> the likely causes must inclu
     "replica_lag": ["replica pe data der se aata hai, replica peeche chal raha hai", "our read replica is lagging behind and shows old data"],
     "wal_retained_by_slot": ["postgres ka pg_wal folder bahut bada ho gaya hai, disk bhar rahi hai", "pg_wal keeps growing on our postgres server"],
     "binlog_not_expiring": ["mysql binlog files bahut jagah le rahi hain", "binary logs are filling the disk on our mysql server"],
+    "db_file_locked": ["sqlite file lock ho jaati hai jab do log ek saath save karte hain", "our sqlite app says the database file is locked when two users save"],
 }
 
 
@@ -130,8 +164,16 @@ def case(i, seed):
     if rng.random() < 0.12:
         cause = rng.choice(list(PLAIN))
         return rng.choice(PLAIN[cause]), {"likely": cause}
-    engine = rng.choice(["mysql", "mysql", "mariadb", "postgresql", "postgresql"])
-    if engine == "postgresql":
+    engine = rng.choice(["mysql", "mysql", "mariadb", "postgresql", "postgresql", "sqlite"])
+    if engine == "sqlite":
+        cause = rng.choice(list(LITE))
+        code, msg = LITE[cause](r)
+        wrap = rng.choice(LITE_WRAP)
+        if "Error: in prepare" in wrap and code != "SQLITE_ERROR":
+            wrap = "Error: stepping, {msg} (19)"     # the command line says 'in prepare' only for errors found before running
+        cls = "IntegrityError" if "CONSTRAINT" in code or code == "SQLITE_MISMATCH" else "OperationalError"
+        body = wrap.format(cls=cls, msg=msg, code=code, t=r["t"], c=r["c"])
+    elif engine == "postgresql":
         cause = rng.choice(list(PG))
         state, msg, detail = PG[cause](r)
         body = rng.choice(PG_WRAP).format(state=state, msg=msg, detail=detail or "", t=r["t"], c=r["c"])
@@ -147,7 +189,7 @@ def case(i, seed):
         eng_word = "MariaDB"
     text = "\n".join(x for x in (f"{said} {eng_word}".strip(), body) if x) if rng.random() < 0.5 else \
         "\n".join(x for x in (body, f"{eng_word} {said}".strip()) if x)
-    family = "postgresql" if engine == "postgresql" else ("mariadb" if engine == "mariadb" else "mysql")
+    family = engine if engine in ("postgresql", "sqlite") else ("mariadb" if engine == "mariadb" else "mysql")
     return text, {"cause": cause, "engine": family, "r": r}
 
 

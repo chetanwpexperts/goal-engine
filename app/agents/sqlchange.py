@@ -780,7 +780,12 @@ def _insert(sql: str, s: str, intent: str, F) -> list:
                           f"that was being inserted and the key column must have a PRIMARY KEY or UNIQUE constraint.",
                           f"{says} PostgreSQL: ON CONFLICT (key column) DO UPDATE SET col = EXCLUDED.col (EXCLUDED = jo row insert ho "
                           f"rahi thi; key column pe PRIMARY KEY ya UNIQUE hona chahiye)."), edits))
-    if ins["conflict"]:
+    from app.agents import sqlbasics
+
+    lite = sqlbasics.CHOSEN.get() == "sqlite"
+    if ins["conflict"] and lite:
+        pass                       # SQLite's own upsert words (3.24+; DO UPDATE without a target from 3.35, lab: 3.53 takes it)
+    elif ins["conflict"]:
         ctext = s[ins["conflict"][0]:ins["conflict"][1]]
         kind, says = _verdict("on_conflict", eng, "postgresql")
         edits = []

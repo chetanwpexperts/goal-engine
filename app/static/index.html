@@ -3,14 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Goal Engine: free help for Excel, Word and database problems (no AI)</title>
+  <title>Goal Engine: free help with database errors, slow queries and Excel problems</title>
   <meta name="description" content="Free for everyone: no card, no UPI, no limits. Tell Goal Engine what is wrong with your Excel file, Word document or database error in English, Hindi or Hinglish. It finds the real cause, shows the proof and fixes it, with Undo. No AI.">
   <meta name="theme-color" content="#EEF1F6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/app.css">
-  <link rel="preload" as="image" href="/static/brain-hd.webp" type="image/webp" fetchpriority="high">
 </head>
 <body data-state="idle">
   <script>try { if (localStorage.getItem("ge_chat") === "1") document.body.dataset.state = "active"; } catch (e) {}</script>
@@ -51,25 +50,15 @@
     </aside>
   </main>
 
-  <div class="home-bg" aria-hidden="true"><span class="wave"></span><span class="bloom"></span><span class="cube c1"></span><span class="cube c2"></span><span class="cube c3"></span><span class="cube c4"></span></div>
   <main class="home" id="home">
     <div id="status" class="status" aria-live="polite" hidden></div>
     <div class="hero" id="hero">
-      <h1>Tell it what's wrong.<br><span class="accent">It fixes it.</span></h1>
-      <p>Excel, Word and database errors. Say it in your own words, in English, Hindi or Hinglish. It finds the real cause, shows you the proof, and fixes it. Every change can be undone.</p>
+      <h1>Tell it what's wrong.<br><span class="accent">It finds out why.</span></h1>
+      <p>Database errors, slow queries, Excel formulas that stopped working. Write it the way you'd tell a colleague, in English, Hindi or Hinglish. You get the cause, the proof from your own query or file, and a fix you can undo.</p>
       <p class="free-line">Free for everyone. No card, no UPI, no limits.</p>
-    </div>
-    <div class="brain-stage" aria-hidden="true">
-      <canvas id="brainhd" class="brain-hd"></canvas>
-      <canvas id="brain" class="brain-art"></canvas>
-      <span class="orbit-tag t1"><i class="ic blue"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></i><span><b>Understand</b><small>Finds the real issue</small></span></span>
-      <span class="orbit-tag t2"><i class="ic violet"><svg viewBox="0 0 24 24"><path d="M6 19V11M11 19V6M16 19v-9M21 19H3"/></svg></i><span><b>Check</b><small>Analyzes &amp; tests</small></span></span>
-      <span class="orbit-tag t3"><i class="ic purple"><svg viewBox="0 0 24 24"><rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M9 8.5h6M9 12.5h6M9 16.5h4"/></svg></i><span><b>Plan</b><small>Creates the best solution</small></span></span>
-      <span class="orbit-tag t4"><i class="ic indigo"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></i><span><b>Fix</b><small>Provides working result</small></span></span>
     </div>
     <div id="composer-slot" class="composer-slot">
   <form id="composer" class="composer">
-    <svg class="spark" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3l1.6 4.6L16 9.2l-4.4 1.6L10 15.5l-1.6-4.7L4 9.2l4.4-1.6zM17.5 13l.9 2.3 2.3.9-2.3.9-.9 2.4-.9-2.4-2.3-.9 2.3-.9z"/></svg>
     <div class="field">
       <textarea id="input" rows="1" maxlength="10000" aria-label="Say what you need"></textarea>
       <div id="ghost" class="ghost" aria-hidden="true"></div>
@@ -97,15 +86,32 @@
       </button>
     </section>
     <div id="scope" class="scope" hidden aria-live="polite"></div>
-    <section class="perks" aria-label="Why Goal Engine">
-      <div class="perk"><i class="ic amber"><svg viewBox="0 0 24 24"><path d="M12 3v18M7 7.5h7.5a3 3 0 0 1 0 6H9.5a3 3 0 0 0 0 6H17"/></svg></i><span><b>Free, no limits</b><small>No card, no UPI. Use it every day</small></span></div>
-      <div class="perk"><i class="ic blue"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5M8.5 11l2 2 3.5-3.5"/></svg></i><span><b>Proof, not guesses</b><small>Finds the real cause in your own file and shows it</small></span></div>
-      <div class="perk"><i class="ic ink"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg></i><span><b>Fixed for you</b><small>It does the work. Every change can be undone</small></span></div>
-      <div class="perk"><i class="ic green"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></i><span><b>No AI, private</b><small>Your files are never sent to any AI company</small></span></div>
+    <section class="sample" aria-labelledby="sample-h">
+      <h2 id="sample-h">What an answer looks like</h2>
+      <div class="sample-card">
+        <div class="sample-ask">
+          <p class="who">Someone asked</p>
+          <p>"This should show paid and shipped orders, but I only get the paid ones."</p>
+          <pre><code>SELECT id, amount
+FROM orders
+WHERE status = 'paid' OR 'shipped';</code></pre>
+        </div>
+        <div class="sample-reply">
+          <p class="who">DBaba <span class="sure">Proven from the query</span></p>
+          <p><b>OR needs the column again.</b> <code>OR 'shipped'</code> doesn't compare anything with <code>status</code>. MySQL turns the word into the number 0 and quietly keeps only the paid orders; PostgreSQL refuses the query.</p>
+          <pre><code>WHERE status IN ('paid', 'shipped')</code></pre>
+          <p class="note">Checked on MariaDB and PostgreSQL: the fixed query returns both kinds of order.</p>
+        </div>
+      </div>
     </section>
-    <section class="engine" aria-labelledby="engine-h">
-      <h2 id="engine-h">Not a chatbot. A data-science engine.</h2>
-      <p>It reads your file like an analyst: what each column is, what's missing, what's duplicated. It learns from real problems and must pass thousands of new test cases before any change goes live. No ChatGPT, no outside AI: it runs on its own models, on its own server.</p>
+    <section class="how" aria-labelledby="how-h">
+      <h2 id="how-h">How it works</h2>
+      <ol class="how-list">
+        <li><b>It reads your query or file step by step.</b> Which rows it keeps, what it adds up, where a join copies rows. Then it points at the step that's wrong and shows why.</li>
+        <li><b>It tells you how sure it is.</b> Some mistakes are certain from the text alone. Others depend on your data or table structure, and it says so, with the query that settles it.</li>
+        <li><b>Nothing changes without you.</b> You see the rows before anything is changed, and every change can be undone.</li>
+      </ol>
+      <p class="how-note">There's no ChatGPT or other AI service behind it. DBaba and Sheetu work from written rules and checks, each one tested on real MariaDB and PostgreSQL databases before it goes live, and they run on this site's own server. Your files are never sent anywhere else.</p>
     </section>
     <section class="talk-cta" aria-labelledby="talk-h">
       <div>
@@ -114,8 +120,7 @@
       </div>
       <a class="talk-btn" href="/enquiry?from=home-card">Talk to us</a>
     </section>
-    <p class="home-hint">Type or speak in English, Hindi or Hinglish.</p>
-    <p class="byline">Built by Chetan Sharma, developer and DBA.</p>
+    <p class="byline">Made by Chetan Sharma, a developer and DBA. Questions or ideas? <a href="/enquiry?from=byline">Write to me</a>.</p>
   </main>
   <div id="options" class="options" hidden></div>
   <p id="fineprint" class="fineprint">Please don't type passwords or card numbers here. <a href="/privacy">Privacy &amp; delete my data</a> · <a href="/enquiry?from=home">Talk to us</a></p>
@@ -130,6 +135,5 @@
   </div>
 
   <script src="/static/app.js" defer></script>
-  <script src="/static/brain.js" defer></script>
 </body>
 </html>

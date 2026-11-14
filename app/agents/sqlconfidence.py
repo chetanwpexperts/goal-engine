@@ -569,8 +569,13 @@ def _equivalence(res: dict, hi: bool) -> str:
         if "keyset" in kinds:
             bits.append("wahi ORDER BY, aakhri column unique, isliye 'aakhri dekhi row ke baad' theek agla page hai" if hi else
                         "the same ORDER BY ending in a unique column, so 'after the last row seen' is exactly the next page")
+        from app.agents import sqlequiv
+
+        ex = sqlequiv.explain(res, hi)                # night 14: aspect by aspect, with the facts it needs
         if bits:
-            return ("Wahi rows kyun: " if hi else "Why it returns the same rows: ") + "; ".join(bits) + "."
+            return ("Wahi rows kyun: " if hi else "Why it returns the same rows: ") + "; ".join(bits) + "." + ("\n\n" + ex if ex else "")
+        if ex:
+            return ex
     if res.get("suggested"):
         names = "; ".join(f["title_hi" if hi else "title_en"] for f in fs if f["kind"] == "check")[:300]
         return ("Ye wahi rows nahi deti: ye tab ke liye hai jab aapka matlab ye tha (" + names + "). Agar abhi wala result hi chahiye "
@@ -645,6 +650,12 @@ def annotate(sql: str, res: dict, sch: dict | None = None) -> dict:
     from app.agents import sqlschema
 
     corr = (res.get("correct") or {})
+    try:
+        from app.agents import sqlequiv
+
+        sqlequiv.annotate(res)                        # night 14: what each same-rows rewrite keeps, and on which facts
+    except Exception:  # noqa: BLE001 - the contract is an extra
+        pass
     amap = _amap(sql)
     annotate_findings(corr.get("findings"), sql, amap)
     annotate_findings((res.get("speed_later") or {}).get("findings"), sql, amap)

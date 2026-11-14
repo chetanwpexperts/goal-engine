@@ -1,0 +1,161 @@
+{
+  "about": "What each same-rows rewrite keeps the same, and on which conditions (night 14). Five aspects are checked for every rewrite: matching (which rows find a partner), NULLs (what a row with nothing to match or total gets), duplicates (how often each row comes out), ordering (what decides the order and the page boundary) and grain (what one result row is). proof = 'query' when the query's text alone proves it; 'schema' when it holds only if the listed table facts are true. Every contract was checked on MariaDB 10.11 and PostgreSQL 16 by tests/practice/test_night14.py and the stmtbugs generator.",
+  "aspects": {
+    "matching": {"en": "Matching", "hi": "Matching"},
+    "nulls": {"en": "NULLs", "hi": "NULL"},
+    "duplicates": {"en": "Duplicates", "hi": "Duplicate rows"},
+    "ordering": {"en": "Ordering", "hi": "Order"},
+    "grain": {"en": "Grain", "hi": "Grain (ek row kya hai)"}
+  },
+  "rewrites": {
+    "preagg_subquery": {
+      "keeps": {
+        "matching": {"en": "the LEFT JOIN uses the same equality as the subquery's link, so each outer row meets exactly the child rows it counted before; a NULL link matches nothing either way", "hi": "LEFT JOIN wahi barabari use karta hai jo subquery ka link tha; NULL link dono mein kuch match nahi karta"},
+        "nulls": {"en": "a parent with no child rows: COUNT is 0 in the subquery and NULL after the LEFT JOIN, so COUNT is wrapped in COALESCE(..., 0); SUM, MIN, MAX and AVG are NULL both ways and stay unwrapped", "hi": "bina child wala parent: subquery mein COUNT 0, LEFT JOIN ke baad NULL, isliye COALESCE(..., 0); SUM/MIN/MAX/AVG dono mein NULL"},
+        "duplicates": {"en": "the derived table is grouped by the link column, so it has one row per link value and the LEFT JOIN never repeats an outer row", "hi": "derived table link column se grouped hai, har value ki ek row, isliye LEFT JOIN koi row dohrata nahi"},
+        "ordering": {"en": "the ORDER BY is kept, with each copy of the subquery replaced by the same value", "hi": "ORDER BY wahi, har copy ki jagah wahi value"},
+        "grain": {"en": "one row per outer row, as before", "hi": "pehle jaisi, har bahar ki row ek baar"}
+      },
+      "holds_if": [],
+      "proof": "query",
+      "proven": ["mariadb", "postgresql"]
+    },
+    "repeat_subquery": {
+      "keeps": {
+        "matching": {"en": "the subquery is the same text, run for the same outer rows", "hi": "wahi subquery, wahi bahar ki rows"},
+        "nulls": {"en": "the value is computed once and used by name, so a NULL stays NULL in every place", "hi": "value ek baar nikalti hai, NULL har jagah NULL"},
+        "duplicates": {"en": "wrapping a query in a derived table neither adds nor removes rows", "hi": "derived table mein rakhne se rows na badhti na ghatti"},
+        "ordering": {"en": "ORDER BY by the name sorts by the very same value", "hi": "ORDER BY naam se wahi value se sort"},
+        "grain": {"en": "unchanged", "hi": "wahi"}
+      },
+      "holds_if": [],
+      "proof": "query",
+      "proven": ["mariadb", "postgresql"]
+    },
+    "same_subquery": {
+      "keeps": {
+        "matching": {"en": "an uncorrelated total gives one value for the whole query; each place now reads that value", "hi": "bina correlation ka total poori query ke liye ek value; har jagah wahi"},
+        "nulls": {"en": "a total over no rows is NULL (COUNT 0) in both forms", "hi": "khaali rows ka total dono mein NULL (COUNT 0)"},
+        "duplicates": {"en": "a total without GROUP BY always has exactly one row, so CROSS JOIN with it adds and loses no row", "hi": "bina GROUP BY ka total hamesha ek row, CROSS JOIN se koi row na badhti na ghatti"},
+        "ordering": {"en": "the ORDER BY is kept", "hi": "ORDER BY wahi"},
+        "grain": {"en": "unchanged", "hi": "wahi"}
+      },
+      "holds_if": [],
+      "proof": "query",
+      "proven": ["mariadb", "postgresql"]
+    },
+    "to_exists": {
+      "keeps": {
+        "matching": {"en": "x IN (SELECT y ...) and EXISTS (... AND y = x) both keep a row when some inner row has y = x", "hi": "dono tab row rakhte hain jab andar koi row y = x ho"},
+        "nulls": {"en": "a NULL x or y matches in neither; IN may be NULL where EXISTS is false, which only NOT tells apart, so it is offered only where nothing negates it", "hi": "NULL dono mein match nahi; IN NULL ho sakta hai jahan EXISTS false, farak sirf NOT se, isliye NOT na ho tabhi"},
+        "duplicates": {"en": "neither form repeats an outer row, whatever the inner table holds", "hi": "koi bhi form row nahi dohrata"},
+        "ordering": {"en": "the ORDER BY is kept", "hi": "ORDER BY wahi"},
+        "grain": {"en": "one row per outer row, as before", "hi": "pehle jaisi"}
+      },
+      "holds_if": [],
+      "proof": "query",
+      "proven": ["mariadb", "postgresql"]
+    },
+    "to_in": {
+      "keeps": {
+        "matching": {"en": "EXISTS with one link inner.y = outer.x and the other conditions on the inner table keeps exactly the rows whose x is among those y values", "hi": "ek link aur baaki conditions andar ki table pe: wahi rows jinka x un y mein hai"},
+        "nulls": {"en": "a NULL matches in neither; NOT EXISTS and NOT IN are not the same when a column can be NULL, so only the positive form is rewritten", "hi": "NULL dono mein match nahi; NOT IN aur NOT EXISTS NULL pe alag, isliye sirf positive form"},
+        "duplicates": {"en": "neither form repeats an outer row", "hi": "koi row nahi dohrati"},
+        "ordering": {"en": "the ORDER BY is kept", "hi": "ORDER BY wahi"},
+        "grain": {"en": "unchanged", "hi": "wahi"}
+      },
+      "holds_if": [],
+      "proof": "query",
+      "proven": ["mariadb", "postgresql"]
+    },
+    "to_join": {
+      "keeps": {
+        "matching": {"en": "the JOIN's ON is the IN's equality, with the subquery's own conditions inside the derived table", "hi": "JOIN ka ON wahi barabari, subquery ki conditions derived table ke andar"},
+        "nulls": {"en": "a NULL matches in neither", "hi": "NULL dono mein match nahi"},
+        "duplicates": {"en": "the derived table is SELECT DISTINCT of the column, one row per value, so an outer row comes out at most once, as with IN (a plain JOIN would repeat it once per match)", "hi": "SELECT DISTINCT: har value ki ek row, isliye bahar ki row zyada se zyada ek baar (seedha JOIN dohrata)"},
+        "ordering": {"en": "the ORDER BY is kept", "hi": "ORDER BY wahi"},
+        "grain": {"en": "one row per outer row that has a match", "hi": "har match wali bahar ki row ek baar"}
+      },
+      "holds_if": [],
+      "proof": "query",
+      "proven": ["mariadb", "postgresql"]
+    },
+    "expr_once": {
+      "keeps": {
+        "matching": {"en": "no condition changes", "hi": "koi condition nahi badli"},
+        "nulls": {"en": "the name holds the very value of the calculation, NULL included", "hi": "naam mein calculation ki wahi value, NULL bhi"},
+        "duplicates": {"en": "no row is added or removed", "hi": "koi row na badhti na ghatti"},
+        "ordering": {"en": "ORDER BY the SELECT name sorts by the same value on MariaDB and PostgreSQL; offered only when no table column has that name", "hi": "ORDER BY naam wahi value se sort karta hai; sirf tab jab kisi column ka wo naam na ho"},
+        "grain": {"en": "unchanged", "hi": "wahi"}
+      },
+      "holds_if": [],
+      "proof": "query",
+      "proven": ["mariadb", "postgresql"]
+    },
+    "having_key": {
+      "keeps": {
+        "matching": {"en": "a condition on a GROUP BY column is true for every row of a group or for none, so filtering rows before grouping keeps exactly the groups HAVING kept", "hi": "GROUP BY column ki condition group ki har row pe ek jaisi, isliye pehle filter karne se wahi groups"},
+        "nulls": {"en": "a NULL key fails the condition in both places", "hi": "NULL key dono jagah fail"},
+        "duplicates": {"en": "each group still comes out once", "hi": "har group ek baar"},
+        "ordering": {"en": "the ORDER BY is kept", "hi": "ORDER BY wahi"},
+        "grain": {"en": "one row per group, as before", "hi": "har group ki ek row"}
+      },
+      "holds_if": [],
+      "proof": "query",
+      "proven": ["mariadb", "postgresql"]
+    },
+    "union_all": {
+      "keeps": {
+        "matching": {"en": "a constant column that differs in each part proves no row of one part can equal a row of another", "hi": "har hisse ka alag constant column sabit karta hai ki do hisson ki row same nahi ho sakti"},
+        "nulls": {"en": "UNION treats two NULLs as equal; UNION ALL keeps both, so a part's own NULL repeats matter too", "hi": "UNION do NULL ko barabar maanta hai; UNION ALL dono rakhta hai"},
+        "duplicates": {"en": "UNION also removes repeats inside one part, so UNION ALL is the same only when each part has no repeated rows of its own", "hi": "UNION ek hisse ke andar ke repeat bhi hatata hai, isliye UNION ALL tabhi same jab har hisse mein apne repeat na hon"},
+        "ordering": {"en": "only the final ORDER BY decides the order, in both", "hi": "order sirf aakhri ORDER BY tay karta hai"},
+        "grain": {"en": "one row per distinct row of each part", "hi": "har hisse ki har alag row"}
+      },
+      "holds_if": [
+        {"en": "each part returns no repeated rows of its own (it lists a key, or has DISTINCT / GROUP BY on all its columns)", "hi": "har hisse mein apne repeat rows na hon (key ho, ya saare columns pe DISTINCT / GROUP BY)"}
+      ],
+      "proof": "schema",
+      "proven": ["mariadb", "postgresql"]
+    },
+    "keyset": {
+      "keeps": {
+        "matching": {"en": "the WHERE keeps the rows that come after the last row seen in the ORDER BY's own order", "hi": "WHERE wahi rows rakhta hai jo ORDER BY ke order mein aakhri dekhi row ke baad aati hain"},
+        "nulls": {"en": "a sort column that can be NULL breaks 'after the last row' (a comparison with NULL is never true), so the sort columns must be NOT NULL", "hi": "sort column NULL ho to 'baad wali row' toot jaata hai, isliye sort columns NOT NULL hone chahiye"},
+        "duplicates": {"en": "the ORDER BY ends in a unique column, so no row sits on two pages and none is skipped", "hi": "ORDER BY unique column pe khatam, isliye koi row do page pe nahi aati, koi chhoot-ti nahi"},
+        "ordering": {"en": "the same ORDER BY, every column in the same direction", "hi": "wahi ORDER BY, har column ek hi direction mein"},
+        "grain": {"en": "the same page size", "hi": "wahi page size"}
+      },
+      "holds_if": [
+        {"en": "the last ORDER BY column is unique (a key) and the sort columns are NOT NULL", "hi": "aakhri ORDER BY column unique (key) ho aur sort columns NOT NULL hon"},
+        {"en": "the application passes the last row of the page before (page N needs page N-1; it cannot jump to page 500 directly)", "hi": "app pichhle page ki aakhri row bheje (seedha page 500 pe nahi ja sakte)"}
+      ],
+      "proof": "schema",
+      "proven": ["mariadb", "postgresql"]
+    },
+    "sargable": {
+      "keeps": {
+        "matching": {"en": "the condition moved off the column onto the values: for every value of the column the same rows pass", "hi": "condition column se hata ke values pe: har value ke liye wahi rows"},
+        "nulls": {"en": "a NULL fails both forms", "hi": "NULL dono mein fail"},
+        "duplicates": {"en": "no row is added or removed", "hi": "koi row na badhti na ghatti"},
+        "ordering": {"en": "the ORDER BY is kept", "hi": "ORDER BY wahi"},
+        "grain": {"en": "unchanged", "hi": "wahi"}
+      },
+      "holds_if": [],
+      "proof": "query",
+      "proven": ["mariadb", "postgresql"]
+    },
+    "or_union": {
+      "keeps": {
+        "matching": {"en": "each UNION ALL branch keeps one side of the OR", "hi": "har UNION ALL hissa OR ki ek taraf"},
+        "nulls": {"en": "the later branch leaves out rows the earlier one returned with a test that is also true for NULL (... IS NOT TRUE)", "hi": "baad wala hissa pehle wale ki rows chhodta hai, NULL ko bhi sambhal ke"},
+        "duplicates": {"en": "no row is returned by two branches, and none is lost", "hi": "koi row do hisson se nahi aati, koi chhoot-ti nahi"},
+        "ordering": {"en": "only an ORDER BY over the whole UNION decides the order", "hi": "order poore UNION pe ORDER BY se"},
+        "grain": {"en": "unchanged", "hi": "wahi"}
+      },
+      "holds_if": [],
+      "proof": "query",
+      "proven": ["mariadb", "postgresql"]
+    }
+  }
+}

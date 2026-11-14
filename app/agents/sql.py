@@ -665,8 +665,12 @@ MEANING_CHECKS = {"count", "not_in", "date_range", "concat", "like", "and_or", "
                   # night 13: offered, not applied: the outer row named in a subquery, the subquery worked out once, UNION ALL /
                   # UNION, a filter moved before the grouping, a CTE read twice left unmaterialized
                   "scalar_uncorr", "corr_inner", "corr_key", "repeat_subquery", "same_subquery", "union_all", "union_all_dups",
-                  "having_key", "cte_filter_late"}
-SPEED_OFFERS = {"or_union", "keyset", "batch_change", "skip_locked", "repeat_subquery", "same_subquery", "having_key", "cte_filter_late"}               # the same rows, a faster form: offered as 'try this', shown on the card
+                  "having_key", "cte_filter_late",
+                  # night 14: the same rows in another form (a correlated total totalled once and joined, the IN / EXISTS / JOIN
+                  # form asked for, a calculation named once): offered with what it keeps the same, never applied as a fix
+                  "preagg_subquery", "to_exists", "to_in", "to_join", "expr_once"}
+SPEED_OFFERS = {"or_union", "keyset", "batch_change", "skip_locked", "repeat_subquery", "same_subquery", "having_key", "cte_filter_late",
+                "preagg_subquery", "to_exists", "to_in", "to_join", "expr_once"}               # the same rows, a faster form: offered as 'try this', shown on the card
 
 
 def _is_select(low: str) -> bool:

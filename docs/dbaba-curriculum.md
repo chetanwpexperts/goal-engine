@@ -104,7 +104,7 @@ label the rest, upgrade to verified when schema, EXPLAIN or data arrive.
 - [x] **13. Remaining structural checks.** Cartesian joins, ON that doesn't connect its tables, broken or repeated correlated
   subqueries, DISTINCT hiding duplicates, UNION vs UNION ALL, late filters, big OFFSET, functions on filtered columns,
   leading wildcards, SELECT * across joins; speed findings are risks, not guarantees.
-- [ ] **14. Safe rewrites with proof.** Pre-aggregate repeated correlated subqueries, IN <-> EXISTS, compute once, UNION ->
+- [x] **14. Safe rewrites with proof.** Pre-aggregate repeated correlated subqueries, IN <-> EXISTS, compute once, UNION ->
   UNION ALL only when safe, OFFSET -> keyset; each states what must stay the same and is proven on both databases.
 - [ ] **15. Big-query exam.** Generated 100-300 line queries with planted mistakes: dependency tree, grain per block, the
   planted findings with the right confidence class, a proven rewrite; the same query with CREATE TABLE / EXPLAIN upgrades or
@@ -457,3 +457,24 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   BY expression but not a WHERE copy, MariaDB shows a DEPENDENT SUBQUERY per copy; both push an outer filter into a grouped
   derived table, MariaDB into both uses of a CTE too, PostgreSQL not into a CTE read twice unless NOT MATERIALIZED (1064 on
   MariaDB); a SELECT alias in HAVING without GROUP BY runs on MariaDB, 42703 on PostgreSQL.
+- **Night 14 (14 Nov 2026).** Safe rewrites with a proof, in `app/agents/sqlequiv.py` (new fundamental `equivalence`; what each
+  rewrite keeps the same, and on which facts, in `app/dbknow/core/rewrites.json`; what each engine does in the dialect files'
+  query_rules: preaggregate, in_exists, order_by_alias, rule B). A rewrite is the same query only when five things stay the same,
+  each one checked: matching, NULLs, duplicates, ordering and grain. New offers (always offered, never applied as a fix, each
+  finding carrying its own rewritten query and its contract): a correlated total in SELECT / WHERE / ORDER BY totalled once per
+  link value and LEFT JOINed (COUNT through COALESCE(.., 0), since a missing group is NULL after the join but 0 as a correlated
+  COUNT; SUM/MIN/MAX/AVG stay NULL both ways; not offered when the link itself looks wrong, when the subquery reads the outer
+  row beyond one equality, or in a grouped / DISTINCT / comma-join query), and for a repeated correlated total this pre-aggregated
+  form now replaces night 13's wrapper as the offered query; the form the person asks for ("rewrite with EXISTS", "isko IN se
+  likho", "join se likho"): IN -> EXISTS and EXISTS -> IN only where nothing negates them, IN -> JOIN only through SELECT
+  DISTINCT; the same calculation in SELECT and ORDER BY sorted by its SELECT name (not when that name is also a column, or
+  the calculation calls RAND() / UUID() and the like). The older same-rows rewrites (repeated subquery, one-row CROSS JOIN,
+  HAVING -> WHERE, UNION ALL, keyset, sargable, OR -> UNION ALL) now carry their contracts too, and the report's "why the rewrite
+  is the same" goes aspect by aspect and lists the table facts it needs (UNION ALL: each part has no repeats; keyset: a unique
+  last column, NOT NULL sort columns). 16 concepts, 40-problem practice bank, 9 stmtbugs families (two quiet). Lab lessons worth
+  keeping: a correlated COUNT over nothing is 0 but the LEFT JOIN to grouped totals gives NULL (both engines); IN -> plain JOIN
+  gives 8 rows for 5; NOT IN over a column with one NULL finds 0 empty departments where NOT EXISTS finds 1; EXCEPT ALL sees a
+  JOIN's 3 repeated rows that EXCEPT hides; ORDER BY prefers a SELECT name over a column of the same name on both, WHERE can't
+  use it (1054 / 42703); `lines` is a reserved word on MariaDB (1064 as an alias); RAND() is MariaDB only (PostgreSQL random(),
+  42883); the pre-aggregated form is one DERIVED table read through key0 on MariaDB and HashAggregate + Hash Join on PostgreSQL,
+  where the correlated one is a DEPENDENT SUBQUERY / SubPlan per row.

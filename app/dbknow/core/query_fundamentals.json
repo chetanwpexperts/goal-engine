@@ -688,6 +688,29 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  "equivalence": {
+   "title_en": "A rewrite is the same query only when five things stay the same",
+   "title_hi": "Rewrite tabhi wahi query hai jab paanch cheezein same rahen",
+   "rule_en": "Two queries return the same rows when, for every possible data, they keep the same matching (which rows find a partner; an equality never matches NULL), the same NULLs (a correlated COUNT over nothing is 0, but a LEFT JOIN to a missing group is NULL; SUM/MIN/MAX/AVG over nothing are NULL), the same duplicates (a join repeats an outer row once per match, IN and EXISTS never do; UNION removes repeats inside each part too), the same ordering (only ORDER BY decides it, and a page boundary needs an order with no ties) and the same grain (a derived table grouped by its join key has one row per key, so joining it adds no rows). A rewrite proven from the query alone is offered as the same rows; one that depends on keys or NOT NULL columns says which fact it needs. Same rows on one sample is evidence, not proof: the reasoning above is the proof, and the lab runs both forms on both engines to catch a mistake in it. To compare two queries on real data, run A EXCEPT B and B EXCEPT A (EXCEPT ALL to count repeats): both empty means the same rows for that data.",
+   "rule_hi": "Do queries tab same rows deti hain jab har data pe paanch cheezein same rahen: matching (kaun si row ko jodi milti hai; NULL kabhi barabar nahi), NULL (correlated COUNT khaali pe 0, par LEFT JOIN ke baad NULL; SUM/MIN/MAX/AVG khaali pe NULL), duplicates (JOIN har match pe row dohrata hai, IN aur EXISTS kabhi nahi; UNION har hisse ke andar ke repeat bhi hatata hai), order (sirf ORDER BY tay karta hai, page ki seema ke liye bina tie ka order chahiye) aur grain (join key se grouped derived table mein har key ki ek row, isliye join se rows nahi badhti). Jo rewrite sirf query se sabit ho wo 'wahi rows' ke saath diya jaata hai; jo key ya NOT NULL pe tika ho wo bataata hai kaun sa fact chahiye. Do queries asli data pe compare karne ke liye A EXCEPT B aur B EXCEPT A chalao: dono khaali to us data pe same rows.",
+   "topics": [
+    "preagg_subquery",
+    "to_exists",
+    "to_in",
+    "to_join",
+    "expr_once"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/subqueries-and-joins/",
+    "https://dev.mysql.com/doc/refman/8.0/en/subquery-optimization-with-exists.html",
+    "https://use-the-index-luke.com/no-offset"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  }
 }

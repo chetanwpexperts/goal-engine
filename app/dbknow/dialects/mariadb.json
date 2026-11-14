@@ -125,7 +125,10 @@
   "union_collation": {"behaviour": "works", "says": "MySQL/MariaDB compare UNION rows with the column's collation: under the usual _ci collation 'aarav@mail.test' and 'AARAV@mail.test' are one row (lab: 9 e-mails vs PostgreSQL's 10).", "proven": ["mariadb"]},
   "repeated_subquery": {"behaviour": "slow", "says": "MariaDB's EXPLAIN shows one DEPENDENT SUBQUERY per copy (its subquery cache may remember results for repeated outer values).", "proven": ["mariadb"]},
   "same_subquery": {"behaviour": "slow", "says": "MariaDB's EXPLAIN shows one SUBQUERY per copy.", "proven": ["mariadb"]},
-  "cte_read_twice": {"behaviour": "works", "says": "MariaDB pushes a filter on a CTE's GROUP BY column into each copy it reads (EXPLAIN FORMAT=JSON: attached_condition inside both), and refuses AS NOT MATERIALIZED (1064).", "proven": ["mariadb"]}
+  "cte_read_twice": {"behaviour": "works", "says": "MariaDB pushes a filter on a CTE's GROUP BY column into each copy it reads (EXPLAIN FORMAT=JSON: attached_condition inside both), and refuses AS NOT MATERIALIZED (1064).", "proven": ["mariadb"]},
+  "preaggregate": {"behaviour": "slow", "says": "On MariaDB the correlated form shows as a DEPENDENT SUBQUERY (run per outer row, helped by its subquery cache for repeated values); the totalled form is one DERIVED table read through an automatic index (key0) on its join column.", "proven": ["mariadb"]},
+  "in_exists": {"behaviour": "same", "says": "MariaDB returns the same rows for positive IN (SELECT ...) and EXISTS; NOT IN with a NULL in the list returns nothing (lab: 0 departments vs 1 with NOT EXISTS).", "proven": ["mariadb"]},
+  "order_by_alias": {"behaviour": "same", "says": "MariaDB lets ORDER BY use a SELECT name (and prefers it over a table column of the same name); WHERE can't (1054).", "proven": ["mariadb"]}
  },
  "proven": [
   "mariadb"

@@ -587,6 +587,20 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
         if pedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in pedits for a, b, _n in edits):
             edits += pedits
 
+    # safe rewrites with a proof (app/agents/sqlequiv.py, night 14): a correlated total totalled once and joined, the IN /
+    # EXISTS / JOIN form the person asked for, a calculation in SELECT and ORDER BY named once. Before night 13's structure,
+    # so its pre-aggregated form is the one offered for a repeated correlated total (the same rows, one pass over the child)
+    from app.agents import sqlequiv
+
+    for fnd, qedits in sqlequiv.rewrites(sql, s, intent, Finding, is_select):
+        if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        if _SURE_ONLY.get():
+            continue
+        if qedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in qedits for a, b, _n in edits):
+            edits += qedits
+
     # structure (app/agents/sqlstruct.py, night 13): correlation that never names the outer row or names the wrong one, the
     # same subquery written twice, UNION vs UNION ALL, a CTE read twice and filtered outside, SELECT * across a join
     from app.agents import sqlstruct

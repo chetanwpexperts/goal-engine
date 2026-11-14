@@ -77,7 +77,13 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         # HAVING condition on a GROUP BY column (WHERE: the same rows), a JOIN with no ON (an error on PostgreSQL), and a
         # correct correlated subquery (quiet)
         "st_uncorr", "st_inner", "st_corr_key", "st_repeat", "st_same", "st_union_all", "st_union_dups", "st_having_key",
-        "st_no_on", "st_quiet_corr"]
+        "st_no_on", "st_quiet_corr",
+        # night 14: safe rewrites with a proof: a correlated total totalled once and LEFT JOINed (COUNT through COALESCE), the IN /
+        # EXISTS / JOIN form the person asks for, a calculation in SELECT and ORDER BY named once; each offered rewrite must
+        # return exactly the rows of the query as written (in the same order) on MariaDB and PostgreSQL. Quiet: NOT IN asked as
+        # NOT EXISTS (not the same with NULLs) and a correlated total that reads the outer row beyond its link (no single grouping)
+        "rw_preagg", "rw_preagg_where", "rw_preagg_two", "rw_in_exists", "rw_exists_in", "rw_in_join", "rw_expr", "rw_quiet_not_in",
+        "rw_quiet_outer"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
@@ -126,11 +132,18 @@ TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": 
          "gr_inner_eq_null": "null", "gr_block_key": "join_fanout",
          "st_uncorr": "scalar_uncorr", "st_inner": "corr_inner", "st_corr_key": "corr_key", "st_repeat": "repeat_subquery",
          "st_same": "same_subquery", "st_union_all": "union_all", "st_union_dups": "union_all_dups", "st_having_key": "having_key",
-         "st_no_on": "join", "st_quiet_corr": "corr_key"}
+         "st_no_on": "join", "st_quiet_corr": "corr_key",
+         "rw_preagg": "preagg_subquery", "rw_preagg_where": "preagg_subquery", "rw_preagg_two": "preagg_subquery",
+         "rw_in_exists": "to_exists", "rw_exists_in": "to_in", "rw_in_join": "to_join", "rw_expr": "expr_once",
+         "rw_quiet_not_in": "to_exists", "rw_quiet_outer": "preagg_subquery"}
+# night 14: the offered rewrite (the finding's own 'rewrite') must return exactly the rows of the query as written
+REWRITE_SAME = {"rw_preagg", "rw_preagg_where", "rw_preagg_two", "rw_in_exists", "rw_exists_in", "rw_in_join", "rw_expr"}
 # night 12: a correct query: the planted topic must NOT be said, and no error / wrong at all
-QUIET = {"gr_block_key", "st_quiet_corr"}
+QUIET = {"gr_block_key", "st_quiet_corr", "rw_quiet_not_in", "rw_quiet_outer"}
 # night 11: the class the planted finding must carry (sqlconfidence.classify); and for every statement, every finding has one
-CLASS = {"st_uncorr": "likely_risk", "st_inner": "likely_risk", "st_corr_key": "likely_risk", "st_repeat": "needs_execution",
+CLASS = {"rw_preagg": "needs_execution", "rw_preagg_where": "needs_execution", "rw_preagg_two": "needs_execution",
+         "rw_in_exists": "needs_execution", "rw_exists_in": "needs_execution", "rw_in_join": "needs_execution", "rw_expr": "needs_execution",
+         "st_uncorr": "likely_risk", "st_inner": "likely_risk", "st_corr_key": "likely_risk", "st_repeat": "needs_execution",
          "st_same": "needs_execution", "st_union_all": "needs_schema", "st_union_dups": "likely_risk", "st_having_key": "needs_execution",
          "gr_cte_fanout": "likely_risk", "gr_derived_fanout": "likely_risk", "gr_cte_order": "proven", "gr_cross": "likely_risk",
          "gr_inner_eq_null": "proven",
@@ -482,6 +495,8 @@ def make(seed: int):
         return _grain_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("st_"):
         return _struct_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("rw_"):
+        return _rewrite_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -1659,6 +1674,8 @@ def check(item, engines: dict) -> list[str]:
         bad.append(f"{tag}: extra findings {extra}\n{item['broken']}")
     if item["stmt"] == "ddl":
         return bad + _check_ddl(item, engines, res, tag)
+    if item["bug"] in REWRITE_SAME:
+        return bad + ([] if bad else _check_same(item, engines, res, tag))
     sure = any(f["topic"] == want and f["kind"] in ("error", "wrong") for f in res["findings"])
     if item["bug"] in FIX_THE_CHECK:
         sure = True
@@ -2373,6 +2390,138 @@ def _struct_bug(seed, bug, rnd, schema, tables, t):
         truth = f"SELECT k.{x['pk']}, p.{p['pk']}\nFROM {x['name']} k\nJOIN {p['name']} p ON k.{fk['name']} = p.{p['pk']}\nORDER BY k.{x['pk']}"
         return item(broken, truth, x["name"], engine=engine)
     return None
+
+
+def _rewrite_bug(seed, bug, rnd, schema, tables, t):
+    """Night 14: queries with a same-rows rewrite, on random real tables (parent / child linked by a foreign key)."""
+    engine = rnd.choice(["mariadb", "postgresql", None])
+    pairs = [(schema["tables"][c["ref"]], x, c) for x in tables for c in x["cols"] if c["kind"] == "fk" and c.get("ref") != x["name"]]
+
+    def item(broken, table, **kw):
+        out = {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": table, "broken": broken, "truth": broken.split(";")[0],
+               "engine": engine}
+        out.update(kw)
+        return out
+
+    def total(x, fk, p, k="k"):
+        nums = _cols(x, "int", "money")
+        m = rnd.choice(nums)["name"] if nums else None
+        aggs = ["COUNT(*)"] + ([f"COUNT({k}.{m})", f"SUM({k}.{m})", f"MAX({k}.{m})", f"MIN({k}.{m})", f"AVG({k}.{m})"] if m else [])
+        cond = ""
+        cats = [c for c in _cols(x, "cat") if _pick_value(x, c, rnd) is not None]
+        if cats and rnd.random() < 0.4:
+            c = rnd.choice(cats)
+            v = _pick_value(x, c, rnd)
+            cond = f" AND {k}.{c['name']} = '{v}'" if isinstance(v, str) else f" AND {k}.{c['name']} = {v}"
+        link = rnd.choice([f"{k}.{fk['name']} = p.{p['pk']}", f"p.{p['pk']} = {k}.{fk['name']}"])
+        return f"(SELECT {rnd.choice(aggs)} FROM {x['name']} {k} WHERE {link}{cond})"
+
+    if bug in ("rw_preagg", "rw_preagg_where", "rw_preagg_two", "rw_quiet_outer"):
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        if bug == "rw_quiet_outer":
+            nums = _cols(x, "int", "money")
+            pn = _cols(p, "int", "money")
+            if not nums or not pn:
+                return None
+            sub = (f"(SELECT COUNT(*) FROM {x['name']} k WHERE k.{fk['name']} = p.{p['pk']} AND k.{nums[0]['name']} > "
+                   f"p.{pn[0]['name']})")
+            return item(f"SELECT p.{p['pk']}, {sub} AS v\nFROM {p['name']} p\nORDER BY p.{p['pk']}", p["name"])
+        sub = total(x, fk, p)
+        if bug == "rw_preagg":
+            order = rnd.choice([f"p.{p['pk']}", f"{sub} DESC, p.{p['pk']}", f"v, p.{p['pk']}"])
+            return item(f"SELECT p.{p['pk']}, {sub} AS v\nFROM {p['name']} p\nORDER BY {order}", p["name"])
+        if bug == "rw_preagg_where":
+            cond = rnd.choice([f"{sub} > {rnd.randint(0, 2)}", f"{sub} IS NULL", f"{sub} = 0", f"{sub} IS NOT NULL"])
+            sel = rnd.choice(["", f", {sub} AS v"])
+            return item(f"SELECT p.{p['pk']}{sel}\nFROM {p['name']} p\nWHERE {cond}\nORDER BY p.{p['pk']}", p["name"])
+        others = [(pp, xx, ff) for pp, xx, ff in pairs if pp is p and (xx is not x or ff is not fk)]
+        if others:
+            _p2, x2, fk2 = rnd.choice(others)
+            sub2 = total(x2, fk2, p, "q")
+        else:
+            sub2 = total(x, fk, p, "q")
+        if _flat_l(sub2.replace(" q ", " k ").replace("q.", "k.")) == _flat_l(sub):
+            return None
+        return item(f"SELECT p.{p['pk']}, {sub} AS v1, {sub2} AS v2\nFROM {p['name']} p\nORDER BY p.{p['pk']}", p["name"])
+    if bug in ("rw_in_exists", "rw_exists_in", "rw_in_join", "rw_quiet_not_in"):
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        cond = ""
+        cats = [c for c in _cols(x, "cat") if _pick_value(x, c, rnd) is not None]
+        if cats and rnd.random() < 0.5:
+            c = rnd.choice(cats)
+            v = _pick_value(x, c, rnd)
+            cond = f"k.{c['name']} = '{v}'" if isinstance(v, str) else f"k.{c['name']} = {v}"
+        pcats = [c for c in _cols(p, "cat", "int") if _pick_value(p, c, rnd) is not None]
+        outer = ""
+        if pcats and rnd.random() < 0.4:
+            c = rnd.choice(pcats)
+            v = _pick_value(p, c, rnd)
+            outer = (f"p.{c['name']} = '{v}' AND " if isinstance(v, str) else f"p.{c['name']} >= {v} AND ")
+        if bug == "rw_exists_in":
+            said = rnd.choice(["rewrite it using IN", "isko IN se likho", "use an IN subquery instead", "convert the EXISTS to IN"])
+            inner = f"k.{fk['name']} = p.{p['pk']}" + (f" AND {cond}" if cond else "")
+            q = f"SELECT p.{p['pk']}\nFROM {p['name']} p\nWHERE {outer}EXISTS (SELECT 1 FROM {x['name']} k WHERE {inner})\nORDER BY p.{p['pk']}"
+            return item(f"{q};\n\n{said}", p["name"])
+        where = f" WHERE {cond}" if cond else ""
+        neg = "NOT " if bug == "rw_quiet_not_in" else ""
+        q = (f"SELECT p.{p['pk']}\nFROM {p['name']} p\nWHERE {outer}p.{p['pk']} {neg}IN (SELECT k.{fk['name']} FROM {x['name']} k{where})"
+             f"\nORDER BY p.{p['pk']}")
+        said = {"rw_in_exists": ["rewrite this with EXISTS", "IN ko EXISTS mein badlo", "use exists instead", "convert it to EXISTS"],
+                "rw_quiet_not_in": ["rewrite this with NOT EXISTS", "use exists instead"],
+                "rw_in_join": ["write it as a join", "join se likho", "convert the IN to a JOIN", "use a join instead"]}[bug]
+        return item(f"{q};\n\n{rnd.choice(said)}", p["name"])
+    if bug == "rw_expr":
+        nums = _cols(t, "int", "money")
+        if not nums:
+            return None
+        a, b = rnd.choice(nums)["name"], rnd.choice(nums)["name"]
+        expr = rnd.choice([f"{a} + {b} * 2", f"{a} - {b}", f"COALESCE({a}, 0) + 1", f"ABS({a} - {b})", f"{a} * 3"])
+        name = rnd.choice(["calc", "score", "total_value", "net_amount"])
+        if name in {c["name"].lower() for c in t["cols"]}:
+            return None
+        q = f"SELECT {t['pk']}, {expr} AS {name}\nFROM {t['name']}\nORDER BY {expr} {rnd.choice(['DESC', 'ASC', ''])}".rstrip() + f", {t['pk']}"
+        return item(q, t["name"])
+    return None
+
+
+def _flat_l(s: str) -> str:
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def _check_same(item, engines, res, tag) -> list[str]:
+    """The finding's own rewrite returns exactly the rows of the query as written (in the same order: every query here ends its
+    ORDER BY with the key), on each database."""
+    from app.agents.sql import unwrap
+
+    want = TOPIC[item["bug"]]
+    f = next(f for f in res["findings"] if f["topic"] == want)
+    new = f.get("rewrite")
+    if not new:
+        return [f"{tag}: no rewrite offered\n{item['broken']}"]
+    if (f.get("same") or {}).get("proof") not in (None, "query"):
+        return [f"{tag}: the contract says it needs table facts\n{item['broken']}"]
+    orig = unwrap(item["broken"]).rstrip().rstrip(";")
+    bad = []
+    for name, eng in engines.items():
+        try:
+            a = [tuple(str(x) for x in r) for r in eng.run(orig)]
+        except Exception as exc:  # noqa: BLE001
+            eng.rollback()
+            bad.append(f"{tag}: on {name} the query itself fails: {exc}\n{orig}")
+            continue
+        try:
+            b = [tuple(str(x) for x in r) for r in eng.run(new.rstrip().rstrip(";"))]
+        except Exception as exc:  # noqa: BLE001
+            eng.rollback()
+            bad.append(f"{tag}: on {name} the rewrite fails: {exc}\n{new}")
+            continue
+        if a != b:
+            bad.append(f"{tag}: on {name} the rewrite returns other rows ({len(a)} vs {len(b)})\n{orig}\n--\n{new}")
+    return bad
 
 
 def _bind(sql: str, values: list) -> str:

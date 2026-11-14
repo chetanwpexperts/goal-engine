@@ -30881,6 +30881,1536 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "equivalent_rewrite",
+   "kind": "concept",
+   "title": {
+    "en": "When a rewritten query is really the same",
+    "hinglish": "Rewrite ki hui query sach mein same kab hoti hai",
+    "hindi": "बदली हुई क्वेरी सच में वही कब होती है"
+   },
+   "terms": [
+    [
+     "(rewrite|rewritten|rewriting|re-written)",
+     "(same|safe|equivalent|identical)"
+    ],
+    [
+     "equivalent",
+     "quer(y|ies)"
+    ],
+    [
+     "(rewrite|badli|badal\\w*)",
+     "(same|wahi) (rows|result)"
+    ],
+    [
+     "(बदली|बदलने)",
+     "क्वेरी",
+     "(वही|समान|same)"
+    ],
+    [
+     "समान",
+     "क्वेरी"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "when is a rewritten query the same as the original",
+     "how do i know a query rewrite is safe",
+     "what is an equivalent query rewrite"
+    ],
+    "hinglish": [
+     "rewrite ki hui query same rows degi kaise pata kare",
+     "query rewrite safe hai kya kaise samjhe"
+    ],
+    "hindi": [
+     "बदली हुई क्वेरी वही rows देगी कैसे पता करें"
+    ]
+   },
+   "answer": {
+    "en": "Two forms are the same query only if, for any data at all, five things stay the same: matching (which rows find a partner; = never matches NULL), NULLs (a COUNT over nothing is 0 but a LEFT JOIN to a missing group gives NULL), duplicates (a JOIN repeats a row once per match, IN and EXISTS never do, UNION removes repeats), ordering (only ORDER BY decides it; a page needs an order with no ties) and grain (what one result row is). Check each one by reasoning first; running both on a sample only catches a mistake in that reasoning, it doesn't prove it.",
+    "hinglish": "Do forms tabhi same hain jab har data pe paanch cheezein same rahen: matching (kaun si row ko jodi milti hai; = kabhi NULL se match nahi), NULL (khaali pe COUNT 0, par LEFT JOIN ke baad NULL), duplicates (JOIN har match pe row dohrata hai, IN/EXISTS nahi, UNION repeat hatata hai), order (sirf ORDER BY; page ke liye bina tie ka order) aur grain (result ki ek row kya hai). Pehle soch ke har ek check karo; sample pe chalana sirf galti pakadta hai, sabit nahi karta.",
+    "hindi": "दो रूप तभी एक क्वेरी हैं जब हर data पर matching, NULL, duplicates, order और grain वही रहें।"
+   },
+   "mistake": {
+    "en": "Trusting one sample: IN rewritten as a plain JOIN gives the same rows until a customer has two orders (lab: 5 rows vs 8).",
+    "hinglish": "Ek sample pe bharosa: IN ko seedha JOIN banaya to tab tak same lagta hai jab tak kisi customer ke do orders na hon (lab: 5 vs 8 rows).",
+    "hindi": "एक sample पर भरोसा: IN को सीधा JOIN बनाने से दो orders वाले customer पर rows बढ़ जाती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM customers c WHERE c.id IN (SELECT customer_id FROM orders)) AS with_in, (SELECT COUNT(*) FROM customers c JOIN orders o ON o.customer_id = c.id) AS plain_join, (SELECT COUNT(*) FROM customers c JOIN (SELECT DISTINCT customer_id FROM orders) d ON d.customer_id = c.id) AS join_distinct"
+     },
+     "columns": [
+      "with_in",
+      "plain_join",
+      "join_distinct"
+     ],
+     "result": [
+      [
+       "5",
+       "8",
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same rules.",
+    "oracle": "Notes only (not lab-tested here): Same rules.",
+    "sqlite": "Notes only (not lab-tested here): Same rules.",
+    "mysql": "Same rules.",
+    "mariadb": "Lab: 5, 8, 5.",
+    "postgresql": "Lab: 5, 8, 5."
+   },
+   "related": [
+    "in_vs_exists",
+    "join_duplicates",
+    "compare_query_results"
+   ],
+   "fundamentals": [
+    "equivalence"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/subqueries-and-joins/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "compare_query_results",
+   "kind": "howto",
+   "title": {
+    "en": "How to check that two queries return the same rows",
+    "hinglish": "Do queries same rows deti hain kaise check kare",
+    "hindi": "दो क्वेरी same rows देती हैं कैसे जांचें"
+   },
+   "terms": [
+    [
+     "(compare|check|test|verify|jaanch\\w*)",
+     "(two|2|both|dono|do) (sql )?quer(y|ies)"
+    ],
+    [
+     "(two|2|both|dono|do) (sql )?quer(y|ies)",
+     "same (rows|result|output)"
+    ],
+    [
+     "दो",
+     "क्वेरी",
+     "(same|वही|एक जैसी|जांच\\w*|तुलना)"
+    ],
+    [
+     "except all",
+     "(compare|check|same)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to check if two queries return the same rows",
+     "how to compare the results of two sql queries",
+     "how to test that two queries give the same result"
+    ],
+    "hinglish": [
+     "do query ka result same hai kaise check kare",
+     "dono queries same rows deti hain kaise pata kare"
+    ],
+    "hindi": [
+     "दो क्वेरी same rows देती हैं कैसे जांचें"
+    ]
+   },
+   "answer": {
+    "en": "Run each one minus the other, both ways: (A EXCEPT ALL B) and (B EXCEPT ALL A). Both empty means the same rows, repeats counted, for that data. Plain EXCEPT removes duplicates first, so it can't see a row that comes out twice. Order is not compared this way; if the order matters, compare the ordered lists too. Same rows on your data is evidence, not proof: a different table state can still tell them apart.",
+    "hinglish": "Har ek mein se doosri ghatao, dono taraf: (A EXCEPT ALL B) aur (B EXCEPT ALL A). Dono khaali to us data pe same rows, repeat bhi gine gaye. Seedha EXCEPT pehle duplicates hata deta hai, isliye do baar aane wali row nahi dikhti. Order aise compare nahi hota; zaroori ho to ordered list bhi milao. Ye sabut hai, proof nahi: alag data pe farak aa sakta hai.",
+    "hindi": "दोनों तरफ़ (A EXCEPT ALL B) और (B EXCEPT ALL A) चलाओ; दोनों खाली तो उस data पर same rows।"
+   },
+   "mistake": {
+    "en": "Using EXCEPT (not EXCEPT ALL): a JOIN that repeats rows looks the same as IN (lab: 0 extra rows with EXCEPT, 3 with EXCEPT ALL).",
+    "hinglish": "EXCEPT (EXCEPT ALL nahi) use karna: repeat karne wala JOIN IN jaisa lagta hai (lab: EXCEPT se 0, EXCEPT ALL se 3 extra rows).",
+    "hindi": "EXCEPT ALL की जगह EXCEPT: दोहराई rows नहीं दिखतीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM (SELECT c.id FROM customers c JOIN orders o ON o.customer_id = c.id EXCEPT ALL SELECT id FROM customers WHERE id IN (SELECT customer_id FROM orders)) x) AS extra_with_except_all, (SELECT COUNT(*) FROM (SELECT c.id FROM customers c JOIN orders o ON o.customer_id = c.id EXCEPT SELECT id FROM customers WHERE id IN (SELECT customer_id FROM orders)) y) AS extra_with_except"
+     },
+     "columns": [
+      "extra_with_except_all",
+      "extra_with_except"
+     ],
+     "result": [
+      [
+       "3",
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): EXCEPT exists, EXCEPT ALL does not.",
+    "oracle": "Notes only (not lab-tested here): MINUS / EXCEPT; EXCEPT ALL from 21c.",
+    "sqlite": "Notes only (not lab-tested here): EXCEPT only, no EXCEPT ALL.",
+    "mysql": "EXCEPT and EXCEPT ALL need MySQL 8.0.31+.",
+    "mariadb": "EXCEPT ALL works from MariaDB 10.5. Lab: 3 and 0.",
+    "postgresql": "Lab: 3 and 0."
+   },
+   "related": [
+    "equivalent_rewrite",
+    "union_vs_union_all"
+   ],
+   "fundamentals": [
+    "equivalence",
+    "set_operations"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-union.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/except/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "in_to_exists",
+   "kind": "howto",
+   "title": {
+    "en": "How to rewrite IN (subquery) as EXISTS",
+    "hinglish": "IN (subquery) ko EXISTS mein kaise badle",
+    "hindi": "IN (subquery) को EXISTS में कैसे बदलें"
+   },
+   "terms": [
+    [
+     "\\bin\\b(?:\\s+\\S+){0,3}?\\s+(?:to|into|as|ko|को)\\s+exists",
+     "(convert|rewrite|change|turn|replace|badl\\w*|likh\\w*|बदल\\w*|लिख\\w*)"
+    ],
+    [
+     "\\bin\\b(?:\\s+\\S+){0,3}?\\s+(?:to|into|as|ko|को)\\s+exists",
+     "subquer\\w*",
+     "(convert|rewrite|change|turn|replace|badl\\w*|likh\\w*|बदल\\w*|लिख\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to convert IN to EXISTS",
+     "how to rewrite an IN subquery as EXISTS",
+     "how do i change where in select to exists"
+    ],
+    "hinglish": [
+     "IN ko EXISTS mein kaise badle",
+     "in subquery ko exists se kaise likhe"
+    ],
+    "hindi": [
+     "IN को EXISTS में कैसे बदलें"
+    ]
+   },
+   "answer": {
+    "en": "x IN (SELECT y FROM t WHERE cond) becomes EXISTS (SELECT 1 FROM t WHERE cond AND t.y = x). Qualify x with its outer table (inside EXISTS a bare name would be looked up in t first). In a WHERE without NOT the rows are the same and neither form repeats a row. Under NOT they differ: NOT IN with a NULL in the list keeps nothing, NOT EXISTS ignores it.",
+    "hinglish": "x IN (SELECT y FROM t WHERE cond) ban jaata hai EXISTS (SELECT 1 FROM t WHERE cond AND t.y = x). x pe bahar wali table ka naam lagao (EXISTS ke andar bare naam pehle t mein dhoondha jaata hai). Bina NOT wale WHERE mein rows same, koi dohrav nahi. NOT ke saath farak: NOT IN list mein NULL ho to kuch nahi deta, NOT EXISTS NULL chhod deta hai.",
+    "hindi": "x IN (SELECT y ...) को EXISTS (SELECT 1 ... WHERE y = x) लिखो; NOT के साथ NULL पर फ़र्क़ है।"
+   },
+   "mistake": {
+    "en": "Leaving x unqualified: inside EXISTS a column of the same name in the inner table wins, and the link silently compares the inner table with itself.",
+    "hinglish": "x pe table ka naam na lagana: EXISTS ke andar same naam ka inner column jeet jaata hai aur link inner table ko khud se compare karne lagta hai.",
+    "hindi": "x पर table का नाम न लगाना: अंदर वाला column जीत जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id FROM customers c WHERE EXISTS (SELECT 1 FROM orders o WHERE o.status = 'paid' AND o.customer_id = c.id) ORDER BY c.id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ],
+      [
+       "2"
+      ],
+      [
+       "3"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same rows.",
+    "oracle": "Notes only (not lab-tested here): Same rows.",
+    "sqlite": "Notes only (not lab-tested here): Same rows.",
+    "mysql": "Same rows; MySQL 8.0.16+ turns EXISTS into a semi-join too.",
+    "mariadb": "Lab: same rows as IN (1, 2, 3).",
+    "postgresql": "Lab: same rows as IN (1, 2, 3)."
+   },
+   "related": [
+    "in_vs_exists",
+    "exists_to_in",
+    "not_in_to_not_exists"
+   ],
+   "fundamentals": [
+    "equivalence",
+    "subquery_shape"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/subquery-optimization-with-exists.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "exists_to_in",
+   "kind": "howto",
+   "title": {
+    "en": "How to rewrite EXISTS as IN (subquery)",
+    "hinglish": "EXISTS ko IN mein kaise badle",
+    "hindi": "EXISTS को IN में कैसे बदलें"
+   },
+   "terms": [
+    [
+     "exists(?:\\s+\\S+){0,3}?\\s+(?:to|into|as|ko|को|with)\\s+(?:an?\\s+)?in",
+     "(convert|rewrite|change|turn|replace|badl\\w*|likh\\w*|बदल\\w*|लिख\\w*)"
+    ],
+    [
+     "exists(?:\\s+\\S+){0,3}?\\s+(?:to|into|as|ko|को|with)\\s+(?:an?\\s+)?in",
+     "subquer\\w*",
+     "(convert|rewrite|change|turn|replace|badl\\w*|likh\\w*|बदल\\w*|लिख\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to convert EXISTS to IN",
+     "how to rewrite an EXISTS subquery with IN",
+     "how do i change exists into an in subquery"
+    ],
+    "hinglish": [
+     "EXISTS ko IN mein kaise badle",
+     "exists ko in se kaise likhe"
+    ],
+    "hindi": [
+     "EXISTS को IN में कैसे बदलें"
+    ]
+   },
+   "answer": {
+    "en": "It works when the EXISTS is tied to the outer row by exactly one equality (inner.y = outer.x) and every other condition reads only the inner table: outer.x IN (SELECT inner.y FROM t WHERE the other conditions). Two links (customer and date) can't become a one-column IN; use (a, b) IN (SELECT ...) or keep EXISTS. Keep it positive: NOT EXISTS is not NOT IN when the column can be NULL.",
+    "hinglish": "Ye tab chalta hai jab EXISTS bahar ki row se sirf ek barabari (inner.y = outer.x) se juda ho aur baaki conditions sirf andar ki table padhen: outer.x IN (SELECT inner.y FROM t WHERE baaki conditions). Do link (customer aur date) ek column wale IN mein nahi aate; (a, b) IN (...) ya EXISTS hi rakho. NOT EXISTS aur NOT IN NULL pe same nahi.",
+    "hindi": "एक ही link (inner.y = outer.x) हो तो outer.x IN (SELECT inner.y ...) लिखो।"
+   },
+   "mistake": {
+    "en": "Moving a condition that reads the outer row into the IN subquery: it becomes a correlated IN, or fails, instead of the plain list you wanted.",
+    "hinglish": "Bahar ki row padhne wali condition IN ke andar le jaana: wo correlated ban jaata hai ya fail hota hai.",
+    "hindi": "बाहर की row पढ़ने वाली condition को IN के अंदर ले जाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id FROM customers c WHERE c.id IN (SELECT o.customer_id FROM orders o WHERE o.status = 'shipped') ORDER BY c.id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ],
+      [
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same rows.",
+    "oracle": "Notes only (not lab-tested here): Same rows.",
+    "sqlite": "Notes only (not lab-tested here): Same rows.",
+    "mysql": "Same rows.",
+    "mariadb": "Lab: 1 and 8, as with EXISTS.",
+    "postgresql": "Lab: 1 and 8, as with EXISTS."
+   },
+   "related": [
+    "in_to_exists",
+    "in_vs_exists",
+    "exists"
+   ],
+   "fundamentals": [
+    "equivalence",
+    "correlation"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/exists-to-in-optimization/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "in_to_join",
+   "kind": "howto",
+   "title": {
+    "en": "How to rewrite IN (subquery) as a JOIN without duplicates",
+    "hinglish": "IN (subquery) ko bina duplicate JOIN mein kaise badle",
+    "hindi": "IN (subquery) को बिना duplicate JOIN में कैसे बदलें"
+   },
+   "terms": [
+    [
+     "\\bin\\b",
+     "join",
+     "(convert|rewrite|change|turn|replace|badl\\w*|likh\\w*|बदल\\w*|without duplicates|bina duplicate)"
+    ],
+    [
+     "\\bin\\b",
+     "(to|into|as) (a )?join"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to convert IN subquery to a join",
+     "how to rewrite where in select as a join without duplicates",
+     "how do i turn an IN into a join"
+    ],
+    "hinglish": [
+     "IN ko join mein kaise badle",
+     "in subquery ko join se kaise likhe bina duplicate"
+    ],
+    "hindi": [
+     "IN को JOIN में कैसे बदलें"
+    ]
+   },
+   "answer": {
+    "en": "Join to the DISTINCT values, not to the table: JOIN (SELECT DISTINCT t.y FROM t WHERE cond) d ON d.y = outer.x. The derived table has one row per value, so each outer row matches at most once, exactly like IN. A plain JOIN t ON t.y = outer.x repeats the outer row for every matching t row.",
+    "hinglish": "Table se nahi, uski DISTINCT values se join karo: JOIN (SELECT DISTINCT t.y FROM t WHERE cond) d ON d.y = outer.x. Har value ki ek row, isliye har bahar ki row zyada se zyada ek baar, bilkul IN jaisi. Seedha JOIN har matching row pe bahar ki row dohrata hai.",
+    "hindi": "SELECT DISTINCT वाली derived table से JOIN करो, सीधे table से नहीं।"
+   },
+   "mistake": {
+    "en": "Joining the table directly and adding DISTINCT on top: it hides the repeats but also merges rows that were really different.",
+    "hinglish": "Seedhe table join karke upar DISTINCT lagana: repeat chhup jaate hain par asli alag rows bhi mil jaati hain.",
+    "hindi": "सीधे join करके ऊपर DISTINCT लगाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id FROM customers c JOIN (SELECT DISTINCT o.customer_id FROM orders o WHERE o.status = 'paid') p ON p.customer_id = c.id ORDER BY c.id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ],
+      [
+       "2"
+      ],
+      [
+       "3"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same rows.",
+    "oracle": "Notes only (not lab-tested here): Same rows.",
+    "sqlite": "Notes only (not lab-tested here): Same rows.",
+    "mysql": "Same rows.",
+    "mariadb": "Lab: 1, 2, 3 (a plain JOIN gives 2 twice).",
+    "postgresql": "Lab: 1, 2, 3 (a plain JOIN gives 2 twice)."
+   },
+   "related": [
+    "equivalent_rewrite",
+    "join_duplicates",
+    "semi_join"
+   ],
+   "fundamentals": [
+    "equivalence",
+    "grain"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/semi-join-subquery-optimizations/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "not_in_to_not_exists",
+   "kind": "howto",
+   "title": {
+    "en": "How to rewrite NOT IN as NOT EXISTS",
+    "hinglish": "NOT IN ko NOT EXISTS mein kaise badle",
+    "hindi": "NOT IN को NOT EXISTS में कैसे बदलें"
+   },
+   "terms": [
+    [
+     "not in",
+     "(to|into|as|ko|se|mein|में|को)",
+     "not exists",
+     "(convert|rewrite|change|turn|replace|badl\\w*|likh\\w*|बदल\\w*|लिख\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to convert NOT IN to NOT EXISTS",
+     "how to rewrite a NOT IN subquery as NOT EXISTS",
+     "how do i change not in into not exists safely"
+    ],
+    "hinglish": [
+     "NOT IN ko NOT EXISTS mein kaise badle",
+     "not in ko not exists se kaise likhe"
+    ],
+    "hindi": [
+     "NOT IN को NOT EXISTS में कैसे बदलें"
+    ]
+   },
+   "answer": {
+    "en": "Write NOT EXISTS (SELECT 1 FROM t WHERE t.y = outer.x AND cond). It returns the same rows as NOT IN only when neither t.y nor outer.x can be NULL. If the list holds a NULL, NOT IN keeps no row at all, while NOT EXISTS keeps the rows with no partner; that is usually what was meant, so the rewrite is a fix, not just a new form.",
+    "hinglish": "NOT EXISTS (SELECT 1 FROM t WHERE t.y = outer.x AND cond) likho. Ye NOT IN jaisi rows tabhi deta hai jab t.y aur outer.x dono NULL na ho saken. List mein NULL ho to NOT IN koi row nahi deta, NOT EXISTS bina jodi wali rows deta hai; aksar wahi chahiye hota hai, isliye ye sirf naya form nahi, fix hai.",
+    "hindi": "NOT EXISTS लिखो; NULL न हो तभी NOT IN जैसी rows।"
+   },
+   "mistake": {
+    "en": "Calling it the same query: with employees.department_id NULL for one person, NOT IN finds 0 empty departments and NOT EXISTS finds 1.",
+    "hinglish": "Ise same query maanna: ek employee ka department_id NULL ho to NOT IN 0 khaali department deta hai, NOT EXISTS 1.",
+    "hindi": "इसे वही क्वेरी मानना: NULL होने पर नतीजा अलग।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT d.id FROM departments d WHERE NOT EXISTS (SELECT 1 FROM employees e WHERE e.department_id = d.id) ORDER BY d.id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same NULL rule.",
+    "oracle": "Notes only (not lab-tested here): Same NULL rule.",
+    "sqlite": "Notes only (not lab-tested here): Same NULL rule.",
+    "mysql": "Same as MariaDB.",
+    "mariadb": "Lab: NOT EXISTS gives department 4; NOT IN gives nothing.",
+    "postgresql": "Lab: NOT EXISTS gives department 4; NOT IN gives nothing."
+   },
+   "related": [
+    "not_in_vs_not_exists",
+    "not_in_null",
+    "in_to_exists"
+   ],
+   "fundamentals": [
+    "equivalence",
+    "null_logic"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/not-in/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "correlated_to_join",
+   "kind": "howto",
+   "title": {
+    "en": "How to replace a correlated subquery with a join",
+    "hinglish": "Correlated subquery ko join se kaise badle",
+    "hindi": "correlated subquery को join से कैसे बदलें"
+   },
+   "terms": [
+    [
+     "correlated subquer\\w*",
+     "join\\w*",
+     "(replace|convert|rewrite|change|turn|badl\\w*|बदल\\w*)"
+    ],
+    [
+     "(subquery|subqueries) (in|inside|ke andar|wali) (the )?select",
+     "(left )?join",
+     "(replace|convert|rewrite|change|turn|badl\\w*|बदल\\w*)"
+    ],
+    [
+     "select wali subquery",
+     "join"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to replace a correlated subquery with a join",
+     "how to rewrite a subquery in select as a left join",
+     "how to convert a correlated subquery into a join"
+    ],
+    "hinglish": [
+     "correlated subquery ko join se kaise badle",
+     "select wali subquery ko left join mein kaise badle"
+    ],
+    "hindi": [
+     "correlated subquery को join से कैसे बदलें"
+    ]
+   },
+   "answer": {
+    "en": "Total the child table once, grouped by its link column, then LEFT JOIN that: LEFT JOIN (SELECT customer_id, COUNT(*) AS n FROM orders GROUP BY customer_id) x ON x.customer_id = c.id. One row per key means no outer row is repeated or lost. Wrap a COUNT in COALESCE(x.n, 0): a parent without children gets NULL from the LEFT JOIN but 0 from the correlated COUNT. SUM/MIN/MAX/AVG are NULL both ways. It reads the child table once instead of once per row; when the outer query keeps only a few rows the per-row form can still be faster, so compare both with EXPLAIN ANALYZE.",
+    "hinglish": "Child table ko ek baar link column se group karke total karo, phir LEFT JOIN: LEFT JOIN (SELECT customer_id, COUNT(*) AS n FROM orders GROUP BY customer_id) x ON x.customer_id = c.id. Har key ki ek row, isliye koi row dohrati ya chhooti nahi. COUNT ko COALESCE(x.n, 0) mein rakho: bina child ke parent ko LEFT JOIN se NULL milta hai, correlated COUNT se 0. SUM/MIN/MAX/AVG dono mein NULL. Child table ek baar padhi jaati hai; bahar kam rows hon to per-row form tez ho sakta hai, EXPLAIN ANALYZE se dekho.",
+    "hindi": "child table को एक बार group करके total करो, फिर LEFT JOIN; COUNT को COALESCE(..., 0) में रखो।"
+   },
+   "mistake": {
+    "en": "Joining the child table first and grouping after: totals of other joined tables get multiplied; or forgetting COALESCE, so customers with no orders show NULL instead of 0.",
+    "hinglish": "Pehle child table join karke baad mein group karna: doosri tables ke total guna ho jaate hain; ya COALESCE bhoolna, to bina order wale customer pe 0 ki jagah NULL.",
+    "hindi": "पहले join करके बाद में group करना, या COALESCE भूलना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, COALESCE(pre.n, 0) AS orders_count FROM customers c LEFT JOIN (SELECT customer_id, COUNT(*) AS n FROM orders GROUP BY customer_id) pre ON pre.customer_id = c.id ORDER BY c.id"
+     },
+     "columns": [
+      "id",
+      "orders_count"
+     ],
+     "result": [
+      [
+       "1",
+       "2"
+      ],
+      [
+       "2",
+       "2"
+      ],
+      [
+       "3",
+       "2"
+      ],
+      [
+       "4",
+       "0"
+      ],
+      [
+       "5",
+       "0"
+      ],
+      [
+       "6",
+       "1"
+      ],
+      [
+       "7",
+       "0"
+      ],
+      [
+       "8",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same rules.",
+    "oracle": "Notes only (not lab-tested here): Same rules.",
+    "sqlite": "Notes only (not lab-tested here): Same rules.",
+    "mysql": "Same; MySQL 8.0.22+ may also merge the derived table.",
+    "mariadb": "Lab: the same counts as the correlated subquery (EXPLAIN: one DERIVED table with key0).",
+    "postgresql": "Lab: the same counts (EXPLAIN: HashAggregate + Hash Join, no SubPlan)."
+   },
+   "related": [
+    "pre_aggregate",
+    "subquery_in_select_speed",
+    "correlated_subquery",
+    "correlated_count_zero"
+   ],
+   "fundamentals": [
+    "equivalence",
+    "grain",
+    "repeated_work"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/subquery-cache/",
+    "https://use-the-index-luke.com/sql/join"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "correlated_count_zero",
+   "kind": "concept",
+   "title": {
+    "en": "Why a correlated COUNT gives 0 but a LEFT JOIN to totals gives NULL",
+    "hinglish": "Correlated COUNT 0 deta hai par LEFT JOIN wala total NULL kyun",
+    "hindi": "correlated COUNT 0 देता है पर LEFT JOIN वाला total NULL क्यों"
+   },
+   "terms": [
+    [
+     "count",
+     "(zero|0)",
+     "null",
+     "(left join|join\\w*|subquer\\w*)"
+    ],
+    [
+     "count",
+     "शून्य",
+     "null"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why does a correlated count give 0 but a left join gives null",
+     "why is the count null instead of zero after joining totals",
+     "count in a subquery gives 0 but a left join gives null why"
+    ],
+    "hinglish": [
+     "subquery ka count 0 aur left join ka count null kyun aata hai",
+     "join ke baad count zero ki jagah null kyun"
+    ],
+    "hindi": [
+     "COUNT subquery में 0 पर LEFT JOIN में null क्यों आता है"
+    ]
+   },
+   "answer": {
+    "en": "A COUNT over no rows is 0: the correlated subquery counts the child rows of that parent, finds none, and says 0. A derived table of totals simply has no row for a parent without children, so the LEFT JOIN fills its columns with NULL. Wrap it: COALESCE(x.n, 0). SUM, MIN, MAX and AVG over nothing are NULL in both forms, so they need no wrapping to stay the same (only if you want 0 instead).",
+    "hinglish": "Khaali rows ka COUNT 0 hota hai: correlated subquery us parent ki child rows ginti hai, kuch nahi milta, 0 deti hai. Totals wali derived table mein bina child ke parent ki row hi nahi hoti, isliye LEFT JOIN NULL bhar deta hai. COALESCE(x.n, 0) lagao. SUM/MIN/MAX/AVG khaali pe dono jagah NULL, unhe same rakhne ke liye kuch nahi chahiye.",
+    "hindi": "खाली का COUNT 0 है; LEFT JOIN में row ही नहीं, इसलिए NULL; COALESCE(x.n, 0) लगाओ।"
+   },
+   "mistake": {
+    "en": "Wrapping SUM in COALESCE while 'just moving it to a join': it changes NULL to 0, which is a different answer, not the same query.",
+    "hinglish": "Join mein le jaate waqt SUM ko bhi COALESCE mein daalna: NULL 0 ban jaata hai, ye alag jawab hai.",
+    "hindi": "SUM को भी COALESCE में डालना: जवाब बदल जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT c.id, (SELECT COUNT(*) FROM orders o WHERE o.customer_id = c.id) AS correlated, x.n AS joined, COALESCE(x.n, 0) AS joined_fixed FROM customers c LEFT JOIN (SELECT customer_id, COUNT(*) AS n FROM orders GROUP BY customer_id) x ON x.customer_id = c.id WHERE c.id IN (1, 4) ORDER BY c.id"
+     },
+     "columns": [
+      "id",
+      "correlated",
+      "joined",
+      "joined_fixed"
+     ],
+     "result": [
+      [
+       "1",
+       "2",
+       "2",
+       "2"
+      ],
+      [
+       "4",
+       "0",
+       "NULL",
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same.",
+    "oracle": "Notes only (not lab-tested here): Same.",
+    "sqlite": "Notes only (not lab-tested here): Same.",
+    "mysql": "Same.",
+    "mariadb": "Lab: customer 4 gets 0, NULL, 0.",
+    "postgresql": "Lab: customer 4 gets 0, NULL, 0."
+   },
+   "related": [
+    "correlated_to_join",
+    "left_join_count",
+    "count_including_zero"
+   ],
+   "fundamentals": [
+    "equivalence",
+    "null_logic",
+    "aggregation"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-aggregate.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/count/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "order_by_alias",
+   "kind": "concept",
+   "title": {
+    "en": "Using a SELECT name (alias) in ORDER BY",
+    "hinglish": "ORDER BY mein SELECT ka naam (alias) use karna",
+    "hindi": "ORDER BY में SELECT का नाम (alias)"
+   },
+   "terms": [
+    [
+     "alias(es)?",
+     "order by"
+    ],
+    [
+     "order by",
+     "select (wala |ka |का )?(name|naam|नाम)"
+    ],
+    [
+     "एलियस",
+     "order by"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can i use a column alias in order by",
+     "how to order by an alias",
+     "why does order by accept an alias but where does not"
+    ],
+    "hinglish": [
+     "order by mein alias use kar sakte hai kya",
+     "order by mein select wala naam kaise use kare"
+    ],
+    "hindi": [
+     "ORDER BY में alias कैसे इस्तेमाल करें"
+    ]
+   },
+   "answer": {
+    "en": "Yes, on MySQL, MariaDB and PostgreSQL: ORDER BY runs after SELECT, so it can sort by the name SELECT gave. It sorts by the very same value, so writing the calculation again is never needed. WHERE runs before SELECT and can't (1054 / 42703). GROUP BY is a trap: PostgreSQL prefers a table column of the same name there, MariaDB the alias, so give an alias a name no table column has.",
+    "hinglish": "Haan, MySQL, MariaDB aur PostgreSQL teeno pe: ORDER BY SELECT ke baad chalta hai, isliye SELECT wale naam se sort kar sakta hai, bilkul usi value se; calculation dobara likhne ki zaroorat nahi. WHERE SELECT se pehle chalta hai, nahi le sakta (1054 / 42703). GROUP BY mein dhyaan: PostgreSQL wahan same naam ka table column chunta hai, MariaDB alias; isliye alias ka naam kisi column jaisa mat rakho.",
+    "hindi": "हाँ, ORDER BY SELECT के बाद चलता है; WHERE नहीं ले सकता।"
+   },
+   "mistake": {
+    "en": "Giving the alias the name of a real column (amount - discount AS amount): ORDER BY sorts by the alias, GROUP BY on PostgreSQL by the column, and readers can't tell which.",
+    "hinglish": "Alias ka naam asli column jaisa rakhna (amount - discount AS amount): ORDER BY alias se, PostgreSQL GROUP BY column se, padhne wala samajh nahi paata.",
+    "hindi": "alias का नाम असली column जैसा रखना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount - COALESCE(discount, 0) AS net FROM orders ORDER BY net DESC, id LIMIT 3"
+     },
+     "columns": [
+      "id",
+      "net"
+     ],
+     "result": [
+      [
+       "3",
+       "79000"
+      ],
+      [
+       "6",
+       "64500"
+      ],
+      [
+       "1",
+       "25500"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): ORDER BY alias works; WHERE doesn't.",
+    "oracle": "Notes only (not lab-tested here): ORDER BY alias works; WHERE doesn't.",
+    "sqlite": "Notes only (not lab-tested here): ORDER BY alias works; WHERE alias also works in SQLite.",
+    "mysql": "Same as MariaDB.",
+    "mariadb": "Lab: orders 3, 6, 1; WHERE net > 1000 is error 1054.",
+    "postgresql": "Lab: orders 3, 6, 1; WHERE net > 1000 is error 42703."
+   },
+   "related": [
+    "alias",
+    "repeat_calculation",
+    "order_by"
+   ],
+   "fundamentals": [
+    "names_scope",
+    "equivalence"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-order.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/problems-with-alias.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "repeat_calculation",
+   "kind": "howto",
+   "title": {
+    "en": "How to avoid writing the same calculation twice in a query",
+    "hinglish": "Query mein wahi calculation do baar likhne se kaise bache",
+    "hindi": "क्वेरी में वही calculation दो बार लिखने से कैसे बचें"
+   },
+   "terms": [
+    [
+     "(same|repeat\\w*|duplicate\\w*)",
+     "(calculation|expression|formula)",
+     "(twice|again|two times|once|avoid|repeat\\w*)"
+    ],
+    [
+     "(calculation|expression|formula)",
+     "(do baar|dobara|ek baar)"
+    ],
+    [
+     "calculation",
+     "दो बार"
+    ],
+    [
+     "calculated (column|value|field)",
+     "(where|again|twice|dobara)"
+    ],
+    [
+     "(compute|calculate|write)",
+     "(expression|calculation|formula)",
+     "once"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to avoid repeating the same calculation in a query",
+     "how to use a calculated column in where without writing it again",
+     "how to compute an expression once in sql"
+    ],
+    "hinglish": [
+     "query mein same calculation do baar likhne se kaise bache",
+     "calculation ek baar likh ke where mein kaise use kare"
+    ],
+    "hindi": [
+     "क्वेरी में calculation दो बार लिखने से कैसे बचें"
+    ]
+   },
+   "answer": {
+    "en": "In ORDER BY just use the SELECT name. For WHERE, put the calculation in a derived table or a CTE and filter outside: SELECT * FROM (SELECT id, amount - COALESCE(discount, 0) AS net FROM orders) t WHERE net > 1000. On PostgreSQL a CROSS JOIN LATERAL (SELECT ... AS net) also works. The rows are the same as writing it twice; you keep one copy to change, so the two can't drift apart. Keep functions like RAND() out of this: each call gives a new value, so 'computed once' and 'written twice' really differ.",
+    "hinglish": "ORDER BY mein seedha SELECT wala naam lo. WHERE ke liye calculation ko derived table ya CTE mein rakho aur bahar filter karo: SELECT * FROM (SELECT id, amount - COALESCE(discount, 0) AS net FROM orders) t WHERE net > 1000. PostgreSQL pe CROSS JOIN LATERAL bhi chalta hai. Rows wahi; badalne ke liye ek hi copy. RAND() jaise functions alag hain: har call nayi value deta hai.",
+    "hindi": "ORDER BY में नाम लो; WHERE के लिए derived table या CTE में रखकर बाहर filter करो।"
+   },
+   "mistake": {
+    "en": "Editing one copy and not the other: the SELECT shows the new formula, the filter still uses the old one.",
+    "hinglish": "Ek copy badalna aur doosri bhool jaana: SELECT naya formula dikhata hai, filter purana use karta hai.",
+    "hindi": "एक copy बदलना और दूसरी भूल जाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, net FROM (SELECT id, amount - COALESCE(discount, 0) AS net FROM orders) t WHERE net > 1000 ORDER BY net DESC, id"
+     },
+     "columns": [
+      "id",
+      "net"
+     ],
+     "result": [
+      [
+       "3",
+       "79000"
+      ],
+      [
+       "6",
+       "64500"
+      ],
+      [
+       "1",
+       "25500"
+      ],
+      [
+       "4",
+       "12000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): CROSS APPLY instead of LATERAL.",
+    "oracle": "Notes only (not lab-tested here): CROSS APPLY / LATERAL from 12c.",
+    "sqlite": "Notes only (not lab-tested here): Derived table or CTE.",
+    "mysql": "Same; LATERAL needs MySQL 8.0.14+.",
+    "mariadb": "Lab: 3, 6, 1, 4. MariaDB 10.11 has no LATERAL.",
+    "postgresql": "Lab: 3, 6, 1, 4."
+   },
+   "related": [
+    "order_by_alias",
+    "derived_table",
+    "cte",
+    "deterministic_functions"
+   ],
+   "fundamentals": [
+    "equivalence",
+    "names_scope"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/derived-tables/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "deterministic_functions",
+   "kind": "concept",
+   "title": {
+    "en": "Functions that give a new value on each call (RAND, NOW, UUID)",
+    "hinglish": "Har call pe nayi value dene wale functions (RAND, NOW, UUID)",
+    "hindi": "हर call पर नई value देने वाले functions (RAND, NOW, UUID)"
+   },
+   "terms": [
+    [
+     "(random|rand|uuid|sysdate|now|clock_timestamp)",
+     "(each time|every time|twice|two times|same value|every row|do baar|har baar|har row|दो बार|हर बार)"
+    ],
+    [
+     "(random|rand|uuid)",
+     "(nayi|new|naya|alag|nai|different|नई) value"
+    ],
+    [
+     "non.?deterministic"
+    ],
+    [
+     "\\bdeterministic\\b"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "is now() the same value everywhere in one query",
+     "does rand() give a new value each time",
+     "what is a non deterministic function in sql"
+    ],
+    "hinglish": [
+     "ek query mein now() har baar same value deta hai kya",
+     "rand() har baar nayi value deta hai kya"
+    ],
+    "hindi": [
+     "RAND() हर बार नई value क्यों देता है"
+    ]
+   },
+   "answer": {
+    "en": "NOW() / CURRENT_TIMESTAMP are fixed for one statement on MySQL and MariaDB and for the whole transaction on PostgreSQL, so two copies agree. RAND() / random(), UUID() / gen_random_uuid(), SYSDATE() (MySQL) and clock_timestamp() (PostgreSQL) give a new value on every call. That matters for rewrites: computing such a value once and reusing it is not the same as calling it twice, and a correlated subquery with RAND() can't be totalled once.",
+    "hinglish": "NOW() / CURRENT_TIMESTAMP MySQL/MariaDB pe ek statement ke liye aur PostgreSQL pe poore transaction ke liye fixed hai, isliye do copies same. RAND() / random(), UUID() / gen_random_uuid(), SYSDATE() (MySQL) aur clock_timestamp() (PostgreSQL) har call pe nayi value dete hain. Rewrite mein farak padta hai: aisi value ek baar nikaal ke dobara use karna do baar call karne jaisa nahi.",
+    "hindi": "NOW() एक statement में fixed; RAND(), UUID(), SYSDATE() हर call पर नई value।"
+   },
+   "mistake": {
+    "en": "Writing ORDER BY RAND() * 10 next to SELECT RAND() * 10 AS r and expecting rows sorted by r: they are two different random numbers.",
+    "hinglish": "SELECT RAND() * 10 AS r ke saath ORDER BY RAND() * 10 likh ke r se sort ki ummeed: dono alag random numbers hain.",
+    "hindi": "SELECT और ORDER BY में अलग-अलग RAND() एक ही नहीं होते।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT CURRENT_TIMESTAMP = CURRENT_TIMESTAMP AS same_value"
+     },
+     "columns": [
+      "same_value"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): GETDATE() is evaluated once per call site; NEWID() per row.",
+    "oracle": "Notes only (not lab-tested here): SYSDATE is fixed per statement; DBMS_RANDOM per call.",
+    "sqlite": "Notes only (not lab-tested here): random() per call.",
+    "mysql": "NOW() fixed per statement; SYSDATE() per call.",
+    "mariadb": "Lab: 1 (true).",
+    "postgresql": "Lab: true; now() is the transaction start, clock_timestamp() changes."
+   },
+   "related": [
+    "random_rows",
+    "repeat_calculation"
+   ],
+   "fundamentals": [
+    "equivalence"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html#function_now",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/functions-datetime.html#FUNCTIONS-DATETIME-CURRENT"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "keyset_tie_breaker",
+   "kind": "howto",
+   "title": {
+    "en": "Keyset pagination when the sort column has ties",
+    "hinglish": "Keyset pagination jab sort column mein same values hon",
+    "hindi": "keyset pagination जब sort column में same values हों"
+   },
+   "terms": [
+    [
+     "(keyset|seek|cursor)",
+     "(duplicate\\w*|ties?|same values?|non.?unique|not unique|tie.?breaker)"
+    ],
+    [
+     "tie.?breaker"
+    ],
+    [
+     "(pagination|paging|pagination)",
+     "(duplicate values|non.?unique|not unique|same values?)"
+    ],
+    [
+     "(keyset|पेजिनेशन)",
+     "(same value|duplicate|डुप्लिकेट)"
+    ],
+    [
+     "page (by|on|through)",
+     "(non.?unique|not unique|duplicate\\w*|same values?)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to do keyset pagination on a column with duplicate values",
+     "what is a tie breaker in keyset pagination",
+     "how to page by a non unique column"
+    ],
+    "hinglish": [
+     "keyset pagination mein duplicate values ho to kaise kare",
+     "same value wale column pe pagination kaise kare"
+    ],
+    "hindi": [
+     "keyset pagination में duplicate values हों तो कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "Add the key as the last ORDER BY column so every row has its own place: ORDER BY status, id. Then 'after the last row seen' is a row comparison: WHERE (status, id) > (:last_status, :last_id) ORDER BY status, id LIMIT n. Without the tie-breaker, rows that share the last value are skipped or repeated across pages. The columns must not be NULL (a NULL is never greater or smaller), all in the same direction (for mixed ASC/DESC write the OR form), and you move page by page; it can't jump to page 500.",
+    "hinglish": "Key ko aakhri ORDER BY column banao taaki har row ki apni jagah ho: ORDER BY status, id. Phir 'aakhri dekhi row ke baad' ek row comparison hai: WHERE (status, id) > (:last_status, :last_id) ORDER BY status, id LIMIT n. Tie-breaker ke bina same value wali rows pages ke beech chhoot ya dohra sakti hain. Columns NULL na hon, ek hi direction mein hon (ASC/DESC mix ho to OR wala form), aur page ek-ek karke; seedha page 500 nahi.",
+    "hindi": "key को आखिरी ORDER BY column बनाओ और (status, id) > (:last_status, :last_id) लिखो।"
+   },
+   "mistake": {
+    "en": "Paging on status alone (WHERE status > :last): every other order with the same status as the last row of the page is never shown.",
+    "hinglish": "Sirf status pe paging (WHERE status > :last): page ki aakhri row jaisa status wale baaki orders kabhi nahi dikhte.",
+    "hindi": "सिर्फ status पर paging: same status वाली rows छूट जाती हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, status FROM orders WHERE (status, id) > ('paid', 3) ORDER BY status, id LIMIT 3"
+     },
+     "columns": [
+      "id",
+      "status"
+     ],
+     "result": [
+      [
+       "5",
+       "paid"
+      ],
+      [
+       "7",
+       "paid"
+      ],
+      [
+       "6",
+       "pending"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): No row comparison: write (status > @s OR (status = @s AND id > @i)).",
+    "oracle": "Notes only (not lab-tested here): No row comparison in WHERE: use the OR form.",
+    "sqlite": "Notes only (not lab-tested here): Row values work from 3.15.",
+    "mysql": "Row comparison works; an index on (status, id) helps.",
+    "mariadb": "Lab: 5, 7, 6 (the row after paid/3).",
+    "postgresql": "Lab: 5, 7, 6; the row comparison uses an index on (status, id)."
+   },
+   "related": [
+    "keyset_pagination",
+    "row_value_comparison",
+    "order_limit_ties"
+   ],
+   "fundamentals": [
+    "equivalence",
+    "ranking"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-comparisons.html#ROW-WISE-COMPARISON",
+   "seen_at": [
+    "https://use-the-index-luke.com/no-offset"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "row_value_comparison",
+   "kind": "concept",
+   "title": {
+    "en": "Row value comparison: (a, b) > (x, y)",
+    "hinglish": "Row value comparison: (a, b) > (x, y)",
+    "hindi": "row value comparison: (a, b) > (x, y)"
+   },
+   "terms": [
+    [
+     "row value comparison"
+    ],
+    [
+     "tuple comparison"
+    ],
+    [
+     "row constructor comparison"
+    ],
+    [
+     "(row values?|tuples?)",
+     "(compare|comparison)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is row value comparison in sql",
+     "how does tuple comparison (a, b) > (x, y) work",
+     "what is a row constructor comparison"
+    ],
+    "hinglish": [
+     "row value comparison kya hota hai",
+     "tuple comparison kaise kaam karta hai"
+    ],
+    "hindi": [
+     "row value comparison क्या है"
+    ]
+   },
+   "answer": {
+    "en": "(a, b) > (x, y) compares column by column like words in a dictionary: true when a > x, or when a = x and b > y. It is the short way to say 'after this row' for keyset paging. MySQL, MariaDB and PostgreSQL all accept it; how well it uses an index differs (PostgreSQL uses a composite index directly; on MySQL/MariaDB check EXPLAIN, and the OR form a > x OR (a = x AND b > y) always works). A NULL anywhere makes the answer unknown.",
+    "hinglish": "(a, b) > (x, y) dictionary ki tarah column-by-column compare karta hai: a > x ho, ya a = x aur b > y ho to true. Keyset paging mein 'is row ke baad' kehne ka chhota tareeka. MySQL, MariaDB, PostgreSQL teeno lete hain; index ka use alag hai (PostgreSQL composite index seedha use karta hai; MySQL/MariaDB pe EXPLAIN dekho, OR wala form hamesha chalta hai). Kahin NULL ho to jawab unknown.",
+    "hindi": "(a, b) > (x, y) dictionary जैसा column-by-column compare।"
+   },
+   "mistake": {
+    "en": "Mixing directions: (a, b) > (x, y) matches ORDER BY a, b, not ORDER BY a DESC, b.",
+    "hinglish": "Direction mix karna: (a, b) > (x, y) ORDER BY a, b se milta hai, ORDER BY a DESC, b se nahi.",
+    "hindi": "direction mix करना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS after_paid_3 FROM orders WHERE (status, id) > ('paid', 3)"
+     },
+     "columns": [
+      "after_paid_3"
+     ],
+     "result": [
+      [
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Not supported; use the OR form.",
+    "oracle": "Notes only (not lab-tested here): Not in WHERE comparisons; use the OR form.",
+    "sqlite": "Notes only (not lab-tested here): Works from 3.15.",
+    "mysql": "Works.",
+    "mariadb": "Lab: 5.",
+    "postgresql": "Lab: 5."
+   },
+   "related": [
+    "keyset_tie_breaker",
+    "keyset_pagination"
+   ],
+   "fundamentals": [
+    "equivalence"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-comparisons.html#ROW-WISE-COMPARISON",
+   "seen_at": [
+    "https://mariadb.com/kb/en/row-constructor-expressions/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "or_vs_in_list",
+   "kind": "compare",
+   "title": {
+    "en": "IN (list) vs several OR conditions",
+    "hinglish": "IN (list) vs kai OR conditions",
+    "hindi": "IN (list) बनाम कई OR conditions"
+   },
+   "terms": [
+    [
+     "\\bin\\b (list|clause|operator)",
+     "\\bor\\b (conditions?|equals?)"
+    ],
+    [
+     "(many|several|multiple|kai) (ors|or conditions?)"
+    ],
+    [
+     "\\bin\\b",
+     "\\bor\\b conditions?"
+    ],
+    [
+     "\\bin\\b",
+     "कई or"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "is IN the same as several OR conditions",
+     "IN list vs OR conditions",
+     "difference between in clause and or conditions"
+    ],
+    "hinglish": [
+     "IN list aur OR conditions mein kya farak hai",
+     "kai OR conditions ki jagah IN same hai kya"
+    ],
+    "hindi": [
+     "IN list और OR conditions में क्या अंतर है"
+    ]
+   },
+   "answer": {
+    "en": "status IN ('paid', 'shipped') is exactly status = 'paid' OR status = 'shipped': the same rows, NULLs included (a NULL status matches neither; a NULL in the list matches nothing). IN is shorter and harder to break when other conditions are added, because AND binds tighter than OR: a = 1 AND b = 2 OR b = 3 is not a = 1 AND b IN (2, 3).",
+    "hinglish": "status IN ('paid', 'shipped') bilkul status = 'paid' OR status = 'shipped' hai: wahi rows, NULL bhi (NULL status kisi se match nahi). IN chhota hai aur doosri conditions ke saath tootta nahi, kyunki AND OR se pehle judta hai: a = 1 AND b = 2 OR b = 3 wo nahi jo a = 1 AND b IN (2, 3) hai.",
+    "hindi": "IN (list) और OR वाली conditions same rows देती हैं; AND/OR के साथ IN सुरक्षित।"
+   },
+   "mistake": {
+    "en": "Turning IN into ORs next to an AND without brackets: the AND then binds only to the first OR part.",
+    "hinglish": "AND ke saath IN ko bina bracket ORs mein badalna: AND sirf pehle hisse se judta hai.",
+    "hindi": "AND के साथ बिना bracket OR लिखना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM orders WHERE status = 'paid' OR status = 'shipped') AS with_or, (SELECT COUNT(*) FROM orders WHERE status IN ('paid', 'shipped')) AS with_in"
+     },
+     "columns": [
+      "with_or",
+      "with_in"
+     ],
+     "result": [
+      [
+       "6",
+       "6"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same.",
+    "oracle": "Notes only (not lab-tested here): Same (IN list up to 1000 items).",
+    "sqlite": "Notes only (not lab-tested here): Same.",
+    "mysql": "Same.",
+    "mariadb": "Lab: 6 and 6.",
+    "postgresql": "Lab: 6 and 6."
+   },
+   "related": [
+    "in_operator",
+    "and_or",
+    "or_vs_union"
+   ],
+   "fundamentals": [
+    "equivalence",
+    "null_logic"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-comparisons.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/in/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "between_inclusive",
+   "kind": "concept",
+   "title": {
+    "en": "Is BETWEEN inclusive",
+    "hinglish": "BETWEEN mein dono end shamil hote hain kya",
+    "hindi": "क्या BETWEEN में दोनों सिरे शामिल हैं"
+   },
+   "terms": [
+    [
+     "between",
+     "(inclusive|exclusive|includes?|both ends|end values|shamil|शामिल)"
+    ],
+    [
+     "between",
+     "(>=|greater than or equal)"
+    ],
+    [
+     "between",
+     "(and|aur) <="
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "is between inclusive in sql",
+     "does between include both end values",
+     "is between the same as greater than or equal and less than or equal"
+    ],
+    "hinglish": [
+     "between mein dono values shamil hoti hai kya",
+     "between inclusive hai kya"
+    ],
+    "hindi": [
+     "BETWEEN में दोनों सिरे शामिल होते हैं क्या"
+    ]
+   },
+   "answer": {
+    "en": "Yes: x BETWEEN a AND b is exactly x >= a AND x <= b, both ends included, on every database (the same rows; a NULL fails both). Two traps: the order matters (BETWEEN 800 AND 500 is empty), and on a date-time column BETWEEN '2024-06-01' AND '2024-06-30' stops at midnight of the 30th; for days use >= the first day AND < the next day.",
+    "hinglish": "Haan: x BETWEEN a AND b bilkul x >= a AND x <= b hai, dono end shamil, har database pe (wahi rows; NULL dono mein fail). Do jaal: order zaroori hai (BETWEEN 800 AND 500 khaali), aur date-time column pe BETWEEN '2024-06-01' AND '2024-06-30' 30 tareekh ki aadhi raat pe ruk jaata hai; din ke liye >= pehla din AND < agla din.",
+    "hindi": "हाँ, BETWEEN a AND b = >= a AND <= b; date-time पर आखिरी दिन का बाकी हिस्सा छूटता है।"
+   },
+   "mistake": {
+    "en": "Using BETWEEN for a month on a DATETIME column: orders placed after 00:00 on the last day are left out.",
+    "hinglish": "DATETIME column pe mahine ke liye BETWEEN: aakhri din 00:00 ke baad ke orders chhoot jaate hain.",
+    "hindi": "DATETIME पर महीने के लिए BETWEEN।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM orders WHERE amount BETWEEN 500 AND 800) AS with_between, (SELECT COUNT(*) FROM orders WHERE amount >= 500 AND amount <= 800) AS with_ge_le"
+     },
+     "columns": [
+      "with_between",
+      "with_ge_le"
+     ],
+     "result": [
+      [
+       "3",
+       "3"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): Same.",
+    "oracle": "Notes only (not lab-tested here): Same.",
+    "sqlite": "Notes only (not lab-tested here): Same.",
+    "mysql": "Same.",
+    "mariadb": "Lab: 3 and 3.",
+    "postgresql": "Lab: 3 and 3 (PostgreSQL also has BETWEEN SYMMETRIC)."
+   },
+   "related": [
+    "datetime_vs_timestamp",
+    "where",
+    "or_vs_in_list"
+   ],
+   "fundamentals": [
+    "equivalence",
+    "time_ranges"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-comparison.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/between-and/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "rewrite_speed_check",
+   "kind": "howto",
+   "title": {
+    "en": "How to know if a rewritten query is faster",
+    "hinglish": "Rewrite ki hui query tez hai kaise pata kare",
+    "hindi": "बदली हुई क्वेरी तेज़ है कैसे पता करें"
+   },
+   "terms": [
+    [
+     "(rewrite|rewritten|optimi[sz]ed|new version)",
+     "(faster|quicker|tez|speed|performance)"
+    ],
+    [
+     "(बदली|नई) (हुई )?क्वेरी",
+     "तेज़"
+    ],
+    [
+     "(rewrite|badli)",
+     "tez"
+    ],
+    [
+     "(compare|check|measure)",
+     "speed",
+     "(two|2|both|dono) (query|queries|versions?)"
+    ],
+    [
+     "speed",
+     "(two|2|both|dono) (query|quer\\w*) versions?"
+    ],
+    [
+     "(nayi|new) quer\\w*",
+     "(speed|tez|fast\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how do i know a rewritten query is faster",
+     "how to check if the optimized query is really faster",
+     "how to compare the speed of two query versions"
+    ],
+    "hinglish": [
+     "rewrite ki hui query tez hai kaise pata kare",
+     "nayi query ki speed kaise compare kare"
+    ],
+    "hindi": [
+     "बदली हुई क्वेरी तेज़ है कैसे पता करें"
+    ]
+   },
+   "answer": {
+    "en": "First prove it returns the same rows (reason it through, then A EXCEPT ALL B both ways on real data). Then time both on the same data with the plan: EXPLAIN ANALYZE on MySQL 8 and PostgreSQL, ANALYZE SELECT on MariaDB. Run each a few times (the first run reads from disk, later ones from memory), and compare rows read, not only milliseconds. A rewrite that wins on a small table can lose on a big one, and the other way round, so test with realistic sizes.",
+    "hinglish": "Pehle sabit karo ki rows same hain (soch ke, phir asli data pe A EXCEPT ALL B dono taraf). Phir dono ko same data pe plan ke saath time karo: MySQL 8 aur PostgreSQL pe EXPLAIN ANALYZE, MariaDB pe ANALYZE SELECT. Har ek ko kuch baar chalao (pehli baar disk se, baad mein memory se) aur sirf milliseconds nahi, padhi gayi rows bhi milao. Chhoti table pe jeetne wala rewrite badi pe haar sakta hai.",
+    "hindi": "पहले same rows साबित करो, फिर EXPLAIN ANALYZE (MariaDB पर ANALYZE) से कई बार चलाकर तुलना करो।"
+   },
+   "mistake": {
+    "en": "Timing each version once, right after the other: the second one finds the data already in memory and looks faster.",
+    "hinglish": "Har version ko ek-ek baar, ek ke baad ek chalana: doosre ko data memory mein milta hai aur wo tez lagta hai.",
+    "hindi": "हर version एक बार चलाना: दूसरा cache की वजह से तेज़ लगता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT (SELECT COUNT(*) FROM customers c WHERE c.id IN (SELECT customer_id FROM orders)) AS original_rows, (SELECT COUNT(*) FROM customers c WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.id)) AS rewritten_rows"
+     },
+     "columns": [
+      "original_rows",
+      "rewritten_rows"
+     ],
+     "result": [
+      [
+       "5",
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlserver": "Notes only (not lab-tested here): SET STATISTICS IO, TIME ON.",
+    "oracle": "Notes only (not lab-tested here): DBMS_XPLAN.DISPLAY_CURSOR with ALLSTATS.",
+    "sqlite": "Notes only (not lab-tested here): EXPLAIN QUERY PLAN, .timer on.",
+    "mysql": "EXPLAIN ANALYZE from 8.0.18.",
+    "mariadb": "Lab: 5 and 5 (rows first); MariaDB has ANALYZE SELECT, not EXPLAIN ANALYZE.",
+    "postgresql": "Lab: 5 and 5; EXPLAIN (ANALYZE, BUFFERS)."
+   },
+   "related": [
+    "explain_analyze",
+    "compare_query_results",
+    "equivalent_rewrite"
+   ],
+   "fundamentals": [
+    "equivalence",
+    "proof_classes"
+   ],
+   "source": "https://www.postgresql.org/docs/current/using-explain.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/analyze-statement/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

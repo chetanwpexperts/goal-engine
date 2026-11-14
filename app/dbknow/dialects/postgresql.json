@@ -562,7 +562,10 @@
   "union_collation": {"behaviour": "works", "says": "PostgreSQL compares UNION rows exactly (its usual collation is case-sensitive): 'aarav@mail.test' and 'AARAV@mail.test' stay two rows.", "proven": ["postgresql"]},
   "repeated_subquery": {"behaviour": "slow", "says": "PostgreSQL's EXPLAIN shows one SubPlan per copy, except that a copy in ORDER BY identical to a SELECT item shares that item's SubPlan.", "proven": ["postgresql"]},
   "same_subquery": {"behaviour": "slow", "says": "PostgreSQL's EXPLAIN shows one InitPlan per copy (each worked out once, but each on its own).", "proven": ["postgresql"]},
-  "cte_read_twice": {"behaviour": "slow", "says": "PostgreSQL builds a CTE that is read twice once and keeps it, so a filter on one use stays outside (EXPLAIN: CTE Scan with the filter, after aggregating every row); AS NOT MATERIALIZED (12+) lets it in.", "proven": ["postgresql"]}
+  "cte_read_twice": {"behaviour": "slow", "says": "PostgreSQL builds a CTE that is read twice once and keeps it, so a filter on one use stays outside (EXPLAIN: CTE Scan with the filter, after aggregating every row); AS NOT MATERIALIZED (12+) lets it in.", "proven": ["postgresql"]},
+  "preaggregate": {"behaviour": "slow", "says": "On PostgreSQL the correlated form is a SubPlan run for each outer row; the totalled form is one HashAggregate joined with a Hash Join.", "proven": ["postgresql"]},
+  "in_exists": {"behaviour": "same", "says": "PostgreSQL returns the same rows for positive IN (SELECT ...) and EXISTS; NOT IN with a NULL in the list returns nothing (lab: 0 departments vs 1 with NOT EXISTS).", "proven": ["postgresql"]},
+  "order_by_alias": {"behaviour": "same", "says": "PostgreSQL lets ORDER BY use a SELECT name (a bare name prefers the SELECT name); WHERE can't (42703), and GROUP BY prefers a table column of the same name.", "proven": ["postgresql"]}
  },
  "proven": [
   "postgresql"

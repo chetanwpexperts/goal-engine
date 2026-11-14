@@ -41,7 +41,8 @@
                      "sum_distinct", "nulls_order", "union_all"],
     "needs_execution": ["sargable", "or_union", "keyset", "keyset_offset", "leading_wildcard", "select_star", "index_prefix",
                         "index_range_first", "batch_change", "skip_locked", "n_plus_one", "index_missing", "index",
-                        "repeat_subquery", "same_subquery", "having_key", "cte_filter_late", "star_join"]
+                        "repeat_subquery", "same_subquery", "having_key", "cte_filter_late", "star_join",
+                        "preagg_subquery", "to_exists", "to_in", "to_join", "expr_once"]
   },
   "facts": {
     "not_null": {"en": "whether {col} can be NULL", "hi": "{col} NULL ho sakta hai ya nahi"},

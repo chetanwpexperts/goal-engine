@@ -2,8 +2,9 @@
 # Start the lab databases and wait until each one answers (at most 10 minutes). LAB_PW must be set.
 set -euo pipefail
 cd "$(dirname "$0")"
+bash ./guard.sh
 : "${LAB_PW:?set LAB_PW}"
-docker compose up -d
+docker compose -p dbaba-lab up -d
 for i in $(seq 1 120); do
   if python3 smoke.py --quiet; then echo "LAB-UP"; exit 0; fi
   sleep 5

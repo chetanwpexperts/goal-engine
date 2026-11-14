@@ -104,7 +104,7 @@ label the rest, upgrade to verified when schema, EXPLAIN or data arrive.
 - [x] **13. Remaining structural checks.** Cartesian joins, ON that doesn't connect its tables, broken or repeated correlated
   subqueries, DISTINCT hiding duplicates, UNION vs UNION ALL, late filters, big OFFSET, functions on filtered columns,
   leading wildcards, SELECT * across joins; speed findings are risks, not guarantees.
-- [ ] **14. Safe rewrites with proof.** Pre-aggregate repeated correlated subqueries, IN <-> EXISTS, compute once, UNION ->
+- [x] **14. Safe rewrites with proof.** Pre-aggregate repeated correlated subqueries, IN <-> EXISTS, compute once, UNION ->
   UNION ALL only when safe, OFFSET -> keyset; each states what must stay the same and is proven on both databases.
 - [ ] **15. Big-query exam.** Generated 100-300 line queries with planted mistakes: dependency tree, grain per block, the
   planted findings with the right confidence class, a proven rewrite; the same query with CREATE TABLE / EXPLAIN upgrades or
@@ -457,3 +457,24 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   BY expression but not a WHERE copy, MariaDB shows a DEPENDENT SUBQUERY per copy; both push an outer filter into a grouped
   derived table, MariaDB into both uses of a CTE too, PostgreSQL not into a CTE read twice unless NOT MATERIALIZED (1064 on
   MariaDB); a SELECT alias in HAVING without GROUP BY runs on MariaDB, 42703 on PostgreSQL.
+- **Night 14 (14 Nov 2026).** Safe rewrites with proof, in `app/agents/sqlproof.py` (a new fundamental, `rewrite_equivalence`;
+  the contracts in `app/dbknow/core/rewrites.json`; engine facts in the dialect files' query_rules: nulls_sort_order,
+  row_comparison, volatile_once, exists_to_in). Every rewrite is checked on five things it must keep: matching, NULLs,
+  duplicates, ordering and grain; each finding carries a proof (family, verdict same / same if / differs, what it keeps, when it
+  holds, when it breaks) and the card says why the rows are the same. Found from the query alone: several correlated totals over
+  one child table (one grouped LEFT JOIN, COUNT wrapped in COALESCE, a total's own condition as CASE WHEN inside it), the same
+  calculation in SELECT and WHERE (named once in a derived table), and a volatile one written twice (RAND(): the copies differ;
+  computing once is offered as a change of meaning). Asked for in words around the query ("rewrite with EXISTS", "IN ki jagah
+  JOIN", "CTE mein likho", "keyset se", "NOT IN se likho"): IN <-> EXISTS, NOT IN <-> NOT EXISTS with the NULL cases written out
+  (the exact form keeps the original's rows; the plain one is named with when it is the same), IN as a JOIN to the DISTINCT
+  values, correlated totals as a grouped CTE, a derived table as a CTE, OFFSET as keyset paging (mixed ASC / DESC spelled column by
+  column). The form asked for wins over an 'if you meant' offer, unless the query has a definite mistake. Honest refusals: UNION
+  ALL where the parts can share a value (with the count check to run), EXISTS for an IN under NOT or in SELECT. 17 concepts, new
+  general question shapes ("what makes ...", "kab ... hoti hain", "kya kare", "kahan aate hain", "kar sakte hain", "how does ...
+  handle"), a 39-problem practice bank, 13 stmtbugs families (pf_*) where each rewrite must return the original's rows in the same
+  order on both databases. Lab lessons worth keeping: IN and EXISTS give the same rows in WHERE but as a SELECT value IN is NULL
+  where EXISTS is 0; a plain JOIN repeats rows (8 vs 5) unless joined to DISTINCT values; one NULL in the list makes NOT IN keep
+  nothing (0 vs 1) and a NULL outer value is dropped by NOT IN only (4 vs 5); a COUNT from a grouped LEFT JOIN is NULL where the
+  subquery gave 0; RAND() / random() written twice draw twice, while a derived table keeps one value per row on both engines;
+  MariaDB sorts NULLs first in ASC, PostgreSQL last; (a, b) > (x, y) works on both and skips NULL rows; PostgreSQL refuses an
+  alias inside an ORDER BY expression (42703), MariaDB allows it; 'lines' is a reserved word on MariaDB (1064 as an alias).

@@ -79,6 +79,12 @@ SHAPES = [                                     # (shape, pattern) in the order t
     ("define", r"^which (alias|aliases|columns?|tables?|condition|keyword|clause) (goes|go|should|to|do|is|are)\b|\b(kaun sa|kaunsa|konsa) (alias|column)\b"),
     ("when", r"^(is it|does it) (ok|okay|fine|bad|good|safe|wrong|better|help|matter|right)\b|\b(likhna|lagana|karna) (sahi|theek|thik) hai\b|"
              r"ठीक है क्या|चाहिए क्या"),
+    # night 14: 'what makes two queries ...', 'do query kab ek jaisi hoti hain', 'null value ho to kya kare', 'NULL kahan aate
+    # hain', 'alias use kar sakte hain': more general shapes (again never someone's own query: _is_work decides that first)
+    ("define", r"^what makes\b|\bkahan (aate|aati|aata|jaate|jaati|hote|hoti)\b|कहाँ (आते|आती|आता|जाते|जाती|होते|होती)"),
+    ("when", r"\bkab (hoti|hota|hote|deti|deta|dete|milti|milta)\b|कब .*(होती|होता|होते|देती|देता|देते|मिलती) (है|हैं)"),
+    ("define", r"^how (does|do|is|are) .* (handle|treat|deal with|handled|treated)\b"),
+    ("howto", r"\b(to )?kya (kare|karein|karen|karu|karun|karna chahiye)\b|क्या करें|(कर|ले|लिख) सकते (हैं|है)"),
 ]
 # a general yes/no question ('is mysql case sensitive', 'does a foreign key create an index'): answered when its words name a
 # known concept; never when it is about their own work ('should I add an index' after a query is a follow-up), and never a

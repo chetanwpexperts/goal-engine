@@ -75,6 +75,11 @@
    "id": "code",
    "en": "If the query lives in code: is every value bound through a placeholder (not inside quotes, not standing for a name), and is the text the database receives the text you meant (no -- comment swallowing joined pieces)?",
    "hi": "Agar query code mein hai: kya har value placeholder se bind hai (quotes ke andar nahi, naam ki jagah nahi), aur kya database tak wahi text pahunchta hai jo tumne socha (jode tukdon ko -- comment nigal na le)?"
+  },
+  {
+   "id": "same_rows",
+   "en": "If you rewrite it, does the new form keep matching, NULLs, duplicates, ordering and grain?",
+   "hi": "Agar badla, to naya roop matching, NULL, duplicates, order aur grain wahi rakhta hai?"
   }
  ],
  "fundamentals": {
@@ -683,6 +688,38 @@
    "seen_at": [
     "https://mariadb.com/kb/en/subquery-cache/",
     "https://mariadb.com/kb/en/condition-pushdown-into-derived-table-optimization/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "rewrite_equivalence": {
+   "title_en": "A rewrite is the same query only if it keeps matching, NULLs, duplicates, ordering and grain",
+   "title_hi": "Rewrite tabhi wahi query hai jab matching, NULL, duplicates, order aur grain wahi rahein",
+   "rule_en": "Two queries are the same only when, on every possible data, they return the same rows the same number of times in the promised order. So a rewrite is checked on five things: which rows pass (matching), what an unknown value does (NULLs: IN vs EXISTS differ under NOT and in SELECT; NOT IN never passes once its list holds a NULL; COUNT of nothing is 0 but NULL after a LEFT JOIN), how many times a row comes (a JOIN repeats rows a semi-join keeps once; UNION removes repeats UNION ALL keeps), the order ORDER BY promises (keyset paging needs a unique, NULL-free sort), and what one output row stands for (grain: a LEFT JOIN to a table grouped by the link keeps one row per outer row). A volatile expression (RAND()) is a new value each time, so computing it once is not the same. What one case shows proves nothing: the proof is the reasoning on all five, checked by running both forms on varied data.",
+   "rule_hi": "Do queries tabhi same hain jab har data pe wahi rows, utni hi baar, wahi order mein dein. Isliye rewrite paanch cheezon pe jaancha jaata hai: kaunsi rows paas hoti hain (matching), NULL kya karta hai (IN vs EXISTS NOT ke andar aur SELECT mein alag; list mein NULL ho to NOT IN kabhi paas nahi; khaali COUNT 0 par LEFT JOIN ke baad NULL), row kitni baar aati hai (JOIN rows dohrata hai, semi-join ek baar; UNION repeats hataata hai, UNION ALL rakhta hai), ORDER BY ka wada (keyset ke liye unique, bina NULL sort), aur ek output row kya hai (grain). RAND() har baar nayi value hai, isliye use ek baar nikalna same nahi. Ek case se kuch pakka nahi hota: paanchon pe soch, aur alag data pe dono roop chala ke jaanch.",
+   "topics": [
+    "preagg",
+    "compute_once",
+    "volatile_repeat",
+    "rw_exists",
+    "rw_not_exists",
+    "rw_in",
+    "rw_not_in",
+    "rw_join",
+    "rw_cte",
+    "rw_cte_derived",
+    "rw_union_all",
+    "rw_keyset",
+    "rw_once",
+    "rw_nothing"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/exists-to-in-optimization/",
+    "https://use-the-index-luke.com/no-offset",
+    "https://www.postgresql.org/docs/current/xfunc-volatility.html"
    ],
    "proven": [
     "mariadb",

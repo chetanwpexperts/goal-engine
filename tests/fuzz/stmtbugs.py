@@ -77,7 +77,14 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         # HAVING condition on a GROUP BY column (WHERE: the same rows), a JOIN with no ON (an error on PostgreSQL), and a
         # correct correlated subquery (quiet)
         "st_uncorr", "st_inner", "st_corr_key", "st_repeat", "st_same", "st_union_all", "st_union_dups", "st_having_key",
-        "st_no_on", "st_quiet_corr"]
+        "st_no_on", "st_quiet_corr",
+        # night 14: safe rewrites with proof: several correlated totals pre-aggregated (found), the same expression in SELECT and
+        # WHERE computed once (found), and the forms asked for in words (EXISTS, NOT EXISTS, IN, NOT IN, JOIN, CTE, keyset):
+        # each rewrite must return exactly the rows of the query as written, in the same order, on MariaDB and PostgreSQL. And
+        # the honest refusals: UNION ALL where the parts can share a value, RAND() written twice (computing once changes the
+        # rows), and EXISTS asked for an IN that stands under NOT or in SELECT (no rewrite)
+        "pf_preagg", "pf_preagg_cte", "pf_once", "pf_exists", "pf_not_exists", "pf_in", "pf_not_in", "pf_join", "pf_keyset",
+        "pf_cte", "pf_union_refuse", "pf_volatile", "pf_quiet"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
@@ -126,7 +133,10 @@ TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": 
          "gr_inner_eq_null": "null", "gr_block_key": "join_fanout",
          "st_uncorr": "scalar_uncorr", "st_inner": "corr_inner", "st_corr_key": "corr_key", "st_repeat": "repeat_subquery",
          "st_same": "same_subquery", "st_union_all": "union_all", "st_union_dups": "union_all_dups", "st_having_key": "having_key",
-         "st_no_on": "join", "st_quiet_corr": "corr_key"}
+         "st_no_on": "join", "st_quiet_corr": "corr_key",
+         "pf_preagg": "preagg", "pf_preagg_cte": "rw_cte", "pf_once": "compute_once", "pf_exists": "rw_exists",
+         "pf_not_exists": "rw_not_exists", "pf_in": "rw_in", "pf_not_in": "rw_not_in", "pf_join": "rw_join", "pf_keyset": "rw_keyset",
+         "pf_cte": "rw_cte_derived", "pf_union_refuse": "rw_union_all", "pf_volatile": "volatile_repeat", "pf_quiet": "rw_nothing"}
 # night 12: a correct query: the planted topic must NOT be said, and no error / wrong at all
 QUIET = {"gr_block_key", "st_quiet_corr"}
 # night 11: the class the planted finding must carry (sqlconfidence.classify); and for every statement, every finding has one
@@ -134,6 +144,9 @@ CLASS = {"st_uncorr": "likely_risk", "st_inner": "likely_risk", "st_corr_key": "
          "st_same": "needs_execution", "st_union_all": "needs_schema", "st_union_dups": "likely_risk", "st_having_key": "needs_execution",
          "gr_cte_fanout": "likely_risk", "gr_derived_fanout": "likely_risk", "gr_cte_order": "proven", "gr_cross": "likely_risk",
          "gr_inner_eq_null": "proven",
+         "pf_preagg": "needs_execution", "pf_preagg_cte": "needs_execution", "pf_once": "needs_execution", "pf_exists": "needs_execution",
+         "pf_not_exists": "needs_schema", "pf_in": "needs_execution", "pf_not_in": "needs_schema", "pf_join": "needs_execution",
+         "pf_keyset": "needs_schema", "pf_cte": "needs_execution", "pf_union_refuse": "needs_schema", "pf_volatile": "likely_risk",
          "qo_fanout": "likely_risk", "qo_fanout_left": "likely_risk", "qo_not_in": "needs_schema", "qo_eq_null": "proven",
          "qo_ties": "needs_schema", "qo_unknown_alias": "proven",
          "eq_null_dml": "proven", "agg_in_where": "proven", "between_reversed": "proven", "or_value": "proven", "like_star": "proven",
@@ -482,6 +495,8 @@ def make(seed: int):
         return _grain_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("st_"):
         return _struct_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("pf_"):
+        return _proof_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -1659,6 +1674,8 @@ def check(item, engines: dict) -> list[str]:
         bad.append(f"{tag}: extra findings {extra}\n{item['broken']}")
     if item["stmt"] == "ddl":
         return bad + _check_ddl(item, engines, res, tag)
+    if item["bug"].startswith("pf_"):
+        return bad + _check_proof(item, engines, res, tag)
     sure = any(f["topic"] == want and f["kind"] in ("error", "wrong") for f in res["findings"])
     if item["bug"] in FIX_THE_CHECK:
         sure = True
@@ -2373,6 +2390,183 @@ def _struct_bug(seed, bug, rnd, schema, tables, t):
         truth = f"SELECT k.{x['pk']}, p.{p['pk']}\nFROM {x['name']} k\nJOIN {p['name']} p ON k.{fk['name']} = p.{p['pk']}\nORDER BY k.{x['pk']}"
         return item(broken, truth, x["name"], engine=engine)
     return None
+
+
+ASK = {"exists": ["rewrite this with EXISTS", "use EXISTS instead of IN", "IN ki jagah EXISTS use karo", "exists se likho",
+                  "EXISTS से लिखो", "convert the IN to EXISTS"],
+       "not_exists": ["use NOT EXISTS instead", "NOT IN ki jagah NOT EXISTS likho", "rewrite it with not exists",
+                      "NOT EXISTS से लिखो"],
+       "in": ["rewrite it using IN", "use IN instead of EXISTS", "EXISTS ki jagah IN use karo", "IN से लिखो"],
+       "not_in": ["use NOT IN instead of NOT EXISTS", "NOT IN se likho", "rewrite it with NOT IN"],
+       "join": ["use a JOIN instead of IN", "join se likho", "rewrite it with a join, without the subquery", "JOIN से लिखो"],
+       "cte": ["write it as a CTE", "CTE mein likho", "use a WITH clause instead", "CTE से लिखो"],
+       "keyset": ["use keyset pagination", "offset ke bina page karo, keyset se", "rewrite it without OFFSET"],
+       "union_all": ["can i use UNION ALL here", "union ki jagah union all use karo", "make it UNION ALL"]}
+
+
+def _proof_bug(seed, bug, rnd, schema, tables, t):
+    """Night 14: queries whose rewrite (found, or asked for in words) must return exactly their own rows, in the same order."""
+    engine = rnd.choice(["mariadb", "postgresql", None])
+    pairs = [(schema["tables"][c["ref"]], x, c) for x in tables for c in x["cols"] if c["kind"] == "fk" and c.get("ref") != x["name"]]
+    pairs = [(p, x, c) for p, x, c in pairs if _cols(x, "int", "money")]
+
+    def item(broken, table, **kw):
+        out = {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": table, "broken": broken, "truth": broken.split(";")[0],
+               "engine": engine}
+        out.update(kw)
+        return out
+
+    def asked(key, q):
+        return f"{q};\n\n{rnd.choice(ASK[key])}"
+
+    def thr(x, m):
+        v = _pick_value(x, next(c for c in x["cols"] if c["name"] == m), rnd)
+        return v if v is not None else 0
+
+    if bug in ("pf_preagg", "pf_preagg_cte"):
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        m = rnd.choice(_cols(x, "int", "money"))["name"]
+        pool = ["COUNT(*)", f"COUNT(k.{m})", f"MAX(k.{m})", f"MIN(k.{m})", f"COUNT(DISTINCT k.{m})"]
+        aggs = rnd.sample(pool, rnd.choice([2, 2, 3]) if bug == "pf_preagg" else rnd.choice([1, 2]))
+        common = rnd.random() < 0.3
+        one = rnd.randrange(len(aggs)) if rnd.random() < 0.5 else -1
+        v = thr(x, m)
+        subs = []
+        for i, a in enumerate(aggs):
+            conds = [f"k.{fk['name']} = p.{p['pk']}"] + ([f"k.{m} IS NOT NULL"] if common else []) + ([f"k.{m} > {v}"] if i == one else [])
+            rnd.shuffle(conds)
+            subs.append(f"(SELECT {a} FROM {x['name']} k WHERE {' AND '.join(conds)}) AS v{i + 1}")
+        where = f"\nWHERE p.{p['pk']} <= {rnd.randint(5, 40)}" if rnd.random() < 0.4 else ""
+        q = f"SELECT p.{p['pk']}, {', '.join(subs)}\nFROM {p['name']} p{where}\nORDER BY p.{p['pk']}"
+        return item(asked("cte", q) if bug == "pf_preagg_cte" else q, p["name"], ordered=True)
+    if bug == "pf_once":
+        nums = _cols(t, "int", "money")
+        if not nums:
+            return None
+        a, b = rnd.choice(nums)["name"], rnd.choice(nums)["name"]
+        expr = rnd.choice([f"{a} + COALESCE({b}, 0)", f"{a} * 2 - {b}", f"ABS({a} - {b})", f"COALESCE({a}, 0) * 3"])
+        v = thr(t, a)
+        other = rnd.choice(["", f" AND {t['pk']} > {rnd.randint(1, 9)}", f" AND {b} IS NOT NULL"])
+        order = rnd.choice([f"{expr} DESC, {t['pk']}", t["pk"], f"calc, {t['pk']}"])
+        q = f"SELECT {t['pk']}, {expr} AS calc\nFROM {t['name']}\nWHERE {expr} > {v}{other}\nORDER BY {order}"
+        return item(q, t["name"], ordered=True)
+    if bug in ("pf_exists", "pf_not_exists", "pf_join", "pf_quiet"):
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        m = rnd.choice(_cols(x, "int", "money"))["name"]
+        inner_f = rnd.choice(["", f" WHERE k.{m} > {thr(x, m)}"])
+        neg = "NOT " if bug == "pf_not_exists" else ""
+        if bug == "pf_not_exists" and rnd.random() < 0.5:     # the outer value may be NULL: a child's link not in some parents
+            q = (f"SELECT k2.{x['pk']}\nFROM {x['name']} k2\nWHERE k2.{fk['name']} NOT IN (SELECT p.{p['pk']} FROM {p['name']} p "
+                 f"WHERE p.{p['pk']} > {rnd.randint(1, 6)})\nORDER BY k2.{x['pk']}")
+            return item(asked("not_exists", q), x["name"], ordered=True)
+        if rnd.random() < 0.4 and bug != "pf_quiet":           # no aliases: the outer value is qualified with its table
+            q = (f"SELECT {p['pk']}\nFROM {p['name']}\nWHERE {p['pk']} {neg}IN (SELECT {fk['name']} FROM {x['name']}"
+                 f"{inner_f.replace('k.', '')})\nORDER BY {p['pk']}")
+        elif bug == "pf_quiet":
+            q = rnd.choice([f"SELECT p.{p['pk']}\nFROM {p['name']} p\nWHERE NOT (p.{p['pk']} IN (SELECT k.{fk['name']} FROM {x['name']} k"
+                            f"{inner_f}))\nORDER BY p.{p['pk']}",
+                            f"SELECT p.{p['pk']}, p.{p['pk']} IN (SELECT k.{fk['name']} FROM {x['name']} k{inner_f}) AS has\n"
+                            f"FROM {p['name']} p\nORDER BY p.{p['pk']}"])
+            return item(asked("exists", q), p["name"])
+        else:
+            extra = rnd.choice(["", f" AND p.{p['pk']} > {rnd.randint(1, 5)}"])
+            q = (f"SELECT p.{p['pk']}\nFROM {p['name']} p\nWHERE p.{p['pk']} {neg}IN (SELECT k.{fk['name']} FROM {x['name']} k"
+                 f"{inner_f}){extra}\nORDER BY p.{p['pk']}")
+        return item(asked({"pf_exists": "exists", "pf_not_exists": "not_exists", "pf_join": "join"}[bug], q), p["name"], ordered=True)
+    if bug in ("pf_in", "pf_not_in"):
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        m = rnd.choice(_cols(x, "int", "money"))["name"]
+        neg = "NOT " if bug == "pf_not_in" else ""
+        link = rnd.choice([f"k.{fk['name']} = p.{p['pk']}", f"p.{p['pk']} = k.{fk['name']}"])
+        more = rnd.choice(["", f" AND k.{m} > {thr(x, m)}"])
+        if bug == "pf_not_in" and rnd.random() < 0.5:          # the outer value may be NULL
+            q = (f"SELECT k.{x['pk']}\nFROM {x['name']} k\nWHERE NOT EXISTS (SELECT 1 FROM {p['name']} p WHERE p.{p['pk']} = k.{fk['name']}"
+                 f" AND p.{p['pk']} > {rnd.randint(1, 6)})\nORDER BY k.{x['pk']}")
+            return item(asked("not_in", q), x["name"], ordered=True)
+        q = (f"SELECT p.{p['pk']}\nFROM {p['name']} p\nWHERE {neg}EXISTS (SELECT 1 FROM {x['name']} k WHERE {link}{more})\n"
+             f"ORDER BY p.{p['pk']}")
+        return item(asked("not_in" if neg else "in", q), p["name"], ordered=True)
+    if bug == "pf_keyset":
+        nums = _cols(t, "int", "money")
+        if not nums or len(t["rows"]) < 30:
+            return None
+        c = rnd.choice(nums)["name"]
+        d1, d2 = rnd.choice(["ASC", "DESC", ""]), rnd.choice(["ASC", "DESC", ""])
+        n, off = rnd.randint(3, 8), rnd.randint(5, 15)
+        q = (f"SELECT {t['pk']}, {c}\nFROM {t['name']}\nWHERE {c} IS NOT NULL\nORDER BY {c} {d1}, {t['pk']} {d2}".replace(" ,", ",")
+             .rstrip() + f"\nLIMIT {n} OFFSET {off}")
+        q = re.sub(r" +\n", "\n", q)
+        return item(asked("keyset", q), t["name"], keyset={"by": [c, t["pk"]], "off": off, "n": n})
+    if bug == "pf_cte":
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        q = (f"SELECT d.k, d.n\nFROM (SELECT {fk['name']} AS k, COUNT(*) AS n FROM {x['name']} GROUP BY {fk['name']}) d\n"
+             f"WHERE d.n > {rnd.randint(0, 2)}\nORDER BY d.k")
+        return item(asked("cte", q), x["name"])
+    if bug == "pf_union_refuse":
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        q = f"SELECT {fk['name']} AS v FROM {x['name']}\nUNION\nSELECT {p['pk']} FROM {p['name']}"
+        return item(asked("union_all", q), x["name"])
+    if bug == "pf_volatile":
+        engine = rnd.choice(["mariadb", "postgresql"])
+        r = "RAND()" if engine == "mariadb" else "random()"
+        q = f"SELECT {t['pk']}, FLOOR({r} * 10) AS r\nFROM {t['name']}\nWHERE FLOOR({r} * 10) > {rnd.randint(2, 7)}"
+        return item(q, t["name"], engine=engine)
+    return None
+
+
+def _check_proof(item, engines, res, tag) -> list[str]:
+    """Night 14: the rewrite returns exactly the rows of the query as written (in the same order when it has a unique ORDER BY),
+    on every running database; the refusals offer no swap."""
+    from app.agents import sqlproof
+
+    bug, want = item["bug"], TOPIC[item["bug"]]
+    bad = []
+    if want not in ("rw_nothing", "volatile_repeat") and not sqlproof.family_of(want):
+        bad.append(f"{tag}: {want} has no contract in rewrites.json")
+    fixed = res.get("corrected")
+    if bug == "pf_union_refuse":
+        return bad + ([f"{tag}: UNION swapped for UNION ALL\n{fixed}"] if fixed and re.search(r"union\s+all", fixed, re.I) else [])
+    if bug == "pf_quiet":
+        said = [f["topic"] for f in res["findings"] if f["topic"] in ("rw_exists", "rw_not_exists")]
+        return bad + ([f"{tag}: rewrote an IN that stands under NOT / in SELECT: {said}\n{item['broken']}"] if said else [])
+    if bug == "pf_volatile":
+        return bad + ([f"{tag}: called a volatile rewrite the same rows"] if any(f["topic"] in sqlproof.SAME for f in res["findings"])
+                      else [])
+    if not fixed:
+        return bad + [f"{tag}: no rewrite\n{item['broken']}"]
+    for name, eng in engines.items():                 # the rewrite is plain SQL: it must hold on both databases
+        sql = fixed
+        try:
+            if bug == "pf_keyset":
+                ks = item["keyset"]
+                last = eng.run(re.sub(r"LIMIT \d+ OFFSET \d+$", f"LIMIT 1 OFFSET {ks['off'] - 1}", item["truth"].rstrip()))
+                cols = [c for c in ks["by"]]
+                vals = dict(zip([item["schema"]["tables"][item["table"]]["pk"], cols[0]], last[0])) if last else {}
+                for c, v in sorted(vals.items(), key=lambda kv: -len(kv[0])):
+                    sql = sql.replace(f":last_{c.lower()}", str(v) if not isinstance(v, str) else f"'{v}'")
+                got = [tuple(map(str, r)) for r in eng.run(sql)]
+                exp = [tuple(map(str, r)) for r in eng.run(item["truth"])]
+            else:
+                got = [tuple(map(str, r)) for r in eng.run(sql)]
+                exp = [tuple(map(str, r)) for r in eng.run(item["truth"])]
+            if not item.get("ordered") and bug != "pf_keyset":
+                got, exp = sorted(got), sorted(exp)
+            if got != exp:
+                bad.append(f"{tag}: on {name} the rewrite returns other rows ({len(got)} vs {len(exp)})\n{item['broken']}\n--\n{sql}")
+        except Exception as exc:  # noqa: BLE001
+            eng.rollback()
+            bad.append(f"{tag}: on {name} the rewrite fails: {exc}\n{sql}")
+    return bad
 
 
 def _bind(sql: str, values: list) -> str:

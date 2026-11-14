@@ -600,6 +600,22 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
         if tedits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in tedits for a, b, _n in edits):
             edits += tedits
 
+    # safe rewrites with proof (app/agents/sqlproof.py, night 14): several correlated totals over one child table worked out
+    # in one grouped pass, an expression repeated in SELECT and WHERE named once, and the form the person asked for (EXISTS,
+    # IN, JOIN, CTE, keyset, UNION ALL) -- each one only when it returns the same rows, with what it keeps said
+    from app.agents import sqlproof
+
+    for fnd, redits in sqlproof.rewrites(sql, s, intent, Finding, is_select, {f.topic for f in F}):
+        if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
+            continue
+        F.append(fnd)
+        if fnd.kind == "check" and _SURE_ONLY.get():
+            continue
+        if redits and fnd.topic.startswith("rw_") and not any(f.kind in ("error", "wrong") for f in F):
+            edits[:] = redits                              # the form the person asked for wins over an 'if you meant' offer
+        elif redits and not any(a < e[1] and e[0] < b or (a == b == e[0]) for e in redits for a, b, _n in edits):
+            edits += redits
+
     # locks and big data (app/agents/sqllock.py): a huge change in batches, queue workers with SKIP LOCKED (offered, same rows)
     from app.agents import sqllock
 

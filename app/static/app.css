@@ -841,3 +841,9 @@ body[data-state="active"] .options { padding: 8px 10px; border-radius: 18px; bac
 @media (min-width: 900px) {
   .machine { max-height: calc(100dvh - 76px - 160px - var(--opts, 0px)); }
 }
+/* the concept answer whose examples are on the panel */
+.concept-show { margin-top: 10px; font-size: 14px; font-weight: 600; color: #4D5BE6; background: none; border: 0; padding: 0; cursor: pointer; }
+.concept-show:hover { text-decoration: underline; }
+.concept-answer.showing .concept-show { color: #7B4FE0; }
+.concept-answer.showing { border-left-color: #7B4FE0; box-shadow: 0 0 0 2px rgba(123, 79, 224, .14); }
+.turn-machine .concept-show { display: block; margin: 12px 0 0; padding: 0; text-decoration: none; }

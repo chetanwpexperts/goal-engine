@@ -345,3 +345,34 @@ def answer(m: dict, text: str) -> tuple[str, list[str]]:
     rel = [by_id(r) for r in c.get("related", [])]
     taps = [r["phrasings"][lang][0] for r in rel if r][:3]
     return "\n".join(out).strip(), taps
+
+
+def card(m: dict, text: str) -> dict | None:
+    """The same answer as answer(), in parts for the page: the explanation goes in the chat, the worked examples (each query
+    with the rows it returned on MariaDB and PostgreSQL) and the database differences go in the side panel."""
+    c = m.get("concept")
+    if c is None:
+        return None
+    lang = _lang(text)
+    L = LABELS[lang]
+    eng = m.get("engine")
+    exs = []
+    for ex in c.get("examples", []):
+        item = {"label": ex.get("label", {}).get(lang) or ex.get("label", {}).get("en") or "",
+                "sql": [{"label": lab, "query": q} for lab, q in _sql_for(ex, eng)]}
+        if ex.get("preview"):
+            item["preview"] = {"sql": [{"label": lab, "query": q} for lab, q in _sql_for({"sql": ex["preview"]}, eng)],
+                               "columns": ex.get("preview_columns") or [], "rows": ex.get("preview_result") or []}
+        if ex.get("result") is not None:
+            item["columns"], item["rows"] = ex.get("columns") or [], ex["result"]
+        elif isinstance(ex.get("changed"), int):
+            item["changed"] = ex["changed"]
+        exs.append(item)
+    notes = c.get("engines") or {}
+    keys = [k for k in ("mysql", "mariadb", "postgresql") if k in notes]
+    if eng and eng in notes:
+        keys = [eng]
+    diffs = [{"engine": ENGINES[k][1], "note": notes[k]} for k in keys]
+    return {"id": c["id"], "lang": lang, "title": c["title"].get(lang) or c["title"]["en"], "answer": c["answer"][lang],
+            "mistake": c["mistake"][lang], "examples": exs, "engines": diffs,
+            "labels": {k: L[k] for k in ("example", "result", "mistake", "engines", "preview", "change", "lab")}}

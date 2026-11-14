@@ -254,7 +254,12 @@
     };
     for (const b of blocks) {
       const lines = b.split("\n");
-      if (CODE_START.test(lines[0]) && (lines.length > 1 || /[;()=]/.test(b))) { code.push(b.replace(/\s+$/, "")); continue; }
+      // a query, not a sentence that happens to start with 'Delete' / 'Show' (a title such as 'Delete duplicate rows (keep one)')
+      const rest = b.replace(/^\s*\S+/, "");
+      if (CODE_START.test(lines[0]) && (lines.length > 1 || /[;()=]/.test(b)) &&
+          (/[;=*]|\b(from|set|where|into|table|values|join|select|by|on|index|database|begin|commit)\b/i.test(rest) || /^\s*(--|=|\$|<\?php)/.test(b))) {
+        code.push(b.replace(/\s+$/, "")); continue;
+      }
       flush();
       if (lines.every((l) => /^\s*[-•]\s+/.test(l) || !l.trim())) {
         const ul = el("ul", "say-list");
@@ -1884,6 +1889,57 @@
     if (agents && agents[0]) lastLang = agents[0].lang;
   }
 
+  // ---------------------------------------------------------------- a concept answer: the explanation in the chat, the worked
+  // examples (each query with the rows it returned) and the database differences beside it
+  function conceptTheory(c) {
+    // '(1) INNER JOIN ... (2) LEFT JOIN ...': a list reads better than one long paragraph
+    const answer = /\(1\)[\s\S]*\(2\)/.test(c.answer) ? c.answer.replace(/\s*\((\d{1,2})\)\s+/g, "\n- ") : c.answer;
+    return [c.title, answer, `${c.labels.mistake}: ${c.mistake}`].join("\n\n");
+  }
+  // side by side only where there is room for two columns; on a phone the whole answer stays in the chat
+  const sideBySide = () => window.matchMedia("(min-width: 900px)").matches;
+
+  function renderConcept(c) {
+    const box = $("#agents");
+    if (!c || !c.examples) return;
+    const hi = c.lang !== "en";
+    const w = W(hi ? "hi" : "en");
+    const card = el("div", "agent concept-card");
+    card.append(el("p", "concept-kicker", `${c.labels.example} · ${c.labels.lab}`), el("h3", "concept-title", c.title));
+    for (const ex of c.examples) {
+      if (ex.label) card.append(el("p", "concept-label", ex.label));
+      if (ex.preview) {
+        card.append(el("p", "concept-step", c.labels.preview));
+        for (const q of ex.preview.sql) card.append(codeBox(q.label, q.query, w));
+        if (ex.preview.columns && ex.preview.columns.length) card.append(grid({ columns: ex.preview.columns, rows: ex.preview.rows }));
+        card.append(el("p", "concept-step", c.labels.change));
+      }
+      for (const q of ex.sql) card.append(codeBox(q.label, q.query, w));
+      if (ex.columns && ex.columns.length) {
+        card.append(el("p", "concept-step", `${c.labels.result} (${ex.rows.length} ${ex.rows.length === 1 ? "row" : "rows"})`));
+        card.append(grid({ columns: ex.columns, rows: ex.rows.slice(0, 20) }));
+      } else if (typeof ex.changed === "number") {
+        card.append(el("p", "concept-step", `${c.labels.result}: ${ex.changed}`));
+      }
+    }
+    if (c.engines && c.engines.length) {
+      const d = el("div", "concept-diffs");
+      d.append(el("p", "concept-step", c.labels.engines));
+      const ul = el("ul", "say-list");
+      for (const x of c.engines) { const li = el("li"); li.append(el("b", null, `${x.engine}: `), document.createTextNode(x.note)); ul.append(li); }
+      d.append(ul);
+      card.append(d);
+    }
+    box.prepend(card);
+    const side = $("#machine");
+    if (side) side.scrollTop = 0;                   // a new answer's examples start at their top
+  }
+
+  // a stored concept answer: show the explanation only when its examples are on the panel beside it
+  function machineText(text, card) {
+    return card && card.title && String(text || "").startsWith(card.title + "\n") ? conceptTheory(card) : text;
+  }
+
   async function refreshGoal() {
     if (!currentGoalId) return;
     const data = await api(`/api/goals/${currentGoalId}`);
@@ -1977,13 +2033,16 @@
     try {
       const data = await api("/api/message", { method: "POST", body: JSON.stringify({ text, goal_id: currentGoalId }) });
       wait.remove();
+      const card = data.relation === "concept" && data.goal && sideBySide() ? data.goal.card : null;
       if (data.goal) {
         currentGoalId = data.goal.id;
         lastLang = data.goal.detected_language === "English" ? "en" : "hi";
         renderUnderstood(data.goal);
         renderAgents(data.agents || []);
+        if (card && !(data.agents || []).length) renderConcept(card);
       }
-      const box = addMachine(data.reply, traceFor(data));
+      const box = addMachine(card && !(data.agents || []).length ? machineText(data.reply, card) : data.reply, traceFor(data));
+      if (card) requestAnimationFrame(() => { const side = $("#machine"); if (side) side.scrollTop = 0; });
       if (data.offer_expert && data.goal) box.append(expertOffer(data.goal, text, data.goal.detected_language !== "English"));
       if (data.next && data.next.length) box.append(nextChips(data.next, lastLang !== "en"));
       showOptions(data.options || []);
@@ -2612,12 +2671,14 @@
     currentGoalId = id;
     setActive();
     thread.replaceChildren();
+    const card = !(data.agents || []).length && sideBySide() ? data.goal.card : null;
     for (const m of data.messages) {
       if (m.role === "user") thread.append(el("p", "turn-user", m.text));
-      else addMachine(m.text);
+      else addMachine(machineText(m.text, card));
     }
     renderUnderstood(data.goal);
     renderAgents(data.agents || []);
+    if (card) renderConcept(card);
   }
 
   $("#open-goals").addEventListener("click", async () => {
@@ -2666,9 +2727,10 @@
       if (!state.messages.length) setIdle();          // remembered a chat that isn't there any more (new chat, logout, deleted)
       if (state.messages.length) {
         setActive();
+        const card = state.current && !(state.agents || []).length && sideBySide() ? state.current.card : null;
         for (const m of state.messages) {
           if (m.role === "user") thread.append(el("p", "turn-user", m.text));
-          else addMachine(m.text);
+          else addMachine(machineText(m.text, card));
         }
         if (state.current) {
           currentGoalId = state.current.id;
@@ -2676,6 +2738,7 @@
           renderUnderstood(state.current);
         }
         renderAgents(state.agents || []);
+        if (card) renderConcept(card);
         typeExamples();
       }
     } catch (_) { /* offline first load: the page still works */ }

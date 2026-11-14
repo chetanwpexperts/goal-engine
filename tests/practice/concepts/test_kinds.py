@@ -44,3 +44,19 @@ def test_kinds_questions_list_the_kinds(client, ml_mode, text, cid, must):
     r = say(client, text)
     assert r["relation"] == "concept" and r["reply"].split("\n", 1)[0] in set(K.by_id(cid)["title"].values()), (text, r["reply"][:200])
     assert all(m in r["reply"] for m in must), (text, r["reply"][:600])
+
+
+def test_a_concept_answer_carries_its_examples_for_the_side_panel(client, ml_mode):
+    """The page shows the explanation in the chat and the worked examples beside it (wide screens): the goal carries them."""
+    fresh(client)
+    r = say(client, "what is a left join")
+    card = r["goal"]["card"]
+    assert card["id"] == "left_join" and card["title"] == r["reply"].split("\n", 1)[0] and card["answer"] in r["reply"]
+    ex = card["examples"][0]
+    assert ex["sql"][0]["query"] in r["reply"] and ex["columns"] and ex["rows"]
+    assert {d["engine"] for d in card["engines"]} == {"MySQL", "MariaDB", "PostgreSQL"}
+    r = say(client, "how to delete duplicate rows in mysql")
+    card = r["goal"]["card"]
+    assert card["examples"][0]["preview"]["sql"] and [d["engine"] for d in card["engines"]] == ["MySQL"]   # the named database only
+    r = say(client, "kaun kaun se window functions hote hain")
+    assert r["goal"]["card"]["lang"] == "hinglish" and r["goal"]["card"]["id"] == "window_function_types"

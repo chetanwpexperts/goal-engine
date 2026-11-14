@@ -72,3 +72,29 @@ def test_earlier_answers_keep_their_examples(client, ml_mode):
     assert titles == ["The types of JOIN", "LEFT JOIN"] and r["goal"]["card"]["title"] == "LEFT JOIN"
     r = say(client, "how many types of join in mysql?")
     assert [c["title"] for c in r["goal"]["cards"]] == ["LEFT JOIN", "The types of JOIN"]     # asked again: once, as the latest
+
+
+@pytest.mark.parametrize("text,eid", [
+    ("how many types of joins in postgrasql?", "postgresql"),     # asked on the live site: answered for every database
+    ("postgress me left join kya hai", "postgresql"), ("posgres error", "postgresql"), ("mysq query", "mysql"),
+    ("myslq", "mysql"), ("maridb", "mariadb"), ("sqllite", "sqlite"), ("orcale", "oracle"),
+])
+def test_a_database_name_typed_with_a_slip_is_still_that_database(client, ml_mode, text, eid):
+    from app.dbknow import engines as E
+
+    assert E.named(text) == eid and K.engine_named(text) == eid, text
+
+
+@pytest.mark.parametrize("text", ["what is a poster", "i did it myself", "join posts and users", "mysterious error", "the server is down",
+                                  "postal code column", "posted date", "marie and maria", "mistake in my query"])
+def test_ordinary_words_are_not_database_names(text):
+    from app.dbknow import engines as E
+
+    assert E.named(text) is None and K.engine_named(text) is None, text
+
+
+def test_a_slipped_name_gets_only_that_databases_answer(client, ml_mode):
+    fresh(client)
+    r = say(client, "how many types of joins in postgrasql?")
+    assert [d["engine"] for d in r["goal"]["card"]["engines"]] == ["PostgreSQL"], r["goal"]["card"]["engines"]
+    assert "Database differences — PostgreSQL" in r["reply"] and "MySQL:" not in r["reply"].split("Database differences")[1], r["reply"]

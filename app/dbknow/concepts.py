@@ -160,7 +160,9 @@ def engine_named(text: str) -> str | None:
     for eid, (rx, _label) in ENGINES.items():
         if re.search(rx, text or "", re.I):
             return eid
-    return None
+    from app.dbknow import engines as E
+
+    return E._misspelt(text or "")                    # 'postgrasql', 'mysq': the name typed with a slip
 
 
 def _score(c: dict, t: str) -> int:

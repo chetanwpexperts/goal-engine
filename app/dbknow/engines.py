@@ -75,12 +75,46 @@ def named(text: str) -> str | None:
                     continue                              # 'not mysql', 'mysql nahi'
                 hits.append((m.start(), eid))
     if not hits:
-        return None
+        return _misspelt(t)
     hits.sort()
     first = hits[0][1]
     if first == "mysql" and any(e == "mariadb" for _p, e in hits):
         return "mariadb"                                  # 'MariaDB (a MySQL fork)': the more specific name
     return first
+
+
+# a database name typed with a slip ('postgrasql', 'postgress', 'mysq', 'myslq', 'mariadab', 'sqllite'): the closest name, when
+# the word is long enough and close enough that no ordinary word gets there (tests/test_dbknow.py keeps a list of near words)
+SPELLED = {"mysql": ["mysql"], "mariadb": ["mariadb"], "postgresql": ["postgresql", "postgres"], "sqlserver": ["sqlserver", "mssql"],
+           "oracle": ["oracle"], "sqlite": ["sqlite", "sqlite3"]}
+
+
+def _misspelt(text: str) -> str | None:
+    import difflib
+
+    for m in re.finditer(r"[A-Za-z][A-Za-z0-9]{3,}", text or ""):
+        w = m.group(0).lower()
+        if len(w) < 4 or w in NOT_NAMES:
+            continue
+        best, score = None, 0.0
+        for eid, names in SPELLED.items():
+            for n in names:
+                if abs(len(w) - len(n)) > 2:
+                    continue                              # 'server' is not 'sqlserver'
+                r = 1.0 if sorted(w) == sorted(n) else difflib.SequenceMatcher(None, w, n).ratio()   # 'myslq': letters swapped
+                if r > score:
+                    best, score = eid, r
+        need = 0.85 if len(w) <= 5 else 0.8
+        if best and score >= need and w[0] == SPELLED[best][0][0]:
+            before = text[max(0, m.start() - 12):m.start()]
+            if re.search(rf"\b{NEGATED}\s*$", before, re.I):
+                continue
+            return best
+    return None
+
+
+NOT_NAMES = set("""posters postage postal poster posted postgame myself mystery mysterious mistake mister mariage marriage
+marine maria marie oracles orange orally sqlite3 sqlserver""".split()) - {"sqlite3", "sqlserver"}
 
 
 # ------------------------------------------------------------------ 2. shown

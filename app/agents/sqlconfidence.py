@@ -664,6 +664,8 @@ def annotate(sql: str, res: dict, sch: dict | None = None) -> dict:
         if isinstance(f, dict) and "confidence" not in f and by_title.get(f.get("title_en")):
             f["confidence"] = by_title[f["title_en"]]
     annotate_findings(shown, sql, amap)
+    if (res.get("plan") or {}).get("steps"):
+        with_plan(sql, res, amap)                     # night 15: the pasted EXPLAIN confirms or drops the speed risks
     if sqlschema.is_schema(sql) or re.match(r"\s*(create|delimiter|do)\b", C._mask(sql), re.I):
         return res
     try:
@@ -689,3 +691,93 @@ def counts_line(res: dict, hi: bool) -> str:
              ("needs_schema", "table structure pe tiki", "need your table structure"), ("needs_execution", "EXPLAIN pe tiki", "need EXPLAIN")]
     bits = [f"{c[k]} {h if hi else e}" for k, h, e in names if c.get(k)]
     return ("Kitna pakka: " if hi else "How sure: ") + ", ".join(bits) + "."
+
+
+# ------------------------------------------------------------------------------------------------ night 15: the plan decides
+FULL = re.compile(r"^(all|seq scan|parallel seq scan|index|full scan|table scan)$", re.I)   # every row read (MariaDB 'index' = whole index)
+
+
+def _finding_tables(f: dict, sql: str, amap: dict) -> set:
+    """The tables a speed finding is about: the aliases its evidence and title name (resolved to tables), else the tables
+    the title names; empty when it can't be told."""
+    text = " ".join(str(f.get(k) or "") for k in ("evidence", "title_en"))
+    out = set()
+    for m in re.finditer(rf"({NAME})\.{NAME}", text):
+        a = _uq(m.group(1))
+        if a in amap and amap[a]:
+            out.add(amap[a])
+    if not out:
+        for t in {v for v in amap.values() if v}:
+            if re.search(rf"\b{re.escape(t)}\b", text, re.I):
+                out.add(t)
+    if not out and f.get("topic") == "leading_wildcard":           # LIKE '%...': the table of the column the LIKE tests
+        for m in re.finditer(rf"({NAME})\.{NAME}\s+like\s+'%", sql, re.I):
+            a = _uq(m.group(1))
+            if amap.get(a):
+                out.add(amap[a])
+    return out
+
+
+def with_plan(sql: str, res: dict, amap: dict | None = None) -> None:
+    """A speed risk (NEEDS EXECUTION) is only a risk until the plan is seen. With the EXPLAIN pasted: a table the plan reads
+    in full (ALL / Seq Scan / a whole-index scan) turns the risk on it into a verified finding ('the plan shows it'); a table
+    the plan reaches through an index drops the risk (moved to res['ruled_out'] with the reason). A finding whose tables the
+    plan doesn't show stays a risk. Both engines' plan words: the access names come from sqlexplain (lab, night 8)."""
+    amap = amap if amap is not None else _amap(sql)
+    steps = res["plan"]["steps"]
+    by = {}
+    for st in steps:
+        for k in (st.get("table"), st.get("alias")):
+            if k:
+                by.setdefault(_uq(k).lower(), []).append(st)
+    inv = {}
+    for a, tname in amap.items():
+        if tname:
+            inv.setdefault(tname.lower(), set()).add(a.lower())
+    dropped = []
+
+    def judge(f):
+        conf = f.get("confidence") or {}
+        if conf.get("class") != "needs_execution":
+            return None
+        tabs = _finding_tables(f, sql, amap)
+        seen = []
+        for tname in tabs:
+            sts = [st for k in {tname.lower()} | inv.get(tname.lower(), set()) for st in by.get(k, [])]
+            if sts:
+                seen.append((tname, sts))
+        if not seen or len(seen) < len(tabs):
+            return None
+        full = [(tn, st) for tn, sts in seen for st in sts if FULL.match((st.get("access") or "").strip())]
+        if full:
+            tn, st = full[0]
+            conf.update({"class": "proven", "label_en": rules()["classes"]["proven"]["en"], "label_hi": rules()["classes"]["proven"]["hi"],
+                         "verified": True, "plan": "confirmed",
+                         "why_en": f"The pasted EXPLAIN shows it: {tn} is read in full ({st.get('access')}, about {st.get('rows') or '?'} "
+                                   f"rows). With few rows that is cheap; it grows with the table.",
+                         "why_hi": f"Paste kiya EXPLAIN dikhata hai: {tn} poori padhi jaati hai ({st.get('access')}, lagbhag "
+                                   f"{st.get('rows') or '?'} rows). Kam rows pe sasta hai; table badhne pe badhta hai."})
+            return "confirmed"
+        keys = ", ".join(sorted({str(st.get("key")) for _tn, sts in seen for st in sts
+                                 if st.get("key") and str(st.get("key")).upper() not in ("NONE", "NULL")}))
+        return ("dropped", ", ".join(tn for tn, _s in seen), keys)
+
+    for lst in (res.get("findings"), (res.get("correct") or {}).get("findings"), (res.get("speed_later") or {}).get("findings")):
+        if not lst:
+            continue
+        keep = []
+        for f in lst:
+            v = judge(f) if isinstance(f, dict) else None
+            if isinstance(v, tuple):
+                dropped.append({"topic": f.get("topic") or "index", "title_en": f.get("title_en"), "by": "plan",
+                                "title_hi": f.get("title_hi") or f.get("title_en"),
+                                "why_en": f"The pasted EXPLAIN reads {v[1]} through an index" + (f" ({v[2]})" if v[2] else "")
+                                          + ": the speed risk doesn't show in this plan.",
+                                "why_hi": f"Paste kiye EXPLAIN mein {v[1]} index se padhi jaati hai" + (f" ({v[2]})" if v[2] else "")
+                                          + ": is plan mein speed ka risk nahi dikhta."})
+                continue
+            keep.append(f)
+        lst[:] = keep
+    if dropped:
+        seen = {d.get("title_en") for d in res.get("ruled_out") or []}
+        res["ruled_out"] = list(res.get("ruled_out") or []) + [d for d in dropped if d["title_en"] not in seen and not seen.add(d["title_en"])]

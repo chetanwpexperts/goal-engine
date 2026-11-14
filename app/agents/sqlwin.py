@@ -335,6 +335,24 @@ def _key_of(s: str, level) -> str | None:
     return None
 
 
+def _block_unique(x: dict, order_keys: list, sql: str, s: str, level) -> bool:
+    """Night 15: PARTITION BY + ORDER BY columns that cover a key the query's own block proves (a CTE grouped by customer_id,
+    category_id, windowed PARTITION BY customer_id ORDER BY units DESC, category_id): no two rows tie, the order is total."""
+    C = _C()
+    bk = C.BLOCK_KEYS.get() or {}
+    srcs = _sources_of(C._no_subqueries(s[level[0]:level[1]]))
+    if not bk or len(srcs) != 1 or srcs[0][0] not in bk:
+        return False
+    parts = [k for _o, k in C._split_top(sql[x["partition"][0]:x["partition"][1]])] if x.get("partition") else []
+    cols = set()
+    for e in parts + order_keys:
+        e = re.sub(r"(?i)\s+(asc|desc)\b.*$|\s+nulls\s+(first|last)\b.*$", "", e.strip())
+        m = re.fullmatch(r"(?:[`\"]?\w+[`\"]?\.)?[`\"]?(\w+)[`\"]?", e)
+        if m:
+            cols.add(m.group(1).lower())
+    return any(k and k <= cols for k in bk[srcs[0][0]])
+
+
 def _is_key(expr: str, s: str, level) -> bool:
     """Does an ORDER BY key name one row (id / order_id of orders)?"""
     C = _C()
@@ -895,7 +913,7 @@ def _window_rules(sql: str, s: str, intent: str, F, eng, levels) -> list:
             continue
         order_keys = [k.strip() for _o, k in C._split_top(sql[x["order"][0]:x["order"][1]])] if has_order else []
         last_key = order_keys[-1] if order_keys else ""
-        unique = bool(last_key) and _is_key(re.sub(r"[`\"]", "", last_key), s, lv)
+        unique = bool(last_key) and _is_key(re.sub(r"[`\"]", "", last_key), s, lv) or _block_unique(x, order_keys, sql, s, lv)
         key = _key_of(s, lv)
         # ---- said 'per X' with no PARTITION BY
         if not x["partition"] and not x["named"]:

@@ -281,6 +281,11 @@ def subqueries(sql: str, s: str, intent: str, F) -> list:
             if im and lm and _uq(im.group(2)) == "id" and _uq(lm.group(2)) == "id" and inner.name:
                 lq = _uq(lm.group(1)) if lm.group(1) else ""
                 outer = next((x for x in blk["psrcs"] if not lq or lq in (_uq(x.alias), _uq(x.name))), None)
+                from app.agents import sqlcorrect as _SC
+
+                made = set(_SC.BLOCK_COLS.get() or {}) | set(_SC.BLOCK_KEYS.get() or {})
+                if _uq(inner.name).lower() in made:
+                    continue                                 # night 15: a CTE of this query: its id is whatever it chose to pass on
                 if outer is not None and outer.name and _uq(outer.name) != _uq(inner.name):
                     fk = _fk(outer.name)
                     p = items[0][0]

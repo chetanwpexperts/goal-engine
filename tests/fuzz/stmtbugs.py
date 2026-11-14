@@ -84,7 +84,14 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         # the honest refusals: UNION ALL where the parts can share a value, RAND() written twice (computing once changes the
         # rows), and EXISTS asked for an IN that stands under NOT or in SELECT (no rewrite)
         "pf_preagg", "pf_preagg_cte", "pf_once", "pf_exists", "pf_not_exists", "pf_in", "pf_not_in", "pf_join", "pf_keyset",
-        "pf_cte", "pf_union_refuse", "pf_volatile", "pf_quiet"]
+        "pf_cte", "pf_union_refuse", "pf_volatile", "pf_quiet",
+        # night 15: what the big-query exam taught: a total's condition in WHERE moved to HAVING (the same rows as the HAVING
+        # query), MariaDB's LAG / LEAD without a default argument and WITH in front of UPDATE / DELETE (rewritten so MariaDB runs
+        # it and the same rows come back / change), a CTE nothing reads (found), DISTINCT over a join with a renamed column
+        # (EXISTS: the same rows), and correct queries that used to get a false check: a block that plainly makes both
+        # 'total' and 'grand_total', a CTE's own id compared with its table's id
+        "bq_having", "bq_lag_default", "bq_cte_delete", "bq_cte_update", "bq_unused", "bq_distinct_alias", "bq_quiet_cols",
+        "bq_quiet_cte_ids"]
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
@@ -136,11 +143,15 @@ TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": 
          "st_no_on": "join", "st_quiet_corr": "corr_key",
          "pf_preagg": "preagg", "pf_preagg_cte": "rw_cte", "pf_once": "compute_once", "pf_exists": "rw_exists",
          "pf_not_exists": "rw_not_exists", "pf_in": "rw_in", "pf_not_in": "rw_not_in", "pf_join": "rw_join", "pf_keyset": "rw_keyset",
-         "pf_cte": "rw_cte_derived", "pf_union_refuse": "rw_union_all", "pf_volatile": "volatile_repeat", "pf_quiet": "rw_nothing"}
+         "pf_cte": "rw_cte_derived", "pf_union_refuse": "rw_union_all", "pf_volatile": "volatile_repeat", "pf_quiet": "rw_nothing",
+         "bq_having": "where", "bq_lag_default": "dialect", "bq_cte_delete": "dialect", "bq_cte_update": "dialect",
+         "bq_unused": "cte_unused", "bq_distinct_alias": "distinct_join", "bq_quiet_cols": "column", "bq_quiet_cte_ids": "sub_key"}
 # night 12: a correct query: the planted topic must NOT be said, and no error / wrong at all
-QUIET = {"gr_block_key", "st_quiet_corr"}
+QUIET = {"gr_block_key", "st_quiet_corr", "bq_quiet_cols", "bq_quiet_cte_ids"}
 # night 11: the class the planted finding must carry (sqlconfidence.classify); and for every statement, every finding has one
-CLASS = {"st_uncorr": "likely_risk", "st_inner": "likely_risk", "st_corr_key": "likely_risk", "st_repeat": "needs_execution",
+CLASS = {"bq_having": "proven", "bq_lag_default": "proven", "bq_cte_delete": "proven", "bq_cte_update": "proven",
+         "bq_unused": "likely_risk", "bq_distinct_alias": "likely_risk",
+         "st_uncorr": "likely_risk", "st_inner": "likely_risk", "st_corr_key": "likely_risk", "st_repeat": "needs_execution",
          "st_same": "needs_execution", "st_union_all": "needs_schema", "st_union_dups": "likely_risk", "st_having_key": "needs_execution",
          "gr_cte_fanout": "likely_risk", "gr_derived_fanout": "likely_risk", "gr_cte_order": "proven", "gr_cross": "likely_risk",
          "gr_inner_eq_null": "proven",
@@ -163,7 +174,7 @@ RULED_OUT = {"ps_not_in_notnull", "ps_between_date", "ps_distinct_parent"}
 NO_FIX = {"agg_in_where", "limit_no_order", "distinct_paren", "comma_cartesian", "on_one_side", "natural_join", "sum_distinct",
           "exists_uncorr", "sub_outer_col", "scalar_rows", "sub_limit_order", "ch_insert_count",
           "sd_two_pk", "sd_list_col", "sd_repeat", "sd_parent_copy", "wf_no_order", "wf_nested", "wf_cte_cols",
-          "ix_keyset", "cp_order_param", "cp_from_param", "ps_join_types", "ps_index_missing", "qo_ties", "qo_unknown_alias", "gr_cross", "gr_block_key"}   # found is enough
+          "ix_keyset", "cp_order_param", "cp_from_param", "ps_join_types", "ps_index_missing", "qo_ties", "qo_unknown_alias", "gr_cross", "gr_block_key", "bq_unused"}   # found is enough
 # a 'check' (depends on engine, data or intent) whose suggested rewrite must do exactly what the person meant
 FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_quotes", "pk_pk", "anti_nullable", "self_pairs",
                  "distinct_join", "sum_null", "avg_avg", "pct_total", "sub_sum_null", "all_null", "in_list_null", "not_in_outer",
@@ -173,7 +184,8 @@ FIX_THE_CHECK = {"same_table", "like_contains", "and_or", "division", "double_qu
                  "ix_year", "ix_year_month", "ix_day", "ix_cast_day", "ix_format", "ix_arith", "ix_coalesce", "ix_left", "ix_or_join",
                  "lk_skip_locked", "pt_power", "ps_text_number", "ps_not_in_nullable", "ps_between_time",
                  "qo_fanout", "qo_fanout_left", "qo_not_in", "gr_cte_fanout", "gr_derived_fanout",
-                 "st_uncorr", "st_inner", "st_corr_key", "st_repeat", "st_same", "st_union_all", "st_union_dups", "st_having_key"}
+                 "st_uncorr", "st_inner", "st_corr_key", "st_repeat", "st_same", "st_union_all", "st_union_dups", "st_having_key",
+                 "bq_distinct_alias"}
 
 
 def _cols(t, *kinds):
@@ -497,6 +509,8 @@ def make(seed: int):
         return _struct_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("pf_"):
         return _proof_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("bq_"):
+        return _bigq_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -2286,6 +2300,99 @@ def _grain_bug(seed, bug, rnd, schema, tables, t):
                   f"  GROUP BY {fk['name']}\n)\nSELECT p.{p['pk']}, SUM(a.child_total) AS child_total{extra}\nFROM {p['name']} p\n"
                   f"JOIN per_parent a ON a.{fk['name']} = p.{p['pk']}\nGROUP BY p.{p['pk']}\nORDER BY p.{p['pk']}")
         return item(broken, broken, p["name"])
+    return None
+
+
+def _bigq_bug(seed, bug, rnd, schema, tables, t):
+    """Night 15: the general rules the big-query exam (tests/fuzz/bigq.py) taught, on random real tables."""
+    pk = t["pk"]
+    engine = rnd.choice(["mariadb", "postgresql", None])
+
+    def item(broken, truth, stmt="select", **kw):
+        return {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": t["name"], "broken": broken, "truth": truth,
+                "engine": engine, **kw}
+
+    def full(c):                                          # a column with a value in every row
+        k = t["cols"].index(c)
+        return all(r[k] is not None for r in t["rows"])
+
+    nums = _cols(t, "int", "money")
+    cats = _cols(t, "cat")
+    if bug == "bq_having":
+        if not nums or not cats:
+            return None
+        m, g = rnd.choice(nums)["name"], rnd.choice(cats)["name"]
+        agg = rnd.choice(["SUM", "COUNT", "MAX", "AVG"])
+        cond = f"{agg}({m}) > {rnd.choice([0, 1, 10, 100])}"
+        row = f"{g} IS NOT NULL" if rnd.random() < 0.5 else None
+        head = f"SELECT {g}, {agg}({m}) AS total\nFROM {t['name']}\n"
+        broken = head + "WHERE " + (f"{row} AND {cond}" if row else cond) + f"\nGROUP BY {g}\nORDER BY {g}"
+        truth = head + (f"WHERE {row}\n" if row else "") + f"GROUP BY {g}\nHAVING {cond}\nORDER BY {g}"
+        return item(broken, truth)
+    if bug == "bq_lag_default":
+        full_nums = [c["name"] for c in nums if full(c)] or [pk]       # a NULL value would read like 'no row' after COALESCE
+        engine = "mariadb"
+        m = rnd.choice(full_nums)
+        fn, d = rnd.choice([("LAG", "0"), ("LEAD", "-1")])
+        part = f"PARTITION BY {cats[0]['name']} " if cats and rnd.random() < 0.4 else ""
+        over = f"OVER ({part}ORDER BY {pk})"
+        broken = f"SELECT {pk}, {fn}({m}, 1, {d}) {over} AS near\nFROM {t['name']}\nORDER BY {pk}"
+        truth = f"SELECT {pk}, COALESCE({fn}({m}, 1) {over}, {d}) AS near\nFROM {t['name']}\nORDER BY {pk}"
+        return item(broken, truth)
+    if bug in ("bq_cte_delete", "bq_cte_update"):
+        cols = [c for c in nums + cats if c["kind"] != "pk"]
+        if not cols:
+            return None
+        engine = "mariadb"
+        c = rnd.choice(cols)
+        v = _pick_value(t, c, rnd)
+        if v is None:
+            return None
+        lit = f"'{v}'" if isinstance(v, str) else str(v)
+        cond = f"{c['name']} = {lit}"
+        cte = f"WITH picked AS (\n  SELECT {pk} FROM {t['name']} WHERE {cond}\n)\n"
+        if bug == "bq_cte_delete":
+            return item(cte + f"DELETE FROM {t['name']}\nWHERE {pk} IN (SELECT {pk} FROM picked)",
+                        f"DELETE FROM {t['name']}\nWHERE {cond}", "delete")
+        if not nums:
+            return None
+        n = rnd.choice(nums)["name"]
+        return item(cte + f"UPDATE {t['name']}\nSET {n} = {n}\nWHERE {pk} IN (SELECT {pk} FROM picked)",
+                    f"UPDATE {t['name']}\nSET {n} = {n}\nWHERE {cond}", "update")
+    if bug == "bq_unused":
+        other = rnd.choice(tables)
+        broken = (f"WITH spare AS (\n  SELECT {other['pk']} FROM {other['name']}\n),\nkept AS (\n  SELECT {pk} FROM {t['name']}\n)\n"
+                  f"SELECT COUNT(*) AS n\nFROM kept")
+        return item(broken, broken)
+    pairs = [(schema["tables"][c["ref"]], x, c) for x in tables for c in x["cols"] if c["kind"] == "fk" and c.get("ref") != x["name"]]
+    if bug == "bq_distinct_alias":
+        pairs = [(p, x, c) for p, x, c in pairs if _cols(p, "cat")]
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        cat = rnd.choice(_cols(p, "cat"))["name"]
+        broken = (f"SELECT DISTINCT p.{p['pk']} AS parent_key, p.{cat} AS label\nFROM {p['name']} p\n"
+                  f"JOIN {x['name']} c ON c.{fk['name']} = p.{p['pk']}")
+        truth = (f"SELECT p.{p['pk']} AS parent_key, p.{cat} AS label\nFROM {p['name']} p\n"
+                 f"WHERE EXISTS (SELECT 1 FROM {x['name']} c WHERE c.{fk['name']} = p.{p['pk']})")
+        out = item(broken, truth)
+        out["table"] = p["name"]
+        return out
+    if bug == "bq_quiet_cols":
+        if not nums:
+            return None
+        m = rnd.choice(nums)["name"]
+        broken = (f"WITH f AS (\n  SELECT {pk}, {m} AS total, {m} * 2 AS grand_total\n  FROM {t['name']}\n)\n"
+                  f"SELECT SUM(f.total) AS a, SUM(f.grand_total) AS b\nFROM f")
+        return item(broken, broken)
+    if bug == "bq_quiet_cte_ids":
+        cols = [c for c in cats + nums if c["kind"] != "pk"]
+        if not cols:
+            return None
+        c = rnd.choice(cols)["name"]
+        broken = (f"WITH x AS (\n  SELECT {pk} FROM {t['name']} WHERE {c} IS NOT NULL\n)\n"
+                  f"SELECT o.{pk}\nFROM {t['name']} o\nWHERE o.{pk} IN (SELECT {pk} FROM x)\nORDER BY o.{pk}")
+        return item(broken, broken)
     return None
 
 

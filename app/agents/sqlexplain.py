@@ -230,6 +230,7 @@ def _pg_nodes(text: str) -> list[dict]:
             im = re.search(r"\busing\s+([\w.\"]+)", head)
             out.append({"indent": len(m.group("indent")), "name": m.group("name").strip(), "head": head,
                         "table": (tm.group(1).strip('"') if tm else ""), "index": (im.group(1).strip('"') if im else ""),
+                        "alias": (tm.group(2) or "") if tm else "",
                         "rows": _int(m.groupdict().get("rows")), "arows": _int(m.groupdict().get("arows")),
                         "cost": float(m.groupdict().get("c2") or 0),
                         "loops": _int(m.groupdict().get("loops")), "attrs": {}})
@@ -265,7 +266,7 @@ def _read_pg(text: str) -> dict | None:
             next((v for k, v in M.get("nodes", {}).items() if n["name"].lower().endswith(k.lower())), {})
         rows = n["arows"] if n["arows"] is not None else n["rows"]
         where = f" {n['table']}" if n["table"] else ""
-        st = {"table": n["table"], "access": n["name"], "key": n["index"], "rows": rows,
+        st = {"table": n["table"], "alias": n.get("alias", ""), "access": n["name"], "key": n["index"], "rows": rows,
               "en": f"{n['head']}: {mean.get('en', n['name'])} ({'' if n['arows'] is not None else 'about '}{rows:,} rows"
                     + (f", {n['loops']} times" if (n["loops"] or 1) > 1 else "") + ")",
               "hi": f"{n['head']}: {mean.get('hi', mean.get('en', n['name']))} ({rows:,} rows" + (f", {n['loops']} baar" if (n["loops"] or 1) > 1 else "") + ")"}

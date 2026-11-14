@@ -32608,6 +32608,1695 @@
     "mariadb",
     "postgresql"
    ]
+  },
+  {
+   "id": "unused_cte",
+   "kind": "concept",
+   "title": {
+    "en": "A CTE that nothing reads",
+    "hinglish": "Aisi CTE jise koi nahi padhta",
+    "hindi": "ऐसी CTE जिसे कोई नहीं पढ़ता"
+   },
+   "terms": [
+    [
+     "unused",
+     "ctes?"
+    ],
+    [
+     "ctes?",
+     "(never|not) (used|read|referenced)"
+    ],
+    [
+     "ctes?",
+     "use nahi"
+    ],
+    [
+     "इस्तेमाल नहीं",
+     "cte"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what happens if a cte is never used",
+     "does an unused cte matter"
+    ],
+    "hinglish": [
+     "unused cte se kya hota hai",
+     "unused cte ka matlab kya hai"
+    ],
+    "hindi": [
+     "इस्तेमाल नहीं हुई CTE का क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A CTE that neither the main query nor another CTE reads never reaches the result. Both MariaDB and PostgreSQL still check its table and column names (a missing table still fails), but they don't run it, so it costs nothing and changes nothing. In a long query it is usually a sign of a forgotten join: its numbers were meant to be in the report. Join it where it belongs, or delete it. (PostgreSQL runs a CTE that changes data, WITH d AS (DELETE ... RETURNING ...), even when nothing reads it.)",
+    "hinglish": "Jo CTE na main query padhti hai na koi aur CTE, wo result tak nahi pahunchti. MariaDB aur PostgreSQL uske table/column naam check karte hain (galat table ho to error), par use chalate nahi. Lambi query mein aksar matlab hai koi join bhool gaye: uske numbers report mein chahiye the. Sahi jagah join karo ya hata do.",
+    "hindi": "जिस CTE को कोई नहीं पढ़ता वह result तक नहीं पहुँचती; नाम जाँचे जाते हैं पर वह चलती नहीं। अक्सर भूला हुआ join होता है।"
+   },
+   "mistake": {
+    "en": "Leaving a totals CTE in a report and believing its numbers are in the output.",
+    "hinglish": "Report mein totals wali CTE chhod dena aur maan lena ki uske numbers output mein hain.",
+    "hindi": "Totals वाली CTE छोड़ देना और मान लेना कि उसके नंबर output में हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH a AS (SELECT id FROM orders), b AS (SELECT 1 / (id - id) AS x FROM orders) SELECT COUNT(*) AS n FROM a"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Not run when unread; names still checked (1146 for a missing table).",
+    "mariadb": "Not run when unread; names still checked (1146). Lab: 8 (the 1 / 0 in b never ran).",
+    "postgresql": "Not run when unread (a data-changing CTE is the exception); names still checked (42P01). Lab: 8, no division error.",
+    "sqlserver": "Notes only (not lab-tested here): A CTE nobody reads is not run.",
+    "oracle": "Notes only (not lab-tested here): An unreferenced subquery factoring clause is ignored.",
+    "sqlite": "Notes only (not lab-tested here): Unread CTEs are not run."
+   },
+   "fundamentals": [
+    "names_scope",
+    "grain"
+   ],
+   "related": [
+    "cte",
+    "multiple_ctes",
+    "dependency_tree"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-with.html",
+   "seen_at": [
+    "https://dba.stackexchange.com/questions/tagged/cte",
+    "https://stackoverflow.com/questions/tagged/common-table-expression"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cte_column_list",
+   "kind": "concept",
+   "title": {
+    "en": "Naming a CTE's columns: WITH t (a, b) AS",
+    "hinglish": "CTE ke columns ka naam: WITH t (a, b) AS",
+    "hindi": "CTE के कॉलम के नाम: WITH t (a, b) AS"
+   },
+   "terms": [
+    [
+     "ctes?",
+     "columns?",
+     "(list|names?|naam)"
+    ],
+    [
+     "with",
+     "column list"
+    ],
+    [
+     "cte",
+     "कॉलम",
+     "नाम"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to name the columns of a cte",
+     "what is a cte column list"
+    ],
+    "hinglish": [
+     "cte ke columns ke naam kaise de",
+     "cte column list kya hai"
+    ],
+    "hindi": [
+     "CTE के कॉलम के नाम कैसे दें"
+    ]
+   },
+   "answer": {
+    "en": "After the CTE's name you can list its column names in brackets: WITH t (customer, total) AS (SELECT customer_id, SUM(amount) FROM orders GROUP BY customer_id). The list names the columns by position, so an expression like SUM(amount) gets a usable name without AS inside. The list must have exactly as many names as the SELECT has columns (otherwise an error on MariaDB and PostgreSQL). A recursive CTE often uses it, since both of its parts must line up.",
+    "hinglish": "CTE ke naam ke baad bracket mein column naam likh sakte ho: WITH t (customer, total) AS (SELECT customer_id, SUM(amount) ...). Naam position se lagte hain, isliye SUM(amount) ko andar AS ke bina naam mil jaata hai. Naam utne hi hone chahiye jitne SELECT ke columns (warna error, dono pe).",
+    "hindi": "CTE के नाम के बाद कोष्ठक में कॉलम के नाम दे सकते हैं; गिनती SELECT के कॉलम जितनी हो।"
+   },
+   "mistake": {
+    "en": "Listing fewer or more names than the SELECT returns, or expecting the names to match by meaning instead of position.",
+    "hinglish": "SELECT se kam ya zyada naam likhna, ya sochna ki naam matlab se milenge, position se nahi.",
+    "hindi": "SELECT से कम या ज़्यादा नाम देना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH t (cid, total) AS (SELECT customer_id, SUM(amount) FROM orders GROUP BY customer_id) SELECT cid, total FROM t ORDER BY total DESC LIMIT 2"
+     },
+     "columns": [
+      "cid",
+      "total"
+     ],
+     "result": [
+      [
+       "2",
+       "80500"
+      ],
+      [
+       "6",
+       "65000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Supported (8.0+).",
+    "mariadb": "Supported. Lab: 2 80500, 6 65000.",
+    "postgresql": "Supported. Lab: 2 80500, 6 65000.",
+    "sqlserver": "Notes only (not lab-tested here): WITH t (a, b) AS works.",
+    "oracle": "Notes only (not lab-tested here): WITH t (a, b) AS works (11gR2+).",
+    "sqlite": "Notes only (not lab-tested here): WITH t (a, b) AS works."
+   },
+   "fundamentals": [
+    "names_scope"
+   ],
+   "related": [
+    "cte",
+    "alias",
+    "recursive_cte"
+   ],
+   "source": "https://mariadb.com/kb/en/with/",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/common-table-expression"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "except_intersect",
+   "kind": "concept",
+   "title": {
+    "en": "EXCEPT and INTERSECT",
+    "hinglish": "EXCEPT aur INTERSECT",
+    "hindi": "EXCEPT और INTERSECT"
+   },
+   "terms": [
+    [
+     "except",
+     "(intersect|operator|union|query|sql|kya|क्या)"
+    ],
+    [
+     "intersect"
+    ],
+    [
+     "minus",
+     "(operator|query|union)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is except in sql",
+     "difference between except and intersect"
+    ],
+    "hinglish": [
+     "except aur intersect kya hai",
+     "sql mein intersect kya hota hai"
+    ],
+    "hindi": [
+     "SQL में EXCEPT क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Like UNION they combine two SELECTs with the same columns, but: EXCEPT keeps the rows of the first that are not in the second, INTERSECT keeps the rows that are in both. Both remove repeats (EXCEPT ALL / INTERSECT ALL keep them, counted). They compare whole rows and treat two NULLs as the same row, unlike = in a WHERE. Handy to check that two queries return the same rows: A EXCEPT B and B EXCEPT A must both be empty.",
+    "hinglish": "UNION jaisa do SELECT jodta hai (same columns), par: EXCEPT pehle ki wo rows deta hai jo doosre mein nahi, INTERSECT wo jo dono mein hain. Dono repeat hatate hain (ALL wale nahi). Poori row compare hoti hai aur do NULL ek jaise maane jaate hain. Do queries same rows deti hain ya nahi: A EXCEPT B aur B EXCEPT A dono khaali hone chahiye.",
+    "hindi": "EXCEPT: पहले में है पर दूसरे में नहीं; INTERSECT: दोनों में। पूरी row मिलाई जाती है।"
+   },
+   "mistake": {
+    "en": "Using EXCEPT one way only to prove two queries are the same (rows only in B are missed), or forgetting it removes duplicates.",
+    "hinglish": "Sirf ek taraf EXCEPT chala ke maan lena ki dono query same hain, ya bhoolna ki ye duplicate hata deta hai.",
+    "hindi": "सिर्फ़ एक तरफ़ EXCEPT चलाकर दोनों query को एक मान लेना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id FROM customers EXCEPT SELECT customer_id FROM orders ORDER BY 1"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "4"
+      ],
+      [
+       "5"
+      ],
+      [
+       "7"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "all": "SELECT id FROM customers INTERSECT SELECT customer_id FROM orders ORDER BY 1"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "1"
+      ],
+      [
+       "2"
+      ],
+      [
+       "3"
+      ],
+      [
+       "6"
+      ],
+      [
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "EXCEPT / INTERSECT from 8.0.31.",
+    "mariadb": "EXCEPT / INTERSECT from 10.3, the ALL forms from 10.5. Lab: 4, 5, 7.",
+    "postgresql": "Supported, with ALL. Lab: 4, 5, 7.",
+    "sqlserver": "Notes only (not lab-tested here): EXCEPT and INTERSECT exist.",
+    "oracle": "Notes only (not lab-tested here): Oracle calls EXCEPT MINUS (EXCEPT from 21c).",
+    "sqlite": "Notes only (not lab-tested here): EXCEPT and INTERSECT exist, no ALL."
+   },
+   "fundamentals": [
+    "set_operations",
+    "null_logic"
+   ],
+   "related": [
+    "union_vs_union_all",
+    "query_equivalence",
+    "anti_join"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-union.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/except",
+    "https://stackoverflow.com/questions/tagged/intersect"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cte_in_explain",
+   "kind": "concept",
+   "title": {
+    "en": "How a CTE shows up in EXPLAIN",
+    "hinglish": "EXPLAIN mein CTE kaise dikhti hai",
+    "hindi": "EXPLAIN में CTE कैसे दिखती है"
+   },
+   "terms": [
+    [
+     "ctes?",
+     "explain"
+    ],
+    [
+     "cte scan"
+    ],
+    [
+     "derived2"
+    ],
+    [
+     "ctes?",
+     "(plan|query plan)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how does a cte show in explain",
+     "what is cte scan in a query plan"
+    ],
+    "hinglish": [
+     "explain mein cte kaise dikhta hai",
+     "cte scan kya hota hai"
+    ],
+    "hindi": [
+     "EXPLAIN में CTE कैसे दिखता है"
+    ]
+   },
+   "answer": {
+    "en": "MariaDB shows a CTE like a derived table: a row with table <derivedN> (select_type DERIVED for the CTE's own read), or it merges the CTE into the outer query when it can. PostgreSQL (12+) folds a CTE read once into the outer query, so it doesn't appear at all; a CTE read twice (or written AS MATERIALIZED) is worked out once and shows as 'CTE t' with 'CTE Scan on t' where it is read. So to find a slow block in a long query, look for its tables' lines inside the plan, not for its name.",
+    "hinglish": "MariaDB CTE ko derived table jaisa dikhata hai (<derivedN>, select_type DERIVED), ya merge kar deta hai. PostgreSQL 12+ ek baar padhi CTE ko bahar ki query mein mila deta hai (alag dikhti hi nahi); do baar padhi (ya MATERIALIZED) ek baar banti hai aur 'CTE Scan on t' dikhta hai. Dheema block dhoondhna ho to uski tables ki lines dekho, naam nahi.",
+    "hindi": "MariaDB में <derivedN>; PostgreSQL में एक बार पढ़ी CTE मिल जाती है, दो बार पढ़ी 'CTE Scan' दिखती है।"
+   },
+   "mistake": {
+    "en": "Looking for the CTE's name in a PostgreSQL plan and concluding it wasn't used, when it was folded into the outer query.",
+    "hinglish": "PostgreSQL plan mein CTE ka naam dhoondhna aur na mile to maan lena ki use nahi hui (wo merge ho gayi thi).",
+    "hindi": "PostgreSQL plan में CTE का नाम न मिले तो मान लेना कि वह चली ही नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH t AS (SELECT customer_id, SUM(amount) AS s FROM orders GROUP BY customer_id) SELECT COUNT(*) AS n FROM t WHERE s > 1000"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Derived-table rows (<derivedN>) or merged.",
+    "mariadb": "Lab: EXPLAIN gives <derived2> (DERIVED, orders ALL); read twice: <derived2> and <derived3>.",
+    "postgresql": "Lab: read once, no CTE node (HashAggregate over Seq Scan on orders); read twice: 'CTE t' and 'CTE Scan on t a / t b'.",
+    "sqlserver": "Notes only (not lab-tested here): Inlined like a view; shows the base tables.",
+    "oracle": "Notes only (not lab-tested here): May show TEMP TABLE TRANSFORMATION when materialized.",
+    "sqlite": "Notes only (not lab-tested here): EXPLAIN QUERY PLAN shows MATERIALIZE or a co-routine."
+   },
+   "fundamentals": [
+    "index_use",
+    "repeated_work"
+   ],
+   "related": [
+    "explain",
+    "cte_materialized",
+    "cte_referenced_twice"
+   ],
+   "source": "https://www.postgresql.org/docs/current/using-explain.html",
+   "seen_at": [
+    "https://dba.stackexchange.com/questions/tagged/execution-plan",
+    "https://use-the-index-luke.com/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "union_null_placeholder",
+   "kind": "concept",
+   "title": {
+    "en": "NULL as a placeholder column in a UNION",
+    "hinglish": "UNION mein khaali column ke liye NULL",
+    "hindi": "UNION में खाली कॉलम के लिए NULL"
+   },
+   "terms": [
+    [
+     "union",
+     "null",
+     "(column|placeholder|missing|khaali|blank)"
+    ],
+    [
+     "union",
+     "(missing|extra) column"
+    ],
+    [
+     "union",
+     "खाली",
+     "कॉलम"
+    ],
+    [
+     "union",
+     "खाली",
+     "कॉलम",
+     "null"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to fill a missing column in a union",
+     "why use null as a column in a union"
+    ],
+    "hinglish": [
+     "union mein missing column ke liye null kaise de",
+     "union mein null column kyun likhte hai"
+    ],
+    "hindi": [
+     "UNION में खाली कॉलम के लिए NULL कैसे दें"
+    ]
+   },
+   "answer": {
+    "en": "Every part of a UNION must return the same number of columns, and the types must fit together per position. When one part has no value for a column, write NULL (or 0 / '' when that is what it means) in that place, with the same position. The first part names the columns. On PostgreSQL a bare NULL takes the type of the other parts' column; a text in one part and a number in another is refused there (42804) while MariaDB silently turns both into text (and then sorts them as text).",
+    "hinglish": "UNION ke har hisse mein columns ki ginti same honi chahiye aur har position ka type mel khana chahiye. Jis hisse mein kisi column ki value nahi, wahan NULL (ya 0 / '' agar wahi matlab ho) usi position pe likho. Naam pehle hisse se aate hain. PostgreSQL text aur number ko ek position pe mana karta hai (42804), MariaDB chupchaap dono ko text bana deta hai.",
+    "hindi": "हर हिस्से में कॉलम की गिनती बराबर हो; जहाँ मान नहीं है वहाँ उसी जगह NULL लिखें।"
+   },
+   "mistake": {
+    "en": "Putting the NULL in the wrong position (the columns shift and a number lands under a name), or mixing a text and a number in one position.",
+    "hinglish": "NULL galat position pe likhna (columns khisak jaate hain), ya ek position pe text aur number milana.",
+    "hindi": "NULL गलत जगह लिखना, जिससे कॉलम खिसक जाते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, NULL AS city FROM customers WHERE id < 3 UNION ALL SELECT id, city FROM customers WHERE id = 3 ORDER BY 1"
+     },
+     "columns": [
+      "id",
+      "city"
+     ],
+     "result": [
+      [
+       "1",
+       "NULL"
+      ],
+      [
+       "2",
+       "NULL"
+      ],
+      [
+       "3",
+       "Mumbai"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Text and number in one position become text.",
+    "mariadb": "Lab: text + number in one position -> text, no error.",
+    "postgresql": "Lab: text + number in one position -> 42804 (types cannot be matched); a bare NULL is fine.",
+    "sqlserver": "Notes only (not lab-tested here): Types follow precedence (number wins, text may fail to convert).",
+    "oracle": "Notes only (not lab-tested here): Types must match by group (ORA-01790).",
+    "sqlite": "Notes only (not lab-tested here): Any mix is allowed."
+   },
+   "fundamentals": [
+    "set_operations",
+    "values_types"
+   ],
+   "related": [
+    "union_columns",
+    "union_vs_union_all",
+    "null"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/union.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/union"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "order_by_position",
+   "kind": "concept",
+   "title": {
+    "en": "ORDER BY 1: sorting by a column's position",
+    "hinglish": "ORDER BY 1: column ki position se sort",
+    "hindi": "ORDER BY 1: कॉलम की जगह से sort"
+   },
+   "terms": [
+    [
+     "order by",
+     "\\d+"
+    ],
+    [
+     "order by",
+     "(position|column number|ordinal)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what does order by 1 mean",
+     "is order by column number a good idea"
+    ],
+    "hinglish": [
+     "order by 1 ka matlab kya hai",
+     "order by 2 desc kya karta hai"
+    ],
+    "hindi": [
+     "ORDER BY 1 का मतलब क्या है"
+    ]
+   },
+   "answer": {
+    "en": "ORDER BY 1 sorts by the first column of the SELECT list, ORDER BY 2 DESC by the second, highest first. It is handy in a UNION, where the names come from the first part. A number that isn't a column position is an error (MariaDB 1054, PostgreSQL 42P10). The catch: when someone adds or moves a column in the SELECT, the sort silently changes, so in a query that will be edited a name is safer.",
+    "hinglish": "ORDER BY 1 SELECT ke pehle column se sort karta hai, ORDER BY 2 DESC doosre se, bada pehle. UNION mein kaam aata hai. Jo number column ki position nahi, wo error (MariaDB 1054, PostgreSQL 42P10). Dikkat: koi SELECT mein column jode ya khiskaye to sort chupchaap badal jaata hai, isliye badalne wali query mein naam likhna safe hai.",
+    "hindi": "ORDER BY 1 मतलब SELECT का पहला कॉलम; कॉलम खिसके तो sort भी बदल जाता है।"
+   },
+   "mistake": {
+    "en": "Adding a column at the start of the SELECT and not noticing ORDER BY 1 now sorts by something else.",
+    "hinglish": "SELECT ke shuru mein column jodna aur dhyan na dena ki ORDER BY 1 ab kisi aur se sort kar raha hai.",
+    "hindi": "SELECT में आगे कॉलम जोड़ना और ORDER BY 1 का बदलना न देखना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT status, COUNT(*) AS n FROM orders GROUP BY status ORDER BY 2 DESC, 1"
+     },
+     "columns": [
+      "status",
+      "n"
+     ],
+     "result": [
+      [
+       "paid",
+       "4"
+      ],
+      [
+       "shipped",
+       "2"
+      ],
+      [
+       "cancelled",
+       "1"
+      ],
+      [
+       "pending",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Supported (positions in GROUP BY are deprecated, in ORDER BY fine).",
+    "mariadb": "Lab: ORDER BY 3 on one column -> 1054.",
+    "postgresql": "Lab: ORDER BY 3 on one column -> 42P10.",
+    "sqlserver": "Notes only (not lab-tested here): Supported.",
+    "oracle": "Notes only (not lab-tested here): Supported.",
+    "sqlite": "Notes only (not lab-tested here): Supported."
+   },
+   "fundamentals": [
+    "names_scope"
+   ],
+   "related": [
+    "order_by",
+    "order_by_alias",
+    "union_order_by"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-order.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sql-order-by"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "over_empty",
+   "kind": "concept",
+   "title": {
+    "en": "OVER (): the same total on every row",
+    "hinglish": "OVER (): har row pe poora total",
+    "hindi": "OVER (): हर row पर पूरा जोड़"
+   },
+   "terms": [
+    [
+     "over",
+     "(empty|blank|nothing inside|no partition)"
+    ],
+    [
+     "(grand )?total",
+     "(every|each) row"
+    ],
+    [
+     "total",
+     "har row"
+    ],
+    [
+     "हर row",
+     "(कुल|total|जोड़)"
+    ],
+    [
+     "over",
+     "(khaali|khali)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to show the grand total on every row",
+     "what does an empty over do"
+    ],
+    "hinglish": [
+     "har row pe total kaise dikhaye",
+     "khaali over ka matlab kya hai"
+    ],
+    "hindi": [
+     "हर row पर कुल जोड़ कैसे दिखाएँ"
+    ]
+   },
+   "answer": {
+    "en": "SUM(amount) OVER () is a window over all the rows the query keeps (after WHERE, GROUP BY and HAVING), so every row gets the same grand total next to its own value, without collapsing them like GROUP BY. That is the usual way to show a share: 100 * amount / SUM(amount) OVER (). With PARTITION BY x inside, the total restarts per x. Same on MariaDB and PostgreSQL.",
+    "hinglish": "SUM(amount) OVER () query ki saari bachi rows (WHERE, GROUP BY, HAVING ke baad) pe chalta hai, isliye har row ke saath wahi poora total aata hai, rows mile bina. Hissa dikhane ka aam tareeka: 100 * amount / SUM(amount) OVER (). PARTITION BY x ho to har x ka alag.",
+    "hindi": "SUM(x) OVER () हर row के साथ वही पूरा जोड़ दिखाता है, rows को मिलाए बिना।"
+   },
+   "mistake": {
+    "en": "Expecting OVER () to see rows that WHERE removed: it only sees the rows the query keeps.",
+    "hinglish": "Sochna ki OVER () WHERE se hati rows bhi dekhega: wo sirf bachi rows dekhta hai.",
+    "hindi": "सोचना कि OVER () WHERE से हटी rows भी देखेगा।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount, SUM(amount) OVER () AS all_total FROM orders WHERE customer_id = 1 ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "amount",
+      "all_total"
+     ],
+     "result": [
+      [
+       "1",
+       "25500",
+       "26000"
+      ],
+      [
+       "2",
+       "500",
+       "26000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Supported (8.0+).",
+    "mariadb": "Lab: 25500 and 500, all_total 26000 on both rows.",
+    "postgresql": "Lab: the same.",
+    "sqlserver": "Notes only (not lab-tested here): Supported.",
+    "oracle": "Notes only (not lab-tested here): Supported (analytic functions).",
+    "sqlite": "Notes only (not lab-tested here): Supported (3.25+)."
+   },
+   "fundamentals": [
+    "window_frames",
+    "aggregation"
+   ],
+   "related": [
+    "window_function",
+    "percent_of_total",
+    "partition_by"
+   ],
+   "source": "https://www.postgresql.org/docs/current/tutorial-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "named_window",
+   "kind": "concept",
+   "title": {
+    "en": "The WINDOW clause: one window, used many times",
+    "hinglish": "WINDOW clause: ek window, kai baar",
+    "hindi": "WINDOW clause: एक window, कई बार"
+   },
+   "terms": [
+    [
+     "window",
+     "clause"
+    ],
+    [
+     "named",
+     "windows?"
+    ],
+    [
+     "reuse",
+     "window"
+    ],
+    [
+     "window",
+     "(naam|नाम)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the window clause in sql",
+     "how to reuse a window definition"
+    ],
+    "hinglish": [
+     "window ko naam kaise de",
+     "window clause kya hai"
+    ],
+    "hindi": [
+     "window को नाम कैसे दें"
+    ]
+   },
+   "answer": {
+    "en": "When several window functions use the same PARTITION BY / ORDER BY, write it once after HAVING: ... WINDOW w AS (PARTITION BY customer_id ORDER BY id), and say OVER w in each function. It is shorter, and the functions can't drift apart when one is edited. A function can add a frame to a named window (OVER (w ROWS BETWEEN 1 PRECEDING AND CURRENT ROW)) but not change its PARTITION BY. MariaDB and PostgreSQL both accept it.",
+    "hinglish": "Kai window functions ka same PARTITION BY / ORDER BY ho to HAVING ke baad ek baar likho: WINDOW w AS (PARTITION BY customer_id ORDER BY id), aur har function mein OVER w. Chhota bhi, aur ek badalne pe baaki se alag nahi hote. Function named window mein frame jod sakta hai, PARTITION BY nahi badal sakta.",
+    "hindi": "एक जैसी window बार-बार हो तो WINDOW w AS (...) एक बार लिखें और OVER w लगाएँ।"
+   },
+   "mistake": {
+    "en": "Copying the same OVER (...) into five places and later changing only some of them.",
+    "hinglish": "Same OVER (...) paanch jagah copy karna aur baad mein kuch hi badalna.",
+    "hindi": "एक ही OVER (...) कई जगह लिखना और बाद में कुछ ही बदलना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount, SUM(amount) OVER w AS running, COUNT(*) OVER w AS n FROM orders WHERE customer_id IN (1, 2) WINDOW w AS (PARTITION BY customer_id ORDER BY id) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "amount",
+      "running",
+      "n"
+     ],
+     "result": [
+      [
+       "1",
+       "25500",
+       "25500",
+       "1"
+      ],
+      [
+       "2",
+       "500",
+       "26000",
+       "2"
+      ],
+      [
+       "3",
+       "80000",
+       "80000",
+       "1"
+      ],
+      [
+       "7",
+       "500",
+       "80500",
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Supported (8.0+).",
+    "mariadb": "Lab: running 25500, 26000 | 80000, 80500.",
+    "postgresql": "Lab: the same.",
+    "sqlserver": "Notes only (not lab-tested here): No WINDOW clause before SQL Server 2022.",
+    "oracle": "Notes only (not lab-tested here): No WINDOW clause before 21c.",
+    "sqlite": "Notes only (not lab-tested here): Supported (3.28+)."
+   },
+   "fundamentals": [
+    "window_frames"
+   ],
+   "related": [
+    "window_function",
+    "partition_by",
+    "running_total"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/window-functions-named-windows.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "lag_default",
+   "kind": "concept",
+   "title": {
+    "en": "LAG / LEAD with a default for the missing row",
+    "hinglish": "LAG / LEAD mein default value",
+    "hindi": "LAG / LEAD में default value"
+   },
+   "terms": [
+    [
+     "(lag|lead)",
+     "default"
+    ],
+    [
+     "(lag|lead)",
+     "(null|nulls)",
+     "(first|last)"
+    ],
+    [
+     "(lag|lead)",
+     "(pehli|aakhri) row"
+    ],
+    [
+     "(lag|lead)",
+     "(पहली|आखिरी)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to give lag a default value",
+     "why is lag null on the first row"
+    ],
+    "hinglish": [
+     "lag mein default value kaise de",
+     "lead aakhri row pe null kyun deta hai"
+    ],
+    "hindi": [
+     "LAG में पहली row पर NULL क्यों आता है"
+    ]
+   },
+   "answer": {
+    "en": "LAG(x) looks at the row before in the window's order; the first row has none, so it gets NULL (LEAD: the last row). PostgreSQL and MySQL 8 take a third argument for that case: LAG(x, 1, 0). MariaDB refuses the third argument (1064, lab), so write the default outside: COALESCE(LAG(x, 1) OVER (...), 0), which runs on all three. The two differ only when the earlier row exists and its own x is NULL: COALESCE turns that into 0 as well.",
+    "hinglish": "LAG(x) window ke kram mein pichhli row dekhta hai; pehli row ki koi pichhli nahi, isliye NULL (LEAD: aakhri row). PostgreSQL aur MySQL 8 teesra argument lete hain: LAG(x, 1, 0). MariaDB mana karta hai (1064, lab), isliye default bahar likho: COALESCE(LAG(x, 1) OVER (...), 0), teeno pe chalta hai. Farak sirf tab jab pichhli row ka x khud NULL ho.",
+    "hindi": "पहली row का LAG NULL होता है; MariaDB में तीसरा argument नहीं, COALESCE(LAG(x, 1) OVER (...), 0) लिखें।"
+   },
+   "mistake": {
+    "en": "Writing LAG(x, 1, 0) for MariaDB (syntax error) or treating a real NULL in the data the same as 'no earlier row'.",
+    "hinglish": "MariaDB ke liye LAG(x, 1, 0) likhna (syntax error), ya data ke asli NULL ko 'pichhli row nahi' jaisa maan lena.",
+    "hindi": "MariaDB के लिए LAG(x, 1, 0) लिखना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, amount, COALESCE(LAG(amount, 1) OVER (ORDER BY id), 0) AS prev FROM orders WHERE id <= 3 ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "amount",
+      "prev"
+     ],
+     "result": [
+      [
+       "1",
+       "25500",
+       "0"
+      ],
+      [
+       "2",
+       "500",
+       "25500"
+      ],
+      [
+       "3",
+       "80000",
+       "500"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "LAG(x, n, default) accepted (8.0+).",
+    "mariadb": "Lab: LAG(amount, 1, 0) -> 1064; the COALESCE form gives 0, 25500, 500.",
+    "postgresql": "LAG(x, n, default) accepted. Lab: both forms give 0, 25500, 500.",
+    "sqlserver": "Notes only (not lab-tested here): LAG(x, n, default) accepted.",
+    "oracle": "Notes only (not lab-tested here): LAG(x, n, default) accepted.",
+    "sqlite": "Notes only (not lab-tested here): LAG(x, n, default) accepted."
+   },
+   "fundamentals": [
+    "window_frames",
+    "null_logic",
+    "engine_syntax"
+   ],
+   "related": [
+    "lag_lead",
+    "coalesce",
+    "window_function"
+   ],
+   "source": "https://mariadb.com/kb/en/lag/",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/lag"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "sql_formatting",
+   "kind": "concept",
+   "title": {
+    "en": "Writing a long query so it can be read",
+    "hinglish": "Lambi query ko padhne layak likhna",
+    "hindi": "लंबी query को पढ़ने लायक लिखना"
+   },
+   "terms": [
+    [
+     "(format\\w*|indent\\w*|readable|readability|neat|clean)",
+     "(sql|quer\\w*)"
+    ],
+    [
+     "quer\\w*",
+     "(padhne layak|saaf)"
+    ],
+    [
+     "query",
+     "(पढ़ने लायक|साफ़)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to format a long sql query",
+     "how to make a big query readable"
+    ],
+    "hinglish": [
+     "lambi query ko readable kaise banaye",
+     "query ko saaf kaise likhe"
+    ],
+    "hindi": [
+     "लंबी query को पढ़ने लायक कैसे लिखें"
+    ]
+   },
+   "answer": {
+    "en": "Databases ignore spaces and line breaks, so the layout is only for people, and it decides how fast a mistake is seen. What helps: one step per CTE with a name that says its grain (paid_orders, spend_per_customer), a comment above each saying what it keeps; one column per line; every column qualified with its table's alias; joins each on their own line with the ON right after; keywords in one case. Then each block can be run on its own while checking (SELECT * FROM that_cte) and the row count compared with what it should be.",
+    "hinglish": "Database spaces aur line break nahi dekhta, layout sirf logon ke liye hai, aur galti kitni jaldi dikhe ye wahi tay karta hai. Kaam ki baatein: har step ek CTE, naam se grain pata chale (paid_orders, spend_per_customer), upar comment; har column alag line; har column alias ke saath; har join alag line pe ON ke saath. Phir har block alag chala ke uski rows gin sakte ho.",
+    "hindi": "हर step अलग CTE, साफ़ नाम, एक कॉलम एक line, alias के साथ; हर block अलग चला कर जाँचें।"
+   },
+   "mistake": {
+    "en": "Fifty columns on one line and unqualified names: the one wrong column hides in the crowd.",
+    "hinglish": "Pachaas columns ek line mein aur bina alias naam: ek galat column bheed mein chhup jaata hai.",
+    "hindi": "एक line में बहुत सारे कॉलम और बिना alias के नाम।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH paid_orders AS (\n  SELECT o.id, o.customer_id, o.amount\n  FROM orders o\n  WHERE o.status = 'paid'\n),\nspend_per_customer AS (\n  SELECT p.customer_id, SUM(p.amount) AS spend\n  FROM paid_orders p\n  GROUP BY p.customer_id\n)\nSELECT s.customer_id, s.spend\nFROM spend_per_customer s\nORDER BY s.spend DESC, s.customer_id"
+     },
+     "columns": [
+      "customer_id",
+      "spend"
+     ],
+     "result": [
+      [
+       "2",
+       "80500"
+      ],
+      [
+       "1",
+       "25500"
+      ],
+      [
+       "3",
+       "800"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Layout is ignored by the server.",
+    "mariadb": "Lab: 2 80500, 1 25500, 3 800.",
+    "postgresql": "Lab: the same.",
+    "sqlserver": "Notes only (not lab-tested here): Layout is ignored.",
+    "oracle": "Notes only (not lab-tested here): Layout is ignored.",
+    "sqlite": "Notes only (not lab-tested here): Layout is ignored."
+   },
+   "fundamentals": [
+    "grain",
+    "names_scope"
+   ],
+   "related": [
+    "debug_long_query",
+    "cte",
+    "sql_comments",
+    "query_blocks"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-syntax-lexical.html",
+   "seen_at": [
+    "https://dba.stackexchange.com/questions/tagged/formatting",
+    "https://stackoverflow.com/questions/tagged/sql-formatting"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "having_without_group_by",
+   "kind": "concept",
+   "title": {
+    "en": "HAVING without GROUP BY",
+    "hinglish": "GROUP BY ke bina HAVING",
+    "hindi": "GROUP BY के बिना HAVING"
+   },
+   "terms": [
+    [
+     "having",
+     "without",
+     "group by"
+    ],
+    [
+     "having",
+     "bina",
+     "group by"
+    ],
+    [
+     "having",
+     "बिना",
+     "group by"
+    ],
+    [
+     "having",
+     "no group by"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can i use having without group by",
+     "what does having without group by do"
+    ],
+    "hinglish": [
+     "group by ke bina having chalta hai kya",
+     "bina group by ke having kya karta hai"
+    ],
+    "hindi": [
+     "GROUP BY के बिना HAVING क्या करता है"
+    ]
+   },
+   "answer": {
+    "en": "Without GROUP BY the whole result is one group: SELECT COUNT(*) FROM orders HAVING COUNT(*) > 5 returns one row when the condition holds and no row at all when it doesn't. HAVING on a plain column with no GROUP BY is refused by PostgreSQL (42803) but run by MariaDB, which reads it like WHERE: an engine difference worth not relying on; a condition on single rows belongs in WHERE.",
+    "hinglish": "GROUP BY na ho to poora result ek group hai: SELECT COUNT(*) FROM orders HAVING COUNT(*) > 5 shart sahi ho to ek row deta hai, warna koi row nahi. Bina GROUP BY plain column pe HAVING PostgreSQL mana karta hai (42803), MariaDB WHERE ki tarah chala deta hai: is pe bharosa mat karo, ek-ek row ki shart WHERE mein.",
+    "hindi": "GROUP BY न हो तो पूरा result एक group है; शर्त सही तो एक row, वरना कोई नहीं।"
+   },
+   "mistake": {
+    "en": "Expecting a row with 0 when the HAVING condition fails: no row comes back at all.",
+    "hinglish": "Sochna ki shart fail ho to 0 wali row aayegi: koi row nahi aati.",
+    "hindi": "सोचना कि शर्त गलत होने पर 0 वाली row आएगी।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS n FROM orders HAVING COUNT(*) > 5"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "8"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "all": "SELECT COUNT(*) AS n FROM orders HAVING COUNT(*) > 50"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": []
+    }
+   ],
+   "engines": {
+    "mysql": "One group; HAVING on a plain column accepted.",
+    "mariadb": "Lab: 8 / no row; HAVING status = 'paid' runs like WHERE.",
+    "postgresql": "Lab: 8 / no row; HAVING on a plain column -> 42803.",
+    "sqlserver": "Notes only (not lab-tested here): One group; plain columns refused.",
+    "oracle": "Notes only (not lab-tested here): One group; plain columns refused.",
+    "sqlite": "Notes only (not lab-tested here): One group (3.39+ allows HAVING without GROUP BY)."
+   },
+   "fundamentals": [
+    "aggregation",
+    "filter_level"
+   ],
+   "related": [
+    "having",
+    "where_vs_having",
+    "group_by"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-select.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/having"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cte_scope",
+   "kind": "concept",
+   "title": {
+    "en": "Where a CTE can be used",
+    "hinglish": "CTE kahan use ho sakti hai",
+    "hindi": "CTE कहाँ इस्तेमाल हो सकती है"
+   },
+   "terms": [
+    [
+     "ctes?",
+     "(scope|another query|next query|other query|later)"
+    ],
+    [
+     "ctes?",
+     "(dusri|doosri|agli) query"
+    ],
+    [
+     "cte",
+     "(दूसरी|अगली) query"
+    ],
+    [
+     "cte",
+     "scope"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can i use a cte in another query",
+     "what is the scope of a cte"
+    ],
+    "hinglish": [
+     "cte ko dusri query mein use kar sakte hai kya",
+     "cte ka scope kya hai"
+    ],
+    "hindi": [
+     "CTE का scope क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A CTE lives only inside the one statement it is written in: the main query, the CTEs after it and their subqueries can read it, as many times as they like; the next statement can't (MariaDB 1146, PostgreSQL 42P01). To reuse a result across statements, keep it in a view (for the definition) or a temporary table (for the rows of this session).",
+    "hinglish": "CTE sirf usi ek statement ke andar rehti hai: main query, uske baad wali CTEs aur subqueries jitni baar chahe padh sakti hain; agla statement nahi (MariaDB 1146, PostgreSQL 42P01). Kai statements mein chahiye to view (definition) ya temporary table (is session ki rows).",
+    "hindi": "CTE सिर्फ़ उसी statement में रहती है; अगली query में नहीं चलती।"
+   },
+   "mistake": {
+    "en": "Running WITH t AS (...) SELECT ... and then a second SELECT ... FROM t on its own.",
+    "hinglish": "WITH t AS (...) SELECT ... chala ke phir alag se SELECT ... FROM t chalana.",
+    "hindi": "WITH वाली query के बाद अलग से उसी CTE को पढ़ना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "WITH t AS (SELECT customer_id, SUM(amount) AS s FROM orders GROUP BY customer_id) SELECT COUNT(*) AS n FROM t WHERE s > (SELECT AVG(s) FROM t)"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Statement scope only.",
+    "mariadb": "Lab: read twice in one statement works; the next statement gets 1146.",
+    "postgresql": "Lab: the same; the next statement gets 42P01.",
+    "sqlserver": "Notes only (not lab-tested here): Statement scope only.",
+    "oracle": "Notes only (not lab-tested here): Statement scope only.",
+    "sqlite": "Notes only (not lab-tested here): Statement scope only."
+   },
+   "fundamentals": [
+    "names_scope"
+   ],
+   "related": [
+    "cte",
+    "view",
+    "temporary_table",
+    "cte_referenced_twice"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/with.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/common-table-expression"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "cte_with_update",
+   "kind": "concept",
+   "title": {
+    "en": "WITH before UPDATE, DELETE or INSERT",
+    "hinglish": "UPDATE / DELETE / INSERT ke saath WITH",
+    "hindi": "UPDATE / DELETE / INSERT के साथ WITH"
+   },
+   "terms": [
+    [
+     "ctes?",
+     "(update|delete|insert)",
+     "(statement|query|rows?|kaise|how|mariadb|mysql|postgres\\w*)"
+    ],
+    [
+     "ctes?",
+     "(update|delete|insert)"
+    ],
+    [
+     "with clause",
+     "(update|delete|insert)"
+    ],
+    [
+     "cte",
+     "(अपडेट|डिलीट|update|delete)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can i use a cte in an update statement",
+     "how to delete rows using a cte in mariadb"
+    ],
+    "hinglish": [
+     "cte ke saath delete kaise kare",
+     "update mein cte kaise use kare"
+    ],
+    "hindi": [
+     "CTE के साथ UPDATE कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "PostgreSQL and MySQL 8 accept WITH in front of UPDATE, DELETE and INSERT ... SELECT. MariaDB doesn't (1064, lab): there the WITH goes inside, in the subquery that reads it (DELETE FROM orders WHERE id IN (WITH g AS (...) SELECT id FROM g)), or after INSERT INTO t (cols). The rows changed are the same. As with any change, run the SELECT that finds the rows first and look at them.",
+    "hinglish": "PostgreSQL aur MySQL 8 UPDATE, DELETE, INSERT ... SELECT ke aage WITH le lete hain. MariaDB nahi (1064, lab): wahan WITH andar jaata hai, us subquery mein jo use padhti hai (DELETE FROM orders WHERE id IN (WITH g AS (...) SELECT id FROM g)), ya INSERT INTO t (cols) ke baad. Wahi rows badalti hain. Pehle SELECT chala ke rows dekh lo.",
+    "hindi": "MariaDB में WITH को UPDATE/DELETE के अंदर subquery में लिखें; PostgreSQL में आगे भी चलता है।"
+   },
+   "mistake": {
+    "en": "Writing WITH ... DELETE for MariaDB and getting a syntax error, or changing rows without first selecting them.",
+    "hinglish": "MariaDB ke liye WITH ... DELETE likhna aur syntax error, ya bina dekhe rows badalna.",
+    "hindi": "MariaDB में WITH ... DELETE लिखना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "DELETE FROM orders WHERE id IN (WITH g AS (SELECT id FROM orders WHERE status = 'cancelled') SELECT id FROM g)",
+      "postgresql": "WITH g AS (SELECT id FROM orders WHERE status = 'cancelled') DELETE FROM orders WHERE id IN (SELECT id FROM g)"
+     },
+     "preview": {
+      "all": "SELECT id, status FROM orders WHERE status = 'cancelled'"
+     },
+     "changed": 1,
+     "preview_columns": [
+      "id",
+      "status"
+     ],
+     "preview_result": [
+      [
+       "4",
+       "cancelled"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "WITH before UPDATE / DELETE accepted (8.0+).",
+    "mariadb": "Lab: WITH ... DELETE / UPDATE / INSERT -> 1064; inside the subquery or after INSERT INTO t (cols) it works (1 row).",
+    "postgresql": "Lab: every form works (1 row); a CTE may itself change data (DELETE ... RETURNING).",
+    "sqlserver": "Notes only (not lab-tested here): WITH before UPDATE / DELETE / INSERT accepted.",
+    "oracle": "Notes only (not lab-tested here): WITH goes inside the subquery of the change.",
+    "sqlite": "Notes only (not lab-tested here): WITH before UPDATE / DELETE / INSERT accepted."
+   },
+   "fundamentals": [
+    "changes_safety",
+    "engine_syntax"
+   ],
+   "related": [
+    "cte",
+    "preview_before_change",
+    "delete_join",
+    "update_join"
+   ],
+   "source": "https://mariadb.com/kb/en/with/",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/mariadb"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "create_table_as",
+   "kind": "concept",
+   "title": {
+    "en": "Saving a query's result as a table: CREATE TABLE ... AS SELECT",
+    "hinglish": "Query ka result table mein save karna",
+    "hindi": "Query का result table में सेव करना"
+   },
+   "terms": [
+    [
+     "create table",
+     "as select"
+    ],
+    [
+     "(save|store)",
+     "(result|output)",
+     "(new )?table"
+    ],
+    [
+     "result",
+     "table",
+     "(save|bana\\w*)"
+    ],
+    [
+     "result",
+     "table",
+     "सेव"
+    ],
+    [
+     "select into",
+     "table"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to save a query result into a new table",
+     "what is create table as select"
+    ],
+    "hinglish": [
+     "query ka result nayi table mein kaise save kare",
+     "result se table kaise banaye"
+    ],
+    "hindi": [
+     "query का result नई table में कैसे सेव करें"
+    ]
+   },
+   "answer": {
+    "en": "CREATE TABLE new_name AS SELECT ... makes a table with the SELECT's columns and copies its rows, once: later changes to the source aren't seen (a view is the live one). It copies no primary key, indexes or foreign keys, so add them if the table will be queried. Works on MariaDB and PostgreSQL; PostgreSQL also accepts SELECT ... INTO new_name, which in MariaDB means something else (into variables).",
+    "hinglish": "CREATE TABLE naya AS SELECT ... SELECT ke columns se table banata hai aur rows ek baar copy karta hai: baad ke badlav nahi dikhte (live chahiye to view). Primary key, index, foreign key copy nahi hote, zaroorat ho to jodo. Dono pe chalta hai; PostgreSQL SELECT ... INTO naya bhi leta hai, MariaDB mein uska matlab variables mein daalna hai.",
+    "hindi": "CREATE TABLE नया AS SELECT ... एक बार की copy है; key और index साथ नहीं आते।"
+   },
+   "mistake": {
+    "en": "Expecting the new table to stay in sync with the source, or to have the source's primary key and indexes.",
+    "hinglish": "Sochna ki nayi table source ke saath badlegi, ya usme primary key aur index honge.",
+    "hindi": "सोचना कि नई table source के साथ बदलेगी।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "CREATE TABLE big_orders AS SELECT id, amount FROM orders WHERE amount > 20000"
+     },
+     "changed": "ok"
+    }
+   ],
+   "engines": {
+    "mysql": "Supported; keys not copied.",
+    "mariadb": "Lab: works; the copy has no primary key.",
+    "postgresql": "Lab: works; also SELECT ... INTO.",
+    "sqlserver": "Notes only (not lab-tested here): SELECT ... INTO new_table.",
+    "oracle": "Notes only (not lab-tested here): CREATE TABLE ... AS SELECT.",
+    "sqlite": "Notes only (not lab-tested here): CREATE TABLE ... AS SELECT."
+   },
+   "fundamentals": [
+    "table_keys"
+   ],
+   "related": [
+    "create_table",
+    "view",
+    "temporary_table",
+    "insert_select"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-createtableas.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/create-table"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "temporary_table",
+   "kind": "concept",
+   "title": {
+    "en": "Temporary tables",
+    "hinglish": "Temporary table",
+    "hindi": "Temporary table"
+   },
+   "terms": [
+    [
+     "temp(orary)? tables?"
+    ],
+    [
+     "अस्थायी",
+     "table"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a temporary table",
+     "when to use a temp table"
+    ],
+    "hinglish": [
+     "temporary table kya hoti hai",
+     "temp table kab use kare"
+    ],
+    "hindi": [
+     "temporary table क्या होती है"
+    ]
+   },
+   "answer": {
+    "en": "CREATE TEMPORARY TABLE makes a table only this connection sees; it disappears when the connection ends. Each session can have its own with the same name, and it hides a real table of that name for that session. Use it to keep a step's rows for several later statements (a CTE lives for one statement only), and add an index if it is big. With a connection pool the session may be reused or replaced, so drop it when done.",
+    "hinglish": "CREATE TEMPORARY TABLE aisi table banata hai jo sirf ye connection dekhta hai; connection band hote hi khatam. Har session ki apni, same naam se, aur us session mein usi naam ki asli table chhup jaati hai. Kai statements mein ek step ki rows chahiye to kaam ki (CTE ek statement tak). Badi ho to index lagao; pool mein session dobara mil sakta hai, isliye kaam ke baad drop karo.",
+    "hindi": "Temporary table सिर्फ़ इसी connection में दिखती है और उसके साथ खत्म होती है।"
+   },
+   "mistake": {
+    "en": "Relying on a temporary table across requests in a pooled app: the next request may get another connection.",
+    "hinglish": "Pool wale app mein requests ke beech temporary table pe bharosa: agli request ko doosra connection mil sakta hai.",
+    "hindi": "Pool वाले app में temporary table पर भरोसा करना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "CREATE TEMPORARY TABLE scratch (id INT, note VARCHAR(20));\nINSERT INTO scratch VALUES (1, 'a'), (2, 'b');\nSELECT COUNT(*) AS n FROM scratch;\nDROP TEMPORARY TABLE scratch",
+      "postgresql": "CREATE TEMPORARY TABLE scratch (id INT, note VARCHAR(20));\nINSERT INTO scratch VALUES (1, 'a'), (2, 'b');\nSELECT COUNT(*) AS n FROM scratch;\nDROP TABLE scratch"
+     },
+     "columns": [
+      "n"
+     ],
+     "result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Session only; DROP TEMPORARY TABLE.",
+    "mariadb": "Lab: 2 rows seen in the session; DROP TEMPORARY TABLE.",
+    "postgresql": "Lab: the same; lives in pg_temp, DROP TABLE.",
+    "sqlserver": "Notes only (not lab-tested here): #name tables, session only.",
+    "oracle": "Notes only (not lab-tested here): Global temporary tables: the definition stays, the rows are per session.",
+    "sqlite": "Notes only (not lab-tested here): TEMP tables, per connection."
+   },
+   "fundamentals": [
+    "names_scope"
+   ],
+   "related": [
+    "cte_vs_temp_table",
+    "cte_scope",
+    "create_table_as"
+   ],
+   "source": "https://mariadb.com/kb/en/create-table/",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/temp-tables"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "group_by_expression",
+   "kind": "concept",
+   "title": {
+    "en": "Grouping by an expression (a CASE, a year)",
+    "hinglish": "Expression se GROUP BY (CASE, saal)",
+    "hindi": "Expression से GROUP BY (CASE, साल)"
+   },
+   "terms": [
+    [
+     "group by",
+     "(case|expression|calculated|computed|calculation)"
+    ],
+    [
+     "case",
+     "(groups?|buckets?|ranges?)",
+     "(count|group)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to group by a case expression",
+     "can i group by a calculated column"
+    ],
+    "hinglish": [
+     "case expression se group by kaise kare",
+     "calculated column pe group by kar sakte hai kya"
+    ],
+    "hindi": [
+     "CASE से GROUP BY कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "GROUP BY can take any expression, not only a column: GROUP BY CASE WHEN amount >= 20000 THEN 'big' ELSE 'small' END makes one group per bucket. Write the same expression in SELECT, or group by its SELECT name (GROUP BY size) or position (GROUP BY 1): MariaDB and PostgreSQL both accept the name. If the SELECT's expression differs from the grouped one even slightly, PostgreSQL refuses the column (42803) and MariaDB shows a value from any row of the group.",
+    "hinglish": "GROUP BY koi bhi expression le sakta hai: GROUP BY CASE WHEN amount >= 20000 THEN 'big' ELSE 'small' END har bucket ka ek group. SELECT mein wahi expression likho, ya SELECT ka naam (GROUP BY size) / position (GROUP BY 1): dono naam le lete hain. Expression thoda bhi alag ho to PostgreSQL mana (42803), MariaDB group ki kisi bhi row ki value dikha deta hai.",
+    "hindi": "GROUP BY में कोई भी expression चलता है; SELECT में वही expression या उसका नाम लिखें।"
+   },
+   "mistake": {
+    "en": "Grouping by one expression and showing a slightly different one in SELECT.",
+    "hinglish": "Ek expression se group karna aur SELECT mein thoda alag dikhana.",
+    "hindi": "एक expression से group करना और SELECT में अलग दिखाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT CASE WHEN amount >= 20000 THEN 'big' ELSE 'small' END AS size, COUNT(*) AS n FROM orders GROUP BY size ORDER BY 1"
+     },
+     "columns": [
+      "size",
+      "n"
+     ],
+     "result": [
+      [
+       "big",
+       "3"
+      ],
+      [
+       "small",
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Expression, name or position.",
+    "mariadb": "Lab: big 3, small 5 (expression or name).",
+    "postgresql": "Lab: big 3, small 5 (expression or name).",
+    "sqlserver": "Notes only (not lab-tested here): The expression only (no SELECT alias).",
+    "oracle": "Notes only (not lab-tested here): The expression only (no alias before 23c).",
+    "sqlite": "Notes only (not lab-tested here): Expression, name or position."
+   },
+   "fundamentals": [
+    "aggregation",
+    "case_logic"
+   ],
+   "related": [
+    "group_by",
+    "case_when",
+    "group_by_month"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/group-by"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "percent_rank",
+   "kind": "concept",
+   "title": {
+    "en": "PERCENT_RANK and CUME_DIST",
+    "hinglish": "PERCENT_RANK aur CUME_DIST",
+    "hindi": "PERCENT_RANK और CUME_DIST"
+   },
+   "terms": [
+    [
+     "percent_rank"
+    ],
+    [
+     "percent rank"
+    ],
+    [
+     "cume_dist"
+    ],
+    [
+     "percentile",
+     "(rank|window|position)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is percent_rank in sql",
+     "difference between percent_rank and cume_dist"
+    ],
+    "hinglish": [
+     "percent_rank kya hota hai",
+     "cume_dist kya karta hai"
+    ],
+    "hindi": [
+     "PERCENT_RANK क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Both say where a row stands in the window's order, as a share from 0 to 1. PERCENT_RANK = (rank - 1) / (rows - 1): the first row is 0, the last 1, ties share a value. CUME_DIST = rows up to and including this one (and its ties) / all rows: never 0, the last is 1. Use them for 'top 10%' style filters (in an outer query, since window results can't be in WHERE). Same on MariaDB and PostgreSQL.",
+    "hinglish": "Dono batate hain row kram mein kahan hai, 0 se 1 ke hisse mein. PERCENT_RANK = (rank - 1) / (rows - 1): pehli 0, aakhri 1, barabar wali same. CUME_DIST = is row tak (barabar wali samet) ki rows / saari rows: kabhi 0 nahi, aakhri 1. 'Top 10%' jaise filter ke liye (bahar ki query mein, WHERE mein window nahi chalta).",
+    "hindi": "PERCENT_RANK पहली row पर 0, आखिरी पर 1; CUME_DIST कभी 0 नहीं।"
+   },
+   "mistake": {
+    "en": "Filtering WHERE PERCENT_RANK() OVER (...) <= 0.1 in the same query: window results need an outer query.",
+    "hinglish": "Usi query mein WHERE PERCENT_RANK() OVER (...) <= 0.1: window ka result bahar ki query mein chahiye.",
+    "hindi": "उसी query के WHERE में PERCENT_RANK लगाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT id, salary, CAST(PERCENT_RANK() OVER (ORDER BY salary) AS DECIMAL(5,2)) AS pr, CAST(CUME_DIST() OVER (ORDER BY salary) AS DECIMAL(5,2)) AS cd FROM employees ORDER BY salary, id"
+     },
+     "columns": [
+      "id",
+      "salary",
+      "pr",
+      "cd"
+     ],
+     "result": [
+      [
+       "5",
+       "42000",
+       "0",
+       "0.14"
+      ],
+      [
+       "4",
+       "45000",
+       "0.17",
+       "0.29"
+      ],
+      [
+       "7",
+       "50000",
+       "0.33",
+       "0.43"
+      ],
+      [
+       "2",
+       "60000",
+       "0.5",
+       "0.71"
+      ],
+      [
+       "3",
+       "60000",
+       "0.5",
+       "0.71"
+      ],
+      [
+       "6",
+       "75000",
+       "0.83",
+       "0.86"
+      ],
+      [
+       "1",
+       "90000",
+       "1",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Supported (8.0+).",
+    "mariadb": "Lab: 42000 -> 0, 0.14; the two 60000 rows share 0.5, 0.71.",
+    "postgresql": "Lab: the same. Both return double precision there, and ROUND(x, 2) on a double fails (42883): cast to numeric first.",
+    "sqlserver": "Notes only (not lab-tested here): Supported.",
+    "oracle": "Notes only (not lab-tested here): Supported.",
+    "sqlite": "Notes only (not lab-tested here): Supported (3.28+)."
+   },
+   "fundamentals": [
+    "ranking",
+    "window_frames"
+   ],
+   "related": [
+    "rank_functions",
+    "ntile",
+    "window_in_where"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-window.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/window-functions"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  ]
 }

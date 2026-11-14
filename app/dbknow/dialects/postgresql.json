@@ -562,7 +562,11 @@
   "union_collation": {"behaviour": "works", "says": "PostgreSQL compares UNION rows exactly (its usual collation is case-sensitive): 'aarav@mail.test' and 'AARAV@mail.test' stay two rows.", "proven": ["postgresql"]},
   "repeated_subquery": {"behaviour": "slow", "says": "PostgreSQL's EXPLAIN shows one SubPlan per copy, except that a copy in ORDER BY identical to a SELECT item shares that item's SubPlan.", "proven": ["postgresql"]},
   "same_subquery": {"behaviour": "slow", "says": "PostgreSQL's EXPLAIN shows one InitPlan per copy (each worked out once, but each on its own).", "proven": ["postgresql"]},
-  "cte_read_twice": {"behaviour": "slow", "says": "PostgreSQL builds a CTE that is read twice once and keeps it, so a filter on one use stays outside (EXPLAIN: CTE Scan with the filter, after aggregating every row); AS NOT MATERIALIZED (12+) lets it in.", "proven": ["postgresql"]}
+  "cte_read_twice": {"behaviour": "slow", "says": "PostgreSQL builds a CTE that is read twice once and keeps it, so a filter on one use stays outside (EXPLAIN: CTE Scan with the filter, after aggregating every row); AS NOT MATERIALIZED (12+) lets it in.", "proven": ["postgresql"]},
+  "nulls_sort_order": {"behaviour": "works", "says": "PostgreSQL sorts NULLs last in ASC and first in DESC (lab: ORDER BY discount, id puts order 2 first); NULLS FIRST / LAST changes it.", "proven": ["postgresql"]},
+  "row_comparison": {"behaviour": "works", "says": "(a, b) > (x, y) works on PostgreSQL and is the row comparison its btree index can use for keyset paging; a NULL makes it not TRUE.", "proven": ["postgresql"]},
+  "volatile_once": {"behaviour": "differs", "says": "random() written twice gives two values per row (lab: 23 rows passed); a subquery in FROM or a CTE keeps one value per row (0 rows): volatile functions stop it being merged.", "proven": ["postgresql"]},
+  "exists_to_in": {"behaviour": "works", "says": "PostgreSQL plans IN (SELECT ...) and EXISTS as the same semi-join; NOT EXISTS becomes an anti-join, NOT IN does not (it must honour NULLs).", "proven": ["postgresql"]}
  },
  "proven": [
   "postgresql"

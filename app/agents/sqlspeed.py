@@ -498,9 +498,10 @@ def _key_like(col: str, table: str) -> bool:
     return any(_likely_primary("_".join(parts[i:]), _bare(col)) for i in range(len(parts)))
 
 
-def keyset_sql(sql: str, eng=None, min_offset: int = 1000):
+def keyset_sql(sql: str, eng=None, min_offset: int = 1000, mixed: bool = False):
     """(new query, the order columns, n, m) for a single-table SELECT ... ORDER BY <cols ending in the key> LIMIT n OFFSET m,
-    paged by the last row seen (named placeholders :last_<col>), or None."""
+    paged by the last row seen (named placeholders :last_<col>), or None. mixed: ASC and DESC in one ORDER BY are spelled
+    column by column (night 14), since a row comparison (a, b) > (x, y) only fits one direction."""
     C = _C()
     s = C._mask(sql)
     body = s.rstrip().rstrip(";").rstrip()
@@ -530,12 +531,18 @@ def keyset_sql(sql: str, eng=None, min_offset: int = 1000):
         if not tm or not _is_column(tm.group(1)):
             return None
         terms.append((tm.group(1), (tm.group(2) or "asc").lower()))
-    if not terms or len({d for _c, d in terms}) != 1 or not _key_like(terms[-1][0], table):
+    if not terms or len({d for _c, d in terms}) != 1 and not mixed or not _key_like(terms[-1][0], table):
         return None
     op = ">" if terms[0][1] == "asc" else "<"
     ph = [f":last_{_bare(c).lower()}" for c, _d in terms]
     cols = [c for c, _d in terms]
-    if len(cols) == 1:
+    if len({d for _c, d in terms}) != 1:
+        ors = []
+        for i in range(len(cols)):
+            ors.append(" AND ".join([f"{cols[j]} = {ph[j]}" for j in range(i)] +
+                                    [f"{cols[i]} {'>' if terms[i][1] == 'asc' else '<'} {ph[i]}"]))
+        cond = "(" + " OR ".join(f"({x})" if " AND " in x else x for x in ors) + ")"
+    elif len(cols) == 1:
         cond = f"{cols[0]} {op} {ph[0]}"
     elif eng == "postgresql":
         cond = f"({', '.join(cols)}) {op} ({', '.join(ph)})"

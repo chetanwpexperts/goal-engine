@@ -125,7 +125,11 @@
   "union_collation": {"behaviour": "works", "says": "MySQL/MariaDB compare UNION rows with the column's collation: under the usual _ci collation 'aarav@mail.test' and 'AARAV@mail.test' are one row (lab: 9 e-mails vs PostgreSQL's 10).", "proven": ["mariadb"]},
   "repeated_subquery": {"behaviour": "slow", "says": "MariaDB's EXPLAIN shows one DEPENDENT SUBQUERY per copy (its subquery cache may remember results for repeated outer values).", "proven": ["mariadb"]},
   "same_subquery": {"behaviour": "slow", "says": "MariaDB's EXPLAIN shows one SUBQUERY per copy.", "proven": ["mariadb"]},
-  "cte_read_twice": {"behaviour": "works", "says": "MariaDB pushes a filter on a CTE's GROUP BY column into each copy it reads (EXPLAIN FORMAT=JSON: attached_condition inside both), and refuses AS NOT MATERIALIZED (1064).", "proven": ["mariadb"]}
+  "cte_read_twice": {"behaviour": "works", "says": "MariaDB pushes a filter on a CTE's GROUP BY column into each copy it reads (EXPLAIN FORMAT=JSON: attached_condition inside both), and refuses AS NOT MATERIALIZED (1064).", "proven": ["mariadb"]},
+  "nulls_sort_order": {"behaviour": "works", "says": "MySQL and MariaDB sort NULLs first in ASC and last in DESC (lab: ORDER BY discount, id puts order 1, with no discount, first).", "proven": ["mariadb"]},
+  "row_comparison": {"behaviour": "works", "says": "(a, b) > (x, y) works on MySQL and MariaDB (lab: the same 6 rows as the spelled-out form); a NULL in either row makes it not TRUE.", "proven": ["mariadb"]},
+  "volatile_once": {"behaviour": "differs", "says": "RAND() written twice gives two values per row (lab: 10 rows passed 'r < 0.5 AND r >= 0.5'); inside a derived table or CTE it is worked out once per row (0 rows).", "proven": ["mariadb"]},
+  "exists_to_in": {"behaviour": "works", "says": "MariaDB rewrites a correlated EXISTS into IN by itself (EXISTS-to-IN optimization) and MySQL 8 runs both as semi-joins, so the plan rarely changes with the spelling.", "proven": ["mariadb"]}
  },
  "proven": [
   "mariadb"

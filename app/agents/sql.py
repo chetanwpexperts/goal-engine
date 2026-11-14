@@ -577,8 +577,17 @@ def _with_correctness(original: str, out: dict, said: str = "", extra: str = "")
         else:                                      # only 'check' items that change the result: offered, never applied as the fix
             out["suggested"] = c["corrected"]
             offered = {f["topic"] for f in c["findings"] if f["topic"] in MEANING_CHECKS}
+            asked = {t for t in offered if t.startswith("rw_")}
+            if asked:                                  # night 14: the form asked for replaced every other offer
+                offered = asked
             if offered and offered <= SPEED_OFFERS:
                 out["suggested_kind"] = "speed"          # the same rows, faster: 'try this form', not 'if that's what you meant'
+    try:                                              # night 14: what each rewrite keeps the same, and when it holds
+        from app.agents import sqlproof
+
+        sqlproof.prove(out)
+    except Exception:  # noqa: BLE001 - the proof is an extra; never let it break the check
+        pass
     return out
 
 
@@ -665,8 +674,14 @@ MEANING_CHECKS = {"count", "not_in", "date_range", "concat", "like", "and_or", "
                   # night 13: offered, not applied: the outer row named in a subquery, the subquery worked out once, UNION ALL /
                   # UNION, a filter moved before the grouping, a CTE read twice left unmaterialized
                   "scalar_uncorr", "corr_inner", "corr_key", "repeat_subquery", "same_subquery", "union_all", "union_all_dups",
-                  "having_key", "cte_filter_late"}
-SPEED_OFFERS = {"or_union", "keyset", "batch_change", "skip_locked", "repeat_subquery", "same_subquery", "having_key", "cte_filter_late"}               # the same rows, a faster form: offered as 'try this', shown on the card
+                  "having_key", "cte_filter_late",
+                  # night 14: offered, not applied: the same rows in another form (pre-aggregated, computed once, or the form
+                  # asked for), and a volatile expression computed once (changes the rows: 'if that's what you meant')
+                  "preagg", "compute_once", "volatile_repeat", "rw_exists", "rw_not_exists", "rw_in", "rw_not_in", "rw_join",
+                  "rw_cte", "rw_cte_derived", "rw_keyset", "rw_once"}
+SPEED_OFFERS = {"or_union", "keyset", "batch_change", "skip_locked", "repeat_subquery", "same_subquery", "having_key", "cte_filter_late",
+                "preagg", "compute_once", "rw_exists", "rw_not_exists", "rw_in", "rw_not_in", "rw_join", "rw_cte", "rw_cte_derived",
+                "rw_keyset", "rw_once"}               # the same rows, a faster form: offered as 'try this', shown on the card
 
 
 def _is_select(low: str) -> bool:

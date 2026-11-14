@@ -571,6 +571,16 @@ def _equivalence(res: dict, hi: bool) -> str:
                         "the same ORDER BY ending in a unique column, so 'after the last row seen' is exactly the next page")
         if bits:
             return ("Wahi rows kyun: " if hi else "Why it returns the same rows: ") + "; ".join(bits) + "."
+    proofs = [p for p in res.get("proof") or [] if p["verdict"] in ("same", "same_if")]
+    if proofs and (res.get("suggested_kind") == "speed" or res.get("rewritten")):   # night 14: the five things it keeps
+        from app.agents import sqlproof
+
+        p = proofs[0]
+        k = "hi" if hi else "en"
+        line = ("Wahi rows kyun (" if hi else "Why it returns the same rows (") + p["title"][k] + "): " + sqlproof.why(p["family"], hi) + "."
+        if p["verdict"] == "same_if":
+            line += (" Shart: " if hi else " It holds when ") + "; ".join(x[k] for x in p["holds_when"]) + "."
+        return line
     if res.get("suggested"):
         names = "; ".join(f["title_hi" if hi else "title_en"] for f in fs if f["kind"] == "check")[:300]
         return ("Ye wahi rows nahi deti: ye tab ke liye hai jab aapka matlab ye tha (" + names + "). Agar abhi wala result hi chahiye "

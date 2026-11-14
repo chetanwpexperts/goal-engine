@@ -1390,7 +1390,9 @@ def _norm(q: str) -> str:
 
 
 SPEED_TOPICS = {"sargable", "or_union", "keyset", "keyset_offset", "leading_wildcard", "select_star", "index_prefix", "index_range_first",
-                "implicit_cast", "repeat_subquery", "same_subquery", "having_key", "cte_filter_late", "star_join"}
+                "implicit_cast", "repeat_subquery", "same_subquery", "having_key", "cte_filter_late", "star_join",
+                "preagg", "compute_once", "rw_exists", "rw_not_exists", "rw_in", "rw_not_in", "rw_join", "rw_cte", "rw_cte_derived",
+                "rw_keyset", "rw_once"}
 
 
 def _sql_reply(ask, query, better, changed, res, hi) -> str:

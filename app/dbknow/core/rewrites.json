@@ -1,0 +1,532 @@
+{
+ "about": "Safe rewrites with proof (night 14), shared by every database (standing rule B). A rewrite is offered as 'the same rows' only when it keeps five things: which rows match (matching), what NULLs do (nulls), how many times each row comes (duplicates), the order promised by ORDER BY (ordering) and what one output row stands for (grain). Each family lists what it keeps, when it holds and when it breaks; app/agents/sqlproof.py attaches this to every rewrite DBaba offers, and tests/fuzz/stmtbugs.py (pf_* families) runs both forms on MariaDB and PostgreSQL and compares the rows.",
+ "dimensions": {
+  "matching": {
+   "en": "Matching",
+   "hi": "Kaunsi rows milti hain"
+  },
+  "nulls": {
+   "en": "NULLs",
+   "hi": "NULL"
+  },
+  "duplicates": {
+   "en": "Duplicates",
+   "hi": "Duplicate"
+  },
+  "ordering": {
+   "en": "Ordering",
+   "hi": "Order"
+  },
+  "grain": {
+   "en": "Grain",
+   "hi": "Grain (ek row = kya)"
+  }
+ },
+ "families": {
+  "preaggregate": {
+   "title": {
+    "en": "Pre-aggregate the correlated subqueries into one grouped derived table",
+    "hi": "Correlated subqueries ko ek grouped derived table mein pehle total karo"
+   },
+   "topics": [
+    "preagg",
+    "rw_cte"
+   ],
+   "keeps": {
+    "matching": {
+     "en": "each total still counts the child rows whose link column equals the outer row's column, with the same extra conditions (a condition only one total had moves inside that total as CASE WHEN ... THEN ... END)",
+     "hi": "har total wahi child rows ginta hai jinka link column bahar ki row ke column ke barabar hai, wahi extra conditions ke saath (jo condition sirf ek total ki thi wo us total ke andar CASE WHEN ... END ban jaati hai)"
+    },
+    "nulls": {
+     "en": "COUNT of no rows is 0 in the subquery but NULL after a LEFT JOIN, so it is wrapped in COALESCE(..., 0); SUM / AVG / MIN / MAX of no rows are NULL both ways; an outer row whose link is NULL matches nothing either way",
+     "hi": "subquery mein khaali COUNT 0 hai par LEFT JOIN ke baad NULL, isliye COALESCE(..., 0); SUM / AVG / MIN / MAX khaali pe dono taraf NULL; NULL link wali bahar ki row dono taraf kuch nahi milati"
+    },
+    "duplicates": {
+     "en": "the derived table is grouped by the link column, so each outer row meets at most one of its rows: no outer row is repeated",
+     "hi": "derived table link column se grouped hai, isliye har bahar ki row ko uski zyada se zyada ek row milti hai: koi row dohrayi nahi jaati"
+    },
+    "ordering": {
+     "en": "the outer ORDER BY and LIMIT are kept as written",
+     "hi": "bahar ka ORDER BY aur LIMIT waisa hi"
+    },
+    "grain": {
+     "en": "LEFT JOIN keeps every outer row, so one output row is still one outer row",
+     "hi": "LEFT JOIN har bahar ki row rakhta hai, isliye ek output row ab bhi ek bahar ki row hai"
+    }
+   },
+   "holds_when": [
+    {
+     "en": "each subquery reads one table, links to the outer row with one equality and has no GROUP BY / LIMIT of its own",
+     "hi": "har subquery ek table padhti hai, bahar ki row se ek '=' se judti hai, aur uska apna GROUP BY / LIMIT nahi"
+    }
+   ],
+   "breaks_when": [
+    {
+     "en": "the LEFT JOIN is written as a plain JOIN (outer rows without children disappear) or the COUNT is not wrapped in COALESCE (0 becomes NULL)",
+     "hi": "LEFT JOIN ki jagah JOIN (bina child wali rows gayab) ya COUNT bina COALESCE (0 ki jagah NULL)"
+    },
+    {
+     "en": "two child tables are joined first and totalled after (each total is multiplied by the other table's rows)",
+     "hi": "do child tables pehle join karke baad mein total (har total doosri table ki rows se guna ho jaata hai)"
+    }
+   ],
+   "fundamental": "grain",
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/derived-tables.html",
+    "https://mariadb.com/kb/en/derived-tables/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "compute_once": {
+   "title": {
+    "en": "Compute a repeated expression or subquery once",
+    "hi": "Dohraaya hua expression / subquery ek baar nikalo"
+   },
+   "topics": [
+    "compute_once",
+    "repeat_subquery",
+    "same_subquery",
+    "rw_once"
+   ],
+   "keeps": {
+    "matching": {
+     "en": "the WHERE condition is the same condition, applied to the named value instead of the copy",
+     "hi": "WHERE wahi condition hai, copy ki jagah naam wali value pe"
+    },
+    "nulls": {
+     "en": "the value is the same value, NULL included, so every comparison gives the same TRUE / FALSE / NULL",
+     "hi": "value wahi hai (NULL bhi), isliye har comparison wahi TRUE / FALSE / NULL deta hai"
+    },
+    "duplicates": {
+     "en": "a derived table without GROUP BY or DISTINCT keeps every row once",
+     "hi": "bina GROUP BY / DISTINCT ki derived table har row ek baar rakhti hai"
+    },
+    "ordering": {
+     "en": "ORDER BY sorts by the same value (by its name), LIMIT stays outside",
+     "hi": "ORDER BY wahi value (naam se) sort karta hai, LIMIT bahar"
+    },
+    "grain": {
+     "en": "one output row is still one row of the same FROM",
+     "hi": "ek output row ab bhi usi FROM ki ek row hai"
+    }
+   },
+   "holds_when": [
+    {
+     "en": "the expression gives the same value every time it is worked out on a row (no RAND(), random(), UUID(), SYSDATE(), clock_timestamp(), nextval())",
+     "hi": "expression ek row pe har baar wahi value de (RAND(), random(), UUID(), SYSDATE(), clock_timestamp(), nextval() nahi)"
+    }
+   ],
+   "breaks_when": [
+    {
+     "en": "the expression draws a new value each time (RAND()): the copies differ today, and computing once changes the rows (lab: 10 and 23 rows with two draws, 0 with one)",
+     "hi": "expression har baar nayi value nikale (RAND()): aaj copies alag hain, ek baar nikaalne se rows badal jaati hain (lab: do draw pe 10 / 23 rows, ek pe 0)"
+    }
+   ],
+   "fundamental": "repeated_work",
+   "source": "https://www.postgresql.org/docs/current/xfunc-volatility.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/rand/",
+    "https://dev.mysql.com/doc/refman/8.0/en/derived-table-optimization.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "in_to_exists": {
+   "title": {
+    "en": "IN (subquery) <-> EXISTS",
+    "hi": "IN (subquery) <-> EXISTS"
+   },
+   "topics": [
+    "rw_exists",
+    "rw_in"
+   ],
+   "keeps": {
+    "matching": {
+     "en": "a row passes when at least one inner row has the value: IN compares the outer value with the inner column, EXISTS puts that same comparison inside the subquery",
+     "hi": "row tab paas hoti hai jab kam se kam ek andar ki row mein wo value ho: IN bahar ki value ko andar ke column se milata hai, EXISTS wahi '=' subquery ke andar rakhta hai"
+    },
+    "nulls": {
+     "en": "IN can give NULL (no match and a NULL in the list, or a NULL outer value) where EXISTS gives FALSE; WHERE drops both, so the rows are the same when the test is not under NOT and not a value in SELECT",
+     "hi": "IN NULL de sakta hai (match nahi aur list mein NULL, ya bahar ki value NULL) jahan EXISTS FALSE deta hai; WHERE dono ko hataata hai, isliye rows wahi hain jab test NOT ke andar na ho aur SELECT ki value na ho"
+    },
+    "duplicates": {
+     "en": "both are semi-joins: an outer row comes once however many inner rows match",
+     "hi": "dono semi-join hain: kitni bhi andar ki rows milein, bahar ki row ek baar aati hai"
+    },
+    "ordering": {
+     "en": "ORDER BY untouched",
+     "hi": "ORDER BY waisa hi"
+    },
+    "grain": {
+     "en": "only a filter changes shape; one output row is still one outer row",
+     "hi": "sirf filter ki shakal badli; ek output row ab bhi ek bahar ki row"
+    }
+   },
+   "holds_when": [
+    {
+     "en": "the test is a condition of WHERE / ON, not under NOT and not a column of SELECT (there NULL and FALSE look different: lab, category 1 shows NULL with IN and 0 with EXISTS)",
+     "hi": "test WHERE / ON ki condition ho, NOT ke andar nahi aur SELECT ka column nahi (wahan NULL aur FALSE alag dikhte hain: lab mein category 1 IN se NULL, EXISTS se 0)"
+    }
+   ],
+   "breaks_when": [
+    {
+     "en": "NOT IN <-> NOT EXISTS: a NULL in the inner column makes NOT IN keep nothing, and a NULL outer value is dropped by NOT IN but kept by NOT EXISTS",
+     "hi": "NOT IN <-> NOT EXISTS: andar ke column mein ek NULL ho to NOT IN kuch nahi rakhta, aur NULL bahar ki value NOT IN hataata hai par NOT EXISTS rakhta hai"
+    }
+   ],
+   "fundamental": "subquery_shape",
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/exists-to-in-optimization/",
+    "https://dev.mysql.com/doc/refman/8.0/en/semijoins.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "not_in_to_not_exists": {
+   "title": {
+    "en": "NOT IN <-> NOT EXISTS (only with the NULL cases written out)",
+    "hi": "NOT IN <-> NOT EXISTS (NULL wale case likh ke hi)"
+   },
+   "topics": [
+    "rw_not_exists",
+    "rw_not_in",
+    "not_in_outer",
+    "qo_not_in",
+    "anti_join"
+   ],
+   "keeps": {
+    "matching": {
+     "en": "a row passes when no inner row has its value",
+     "hi": "row tab paas hoti hai jab kisi andar ki row mein uski value na ho"
+    },
+    "nulls": {
+     "en": "NOT IN is never TRUE when the inner column has a NULL or the outer value is NULL (unless the inner list is empty); the exact NOT EXISTS form adds those two tests, so it keeps exactly the rows NOT IN keeps",
+     "hi": "andar ke column mein NULL ho ya bahar ki value NULL ho to NOT IN kabhi TRUE nahi (jab tak list khaali na ho); sahi NOT EXISTS roop ye dono test jodta hai, isliye bilkul wahi rows rakhta hai jo NOT IN"
+    },
+    "duplicates": {
+     "en": "anti-joins: each outer row at most once",
+     "hi": "anti-join: har bahar ki row zyada se zyada ek baar"
+    },
+    "ordering": {
+     "en": "ORDER BY untouched",
+     "hi": "ORDER BY waisa hi"
+    },
+    "grain": {
+     "en": "one output row is still one outer row",
+     "hi": "ek output row ab bhi ek bahar ki row"
+    }
+   },
+   "holds_when": [
+    {
+     "en": "plain NOT EXISTS gives the same rows as NOT IN only when the inner column and the outer column have no NULLs (NOT NULL columns, or WHERE ... IS NOT NULL)",
+     "hi": "seedha NOT EXISTS NOT IN jaisi rows tabhi deta hai jab andar aur bahar ke column mein NULL na ho (NOT NULL column, ya WHERE ... IS NOT NULL)"
+    }
+   ],
+   "breaks_when": [
+    {
+     "en": "a NULL in the inner column: NOT IN keeps 0 rows, NOT EXISTS keeps the unmatched ones (lab: categories not used by any product: 0 vs 1 row)",
+     "hi": "andar ke column mein NULL: NOT IN 0 rows, NOT EXISTS bina match wali rakhta hai (lab: 0 vs 1 row)"
+    },
+    {
+     "en": "a NULL outer value: NOT IN drops the row, NOT EXISTS keeps it (lab: an employee with no department: 4 vs 5 rows)",
+     "hi": "NULL bahar ki value: NOT IN row hataata hai, NOT EXISTS rakhta hai (lab: 4 vs 5 rows)"
+    }
+   ],
+   "fundamental": "null_logic",
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/exists-to-in-optimization/",
+    "https://stackoverflow.com/questions/173041/not-in-vs-not-exists"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "in_to_join": {
+   "title": {
+    "en": "IN (subquery) -> JOIN a de-duplicated derived table",
+    "hi": "IN (subquery) -> de-duplicated derived table se JOIN"
+   },
+   "topics": [
+    "rw_join"
+   ],
+   "keeps": {
+    "matching": {
+     "en": "the join condition is the IN comparison: the outer value equals an inner value",
+     "hi": "join ki condition wahi IN wala '=' hai"
+    },
+    "nulls": {
+     "en": "a NULL never equals anything, in IN or in ON, so NULL rows are dropped by both",
+     "hi": "NULL kisi ke barabar nahi, IN mein bhi aur ON mein bhi, isliye dono NULL rows hataate hain"
+    },
+    "duplicates": {
+     "en": "SELECT DISTINCT in the derived table leaves each value once, so an outer row meets at most one row; a plain JOIN would repeat it once per matching inner row (lab: 8 rows instead of 5)",
+     "hi": "derived table ka SELECT DISTINCT har value ek baar rakhta hai, isliye bahar ki row ko zyada se zyada ek row milti hai; seedha JOIN har match pe row dohrata (lab: 5 ki jagah 8)"
+    },
+    "ordering": {
+     "en": "ORDER BY untouched",
+     "hi": "ORDER BY waisa hi"
+    },
+    "grain": {
+     "en": "one output row is still one outer row",
+     "hi": "ek output row ab bhi ek bahar ki row"
+    }
+   },
+   "holds_when": [
+    {
+     "en": "a positive IN in WHERE (NOT IN is an anti-join: use NOT EXISTS)",
+     "hi": "WHERE mein seedha IN (NOT IN anti-join hai: NOT EXISTS lo)"
+    }
+   ],
+   "breaks_when": [
+    {
+     "en": "joining the inner table itself without DISTINCT",
+     "hi": "andar ki table ko bina DISTINCT ke seedha join karna"
+    }
+   ],
+   "fundamental": "cardinality",
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/semijoins.html",
+    "https://mariadb.com/kb/en/semi-join-subquery-optimizations/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "union_to_union_all": {
+   "title": {
+    "en": "UNION -> UNION ALL only when no row can come twice",
+    "hi": "UNION -> UNION ALL sirf tab jab koi row do baar na aa sake"
+   },
+   "topics": [
+    "union_all",
+    "rw_union_all",
+    "union_all_dups"
+   ],
+   "keeps": {
+    "matching": {
+     "en": "the same parts with the same conditions",
+     "hi": "wahi parts, wahi conditions"
+    },
+    "nulls": {
+     "en": "UNION treats two NULLs as the same row; UNION ALL keeps both",
+     "hi": "UNION do NULL ko ek row maanta hai; UNION ALL dono rakhta hai"
+    },
+    "duplicates": {
+     "en": "UNION removes repeats between the parts AND inside each part; UNION ALL removes none, so they agree only when no part repeats a row and no two parts share one",
+     "hi": "UNION parts ke beech AUR har part ke andar ke repeats hataata hai; UNION ALL koi nahi, isliye dono tabhi barabar jab koi part row na dohraye aur do parts ki koi row common na ho"
+    },
+    "ordering": {
+     "en": "neither promises an order without ORDER BY",
+     "hi": "bina ORDER BY dono koi order nahi dete"
+    },
+    "grain": {
+     "en": "one output row per distinct row vs one per source row: equal only under the condition above",
+     "hi": "har alag row ek baar vs har source row: upar wali shart pe hi barabar"
+    }
+   },
+   "holds_when": [
+    {
+     "en": "a constant column differs per part (or the conditions exclude each other) AND each part lists a key or has DISTINCT / GROUP BY on its columns",
+     "hi": "har part mein alag constant column (ya ulti conditions) AUR har part mein key ya DISTINCT / GROUP BY"
+    }
+   ],
+   "breaks_when": [
+    {
+     "en": "parts that can share a value (customer ids and order customer_ids: 8 rows with UNION, 16 with UNION ALL in the lab)",
+     "hi": "parts jinki value common ho sakti hai (lab: UNION 8, UNION ALL 16)"
+    },
+    {
+     "en": "a part that repeats a row itself (cities of customers)",
+     "hi": "part jo khud row dohraye (customers ke shehar)"
+    }
+   ],
+   "fundamental": "set_operations",
+   "source": "https://www.postgresql.org/docs/current/queries-union.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/union/",
+    "https://dev.mysql.com/doc/refman/8.0/en/union.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "offset_to_keyset": {
+   "title": {
+    "en": "LIMIT ... OFFSET -> keyset paging",
+    "hi": "LIMIT ... OFFSET -> keyset paging"
+   },
+   "topics": [
+    "keyset",
+    "rw_keyset"
+   ],
+   "keeps": {
+    "matching": {
+     "en": "the same WHERE, plus 'after the last row shown' in the sort order",
+     "hi": "wahi WHERE, aur sort order mein 'aakhri dikhayi row ke baad'"
+    },
+    "nulls": {
+     "en": "a comparison with NULL is never TRUE, so rows with NULL in a sort column are never 'after' anything: the sort columns must not hold NULLs (and NULLs sort first on MariaDB, last on PostgreSQL)",
+     "hi": "NULL se comparison kabhi TRUE nahi, isliye sort column mein NULL wali rows kabhi 'baad' nahi aati: sort columns mein NULL nahi hone chahiye (MariaDB NULL pehle rakhta hai, PostgreSQL aakhir mein)"
+    },
+    "duplicates": {
+     "en": "the sort must end with a unique column (the key), so 'after this row' has exactly one meaning and no row is skipped or shown twice",
+     "hi": "sort ke aakhir mein unique column (key) ho, taaki 'is row ke baad' ka ek hi matlab ho aur koi row chhoote ya dohraye nahi"
+    },
+    "ordering": {
+     "en": "the same ORDER BY; with mixed ASC / DESC the condition is spelled column by column (a row comparison (a, b) > (x, y) only fits one direction)",
+     "hi": "wahi ORDER BY; ASC / DESC mile hon to condition column-dar-column likhi jaati hai ((a, b) > (x, y) sirf ek direction pe chalta hai)"
+    },
+    "grain": {
+     "en": "one page of the same rows",
+     "hi": "wahi rows ka ek page"
+    }
+   },
+   "holds_when": [
+    {
+     "en": "the ORDER BY ends with a unique column and its columns have no NULLs; the app keeps the last row's values",
+     "hi": "ORDER BY unique column pe khatam ho aur uske columns mein NULL na ho; app aakhri row ki values yaad rakhe"
+    }
+   ],
+   "breaks_when": [
+    {
+     "en": "a sort that is not unique (ties): OFFSET pages are not even repeatable then; add the key at the end first",
+     "hi": "sort unique nahi (ties): tab OFFSET ke page bhi pakke nahi; pehle aakhir mein key jodo"
+    },
+    {
+     "en": "NULLs in a sort column (lab: (discount, id) > (0, 0) keeps 3 of 8 orders)",
+     "hi": "sort column mein NULL (lab: 8 mein se 3 rows)"
+    }
+   ],
+   "fundamental": "index_use",
+   "source": "https://www.postgresql.org/docs/current/queries-limit.html",
+   "seen_at": [
+    "https://use-the-index-luke.com/no-offset",
+    "https://www.postgresql.org/docs/current/functions-comparisons.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "filter_earlier": {
+   "title": {
+    "en": "Move a filter before the grouping / into the CTE",
+    "hi": "Filter grouping se pehle / CTE ke andar le jao"
+   },
+   "topics": [
+    "having_key",
+    "cte_filter_late"
+   ],
+   "keeps": {
+    "matching": {
+     "en": "a condition on a GROUP BY column is true for every row of a group or for none, so filtering rows first keeps exactly the same groups",
+     "hi": "GROUP BY column ki condition group ki har row pe ya kisi pe nahi sach hoti, isliye pehle rows filter karne se wahi groups bachte hain"
+    },
+    "nulls": {
+     "en": "the same condition on the same values",
+     "hi": "wahi condition wahi values pe"
+    },
+    "duplicates": {
+     "en": "the same groups, each once",
+     "hi": "wahi groups, har ek ek baar"
+    },
+    "ordering": {
+     "en": "ORDER BY untouched",
+     "hi": "ORDER BY waisa hi"
+    },
+    "grain": {
+     "en": "one row per group, as before",
+     "hi": "pehle jaisa har group ki ek row"
+    }
+   },
+   "holds_when": [
+    {
+     "en": "the moved condition names only GROUP BY columns (no total)",
+     "hi": "le jaayi condition mein sirf GROUP BY columns hon (koi total nahi)"
+    }
+   ],
+   "breaks_when": [
+    {
+     "en": "a condition on a total (COUNT(*) > 1) must stay in HAVING",
+     "hi": "total pe condition (COUNT(*) > 1) HAVING mein hi rahegi"
+    }
+   ],
+   "fundamental": "filter_level",
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html#QUERIES-GROUP",
+   "seen_at": [
+    "https://mariadb.com/kb/en/condition-pushdown-into-derived-table-optimization/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "derived_to_cte": {
+   "title": {
+    "en": "A derived table written as a CTE (WITH)",
+    "hi": "Derived table ko CTE (WITH) mein likhna"
+   },
+   "topics": [
+    "rw_cte_derived"
+   ],
+   "keeps": {
+    "matching": {
+     "en": "the same query under a name",
+     "hi": "wahi query, ek naam ke saath"
+    },
+    "nulls": {
+     "en": "unchanged",
+     "hi": "waise hi"
+    },
+    "duplicates": {
+     "en": "unchanged: the CTE is read once, where the derived table stood",
+     "hi": "waise hi: CTE ek baar padha jaata hai, wahin jahan derived table thi"
+    },
+    "ordering": {
+     "en": "unchanged",
+     "hi": "waise hi"
+    },
+    "grain": {
+     "en": "unchanged",
+     "hi": "waise hi"
+    }
+   },
+   "holds_when": [
+    {
+     "en": "the name is not also the name of a table the query reads (a CTE hides that table everywhere in the query)",
+     "hi": "naam kisi table ka naam na ho jo query padhti hai (CTE us table ko poori query mein chhupa deta hai)"
+    }
+   ],
+   "breaks_when": [
+    {
+     "en": "MySQL before 8.0 and MariaDB before 10.2 have no WITH",
+     "hi": "MySQL 8.0 se pehle aur MariaDB 10.2 se pehle WITH nahi"
+    }
+   ],
+   "fundamental": "names_scope",
+   "source": "https://www.postgresql.org/docs/current/queries-with.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/with/",
+    "https://dev.mysql.com/doc/refman/8.0/en/with.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  }
+ }
+}

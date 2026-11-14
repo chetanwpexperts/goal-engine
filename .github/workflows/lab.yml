@@ -1,0 +1,38 @@
+# The night lab on the project's own server (docs/lab-server.md): SQL Server, Oracle and MongoDB in Docker, started for the
+# job and removed after it. Runs only on the self-hosted runner labelled dbaba-lab.
+#
+# Safety on a public repo: this job never runs for pull requests (a pull request from a fork could otherwise run code on the
+# server). It runs for pushes by people with write access to the knowledge branches, by hand, and on the night schedule.
+name: lab
+on:
+  workflow_dispatch:
+  push:
+    branches: ["db-knowledge*", "lab-*"]
+  schedule:
+    - cron: "30 20 * * *"            # 02:00 India time
+concurrency:
+  group: dbaba-lab                   # one lab at a time on the server
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  lab:
+    if: github.repository == 'chetanwpexperts/goal-engine'
+    runs-on: [self-hosted, dbaba-lab]
+    timeout-minutes: 120             # a stuck run can't keep the databases up into the day
+    steps:
+      - uses: actions/checkout@v4
+      - name: A fresh password for this run only
+        run: echo "LAB_PW=Lab_$(openssl rand -hex 12)A1!" >> "$GITHUB_ENV"
+      - name: Drivers
+        run: |
+          python3 -m venv .labenv
+          .labenv/bin/pip install -q pymssql oracledb pymongo
+          echo "$PWD/.labenv/bin" >> "$GITHUB_PATH"
+      - name: Start the lab databases
+        run: bash lab/up.sh
+      - name: Smoke test
+        run: python3 lab/smoke.py
+      - name: Remove the lab databases
+        if: always()
+        run: bash lab/down.sh

@@ -61,7 +61,7 @@ def _engine(sql: str):
 def _says(key: str, eng) -> str:
     from app.agents import sqlbasics
 
-    if eng in ("mysql", "postgresql"):
+    if eng:
         return sqlbasics.rules(eng).get(key, {}).get("says", "")
     return f"{sqlbasics.rules('mysql').get(key, {}).get('says', '')} {sqlbasics.rules('postgresql').get(key, {}).get('says', '')}".strip()
 

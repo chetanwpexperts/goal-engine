@@ -127,6 +127,9 @@ def run_sqlite(ex: dict) -> dict:
         out = (None, 0)
         for stmt in split_script(ex["sql"]["sqlite"]):
             cur = conn.execute(stmt)
+            if re.match(r"\s*explain\s+query\s+plan\b", stmt, re.I):
+                out = (["detail"], [[r[3]] for r in cur.fetchall()])   # what the plan says (its ids and numbers vary by version)
+                continue
             if cur.description:
                 out = ([x[0] for x in cur.description], [[S.norm(v) for v in r] for r in cur.fetchall()])
             elif out[0] is None:

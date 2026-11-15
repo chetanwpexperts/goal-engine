@@ -127,8 +127,12 @@ becomes a rule; an engine stops being "notes only" (rule A) once its own lab-pro
   - [x] Night 2: types and tables: type affinity in comparisons ('1' = 1, dates of two shapes), STRICT tables, INT PRIMARY
     KEY / AUTO_INCREMENT / SERIAL giving NULL ids, VARCHAR(n) not enforced, foreign keys off, ALTER TABLE rebuilds: the
     CREATE TABLE checker on SQLite.
-  - [ ] Night 3: every existing query rule re-checked on SQLite in the lab (NULLs, joins, bare columns in GROUP BY, integer
+  - [x] Night 3: every existing query rule re-checked on SQLite in the lab (NULLs, joins, bare columns in GROUP BY, integer
     division, LIMIT, subqueries, windows, upserts) and kept or recorded as different in sqlite.json; EXPLAIN QUERY PLAN.
+    Done: all 50 MySQL/PostgreSQL query_rules plus 9 of SQLite's own (ANY / ALL, a SELECT name in WHERE, a scalar subquery's
+    first row, x / 0, ORDER BY inside a UNION part, OFFSET without LIMIT, CAST's leading number ...) with lab lines; findings
+    in SQLite's words (wording / not_here / kinds); SQLite rewrites for + on text, UPDATE / DELETE LIMIT, DELETE ... USING,
+    REPLACE, random() twice (MATERIALIZED); its plans read; 16 concepts; 37 problems + 5 changes; 11 s3_* families.
   - [ ] Night 4: transactions and locking (BEGIN IMMEDIATE, WAL, busy timeout), a practice exam across the nights, and
     SQLite stops being notes-only.
 - [ ] **E2. SQL Server (6-8 nights).** TOP / OFFSET-FETCH, ISNULL vs COALESCE, GETDATE, [brackets], string + concatenation,

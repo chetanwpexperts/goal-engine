@@ -12,7 +12,8 @@
 Everything one engine owns (how it is named, its syntax marks, its error format) is in its dialect file
 (app/dbknow/dialects/<engine>.json: 'named', 'query_marks', 'weak_marks', 'error_marks'); this file only reasons over them.
 SQL Server, Oracle and SQLite are 'notes_only': recognised, answered with general SQL reasoning plus notes, and said so.
-SQLite's errors and its refused syntax are lab-tested already (E1 night 1, syntax_family), so its notes line says which.
+SQLite's errors and its refused syntax are lab-tested already (E1 night 1, syntax_family), and from E1 night 3 its query rules
+answer for it on their own (query_family), so its notes line says which parts are lab-tested.
 """
 
 import json
@@ -59,6 +60,14 @@ def syntax_family(eid: str | None) -> str | None:
     if eid in FAMILY:
         return FAMILY[eid]
     return eid if eid in ORDER and dialect(eid).get("port") and eid in dialect(eid).get("proven", []) else None
+
+
+def query_family(eid: str | None) -> str | None:
+    """Whose query rules answer for this database: the family for MySQL/MariaDB/PostgreSQL, and an engine's own id once its
+    dialect file's query_rules are lab-proven as a whole ('query_rules_proven': SQLite from E1 night 3). None otherwise."""
+    if eid in FAMILY:
+        return FAMILY[eid]
+    return eid if eid in ORDER and dialect(eid).get("query_rules_proven") and eid in dialect(eid).get("proven", []) else None
 
 
 def family(eid: str | None) -> str | None:

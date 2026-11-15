@@ -157,7 +157,8 @@
    "source": "https://dev.mysql.com/doc/refman/8.4/en/select.html",
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "subquery_shape": {
@@ -178,7 +179,8 @@
    "source": "https://dev.mysql.com/doc/refman/8.4/en/subquery-errors.html",
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "values_types": {
@@ -222,7 +224,8 @@
    "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-alias.html",
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "ranking": {
@@ -268,7 +271,8 @@
    "source": "https://dev.mysql.com/doc/refman/8.4/en/update.html",
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "precedence": {
@@ -295,7 +299,8 @@
    "source": "https://dev.mysql.com/doc/refman/8.4/en/join.html",
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "engine_syntax": {
@@ -352,7 +357,8 @@
    "source": "https://www.postgresql.org/docs/current/functions-aggregate.html",
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "correlation": {
@@ -373,7 +379,8 @@
    "source": "https://www.postgresql.org/docs/current/sql-expressions.html#SQL-SYNTAX-SCALAR-SUBQUERIES",
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "routine_flow": {
@@ -474,7 +481,8 @@
    "source": "https://www.postgresql.org/docs/current/functions-conditional.html#FUNCTIONS-CASE",
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "recursion": {
@@ -495,7 +503,8 @@
    "source": "https://www.postgresql.org/docs/current/queries-with.html#QUERIES-WITH-RECURSIVE",
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "window_frames": {
@@ -517,7 +526,8 @@
    "source": "https://www.postgresql.org/docs/current/sql-expressions.html#SYNTAX-WINDOW-FUNCTIONS",
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "index_use": {
@@ -545,7 +555,8 @@
     "plan_full_index",
     "plan_heap_fetches",
     "plan_dependent",
-    "plan_impossible"
+    "plan_impossible",
+    "plan_auto_index"
    ],
    "source": "https://dev.mysql.com/doc/refman/8.0/en/mysql-indexes.html",
    "seen_at": [
@@ -555,7 +566,8 @@
    ],
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "locking": {
@@ -693,7 +705,8 @@
    ],
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "repeated_work": {
@@ -712,7 +725,8 @@
    ],
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "rewrite_equivalence": {

@@ -519,6 +519,22 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
         ev = re.sub(r"\s+", " ", sql[m.start():b + 1])
         ev = ev if len(ev) <= 90 else ev[:87] + "..."
         fix_in = op == "="
+        from app.agents import sqlbasics as _B
+
+        _eng = _B.engine_seen(sql)
+        if _B.behaviour("scalar_subquery_rows", _eng) == "first_row":
+            F.append(Finding("check" if keyed else "wrong", "subquery",
+                             f"{col} {op} (SELECT ...) silently uses only the first row the subquery returns",
+                             f"{col} {op} (SELECT ...) chupchaap subquery ki sirf pehli row leta hai", ev,
+                             ("It filters on a key, so it probably returns one row; if it can return more, " if keyed else
+                              "Its WHERE can match several rows, and then ") + _B.says("scalar_subquery_rows", _eng) + " "
+                             + (f"Use {col} IN (SELECT ...): the same result for one row, and right for many."
+                                if fix_in else "Decide which row you mean: MIN() or MAX() inside the subquery."),
+                             _B.says_hi("scalar_subquery_rows", _eng) + " "
+                             + (f"{col} IN (SELECT ...) likho." if fix_in else "Subquery mein MIN() ya MAX() lagao.")))
+            if fix_in and not keyed:
+                edits.append((m.start(2), m.end(2), "IN"))
+            continue
         F.append(Finding("check" if keyed else "error", "subquery",
                          f"{col} {op} (SELECT ...) breaks when the subquery returns more than one row",
                          f"{col} {op} (SELECT ...) tab toot-ta hai jab subquery ek se zyada row de", ev,
@@ -1475,6 +1491,10 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
             w = m.group(1)
             if w.lower() in win_names:
                 continue
+            from app.agents import sqlbasics as _B
+
+            if _B.behaviour("alias_where", _B.engine_seen(sql)) == "works":
+                continue                                 # SQLite lets WHERE use a SELECT name (lab, E1 night 3)
             if w.lower() in sel_aliases and not any(w.lower() == (x.alias or "").lower() for x in srcs) and \
                     not re.match(r"\s*\.", wtext[m.end():]) and not any(w.lower() == c.lower() for _q, c, _p in all_refs) and \
                     not re.search(rf"(?<![\w.]){re.escape(w)}(?!\w)", re.sub(r"\s+as\s+\S+\s*$", "", sel_aliases[w.lower()]["text"], flags=re.I), re.I):
@@ -1707,7 +1727,30 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                 if w.lower() not in gbare and not any(w.lower() == c for _q, c in gref):
                     loose.append(w)
         loose = list(dict.fromkeys(loose))
-        if aggs and loose and group:
+        from app.agents import sqlbasics as _B
+
+        _eng = _B.engine_seen(sql)
+        if aggs and loose and _B.own_rules(_eng) and _B.behaviour("bare_columns", _eng) == "arbitrary":
+            # SQLite (lab, E1 night 3): no error; the plain column comes from one row of each group, and with exactly one MIN() or
+            # MAX() it is the row holding that minimum or maximum (its documented promise), so that one shape is only a check
+            sel = s[cl["select"][0]:cl["select"][1]]
+            minmax = len(re.findall(r"\b(min|max)\s*\(", sel, re.I)) == 1 and \
+                len(re.findall(r"\b(count|sum|avg|total|group_concat|string_agg)\s*\(", sel, re.I)) == 0
+            name = _B._label(_eng)
+            where_ = ("GROUP BY " + re.sub(r"\s+", " ", sql[group[0]:group[1]].strip())) if group else items[0]["text"][:60]
+            add("check" if minmax else "wrong", "group",
+                "Columns in SELECT that aren't grouped" if group else "A total (COUNT/SUM) next to plain columns, without GROUP BY",
+                "SELECT mein aise columns jo group nahi hue" if group else "Bina GROUP BY ke total (COUNT/SUM) aur plain columns saath",
+                where_,
+                f"{', '.join(loose[:6])}{' …' if len(loose) > 6 else ''} can have many values in one group. {_B.says('bare_columns', _eng)} "
+                + ("Here that is what one MIN()/MAX() gives: the other columns of the row with that value (ties: any one of them). "
+                   "Other databases refuse it; the same row everywhere: a ROW_NUMBER() window, or a join back to the MIN/MAX."
+                   if minmax else
+                   ("Either list rows without totals (drop the total and GROUP BY), or show totals with only the grouped columns."
+                    if group else "Add GROUP BY for the plain columns, or take them out.")),
+                f"{', '.join(loose[:6])} ek group mein kai value ho sakti hain. {_B.says_hi('bare_columns', _eng)} "
+                + ("Yahan ek MIN()/MAX() hai, isliye wahi row. " if minmax else "Total sirf group wale columns ke saath dikhao."))
+        elif aggs and loose and group:
             add("error", "group", "Columns in SELECT that aren't grouped", "SELECT mein aise columns jo group nahi hue",
                 "GROUP BY " + re.sub(r"\s+", " ", sql[group[0]:group[1]].strip()),
                 f"{', '.join(loose[:6])}{' …' if len(loose) > 6 else ''} can have many values in one group, so MySQL refuses the "
@@ -1929,6 +1972,8 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
 
         mine = {"postgresql": ["postgres"], "mysql": [_x for _x in ("mariadb", "mysql") if CHOSEN.get() == _x] or ["mysql", "mariadb"]}.get(
             _E.family(CHOSEN.get()) or "", [])
+        if not mine and _E.query_family(CHOSEN.get()):
+            mine = [_E.query_family(CHOSEN.get())]           # SQLite: none of these was proven on it, so none is said
         shown = {k: e for k, e in r["engines"].items() if k in mine} or r["engines"]   # the person's database speaks first
         if mine and not set(mine) & set(r["engines"]):
             continue                                          # proven on other databases only: not said for this one
@@ -2127,16 +2172,20 @@ def _in_engine_words(out: dict, engine: str) -> dict:
 
     from app.dbknow import engines as E
 
-    fam = E.family(engine)
-    if fam != "postgresql":
+    fam = E.query_family(engine)
+    if fam not in ("postgresql", "sqlite"):
         return out
     d = json.loads((Path(__file__).resolve().parents[1] / "dbknow" / "dialects" / f"{fam}.json").read_text(encoding="utf-8"))
     words = [(re.compile(w["re"]), w["to"]) for w in d.get("wording", [])]
     drop = [re.compile(x) for x in d.get("not_here", [])]
+    kinds = [(re.compile(k["re"]), k["kind"]) for k in d.get("kinds", [])]
     kept = []
     for f in out.get("findings", []):
         if any(rx.search(f.get("title_en", "")) for rx in drop):
             continue
+        for rx, kind in kinds:                    # what this database really does with it (lab): refused, or silently wrong
+            if rx.search(f.get("title_en", "")):
+                f["kind"] = kind
         for k in ("title_en", "title_hi", "fix_en", "fix_hi"):
             for rx, to in words:
                 if f.get(k):

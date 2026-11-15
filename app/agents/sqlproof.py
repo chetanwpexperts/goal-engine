@@ -521,6 +521,23 @@ def _compute_once(sql: str, q: dict, F, want: list) -> list:
         ev = _short(core, 80)
         if volatile:
             fn = VOLATILE.search(core_m).group(1).upper()
+            from app.agents import sqlbasics
+
+            eng = sqlbasics.engine_seen(sql)
+            if sqlbasics.behaviour("volatile_once", eng) == "differs" and sqlbasics.own_rules(eng):
+                # SQLite folds a derived table (and a plain WITH, and a SELECT name used in WHERE) into the outer query, so each
+                # copy is drawn again; only a MATERIALIZED WITH keeps one value per row (lab, E1 night 3)
+                m2 = re.fullmatch(r"SELECT (.*?)\nFROM \(\n(.*)\n\) (\w+)\n(.*)", new or "", re.S)
+                mat = (f"WITH {m2.group(3)} AS MATERIALIZED (\n{m2.group(2)}\n)\nSELECT {m2.group(1)}\nFROM {m2.group(3)}\n{m2.group(4)}"
+                       if m2 else None)
+                return [(F("check", "volatile_repeat", f"{fn}() is written {n} times: each copy draws a different value",
+                           f"{fn}() {n} baar likha hai: har copy alag value nikalti hai", ev,
+                           f"{fn}() gives a new value every time it is worked out, so the {alias} shown and the one WHERE tests are "
+                           f"two different draws. {sqlbasics.says('volatile_once', eng)} If the same value was meant"
+                           + (f", compute it once that way: the form is below. It changes the rows (that is the point)." if mat else
+                              ", compute it once in a WITH ... AS MATERIALIZED and filter on its name."),
+                           f"{fn}() har baar nayi value deta hai. {sqlbasics.says_hi('volatile_once', eng)}"),
+                         [(0, len(sql), mat)] if mat else [])]
             return [(F("check", "volatile_repeat", f"{fn}() is written {n} times: each copy draws a different value",
                        f"{fn}() {n} baar likha hai: har copy alag value nikalti hai", ev,
                        f"{fn}() gives a new value every time it is worked out, so the {alias} shown and the one WHERE tests are "

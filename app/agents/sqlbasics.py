@@ -58,10 +58,60 @@ def engine_seen(sql: str) -> str | None:
 
     chosen = CHOSEN.get()
     if chosen:
-        return E.family(chosen)              # notes-only (SQL Server, Oracle, SQLite) and 'not sure': no single family
+        return E.query_family(chosen)        # SQLite answers from its own query_rules (E1 night 3); SQL Server, Oracle, 'not sure': none
     my = any(rx.search(sql) for rx in _marks("mysql"))
     pg = any(rx.search(sql) for rx in _marks("postgresql"))
     return "mysql" if my and not pg else "postgresql" if pg and not my else None
+
+
+def _short(t: str, n: int = 40) -> str:
+    t = re.sub(r"\s+", " ", t).strip()
+    return t if len(t) <= n else t[:n - 1] + "…"
+
+
+def _label(eng) -> str:
+    from app.dbknow import engines as E
+
+    return E.label(eng)
+
+
+def own_rules(eng) -> bool:
+    """A database answered from its own query_rules that isn't one of the two families the first nights were written for
+    (SQLite, E1 night 3): code that names MySQL/PostgreSQL in its text asks the dialect file instead."""
+    return bool(eng) and eng not in ("mysql", "postgresql")
+
+
+def behaviour(key: str, eng):
+    """A database's fact for a rule: its 'behaviour' (or the plain value the first nights' files keep), None when unknown."""
+    if not eng:
+        return None
+    r = rules(eng).get(key)
+    return r.get("behaviour") if isinstance(r, dict) else r
+
+
+def says(key: str, eng) -> str:
+    """The engine fact from the dialect files (rule B): for the known database only, else for MySQL and PostgreSQL."""
+    if eng:
+        return rules(eng).get(key, {}).get("says", "")
+    return f"{rules('mysql').get(key, {}).get('says', '')} {rules('postgresql').get(key, {}).get('says', '')}".strip()
+
+
+def says_hi(key: str, eng) -> str:
+    r = rules(eng).get(key, {}) if eng else {}
+    return r.get("says_hi", r.get("says", ""))
+
+
+def verdict(key: str, eng) -> str | None:
+    """What a database's own behaviour makes of an engine-specific finding: None (it does what was meant), 'error' (refused),
+    'wrong' (runs, silently not what was meant) or 'check'."""
+    b = rules(eng).get(key, {}).get("behaviour")
+    if b in ("works", "fast", True):
+        return None
+    if b == "error":
+        return "error"
+    if b in ("arbitrary", "silent_first", "mixed", "converts_to_text", "first_row", "number", "prefix", "truncates"):
+        return "wrong"
+    return "check"                                  # 'build_option' (SQLite's UPDATE ... LIMIT), 'endless', 'slow' ...
 
 
 def _col(op: str) -> str:
@@ -120,6 +170,11 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
             continue
         if re.search(r"\binterval\s*$", sql[:m.start()], re.I) or re.match(r"\s*(day|month|year|hour|minute|second|week)\b", sql[m.end():], re.I):
             continue
+        if own_rules(eng):
+            new = " || ".join(parts)
+            out.append((F("wrong", "concat", "+ doesn't join text: use ||", "+ text nahi jodta: || lagao", sql[m.start():m.end()][:90],
+                          f"{says('plus_on_text', eng)} Here: {new}.", f"{says_hi('plus_on_text', eng)} Yahan: {new}."), (m.start(), m.end(), new)))
+            continue
         new = "CONCAT(" + ", ".join(parts) + ")"
         out.append((F("wrong", "concat", "+ doesn't join text: use CONCAT", "+ text nahi jodta: CONCAT lagao", sql[m.start():m.end()][:90],
                       "In MySQL and MariaDB + only adds numbers: each text part is turned into a number (usually 0), so the result "
@@ -133,7 +188,7 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
         parts = [p.strip() for p in re.split(r"\s*\|\|\s*", sql[m.start():m.end()])]
         if not any(p.startswith("'") and not re.fullmatch(r"'\d*'", p) for p in parts):
             continue                                       # a || b with no text in it may well be a logical OR
-        if eng == "postgresql":
+        if eng == "postgresql" or behaviour("pipes", eng) == "concat":
             continue
         new = "CONCAT(" + ", ".join(parts) + ")"
         sure = eng == "mysql"
@@ -167,7 +222,7 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
         a = m.end() - 1
         b = _close(s, a)
         args = _split_args(sql[a + 1:b])
-        if len(args) != 2 or (eng == "mysql" and fn == "ifnull"):
+        if len(args) != 2 or (eng == "mysql" and fn == "ifnull") or own_rules(eng):
             continue
         new = f"COALESCE({args[0]}, {args[1]})"
         pg = eng == "postgresql"
@@ -195,10 +250,12 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
         if "%" not in pat and "_" not in pat and pat:
             want = "contains" if CONTAINS.search(said) else "starts" if STARTS.search(said) else "ends" if ENDS.search(said) else ""
             new = {"contains": f"'%{pat}%'", "starts": f"'{pat}%'", "ends": f"'%{pat}'"}.get(want)
+            case = (f"({says('like_case', eng)})" if own_rules(eng) else
+                    "(case-insensitive on MySQL/MariaDB with the default collation, case-sensitive on PostgreSQL)")
             out.append((F("check", "like", f"LIKE '{pat}' has no wildcard, so it only finds exactly '{pat}'",
                           f"LIKE '{pat}' mein koi wildcard nahi, ye sirf poora '{pat}' dhoondhta hai", sql[m.start():m.end()][:80],
-                          "Without % or _ a LIKE works like =: whole-value match (case-insensitive on MySQL/MariaDB with the default "
-                          "collation, case-sensitive on PostgreSQL). For 'contains' write '%" + pat + "%', for 'starts with' '" + pat + "%'.",
+                          f"Without % or _ a LIKE works like =: whole-value match {case}. For 'contains' write '%" + pat + "%', for "
+                          "'starts with' '" + pat + "%'.",
                           "% ya _ ke bina LIKE = jaisa hai: poori value milti hai. 'Jisme ho' ke liye '%" + pat + "%', 'shuru ho' ke liye '" + pat + "%'."),
                         (lit_a, lit_b, new) if new else None))
             continue
@@ -262,7 +319,7 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
                         (pos, end, new)), [("not_null", (m.group(1) or "").strip('.`"') or None, m.group(2).strip('`"'))])
 
     # 11. CONCAT with a part that is often missing: NULL for the whole value on MySQL/MariaDB
-    if eng != "postgresql":
+    if eng != "postgresql" and behaviour("concat_null", eng) != "ignored":
         for m in re.finditer(r"\bconcat\s*\(", s, re.I):
             a = m.end() - 1
             b = _close(s, a)
@@ -291,7 +348,15 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
             continue
         if re.search(r"\d+\.\d+\s*\*\s*$|::\s*\w+\s*$|cast\s*\(\s*$", s[:m.start()], re.I):
             continue
-        sure = eng == "postgresql"
+        sure = eng == "postgresql" or behaviour("int_division", eng) == "truncates"
+        if own_rules(eng) and sure:
+            out.append((F("wrong", "division", f"COUNT(...) / COUNT(...) is whole-number division on {_label(eng)}",
+                          f"{_label(eng)} pe COUNT(...) / COUNT(...) poore number ka bhaag hai", sql[m.start():b + 1 + nxt.end()][:90],
+                          f"{says('int_division', eng)} So a share like 3/8 comes out as 0 (and x 100 is still 0). Multiply by 1.0 "
+                          f"first to keep the fraction: 1.0 * {sql[m.start():b + 1]} / ...",
+                          f"{says_hi('int_division', eng)} Pehle 1.0 se guna karo: 1.0 * {sql[m.start():b + 1]} / ..."),
+                        (m.start(), m.start(), "1.0 * ")))
+            continue
         out.append((F("wrong" if sure else "check", "division", "COUNT(...) / COUNT(...) is whole-number division on PostgreSQL",
                       "PostgreSQL pe COUNT(...) / COUNT(...) poore number ka bhaag hai", sql[m.start():b + 1 + nxt.end()][:90],
                       "On PostgreSQL an integer divided by an integer drops the fraction, so a share like 3/8 comes out as 0 (and "
@@ -299,6 +364,23 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
                       f"1.0 * {sql[m.start():b + 1]} / ...",
                       "PostgreSQL pe integer / integer ka decimal hissa kat jaata hai (3/8 = 0). Pehle 1.0 se guna karo: "
                       f"1.0 * {sql[m.start():b + 1]} / ..."), (m.start(), m.start(), "1.0 * ")))
+
+    # 12b. SUM(...) / COUNT(...) (or / SUM): on SQLite a DECIMAL column's whole values are stored as whole numbers, so the division
+    #      of two whole totals drops the fraction too (lab, E1 night 3: SUM(amount) / COUNT(*) = 87 for 100 and 75)
+    if own_rules(eng) and behaviour("int_division", eng) == "truncates":
+        for m in re.finditer(r"\bsum\s*\(", s, re.I):
+            a = m.end() - 1
+            b = _close(s, a)
+            nxt = re.match(r"\s*/\s*(count|sum)\s*\(", s[b + 1:], re.I)
+            if not nxt or re.search(r"\d+\.\d+\s*\*\s*$|cast\s*\(\s*$", s[:m.start()], re.I):
+                continue
+            c2 = _close(s, b + 1 + nxt.end() - 1)
+            whole = sql[m.start():c2 + 1]
+            out.append((F("check", "division", f"{_short(whole)}: whole-number division on {_label(eng)} when the values are whole",
+                          f"{_label(eng)} pe {_short(whole)} poore number ka bhaag ho sakta hai", whole[:90],
+                          f"{says('int_division', eng)} So an average of 100 and 75 written this way comes out as 87, not 87.5. "
+                          f"Multiply by 1.0 first: 1.0 * {whole} (or use AVG(), which always keeps the fraction on {_label(eng)}).",
+                          f"{says_hi('int_division', eng)} Pehle 1.0 se guna karo: 1.0 * {whole}."), (m.start(), m.start(), "1.0 * ")))
 
     # 13-15. ORDER BY ... LIMIT: NULLs first on one engine, ties, and LIMIT with no order at all
     if is_select:
@@ -336,14 +418,19 @@ def _order_limit(sql, s, dep, eng, F) -> list:
     if km and _col(km.group(2)) in OPTIONAL_SORT and "is null" not in s[oa:ob].lower():
         desc = (km.group(4) or "").lower() == "desc"
         nulls_first_on = "PostgreSQL" if desc else "MySQL and MariaDB"
-        if not ((eng == "mysql" and desc) or (eng == "postgresql" and not desc)):
+        mine = behaviour("nulls_in_desc", eng) if own_rules(eng) else None
+        if mine:
+            nulls_first_on = _label(eng)
+        if not ((eng == "mysql" and desc) or (eng == "postgresql" and not desc) or (mine == "last" and desc) or (mine == "first" and not desc)):
             col = (km.group(1) or "") + km.group(2)
             start = oa + p0 + (len(first) - len(first.lstrip()))
             end = oa + p0 + len(first.rstrip())
             new = f"{col} IS NULL, {sql[start:end]}"
+            where_ = (f"in {'DESC' if desc else 'ASC'} on {nulls_first_on}" if mine else
+                      'in DESC on PostgreSQL' if desc else 'in ASC on MySQL and MariaDB')
             out.append((F("check", "nulls_order", f"ORDER BY {_col(col)}{' DESC' if desc else ''} + LIMIT: on {nulls_first_on} the NULLs come first",
                           f"{nulls_first_on} pe NULL wali rows pehle aati hain", sql[start:end],
-                          f"Rows where {_col(col)} is NULL sort first {'in DESC on PostgreSQL' if desc else 'in ASC on MySQL and MariaDB'}, "
+                          f"Rows where {_col(col)} is NULL sort first {where_}, "
                           f"so the 'top' rows can be the ones with no {_col(col)} at all. ORDER BY {new} puts them last on every database.",
                           f"NULL wali rows pehle aa jaati hain, isliye 'top' mein khaali {_col(col)} wali rows aa sakti hain. ORDER BY {new} "
                           f"unhe har database pe aakhir mein rakhta hai."), (start, end, new)))
@@ -381,6 +468,17 @@ def _double_quoted(sql, s, eng, F) -> list:
     if eng == "mysql":
         return out
     for m in re.finditer(r"(=|<>|!=|\blike)\s*\"([^\"\n]*)\"(?!\s*\.)", sql, re.I):
+        if own_rules(eng):
+            if re.search(r"\.\s*$", sql[:m.start(2) - 1]):
+                continue
+            val = m.group(2)
+            new = "'" + val.replace("'", "''") + "'"
+            out.append((F("check", "quotes", f"\"{val}\" is read as a column name first on {_label(eng)}",
+                          f"{_label(eng)} \"{val}\" ko pehle column ka naam samajhta hai", sql[m.start():m.end()][:80],
+                          f"Text values go in single quotes. {says('double_quotes', eng)} {new} is always the text.",
+                          f"Text single quotes mein likho. {says_hi('double_quotes', eng)} {new} hamesha text hai."),
+                        (m.start(2) - 1, m.end(2) + 1, new)))
+            continue
         if re.search(r"\.\s*$", sql[:m.start(2) - 1]):
             continue
         val = m.group(2)

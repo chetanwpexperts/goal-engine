@@ -88,6 +88,9 @@ SHAPES = [                                     # (shape, pattern) in the order t
     ("define", r"^how (does|do|is|are) .* (handle|treat|deal with|handled|treated)\b"),
     # E1 night 2: 'how does sqlite decide / pick / store ...', 'how is X stored': how a database does something, a lesson
     ("define", r"^how (does|do|is|are) .* (decides?|decided|chooses?|chosen|picks?|picked|stores?|stored|keeps?|kept|works? out|reads?)\b"),
+    # E1 night 3: 'how does sqlite sort nulls', 'how does a database order / compare / treat / handle X': how it behaves, a lesson
+    ("define", r"^how (does|do|is|are) (?!.*\b(my|our|mera|meri|mere|hamara|hamari)\b).* (sorts?|sorted|orders?|ordered|compares?|"
+               r"compared|treats?|treated|handles?|handled|rounds?|rounded|divides?|divided)\b"),
     ("howto", r"\b(to )?kya (kare|karein|karen|karu|karun|karna chahiye)\b|क्या करें|(कर|ले|लिख) सकते (हैं|है)"),
 ]
 # a general yes/no question ('is mysql case sensitive', 'does a foreign key create an index'): answered when its words name a

@@ -37644,6 +37644,1610 @@
     "postgresql"
    ],
    "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_explain_query_plan",
+   "kind": "concept",
+   "title": {
+    "en": "Reading a query plan in SQLite (EXPLAIN QUERY PLAN)",
+    "hinglish": "SQLite mein query plan (EXPLAIN QUERY PLAN)",
+    "hindi": "SQLite में query plan (EXPLAIN QUERY PLAN)"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "explain query plan"
+    ],
+    [
+     "sqlite3?",
+     "(query|execution) plans?"
+    ],
+    [
+     "sqlite3?",
+     "\\.eqp"
+    ],
+    [
+     "sqlite3?",
+     "explain",
+     "(plan|index)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is explain query plan in sqlite",
+     "how to see the query plan in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein query plan kaise dekhe"
+    ],
+    "hindi": [
+     "SQLite में query plan कैसे देखें"
+    ]
+   },
+   "answer": {
+    "en": "Put EXPLAIN QUERY PLAN in front of a query: SQLite doesn't run it, it lists the steps it would take, one line per table or sub-step. SCAN t means every row of t is read; SEARCH t USING INDEX ix (col=?) means only the matching entries; USE TEMP B-TREE means a sort it had to do itself. There are no row counts or times (SQLite has no EXPLAIN ANALYZE): use the command line's .timer on, or time it in the app.",
+    "hinglish": "Query ke aage EXPLAIN QUERY PLAN lagao: SQLite query chalata nahi, bas steps batata hai. SCAN = poori table, SEARCH ... USING INDEX = sirf matching rows, USE TEMP B-TREE = khud ka sort. Row counts / time nahi milte (EXPLAIN ANALYZE nahi hai).",
+    "hindi": "Query से पहले EXPLAIN QUERY PLAN लगाइए: SCAN यानी पूरी table, SEARCH ... USING INDEX यानी सिर्फ़ matching rows।"
+   },
+   "mistake": {
+    "en": "Using plain EXPLAIN: in SQLite that prints the low-level bytecode program, not the plan.",
+    "hinglish": "Sirf EXPLAIN likhna: SQLite mein wo bytecode deta hai, plan nahi.",
+    "hindi": "सिर्फ़ EXPLAIN लिखना: वह bytecode देता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE INDEX ix_orders_status ON orders (status);\nEXPLAIN QUERY PLAN SELECT id FROM orders WHERE status = 'paid' ORDER BY order_date"
+     },
+     "columns": [
+      "detail"
+     ],
+     "result": [
+      [
+       "SEARCH orders USING INDEX ix_orders_status (status=?)"
+      ],
+      [
+       "USE TEMP B-TREE FOR ORDER BY"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): the plan read SEARCH orders USING INDEX ix_orders_status (status=?) and then USE TEMP B-TREE FOR ORDER BY.",
+    "mysql": "EXPLAIN (or EXPLAIN FORMAT=TREE / EXPLAIN ANALYZE in 8.0.18+) shows a table of access types.",
+    "mariadb": "Lab: EXPLAIN shows type / key / rows per table; ANALYZE FORMAT=JSON runs it.",
+    "postgresql": "Lab: EXPLAIN shows a tree of nodes with cost and rows; EXPLAIN ANALYZE runs it.",
+    "sqlserver": "Notes only (not lab-tested here): SET SHOWPLAN_TEXT ON or the graphical plan.",
+    "oracle": "Notes only (not lab-tested here): EXPLAIN PLAN FOR ... then DBMS_XPLAN.DISPLAY."
+   },
+   "fundamentals": [
+    "index_use"
+   ],
+   "related": [
+    "sqlite_scan_search",
+    "sqlite_temp_btree",
+    "explain"
+   ],
+   "source": "https://www.sqlite.org/eqp.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_scan_search",
+   "kind": "concept",
+   "title": {
+    "en": "SCAN and SEARCH in an SQLite plan",
+    "hinglish": "SQLite plan mein SCAN aur SEARCH",
+    "hindi": "SQLite plan में SCAN और SEARCH"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "\\bscan\\b",
+     "\\bsearch\\b"
+    ],
+    [
+     "sqlite3?",
+     "\\bscan\\b",
+     "(plan|mean\\w*|matlab|मतलब)"
+    ],
+    [
+     "sqlite3?",
+     "covering index",
+     "scan"
+    ],
+    [
+     "sqlite3?",
+     "explain",
+     "\\bsearch\\b"
+    ],
+    [
+     "sqlite3?",
+     "\\bsearch\\b",
+     "(plan|mean\\w*|matlab|मतलब)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what does SCAN mean in a sqlite query plan",
+     "SCAN vs SEARCH in sqlite"
+    ],
+    "hinglish": [
+     "sqlite plan mein SCAN ka matlab kya hai"
+    ],
+    "hindi": [
+     "SQLite plan में SCAN का मतलब क्या है"
+    ]
+   },
+   "answer": {
+    "en": "SEARCH t USING INDEX ix (col=?) jumps to the matching entries of an index: few rows read. SCAN t reads the whole table; SCAN t USING COVERING INDEX ix reads the whole index (smaller than the table, but still everything), usually because the query sorts or groups by it or wraps the column in a function. A SCAN of a big table that the query filters is the line to fix: index the filtered column and compare it bare.",
+    "hinglish": "SEARCH = index se seedha matching entries tak. SCAN t = poori table, SCAN ... USING COVERING INDEX = poora index. Badi table pe filter ke saath SCAN dikhe to us column ka index lagao aur column ko bina function compare karo.",
+    "hindi": "SEARCH यानी index से सीधे matching entries; SCAN यानी सब कुछ पढ़ा गया।"
+   },
+   "mistake": {
+    "en": "Thinking 'USING INDEX' always means fast: SCAN ... USING INDEX still reads every entry.",
+    "hinglish": "'USING INDEX' dekh ke tez maan lena: SCAN ... USING INDEX phir bhi sab padhta hai.",
+    "hindi": "'USING INDEX' को हमेशा तेज़ मानना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE INDEX ix_customers_city ON customers (city);\nEXPLAIN QUERY PLAN SELECT id FROM customers WHERE city = 'Pune'"
+     },
+     "columns": [
+      "detail"
+     ],
+     "result": [
+      [
+       "SEARCH customers USING INDEX ix_customers_city (city=?)"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "sqlite": "CREATE INDEX ix_customers_city ON customers (city);\nEXPLAIN QUERY PLAN SELECT id FROM customers WHERE substr(city, 1, 1) = 'P'"
+     },
+     "columns": [
+      "detail"
+     ],
+     "result": [
+      [
+       "SCAN customers"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): city = 'Pune' was a SEARCH through the index; substr(city, 1, 1) = 'P' read the whole index (SCAN ... USING COVERING INDEX).",
+    "mysql": "type ref / range vs ALL / index in EXPLAIN.",
+    "mariadb": "Lab: type ref vs ALL.",
+    "postgresql": "Lab: Index Scan vs Seq Scan.",
+    "sqlserver": "Notes only (not lab-tested here): Index Seek vs Index/Table Scan.",
+    "oracle": "Notes only (not lab-tested here): INDEX RANGE SCAN vs TABLE ACCESS FULL."
+   },
+   "fundamentals": [
+    "index_use"
+   ],
+   "related": [
+    "sqlite_explain_query_plan",
+    "sqlite_automatic_index"
+   ],
+   "source": "https://www.sqlite.org/eqp.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_automatic_index",
+   "kind": "concept",
+   "title": {
+    "en": "Automatic indexes in SQLite",
+    "hinglish": "SQLite mein automatic index",
+    "hindi": "SQLite में automatic index"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "automatic (partial )?(covering )?index\\w*"
+    ],
+    [
+     "sqlite3?",
+     "auto(matic)?[- ]index\\w*"
+    ],
+    [
+     "sqlite3?",
+     "temporary index\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is an automatic index in sqlite",
+     "why does sqlite create an automatic index"
+    ],
+    "hinglish": [
+     "sqlite mein automatic index kya hota hai"
+    ],
+    "hindi": [
+     "SQLite में automatic index क्या है"
+    ]
+   },
+   "answer": {
+    "en": "When a join (or, on newer versions, a correlated subquery) needs to look up a column that has no index, SQLite may build a temporary index on it for that one query (the plan says USING AUTOMATIC INDEX or AUTOMATIC COVERING INDEX) and throw it away afterwards. It works, but every run pays to build it: create that index for real.",
+    "hinglish": "Join ya correlated subquery ke column pe index na ho to SQLite us ek query ke liye temporary index bana leta hai (plan: AUTOMATIC INDEX) aur baad mein phenk deta hai. Har baar banta hai: asli index bana do.",
+    "hindi": "Index न हो तो SQLite एक query के लिए temporary index बनाता है; असली index बना दीजिए।"
+   },
+   "mistake": {
+    "en": "Reading AUTOMATIC INDEX as 'an index exists': it is rebuilt on every run.",
+    "hinglish": "AUTOMATIC INDEX ko 'index hai' samajhna: wo har baar banta hai.",
+    "hindi": "इसे स्थायी index समझना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "EXPLAIN QUERY PLAN SELECT c.id, d.id FROM customers c JOIN customers d ON d.city = c.city AND d.id <> c.id"
+     },
+     "columns": [
+      "detail"
+     ],
+     "result": [
+      [
+       "SCAN c"
+      ],
+      [
+       "SEARCH d USING AUTOMATIC COVERING INDEX (city=?)"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "sqlite": "CREATE INDEX ix_customers_city ON customers (city);\nEXPLAIN QUERY PLAN SELECT c.id, d.id FROM customers c JOIN customers d ON d.city = c.city AND d.id <> c.id"
+     },
+     "columns": [
+      "detail"
+     ],
+     "result": [
+      [
+       "SCAN c"
+      ],
+      [
+       "SEARCH d USING INDEX ix_customers_city (city=?)"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53 and Ubuntu's 3.45.1): customers paired by city, with no index on city, got SEARCH d USING AUTOMATIC COVERING INDEX (city=?); after CREATE INDEX it was a SEARCH through ix_customers_city. A correlated EXISTS got an automatic index on 3.53 but a full scan per row on 3.45.",
+    "mysql": "No automatic index: MySQL 8 runs EXISTS as a semi-join (materialization or a hash join).",
+    "mariadb": "Lab (MariaDB 10.11): no index is made on the table; an EXISTS was materialized once with a temporary unique key (<subquery2>, distinct_key).",
+    "postgresql": "Lab (PostgreSQL 16): a Hash Join over a HashAggregate of orders (hashed once); no index is built.",
+    "sqlserver": "Notes only (not lab-tested here): No automatic index: hash join or a spool.",
+    "oracle": "Notes only (not lab-tested here): No automatic index: hash join."
+   },
+   "fundamentals": [
+    "index_use",
+    "join_condition"
+   ],
+   "related": [
+    "sqlite_scan_search",
+    "sqlite_explain_query_plan"
+   ],
+   "source": "https://www.sqlite.org/optoverview.html#automatic_indexes",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_temp_btree",
+   "kind": "concept",
+   "title": {
+    "en": "USE TEMP B-TREE in an SQLite plan",
+    "hinglish": "SQLite plan mein USE TEMP B-TREE",
+    "hindi": "SQLite plan में USE TEMP B-TREE"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "temp b-?tree"
+    ],
+    [
+     "sqlite3?",
+     "use temp"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what does use temp b-tree for order by mean in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein temp b-tree kya hai"
+    ],
+    "hindi": [
+     "SQLite में TEMP B-TREE का मतलब क्या है"
+    ]
+   },
+   "answer": {
+    "en": "USE TEMP B-TREE FOR ORDER BY (or GROUP BY / DISTINCT) means SQLite had to sort the rows itself after finding them, in a temporary structure, because no index gives them in that order. On big results that is the slow part; an index on the WHERE's '=' columns followed by the ORDER BY columns returns them already sorted (and with LIMIT, only the first few are read).",
+    "hinglish": "USE TEMP B-TREE ka matlab: rows milne ke baad SQLite ne khud sort kiya, kyunki koi index wo kram nahi deta. '=' columns phir ORDER BY columns ka index lagao.",
+    "hindi": "मतलब: SQLite ने rows खुद sort कीं; सही index से यह हट जाता है।"
+   },
+   "mistake": {
+    "en": "Adding an index only on the ORDER BY column when the WHERE filters on another one.",
+    "hinglish": "Sirf ORDER BY column ka index jab WHERE doosre column pe hai.",
+    "hindi": "सिर्फ़ ORDER BY column का index।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE INDEX ix_orders_status ON orders (status);\nEXPLAIN QUERY PLAN SELECT id FROM orders WHERE status = 'paid' ORDER BY order_date"
+     },
+     "columns": [
+      "detail"
+     ],
+     "result": [
+      [
+       "SEARCH orders USING INDEX ix_orders_status (status=?)"
+      ],
+      [
+       "USE TEMP B-TREE FOR ORDER BY"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "sqlite": "CREATE INDEX ix_orders_status_date ON orders (status, order_date);\nEXPLAIN QUERY PLAN SELECT id FROM orders WHERE status = 'paid' ORDER BY order_date"
+     },
+     "columns": [
+      "detail"
+     ],
+     "result": [
+      [
+       "SEARCH orders USING INDEX ix_orders_status_date (status=?)"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): with an index on status alone the plan added USE TEMP B-TREE FOR ORDER BY; with (status, order_date) the sort step was gone.",
+    "mysql": "Using filesort in EXPLAIN's Extra.",
+    "mariadb": "Lab: Using filesort.",
+    "postgresql": "Lab: a Sort node above the scan.",
+    "sqlserver": "Notes only (not lab-tested here): A Sort operator.",
+    "oracle": "Notes only (not lab-tested here): SORT ORDER BY."
+   },
+   "fundamentals": [
+    "index_use"
+   ],
+   "related": [
+    "sqlite_explain_query_plan",
+    "sqlite_scan_search"
+   ],
+   "source": "https://www.sqlite.org/eqp.html#temporary_sorting_b_trees",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_bare_columns",
+   "kind": "concept",
+   "title": {
+    "en": "Columns not in GROUP BY in SQLite (bare columns)",
+    "hinglish": "SQLite mein GROUP BY ke bahar wale columns",
+    "hindi": "SQLite में GROUP BY से बाहर के columns"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "bare columns?"
+    ],
+    [
+     "sqlite3?",
+     "not in group by"
+    ],
+    [
+     "sqlite3?",
+     "group by",
+     "(ungrouped|non[- ]?aggregated|bahar|बाहर)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a bare column in sqlite",
+     "why does sqlite allow columns not in group by"
+    ],
+    "hinglish": [
+     "sqlite mein group by ke bahar wala column kyun chalta hai"
+    ],
+    "hindi": [
+     "SQLite में GROUP BY से बाहर का column क्यों चलता है"
+    ]
+   },
+   "answer": {
+    "en": "SQLite lets a SELECT with GROUP BY (or a total) show a column that isn't grouped, with no error: it takes the value from one row of each group, so the answer can be any row's value. The one exception it promises: with exactly one MIN() or MAX() in the SELECT, those columns come from the row holding that minimum or maximum. Other databases refuse it, so for anything else group by the column or use a window function.",
+    "hinglish": "SQLite GROUP BY ke saath bina group wala column bina error dikha deta hai: group ki kisi ek row ki value. Bas ek MIN()/MAX() ho to wahi row aati hai. Baaki databases mana karte hain.",
+    "hindi": "SQLite बिना error के group की किसी एक row की value दिखाता है; एक MIN()/MAX() हो तो वही row।"
+   },
+   "mistake": {
+    "en": "Trusting the extra column with COUNT() or SUM(): its value comes from an arbitrary row.",
+    "hinglish": "COUNT/SUM ke saath extra column pe bharosa: value kisi bhi row ki.",
+    "hindi": "COUNT/SUM के साथ extra column पर भरोसा।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT customer_id, id, MAX(amount) AS biggest FROM orders GROUP BY customer_id ORDER BY customer_id"
+     },
+     "columns": [
+      "customer_id",
+      "id",
+      "biggest"
+     ],
+     "result": [
+      [
+       "1",
+       "1",
+       "25500"
+      ],
+      [
+       "2",
+       "3",
+       "80000"
+      ],
+      [
+       "3",
+       "4",
+       "12000"
+      ],
+      [
+       "6",
+       "6",
+       "65000"
+      ],
+      [
+       "8",
+       "8",
+       "300"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): with one MAX(), id came from each customer's biggest order (customer 2: order 3 of 80000); with SUM() instead the id is not promised.",
+    "mysql": "Refused with ONLY_FULL_GROUP_BY (the default, error 1055).",
+    "mariadb": "Lab (MariaDB 10.11): runs and shows a value from one row.",
+    "postgresql": "Lab: refused (42803).",
+    "sqlserver": "Notes only (not lab-tested here): Refused (Msg 8120).",
+    "oracle": "Notes only (not lab-tested here): Refused (ORA-00979)."
+   },
+   "fundamentals": [
+    "aggregation",
+    "grain"
+   ],
+   "related": [
+    "sqlite_explain_query_plan"
+   ],
+   "source": "https://www.sqlite.org/lang_select.html#bare_columns_in_an_aggregate_query",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_integer_division",
+   "kind": "concept",
+   "title": {
+    "en": "Division in SQLite (7 / 2 = 3)",
+    "hinglish": "SQLite mein division (7 / 2 = 3)",
+    "hindi": "SQLite में division (7 / 2 = 3)"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "(integer|whole number|int) division"
+    ],
+    [
+     "sqlite3?",
+     "division"
+    ],
+    [
+     "sqlite3?",
+     "decimal",
+     "(kat|cut|lost|missing|gayab)"
+    ],
+    [
+     "sqlite3?",
+     "division",
+     "decimal\\w*"
+    ],
+    [
+     "sqlite3?",
+     "\\d+ ?/ ?\\d+"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why does division give a whole number in sqlite",
+     "integer division in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein division ka decimal kyun kat jaata hai"
+    ],
+    "hindi": [
+     "SQLite में division पूरा नंबर क्यों देता है"
+    ]
+   },
+   "answer": {
+    "en": "When both sides are whole numbers SQLite drops the fraction: 7 / 2 = 3. A DECIMAL or NUMERIC column holding 100 stores it as the whole number 100, so SUM(amount) / COUNT(*) can drop it too. Make one side a real number: 7 / 2.0, 1.0 * a / b, or CAST(a AS REAL) / b; AVG() always keeps the fraction.",
+    "hinglish": "Dono taraf poore number hon to SQLite fraction kaat deta hai: 7 / 2 = 3. DECIMAL column ki 100 bhi integer hai. 1.0 * a / b ya 7 / 2.0 likho; AVG() fraction rakhta hai.",
+    "hindi": "दोनों तरफ़ पूरे नंबर हों तो 7 / 2 = 3; 1.0 * a / b लिखिए।"
+   },
+   "mistake": {
+    "en": "Writing COUNT(*) / total * 100 for a percentage: it is 0 for anything below 100%.",
+    "hinglish": "Percentage ke liye COUNT(*) / total * 100: 100% se kam sab 0.",
+    "hindi": "प्रतिशत 0 आ जाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT 7 / 2 AS whole, 7 / 2.0 AS exact, SUM(amount) / COUNT(*) AS avg_cut, 1.0 * SUM(amount) / COUNT(*) AS avg_kept FROM orders WHERE id IN (2, 5, 8)"
+     },
+     "columns": [
+      "whole",
+      "exact",
+      "avg_cut",
+      "avg_kept"
+     ],
+     "result": [
+      [
+       "3",
+       "3.5",
+       "533",
+       "533.33"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): 7 / 2 gave 3 and 7 / 2.0 gave 3.5; the average of 500, 800 and 300 written as SUM / COUNT gave 533, and 533.33 with 1.0 *.",
+    "mysql": "Lab (MariaDB): 7 / 2 = 3.5000 (DIV gives 3).",
+    "mariadb": "Lab: 7 / 2 = 3.5000.",
+    "postgresql": "Lab: 7 / 2 = 3 for integers, numeric keeps the fraction.",
+    "sqlserver": "Notes only (not lab-tested here): int / int drops the fraction.",
+    "oracle": "Notes only (not lab-tested here): Keeps the fraction (NUMBER)."
+   },
+   "fundamentals": [
+    "values_types"
+   ],
+   "related": [
+    "sqlite_type_affinity"
+   ],
+   "source": "https://www.sqlite.org/lang_expr.html#operators_and_parse_affecting_attributes",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_concat",
+   "kind": "concept",
+   "title": {
+    "en": "Joining text in SQLite",
+    "hinglish": "SQLite mein text jodna",
+    "hindi": "SQLite में text जोड़ना"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "concat\\w*"
+    ],
+    [
+     "sqlite3?",
+     "(join|combine|jod\\w*) (two )?(strings|text|columns|names)"
+    ],
+    [
+     "sqlite3?",
+     "(strings?|text)",
+     "(जोड़\\w*|jod\\w*)"
+    ],
+    [
+     "sqlite3?",
+     "(join|combine|jod\\w*|merge)",
+     "(first|last|full) name"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to concatenate strings in sqlite",
+     "how to join two text columns in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein do text kaise jode"
+    ],
+    "hindi": [
+     "SQLite में strings कैसे जोड़ें"
+    ]
+   },
+   "answer": {
+    "en": "SQLite joins text with ||: first_name || ' ' || last_name. + only adds numbers (text becomes 0), so it never joins text. A NULL part makes the whole || result NULL: wrap such parts in IFNULL(x, ''). CONCAT() and CONCAT_WS() exist only from SQLite 3.44, and they skip NULL parts.",
+    "hinglish": "SQLite mein text || se judta hai: first_name || ' ' || last_name. + sirf number jodta hai. NULL hissa poora result NULL kar deta hai: IFNULL(x, '') lagao. CONCAT() 3.44 se hai.",
+    "hindi": "SQLite में text || से जुड़ता है; + सिर्फ़ नंबर जोड़ता है।"
+   },
+   "mistake": {
+    "en": "Using + as in SQL Server: 'a' + 'b' is 0 in SQLite, with no error.",
+    "hinglish": "SQL Server jaisa + likhna: SQLite mein 'a' + 'b' = 0.",
+    "hindi": "+ लिखना: नतीजा 0।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT first_name || ' ' || last_name AS full_name, first_name || ' ' || middle_name AS with_middle, first_name + last_name AS plus FROM customers WHERE id IN (1, 2) ORDER BY id"
+     },
+     "columns": [
+      "full_name",
+      "with_middle",
+      "plus"
+     ],
+     "result": [
+      [
+       "Aarav Shah",
+       "NULL",
+       "0"
+      ],
+      [
+       "Diya Patel",
+       "Diya K",
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): || joined the names; with a NULL middle name the result was NULL; + gave 0.",
+    "mysql": "Lab: CONCAT(); || is OR unless PIPES_AS_CONCAT.",
+    "mariadb": "Lab: CONCAT(); || is OR by default.",
+    "postgresql": "Lab: || or CONCAT().",
+    "sqlserver": "Notes only (not lab-tested here): + or CONCAT().",
+    "oracle": "Notes only (not lab-tested here): || or CONCAT() (two arguments)."
+   },
+   "fundamentals": [
+    "values_types",
+    "null_logic"
+   ],
+   "related": [
+    "concat",
+    "sqlite_type_affinity"
+   ],
+   "source": "https://www.sqlite.org/lang_expr.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_null_sort",
+   "kind": "concept",
+   "title": {
+    "en": "Where NULLs sort in SQLite",
+    "hinglish": "SQLite mein NULL sort mein kahan aata hai",
+    "hindi": "SQLite में NULL sort में कहाँ आते हैं"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "nulls? (first|last)"
+    ],
+    [
+     "sqlite3?",
+     "sort\\w*",
+     "nulls?"
+    ],
+    [
+     "sqlite3?",
+     "order by",
+     "nulls?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how does sqlite sort nulls",
+     "nulls last in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein NULL sort mein kahan aata hai"
+    ],
+    "hindi": [
+     "SQLite में NULL sort में कहाँ आते हैं"
+    ]
+   },
+   "answer": {
+    "en": "SQLite treats NULL as smaller than any value: NULLs come first in ORDER BY ... ASC and last in DESC (as MySQL does; PostgreSQL is the other way round). From 3.30, write NULLS FIRST or NULLS LAST to choose; on older versions ORDER BY col IS NULL, col puts them last.",
+    "hinglish": "SQLite mein NULL sabse chhota: ASC mein pehle, DESC mein aakhir. 3.30 se NULLS LAST likho; purane version pe ORDER BY col IS NULL, col.",
+    "hindi": "ASC में NULL पहले; NULLS LAST (3.30+) से आख़िर में।"
+   },
+   "mistake": {
+    "en": "ORDER BY discount ... LIMIT 3 for 'the smallest discounts' and getting the rows with no discount.",
+    "hinglish": "'Sabse kam' ke liye LIMIT aur NULL wali rows aa jaana.",
+    "hindi": "NULL वाली rows ऊपर आ जाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT id, discount FROM orders ORDER BY discount, id LIMIT 3"
+     },
+     "columns": [
+      "id",
+      "discount"
+     ],
+     "result": [
+      [
+       "1",
+       "NULL"
+      ],
+      [
+       "4",
+       "NULL"
+      ],
+      [
+       "5",
+       "NULL"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "sqlite": "SELECT id, discount FROM orders ORDER BY discount NULLS LAST, id LIMIT 3"
+     },
+     "columns": [
+      "id",
+      "discount"
+     ],
+     "result": [
+      [
+       "2",
+       "50"
+      ],
+      [
+       "6",
+       "500"
+      ],
+      [
+       "3",
+       "1000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): plain ORDER BY discount put orders 1, 4 and 5 (no discount) first; NULLS LAST put 2, 6 and 3 first.",
+    "mysql": "Lab: NULLs first in ASC; no NULLS LAST (use col IS NULL).",
+    "mariadb": "Lab: NULLs first in ASC.",
+    "postgresql": "Lab: NULLs last in ASC; NULLS FIRST / LAST exist.",
+    "sqlserver": "Notes only (not lab-tested here): NULLs first in ASC.",
+    "oracle": "Notes only (not lab-tested here): NULLs last in ASC; NULLS FIRST / LAST exist."
+   },
+   "fundamentals": [
+    "null_logic",
+    "ranking"
+   ],
+   "related": [
+    "nulls_sort_order"
+   ],
+   "source": "https://www.sqlite.org/lang_select.html#the_order_by_clause",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_update_join",
+   "kind": "concept",
+   "title": {
+    "en": "UPDATE with another table in SQLite",
+    "hinglish": "SQLite mein doosri table se UPDATE",
+    "hindi": "SQLite में दूसरी table से UPDATE"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "update",
+     "join\\w*"
+    ],
+    [
+     "sqlite3?",
+     "update",
+     "\\bfrom\\b"
+    ],
+    [
+     "sqlite3?",
+     "update",
+     "(another|other|second|doosri|दूसरी) table"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to update with a join in sqlite",
+     "update from another table in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein join ke saath update kaise kare"
+    ],
+    "hindi": [
+     "SQLite में join के साथ update कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "SQLite has no UPDATE ... JOIN. From 3.33 it writes UPDATE t SET col = o.col FROM other o WHERE o.key = t.key; before that, a subquery per column: SET col = (SELECT o.col FROM other o WHERE o.key = t.key) WHERE EXISTS (...). Each row is changed once, so if the other table has several matches only one of them is used: check that first with a SELECT.",
+    "hinglish": "SQLite mein UPDATE ... JOIN nahi. 3.33 se: UPDATE t SET col = o.col FROM other o WHERE o.key = t.key; usse pehle SET col = (SELECT ...). Pehle SELECT se dekh lo.",
+    "hindi": "UPDATE t SET col = o.col FROM other o WHERE o.key = t.key (3.33+)।"
+   },
+   "mistake": {
+    "en": "Writing MySQL's UPDATE a JOIN b ... SET: SQLite stops at JOIN (syntax error).",
+    "hinglish": "MySQL ka UPDATE a JOIN b likhna: syntax error.",
+    "hindi": "MySQL वाला UPDATE ... JOIN लिखना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "UPDATE orders SET status = 'vip' FROM customers c WHERE c.id = orders.customer_id AND c.city = 'Chennai';\nSELECT id, status FROM orders WHERE status = 'vip'"
+     },
+     "columns": [
+      "id",
+      "status"
+     ],
+     "result": [
+      [
+       "6",
+       "vip"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): the order of the customer from Chennai (order 6) became 'vip'; UPDATE orders JOIN customers ... was a syntax error.",
+    "mysql": "Lab: UPDATE a JOIN b ON ... SET a.col = ...",
+    "mariadb": "Lab: UPDATE a JOIN b ON ... SET a.col = ...",
+    "postgresql": "Lab: UPDATE a SET col = ... FROM b WHERE ...",
+    "sqlserver": "Notes only (not lab-tested here): UPDATE a SET ... FROM a JOIN b ON ...",
+    "oracle": "Notes only (not lab-tested here): MERGE, or a correlated subquery."
+   },
+   "fundamentals": [
+    "changes_safety",
+    "engine_syntax"
+   ],
+   "related": [
+    "sqlite_delete_join",
+    "sqlite_upsert"
+   ],
+   "source": "https://www.sqlite.org/lang_update.html#update_from",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_delete_join",
+   "kind": "concept",
+   "title": {
+    "en": "DELETE using another table in SQLite",
+    "hinglish": "SQLite mein doosri table ke hisaab se DELETE",
+    "hindi": "SQLite में दूसरी table के हिसाब से DELETE"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "delete",
+     "join\\w*"
+    ],
+    [
+     "sqlite3?",
+     "delete",
+     "(using|another table|other table|doosri table|दूसरी table)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to delete with a join in sqlite",
+     "delete rows using another table in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein join se delete kaise kare"
+    ],
+    "hindi": [
+     "SQLite में join से delete कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "SQLite's DELETE names one table and has no JOIN or USING. Pick the rows with a subquery: DELETE FROM t WHERE EXISTS (SELECT 1 FROM other o WHERE o.key = t.key AND ...) or DELETE FROM t WHERE key IN (SELECT ...). Run the same condition as a SELECT first to see what goes.",
+    "hinglish": "SQLite ke DELETE mein JOIN / USING nahi. DELETE FROM t WHERE EXISTS (SELECT 1 FROM other o WHERE o.key = t.key ...) likho. Pehle wahi condition SELECT se dekho.",
+    "hindi": "DELETE FROM t WHERE EXISTS (SELECT 1 FROM other ...) लिखिए।"
+   },
+   "mistake": {
+    "en": "Writing DELETE t FROM t JOIN ... (MySQL) or DELETE FROM t USING ... (PostgreSQL): both are syntax errors in SQLite.",
+    "hinglish": "MySQL / PostgreSQL wala DELETE likhna: syntax error.",
+    "hindi": "दूसरे database वाला DELETE लिखना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "DELETE FROM payments WHERE EXISTS (SELECT 1 FROM orders o WHERE o.id = payments.order_id AND o.status = 'shipped');\nSELECT COUNT(*) AS left_payments FROM payments"
+     },
+     "columns": [
+      "left_payments"
+     ],
+     "result": [
+      [
+       "5"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): the payment of the shipped order (order 2) went and 5 payments were left; DELETE ... USING was a syntax error.",
+    "mysql": "Lab: DELETE a FROM a JOIN b ON ...",
+    "mariadb": "Lab: DELETE a FROM a JOIN b ON ...",
+    "postgresql": "Lab: DELETE FROM a USING b WHERE ...",
+    "sqlserver": "Notes only (not lab-tested here): DELETE a FROM a JOIN b ON ...",
+    "oracle": "Notes only (not lab-tested here): A subquery (DELETE FROM a WHERE EXISTS ...)."
+   },
+   "fundamentals": [
+    "changes_safety",
+    "engine_syntax"
+   ],
+   "related": [
+    "sqlite_update_join"
+   ],
+   "source": "https://www.sqlite.org/lang_delete.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_update_limit",
+   "kind": "concept",
+   "title": {
+    "en": "UPDATE / DELETE with LIMIT in SQLite",
+    "hinglish": "SQLite mein LIMIT ke saath UPDATE / DELETE",
+    "hindi": "SQLite में LIMIT के साथ UPDATE / DELETE"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "(update|delete)",
+     "limit"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to update with limit in sqlite",
+     "delete with limit in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein limit ke saath delete kaise kare"
+    ],
+    "hindi": [
+     "SQLite में limit के साथ delete कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "Whether UPDATE and DELETE take ORDER BY / LIMIT depends on how SQLite was built (the SQLITE_ENABLE_UPDATE_DELETE_LIMIT option): the lab's Python build of 3.53 refused it, Ubuntu's libsqlite3 3.45 ran it. Picking the rows by rowid works on every build: DELETE FROM t WHERE rowid IN (SELECT rowid FROM t WHERE ... ORDER BY ... LIMIT 100). Without ORDER BY, which rows are picked isn't defined.",
+    "hinglish": "UPDATE/DELETE ke saath LIMIT SQLite ke build pe tika hai (Ubuntu ka leta hai, kai builds nahi). Rowid se chuno, har build pe chalta hai: DELETE FROM t WHERE rowid IN (SELECT rowid FROM t WHERE ... ORDER BY ... LIMIT 100).",
+    "hindi": "rowid से चुनिए: WHERE rowid IN (SELECT rowid ... LIMIT n)।"
+   },
+   "mistake": {
+    "en": "Copying DELETE ... LIMIT from MySQL: it works on one machine's SQLite and fails ('near LIMIT: syntax error') on another's.",
+    "hinglish": "MySQL se DELETE ... LIMIT copy karna: syntax error.",
+    "hindi": "MySQL से DELETE ... LIMIT लाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "DELETE FROM orders WHERE rowid IN (SELECT rowid FROM orders WHERE status = 'paid' ORDER BY order_date LIMIT 2);\nSELECT id FROM orders WHERE status = 'paid' ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "5"
+      ],
+      [
+       "7"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53, Python's build): the two oldest paid orders (1 and 3) went with the rowid form, and DELETE ... LIMIT 2 was a syntax error; Ubuntu's 3.45.1 library ran DELETE ... LIMIT too.",
+    "mysql": "Lab: UPDATE/DELETE ... ORDER BY ... LIMIT n works on one table.",
+    "mariadb": "Lab: works on one table.",
+    "postgresql": "Lab: refused; pick rows with ctid or the key in a subquery.",
+    "sqlserver": "Notes only (not lab-tested here): TOP (n) in UPDATE / DELETE.",
+    "oracle": "Notes only (not lab-tested here): WHERE ROWNUM <= n, or FETCH FIRST in a subquery."
+   },
+   "fundamentals": [
+    "changes_safety",
+    "engine_syntax"
+   ],
+   "related": [
+    "sqlite_rowid",
+    "sqlite_delete_join"
+   ],
+   "source": "https://www.sqlite.org/lang_delete.html#optional_limit_and_order_by_clauses",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_double_quotes",
+   "kind": "concept",
+   "title": {
+    "en": "Single and double quotes in SQLite",
+    "hinglish": "SQLite mein single aur double quotes",
+    "hindi": "SQLite में single और double quotes"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "double quot\\w*"
+    ],
+    [
+     "sqlite3?",
+     "single quot\\w*"
+    ],
+    [
+     "sqlite3?",
+     "quotes?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "single vs double quotes in sqlite",
+     "why does a double quoted string work in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein double quotes ka matlab kya hai"
+    ],
+    "hindi": [
+     "SQLite में double quotes का मतलब क्या है"
+    ]
+   },
+   "answer": {
+    "en": "'text' in single quotes is a value; \"name\" in double quotes is a column or table name. SQLite bends this for old code: if no column has that name it quietly takes \"x\" as text, so WHERE city = \"Pune\" seems to work, until a column with that name exists and it silently compares with the column. Always write values in single quotes.",
+    "hinglish": "Single quotes = value, double quotes = column/table ka naam. SQLite purane code ke liye \"x\" ko text maan leta hai agar us naam ka column na ho, par column ho to chupchaap column se tulna. Value hamesha single quotes mein.",
+    "hindi": "Value हमेशा single quotes में; double quotes नाम के लिए।"
+   },
+   "mistake": {
+    "en": "WHERE status = \"status\": it compares the column with itself and returns every row.",
+    "hinglish": "WHERE status = \"status\": har row aa jaati hai.",
+    "hindi": "\"status\" लिखने पर हर row आ जाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT COUNT(*) AS as_text FROM orders WHERE status = \"paid\""
+     },
+     "columns": [
+      "as_text"
+     ],
+     "result": [
+      [
+       "4"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "sqlite": "SELECT COUNT(*) AS as_column FROM orders WHERE status = \"status\""
+     },
+     "columns": [
+      "as_column"
+     ],
+     "result": [
+      [
+       "8"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): \"paid\" was taken as text (4 orders); \"status\" was the column itself, so all 8 rows matched.",
+    "mysql": "Lab: double quotes are text unless ANSI_QUOTES.",
+    "mariadb": "Lab: double quotes are text by default.",
+    "postgresql": "Lab: double quotes are always names (42703 for a value).",
+    "sqlserver": "Notes only (not lab-tested here): Names, with QUOTED_IDENTIFIER ON.",
+    "oracle": "Notes only (not lab-tested here): Names (case-sensitive)."
+   },
+   "fundamentals": [
+    "values_types",
+    "names_scope"
+   ],
+   "related": [
+    "quote_names",
+    "sqlite_case_compare"
+   ],
+   "source": "https://www.sqlite.org/quirks.html#double_quoted_string_literals_are_accepted",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_any_all",
+   "kind": "concept",
+   "title": {
+    "en": "ANY / ALL with a subquery in SQLite",
+    "hinglish": "SQLite mein subquery ke saath ANY / ALL",
+    "hindi": "SQLite में subquery के साथ ANY / ALL"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "\\bany\\b",
+     "\\ball\\b"
+    ],
+    [
+     "sqlite3?",
+     "\\bany\\b",
+     "subquer\\w*"
+    ],
+    [
+     "sqlite3?",
+     "\\ball\\b",
+     "subquer\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can i use any and all with a subquery in sqlite",
+     "how to write all subquery in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein ANY ALL subquery kaise likhe"
+    ],
+    "hindi": [
+     "SQLite में ANY और ALL subquery कैसे लिखें"
+    ]
+   },
+   "answer": {
+    "en": "SQLite has no ANY / ALL / SOME before a subquery (syntax error near SELECT). Say it with one value: x = ANY (...) is x IN (...); x <> ALL (...) is x NOT IN (...); x > ANY (SELECT c ...) is x > (SELECT MIN(c) ...); x > ALL (SELECT c ...) is x > (SELECT MAX(c) ...) when c has no NULLs.",
+    "hinglish": "SQLite mein subquery se pehle ANY / ALL nahi. = ANY ko IN, > ANY ko > (SELECT MIN(c) ...), > ALL ko > (SELECT MAX(c) ...) likho (c mein NULL na ho).",
+    "hindi": "= ANY को IN, > ALL को > (SELECT MAX(c) ...) लिखिए।"
+   },
+   "mistake": {
+    "en": "Using MAX for > ALL when the column has NULLs: ALL is then never true, MAX ignores the NULL.",
+    "hinglish": "NULL wale column pe > ALL ki jagah MAX: nateeja alag.",
+    "hindi": "NULL वाले column पर MAX।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT id FROM products WHERE price > (SELECT MAX(price) FROM products WHERE category_id = 2) ORDER BY id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "3"
+      ],
+      [
+       "6"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): products dearer than every product of category 2 were found with MAX(); > ALL (SELECT ...) was a syntax error.",
+    "mysql": "Lab: ANY / ALL / SOME work.",
+    "mariadb": "Lab (MariaDB 10.11): > ALL (SELECT ...) gave products 3 and 6, = ANY worked.",
+    "postgresql": "Lab (PostgreSQL 16): the same rows with > ALL and = ANY.",
+    "sqlserver": "Notes only (not lab-tested here): ANY / ALL / SOME work.",
+    "oracle": "Notes only (not lab-tested here): ANY / ALL / SOME work."
+   },
+   "fundamentals": [
+    "subquery_shape",
+    "engine_syntax"
+   ],
+   "related": [
+    "not_in_null"
+   ],
+   "source": "https://www.sqlite.org/lang_expr.html#the_in_and_not_in_operators",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_recursive_cte",
+   "kind": "concept",
+   "title": {
+    "en": "Recursive queries in SQLite (WITH RECURSIVE)",
+    "hinglish": "SQLite mein recursive query",
+    "hindi": "SQLite में recursive query"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "recursive\\w*"
+    ],
+    [
+     "sqlite3?",
+     "with recursive"
+    ],
+    [
+     "sqlite3?",
+     "(hierarch\\w*|tree|parent.?child)",
+     "(query|quer\\w*|likh\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to write a recursive query in sqlite",
+     "what is with recursive in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein recursive query kaise likhe"
+    ],
+    "hindi": [
+     "SQLite में recursive query कैसे लिखें"
+    ]
+   },
+   "answer": {
+    "en": "WITH RECURSIVE n AS (start rows UNION ALL rows made from n) walks a tree or makes a series. SQLite has no round limit at all: a recursive part with no stopping condition runs until it is interrupted, so put the stop in its WHERE (or LIMIT on the outer query). It also accepts the WITH without the word RECURSIVE, but other databases need it.",
+    "hinglish": "WITH RECURSIVE n AS (shuru ki rows UNION ALL n se bani rows). SQLite mein round ki koi limit nahi: rukne ki condition WHERE mein zaroor likho.",
+    "hindi": "रुकने की शर्त WHERE में ज़रूर लिखिए; SQLite खुद नहीं रोकता।"
+   },
+   "mistake": {
+    "en": "Leaving out the stop condition: SQLite never stops by itself.",
+    "hinglish": "Rukne ki condition chhodna: SQLite khud nahi rukta.",
+    "hindi": "रुकने की शर्त छोड़ना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "WITH RECURSIVE tree(id, name, depth) AS (SELECT id, name, 0 FROM categories WHERE parent_id IS NULL UNION ALL SELECT c.id, c.name, t.depth + 1 FROM categories c JOIN tree t ON c.parent_id = t.id) SELECT id, name, depth FROM tree ORDER BY depth, id"
+     },
+     "columns": [
+      "id",
+      "name",
+      "depth"
+     ],
+     "result": [
+      [
+       "1",
+       "Electronics",
+       "0"
+      ],
+      [
+       "4",
+       "Books",
+       "0"
+      ],
+      [
+       "5",
+       "Toys",
+       "0"
+      ],
+      [
+       "2",
+       "Phones",
+       "1"
+      ],
+      [
+       "3",
+       "Laptops",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): the category tree came out level by level; a series with no stop ran past 5000 rounds.",
+    "mysql": "Lab: WITH RECURSIVE (8.0+), stops at cte_max_recursion_depth (1000).",
+    "mariadb": "Lab: stops after max_recursive_iterations (1000) without error.",
+    "postgresql": "Lab: no round limit.",
+    "sqlserver": "Notes only (not lab-tested here): No RECURSIVE word; MAXRECURSION 100 by default.",
+    "oracle": "Notes only (not lab-tested here): No RECURSIVE word, or CONNECT BY."
+   },
+   "fundamentals": [
+    "recursion"
+   ],
+   "related": [
+    "recursive_cte",
+    "hierarchy_query"
+   ],
+   "source": "https://www.sqlite.org/lang_with.html#recursive_common_table_expressions",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_divide_by_zero",
+   "kind": "concept",
+   "title": {
+    "en": "Dividing by zero in SQLite",
+    "hinglish": "SQLite mein zero se divide",
+    "hindi": "SQLite में zero से divide"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "divi\\w* by (zero|0)"
+    ],
+    [
+     "sqlite3?",
+     "(zero|0)",
+     "divide\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what happens when you divide by zero in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein zero se divide karne pe kya hota hai"
+    ],
+    "hindi": [
+     "SQLite में zero से divide करने पर क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "SQLite returns NULL for x / 0 and x % 0, with no error, so a ratio quietly becomes NULL (and SUM / AVG then skip it). Decide what an empty divisor should mean and say it: x / NULLIF(y, 0) for NULL on purpose, or CASE WHEN y = 0 THEN 0 ELSE 1.0 * x / y END.",
+    "hinglish": "SQLite x / 0 pe bina error NULL deta hai. Matlab tay karo: x / NULLIF(y, 0) ya CASE WHEN y = 0 THEN 0 ELSE 1.0 * x / y END.",
+    "hindi": "SQLite x / 0 पर NULL देता है, बिना error के।"
+   },
+   "mistake": {
+    "en": "Expecting an error to catch: the NULL just flows into the report.",
+    "hinglish": "Error ki ummeed: NULL chupchaap report mein aa jaata hai.",
+    "hindi": "error की उम्मीद करना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT 5 / 0 AS int_div, 5.0 / 0 AS real_div, 5 % 0 AS remainder, COALESCE(5 / NULLIF(0, 0), 0) AS chosen"
+     },
+     "columns": [
+      "int_div",
+      "real_div",
+      "remainder",
+      "chosen"
+     ],
+     "result": [
+      [
+       "NULL",
+       "NULL",
+       "NULL",
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): 5 / 0, 5.0 / 0 and 5 % 0 all gave NULL; the chosen form gave 0.",
+    "mysql": "Lab (MariaDB): NULL with a warning (an error in strict mode for changes).",
+    "mariadb": "Lab (MariaDB 10.11): SELECT 5 / 0 gave NULL (with a warning).",
+    "postgresql": "Lab (PostgreSQL 16): division by zero (22012).",
+    "sqlserver": "Notes only (not lab-tested here): Error 8134.",
+    "oracle": "Notes only (not lab-tested here): Error ORA-01476."
+   },
+   "fundamentals": [
+    "null_logic",
+    "values_types"
+   ],
+   "related": [
+    "sqlite_integer_division",
+    "coalesce"
+   ],
+   "source": "https://www.sqlite.org/lang_expr.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_alias_in_where",
+   "kind": "concept",
+   "title": {
+    "en": "Using a SELECT name in WHERE in SQLite",
+    "hinglish": "SQLite mein WHERE mein SELECT ka naam",
+    "hindi": "SQLite में WHERE में SELECT का नाम"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "alias\\w*",
+     "where"
+    ],
+    [
+     "sqlite3?",
+     "(naam|name|नाम)",
+     "where"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can i use a column alias in where in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein where mein alias chalta hai kya"
+    ],
+    "hindi": [
+     "SQLite में WHERE में alias चलता है क्या"
+    ]
+   },
+   "answer": {
+    "en": "Yes, SQLite lets WHERE (and GROUP BY, HAVING) use a name made in the SELECT list, which MySQL and PostgreSQL refuse. Two catches: if a real column has the same name, WHERE means the column; and a name for random() or another changing value is worked out again in WHERE, not reused. Repeating the expression keeps the query portable.",
+    "hinglish": "Haan, SQLite WHERE mein SELECT ka naam maan leta hai (MySQL/PostgreSQL nahi). Par us naam ka asli column ho to column jeetta hai, aur random() jaisi value dobara banti hai.",
+    "hindi": "हाँ, SQLite WHERE में SELECT का नाम मानता है; उसी नाम का column हो तो column जीतता है।"
+   },
+   "mistake": {
+    "en": "Naming a total the same as a column (SUM(amount) AS amount) and filtering WHERE amount > ...: that is the column, not the total.",
+    "hinglish": "Total ka naam column jaisa rakhna: WHERE mein column aata hai.",
+    "hindi": "Total का नाम column जैसा रखना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT id, amount * 2 AS doubled FROM orders WHERE doubled > 100000 ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "doubled"
+     ],
+     "result": [
+      [
+       "3",
+       "160000"
+      ],
+      [
+       "6",
+       "130000"
+      ]
+     ]
+    },
+    {
+     "sql": {
+      "sqlite": "SELECT id, amount * 2 AS amount FROM orders WHERE amount > 30000 ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "amount"
+     ],
+     "result": [
+      [
+       "3",
+       "160000"
+      ],
+      [
+       "6",
+       "130000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): WHERE doubled > 100000 used the SELECT name (orders 3 and 6); WHERE amount > 30000 meant the real column (order 1, whose doubled amount is 51000, stayed out).",
+    "mysql": "Lab: refused (1054 Unknown column).",
+    "mariadb": "Lab: refused (1054).",
+    "postgresql": "Lab: refused (42703).",
+    "sqlserver": "Notes only (not lab-tested here): Refused (Msg 207).",
+    "oracle": "Notes only (not lab-tested here): Refused (ORA-00904)."
+   },
+   "fundamentals": [
+    "names_scope"
+   ],
+   "related": [
+    "alias",
+    "having_alias"
+   ],
+   "source": "https://www.sqlite.org/lang_select.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
   }
  ]
 }

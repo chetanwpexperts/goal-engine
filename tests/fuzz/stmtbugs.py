@@ -104,13 +104,21 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         # or text, dates written in another shape), the rewrite's rows compared with the intended query's on SQLite
         "s2_int_pk", "s2_auto_after", "s2_identity", "s2_autoinc_int", "s2_options", "s2_inline_key", "s2_unique_key", "s2_enum",
         "s2_default_now", "s2_on_update", "s2_string", "s2_strict",
-        "s2_strftime_eq", "s2_strftime_ge", "s2_strftime_text", "s2_date_unpadded", "s2_date_dmy", "s2_length_text"]
+        "s2_strftime_eq", "s2_strftime_ge", "s2_strftime_text", "s2_date_unpadded", "s2_date_dmy", "s2_length_text",
+        # E1 (SQLite) night 3: the query rules re-checked on SQLite: + on text (|| joins it), whole-number division (COUNT / COUNT,
+        # SUM / COUNT), ANY / ALL and MINUS it doesn't have, OFFSET without LIMIT, a scalar subquery that silently keeps its first
+        # row, and UPDATE / DELETE with LIMIT or a table name in SET; each rewrite run on SQLite against the intended statement
+        "s3_plus_concat", "s3_count_share", "s3_sum_count", "s3_eq_any", "s3_ne_all", "s3_minus", "s3_offset", "s3_first_row",
+        "s3_update_limit", "s3_delete_limit", "s3_set_qualified"]
 SL_TOPIC = {b: "dialect" for b in BUGS if b.startswith("sl_")}
 SL_TOPIC.update({"sl_cast_date": "cast_date", "sl_date_minus": "date_math", "sl_date_plus": "date_math"})
 SL_TOPIC.update({"s2_int_pk": "sqlite_rowid_pk", "s2_autoinc_int": "sqlite_rowid_pk", "s2_string": "sqlite_affinity",
                  "s2_strict": "sqlite_strict_type", "s2_strftime_eq": "type_compare", "s2_strftime_ge": "type_compare",
                  "s2_strftime_text": "type_compare", "s2_date_unpadded": "date_shape", "s2_date_dmy": "date_shape",
                  "s2_length_text": "type_compare"})
+SL_TOPIC.update({"s3_plus_concat": "concat", "s3_count_share": "division", "s3_sum_count": "division", "s3_eq_any": "dialect",
+                 "s3_ne_all": "dialect", "s3_minus": "dialect", "s3_offset": "dialect", "s3_first_row": "subquery",
+                 "s3_update_limit": "change_limit", "s3_delete_limit": "change_limit", "s3_set_qualified": "set_qualified"})
 SL_TOPIC.update({b: "ddl_dialect" for b in ("s2_auto_after", "s2_identity", "s2_options", "s2_inline_key", "s2_unique_key", "s2_enum",
                                             "s2_default_now", "s2_on_update")})
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
@@ -537,6 +545,8 @@ def make(seed: int):
         return _sqlite_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("s2_"):
         return _sqlite2_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("s3_"):
+        return _sqlite3_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -2365,6 +2375,89 @@ def _sqlite2_bug(seed, bug, rnd, schema, tables, t):
         broken += rnd.choice(["\n\n-- sqlite", "\n\n-- for our SQLite file"])
     return {"seed": seed, "bug": bug, "stmt": "ddl", "schema": schema, "table": new, "broken": broken, "truth": truth, "engine": "sqlite",
             "only": ["sqlite"], "lite_ddl": True, "probe": (pcols, probe)}
+
+
+def _sqlite3_bug(seed, bug, rnd, schema, tables, t):
+    """E1 (SQLite) night 3: the first nights' query mistakes as they show on SQLite, and other databases' query words SQLite
+    refuses. truth = the statement in SQLite's words, written independently; both run on SQLite only."""
+    pk, name = t["pk"], t["name"]
+    col = lambda *kinds: [c for c in t["cols"] if c["kind"] in kinds]   # noqa: E731
+    texts, ints, cats = col("name", "cat", "text"), col("int"), col("cat")
+    out = {"seed": seed, "bug": bug, "schema": schema, "table": name, "engine": "sqlite", "only": ["sqlite"], "stmt": "select"}
+    if bug == "s3_plus_concat":
+        if len(texts) < 2:
+            return None
+        a, b = rnd.sample(texts, 2)
+        sep = rnd.choice(["' '", "', '", "' - '"])
+        broken = f"SELECT {pk}, {a['name']} + {sep} + {b['name']} AS label\nFROM {name}\nORDER BY {pk}"
+        truth = f"SELECT {pk}, {a['name']} || {sep} || {b['name']} AS label\nFROM {name}\nORDER BY {pk}"
+    elif bug == "s3_count_share":
+        if not cats:
+            return None
+        c = rnd.choice(cats)
+        v = rnd.choice(c["params"])
+        broken = f"SELECT COUNT(CASE WHEN {c['name']} = '{v}' THEN 1 END) / COUNT(*) AS share\nFROM {name}"
+        truth = f"SELECT 1.0 * COUNT(CASE WHEN {c['name']} = '{v}' THEN 1 END) / COUNT(*) AS share\nFROM {name}"
+    elif bug == "s3_sum_count":
+        if not ints:
+            return None
+        c = rnd.choice(ints)["name"]
+        broken = f"SELECT SUM({c}) / COUNT(*) AS avg_{c}\nFROM {name}"
+        truth = f"SELECT 1.0 * SUM({c}) / COUNT(*) AS avg_{c}\nFROM {name}"
+    elif bug in ("s3_eq_any", "s3_ne_all"):
+        if not cats:
+            return None
+        c = rnd.choice(cats)
+        v = rnd.choice(c["params"])
+        op, word = ("= ANY", "IN") if bug == "s3_eq_any" else (rnd.choice(["<> ALL", "!= ALL"]), "NOT IN")
+        inner = f"(SELECT {pk} FROM {name} WHERE {c['name']} = '{v}')"
+        broken = f"SELECT {pk}\nFROM {name}\nWHERE {pk} {op} {inner}\nORDER BY {pk}"
+        truth = f"SELECT {pk}\nFROM {name}\nWHERE {pk} {word} {inner}\nORDER BY {pk}"
+    elif bug == "s3_minus":
+        if not cats:
+            return None
+        c = rnd.choice(cats)
+        v = rnd.choice(c["params"])
+        broken = f"SELECT {pk} FROM {name}\nMINUS\nSELECT {pk} FROM {name} WHERE {c['name']} = '{v}'"
+        truth = f"SELECT {pk} FROM {name}\nEXCEPT\nSELECT {pk} FROM {name} WHERE {c['name']} = '{v}'"
+    elif bug == "s3_offset":
+        n = rnd.randint(1, 5)
+        broken = f"SELECT {pk}\nFROM {name}\nORDER BY {pk}\nOFFSET {n}"
+        truth = f"SELECT {pk}\nFROM {name}\nORDER BY {pk}\nLIMIT -1 OFFSET {n}"
+    elif bug == "s3_first_row":
+        if not cats:
+            return None
+        c = rnd.choice(cats)
+        i = t["cols"].index(c)
+        seen = Counter(r[i] for r in t["rows"] if r[i] is not None)
+        many = [v for v, k in seen.items() if k >= 2]
+        if not many:
+            return None
+        v = rnd.choice(many)
+        broken = f"SELECT {pk}\nFROM {name}\nWHERE {pk} = (SELECT {pk} FROM {name} WHERE {c['name']} = '{v}')\nORDER BY {pk}"
+        truth = f"SELECT {pk}\nFROM {name}\nWHERE {pk} IN (SELECT {pk} FROM {name} WHERE {c['name']} = '{v}')\nORDER BY {pk}"
+    elif bug in ("s3_update_limit", "s3_delete_limit"):
+        if not cats or (bug == "s3_update_limit" and not ints):
+            return None
+        c = rnd.choice(cats)
+        v = rnd.choice(c["params"])
+        n = rnd.randint(1, 3)
+        order = rnd.choice([f"\nORDER BY {pk}", f"\nORDER BY {pk} DESC"])
+        head = (f"UPDATE {name}\nSET {ints[0]['name']} = 0" if bug == "s3_update_limit" else f"DELETE FROM {name}")
+        out["stmt"] = "update" if bug == "s3_update_limit" else "delete"
+        broken = f"{head}\nWHERE {c['name']} = '{v}'{order}\nLIMIT {n}"
+        truth = f"{head}\nWHERE rowid IN (SELECT rowid FROM {name} WHERE {c['name']} = '{v}'{order.replace(chr(10), ' ')} LIMIT {n})"
+    else:                                                 # s3_set_qualified
+        if not ints:
+            return None
+        c = rnd.choice(ints)["name"]
+        k = rnd.choice(t["rows"])[0]
+        out["stmt"] = "update"
+        broken = f"UPDATE {name}\nSET {name}.{c} = {c} + 1\nWHERE {pk} = {k}"
+        truth = f"UPDATE {name}\nSET {c} = {c} + 1\nWHERE {pk} = {k}"
+    if rnd.random() < 0.4:
+        broken += rnd.choice(["\n\n-- sqlite", "\n\n-- for the SQLite file"])
+    return {**out, "broken": broken, "truth": truth}
 
 
 def _lite_ddl_effect(script: str, item) -> tuple:

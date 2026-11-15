@@ -44,6 +44,7 @@ MY = {  # MySQL / MariaDB: (code, sqlstate, message)
     "replication_stopped": lambda r: ("1032", "HY000", f"Could not execute Delete_rows_v1 event on table app.{r['t']}; Can't find record in '{r['t']}', Error_code: 1032; handler error HA_ERR_KEY_NOT_FOUND; the event's master log bin.000003, end_log_pos 1124"),
     "source_log_purged": lambda r: ("1236", "HY000", "Got fatal error 1236 from source when reading data from binary log: 'Could not find first log file name in binary log index file'"),
     "write_on_replica": lambda r: ("1290", "HY000", "The MySQL server is running with the --super-read-only option so it cannot execute this statement"),
+    "two_primary_keys": lambda r: ("1068", "42000", "Multiple primary key defined"),
 }
 PG = {  # PostgreSQL: (sqlstate, message, detail)
     "duplicate_key": lambda r: ("23505", f"duplicate key value violates unique constraint \"{r['t']}_{r['c']}_key\"", f"Key ({r['c']})=({r['v']}) already exists."),
@@ -81,6 +82,8 @@ PG = {  # PostgreSQL: (sqlstate, message, detail)
     # WAL and disk (formats seen on a real PostgreSQL 16 with a failing archive_command and a small max_wal_size)
     "wal_archive_failing": lambda r: ("00000", "archive command failed with exit code 1", "The failed archive command was: cp pg_wal/00000001000000000000001B /mnt/backup/wal/00000001000000000000001B"),
     "checkpoints_too_frequent": lambda r: ("00000", "checkpoints are occurring too frequently (12 seconds apart)", ""),
+    "fk_target_not_key": lambda r: ("42830", f"there is no unique constraint matching given keys for referenced table \"{r['t']}\"", ""),
+    "two_primary_keys": lambda r: ("42P16", f"multiple primary keys for table \"{r['t']}\" are not allowed", ""),
     "replication_stopped": lambda r: ("23505", f"duplicate key value violates unique constraint \"{r['t']}_pkey\"\nCONTEXT:  processing remote data for replication origin \"pg_16393\" during message type \"INSERT\" for replication target relation \"public.{r['t']}\"", f"Key (id)=({r['v']}) already exists."),
 }
 LITE = {  # SQLite: (extended result code name, message), each produced on SQLite 3.53 (Python's sqlite3) or the 3.45 command line
@@ -104,6 +107,12 @@ LITE = {  # SQLite: (extended result code name, message), each produced on SQLit
     "cannot_open_file": lambda r: ("SQLITE_CANTOPEN", "unable to open database file"),
     "disk_full": lambda r: ("SQLITE_FULL", "database or disk is full"),
     "file_corrupt": lambda r: ("SQLITE_CORRUPT", "database disk image is malformed"),
+    # E1 night 2: table designs (each produced on SQLite 3.53 and the 3.45 command line)
+    "strict_type": lambda r: ("SQLITE_ERROR", f"unknown datatype for {r['t']}.{r['c']}: \"VARCHAR(50)\""),
+    "autoinc_not_integer_pk": lambda r: ("SQLITE_ERROR", "AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY"),
+    "fk_target_not_key": lambda r: ("SQLITE_ERROR", f"foreign key mismatch - \"{r['t']}\" referencing \"customers\""),
+    "two_primary_keys": lambda r: ("SQLITE_ERROR", f"table \"{r['t']}\" has more than one primary key"),
+    "drop_column_blocked": lambda r: ("SQLITE_ERROR", f"cannot drop UNIQUE column: \"{r['c']}\""),
 }
 LITE_WRAP = [
     "sqlite3.{cls}: {msg}",

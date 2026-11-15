@@ -137,6 +137,10 @@ def evidence(text: str) -> dict:
         facts.pop("syntax_error", None)                   # (PostgreSQL files a value-count slip under 42601, a syntax error)
     if "alter_not_supported" in facts:
         facts.pop("reserved_word", None)
+    if "drop_column_blocked" in facts:                    # 'error in index ix after drop column: no such column: c'
+        facts.pop("unknown_column", None)
+    if facts.keys() & {"strict_type", "autoinc_not_integer_pk", "two_primary_keys"}:
+        facts.pop("syntax_error", None)
     if "aggregate_misuse" in facts:
         facts.pop("group_by_strict", None)                # PostgreSQL files it under 42803 too
     fk = facts.get("fk_missing_parent")

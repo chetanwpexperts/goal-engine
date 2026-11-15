@@ -2,7 +2,7 @@
   "name": "SQLite",
   "notes_only": true,
   "family": "relational",
-  "about": "SQLite (E1 in docs/dbaba-curriculum.md). Lab-tested on SQLite 3.53 (Python's sqlite3) and the 3.45 command line: its own error messages (the diagnoser), the other databases' words it refuses with their SQLite rewrites, and date arithmetic that runs but means something else. The other query checks are general SQL reasoning until E1's later nights re-check them on SQLite.",
+  "about": "SQLite (E1 in docs/dbaba-curriculum.md). Lab-tested on SQLite 3.53 (Python's sqlite3) and the 3.45 command line: its own error messages (the diagnoser), the other databases' words it refuses with their SQLite rewrites, date arithmetic that runs but means something else (night 1), and table designs: type affinity, ids, keys, STRICT tables, foreign keys and ALTER TABLE's limits (night 2). The other query checks are general SQL reasoning until E1 night 3 re-checks them on SQLite.",
   "named": [
     "\\bsqlite3?\\b",
     "एसक्यूलाइट"
@@ -20,7 +20,8 @@
     "\\binsert\\s+or\\s+(?:replace|ignore|abort|fail|rollback)\\b",
     "\\bwithout\\s+rowid\\b",
     "\\blast_insert_rowid\\s*\\(",
-    "\\bpragma_table_info\\b"
+    "\\bpragma_table_info\\b",
+    "\\)\\s*strict\\s*(?:,|;|$)"
   ],
   "weak_marks": [],
   "error_marks": [
@@ -263,6 +264,38 @@
       "re": "near \\\"(?P<token>MODIFY|CHANGE|TYPE)\\\": syntax error"
     },
     {
+      "cause": "strict_type",
+      "re": "unknown datatype for (?P<table>[\\w$]+)\\.(?P<column>[\\w$]+): \\\"(?P<token>[^\\\"]+)\\\""
+    },
+    {
+      "cause": "strict_type",
+      "re": "missing datatype for (?P<table>[\\w$]+)\\.(?P<column>[\\w$]+)"
+    },
+    {
+      "cause": "autoinc_not_integer_pk",
+      "re": "AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY"
+    },
+    {
+      "cause": "fk_target_not_key",
+      "re": "foreign key mismatch - \\\"(?P<table>[\\w$]+)\\\" referencing \\\"(?P<parent>[\\w$]+)\\\""
+    },
+    {
+      "cause": "two_primary_keys",
+      "re": "table \\\"(?P<table>[\\w$]+)\\\" has more than one primary key"
+    },
+    {
+      "cause": "drop_column_blocked",
+      "re": "cannot drop (?P<what>UNIQUE|PRIMARY KEY) column: \\\"(?P<column>[\\w$]+)\\\""
+    },
+    {
+      "cause": "drop_column_blocked",
+      "re": "error in (?P<what>index|view|trigger|table) (?P<object>[\\w$]+) after drop column: no such column: (?P<column>[\\w$]+)"
+    },
+    {
+      "cause": "alter_not_supported",
+      "re": "Cannot add a column with non-constant default|constraint may not be dropped: (?P<constraint>[\\w$]+)|Cannot add a (?:STORED|GENERATED) column"
+    },
+    {
       "cause": "reserved_word",
       "re": "near \\\"(?P<token>order|group|default|check|index|table|values|references|transaction|limit|unique|primary)\\\": syntax error"
     },
@@ -421,7 +454,26 @@
     ],
     "alter_not_supported": [
       "-- SQLite's ALTER TABLE can only RENAME TO, RENAME COLUMN, ADD COLUMN, DROP COLUMN (3.35+). Anything else is a rebuild:\nPRAGMA foreign_keys = OFF;\nBEGIN;\nCREATE TABLE {table}_new (... the new definition ...);\nINSERT INTO {table}_new (cols) SELECT cols FROM {table};\nDROP TABLE {table};\nALTER TABLE {table}_new RENAME TO {table};\nPRAGMA foreign_key_check;\nCOMMIT;\nPRAGMA foreign_keys = ON;",
-      "-- A NOT NULL column can be added with a default: ALTER TABLE {table} ADD COLUMN c TEXT NOT NULL DEFAULT '';"
+      "-- A NOT NULL column can be added with a default: ALTER TABLE {table} ADD COLUMN c TEXT NOT NULL DEFAULT '';",
+      "-- 'non-constant default' (CURRENT_TIMESTAMP, an expression): add the column without it, then fill the old rows (preview first):\nALTER TABLE {table} ADD COLUMN created_at TEXT;\nSELECT COUNT(*) FROM {table} WHERE created_at IS NULL;   -- the rows the next line changes\nUPDATE {table} SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL;"
+    ],
+    "strict_type": [
+      "-- A STRICT table takes only these type names: INTEGER (or INT), REAL, TEXT, BLOB, ANY.\n-- VARCHAR(n) / CHAR(n) -> TEXT (add CHECK (length(col) <= n) to keep the limit), DATE / DATETIME / TIMESTAMP -> TEXT,\n-- DECIMAL / NUMERIC / FLOAT / DOUBLE -> REAL (or INTEGER holding paise), BOOLEAN -> INTEGER, JSON -> TEXT, no type -> ANY.\nCREATE TABLE {table} (... {column} TEXT ...) STRICT;",
+      "-- Or drop STRICT and keep the old type names (then SQLite doesn't enforce them: type affinity)."
+    ],
+    "autoinc_not_integer_pk": [
+      "-- Only a column written exactly INTEGER PRIMARY KEY is the row id that numbers itself; AUTOINCREMENT goes after it:\nCREATE TABLE t (id INTEGER PRIMARY KEY AUTOINCREMENT, ...);\n-- Plain INTEGER PRIMARY KEY is usually enough (AUTOINCREMENT only stops ids of deleted rows coming back)."
+    ],
+    "fk_target_not_key": [
+      "-- A foreign key must point at the parent's PRIMARY KEY or a UNIQUE column. Either point it at the key:\n--   ... REFERENCES {parent} (id)\n-- or make the parent column unique (SQLite: a unique index is enough):\nCREATE UNIQUE INDEX ux_{parent}_col ON {parent} (col);",
+      "-- See what the parent's keys are:\nSELECT name, pk FROM pragma_table_info('{parent}');\nSELECT name, \"unique\" FROM pragma_index_list('{parent}');"
+    ],
+    "two_primary_keys": [
+      "-- One PRIMARY KEY per table. Two columns that together name a row:\nCREATE TABLE {table} (a INTEGER NOT NULL, b INTEGER NOT NULL, PRIMARY KEY (a, b));\n-- A second column that must only be unique: UNIQUE instead of PRIMARY KEY."
+    ],
+    "drop_column_blocked": [
+      "-- DROP COLUMN refuses a column that an index, view, trigger, CHECK, foreign key or key still uses. See them:\nSELECT type, name, sql FROM sqlite_master WHERE sql LIKE '%{column}%';\n-- Drop (or change) those first, e.g. DROP INDEX ix_name; DROP VIEW v; then ALTER TABLE t DROP COLUMN {column};",
+      "-- A PRIMARY KEY or UNIQUE column can't be dropped at all: rebuild the table without it\n-- (CREATE TABLE t_new ..., INSERT INTO t_new SELECT ..., DROP TABLE t, ALTER TABLE t_new RENAME TO t, in one transaction)."
     ]
   },
   "refuses": [
@@ -689,12 +741,12 @@
     },
     {
       "id": "alter_column",
-      "re": "\\balter\\s+table\\s+[A-Za-z_][\\w$]*\\s+(?:modify|change|alter)\\b(?!\\s+column\\s+[\\w$]+\\s+rename\\b)",
+      "re": "\\balter\\s+table\\s+[A-Za-z_][\\w$]*\\s+(?:modify|change|alter)\\b(?!\\s+(?:column\\s+)?[\\w$\\\"`]+\\s+(?:rename\\b|set\\s+not\\s+null\\b|drop\\s+not\\s+null\\b))",
       "to": null,
       "error": "near \"MODIFY\" (or \"ALTER\"): syntax error",
       "title_en": "{db}'s ALTER TABLE can't change a column",
       "title_hi": "{db} ka ALTER TABLE column nahi badal sakta",
-      "fix_en": "SQLite's ALTER TABLE only renames, adds or drops (3.35+) columns. To change a type, default or NOT NULL, rebuild the table: CREATE TABLE t_new (...), INSERT INTO t_new SELECT ... FROM t, DROP TABLE t, ALTER TABLE t_new RENAME TO t, all in one transaction with foreign keys off.",
+      "fix_en": "SQLite's ALTER TABLE renames, adds or drops (3.35+) columns, and from 3.53 sets or drops NOT NULL; nothing else changes a column. To change a type or a default, rebuild the table: CREATE TABLE t_new (...), INSERT INTO t_new SELECT ... FROM t, DROP TABLE t, ALTER TABLE t_new RENAME TO t, all in one transaction with foreign keys off.",
       "fix_hi": "SQLite ka ALTER TABLE sirf naam badalta, column jodta ya hataata hai. Type badalne ke liye table dobara banao (nayi table, rows copy, purani drop, rename).",
       "proven": [
         "sqlite"
@@ -735,6 +787,166 @@
       "title_hi": "{db} mein MOD shabd nahi hota",
       "fix_en": "Use a % b. On SQLite % works on whole numbers (7.5 % 2 is 1.0, not 1.5): for fractions use mod(a, b) where the math functions are built in (3.35+).",
       "fix_hi": "a % b likho (SQLite pe % poore numbers pe chalta hai).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_add_constraint_unique",
+      "re": "\\balter\\s+table\\s+([A-Za-z_][\\w$]*)\\s+add\\s+constraint\\s+([A-Za-z_][\\w$]*)\\s+unique\\s*(?:key\\s+|index\\s+)?\\(([^()]*)\\)",
+      "to": "CREATE UNIQUE INDEX \\2 ON \\1 (\\3)",
+      "error": "near \"CONSTRAINT\" / \"UNIQUE\": syntax error",
+      "title_en": "{db}'s ALTER TABLE can't add a constraint",
+      "title_hi": "{db} ka ALTER TABLE constraint nahi jod sakta",
+      "fix_en": "A unique index does the same job and SQLite adds it any time.",
+      "fix_hi": "Unique index wahi kaam karta hai aur kabhi bhi jud jaata hai.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_add_unique",
+      "re": "\\balter\\s+table\\s+([A-Za-z_][\\w$]*)\\s+add\\s+unique\\s+(?:key|index)?\\s*(?:([A-Za-z_][\\w$]*)\\s*)?\\(([^()]*)\\)",
+      "to": "CREATE UNIQUE INDEX ux_\\1 ON \\1 (\\3)",
+      "error": "near \"UNIQUE\": syntax error",
+      "title_en": "{db}'s ALTER TABLE can't add UNIQUE",
+      "title_hi": "{db} ka ALTER TABLE UNIQUE nahi jod sakta",
+      "fix_en": "Add a unique index instead (rows that already repeat stop it: 'UNIQUE constraint failed').",
+      "fix_hi": "Uski jagah unique index banao.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_add_index",
+      "re": "\\balter\\s+table\\s+([A-Za-z_][\\w$]*)\\s+add\\s+(?:index|key)\\s+([A-Za-z_][\\w$]*)\\s*\\(([^()]*)\\)",
+      "to": "CREATE INDEX \\2 ON \\1 (\\3)",
+      "error": "near \"INDEX\" / \"KEY\": syntax error",
+      "title_en": "{db} adds an index with CREATE INDEX, not ALTER TABLE",
+      "title_hi": "{db} mein index CREATE INDEX se banta hai, ALTER TABLE se nahi",
+      "fix_en": "Write it as its own statement.",
+      "fix_hi": "Alag statement likho.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_add_key",
+      "re": "\\balter\\s+table\\s+[A-Za-z_][\\w$]*\\s+add\\s+(?:constraint\\s+[A-Za-z_][\\w$]*\\s+)?(?:primary\\s+key|foreign\\s+key)\\b",
+      "to": null,
+      "error": "near \"PRIMARY\" / \"FOREIGN\" / \"CONSTRAINT\": syntax error",
+      "title_en": "{db}'s ALTER TABLE can't add a primary key or a foreign key",
+      "title_hi": "{db} ka ALTER TABLE primary key ya foreign key nahi jod sakta",
+      "fix_en": "Rebuild the table with the key in its CREATE TABLE: PRAGMA foreign_keys = OFF; BEGIN; CREATE TABLE t_new (... with the key ...); INSERT INTO t_new SELECT ... FROM t; DROP TABLE t; ALTER TABLE t_new RENAME TO t; PRAGMA foreign_key_check; COMMIT; PRAGMA foreign_keys = ON. (A new column can carry REFERENCES: ALTER TABLE t ADD COLUMN parent_id INTEGER REFERENCES parent(id).)",
+      "fix_hi": "Key ke saath table dobara banao (nayi table, rows copy, purani drop, rename, ek transaction mein). Naya column REFERENCES ke saath jod sakte ho.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_add_if_not_exists",
+      "re": "\\b(alter\\s+table\\s+[\\w$\\\"`.]+\\s+add\\s+(?:column\\s+)?)if\\s+not\\s+exists\\s+",
+      "to": "\\1",
+      "error": "near \"EXISTS\": syntax error",
+      "title_en": "{db}'s ADD COLUMN has no IF NOT EXISTS",
+      "title_hi": "{db} ke ADD COLUMN mein IF NOT EXISTS nahi hota",
+      "fix_en": "Check first whether the column is there: SELECT 1 FROM pragma_table_info('t') WHERE name = 'col'; and add it only when that returns nothing.",
+      "fix_hi": "Pehle dekho column hai ya nahi (pragma_table_info), na ho tabhi jodo.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_add_many",
+      "re": "\\balter\\s+table\\s+[A-Za-z_][\\w$]*\\s+add\\s+(?:column\\s+)?[^;,()]+(?:\\([^()]*\\)[^;,()]*)*,\\s*add\\b",
+      "to": null,
+      "error": "near \",\": syntax error",
+      "once": true,
+      "title_en": "{db}'s ALTER TABLE adds one column at a time",
+      "title_hi": "{db} ka ALTER TABLE ek baar mein ek column jodta hai",
+      "fix_en": "Write one ALTER TABLE t ADD COLUMN ... statement per column.",
+      "fix_hi": "Har column ke liye alag ALTER TABLE t ADD COLUMN likho.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_add_unique_column",
+      "re": "\\balter\\s+table\\s+([A-Za-z_][\\w$]*)\\s+add\\s+(?:column\\s+)?([A-Za-z_][\\w$]*)\\s+([A-Za-z_][\\w$]*(?:\\s*\\([^()]*\\))?)\\s+unique\\s*(?=;|$)",
+      "to": "ALTER TABLE \\1 ADD COLUMN \\2 \\3;\\nCREATE UNIQUE INDEX ux_\\1_\\2 ON \\1 (\\2)",
+      "error": "Cannot add a UNIQUE column",
+      "title_en": "{db} can't add a UNIQUE column",
+      "title_hi": "{db} UNIQUE column nahi jod sakta",
+      "fix_en": "Add the column, then a unique index on it (the old rows get NULL, and NULLs don't clash in a unique index).",
+      "fix_hi": "Column jodo, phir uspe unique index (purani rows mein NULL, jo unique index mein takraate nahi).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_add_pk_column",
+      "re": "\\balter\\s+table\\s+[A-Za-z_][\\w$]*\\s+add\\s+(?:column\\s+)?[A-Za-z_][\\w$]*\\s+[^;]*?\\bprimary\\s+key\\b",
+      "to": null,
+      "error": "Cannot add a PRIMARY KEY column",
+      "title_en": "{db} can't add a PRIMARY KEY column",
+      "title_hi": "{db} PRIMARY KEY column nahi jod sakta",
+      "fix_en": "Rebuild the table with the key (CREATE TABLE t_new (id INTEGER PRIMARY KEY, ...); INSERT INTO t_new (...) SELECT ... FROM t; DROP TABLE t; ALTER TABLE t_new RENAME TO t; in one transaction). Every SQLite table already has a rowid you can read meanwhile.",
+      "fix_hi": "Key ke saath table dobara banao. Tab tak har SQLite table ka rowid padh sakte ho.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_drop_constraint",
+      "re": "\\balter\\s+table\\s+[A-Za-z_][\\w$]*\\s+drop\\s+(?:constraint|index|key|primary\\s+key|foreign\\s+key)\\b",
+      "to": null,
+      "error": "constraint may not be dropped (3.53) / near \"CONSTRAINT\": syntax error (3.45)",
+      "title_en": "{db}'s ALTER TABLE can't drop a constraint",
+      "title_hi": "{db} ka ALTER TABLE constraint nahi hata sakta",
+      "fix_en": "An index made with CREATE INDEX goes with DROP INDEX name; a key, UNIQUE, CHECK or foreign key written in the CREATE TABLE goes only by rebuilding the table without it (from 3.53, NOT NULL alone: ALTER TABLE t ALTER COLUMN c DROP NOT NULL).",
+      "fix_hi": "CREATE INDEX wala index DROP INDEX se jaata hai; CREATE TABLE mein likhi key / UNIQUE / CHECK sirf table dobara banake.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_add_now_default",
+      "kind": "check",
+      "re": "\\balter\\s+table\\s+([A-Za-z_][\\w$]*)\\s+add\\s+(?:column\\s+)?([A-Za-z_][\\w$]*)\\s+[^;]*?\\bdefault\\s+(?:current_timestamp|current_date|current_time|\\()",
+      "to": null,
+      "error": "Cannot add a column with non-constant default",
+      "title_en": "{db} refuses this default when the table already has rows",
+      "title_hi": "Table mein rows hon to {db} ye default mana karta hai",
+      "fix_en": "ADD COLUMN takes only a fixed default (a number or a text): CURRENT_TIMESTAMP or an expression works on an empty table and fails on one with rows ('Cannot add a column with non-constant default'). Add the column without it, then fill the old rows yourself (preview with SELECT COUNT(*) ... WHERE col IS NULL first): ALTER TABLE t ADD COLUMN created_at TEXT; UPDATE t SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL. New rows then need the value from the app (or the table rebuilt with the default).",
+      "fix_hi": "ADD COLUMN sirf fixed default leta hai: rows wali table pe CURRENT_TIMESTAMP fail hota hai. Bina default jodo, phir purani rows bharo (pehle preview).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_add_not_null",
+      "kind": "check",
+      "re": "\\balter\\s+table\\s+[A-Za-z_][\\w$]*\\s+add\\s+(?:column\\s+)?[A-Za-z_][\\w$]*\\s+(?:(?!\\bdefault\\b)[^;])*?\\bnot\\s+null\\b(?:(?!\\bdefault\\b)[^;])*(?=;|$)",
+      "to": null,
+      "error": "Cannot add a NOT NULL column with default value NULL",
+      "title_en": "{db} adds a NOT NULL column only with a default",
+      "title_hi": "{db} NOT NULL column sirf default ke saath jodta hai",
+      "fix_en": "The old rows need a value: on a table with rows this fails ('Cannot add a NOT NULL column with default value NULL'; it works only while the table is empty). Give it a default: ... NOT NULL DEFAULT '' (or 0).",
+      "fix_hi": "Purani rows ko value chahiye: rows wali table pe ye fail hota hai. Default do: NOT NULL DEFAULT '' (ya 0).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "alter_set_not_null",
+      "kind": "check",
+      "re": "\\balter\\s+table\\s+[A-Za-z_][\\w$]*\\s+alter\\s+(?:column\\s+)?[\\w$\\\"`]+\\s+(?:set|drop)\\s+not\\s+null\\b",
+      "to": null,
+      "error": "near \"ALTER\": syntax error before 3.53",
+      "title_en": "ALTER COLUMN ... SET / DROP NOT NULL needs {db} 3.53 or newer",
+      "title_hi": "ALTER COLUMN ... SET / DROP NOT NULL ke liye {db} 3.53+ chahiye",
+      "fix_en": "SQLite added it in 3.53.0 (April 2026): lab, 3.53 ran it (and refused SET NOT NULL while a NULL row was there: 'constraint failed'), the 3.45 command line gave a syntax error. Check yours with SELECT sqlite_version(); on an older one, rebuild the table.",
+      "fix_hi": "Ye SQLite 3.53.0 (April 2026) mein aaya: lab mein 3.53 ne chalaya, 3.45 ne syntax error diya. SELECT sqlite_version() se dekho; purane pe table dobara banao.",
       "proven": [
         "sqlite"
       ]
@@ -1517,7 +1729,440 @@
     ]
   },
   "proven_parts": {
-    "en": "its error messages, the other databases' words it refuses (with rewrites run on SQLite) and its date arithmetic",
-    "hi": "iske error messages, doosre databases ke shabd jo ye mana karta hai (SQLite pe chalaye rewrites ke saath), aur date ka hisaab"
+    "en": "its error messages, the other databases' words it refuses (with rewrites run on SQLite), its date arithmetic, its table designs (types, ids, keys, STRICT, foreign keys, ALTER TABLE) and values compared across types",
+    "hi": "iske error messages, doosre databases ke shabd jo ye mana karta hai (SQLite pe chalaye rewrites ke saath), date ka hisaab, table design (types, ids, keys, STRICT, foreign keys, ALTER TABLE) aur alag type ki values ki tulna"
+  },
+  "query_rules": {
+    "type_compare": {
+      "says_en": "A column's type is only a preference (its affinity): a literal compared with a column is converted to it, so '2' = 2 finds the row of a TEXT column. An expression (strftime, substr, trim, upper, abs, length ...) has no affinity, so its text is never equal to a number and a number always sorts below any text.",
+      "lab_en": "lab: strftime('%Y', d) = 2024 found 0 of 2 rows, strftime('%Y', d) >= 2025 found all 3, substr(d, 1, 4) = 2024 found 0, abs(n) = '7' found 0, while code = 2 on a TEXT column found its row",
+      "lab": [
+        [
+          "SELECT '1' = 1, 1 = '1', '1' = '1'",
+          [
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        ],
+        [
+          "strftime('%Y', d) = 2024 on 2023-03-05, 2024-03-09, 2024-11-01",
+          "no rows"
+        ],
+        [
+          "strftime('%Y', d) >= 2025",
+          "all 3 rows"
+        ],
+        [
+          "CAST(strftime('%Y', d) AS INTEGER) = 2024",
+          "rows 2, 3"
+        ],
+        [
+          "strftime('%m', d) = '3'",
+          "no rows (it gives '03')"
+        ],
+        [
+          "code = 2 on a TEXT column holding '2'",
+          "the row (the column converts 2 to '2')"
+        ],
+        [
+          "trim(code) = 2",
+          "no rows"
+        ]
+      ],
+      "proven": [
+        "sqlite"
+      ]
+    },
+    "date_shape": {
+      "says_en": "SQLite has no date type: dates are text and compare letter by letter, so only 'YYYY-MM-DD' (zero-padded, dashes) sorts like time, and date() / julianday() read only ISO shapes.",
+      "lab_en": "lab: d >= '2024-3-1' found 0 of 2 March-and-later rows, d BETWEEN '2024-1-1' AND '2024-12-31' found 1 of 2, d < '15/06/2024' found 0 of 2, date('2024-1-20') is NULL",
+      "lab": [
+        [
+          "d >= '2024-3-1' vs d >= '2024-03-01'",
+          "0 rows vs 2"
+        ],
+        [
+          "d BETWEEN '2024-1-1' AND '2024-12-31'",
+          "1 row of 2"
+        ],
+        [
+          "d < '15/06/2024' vs d < '2024-06-15'",
+          "0 rows vs 2"
+        ],
+        [
+          "date('2024-1-20'), date('05/01/2024')",
+          [
+            [
+              null,
+              null
+            ]
+          ]
+        ],
+        [
+          "max(d) over '2024-01-05', '2024-1-20', '2024-12-03', '31/01/2024'",
+          "'31/01/2024'"
+        ]
+      ],
+      "proven": [
+        "sqlite"
+      ]
+    }
+  },
+  "schema_rules": {
+    "about": "How SQLite takes a CREATE TABLE (E1 night 2): a type name only gives a column its affinity, a few things look like other databases' rules but aren't checked, and some of their words are refused. Lab: SQLite 3.53 (Python's sqlite3) and the 3.45 command line.",
+    "marks": [
+      "\\bautoincrement\\b",
+      "\\)\\s*strict\\b",
+      "\\bwithout\\s+rowid\\b"
+    ],
+    "affinity": {
+      "rules": [
+        [
+          "INT",
+          "INTEGER"
+        ],
+        [
+          "CHAR",
+          "TEXT"
+        ],
+        [
+          "CLOB",
+          "TEXT"
+        ],
+        [
+          "TEXT",
+          "TEXT"
+        ],
+        [
+          "BLOB",
+          "BLOB"
+        ],
+        [
+          "REAL",
+          "REAL"
+        ],
+        [
+          "FLOA",
+          "REAL"
+        ],
+        [
+          "DOUB",
+          "REAL"
+        ]
+      ],
+      "empty": "BLOB",
+      "otherwise": "NUMERIC",
+      "says": "The declared type is read for these letters in this order: INT -> INTEGER; CHAR, CLOB or TEXT -> TEXT; BLOB or no type -> BLOB; REAL, FLOA or DOUB -> REAL; anything else (DECIMAL, DATE, DATETIME, BOOLEAN, STRING, JSON) -> NUMERIC.",
+      "lab": [
+        [
+          "STRING column given '012345'",
+          "12345 (integer): STRING is NUMERIC, not text"
+        ],
+        [
+          "DATETIME column given '2024', 20240105",
+          "2024 and 20240105 as integers"
+        ],
+        [
+          "INTEGER column given 'hello', '012', '1.5'",
+          "'hello' (text), 12, 1.5"
+        ],
+        [
+          "DECIMAL(10,2) column given 1.10, 0.1 + 0.2",
+          "1.1 (real), 0.30000000000000004; = 0.3 is false"
+        ]
+      ],
+      "proven": [
+        "sqlite"
+      ]
+    },
+    "rowid_alias": {
+      "says": "Only a single-column PRIMARY KEY whose declared type is exactly INTEGER (any case, no length, not DESC, not in a WITHOUT ROWID table) becomes the rowid and numbers itself. INT, BIGINT, INTEGER(11), SERIAL, UNSIGNED INTEGER and 'INT AUTO_INCREMENT' are ordinary columns: leave them out of an INSERT and the id is NULL, and NULL ids don't clash, so the key keeps nothing unique.",
+      "lab": [
+        [
+          "id INT PRIMARY KEY, two INSERTs without id",
+          "both ids NULL (rowids 1, 2)"
+        ],
+        [
+          "id INTEGER PRIMARY KEY",
+          "1, 2"
+        ],
+        [
+          "id INTEGER(11) / BIGINT / SERIAL / UNSIGNED INTEGER PRIMARY KEY",
+          "NULL"
+        ],
+        [
+          "id INT AUTO_INCREMENT PRIMARY KEY",
+          "accepted, type 'INT AUTO_INCREMENT', ids NULL"
+        ],
+        [
+          "id INTEGER PRIMARY KEY DESC",
+          "NULL"
+        ],
+        [
+          "id INTEGER, PRIMARY KEY (id)",
+          "1"
+        ],
+        [
+          "INTEGER PRIMARY KEY AUTO_INCREMENT",
+          "near \"AUTO_INCREMENT\": syntax error"
+        ],
+        [
+          "INT PRIMARY KEY AUTOINCREMENT",
+          "AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY"
+        ],
+        [
+          "GENERATED ALWAYS AS IDENTITY",
+          "near \"IDENTITY\": syntax error"
+        ],
+        [
+          "INT PRIMARY KEY in a STRICT table, INSERT without id",
+          "NOT NULL constraint failed"
+        ]
+      ],
+      "proven": [
+        "sqlite"
+      ]
+    },
+    "pk_null": {
+      "says": "Any other PRIMARY KEY (TEXT, two columns, INT) accepts NULL in an ordinary table, and NULLs never clash; NOT NULL on the key's columns, STRICT or WITHOUT ROWID stop it.",
+      "lab": [
+        [
+          "code TEXT PRIMARY KEY, two INSERTs without code",
+          "2 rows with NULL code"
+        ],
+        [
+          "PRIMARY KEY (a, b), (1, NULL) twice",
+          "2 rows"
+        ],
+        [
+          "the same with NOT NULL, STRICT or WITHOUT ROWID",
+          "NOT NULL constraint failed"
+        ]
+      ],
+      "proven": [
+        "sqlite"
+      ]
+    },
+    "unenforced": {
+      "says": "VARCHAR(n), CHAR(n) and UNSIGNED are accepted and not checked: the length is not a limit and CHAR is not padded.",
+      "lab": [
+        [
+          "VARCHAR(3) given 'abcdef'",
+          "'abcdef', length 6"
+        ],
+        [
+          "CHAR(5) given 'ab'",
+          "'ab' (no padding)"
+        ],
+        [
+          "INT UNSIGNED given -5",
+          "-5"
+        ],
+        [
+          "TEXT CHECK (length(n) <= 3) given 'abcdef'",
+          "CHECK constraint failed"
+        ],
+        [
+          "CHECK (n >= 0) given -5",
+          "CHECK constraint failed"
+        ]
+      ],
+      "proven": [
+        "sqlite"
+      ]
+    },
+    "no_date_type": {
+      "says": "There is no date type: DATE, DATETIME and TIMESTAMP give NUMERIC affinity, so anything goes in and the shape decides how it sorts. CHECK (d IS date(d)) keeps one day shape ('YYYY-MM-DD'); CHECK (t IS datetime(t)) keeps 'YYYY-MM-DD HH:MM:SS' (CURRENT_TIMESTAMP passes; a 'T' or fractions don't).",
+      "lab": [
+        [
+          "DATE column given '2024-01-05'",
+          "'2024-01-05' (text)"
+        ],
+        [
+          "CHECK (d IS date(d)) given '2024-1-5', '2024-02-30'",
+          "CHECK constraint failed"
+        ],
+        [
+          "CHECK (t IS datetime(t)) with DEFAULT CURRENT_TIMESTAMP, and NULL",
+          "accepted"
+        ],
+        [
+          "CHECK (t IS datetime(t)) given '2024-01-05T10:00:00'",
+          "CHECK constraint failed"
+        ],
+        [
+          "date('2024-02-30')",
+          "'2024-03-01' (rolled over, so the CHECK sees a different value)"
+        ]
+      ],
+      "proven": [
+        "sqlite"
+      ]
+    },
+    "money": {
+      "says": "There is no exact decimal type: DECIMAL / NUMERIC keep 1.10 as the binary REAL 1.1, the same as REAL, FLOAT and DOUBLE. Exact money is a whole number of the smallest unit (paise / cents) in INTEGER.",
+      "lab": [
+        [
+          "DECIMAL(10,2) given 0.1 + 0.2, then = 0.3",
+          "0 (stored 0.30000000000000004)"
+        ],
+        [
+          "DECIMAL(10,2) given 1.10, 5.00",
+          "1.1 (real), 5 (integer)"
+        ],
+        [
+          "INTEGER paise 10 ten times, SUM / 100.0",
+          "100, 1.0"
+        ]
+      ],
+      "proven": [
+        "sqlite"
+      ]
+    },
+    "strict": {
+      "types": [
+        "INT",
+        "INTEGER",
+        "REAL",
+        "TEXT",
+        "BLOB",
+        "ANY"
+      ],
+      "map": {
+        "int": "INTEGER",
+        "text": "TEXT",
+        "real": "REAL",
+        "blob": "BLOB",
+        "numeric": "REAL",
+        "boolean": "INTEGER",
+        "date": "TEXT",
+        "json": "TEXT",
+        "": "ANY"
+      },
+      "says": "A STRICT table (3.37+) takes only INT, INTEGER, REAL, TEXT, BLOB and ANY, and refuses a value that can't be converted without loss.",
+      "lab": [
+        [
+          "CREATE TABLE u (n VARCHAR(50)) STRICT",
+          "unknown datatype for u.n: \"VARCHAR(50)\" (3.53 and 3.45)"
+        ],
+        [
+          "(d DATE) STRICT",
+          "unknown datatype for u.d: \"DATE\""
+        ],
+        [
+          "(i) STRICT",
+          "missing datatype for u.i"
+        ],
+        [
+          "INTEGER column given 'abc'",
+          "cannot store TEXT value in INTEGER column u.i"
+        ],
+        [
+          "INT given '12'",
+          "12 (integer)"
+        ]
+      ],
+      "proven": [
+        "sqlite"
+      ]
+    },
+    "foreign_keys": {
+      "says": "FOREIGN KEY and REFERENCES are stored but checked only on connections that run PRAGMA foreign_keys = ON (off by default). The parent may be created later, nothing indexes the child column, a link to a column that is not a key makes every write to the child fail once checking is on, and the two ends' types are not compared.",
+      "lab": [
+        [
+          "orphan child row, foreign_keys off",
+          "inserted"
+        ],
+        [
+          "the same with PRAGMA foreign_keys = ON",
+          "FOREIGN KEY constraint failed"
+        ],
+        [
+          "child created before its parent",
+          "accepted, and works once the parent exists"
+        ],
+        [
+          "index list after REFERENCES",
+          "none; EXPLAIN QUERY PLAN: SCAN c"
+        ],
+        [
+          "REFERENCES p(code), code not unique, foreign_keys on, INSERT",
+          "foreign key mismatch - \"c\" referencing \"p\""
+        ],
+        [
+          "TEXT child -> INTEGER parent, INSERT '1'",
+          "accepted, stored as text '1'"
+        ]
+      ],
+      "proven": [
+        "sqlite"
+      ]
+    },
+    "reserved": [
+      "order",
+      "group",
+      "check",
+      "table",
+      "default",
+      "index",
+      "values",
+      "limit",
+      "select",
+      "from",
+      "where",
+      "primary",
+      "unique",
+      "references",
+      "transaction",
+      "to",
+      "as",
+      "and",
+      "or",
+      "not",
+      "null",
+      "in",
+      "is",
+      "between",
+      "case",
+      "when",
+      "then",
+      "else",
+      "join",
+      "using",
+      "on",
+      "having",
+      "distinct",
+      "all",
+      "union",
+      "except",
+      "intersect",
+      "exists",
+      "collate",
+      "constraint",
+      "foreign",
+      "create",
+      "drop",
+      "alter",
+      "insert",
+      "update",
+      "delete",
+      "into",
+      "set",
+      "returning",
+      "nothing"
+    ],
+    "reserved_note": "Lab (3.53): these were refused as a bare column or table name (near \"x\": syntax error); user, desc, key, range, rows, end, offset, window, date, status, type and name were accepted.",
+    "foreign_syntax": {
+      "says": "Words from MySQL/MariaDB and PostgreSQL table scripts that SQLite refuses (lab: syntax errors): AUTO_INCREMENT after PRIMARY KEY, GENERATED ... AS IDENTITY, ENGINE= / CHARSET= / COLLATE= / AUTO_INCREMENT= table options, ON UPDATE CURRENT_TIMESTAMP, KEY / INDEX / UNIQUE KEY inside CREATE TABLE, ENUM(...), DEFAULT now(). Accepted without meaning: backticks, UNSIGNED, TEXT[], JSONB (text), TIMESTAMPTZ (NUMERIC).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    "proven": [
+      "sqlite"
+    ]
   }
 }

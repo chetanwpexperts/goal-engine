@@ -18,6 +18,7 @@
  ],
  "codes": {
   "42P07": "table_exists",
+  "42830": "fk_target_not_key",
   "42601": "syntax_error",
   "42P01": "unknown_table",
   "42703": "unknown_column",
@@ -62,6 +63,8 @@
   {"cause": "aggregate_misuse", "re": "aggregate functions are not allowed in (?P<clause>WHERE|JOIN conditions|GROUP BY)"},
   {"cause": "value_count_mismatch", "re": "INSERT has more (?:expressions than target columns|target columns than expressions)"},
   {"cause": "table_exists", "re": "relation \"(?P<table>[^\"]+)\" already exists"},
+  {"cause": "fk_target_not_key", "re": "there is no unique constraint matching given keys for referenced table \"(?P<parent>[^\"]+)\""},
+  {"cause": "two_primary_keys", "re": "multiple primary keys for table \"(?P<table>[^\"]+)\" are not allowed"},
   {
    "cause": "wal_archive_failing",
    "re": "archive command failed with exit code (?P<code>\\d+)|archiving write-ahead log file \\\"(?P<wal>[0-9A-F]{24})\\\" failed too many times|archive command (?:was terminated|failed) by signal"
@@ -216,6 +219,8 @@
   }
  ],
  "fix": {
+  "fk_target_not_key": ["-- A foreign key points at the parent's PRIMARY KEY or a UNIQUE column. Point it at the key:\n--   ... REFERENCES {parent} (id)\n-- or make the parent column unique first:\nALTER TABLE {parent} ADD CONSTRAINT {parent}_col_key UNIQUE (col);"],
+  "two_primary_keys": ["-- One PRIMARY KEY per table; two columns that together name a row:\nCREATE TABLE {table} (a integer NOT NULL, b integer NOT NULL, PRIMARY KEY (a, b));\n-- a second column that must only be unique: UNIQUE instead of PRIMARY KEY."],
   "aggregate_misuse": ["SELECT customer_id, SUM(amount) AS total\nFROM orders\nGROUP BY customer_id\nHAVING SUM(amount) > 1000;   -- the condition on the total goes in HAVING", "-- In UPDATE/DELETE compare with a subquery:\nDELETE FROM t WHERE amount < (SELECT AVG(amount) FROM t);"],
   "value_count_mismatch": ["-- Name the columns and give one value for each, in the same order:\nINSERT INTO {table} (col1, col2) VALUES ($1, $2);"],
   "table_exists": ["CREATE TABLE IF NOT EXISTS {table} (...);", "-- or see what is already there:\nSELECT column_name, data_type FROM information_schema.columns WHERE table_name = '{table}';"],

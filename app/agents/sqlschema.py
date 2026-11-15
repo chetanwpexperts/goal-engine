@@ -30,6 +30,11 @@ PROVEN = {k: ["mariadb", "postgresql"] for k in (
     "money_float", "date_as_text", "number_as_text", "code_as_number", "no_primary_key", "fk_no_index", "utf8mb3", "myisam_fk",
     "ddl_dialect", "two_primary_keys", "fk_type", "fk_order", "fk_target", "varchar_length", "reserved_name", "row_too_big",
     "text_key", "timestamp_range", "over_wide", "list_in_column", "repeating_group", "parent_copy")}
+for _k in ("no_primary_key", "two_primary_keys", "reserved_name", "number_as_text", "code_as_number", "list_in_column", "repeating_group",
+           "parent_copy", "fk_target", "fk_type", "fk_no_index", "ddl_dialect"):
+    PROVEN[_k] = PROVEN[_k] + ["sqlite"]                  # re-checked on SQLite in E1 night 2 (its own wording there)
+PROVEN.update({k: ["sqlite"] for k in ("sqlite_rowid_pk", "sqlite_pk_null", "sqlite_unenforced", "sqlite_date_type", "sqlite_money",
+                                       "sqlite_affinity", "sqlite_fk_off", "sqlite_strict_type")})
 
 NAME = r"(?:`[^`]+`|\"[^\"]+\"|[A-Za-z_][\w$]*)"
 CREATE_RE = re.compile(rf"\bcreate\s+(?:(?:global\s+|local\s+)?temp(?:orary)?\s+)?table\s+(?:if\s+not\s+exists\s+)?((?:{NAME}\.)?{NAME})\s*\(",
@@ -112,7 +117,7 @@ def _short(t: str, n: int = 110) -> str:
 def is_schema(text: str) -> bool:
     """Does this text make tables? (CREATE TABLE ... ( ... ), possibly after DROP TABLE / SET / USE lines)."""
     m = _mask(text or "")
-    return bool(re.match(r"^\s*(?:(?:drop\s+table|set|use|create\s+(?:database|schema))\b[^;]*;\s*)*create\s+(?:(?:global\s+|local\s+)?"
+    return bool(re.match(r"^\s*(?:(?:drop\s+table|set|use|pragma|create\s+(?:database|schema))\b[^;]*;\s*)*create\s+(?:(?:global\s+|local\s+)?"
                          rf"temp(?:orary)?\s+)?table\s+(?:if\s+not\s+exists\s+)?(?:{NAME}\.)?{NAME}\s*\(", m, re.I))
 
 
@@ -349,6 +354,8 @@ def _schema(sql: str, intent: str, F) -> list:
     d = read_design(sql)
     if not d["tables"]:
         return []
+    if _is_lite(sql):                                 # SQLite reads a design its own way (E1 night 2, sqlite.json schema_rules)
+        return _lite_schema(sql, d, F)
     fam, named = _family(sql)
     R_my, R_pg = rules("mariadb"), rules("postgresql")
     tables = d["tables"]
@@ -482,16 +489,7 @@ def _schema(sql: str, intent: str, F) -> list:
                         f"Text mein number '100' ko '9' se pehle rakhta hai, 'abc' bhi le leta hai, aur SUM PostgreSQL pe fail ya "
                         f"MariaDB pe galat. {new} rakho.", [(ts[0], ts[1], new)])
                     continue
-                if LISTISH.search(nm) and not c["auto"]:
-                    one = _singular(re.sub(r"_ids$", "_id", nm))
-                    add("check", "list_in_column", f"{c['raw']} looks like a list kept in one text column",
-                        f"{c['raw']} ek text column mein list jaisa lagta hai", ev,
-                        f"A list inside one value ('3,7,12') can't be joined, checked by a foreign key or indexed, and finding one "
-                        f"item needs LIKE '%7%' (which also matches 17 and 70). Give each item its own row in a link table, e.g. "
-                        f"CREATE TABLE {t['name']}_{re.sub(r'_id$', '', one)} ({_singular(t['name'])}_id INT NOT NULL, {one} ... NOT NULL, "
-                        f"PRIMARY KEY ({_singular(t['name'])}_id, {one})).",
-                        "Ek value mein list ('3,7,12') join, foreign key ya index nahi ho sakti, aur ek item dhoondhne ke liye LIKE "
-                        "'%7%' lagta hai (jo 17 aur 70 bhi pakad leta hai). Har item ki apni row ho: alag link table.")
+                if _list_col(t, c, add, ev):
                     continue
                 if nm in SHORT_FIELD and args and args.isdigit() and int(args) >= 1000 and base in ("varchar", "character varying", "nvarchar"):
                     new = f"VARCHAR({SHORT_FIELD[nm]})"
@@ -550,44 +548,7 @@ def _schema(sql: str, intent: str, F) -> list:
                     "MySQL/MariaDB TEXT ko poori key nahi banne dete (1170); PostgreSQL de deta hai. Key chhoti ho: VARCHAR(255).",
                     [(ts[0], ts[1], "VARCHAR(255)")] if fam == "mysql" else [])
 
-        # ---- repeating groups: phone1, phone2 ...
-        stems = {}
-        for c in t["cols"]:
-            sm = re.match(r"^(.*?[a-z])_?(\d)$", c["name"])
-            if sm and not re.search(r"(line|address|addr|line_)$", sm.group(1)):
-                stems.setdefault(sm.group(1), []).append(c)
-        for stem, cs in stems.items():
-            if len(cs) >= 2:
-                add("check", "repeating_group", f"{', '.join(c['raw'] for c in cs)}: the same thing in numbered columns",
-                    f"{', '.join(c['raw'] for c in cs)}: ek hi cheez numbered columns mein", f"{t['raw']}: " + ", ".join(c["raw"] for c in cs),
-                    f"Numbered columns put a fixed limit on a list ({len(cs)}, and then?), leave most of them NULL, and make every "
-                    f"search look in each one (WHERE {stem}1 = ? OR {stem}2 = ? ...). Each {stem} wants its own row: "
-                    f"CREATE TABLE {t['name']}_{stem}s ({_singular(t['name'])}_id ... NOT NULL REFERENCES {t['name']}, {stem} ..., "
-                    f"PRIMARY KEY ({_singular(t['name'])}_id, {stem})).",
-                    f"Numbered columns list pe limit lagate hain ({len(cs)}, phir?), zyada NULL rehte hain, aur har search har column "
-                    f"mein dekhti hai. Har {stem} ki apni row ho: alag table.")
-
-        # ---- a parent's details copied next to its id
-        for fk in t["fks"] + [{"cols": [c["name"]], "parent": None, "pcols": [], "inline": None} for c in t["cols"]
-                              if c["name"].endswith("_id") and not any(c["name"] in f["cols"] for f in t["fks"])]:
-            if len(fk["cols"]) != 1:
-                continue
-            stem = fk["cols"][0][:-3] if fk["cols"][0].endswith("_id") else None
-            if not stem:
-                continue
-            copies = [c for c in t["cols"] if c["name"].startswith(stem + "_") and c["name"] != fk["cols"][0] and
-                      re.match(rf"{re.escape(stem)}_(name|email|phone|mobile|city|address|first_name|last_name|full_name|title|"
-                               r"category|country|state|dob|gender)$", c["name"])]
-            if copies:
-                add("check", "parent_copy", f"{t['raw']} keeps {fk['cols'][0]} and also copies {', '.join(c['raw'] for c in copies)}",
-                    f"{t['raw']} {fk['cols'][0]} rakhta hai aur saath mein {', '.join(c['raw'] for c in copies)} bhi copy karta hai",
-                    f"{t['raw']}: {fk['cols'][0]}, " + ", ".join(c["raw"] for c in copies),
-                    f"{', '.join(c['raw'] for c in copies)} belong to the {stem} that {fk['cols'][0]} already points at. Kept here too, "
-                    f"they go stale the day the {stem} changes and the two copies disagree. Read them with a JOIN on "
-                    f"{fk['cols'][0]} instead, unless this is a deliberate snapshot (what it was at the time of this row), and "
-                    f"then name it so (e.g. {stem}_name_at_order).",
-                    f"{', '.join(c['raw'] for c in copies)} us {stem} ke hain jise {fk['cols'][0]} pehle se batata hai. Yahan copy "
-                    f"rakhne se {stem} badalne pe dono alag ho jaate hain. JOIN se padho, jab tak ye jaan-boojh kar snapshot na ho.")
+        _one_fact(t, add)
 
         # ---- foreign keys
         for fk in t["fks"]:
@@ -726,6 +687,82 @@ def _schema(sql: str, intent: str, F) -> list:
                     f"MySQL/MariaDB pe har VARCHAR poori length ke saath ek 65,535-byte row mein ginta hai ({code}). Lamba text TEXT "
                     f"mein rakho: {', '.join(c['raw'] for c in fix_cols[:len(edits)])} -> TEXT.", edits)
     return out
+
+
+def _one_fact(t: dict, add) -> None:
+    """One fact in one place, the same on every engine: numbered copies of a column, a parent's details copied next to its id."""
+    # ---- repeating groups: phone1, phone2 ...
+    stems = {}
+    for c in t["cols"]:
+        sm = re.match(r"^(.*?[a-z])_?(\d)$", c["name"])
+        if sm and not re.search(r"(line|address|addr|line_)$", sm.group(1)):
+            stems.setdefault(sm.group(1), []).append(c)
+    for stem, cs in stems.items():
+        if len(cs) >= 2:
+            add("check", "repeating_group", f"{', '.join(c['raw'] for c in cs)}: the same thing in numbered columns",
+                f"{', '.join(c['raw'] for c in cs)}: ek hi cheez numbered columns mein", f"{t['raw']}: " + ", ".join(c["raw"] for c in cs),
+                f"Numbered columns put a fixed limit on a list ({len(cs)}, and then?), leave most of them NULL, and make every "
+                f"search look in each one (WHERE {stem}1 = ? OR {stem}2 = ? ...). Each {stem} wants its own row: "
+                f"CREATE TABLE {t['name']}_{stem}s ({_singular(t['name'])}_id ... NOT NULL REFERENCES {t['name']}, {stem} ..., "
+                f"PRIMARY KEY ({_singular(t['name'])}_id, {stem})).",
+                f"Numbered columns list pe limit lagate hain ({len(cs)}, phir?), zyada NULL rehte hain, aur har search har column "
+                f"mein dekhti hai. Har {stem} ki apni row ho: alag table.")
+
+    # ---- a parent's details copied next to its id
+    for fk in t["fks"] + [{"cols": [c["name"]], "parent": None, "pcols": [], "inline": None} for c in t["cols"]
+                          if c["name"].endswith("_id") and not any(c["name"] in f["cols"] for f in t["fks"])]:
+        if len(fk["cols"]) != 1:
+            continue
+        stem = fk["cols"][0][:-3] if fk["cols"][0].endswith("_id") else None
+        if not stem:
+            continue
+        copies = [c for c in t["cols"] if c["name"].startswith(stem + "_") and c["name"] != fk["cols"][0] and
+                  re.match(rf"{re.escape(stem)}_(name|email|phone|mobile|city|address|first_name|last_name|full_name|title|"
+                           r"category|country|state|dob|gender)$", c["name"])]
+        if copies:
+            add("check", "parent_copy", f"{t['raw']} keeps {fk['cols'][0]} and also copies {', '.join(c['raw'] for c in copies)}",
+                f"{t['raw']} {fk['cols'][0]} rakhta hai aur saath mein {', '.join(c['raw'] for c in copies)} bhi copy karta hai",
+                f"{t['raw']}: {fk['cols'][0]}, " + ", ".join(c["raw"] for c in copies),
+                f"{', '.join(c['raw'] for c in copies)} belong to the {stem} that {fk['cols'][0]} already points at. Kept here too, "
+                f"they go stale the day the {stem} changes and the two copies disagree. Read them with a JOIN on "
+                f"{fk['cols'][0]} instead, unless this is a deliberate snapshot (what it was at the time of this row), and "
+                f"then name it so (e.g. {stem}_name_at_order).",
+                f"{', '.join(c['raw'] for c in copies)} us {stem} ke hain jise {fk['cols'][0]} pehle se batata hai. Yahan copy "
+                f"rakhne se {stem} badalne pe dono alag ho jaate hain. JOIN se padho, jab tak ye jaan-boojh kar snapshot na ho.")
+
+
+def _list_col(t: dict, c: dict, add, ev: str) -> bool:
+    """A list kept in one text column ('3,7,12'): the same on every engine."""
+    nm = c["name"]
+    if not (LISTISH.search(nm) and not c["auto"]):
+        return False
+    one = _singular(re.sub(r"_ids$", "_id", nm))
+    add("check", "list_in_column", f"{c['raw']} looks like a list kept in one text column",
+        f"{c['raw']} ek text column mein list jaisa lagta hai", ev,
+        f"A list inside one value ('3,7,12') can't be joined, checked by a foreign key or indexed, and finding one "
+        f"item needs LIKE '%7%' (which also matches 17 and 70). Give each item its own row in a link table, e.g. "
+        f"CREATE TABLE {t['name']}_{re.sub(r'_id$', '', one)} ({_singular(t['name'])}_id INT NOT NULL, {one} ... NOT NULL, "
+        f"PRIMARY KEY ({_singular(t['name'])}_id, {one})).",
+        "Ek value mein list ('3,7,12') join, foreign key ya index nahi ho sakti, aur ek item dhoondhne ke liye LIKE "
+        "'%7%' lagta hai (jo 17 aur 70 bhi pakad leta hai). Har item ki apni row ho: alag link table.")
+    return True
+
+
+def _is_lite(sql: str) -> bool:
+    """SQLite: named or chosen (rule A), or shown by words only SQLite takes in a table script (AUTOINCREMENT, STRICT, WITHOUT ROWID)."""
+    from app.agents.sqlbasics import CHOSEN
+    from app.dbknow import engines as E
+
+    chosen = CHOSEN.get()
+    if chosen:
+        return chosen == "sqlite"
+    return any(re.search(p, _mask(sql), re.I) for p in E.dialect("sqlite").get("schema_rules", {}).get("marks", []))
+
+
+def _lite_schema(sql: str, d: dict, F) -> list:
+    from app.agents import sqllite
+
+    return sqllite.design(sql, d, F)
 
 
 # ------------------------------------------------------------------------------------------------ rewrites

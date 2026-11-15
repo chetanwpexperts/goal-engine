@@ -525,9 +525,13 @@ def _foreign_syntax(sql: str, s: str, F) -> list:
             shown = ev.strip()[:80]
             if shown in seen_ev:                     # the same word twice (SELECT `id` ... ORDER BY `id`): say where
                 shown = re.sub(r"\s+", " ", sql[max(0, m.start() - 12):m.end()]).strip()[:80]
-            out.append((F("error", "dialect", r["title_en"].replace("{db}", name), r["title_hi"].replace("{db}", name), shown,
-                          f"{name} refuses it ({r['error']}). " + fen, f"{name} ise mana karta hai ({r['error']}). " + fhi),
-                        (m.start(), m.end(), new) if new is not None else None))
+            if r.get("kind") == "check":             # refused only sometimes (a table with rows, an older version): said, not fixed
+                out.append((F("check", "dialect", r["title_en"].replace("{db}", name), r["title_hi"].replace("{db}", name), shown,
+                              fen, fhi), None))
+            else:
+                out.append((F("error", "dialect", r["title_en"].replace("{db}", name), r["title_hi"].replace("{db}", name), shown,
+                              f"{name} refuses it ({r['error']}). " + fen, f"{name} ise mana karta hai ({r['error']}). " + fhi),
+                            (m.start(), m.end(), new) if new is not None else None))
             if r.get("once"):
                 break
     return out

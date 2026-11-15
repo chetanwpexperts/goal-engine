@@ -35503,8 +35503,8 @@
     ]
    },
    "answer": {
-    "en": "SQLite's ALTER TABLE does four things: RENAME TO (the table), RENAME COLUMN (3.25+), ADD COLUMN, DROP COLUMN (3.35+). It can't change a column's type, default, NOT NULL or CHECK, and can't add a PRIMARY KEY or UNIQUE column. For those, rebuild: in one transaction with foreign keys off, CREATE TABLE new with the new definition, INSERT INTO new SELECT ... FROM old, DROP the old table, ALTER TABLE new RENAME TO old, recreate its indexes and triggers, run PRAGMA foreign_key_check, COMMIT.",
-    "hinglish": "SQLite ka ALTER TABLE chaar kaam karta hai: table ka naam badalna, column ka naam badalna (3.25+), column jodna, column hatana (3.35+). Type, default, NOT NULL badalna ya PRIMARY KEY/UNIQUE column jodna nahi. Uske liye table dobara banao: nayi definition ki table, rows copy, purani drop, nayi ka naam badlo, indexes wapas banao, sab ek transaction mein.",
+    "en": "SQLite's ALTER TABLE does four things: RENAME TO (the table), RENAME COLUMN (3.25+), ADD COLUMN, DROP COLUMN (3.35+). It can't change a column's type, default or CHECK, and can't add a PRIMARY KEY or UNIQUE column (from 3.53 it can set or drop NOT NULL: ALTER COLUMN c SET NOT NULL). For those, rebuild: in one transaction with foreign keys off, CREATE TABLE new with the new definition, INSERT INTO new SELECT ... FROM old, DROP the old table, ALTER TABLE new RENAME TO old, recreate its indexes and triggers, run PRAGMA foreign_key_check, COMMIT.",
+    "hinglish": "SQLite ka ALTER TABLE chaar kaam karta hai: table ka naam badalna, column ka naam badalna (3.25+), column jodna, column hatana (3.35+). Type ya default badalna (NOT NULL 3.53 se ALTER COLUMN c SET NOT NULL se) ya PRIMARY KEY/UNIQUE column jodna nahi. Uske liye table dobara banao: nayi definition ki table, rows copy, purani drop, nayi ka naam badlo, indexes wapas banao, sab ek transaction mein.",
     "hindi": "SQLite का ALTER TABLE type नहीं बदल सकता: नई table बनाइए, rows copy, पुरानी drop, नाम बदलिए।"
    },
    "mistake": {
@@ -35537,7 +35537,7 @@
     }
    ],
    "engines": {
-    "sqlite": "Lab (SQLite 3.53): ALTER TABLE ... MODIFY / ALTER COLUMN TYPE gave a syntax error; ADD COLUMN NOT NULL without default, a PRIMARY KEY or a UNIQUE column were refused; DROP COLUMN worked.",
+    "sqlite": "Lab (SQLite 3.53): ALTER TABLE ... MODIFY / ALTER COLUMN TYPE gave a syntax error; ADD COLUMN NOT NULL without default, a PRIMARY KEY or a UNIQUE column were refused; DROP COLUMN worked; ALTER COLUMN ... SET / DROP NOT NULL ran on 3.53 and was a syntax error on the 3.45 command line.",
     "mysql": "Lab (MariaDB 10.11): ALTER TABLE t MODIFY col type works.",
     "mariadb": "Lab: MODIFY / CHANGE work.",
     "postgresql": "Lab (PostgreSQL 16): ALTER TABLE t ALTER COLUMN col TYPE type works.",
@@ -36042,6 +36042,1599 @@
     "sqlite_type_affinity"
    ],
    "source": "https://www.sqlite.org/lang_expr.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_int_primary_key",
+   "kind": "concept",
+   "title": {
+    "en": "INT PRIMARY KEY vs INTEGER PRIMARY KEY in SQLite",
+    "hinglish": "SQLite mein INT PRIMARY KEY aur INTEGER PRIMARY KEY",
+    "hindi": "SQLite में INT और INTEGER PRIMARY KEY"
+   },
+   "terms": [
+    [
+     "int primary key"
+    ],
+    [
+     "integer\\s*\\(\\s*\\d+\\s*\\)",
+     "primary key"
+    ],
+    [
+     "(bigint|serial)",
+     "primary key",
+     "sqlite3?"
+    ],
+    [
+     "sqlite3?",
+     "\\bint\\b",
+     "\\binteger\\b",
+     "primary"
+    ],
+    [
+     "sqlite3?",
+     "int primary key",
+     "(null|ids?|khaali)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the difference between int primary key and integer primary key in sqlite",
+     "why does int primary key give null ids in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein int primary key aur integer primary key mein kya fark hai"
+    ],
+    "hindi": [
+     "SQLite में INT PRIMARY KEY और INTEGER PRIMARY KEY में क्या फर्क है"
+    ]
+   },
+   "answer": {
+    "en": "Only a column declared exactly INTEGER PRIMARY KEY becomes SQLite's rowid, the hidden whole-number key that numbers itself when an INSERT leaves it out. INT, BIGINT, INTEGER(11), SERIAL or 'INT AUTO_INCREMENT' with PRIMARY KEY make an ordinary column instead: an INSERT without the id stores NULL, and NULL ids don't clash, so the key stops keeping rows apart. Use INTEGER PRIMARY KEY for every id.",
+    "hinglish": "Sirf theek INTEGER PRIMARY KEY likha column SQLite ka rowid banta hai jo INSERT mein chhodne pe khud ginta hai. INT, BIGINT, INTEGER(11), SERIAL aam column banate hain: id chhodo to NULL jaata hai aur NULL id aapas mein nahi takraate. Har id ke liye INTEGER PRIMARY KEY likho.",
+    "hindi": "सिर्फ INTEGER PRIMARY KEY लिखा column अपने-आप गिनता है; INT PRIMARY KEY में id NULL रह जाती है।"
+   },
+   "mistake": {
+    "en": "Copying 'id INT(11) PRIMARY KEY' or 'id INT AUTO_INCREMENT PRIMARY KEY' from a MySQL script: SQLite accepts it and every new row's id is NULL.",
+    "hinglish": "MySQL script se 'id INT(11) PRIMARY KEY' copy karna: SQLite le leta hai aur har nayi row ka id NULL.",
+    "hindi": "MySQL से INT(11) PRIMARY KEY copy करना: id NULL आती है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_int (id INT PRIMARY KEY, n TEXT);\nCREATE TABLE t_integer (id INTEGER PRIMARY KEY, n TEXT);\nINSERT INTO t_int (n) VALUES ('a');\nINSERT INTO t_integer (n) VALUES ('a');\nSELECT (SELECT id FROM t_int) AS int_id, (SELECT id FROM t_integer) AS integer_id"
+     },
+     "columns": [
+      "int_id",
+      "integer_id"
+     ],
+     "result": [
+      [
+       "NULL",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): INT, BIGINT, INTEGER(11), SERIAL and INTEGER PRIMARY KEY DESC gave NULL ids; INTEGER PRIMARY KEY gave 1, 2; in a STRICT table INT PRIMARY KEY gave 'NOT NULL constraint failed'.",
+    "mysql": "Lab (MariaDB 10.11): INT and INTEGER are the same type; an id numbers itself only with AUTO_INCREMENT, and a key without a value is refused (1364).",
+    "mariadb": "Lab: INT = INTEGER; ids need AUTO_INCREMENT.",
+    "postgresql": "Lab (PostgreSQL 16): int and integer are the same; ids number themselves with GENERATED ... AS IDENTITY (or serial); a key without a value is refused (23502).",
+    "sqlserver": "Notes only (not lab-tested here): INT and INTEGER are the same; ids use IDENTITY(1,1).",
+    "oracle": "Notes only (not lab-tested here): INTEGER is NUMBER(38); ids use GENERATED AS IDENTITY or a sequence."
+   },
+   "fundamentals": [
+    "table_keys",
+    "column_types"
+   ],
+   "related": [
+    "sqlite_rowid",
+    "sqlite_autoincrement",
+    "primary_key"
+   ],
+   "source": "https://www.sqlite.org/lang_createtable.html#rowid",
+   "seen_at": [
+    "https://stackoverflow.com/questions/16832401/sqlite-auto-increment-not-working",
+    "https://stackoverflow.com/questions/31504417/why-is-the-id-column-in-my-sqlite-database-blank"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_autoincrement",
+   "kind": "concept",
+   "title": {
+    "en": "AUTOINCREMENT in SQLite: when it is needed",
+    "hinglish": "SQLite mein AUTOINCREMENT kab chahiye",
+    "hindi": "SQLite में AUTOINCREMENT कब चाहिए"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "autoincrement",
+     "(when|kab|need\\w*|zaroor\\w*|should|chahiye|reuse\\w*|sqlite_sequence|vs|fark|difference|matlab|do(es)?)"
+    ],
+    [
+     "sqlite_sequence"
+    ],
+    [
+     "sqlite3?",
+     "autoincrement",
+     "(कब|क्यों|क्या|ज़रूरत|जरूरत)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "when should i use autoincrement in sqlite",
+     "what does the autoincrement keyword do in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein autoincrement kab lagana chahiye"
+    ],
+    "hindi": [
+     "SQLite में AUTOINCREMENT कब लगाना चाहिए"
+    ]
+   },
+   "answer": {
+    "en": "INTEGER PRIMARY KEY already numbers new rows (the largest id + 1). AUTOINCREMENT adds one promise: an id is never handed out again, even after the row with the largest id is deleted; SQLite keeps the highest id ever used in the sqlite_sequence table to do it, which costs a little on every insert. Use it only when a reused id would confuse something outside the database (old links, other systems); plain INTEGER PRIMARY KEY is enough otherwise.",
+    "hinglish": "INTEGER PRIMARY KEY pehle se nayi rows ginta hai (sabse bada id + 1). AUTOINCREMENT ek vaada jodta hai: hataye gaye sabse bade id ko bhi dobara nahi deta; iske liye sqlite_sequence table rakhta hai. Tabhi lagao jab dobara aaya id bahar kuch gadbad kare; warna INTEGER PRIMARY KEY kaafi hai.",
+    "hindi": "AUTOINCREMENT हटाए गए id को दोबारा नहीं देता; वरना INTEGER PRIMARY KEY काफी है।"
+   },
+   "mistake": {
+    "en": "Writing AUTOINCREMENT on INT or BIGINT: refused ('AUTOINCREMENT is only allowed on an INTEGER PRIMARY KEY'); or writing MySQL's AUTO_INCREMENT: a syntax error after PRIMARY KEY.",
+    "hinglish": "INT ya BIGINT pe AUTOINCREMENT likhna: mana hota hai; ya MySQL ka AUTO_INCREMENT likhna: syntax error.",
+    "hindi": "INT पर AUTOINCREMENT लिखना मना है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_plain (id INTEGER PRIMARY KEY, n TEXT);\nCREATE TABLE t_auto (id INTEGER PRIMARY KEY AUTOINCREMENT, n TEXT);\nINSERT INTO t_plain (n) VALUES ('a'), ('b'), ('c');\nINSERT INTO t_auto (n) VALUES ('a'), ('b'), ('c');\nDELETE FROM t_plain WHERE id = 3;\nDELETE FROM t_auto WHERE id = 3;\nINSERT INTO t_plain (n) VALUES ('d');\nINSERT INTO t_auto (n) VALUES ('d');\nSELECT (SELECT max(id) FROM t_plain) AS plain_new_id, (SELECT max(id) FROM t_auto) AS auto_new_id"
+     },
+     "columns": [
+      "plain_new_id",
+      "auto_new_id"
+     ],
+     "result": [
+      [
+       "3",
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): after deleting id 3 the next id was 3 again with INTEGER PRIMARY KEY and 4 with AUTOINCREMENT; INT PRIMARY KEY AUTOINCREMENT was refused.",
+    "mysql": "Lab (MariaDB 10.11): AUTO_INCREMENT doesn't hand out a deleted top id again (InnoDB keeps the counter).",
+    "mariadb": "Lab: AUTO_INCREMENT keeps counting.",
+    "postgresql": "Lab (PostgreSQL 16): an identity / sequence never goes back; a rolled-back insert still uses up its number.",
+    "sqlserver": "Notes only (not lab-tested here): IDENTITY keeps counting.",
+    "oracle": "Notes only (not lab-tested here): a sequence keeps counting."
+   },
+   "fundamentals": [
+    "table_keys"
+   ],
+   "related": [
+    "sqlite_rowid",
+    "sqlite_int_primary_key"
+   ],
+   "source": "https://www.sqlite.org/autoinc.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_null_primary_key",
+   "kind": "concept",
+   "title": {
+    "en": "Why a SQLite primary key can hold NULL",
+    "hinglish": "SQLite ki primary key mein NULL kyun aa jata hai",
+    "hindi": "SQLite primary key में NULL"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "primary key",
+     "(null|nulls|khaali|empty)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why does sqlite allow null in a primary key",
+     "can a primary key be null in sqlite"
+    ],
+    "hinglish": [
+     "sqlite primary key mein null kyun aa jata hai"
+    ],
+    "hindi": [
+     "SQLite में primary key में NULL क्यों आ जाता है"
+    ]
+   },
+   "answer": {
+    "en": "In an ordinary SQLite table a PRIMARY KEY that isn't the INTEGER rowid (a TEXT code, a two-column key, an INT id) accepts NULL: an old bug kept so existing databases keep working. NULLs never equal each other, so rows without a key don't clash and can pile up. Add NOT NULL to the key's columns, or make the table STRICT or WITHOUT ROWID, which refuse it.",
+    "hinglish": "SQLite ki aam table mein INTEGER rowid ke alawa primary key (TEXT code, do column ki key, INT id) NULL le leti hai: purana bug jo purani databases ke liye rakha gaya. NULL aapas mein barabar nahi, isliye bina key wali rows jama ho sakti hain. Key ke columns pe NOT NULL lagao, ya table STRICT / WITHOUT ROWID banao.",
+    "hindi": "SQLite में primary key NULL ले सकती है; NOT NULL लगाइए।"
+   },
+   "mistake": {
+    "en": "Trusting PRIMARY KEY to mean 'never empty' on SQLite: write NOT NULL too.",
+    "hinglish": "SQLite pe PRIMARY KEY ko 'kabhi khaali nahi' samajhna: NOT NULL bhi likho.",
+    "hindi": "NOT NULL भी लिखिए।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_codes (code TEXT PRIMARY KEY, n TEXT);\nINSERT INTO t_codes (n) VALUES ('a');\nINSERT INTO t_codes (n) VALUES ('b');\nSELECT count(*) AS rows_with_null_key FROM t_codes WHERE code IS NULL"
+     },
+     "columns": [
+      "rows_with_null_key"
+     ],
+     "result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): two INSERTs without the key gave two rows with a NULL key (TEXT key and two-column key alike); with NOT NULL, STRICT or WITHOUT ROWID: 'NOT NULL constraint failed'.",
+    "mysql": "Lab (MariaDB 10.11): a key column is NOT NULL by itself: an INSERT without it was refused (1364).",
+    "mariadb": "Lab: keys are never NULL.",
+    "postgresql": "Lab (PostgreSQL 16): a key column is NOT NULL by itself (23502).",
+    "sqlserver": "Notes only (not lab-tested here): key columns are NOT NULL.",
+    "oracle": "Notes only (not lab-tested here): key columns are NOT NULL."
+   },
+   "fundamentals": [
+    "table_keys",
+    "null_logic"
+   ],
+   "related": [
+    "primary_key",
+    "sqlite_int_primary_key",
+    "sqlite_without_rowid"
+   ],
+   "source": "https://www.sqlite.org/quirks.html#primary_keys_can_sometimes_contain_nulls",
+   "seen_at": [
+    "https://stackoverflow.com/questions/29583854/create-sql-table-allow-null-unique-key"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_varchar_length",
+   "kind": "concept",
+   "title": {
+    "en": "VARCHAR(n) in SQLite is not a limit",
+    "hinglish": "SQLite mein VARCHAR(n) limit nahi hai",
+    "hindi": "SQLite में VARCHAR(n) सीमा नहीं"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "varchar",
+     "(length|limit|enforc\\w*|lambai|lamba|lambi|size|long|longer|50|255)"
+    ],
+    [
+     "sqlite3?",
+     "varchar\\s*\\(\\s*\\d+\\s*\\)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does sqlite enforce varchar length",
+     "why does sqlite store text longer than varchar 50"
+    ],
+    "hinglish": [
+     "sqlite mein varchar 50 se lamba text kyun save ho jata hai"
+    ],
+    "hindi": [
+     "SQLite में VARCHAR की length लागू होती है क्या"
+    ]
+   },
+   "answer": {
+    "en": "No. SQLite reads VARCHAR(50) only for the letters CHAR, which give the column TEXT affinity; the 50 is ignored, so a 2,000-letter value goes in as it is (CHAR(n) isn't padded either). When the length matters, say it as a rule SQLite does check: name TEXT CHECK (length(name) <= 50).",
+    "hinglish": "Nahi. SQLite VARCHAR(50) mein sirf CHAR akshar padhta hai (TEXT affinity); 50 ko ignore karta hai, isliye lamba text bhi chala jaata hai. Length zaroori ho to CHECK likho: name TEXT CHECK (length(name) <= 50).",
+    "hindi": "नहीं; length ज़रूरी हो तो CHECK (length(name) <= 50) लिखिए।"
+   },
+   "mistake": {
+    "en": "Relying on VARCHAR(10) to stop bad input on SQLite; and writing VARCHAR in a STRICT table, which refuses it ('unknown datatype').",
+    "hinglish": "SQLite pe VARCHAR(10) se galat input rukne ki ummeed; aur STRICT table mein VARCHAR likhna, jo mana hai.",
+    "hindi": "VARCHAR(10) पर भरोसा करना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_short (code VARCHAR(3), safe TEXT CHECK (length(safe) <= 3));\nINSERT INTO t_short (code) VALUES ('abcdef');\nSELECT code, length(code) AS letters FROM t_short"
+     },
+     "columns": [
+      "code",
+      "letters"
+     ],
+     "result": [
+      [
+       "abcdef",
+       "6"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): 'abcdef' went into VARCHAR(3) and kept 6 letters; with CHECK (length(x) <= 3) it was refused ('CHECK constraint failed').",
+    "mysql": "Lab (MariaDB 10.11): 'abcdef' into VARCHAR(3) was refused: 1406 Data too long (strict mode).",
+    "mariadb": "Lab: 1406 Data too long.",
+    "postgresql": "Lab (PostgreSQL 16): value too long for type character varying(3) (22001).",
+    "sqlserver": "Notes only (not lab-tested here): a too-long value is refused (String or binary data would be truncated).",
+    "oracle": "Notes only (not lab-tested here): a too-long value is refused (ORA-12899)."
+   },
+   "fundamentals": [
+    "column_types"
+   ],
+   "related": [
+    "sqlite_type_affinity",
+    "sqlite_strict",
+    "check_constraint"
+   ],
+   "source": "https://www.sqlite.org/datatype3.html#affinity_name_examples",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_affinity_rules",
+   "kind": "concept",
+   "title": {
+    "en": "How SQLite picks a column's affinity from its type name",
+    "hinglish": "SQLite type naam se affinity kaise chunta hai",
+    "hindi": "SQLite type नाम से affinity कैसे चुनता है"
+   },
+   "terms": [
+    [
+     "affinity",
+     "(rule\\w*|niyam|decide\\w*|chun\\w*|pick\\w*|kaise|how)"
+    ],
+    [
+     "sqlite3?",
+     "string",
+     "(type|column|zero|zeros)"
+    ],
+    [
+     "sqlite3?",
+     "leading zeros?"
+    ],
+    [
+     "sqlite3?",
+     "leading zeros?",
+     "string"
+    ],
+    [
+     "sqlite3?",
+     "affinity",
+     "(कैसे|तय)"
+    ],
+    [
+     "sqlite3?",
+     "leading zeros?",
+     "string",
+     "column"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how does sqlite decide a column's affinity",
+     "why does a string column drop leading zeros in sqlite"
+    ],
+    "hinglish": [
+     "sqlite type naam se affinity kaise decide karta hai"
+    ],
+    "hindi": [
+     "SQLite type नाम से affinity कैसे तय करता है"
+    ]
+   },
+   "answer": {
+    "en": "SQLite looks for letters in the declared type, in this order: INT -> INTEGER (so INT, BIGINT, INTEGER(11)); CHAR, CLOB or TEXT -> TEXT (VARCHAR, NCHAR); BLOB or no type -> BLOB (kept as given); REAL, FLOA or DOUB -> REAL; anything else -> NUMERIC (DECIMAL, BOOLEAN, DATE, DATETIME, and STRING). NUMERIC turns anything that looks like a number into one, so a STRING column stores '012345' as 12345. Write TEXT for codes, INTEGER for whole numbers, REAL for fractions.",
+    "hinglish": "SQLite declared type mein akshar dhoondhta hai: INT -> INTEGER; CHAR, CLOB, TEXT -> TEXT; BLOB ya koi type nahi -> BLOB; REAL, FLOA, DOUB -> REAL; baaki sab (DECIMAL, BOOLEAN, DATE, STRING) -> NUMERIC. NUMERIC number jaisi har cheez ko number bana deta hai, isliye STRING column '012345' ko 12345 rakhta hai. Code ke liye TEXT likho.",
+    "hindi": "STRING column NUMERIC होता है: '012345' 12345 बन जाता है; TEXT लिखिए।"
+   },
+   "mistake": {
+    "en": "Declaring codes, PINs or phone numbers as STRING or NUMBER: SQLite makes them numbers and the leading zeros are gone.",
+    "hinglish": "Code, PIN ya phone ko STRING / NUMBER likhna: SQLite number bana deta hai aur aage ke zero chale jaate hain.",
+    "hindi": "PIN को STRING लिखना: zero चला जाता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_pins (as_string STRING, as_text TEXT);\nINSERT INTO t_pins VALUES ('012345', '012345');\nSELECT as_string, typeof(as_string) AS string_type, as_text, typeof(as_text) AS text_type FROM t_pins"
+     },
+     "columns": [
+      "as_string",
+      "string_type",
+      "as_text",
+      "text_type"
+     ],
+     "result": [
+      [
+       "12345",
+       "integer",
+       "012345",
+       "text"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): STRING got 12345 (integer) for '012345' while TEXT kept '012345'; DATETIME got 2024 and 20240105 as integers; FLOATING POINT reads as INTEGER (it contains INT).",
+    "mysql": "Lab (MariaDB 10.11): the type is the type: VARCHAR keeps '012345'; there is no STRING type (1064).",
+    "mariadb": "Lab: no STRING type.",
+    "postgresql": "Lab (PostgreSQL 16): there is no STRING type (type \"string\" does not exist).",
+    "sqlserver": "Notes only (not lab-tested here): no STRING type; VARCHAR keeps the text.",
+    "oracle": "Notes only (not lab-tested here): no STRING type; VARCHAR2 keeps the text."
+   },
+   "fundamentals": [
+    "column_types",
+    "values_types"
+   ],
+   "related": [
+    "sqlite_type_affinity",
+    "sqlite_strict"
+   ],
+   "source": "https://www.sqlite.org/datatype3.html#determination_of_column_affinity",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_boolean",
+   "kind": "concept",
+   "title": {
+    "en": "True and false in SQLite",
+    "hinglish": "SQLite mein true / false",
+    "hindi": "SQLite में true / false"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "(boolean|bool)"
+    ],
+    [
+     "sqlite3?",
+     "true",
+     "false"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does sqlite have a boolean type",
+     "how are true and false stored in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein boolean kaise store kare"
+    ],
+    "hindi": [
+     "SQLite में boolean कैसे रखें"
+    ]
+   },
+   "answer": {
+    "en": "SQLite has no boolean type: TRUE and FALSE (3.23+) are just the integers 1 and 0, and a BOOLEAN column has NUMERIC affinity, so it takes 'yes' or 'true' as text too. Store 0 / 1 in an INTEGER column and keep it honest with CHECK (flag IN (0, 1)); WHERE flag reads as 'flag is not 0'.",
+    "hinglish": "SQLite mein boolean type nahi: TRUE aur FALSE (3.23+) bas 1 aur 0 hain, aur BOOLEAN column 'yes' ya 'true' text bhi le leta hai. INTEGER column mein 0 / 1 rakho aur CHECK (flag IN (0, 1)) lagao.",
+    "hindi": "SQLite में TRUE = 1, FALSE = 0; CHECK (flag IN (0, 1)) लगाइए।"
+   },
+   "mistake": {
+    "en": "Saving 'true' / 'false' text from the app: WHERE flag = 1 then misses them.",
+    "hinglish": "App se 'true' / 'false' text save karna: WHERE flag = 1 unhe nahi pakadta.",
+    "hindi": "'true' text save करना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_flags (active BOOLEAN);\nINSERT INTO t_flags VALUES (TRUE), (FALSE), ('true');\nSELECT active, typeof(active) AS stored_as FROM t_flags"
+     },
+     "columns": [
+      "active",
+      "stored_as"
+     ],
+     "result": [
+      [
+       "1",
+       "integer"
+      ],
+      [
+       "0",
+       "integer"
+      ],
+      [
+       "true",
+       "text"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): TRUE and FALSE were stored as 1 and 0 (integer) and 'true' stayed text; WHERE active = 1 found only the first.",
+    "mysql": "Lab (MariaDB 10.11): BOOLEAN is TINYINT(1): SELECT TRUE gave 1.",
+    "mariadb": "Lab: BOOLEAN is TINYINT(1).",
+    "postgresql": "Lab (PostgreSQL 16): boolean is a real type: SELECT TRUE gave t.",
+    "sqlserver": "Notes only (not lab-tested here): BIT holds 0 / 1.",
+    "oracle": "Notes only (not lab-tested here): BOOLEAN exists in SQL from 23ai; before that NUMBER(1)."
+   },
+   "fundamentals": [
+    "column_types",
+    "values_types"
+   ],
+   "related": [
+    "sqlite_type_affinity",
+    "check_constraint"
+   ],
+   "source": "https://www.sqlite.org/quirks.html#no_separate_boolean_datatype",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_money",
+   "kind": "concept",
+   "title": {
+    "en": "Storing money in SQLite",
+    "hinglish": "SQLite mein paisa kaise rakhe",
+    "hindi": "SQLite में पैसे कैसे रखें"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "(money|currency|paisa|paise|rupees?|price|amount|decimal|numeric)",
+     "(store|stored|save|rakh\\w*|type|exact|kaise|how)"
+    ],
+    [
+     "sqlite3?",
+     "(decimal|numeric)",
+     "(type|exact|hai|have|has)"
+    ],
+    [
+     "sqlite3?",
+     "(पैसे|पैसा|रुपये)",
+     "(रखें|रखे|कैसे)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to store money in sqlite",
+     "does sqlite have a decimal type"
+    ],
+    "hinglish": [
+     "sqlite mein paisa kaise store kare"
+    ],
+    "hindi": [
+     "SQLite में पैसे कैसे रखें"
+    ]
+   },
+   "answer": {
+    "en": "SQLite has no exact decimal type: DECIMAL(10,2) and NUMERIC are only names, so 19.99 is kept as the binary REAL nearest to it, the same as REAL or DOUBLE, and sums can drift by tiny fractions. For exact money keep whole paise (or cents) in an INTEGER column, e.g. price_paise = 1999 for 19.99, add those up, and divide by 100.0 only to show it. If you keep REAL, round every total with ROUND(x, 2) and never compare amounts with =.",
+    "hinglish": "SQLite mein exact decimal type nahi: DECIMAL(10,2) sirf naam hai, 19.99 binary REAL banke rehta hai, aur totals mein chhota farak aa sakta hai. Exact paise ke liye INTEGER column mein paise rakho (19.99 = 1999), unka SUM karo, aur sirf dikhate waqt 100.0 se bhaag do. REAL rakho to har total ROUND(x, 2) karo.",
+    "hindi": "पैसे को INTEGER paise में रखिए (19.99 = 1999)।"
+   },
+   "mistake": {
+    "en": "Trusting DECIMAL(10,2) on SQLite: 0.1 + 0.2 is stored as 0.30000000000000004 and WHERE amount = 0.3 finds nothing.",
+    "hinglish": "SQLite pe DECIMAL(10,2) pe bharosa: 0.1 + 0.2 0.30000000000000004 banta hai aur WHERE amount = 0.3 kuch nahi deta.",
+    "hindi": "DECIMAL पर भरोसा करना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_money (as_decimal DECIMAL(10,2), as_paise INTEGER);\nINSERT INTO t_money VALUES (0.1 + 0.2, 10 + 20);\nSELECT as_decimal = 0.3 AS decimal_is_exact, as_paise = 30 AS paise_is_exact, as_paise / 100.0 AS shown FROM t_money"
+     },
+     "columns": [
+      "decimal_is_exact",
+      "paise_is_exact",
+      "shown"
+     ],
+     "result": [
+      [
+       "0",
+       "1",
+       "0.3"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): DECIMAL(10,2) kept 0.1 + 0.2 as 0.30000000000000004 (= 0.3 was false) and 1.10 as the real 1.1; INTEGER paise added exactly.",
+    "mysql": "Lab (MariaDB 10.11): DECIMAL(10,2) is exact: 0.1 + 0.2 stored 0.30 and = 0.3 was true.",
+    "mariadb": "Lab: DECIMAL is exact.",
+    "postgresql": "Lab (PostgreSQL 16): numeric(10,2) is exact: = 0.3 was true.",
+    "sqlserver": "Notes only (not lab-tested here): DECIMAL / MONEY are exact.",
+    "oracle": "Notes only (not lab-tested here): NUMBER(10,2) is exact."
+   },
+   "fundamentals": [
+    "column_types",
+    "values_types"
+   ],
+   "related": [
+    "sqlite_type_affinity",
+    "decimal_vs_float"
+   ],
+   "source": "https://www.sqlite.org/datatype3.html#storage_classes_and_datatypes",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_date_check",
+   "kind": "concept",
+   "title": {
+    "en": "Keeping dates in one shape in SQLite",
+    "hinglish": "SQLite mein date ek hi shape mein rakhna",
+    "hindi": "SQLite में date एक shape में रखना"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "(valid\\w*|check|galat|wrong|invalid|rok\\w*|stop|prevent)",
+     "dates?"
+    ],
+    [
+     "sqlite3?",
+     "dates?",
+     "(format|shape)",
+     "(different|mixed|alag|do|two)"
+    ],
+    [
+     "sqlite3?",
+     "(गलत|ग़लत)",
+     "date"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to validate a date column in sqlite",
+     "how to stop wrong dates in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein galat date save hone se kaise roke"
+    ],
+    "hindi": [
+     "SQLite में गलत date को कैसे रोकें"
+    ]
+   },
+   "answer": {
+    "en": "SQLite keeps dates as text, and text compares letter by letter, so only one shape sorts like time: 'YYYY-MM-DD' (or 'YYYY-MM-DD HH:MM:SS'), zero-padded. '2024-1-5' or '05/01/2024' in the same column sort wrongly and date() can't read them (it gives NULL). Let SQLite refuse other shapes: d TEXT CHECK (d IS date(d)) for days, t TEXT CHECK (t IS datetime(t)) for moments; it also refuses impossible days like '2024-02-30', because date() rolls them over.",
+    "hinglish": "SQLite date ko text rakhta hai jo akshar se akshar compare hota hai, isliye sirf 'YYYY-MM-DD' shape sahi sort hoti hai. '2024-1-5' ya '05/01/2024' galat sort hote hain aur date() unhe nahi padhta (NULL). SQLite se mana karwao: d TEXT CHECK (d IS date(d)); ye '2024-02-30' bhi rokta hai.",
+    "hindi": "CHECK (d IS date(d)) लगाइए।"
+   },
+   "mistake": {
+    "en": "Comparing with a date written another way (d >= '2024-3-1'): no error, just the wrong rows.",
+    "hinglish": "Doosri shape ki date se compare (d >= '2024-3-1'): bina error galat rows.",
+    "hindi": "दूसरी shape से compare करना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_days (d TEXT CHECK (d IS date(d)));\nINSERT INTO t_days VALUES ('2024-01-05'), (NULL);\nSELECT date('2024-1-5') AS short_shape, date('05/01/2024') AS slash_shape, date('2024-02-30') AS rolled_over, count(*) AS kept FROM t_days"
+     },
+     "columns": [
+      "short_shape",
+      "slash_shape",
+      "rolled_over",
+      "kept"
+     ],
+     "result": [
+      [
+       "NULL",
+       "NULL",
+       "2024-03-01",
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): CHECK (d IS date(d)) refused '2024-1-5' and '2024-02-30' and kept NULL; d >= '2024-3-1' found none of the March-and-later rows; date('2024-1-20') was NULL.",
+    "mysql": "Lab (MariaDB 10.11): a DATE column refused '2024-02-30' (1292) and read '2024-1-5' as 2024-01-05.",
+    "mariadb": "Lab: DATE refuses impossible days.",
+    "postgresql": "Lab (PostgreSQL 16): date refused '2024-02-30' (out of range) and read '2024-1-5'.",
+    "sqlserver": "Notes only (not lab-tested here): DATE refuses impossible days.",
+    "oracle": "Notes only (not lab-tested here): DATE refuses impossible days; formats need TO_DATE."
+   },
+   "fundamentals": [
+    "column_types",
+    "time_ranges"
+   ],
+   "related": [
+    "sqlite_dates",
+    "check_constraint"
+   ],
+   "source": "https://www.sqlite.org/lang_datefunc.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_text_number_compare",
+   "kind": "concept",
+   "title": {
+    "en": "Text compared with a number in SQLite",
+    "hinglish": "SQLite mein text aur number ki tulna",
+    "hindi": "SQLite में text और number की तुलना"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "strftime",
+     "(nothing|no rows?|empty|kuch nahi|koi row|0 rows?|zero rows?|not working|kaam nahi)"
+    ],
+    [
+     "sqlite3?",
+     "(text|string)",
+     "(number|integer)",
+     "(compar\\w*|equal|barabar|match\\w*)"
+    ],
+    [
+     "sqlite3?",
+     "strftime",
+     "(year|saal|month|mahina)",
+     "(compar\\w*|equal|=|match\\w*)"
+    ],
+    [
+     "sqlite3?",
+     "strftime",
+     "(not equal|never equal|equal|barabar|compar\\w*)"
+    ],
+    [
+     "sqlite3?",
+     "strftime",
+     "(कुछ|नहीं|मिलाने)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why is strftime year not equal to a number in sqlite",
+     "why is text never equal to a number in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein strftime se year compare karne pe koi row kyun nahi aati"
+    ],
+    "hindi": [
+     "SQLite में strftime से साल मिलाने पर कुछ क्यों नहीं आता"
+    ]
+   },
+   "answer": {
+    "en": "Every SQLite value carries its own type. A column converts a value compared with it to its own affinity, so code = 2 still finds '2' in a TEXT column. An expression like strftime('%Y', d), substr(...) or trim(...) has no affinity: its TEXT is never equal to an INTEGER, and any number sorts below any text. So strftime('%Y', d) = 2024 finds nothing and strftime('%Y', d) >= 2025 finds everything, with no error. Compare like with like: strftime('%Y', d) = '2024', or CAST(strftime('%m', d) AS INTEGER) = 3 (the month text is '03').",
+    "hinglish": "SQLite mein har value ka apna type hota hai. Column apne se compare hone wali value ko apne type mein badalta hai, par strftime('%Y', d) jaisa expression nahi: uska TEXT kabhi INTEGER ke barabar nahi, aur har number text se chhota maana jaata hai. Isliye strftime('%Y', d) = 2024 kuch nahi deta. strftime('%Y', d) = '2024' likho, ya CAST(strftime('%m', d) AS INTEGER) = 3.",
+    "hindi": "strftime('%Y', d) = '2024' लिखिए, 2024 नहीं।"
+   },
+   "mistake": {
+    "en": "strftime('%m', d) = 3 or = '3': both find nothing, because the month text is '03'.",
+    "hinglish": "strftime('%m', d) = 3 ya '3': dono kuch nahi dete, kyunki mahina '03' hai.",
+    "hindi": "strftime('%m', d) = 3 लिखना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT strftime('%Y', '2024-03-09') = 2024 AS text_vs_number, strftime('%Y', '2024-03-09') = '2024' AS text_vs_text, CAST(strftime('%m', '2024-03-09') AS INTEGER) = 3 AS month_as_number"
+     },
+     "columns": [
+      "text_vs_number",
+      "text_vs_text",
+      "month_as_number"
+     ],
+     "result": [
+      [
+       "0",
+       "1",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): strftime('%Y', d) = 2024 found 0 rows of 2 and >= 2025 found all 3; SELECT '1' = 1 gave 0; code = 2 on a TEXT column found its row.",
+    "mysql": "Lab (MariaDB 10.11): text is turned into a number for the comparison: DATE_FORMAT(d, '%Y') = 2024 and '1' = 1 were true.",
+    "mariadb": "Lab: '1' = 1 is true.",
+    "postgresql": "Lab (PostgreSQL 16): '1' = 1 was true (the literal is read as a number), but to_char(...) = 2024 is refused: operator does not exist: text = integer.",
+    "sqlserver": "Notes only (not lab-tested here): text is converted to the number's type ('1' = 1 is true).",
+    "oracle": "Notes only (not lab-tested here): text is converted to a number ('1' = 1 is true)."
+   },
+   "fundamentals": [
+    "values_types"
+   ],
+   "related": [
+    "sqlite_type_affinity",
+    "sqlite_strftime"
+   ],
+   "source": "https://www.sqlite.org/datatype3.html#comparison_expressions",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite+strftime"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_add_column",
+   "kind": "concept",
+   "title": {
+    "en": "Adding a column in SQLite: what ADD COLUMN can't do",
+    "hinglish": "SQLite mein column jodna: ADD COLUMN kya nahi karta",
+    "hindi": "SQLite में column जोड़ना"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "add\\w*",
+     "column",
+     "(unique|not null|default|primary key|current_timestamp|constraint|if not exists)"
+    ],
+    [
+     "sqlite3?",
+     "(jod\\w*|add\\w*)",
+     "(unique|not null)",
+     "column"
+    ],
+    [
+     "sqlite3?",
+     "unique",
+     "column",
+     "(जोड़ें|जोड़|जोड़े)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to add a unique column in sqlite",
+     "how to add a not null column to an existing sqlite table"
+    ],
+    "hinglish": [
+     "sqlite mein not null column kaise jode"
+    ],
+    "hindi": [
+     "SQLite में UNIQUE column कैसे जोड़ें"
+    ]
+   },
+   "answer": {
+    "en": "ALTER TABLE t ADD COLUMN adds one column at the end, with limits: no PRIMARY KEY or UNIQUE on it, NOT NULL only with a default other than NULL, and on a table that has rows no default that isn't a fixed value (CURRENT_TIMESTAMP, an expression). The ways round: add the column, then CREATE UNIQUE INDEX on it; give a NOT NULL column a default (NOT NULL DEFAULT ''); add a timestamp column without a default and fill the old rows with an UPDATE (preview first). One column per statement, and no IF NOT EXISTS.",
+    "hinglish": "ALTER TABLE t ADD COLUMN ek column aakhir mein jodta hai, kuch seemaon ke saath: PRIMARY KEY ya UNIQUE nahi, NOT NULL sirf default ke saath, aur rows wali table pe CURRENT_TIMESTAMP jaisa default nahi. Raaste: column jodo phir CREATE UNIQUE INDEX; NOT NULL ke saath DEFAULT ''; timestamp bina default jodo aur purani rows UPDATE se bharo (pehle preview). Ek statement mein ek column.",
+    "hindi": "UNIQUE के लिए column जोड़कर CREATE UNIQUE INDEX बनाइए।"
+   },
+   "mistake": {
+    "en": "ALTER TABLE t ADD COLUMN email TEXT UNIQUE: refused ('Cannot add a UNIQUE column').",
+    "hinglish": "ALTER TABLE t ADD COLUMN email TEXT UNIQUE: mana ('Cannot add a UNIQUE column').",
+    "hindi": "UNIQUE column सीधे जोड़ना मना है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_people (id INTEGER PRIMARY KEY, name TEXT);\nINSERT INTO t_people (name) VALUES ('a'), ('b');\nALTER TABLE t_people ADD COLUMN email TEXT;\nCREATE UNIQUE INDEX ux_t_people_email ON t_people (email);\nALTER TABLE t_people ADD COLUMN status TEXT NOT NULL DEFAULT 'new';\nSELECT id, email, status FROM t_people ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "email",
+      "status"
+     ],
+     "result": [
+      [
+       "1",
+       "NULL",
+       "new"
+      ],
+      [
+       "2",
+       "NULL",
+       "new"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): ADD COLUMN ... UNIQUE / PRIMARY KEY were refused; NOT NULL without a default and DEFAULT CURRENT_TIMESTAMP were refused on a table with rows and accepted on an empty one; ADD COLUMN IF NOT EXISTS and two ADDs in one statement were syntax errors; the unique index and NOT NULL DEFAULT 'new' worked.",
+    "mysql": "Lab (MariaDB 10.11): ADD COLUMN takes UNIQUE, NOT NULL (old rows get the type's empty value) and CURRENT_TIMESTAMP defaults, several in one statement.",
+    "mariadb": "Lab: ADD COLUMN takes all of them.",
+    "postgresql": "Lab (PostgreSQL 16): ADD COLUMN c TEXT NOT NULL on a table with rows: column \"c\" contains null values; UNIQUE and defaults work.",
+    "sqlserver": "Notes only (not lab-tested here): ADD c TYPE NOT NULL needs a DEFAULT on a table with rows.",
+    "oracle": "Notes only (not lab-tested here): ADD (c TYPE NOT NULL) needs a DEFAULT on a table with rows."
+   },
+   "fundamentals": [
+    "changes_safety",
+    "table_keys"
+   ],
+   "related": [
+    "sqlite_alter_table",
+    "sqlite_rebuild_table"
+   ],
+   "source": "https://www.sqlite.org/lang_altertable.html#alter_table_add_column",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_drop_column",
+   "kind": "concept",
+   "title": {
+    "en": "Dropping a column in SQLite",
+    "hinglish": "SQLite mein column hatana",
+    "hindi": "SQLite में column हटाना"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "(drop|delete|remove|hata\\w*|hat)",
+     "column",
+     "(cannot|can.?t|error|nahi|index\\w*|unique|fail\\w*|why|kyun)"
+    ],
+    [
+     "sqlite3?",
+     "column",
+     "(हटता|हटाना|हटाएं|हटे)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why can't sqlite drop an indexed column",
+     "how to drop an indexed column in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein column kyun nahi hat raha"
+    ],
+    "hindi": [
+     "SQLite में column क्यों नहीं हटता"
+    ]
+   },
+   "answer": {
+    "en": "ALTER TABLE t DROP COLUMN c (3.35+) removes a column only when nothing else needs it. It refuses a PRIMARY KEY or UNIQUE column, and a column that an index, a view, a trigger, a CHECK, a foreign key or a generated column still uses ('error in index ix after drop column'). Drop that index or view first, then the column; a key or UNIQUE column goes only by rebuilding the table.",
+    "hinglish": "ALTER TABLE t DROP COLUMN c (3.35+) tabhi column hataata hai jab koi aur use na kare. PRIMARY KEY / UNIQUE column, aur jise index, view, trigger, CHECK ya foreign key use kare, use mana karta hai. Pehle wo index ya view hatao, phir column; key ya UNIQUE column sirf table dobara banake jaata hai.",
+    "hindi": "पहले index हटाइए, फिर column।"
+   },
+   "mistake": {
+    "en": "Expecting DROP COLUMN to take its index with it, as MySQL does: SQLite stops instead.",
+    "hinglish": "Ummeed ki DROP COLUMN index bhi saath le jaayega (MySQL jaisa): SQLite ruk jaata hai.",
+    "hindi": "index साथ जाने की उम्मीद।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_cols (id INTEGER PRIMARY KEY, code TEXT, note TEXT);\nCREATE INDEX ix_t_cols_code ON t_cols (code);\nDROP INDEX ix_t_cols_code;\nALTER TABLE t_cols DROP COLUMN code;\nSELECT name FROM pragma_table_info('t_cols') ORDER BY cid"
+     },
+     "columns": [
+      "name"
+     ],
+     "result": [
+      [
+       "id"
+      ],
+      [
+       "note"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): DROP COLUMN of an indexed column gave 'error in index ix after drop column', of a UNIQUE one 'cannot drop UNIQUE column', of the key 'cannot drop PRIMARY KEY column'; after DROP INDEX it worked.",
+    "mysql": "Lab (MariaDB 10.11): DROP COLUMN takes the column out of its indexes too.",
+    "mariadb": "Lab: indexes follow the column.",
+    "postgresql": "Lab (PostgreSQL 16): DROP COLUMN drops the indexes on it too (views need CASCADE).",
+    "sqlserver": "Notes only (not lab-tested here): DROP COLUMN refuses while an index or constraint uses it.",
+    "oracle": "Notes only (not lab-tested here): DROP COLUMN drops its indexes and constraints."
+   },
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "related": [
+    "sqlite_alter_table",
+    "sqlite_rebuild_table"
+   ],
+   "source": "https://www.sqlite.org/lang_altertable.html#alter_table_drop_column",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_rebuild_table",
+   "kind": "concept",
+   "title": {
+    "en": "Rebuilding a table in SQLite (the safe order)",
+    "hinglish": "SQLite mein table dobara banana (sahi kram)",
+    "hindi": "SQLite में table दोबारा बनाना"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "rebuild\\w*",
+     "table"
+    ],
+    [
+     "sqlite3?",
+     "(recreate|re-create|dobara bana\\w*)",
+     "table"
+    ],
+    [
+     "sqlite3?",
+     "12 steps?"
+    ],
+    [
+     "sqlite3?",
+     "dobara",
+     "table"
+    ],
+    [
+     "sqlite3?",
+     "table",
+     "दोबारा"
+    ],
+    [
+     "sqlite3?",
+     "rebuild\\w*",
+     "table",
+     "(column|type|key)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to rebuild a table in sqlite",
+     "how to safely recreate a table in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein table dobara kaise banaye"
+    ],
+    "hindi": [
+     "SQLite में table दोबारा कैसे बनाएं"
+    ]
+   },
+   "answer": {
+    "en": "For a change ALTER TABLE can't make (a type, a default, a key, a CHECK): PRAGMA foreign_keys = OFF; BEGIN; note the table's indexes, triggers and views (SELECT sql FROM sqlite_master WHERE tbl_name = 't'); CREATE TABLE t_new with the new definition; INSERT INTO t_new (cols) SELECT cols FROM t; DROP TABLE t; ALTER TABLE t_new RENAME TO t; create the indexes, triggers and views again; PRAGMA foreign_key_check; COMMIT; PRAGMA foreign_keys = ON. Create the new table and then rename it, never rename the old one first: the rename rewrites what points at it.",
+    "hinglish": "Jo badlaav ALTER TABLE nahi karta (type, default, key, CHECK): foreign keys band, BEGIN, indexes / triggers / views note karo, nayi table t_new banao, rows copy karo, purani DROP, t_new ka naam t, indexes wapas banao, foreign_key_check, COMMIT, foreign keys chalu. Pehle purani ka naam mat badlo.",
+    "hindi": "नई table बनाइए, rows copy, पुरानी drop, नाम बदलिए, एक transaction में।"
+   },
+   "mistake": {
+    "en": "Renaming the old table first (ALTER TABLE t RENAME TO t_old) and then creating t: foreign keys, views and triggers follow the old table to t_old.",
+    "hinglish": "Pehle purani table ka naam badalna: foreign keys, views, triggers t_old ke peeche chale jaate hain.",
+    "hindi": "पुरानी table का नाम पहले बदलना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_rb (id INTEGER PRIMARY KEY, qty TEXT);\nINSERT INTO t_rb (qty) VALUES ('5'), ('12');\nBEGIN;\nCREATE TABLE t_rb_new (id INTEGER PRIMARY KEY, qty INTEGER NOT NULL CHECK (qty >= 0));\nINSERT INTO t_rb_new (id, qty) SELECT id, CAST(qty AS INTEGER) FROM t_rb;\nDROP TABLE t_rb;\nALTER TABLE t_rb_new RENAME TO t_rb;\nCOMMIT;\nSELECT id, qty, typeof(qty) AS stored_as FROM t_rb ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "qty",
+      "stored_as"
+     ],
+     "result": [
+      [
+       "1",
+       "5",
+       "integer"
+      ],
+      [
+       "2",
+       "12",
+       "integer"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): the rebuild kept both rows and their ids, with qty now integer and checked; ALTER COLUMN TYPE was a syntax error.",
+    "mysql": "Lab (MariaDB 10.11): ALTER TABLE ... MODIFY changes a column in place.",
+    "mariadb": "Lab: MODIFY / CHANGE work in place.",
+    "postgresql": "Lab (PostgreSQL 16): ALTER COLUMN ... TYPE ... USING changes it in place.",
+    "sqlserver": "Notes only (not lab-tested here): ALTER COLUMN changes it in place.",
+    "oracle": "Notes only (not lab-tested here): MODIFY changes it in place."
+   },
+   "fundamentals": [
+    "changes_safety"
+   ],
+   "related": [
+    "sqlite_alter_table",
+    "transaction"
+   ],
+   "source": "https://www.sqlite.org/lang_altertable.html#otheralter",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_set_not_null",
+   "kind": "concept",
+   "title": {
+    "en": "Making an existing SQLite column NOT NULL",
+    "hinglish": "SQLite ke existing column ko NOT NULL banana",
+    "hindi": "SQLite के column को NOT NULL बनाना"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "set not null"
+    ],
+    [
+     "sqlite3?",
+     "drop not null"
+    ],
+    [
+     "sqlite3?",
+     "not null",
+     "(existing|purane|purana|already|pehle se)"
+    ],
+    [
+     "sqlite3?",
+     "column",
+     "not null",
+     "(bana\\w*|make)"
+    ],
+    [
+     "sqlite3?",
+     "not null",
+     "(पुराने|बनाएं)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to make an existing column not null in sqlite",
+     "does sqlite support alter column set not null"
+    ],
+    "hinglish": [
+     "sqlite mein existing column ko not null kaise banaye"
+    ],
+    "hindi": [
+     "SQLite में पुराने column को NOT NULL कैसे बनाएं"
+    ]
+   },
+   "answer": {
+    "en": "From SQLite 3.53 (April 2026): ALTER TABLE t ALTER COLUMN c SET NOT NULL (and DROP NOT NULL). It checks the rows already there, so fill or remove the NULLs first (SELECT count(*) FROM t WHERE c IS NULL, then an UPDATE you have previewed). On an older SQLite (check SELECT sqlite_version()) it is a syntax error, and the way is to rebuild the table with NOT NULL in its CREATE TABLE.",
+    "hinglish": "SQLite 3.53 (April 2026) se: ALTER TABLE t ALTER COLUMN c SET NOT NULL (aur DROP NOT NULL). Ye purani rows check karta hai, isliye pehle NULL bharo (preview ke saath). Purane SQLite pe syntax error, wahan table dobara banao.",
+    "hindi": "3.53 से ALTER COLUMN c SET NOT NULL; पुराने पर table दोबारा बनाइए।"
+   },
+   "mistake": {
+    "en": "Running SET NOT NULL while NULL rows are there: refused ('constraint failed'); count and fill them first.",
+    "hinglish": "NULL rows ke rehte SET NOT NULL: mana; pehle gin ke bharo.",
+    "hindi": "NULL rows के रहते SET NOT NULL चलाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_nn (id INTEGER PRIMARY KEY, city TEXT);\nINSERT INTO t_nn (city) VALUES ('Pune'), (NULL);\nSELECT count(*) AS null_rows_to_fill_first FROM t_nn WHERE city IS NULL"
+     },
+     "columns": [
+      "null_rows_to_fill_first"
+     ],
+     "result": [
+      [
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): 3.53 ran ALTER COLUMN c SET NOT NULL and DROP NOT NULL, and refused SET NOT NULL with a NULL row there ('constraint failed'); the 3.45 command line gave near \"ALTER\": syntax error.",
+    "mysql": "Lab (MariaDB 10.11): ALTER TABLE t MODIFY c type NOT NULL works (it changes NULLs to the type's empty value only outside strict mode).",
+    "mariadb": "Lab: MODIFY ... NOT NULL works.",
+    "postgresql": "Lab (PostgreSQL 16): ALTER COLUMN c SET NOT NULL works and refuses while NULLs are there (column \"c\" contains null values).",
+    "sqlserver": "Notes only (not lab-tested here): ALTER COLUMN c type NOT NULL works.",
+    "oracle": "Notes only (not lab-tested here): MODIFY (c NOT NULL) works."
+   },
+   "fundamentals": [
+    "changes_safety",
+    "null_logic"
+   ],
+   "related": [
+    "sqlite_alter_table",
+    "sqlite_rebuild_table"
+   ],
+   "source": "https://www.sqlite.org/lang_altertable.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_without_rowid",
+   "kind": "concept",
+   "title": {
+    "en": "WITHOUT ROWID tables in SQLite",
+    "hinglish": "SQLite mein WITHOUT ROWID table",
+    "hindi": "SQLite में WITHOUT ROWID table"
+   },
+   "terms": [
+    [
+     "without rowid"
+    ],
+    [
+     "sqlite3?",
+     "without rowid"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a without rowid table in sqlite",
+     "when to use without rowid in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein without rowid kya hota hai"
+    ],
+    "hindi": [
+     "SQLite में WITHOUT ROWID क्या है"
+    ]
+   },
+   "answer": {
+    "en": "Writing WITHOUT ROWID after a CREATE TABLE's closing bracket stores the rows in the order of the table's own PRIMARY KEY instead of a hidden rowid. It needs a PRIMARY KEY, refuses NULL in it, and has no rowid or self-numbering id. It saves space and a lookup for tables keyed by a short text or a pair of columns (a lookup table, a link table); ordinary tables with an INTEGER PRIMARY KEY are better left as they are.",
+    "hinglish": "CREATE TABLE ke bracket ke baad WITHOUT ROWID likhne se rows table ki PRIMARY KEY ke kram mein rakhi jaati hain, chhupe rowid ke bina. PRIMARY KEY zaroori, usme NULL mana, aur apne-aap ginti wala id nahi. Chhote text ya do column ki key wali tables (lookup, link table) ke liye accha.",
+    "hindi": "WITHOUT ROWID: primary key के क्रम में rows, NULL मना।"
+   },
+   "mistake": {
+    "en": "Expecting an id to number itself in a WITHOUT ROWID table: there is no rowid, so the app must send the key.",
+    "hinglish": "WITHOUT ROWID table mein id khud ginne ki ummeed: rowid nahi hota.",
+    "hindi": "id अपने-आप गिनने की उम्मीद।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_kv (k TEXT PRIMARY KEY, v TEXT) WITHOUT ROWID;\nINSERT INTO t_kv VALUES ('b', '2'), ('a', '1');\nSELECT k, v FROM t_kv"
+     },
+     "columns": [
+      "k",
+      "v"
+     ],
+     "result": [
+      [
+       "a",
+       "1"
+      ],
+      [
+       "b",
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): rows came back in key order ('a', 'b'); an INSERT without the key gave 'NOT NULL constraint failed'.",
+    "mysql": "Lab (MariaDB 10.11): InnoDB always stores rows in primary key order (a clustered index).",
+    "mariadb": "Lab: InnoDB clusters by the primary key.",
+    "postgresql": "Lab (PostgreSQL 16): tables are heaps; CLUSTER reorders once.",
+    "sqlserver": "Notes only (not lab-tested here): a clustered index stores rows in key order.",
+    "oracle": "Notes only (not lab-tested here): an index-organized table (ORGANIZATION INDEX) does this."
+   },
+   "fundamentals": [
+    "table_keys"
+   ],
+   "related": [
+    "sqlite_rowid",
+    "sqlite_null_primary_key"
+   ],
+   "source": "https://www.sqlite.org/withoutrowid.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_fk_index",
+   "kind": "concept",
+   "title": {
+    "en": "Foreign keys and indexes in SQLite",
+    "hinglish": "SQLite mein foreign key aur index",
+    "hindi": "SQLite में foreign key और index"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "foreign keys?",
+     "index\\w*"
+    ],
+    [
+     "sqlite3?",
+     "references",
+     "index\\w*"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does sqlite index foreign key columns",
+     "does a foreign key need an index in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein foreign key pe index banta hai kya"
+    ],
+    "hindi": [
+     "SQLite में foreign key पर index बनता है क्या"
+    ]
+   },
+   "answer": {
+    "en": "No: SQLite indexes the parent's key, never the child's column. Without an index there, finding a parent's rows reads the whole child table, and with foreign keys on so does every DELETE or key change in the parent. Add one yourself: CREATE INDEX ix_orders_customer_id ON orders (customer_id).",
+    "hinglish": "Nahi: SQLite parent ki key pe index rakhta hai, child ke column pe kabhi nahi. Iske bina parent ki rows dhoondhna aur parent ka har DELETE poori child table padhta hai. Khud banao: CREATE INDEX ix_orders_customer_id ON orders (customer_id).",
+    "hindi": "नहीं; CREATE INDEX खुद बनाइए।"
+   },
+   "mistake": {
+    "en": "Assuming REFERENCES made an index, as InnoDB does: queries by customer_id then scan the whole table.",
+    "hinglish": "Maan lena ki REFERENCES ne index banaya (InnoDB jaisa): poori table scan.",
+    "hindi": "REFERENCES से index मान लेना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_parent (id INTEGER PRIMARY KEY);\nCREATE TABLE t_child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES t_parent (id));\nSELECT count(*) AS indexes_on_child FROM sqlite_master WHERE type = 'index' AND tbl_name = 't_child'"
+     },
+     "columns": [
+      "indexes_on_child"
+     ],
+     "result": [
+      [
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): no index was made for the REFERENCES column (EXPLAIN QUERY PLAN: SCAN t_child); after CREATE INDEX: SEARCH ... USING COVERING INDEX.",
+    "mysql": "Lab (MariaDB 10.11): InnoDB made an index on the foreign key column by itself.",
+    "mariadb": "Lab: InnoDB indexes it.",
+    "postgresql": "Lab (PostgreSQL 16): no index is made on the child column (pg_indexes showed only the key).",
+    "sqlserver": "Notes only (not lab-tested here): no index is made on the child column.",
+    "oracle": "Notes only (not lab-tested here): no index is made on the child column."
+   },
+   "fundamentals": [
+    "table_keys",
+    "index_use"
+   ],
+   "related": [
+    "sqlite_foreign_keys",
+    "foreign_key",
+    "index"
+   ],
+   "source": "https://www.sqlite.org/foreignkeys.html#fk_indexes",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_default_timestamp",
+   "kind": "concept",
+   "title": {
+    "en": "A created_at default in SQLite",
+    "hinglish": "SQLite mein created_at ka default",
+    "hindi": "SQLite में created_at का default"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "default",
+     "(current_timestamp|now|current time|timestamp|created_at|time)"
+    ],
+    [
+     "sqlite3?",
+     "created_at",
+     "(default|auto\\w*|khud)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to set a default current timestamp in sqlite",
+     "how to fill created_at automatically in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein created_at ka default kaise lagaye"
+    ],
+    "hindi": [
+     "SQLite में created_at का default कैसे लगाएं"
+    ]
+   },
+   "answer": {
+    "en": "Write created_at TEXT DEFAULT CURRENT_TIMESTAMP: an INSERT that leaves it out gets the time as text 'YYYY-MM-DD HH:MM:SS' in UTC. now() doesn't exist (DEFAULT now() is a syntax error); an expression needs brackets: DEFAULT (datetime('now', 'localtime')). There is no ON UPDATE: to keep updated_at current use a trigger or set it in the UPDATE.",
+    "hinglish": "created_at TEXT DEFAULT CURRENT_TIMESTAMP likho: INSERT mein chhodo to UTC samay text 'YYYY-MM-DD HH:MM:SS' aata hai. now() nahi hota; expression bracket mein: DEFAULT (datetime('now', 'localtime')). ON UPDATE nahi hota: updated_at ke liye trigger ya UPDATE mein khud likho.",
+    "hindi": "DEFAULT CURRENT_TIMESTAMP लिखिए (UTC)।"
+   },
+   "mistake": {
+    "en": "DEFAULT now() or ON UPDATE CURRENT_TIMESTAMP copied from another database: syntax errors on SQLite; and reading the time as local when it is UTC.",
+    "hinglish": "Doosre database se DEFAULT now() ya ON UPDATE copy karna: SQLite pe syntax error; aur UTC ko local samajhna.",
+    "hindi": "DEFAULT now() लिखना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_log (id INTEGER PRIMARY KEY, msg TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP);\nINSERT INTO t_log (msg) VALUES ('hi');\nSELECT msg, length(created_at) AS letters, created_at LIKE '____-__-__ __:__:__' AS iso_shape FROM t_log"
+     },
+     "columns": [
+      "msg",
+      "letters",
+      "iso_shape"
+     ],
+     "result": [
+      [
+       "hi",
+       "19",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): DEFAULT CURRENT_TIMESTAMP filled a 19-letter 'YYYY-MM-DD HH:MM:SS' text; DEFAULT now() and ON UPDATE CURRENT_TIMESTAMP were syntax errors; DEFAULT (datetime('now')) worked.",
+    "mysql": "Lab (MariaDB 10.11): DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP works.",
+    "mariadb": "Lab: ON UPDATE CURRENT_TIMESTAMP works.",
+    "postgresql": "Lab (PostgreSQL 16): timestamptz DEFAULT now() works; no ON UPDATE (a trigger does it).",
+    "sqlserver": "Notes only (not lab-tested here): DEFAULT GETDATE() / SYSDATETIME() works.",
+    "oracle": "Notes only (not lab-tested here): DEFAULT SYSTIMESTAMP works."
+   },
+   "fundamentals": [
+    "column_types",
+    "time_ranges"
+   ],
+   "related": [
+    "sqlite_now",
+    "sqlite_dates"
+   ],
+   "source": "https://www.sqlite.org/lang_createtable.html#the_default_clause",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_enum",
+   "kind": "concept",
+   "title": {
+    "en": "An ENUM column in SQLite",
+    "hinglish": "SQLite mein ENUM column",
+    "hindi": "SQLite में ENUM column"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "enum\\w*"
+    ],
+    [
+     "sqlite3?",
+     "(allowed|fixed|limited) values"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to make an enum column in sqlite",
+     "does sqlite support enum"
+    ],
+    "hinglish": [
+     "sqlite mein enum kaise banaye"
+    ],
+    "hindi": [
+     "SQLite में enum कैसे बनाएं"
+    ]
+   },
+   "answer": {
+    "en": "SQLite has no ENUM (it is a syntax error). Write the column as text with a CHECK listing the allowed values: status TEXT NOT NULL CHECK (status IN ('new', 'paid', 'shipped')). Changing the list later needs a table rebuild; when the list changes often, keep the values in their own table and point at it with a foreign key.",
+    "hinglish": "SQLite mein ENUM nahi (syntax error). Text column + CHECK likho: status TEXT NOT NULL CHECK (status IN ('new', 'paid', 'shipped')). List badalne ke liye table dobara banani padti hai; list baar baar badle to values ki alag table rakho aur foreign key se jodo.",
+    "hindi": "TEXT CHECK (status IN (...)) लिखिए।"
+   },
+   "mistake": {
+    "en": "Copying status ENUM('new','paid') from MySQL: SQLite stops at it.",
+    "hinglish": "MySQL se ENUM copy karna: SQLite ruk jaata hai.",
+    "hindi": "ENUM copy करना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "CREATE TABLE t_orders_status (id INTEGER PRIMARY KEY, status TEXT NOT NULL CHECK (status IN ('new', 'paid')));\nINSERT INTO t_orders_status (status) VALUES ('new'), ('paid');\nSELECT status, count(*) AS n FROM t_orders_status GROUP BY status ORDER BY status"
+     },
+     "columns": [
+      "status",
+      "n"
+     ],
+     "result": [
+      [
+       "new",
+       "1"
+      ],
+      [
+       "paid",
+       "1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): ENUM('a','b') was a syntax error; with the CHECK, 'zzz' gave 'CHECK constraint failed'.",
+    "mysql": "Lab (MariaDB 10.11): ENUM exists; a value outside it was refused (1265 Data truncated, strict mode).",
+    "mariadb": "Lab: ENUM exists.",
+    "postgresql": "Lab (PostgreSQL 16): CREATE TYPE ... AS ENUM exists; 'zzz' was refused (invalid input value for enum).",
+    "sqlserver": "Notes only (not lab-tested here): no ENUM: a CHECK does it.",
+    "oracle": "Notes only (not lab-tested here): no ENUM: a CHECK does it."
+   },
+   "fundamentals": [
+    "column_types"
+   ],
+   "related": [
+    "check_constraint",
+    "sqlite_rebuild_table"
+   ],
+   "source": "https://www.sqlite.org/lang_createtable.html#check_constraints",
    "seen_at": [
     "https://stackoverflow.com/questions/tagged/sqlite"
    ],

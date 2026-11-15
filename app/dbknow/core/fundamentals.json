@@ -1248,7 +1248,7 @@
    "shown_by": "alter_not_supported",
    "title_en": "SQLite's ALTER TABLE can't make this change",
    "title_hi": "SQLite ka ALTER TABLE ye badlaav nahi kar sakta",
-   "why_en": "SQLite's ALTER TABLE only renames a table or a column, adds a column, or drops one (from 3.35). Changing a column's type, default or NOT NULL, adding a PRIMARY KEY or UNIQUE column, or adding a NOT NULL column without a default all need the table rebuilt: a new table with the new definition, the rows copied over, the old one dropped and the new one renamed.",
+   "why_en": "SQLite's ALTER TABLE only renames a table or a column, adds a column, drops one (from 3.35) and, from 3.53, sets or drops NOT NULL. Changing a column's type or default, adding a PRIMARY KEY or UNIQUE column, adding a constraint, adding a NOT NULL column without a default, or a column whose default isn't a fixed value (CURRENT_TIMESTAMP) to a table that has rows all need the table rebuilt: a new table with the new definition, the rows copied over, the old one dropped and the new one renamed.",
    "why_hi": "SQLite ka ALTER TABLE sirf table ya column ka naam badalta hai, column jodta hai, ya hata deta hai (3.35 se). Column ka type, default ya NOT NULL badalna, PRIMARY KEY ya UNIQUE column jodna, ya bina default ka NOT NULL column jodna, in sab ke liye table dobara banani padti hai: nayi definition ki table, rows copy, purani drop, nayi ka naam badlo.",
    "confirm_en": "PRAGMA table_info(table) shows the new definition after the rebuild, and the row count is the same as before.",
    "confirm_hi": "Rebuild ke baad PRAGMA table_info(table) nayi definition dikhata hai, aur rows ki ginti pehle jitni hai.",
@@ -1257,6 +1257,120 @@
    "needs": [],
    "short_en": "A table change SQLite's ALTER TABLE can't do",
    "short_hi": "Table ka badlaav jo SQLite ka ALTER TABLE nahi karta"
+  },
+  "strict_type": {
+   "layer": "schema",
+   "family": "any",
+   "engines": [
+    "sqlite"
+   ],
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.8
+   },
+   "prior": 0.1,
+   "shown_by": "strict_type",
+   "title_en": "A STRICT table refuses that type name",
+   "title_hi": "STRICT table ye type naam mana karti hai",
+   "why_en": "A table created with STRICT (SQLite 3.37+) takes only INT, INTEGER, REAL, TEXT, BLOB and ANY as column types, and every column must have one. VARCHAR(n), DATE, DATETIME, DECIMAL, BOOLEAN or a column with no type stop the CREATE TABLE ('unknown datatype' / 'missing datatype').",
+   "why_hi": "STRICT (SQLite 3.37+) wali table sirf INT, INTEGER, REAL, TEXT, BLOB, ANY type leti hai, aur har column ka type chahiye. VARCHAR(n), DATE, DECIMAL, BOOLEAN ya bina type ka column CREATE TABLE rok dete hain.",
+   "confirm_en": "The CREATE TABLE runs once each column says INTEGER, REAL, TEXT, BLOB or ANY.",
+   "confirm_hi": "Har column INTEGER, REAL, TEXT, BLOB ya ANY ho to CREATE TABLE chal jaati hai.",
+   "prevent_en": "Write SQLite's own type names in STRICT tables: TEXT for text and dates, INTEGER for whole numbers and true/false, REAL for fractions, and a CHECK for a length that matters.",
+   "prevent_hi": "STRICT table mein SQLite ke apne type naam likho: text aur dates ke liye TEXT, poore number aur true/false ke liye INTEGER, fraction ke liye REAL.",
+   "needs": [],
+   "short_en": "A STRICT table doesn't know that type name",
+   "short_hi": "STRICT table ye type naam nahi jaanti"
+  },
+  "autoinc_not_integer_pk": {
+   "layer": "schema",
+   "family": "any",
+   "engines": [
+    "sqlite"
+   ],
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.8
+   },
+   "prior": 0.1,
+   "shown_by": "autoinc_not_integer_pk",
+   "title_en": "AUTOINCREMENT goes only on INTEGER PRIMARY KEY",
+   "title_hi": "AUTOINCREMENT sirf INTEGER PRIMARY KEY pe lagta hai",
+   "why_en": "In SQLite only a column declared exactly INTEGER PRIMARY KEY is the rowid that numbers itself, and AUTOINCREMENT is an extra promise about that rowid (an id is never handed out twice). On INT, BIGINT or a key of another type it has nothing to work on, so SQLite refuses it.",
+   "why_hi": "SQLite mein sirf theek INTEGER PRIMARY KEY likha column rowid banke khud ginta hai, aur AUTOINCREMENT usi rowid ka extra vaada hai. INT, BIGINT ya kisi aur key pe ye kaam nahi karta, isliye SQLite mana karta hai.",
+   "confirm_en": "With the column declared INTEGER PRIMARY KEY AUTOINCREMENT the CREATE TABLE runs, and an INSERT without the id gets 1, 2, 3 ...",
+   "confirm_hi": "INTEGER PRIMARY KEY AUTOINCREMENT likhne pe CREATE TABLE chalti hai aur bina id ke INSERT 1, 2, 3 ... deta hai.",
+   "prevent_en": "Write ids as id INTEGER PRIMARY KEY (AUTOINCREMENT only when a deleted row's id must never come back).",
+   "prevent_hi": "id INTEGER PRIMARY KEY likho (AUTOINCREMENT tabhi jab hataye gaye id kabhi wapas na aayein).",
+   "needs": [],
+   "short_en": "AUTOINCREMENT on a column that isn't INTEGER PRIMARY KEY",
+   "short_hi": "AUTOINCREMENT aise column pe jo INTEGER PRIMARY KEY nahi"
+  },
+  "fk_target_not_key": {
+   "layer": "schema",
+   "family": "any",
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.8
+   },
+   "prior": 0.1,
+   "shown_by": "fk_target_not_key",
+   "title_en": "The foreign key points at a column that isn't a key",
+   "title_hi": "Foreign key aise column ko point karti hai jo key nahi",
+   "why_en": "A foreign key must point at something that names exactly one parent row: the parent's PRIMARY KEY or a UNIQUE column. PostgreSQL refuses to create such a link (42830); SQLite creates it and then every write to the child fails once foreign keys are on ('foreign key mismatch').",
+   "why_hi": "Foreign key ko aisi cheez pe point karna chahiye jo ek hi parent row batati ho: parent ki PRIMARY KEY ya UNIQUE column. PostgreSQL aisa link banne hi nahi deta (42830); SQLite bana deta hai aur foreign keys chalu hote hi child ka har write fail ('foreign key mismatch').",
+   "confirm_en": "The parent's column is its primary key or has a UNIQUE constraint / unique index, and the link (or the insert) goes through.",
+   "confirm_hi": "Parent ka column uski primary key hai ya uspe UNIQUE hai, aur link (ya insert) chal jaata hai.",
+   "prevent_en": "Point links at ids (the parent's primary key); a natural code used as a link gets a UNIQUE constraint first.",
+   "prevent_hi": "Link hamesha id (parent ki primary key) pe; koi code link bane to pehle uspe UNIQUE lagao.",
+   "needs": [],
+   "short_en": "A link to a column that isn't unique",
+   "short_hi": "Aise column se link jo unique nahi"
+  },
+  "two_primary_keys": {
+   "layer": "schema",
+   "family": "any",
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.8
+   },
+   "prior": 0.1,
+   "shown_by": "two_primary_keys",
+   "title_en": "The table says PRIMARY KEY twice",
+   "title_hi": "Table mein PRIMARY KEY do baar likha hai",
+   "why_en": "A table has exactly one primary key: the one thing that names each row. PRIMARY KEY written on two columns (or a column PRIMARY KEY plus a PRIMARY KEY (...) line) is refused: MySQL/MariaDB 1068 Multiple primary key defined, PostgreSQL multiple primary keys are not allowed, SQLite table has more than one primary key.",
+   "why_hi": "Table ki ek hi primary key hoti hai. Do columns pe PRIMARY KEY likhna mana hai: MySQL/MariaDB 1068, PostgreSQL 'multiple primary keys', SQLite 'more than one primary key'.",
+   "confirm_en": "The CREATE TABLE runs with one PRIMARY KEY (a, b) when two columns together name the row, or with the other column UNIQUE.",
+   "confirm_hi": "Ek PRIMARY KEY (a, b), ya doosra column UNIQUE karne pe CREATE TABLE chal jaati hai.",
+   "prevent_en": "Decide what one row is before writing the table: that is the primary key; everything else that must not repeat is UNIQUE.",
+   "prevent_hi": "Table likhne se pehle tay karo ek row kya hai: wahi primary key; baaki jo repeat na ho wo UNIQUE.",
+   "needs": [],
+   "short_en": "Two PRIMARY KEYs in one table",
+   "short_hi": "Ek table mein do PRIMARY KEY"
+  },
+  "drop_column_blocked": {
+   "layer": "schema",
+   "family": "any",
+   "engines": [
+    "sqlite"
+   ],
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.8
+   },
+   "prior": 0.1,
+   "shown_by": "drop_column_blocked",
+   "title_en": "Something still uses the column SQLite was asked to drop",
+   "title_hi": "Jo column hataana hai use abhi bhi kuch use kar raha hai",
+   "why_en": "SQLite's DROP COLUMN (3.35+) refuses a column that is a PRIMARY KEY or UNIQUE, or that an index, a view, a trigger, a CHECK, a foreign key or a generated column still uses: it would leave that object broken ('cannot drop UNIQUE column', 'error in index ix after drop column').",
+   "why_hi": "SQLite ka DROP COLUMN (3.35+) aisa column nahi hataata jo PRIMARY KEY ya UNIQUE ho, ya jise koi index, view, trigger, CHECK ya foreign key use kar raha ho: wo cheez toot jaati.",
+   "confirm_en": "After the index / view / trigger that uses it is dropped (or the table rebuilt for a key), ALTER TABLE ... DROP COLUMN runs.",
+   "confirm_hi": "Use karne wala index / view / trigger hataane ke baad (ya key ke liye table dobara banane ke baad) DROP COLUMN chalta hai.",
+   "prevent_en": "Before dropping a column, list what uses it: SELECT type, name FROM sqlite_master WHERE sql LIKE '%col%'.",
+   "prevent_hi": "Column hataane se pehle dekho kaun use karta hai: sqlite_master mein sql LIKE '%col%'.",
+   "needs": [],
+   "short_en": "A column still used by an index, view, key or check",
+   "short_hi": "Column jise abhi index, view, key ya check use karta hai"
   }
  }
 }

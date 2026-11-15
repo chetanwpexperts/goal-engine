@@ -184,7 +184,7 @@
   "values_types": {
    "title_en": "Values have types: text in quotes, dates in quotes",
    "title_hi": "Values ke type hote hain: text aur date quotes mein",
-   "rule_en": "A word without quotes is a column name and a date without quotes is arithmetic (2024-01-01 is 2022). Each side of a condition must be a whole comparison: status = 'a' OR 'b' compares nothing on the OR side; write IN ('a', 'b'). BETWEEN needs the smaller value first. Operators depend on the type and the engine: + adds numbers (text joins with CONCAT; || joins text only on PostgreSQL), integer / integer drops the fraction on PostgreSQL, in LIKE % and _ are wildcards, and double quotes mean a name on PostgreSQL.",
+   "rule_en": "A word without quotes is a column name and a date without quotes is arithmetic (2024-01-01 is 2022). Each side of a condition must be a whole comparison: status = 'a' OR 'b' compares nothing on the OR side; write IN ('a', 'b'). BETWEEN needs the smaller value first. Operators depend on the type and the engine: + adds numbers (text joins with CONCAT; || joins text only on PostgreSQL), integer / integer drops the fraction on PostgreSQL, in LIKE % and _ are wildcards, and double quotes mean a name on PostgreSQL. On SQLite every value carries its own type: an expression's text (strftime, substr) is never equal to a number, and dates compare as text, so only 'YYYY-MM-DD' sorts like time.",
    "rule_hi": "Bina quotes ka shabd column ka naam hai aur bina quotes ki date hisaab hai (2024-01-01 = 2022). OR ke dono taraf poora comparison chahiye: IN ('a', 'b') likho. BETWEEN mein chhoti value pehle. Operator type aur database pe nirbhar hain: + number jodta hai (text CONCAT se; || sirf PostgreSQL pe text jodta hai), PostgreSQL pe integer / integer decimal kaat deta hai, LIKE mein % aur _ wildcard hain, aur PostgreSQL pe double quotes naam hote hain.",
    "topics": [
     "value",
@@ -193,9 +193,16 @@
     "concat",
     "like",
     "division",
-    "quotes"
+    "quotes",
+    "type_compare",
+    "date_shape"
    ],
-   "source": "https://dev.mysql.com/doc/refman/8.4/en/type-conversion.html"
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/type-conversion.html",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
   },
   "names_scope": {
    "title_en": "Names belong to a scope",
@@ -390,7 +397,7 @@
   "table_keys": {
    "title_en": "Every table names its rows; every link points at a key",
    "title_hi": "Har table apni rows ko naam deti hai; har link kisi key pe point karta hai",
-   "rule_en": "A primary key says what one row is, so a table has exactly one (it may span several columns). A foreign key points at a parent's primary key or UNIQUE column, in a table that already exists, and both ends hold the same type (MySQL/MariaDB: same integer size and signedness). The link is read from the child's side (joins from the parent, a parent's DELETE), so the child column wants an index: MySQL/MariaDB InnoDB make one, PostgreSQL does not. MyISAM tables keep no foreign keys at all.",
+   "rule_en": "A primary key says what one row is, so a table has exactly one (it may span several columns). A foreign key points at a parent's primary key or UNIQUE column, in a table that already exists, and both ends hold the same type (MySQL/MariaDB: same integer size and signedness). The link is read from the child's side (joins from the parent, a parent's DELETE), so the child column wants an index: MySQL/MariaDB InnoDB make one, PostgreSQL does not. MyISAM tables keep no foreign keys at all. On SQLite only a column declared exactly INTEGER PRIMARY KEY numbers itself (INT PRIMARY KEY gives NULL ids), any other key accepts NULL unless its columns say NOT NULL, and foreign keys are checked only on connections that turn them on.",
    "rule_hi": "Primary key batati hai ek row kya hai, isliye table mein ek hi hoti hai (kai columns ki bhi ho sakti hai). Foreign key parent ki primary key ya UNIQUE column pe point karti hai, pehle se bani table mein, aur dono sire same type ke hon. Link child ki taraf se padha jaata hai, isliye child column pe index chahiye: InnoDB khud banata hai, PostgreSQL nahi. MyISAM foreign key rakhta hi nahi.",
    "topics": [
     "no_primary_key",
@@ -399,18 +406,22 @@
     "fk_target",
     "fk_type",
     "fk_no_index",
-    "myisam_fk"
+    "myisam_fk",
+    "sqlite_rowid_pk",
+    "sqlite_pk_null",
+    "sqlite_fk_off"
    ],
    "source": "https://www.postgresql.org/docs/current/ddl-constraints.html",
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "column_types": {
    "title_en": "A column's type is a promise about its values",
    "title_hi": "Column ka type uski values ka vaada hai",
-   "rule_en": "Pick the type by what the value is and what will be done with it. Money is exact: DECIMAL / NUMERIC, never FLOAT / DOUBLE / REAL (binary guesses). Days and moments are DATE / DATETIME / TIMESTAMP, never text (text sorts letter by letter and accepts 30 February). Quantities are numbers; codes made of digits (phone, PIN code, account number) are text (numbers drop the leading 0 and overflow). On MySQL/MariaDB, text needs utf8mb4 (their 'utf8' is the 3-byte utf8mb3), TIMESTAMP only covers 1970-2038, and VARCHARs share a 65,535-byte row. A length is also a check: make it fit real values.",
+   "rule_en": "Pick the type by what the value is and what will be done with it. Money is exact: DECIMAL / NUMERIC, never FLOAT / DOUBLE / REAL (binary guesses). Days and moments are DATE / DATETIME / TIMESTAMP, never text (text sorts letter by letter and accepts 30 February). Quantities are numbers; codes made of digits (phone, PIN code, account number) are text (numbers drop the leading 0 and overflow). On MySQL/MariaDB, text needs utf8mb4 (their 'utf8' is the 3-byte utf8mb3), TIMESTAMP only covers 1970-2038, and VARCHARs share a 65,535-byte row. A length is also a check: make it fit real values. On SQLite a type only gives the column an affinity: VARCHAR(n) and UNSIGNED aren't checked, there is no date type and no exact decimal (dates are 'YYYY-MM-DD' text, exact money is INTEGER paise), STRING means NUMERIC, and a STRICT table takes only INT, INTEGER, REAL, TEXT, BLOB and ANY.",
    "rule_hi": "Type value ke hisaab se chuno. Paisa exact: DECIMAL / NUMERIC, FLOAT / DOUBLE / REAL kabhi nahi. Din aur samay DATE / DATETIME / TIMESTAMP, text nahi (text akshar se sort hota hai aur 30 February le leta hai). Quantity number; digits wale code (phone, PIN) text (number aage ka 0 hata deta hai). MySQL/MariaDB pe text ke liye utf8mb4, TIMESTAMP sirf 1970-2038, aur VARCHARs ek 65,535-byte row baant-te hain.",
    "topics": [
     "money_float",
@@ -419,12 +430,18 @@
     "code_as_number",
     "utf8mb3",
     "timestamp_range",
-    "over_wide"
+    "over_wide",
+    "sqlite_unenforced",
+    "sqlite_date_type",
+    "sqlite_money",
+    "sqlite_affinity",
+    "sqlite_strict_type"
    ],
    "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-float.html",
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "one_fact_one_place": {

@@ -84,7 +84,10 @@ SHAPES = [                                     # (shape, pattern) in the order t
     # hain', 'alias use kar sakte hain': more general shapes (again never someone's own query: _is_work decides that first)
     ("define", r"^what makes\b|\bkahan (aate|aati|aata|jaate|jaati|hote|hoti)\b|कहाँ (आते|आती|आता|जाते|जाती|होते|होती)"),
     ("when", r"\bkab (hoti|hota|hote|deti|deta|dete|milti|milta)\b|कब .*(होती|होता|होते|देती|देता|देते|मिलती) (है|हैं)"),
+    ("when", r"कब .*चाहिए"),                                             # 'X कब लगाना चाहिए' (E1 night 2)
     ("define", r"^how (does|do|is|are) .* (handle|treat|deal with|handled|treated)\b"),
+    # E1 night 2: 'how does sqlite decide / pick / store ...', 'how is X stored': how a database does something, a lesson
+    ("define", r"^how (does|do|is|are) .* (decides?|decided|chooses?|chosen|picks?|picked|stores?|stored|keeps?|kept|works? out|reads?)\b"),
     ("howto", r"\b(to )?kya (kare|karein|karen|karu|karun|karna chahiye)\b|क्या करें|(कर|ले|लिख) सकते (हैं|है)"),
 ]
 # a general yes/no question ('is mysql case sensitive', 'does a foreign key create an index'): answered when its words name a

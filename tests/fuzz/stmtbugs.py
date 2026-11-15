@@ -97,9 +97,22 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         # something else because its dates are text (CAST AS DATE, date - date, date + n)
         "sl_now", "sl_interval", "sl_dateadd_ss", "sl_datediff", "sl_year", "sl_date_format", "sl_date_trunc", "sl_text",
         "sl_greatest", "sl_nvl", "sl_rows", "sl_ilike", "sl_pgcast", "sl_cast_date", "sl_date_minus", "sl_date_plus", "sl_div",
-        "sl_dual", "sl_for_update", "sl_insert_ignore", "sl_upsert", "sl_truncate", "sl_rand"]
+        "sl_dual", "sl_for_update", "sl_insert_ignore", "sl_upsert", "sl_truncate", "sl_rand",
+        # E1 (SQLite) night 2: table designs as SQLite really takes them (ids that don't number themselves, other databases'
+        # table words, STRING, STRICT's type names), checked by what the corrected script makes on SQLite (columns, keys, indexes,
+        # and the rows a probe INSERT leaves); and values compared across types in queries (strftime / length against a number
+        # or text, dates written in another shape), the rewrite's rows compared with the intended query's on SQLite
+        "s2_int_pk", "s2_auto_after", "s2_identity", "s2_autoinc_int", "s2_options", "s2_inline_key", "s2_unique_key", "s2_enum",
+        "s2_default_now", "s2_on_update", "s2_string", "s2_strict",
+        "s2_strftime_eq", "s2_strftime_ge", "s2_strftime_text", "s2_date_unpadded", "s2_date_dmy", "s2_length_text"]
 SL_TOPIC = {b: "dialect" for b in BUGS if b.startswith("sl_")}
 SL_TOPIC.update({"sl_cast_date": "cast_date", "sl_date_minus": "date_math", "sl_date_plus": "date_math"})
+SL_TOPIC.update({"s2_int_pk": "sqlite_rowid_pk", "s2_autoinc_int": "sqlite_rowid_pk", "s2_string": "sqlite_affinity",
+                 "s2_strict": "sqlite_strict_type", "s2_strftime_eq": "type_compare", "s2_strftime_ge": "type_compare",
+                 "s2_strftime_text": "type_compare", "s2_date_unpadded": "date_shape", "s2_date_dmy": "date_shape",
+                 "s2_length_text": "type_compare"})
+SL_TOPIC.update({b: "ddl_dialect" for b in ("s2_auto_after", "s2_identity", "s2_options", "s2_inline_key", "s2_unique_key", "s2_enum",
+                                            "s2_default_now", "s2_on_update")})
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
          "between_reversed": "between", "agg_in_where": "where", "eq_null_dml": "null", "same_table": "same_table", "per_group": "per_group",
          "plus_concat": "concat", "pipes_mysql": "concat", "isnull_two": "null_fn", "like_star": "like", "like_contains": "like",
@@ -522,6 +535,8 @@ def make(seed: int):
         return _bigq_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("sl_"):
         return _sqlite_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("s2_"):
+        return _sqlite2_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -1697,6 +1712,8 @@ def check(item, engines: dict) -> list[str]:
     extra = [f["title_en"] for f in res["findings"] if f["kind"] in ("error", "wrong") and f["topic"] != want]
     if extra:
         bad.append(f"{tag}: extra findings {extra}\n{item['broken']}")
+    if item.get("lite_ddl"):
+        return bad + _check_lite_ddl(item, res, tag)
     if item["stmt"] == "ddl":
         return bad + _check_ddl(item, engines, res, tag)
     if item["bug"].startswith("pf_"):
@@ -2203,6 +2220,199 @@ def _sqlite_bug(seed, bug, rnd, schema, tables, t):
         words = rnd.choice(["\n\n-- this is for SQLite", "\n\n-- sqlite3 app db"])
     return {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": name, "broken": broken + words, "truth": truth,
             "engine": "sqlite", "only": ["sqlite"]}
+
+
+def _sqlite2_bug(seed, bug, rnd, schema, tables, t):
+    """E1 (SQLite) night 2. Designs: a new table in SQLite's words (the truth) and the same table as a person writes it from
+    MySQL / PostgreSQL habits; the corrected script must make on SQLite exactly what the truth makes. Queries: a comparison
+    across types on the practice data, the truth written independently in SQLite's words."""
+    from app.agents.sqlport import _is_date
+
+    pk, name = t["pk"], t["name"]
+    if bug in ("s2_strftime_eq", "s2_strftime_ge", "s2_strftime_text", "s2_date_unpadded", "s2_date_dmy", "s2_length_text"):
+        days = [c for c in t["cols"] if c["kind"] == "date" and _is_date(c["name"], c["name"]) == "date"]
+        k = t["cols"].index(days[0]) if days else None
+        vals = [r[k] for r in t["rows"] if k is not None and r[k] is not None]
+        if bug != "s2_length_text" and not vals:
+            return None
+        c = days[0]["name"] if days else None
+        sel = f"SELECT {pk}\nFROM {name}\nWHERE "
+        if bug == "s2_strftime_eq":
+            v = rnd.choice(vals)
+            fmt, num = rnd.choice([("%Y", v.year), ("%m", v.month), ("%d", v.day)])
+            text = f"{num:04d}" if fmt == "%Y" else f"{num:02d}"
+            broken, truth = f"strftime('{fmt}', {c}) = {num}", f"strftime('{fmt}', {c}) = '{text}'"
+        elif bug == "s2_strftime_ge":
+            y = rnd.choice(vals).year + rnd.choice([0, 1])
+            op = rnd.choice([">=", "<"])
+            broken, truth = f"strftime('%Y', {c}) {op} {y}", f"{c} {op} '{y}-01-01'"
+        elif bug == "s2_strftime_text":
+            m = rnd.randint(1, 9)
+            broken, truth = f"strftime('%m', {c}) = '{m}'", f"strftime('%m', {c}) = '0{m}'"
+        elif bug == "s2_date_unpadded":
+            v = rnd.choice(vals)
+            m, d = rnd.randint(1, 9), rnd.randint(1, 9)
+            op = rnd.choice([">=", "<", "<=", ">", "="])
+            if op == "=":
+                m, d = v.month, v.day
+            short = f"{v.year}-{m}-{d}"
+            iso = f"{v.year:04d}-{m:02d}-{d:02d}"
+            if short == iso:
+                short = f"{v.year}-{m}-{d}".replace("-0", "-")
+            if short == iso:
+                return None
+            broken, truth = f"{c} {op} '{short}'", f"{c} {op} '{iso}'"
+        elif bug == "s2_date_dmy":
+            v = rnd.choice(vals)
+            d = rnd.randint(13, 28)
+            op = rnd.choice([">=", "<"])
+            broken, truth = f"{c} {op} '{d:02d}/{v.month:02d}/{v.year}'", f"{c} {op} '{v.year:04d}-{v.month:02d}-{d:02d}'"
+        else:                                             # s2_length_text
+            texts = [x for x in t["cols"] if x["kind"] in ("name", "email", "sku")]
+            if not texts:
+                return None
+            tc = rnd.choice(texts)
+            i = t["cols"].index(tc)
+            lens = [len(str(r[i])) for r in t["rows"] if r[i] is not None]
+            if not lens:
+                return None
+            n = rnd.choice(lens)
+            broken, truth = f"length({tc['name']}) = '{n}'", f"length({tc['name']}) = {n}"
+        return {"seed": seed, "bug": bug, "stmt": "select", "schema": schema, "table": name, "broken": sel + broken + f"\nORDER BY {pk}",
+                "truth": sel + truth + f"\nORDER BY {pk}", "engine": "sqlite", "only": ["sqlite"]}
+    # ---- designs: a new table with a few of this table's plain columns
+    plain = [c for c in t["cols"] if c["kind"] in ("int", "cat", "text", "name", "email", "sku")]
+    if not plain:
+        return None
+    cols = rnd.sample(plain, min(len(plain), rnd.randint(1, 3)))
+    new = f"{name}_n2"
+    typ = {"int": "INTEGER"}
+    body = [f"{c['name']} {typ.get(c['kind'], 'TEXT')}" for c in cols]
+    good_id, bad_id, tail_good, tail_bad = "id INTEGER PRIMARY KEY", None, "", ""
+    extra_good, extra_bad, after_good = [], [], ""
+    probe = [[(k + 1) * 7 if c["kind"] == "int" else f"v{k}_{j}" for j, c in enumerate(cols)] for k in range(2)]
+    pcols = [c["name"] for c in cols]
+    if bug == "s2_int_pk":
+        ty = rnd.choice(["INT", "BIGINT", "INTEGER(11)", "SMALLINT", "MEDIUMINT", "SERIAL", "INT AUTO_INCREMENT", "UNSIGNED BIG INT"])
+        auto = ty in ("SERIAL", "INT AUTO_INCREMENT")
+        if rnd.random() < 0.5 and ty != "INT AUTO_INCREMENT":
+            bad_id, good_id = f"id {ty}", "id INTEGER"
+            extra_bad, extra_good = ["PRIMARY KEY (id)"], ["PRIMARY KEY (id)"]
+            if auto:
+                good_id, extra_good = "id INTEGER PRIMARY KEY AUTOINCREMENT", []
+        else:
+            bad_id, good_id = f"id {ty} PRIMARY KEY", "id INTEGER PRIMARY KEY" + (" AUTOINCREMENT" if auto else "")
+    elif bug == "s2_auto_after":
+        if rnd.random() < 0.5:
+            bad_id, good_id = "id INTEGER PRIMARY KEY AUTO_INCREMENT", "id INTEGER PRIMARY KEY AUTOINCREMENT"
+        else:
+            bad_id, good_id = "id INT NOT NULL AUTO_INCREMENT", "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL"
+            extra_bad = ["PRIMARY KEY (id)"]
+    elif bug == "s2_identity":
+        bad_id = f"id INTEGER GENERATED {rnd.choice(['ALWAYS', 'BY DEFAULT'])} AS IDENTITY PRIMARY KEY"
+        good_id = "id INTEGER PRIMARY KEY AUTOINCREMENT"
+    elif bug == "s2_autoinc_int":
+        bad_id, good_id = f"id {rnd.choice(['INT', 'BIGINT'])} PRIMARY KEY AUTOINCREMENT", "id INTEGER PRIMARY KEY AUTOINCREMENT"
+    elif bug == "s2_options":
+        tail_bad = rnd.choice([" ENGINE=InnoDB", " ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", " ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+                               " DEFAULT CHARSET=utf8mb4"])
+    elif bug in ("s2_inline_key", "s2_unique_key"):
+        c = rnd.choice(cols)["name"]
+        if bug == "s2_inline_key":
+            extra_bad = [f"{rnd.choice(['KEY', 'INDEX'])} ix_{c} ({c})"]
+            after_good = f";\nCREATE INDEX ix_{new}_{c} ON {new} ({c})"
+        else:
+            extra_bad, extra_good = [f"UNIQUE {rnd.choice(['KEY', 'INDEX'])} uq_{c} ({c})"], [f"UNIQUE ({c})"]
+    elif bug == "s2_enum":
+        vals = ["new", "paid", "shipped"][:rnd.randint(2, 3)]
+        lst = ", ".join(f"'{v}'" for v in vals)
+        body.append(f"n2_state ENUM({lst.replace(', ', ',')})")
+        extra = f"n2_state TEXT CHECK (n2_state IN ({lst}))"
+        body_good = body[:-1] + [extra]
+        pcols.append("n2_state")
+        for k, r in enumerate(probe):
+            r.append(vals[k % len(vals)])
+    elif bug in ("s2_default_now", "s2_on_update"):
+        dflt = rnd.choice(["now()", "NOW()", "CURRENT_TIMESTAMP()"]) if bug == "s2_default_now" else "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+        body.append(f"n2_stamp_at TEXT DEFAULT {dflt}")
+        body_good = body[:-1] + ["n2_stamp_at TEXT DEFAULT CURRENT_TIMESTAMP"]
+        pcols.append("n2_stamp_at")
+        for k, r in enumerate(probe):
+            r.append(f"2024-0{k + 1}-05 10:00:00")
+    elif bug == "s2_string":
+        body.append("n2_pin STRING")
+        body_good = body[:-1] + ["n2_pin TEXT"]
+        pcols.append("n2_pin")
+        for k, r in enumerate(probe):
+            r.append(f"0{k}1234")
+    elif bug == "s2_strict":
+        kind = rnd.choice(["varchar", "date", "boolean", "decimal"])
+        bad_t, good_t, v = {"varchar": ("VARCHAR(40)", "TEXT", "abc"), "date": ("DATE", "TEXT", "2024-03-09"), "boolean": ("BOOLEAN", "INTEGER", 1),
+                            "decimal": ("DECIMAL(10,2)", "REAL", 12.5)}[kind]
+        col = {"varchar": "n2_label", "date": "n2_made_on", "boolean": "n2_active", "decimal": "n2_weight"}[kind]
+        body.append(f"{col} {bad_t}")
+        body_good = body[:-1] + [f"{col} {good_t}"]
+        pcols.append(col)
+        for r in probe:
+            r.append(v)
+        tail_bad = tail_good = " STRICT"
+    if bug not in ("s2_enum", "s2_default_now", "s2_on_update", "s2_string", "s2_strict"):
+        body_good = body
+    bad_id = bad_id or good_id
+    broken = f"CREATE TABLE {new} (\n  " + ",\n  ".join([bad_id] + body + extra_bad) + f"\n){tail_bad};"
+    truth = f"CREATE TABLE {new} (\n  " + ",\n  ".join([good_id] + body_good + extra_good) + f"\n){tail_good}" + after_good + ";"
+    if rnd.random() < 0.3:
+        broken += rnd.choice(["\n\n-- sqlite", "\n\n-- for our SQLite file"])
+    return {"seed": seed, "bug": bug, "stmt": "ddl", "schema": schema, "table": new, "broken": broken, "truth": truth, "engine": "sqlite",
+            "only": ["sqlite"], "lite_ddl": True, "probe": (pcols, probe)}
+
+
+def _lite_ddl_effect(script: str, item) -> tuple:
+    """What a table script makes on SQLite: its columns (type, NOT NULL, default, key), its indexes (unique, columns), and the rows
+    two INSERTs without an id leave. ('refused', why) when SQLite refuses the script."""
+    import sqlite3
+
+    c = sqlite3.connect(":memory:", isolation_level=None)
+    name = item["table"]
+    try:
+        try:
+            c.executescript(script)
+        except sqlite3.Error as exc:
+            return ("refused", str(exc)[:80])
+        info = tuple((r[1], (r[2] or "").upper(), r[3], r[4], r[5]) for r in c.execute(f"SELECT * FROM pragma_table_info('{name}')"))
+        idx = sorted((u, tuple(x[0] for x in c.execute(f"SELECT name FROM pragma_index_info('{ix}') ORDER BY seqno")))
+                     for ix, u in c.execute(f"SELECT name, \"unique\" FROM pragma_index_list('{name}')"))
+        cols, rows = item["probe"]
+        try:
+            for r in rows:
+                c.execute(f"INSERT INTO {name} ({', '.join(cols)}) VALUES ({', '.join('?' * len(r))})", r)
+            got = tuple(c.execute(f"SELECT * FROM {name} ORDER BY rowid").fetchall())
+        except sqlite3.Error as exc:
+            got = ("insert refused", type(exc).__name__)
+        return (info, tuple(idx), got)
+    finally:
+        c.close()
+
+
+def _check_lite_ddl(item, res, tag) -> list[str]:
+    from app.agents import sqlcorrect
+
+    bad = []
+    tf = [f["title_en"] for f in sqlcorrect.check(item["truth"], engine="sqlite")["findings"] if f["kind"] in ("error", "wrong")]
+    if tf:
+        bad.append(f"{tag}: false alarm on the intended design {tf}\n{item['truth']}")
+    fixed = res["corrected"]
+    if not fixed:
+        return bad + [f"{tag}: no corrected design\n{item['broken']}"]
+    again = [f["title_en"] for f in sqlcorrect.check(fixed, engine="sqlite")["findings"] if f["kind"] in ("error", "wrong")]
+    if again:
+        bad.append(f"{tag}: the corrected design still has mistakes {again}\n{fixed}")
+    got, exp = _lite_ddl_effect(fixed, item), _lite_ddl_effect(item["truth"], item)
+    if exp[0] == "refused":
+        bad.append(f"{tag}: on sqlite the intended design is refused {exp}\n{item['truth']}")
+    elif got != exp:
+        bad.append(f"{tag}: on sqlite the corrected design makes something else\n{fixed}\n--- got {str(got)[:300]}\n--- want {str(exp)[:300]}")
+    return bad
 
 
 def _param_bug(seed, bug, rnd, schema, tables, t):

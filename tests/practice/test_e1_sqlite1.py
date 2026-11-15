@@ -233,8 +233,12 @@ def test_every_refused_word_is_refused_by_sqlite_and_every_rewrite_runs(lite):
         "regexp": "SELECT 'abc' REGEXP '^a'", "div": "SELECT 7 DIV 2", "mod_word": "SELECT 7 MOD 2",
     }
     d = E.dialect("sqlite")
-    assert {r["id"] for r in d["refuses"]} == set(samples)
+    from tests.practice.test_e1_sqlite2 import REFUSED_TONIGHT       # night 2's ALTER TABLE entries are tried there
+
+    assert {r["id"] for r in d["refuses"]} == set(samples) | set(REFUSED_TONIGHT)
     for r in d["refuses"]:
+        if r["id"] not in samples:
+            continue
         assert r["proven"] == ["sqlite"]
         with pytest.raises(sqlite3.Error):
             lite.execute(samples[r["id"]])

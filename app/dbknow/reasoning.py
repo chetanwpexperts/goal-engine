@@ -149,6 +149,14 @@ def evidence(text: str) -> dict:
         facts["fk_has_children"] = facts.pop("fk_missing_parent")   # SQLite's message doesn't say which side: the statement does
     if "charset_mismatch" in facts:
         facts.pop("bad_value_type", None)
+    if "savepoint_missing" in facts and "unknown_function" in facts:   # MySQL's 1305 is also its unknown-function number:
+        gone = facts.pop("unknown_function")                            # the message says which; the code still says MySQL
+        facts["savepoint_missing"].setdefault("codes", set()).update(gone.get("codes") or ())
+    if "read_upgrade_busy" in facts:                      # 'database is locked' with SQLITE_BUSY_SNAPSHOT: the specific reading
+        facts.pop("db_file_locked", None)
+    if facts.keys() & {"txn_nested", "txn_settings_late"}:   # PostgreSQL files these warnings / errors under 25001 too
+        facts.pop("outside_txn_only", None) if "outside_txn_only" in facts and not re.search(
+            r"cannot run inside a transaction block", text or "") else None
     if "ssl_required" in facts:
         facts.pop("host_not_allowed", None)
     if "replication_stopped" in facts:                    # the replica's own copy broke a rule: not the app's insert

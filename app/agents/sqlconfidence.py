@@ -82,8 +82,8 @@ def _verify(eid: str | None) -> list[tuple[str, dict]]:
     """[(engine label, verify templates)]: the chosen engine's, or MySQL/MariaDB and PostgreSQL both when none is chosen."""
     from app.dbknow import engines as E
 
-    if eid in ("mysql", "mariadb", "postgresql"):
-        return [(E.label(eid), E.dialect(eid)["verify"])]
+    if eid in ("mysql", "mariadb", "postgresql") or (eid in E.ORDER and not E.notes_only(eid) and E.dialect(eid).get("verify")):
+        return [(E.label(eid), E.dialect(eid)["verify"])]          # SQLite's own (pragma_table_info) from E1 night 4
     if eid in E.ORDER:                                              # notes-only engines: general SQL, said as such
         return []
     return [("MySQL/MariaDB", E.dialect("mariadb")["verify"]), ("PostgreSQL", E.dialect("postgresql")["verify"])]

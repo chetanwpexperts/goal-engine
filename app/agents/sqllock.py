@@ -25,6 +25,7 @@ Returns [(Finding, [edits])], edit = (start, end, new text) on the original quer
 import re
 
 PROVEN = {k: ["mariadb", "postgresql"] for k in ("batch_change", "lock_scan", "skip_locked", "n_plus_one", "deadlock_order")}
+PROVEN["batch_change"] = ["mariadb", "postgresql", "sqlite"]          # SQLite's rowid form: E1 night 4 (tests/practice/test_e1_sqlite4.py)
 BATCH = 5000
 
 BIG_SAID = re.compile(r"\b(millions?|lakhs?|crores?|billions?|\d+\s*(?:m|k|lakh|million|crore)\s+rows|huge|very\s+(?:big|large)|"
@@ -103,7 +104,13 @@ def batched(sql: str, eng) -> dict | None:
         guard = guards[0] if len(guards) == 1 else "(" + " OR ".join(guards) + ")"   # a row is done when every column has its value
         head = f"UPDATE {table}{' ' + alias if alias else ''} SET {_flat(sets)}"
     where = f"({cond})" + (f" AND {guard}" if guard else "")
-    if eng == "postgresql":
+    if eng == "sqlite":                                      # E1 night 4: by rowid (UPDATE / DELETE ... LIMIT depends on the build)
+        inner = f"SELECT rowid FROM {table}{' ' + alias if alias else ''} WHERE {where} LIMIT {BATCH}"
+        if kind == "delete":
+            new = f"DELETE FROM {table} WHERE rowid IN ({inner})"
+        else:
+            new = f"UPDATE {table} SET {_flat(sets)} WHERE rowid IN ({inner})"
+    elif eng == "postgresql":
         inner = f"SELECT ctid FROM {table}{' ' + alias if alias else ''} WHERE {where} LIMIT {BATCH}"
         if kind == "delete":
             new = f"DELETE FROM {table} WHERE ctid IN ({inner})"
@@ -129,11 +136,22 @@ def _batch_change(sql: str, s: str, intent: str, F, eng) -> list:
                        "Ek UPDATE bahut rows pe saari changed rows ko commit tak lock rakhti hai. Ye SET har baar value phir badalta hai, "
                        "isliye key range se tukde karo (id >= :from AND id < :to), har tukda alag commit."), [])]
         return []
-    pick = pg if eng == "postgresql" else my
-    both = "" if eng in ("mysql", "postgresql") else (f" On PostgreSQL (no LIMIT in UPDATE/DELETE): {pg['sql']}" if pg else "")
+    pick = pg if eng == "postgresql" else batched(sql, "sqlite") if eng == "sqlite" else my
+    both = "" if eng in ("mysql", "postgresql", "sqlite") else (f" On PostgreSQL (no LIMIT in UPDATE/DELETE): {pg['sql']}" if pg else "")
     what = "DELETE" if my["kind"] == "delete" else "UPDATE"
     guard_en = (" The added condition skips rows that already have the new value, so each run takes rows not yet done and the "
                 "loop ends." if what == "UPDATE" else "")
+    if eng == "sqlite":
+        return [(F("check", "batch_change", f"One huge {what} holds SQLite's write lock until it ends: run it in batches of {BATCH:,}",
+                   f"Ek badi {what} khatam hone tak SQLite ka write lock rakhti hai: {BATCH:,} rows ke tukdon mein chalao", _short(sql, 80),
+                   f"SQLite locks the whole database for a write until it commits, so while one big {what} runs every other writer "
+                   f"waits (up to its busy timeout) or gets 'database is locked', and the journal grows with it. Run the batched form "
+                   f"again and again, each run its own short transaction, until it changes 0 rows: the final table is exactly what the "
+                   f"single statement makes (lab: SQLite, 12,000 rows in 3 runs), and other connections can write in between. It picks "
+                   f"rows by rowid because UPDATE / DELETE ... LIMIT exists only in some SQLite builds.{guard_en}",
+                   f"SQLite likhte waqt commit tak poori database lock karta hai, isliye ek badi {what} ke dauraan baaki writers rukte ya "
+                   f"'database is locked' paate hain. Tukdon wala roop (rowid se) baar baar chalao jab tak 0 rows na badle: aakhri table "
+                   f"wahi banti hai."), [(0, len(sql.rstrip().rstrip(";").rstrip()), pick["sql"])])]
     return [(F("check", "batch_change", f"One huge {what} holds its locks until it ends: run it in batches of {BATCH:,}",
                f"Ek badi {what} khatam hone tak locks rakhti hai: {BATCH:,} rows ke tukdon mein chalao", _short(sql, 80),
                f"A single {what} over a big table keeps every row it changes locked until it commits, so other writers wait or time "

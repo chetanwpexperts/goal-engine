@@ -1371,6 +1371,202 @@
    "needs": [],
    "short_en": "A column still used by an index, view, key or check",
    "short_hi": "Column jise abhi index, view, key ya check use karta hai"
+  },
+  "txn_nested": {
+   "layer": "transactions",
+   "family": "any",
+   "engines": [
+    "sqlite",
+    "postgresql"
+   ],
+   "explains": {
+    "query_error": 1.0,
+    "save_fails": 0.4
+   },
+   "prior": 0.05,
+   "title_en": "A transaction was started while another was already open",
+   "title_hi": "Ek transaction khuli rehte doosri shuru ki gayi",
+   "why_en": "BEGIN doesn't nest. SQLite refuses the second BEGIN and carries on inside the first transaction; PostgreSQL ignores it with a warning; MySQL/MariaDB silently commit the first one and start again. Code usually gets here when a helper opens its own transaction inside one the caller already opened, or a previous error left a transaction open on a pooled connection.",
+   "why_hi": "BEGIN nest nahi hota. SQLite doosra BEGIN mana karke pehli transaction mein chalta rehta hai; PostgreSQL warning deke ignore karta hai; MySQL/MariaDB pehli ko chupchaap COMMIT kar dete hain. Aksar ek helper apni transaction kholta hai jab caller ne pehle hi khol rakhi ho, ya pichhle error ne transaction khuli chhod di.",
+   "confirm_en": "Look at where the outer transaction began: with a SAVEPOINT for the inner part (or no inner BEGIN), the error goes.",
+   "confirm_hi": "Bahar wali transaction kahan shuru hui dekho: andar ke hisse ke liye SAVEPOINT se error chala jaata hai.",
+   "prevent_en": "Open a transaction in one place (the outermost caller); inner steps that must be undoable on their own use SAVEPOINT name ... RELEASE name. Always end a transaction (COMMIT, or ROLLBACK in the error path) before the connection is reused.",
+   "prevent_hi": "Transaction ek hi jagah kholo (sabse bahar wala caller); andar ke hisse SAVEPOINT ... RELEASE se. Connection dobara use karne se pehle transaction hamesha khatam karo.",
+   "needs": [],
+   "short_en": "A BEGIN inside an open transaction",
+   "short_hi": "Khuli transaction ke andar BEGIN",
+   "shown_by": "txn_nested"
+  },
+  "txn_not_active": {
+   "layer": "transactions",
+   "family": "any",
+   "engines": [
+    "sqlite",
+    "postgresql"
+   ],
+   "explains": {
+    "query_error": 1.0,
+    "save_fails": 0.3
+   },
+   "prior": 0.05,
+   "title_en": "COMMIT or ROLLBACK ran with no transaction open",
+   "title_hi": "Bina khuli transaction ke COMMIT ya ROLLBACK chala",
+   "why_en": "Nothing began a transaction (or it already ended), so every statement before was saved on its own as it ran. The usual causes: no BEGIN at all, a COMMIT / ROLLBACK called twice, an error (or a DDL statement on MySQL) that already ended the transaction, or a driver whose autocommit is on. A ROLLBACK here undoes nothing.",
+   "why_hi": "Kisi ne transaction shuru hi nahi ki (ya wo khatam ho chuki), isliye pehle ke statements apne aap save ho gaye. Aam wajah: BEGIN hi nahi, COMMIT/ROLLBACK do baar, ya driver ka autocommit on. Yahan ROLLBACK kuch wapas nahi karta.",
+   "confirm_en": "Put BEGIN before the first change: the COMMIT / ROLLBACK then ends a real transaction and the message goes.",
+   "confirm_hi": "Pehle badlav se pehle BEGIN lagao: phir COMMIT/ROLLBACK asli transaction khatam karega.",
+   "prevent_en": "Start every multi-step change with BEGIN and end it exactly once; in code, let one place own the transaction (a with-block or try / finally).",
+   "prevent_hi": "Har multi-step badlav BEGIN se shuru karo aur ek hi baar khatam karo; code mein transaction ek jagah sambhale (with-block / try-finally).",
+   "needs": [],
+   "short_en": "No transaction was open",
+   "short_hi": "Koi transaction khuli nahi thi",
+   "shown_by": "txn_not_active"
+  },
+  "savepoint_missing": {
+   "layer": "transactions",
+   "family": "any",
+   "explains": {
+    "query_error": 1.0,
+    "save_fails": 0.4
+   },
+   "prior": 0.05,
+   "title_en": "RELEASE / ROLLBACK TO names a savepoint that doesn't exist",
+   "title_hi": "RELEASE / ROLLBACK TO aisa savepoint maangta hai jo hai hi nahi",
+   "why_en": "A savepoint lives only inside its transaction: a typo in the name, a savepoint already released (or rolled back past), or one made outside a transaction (MySQL forgets it at once in autocommit; PostgreSQL refuses it) leaves nothing to go back to. On PostgreSQL the error also aborts the transaction.",
+   "why_hi": "Savepoint sirf apni transaction ke andar rehta hai: naam mein typo, pehle hi release ho chuka, ya transaction ke bahar banaya (MySQL autocommit mein turant bhool jaata hai; PostgreSQL mana karta hai) to wapas jaane ko kuch nahi. PostgreSQL pe ye error transaction bhi rok deta hai.",
+   "confirm_en": "Make SAVEPOINT name inside the open transaction with exactly that name: then RELEASE / ROLLBACK TO it works.",
+   "confirm_hi": "Khuli transaction mein wahi naam ka SAVEPOINT banao: phir RELEASE / ROLLBACK TO chalega.",
+   "prevent_en": "Keep savepoint names in one place in the code and only inside BEGIN ... COMMIT.",
+   "prevent_hi": "Savepoint ke naam code mein ek jagah rakho aur sirf BEGIN ... COMMIT ke andar.",
+   "needs": [],
+   "short_en": "That savepoint doesn't exist",
+   "short_hi": "Wo savepoint hai hi nahi",
+   "shown_by": "savepoint_missing"
+  },
+  "outside_txn_only": {
+   "layer": "transactions",
+   "family": "any",
+   "engines": [
+    "sqlite",
+    "postgresql"
+   ],
+   "explains": {
+    "query_error": 1.0,
+    "wont_run": 0.8
+   },
+   "prior": 0.05,
+   "title_en": "This command can't run inside a transaction",
+   "title_hi": "Ye command transaction ke andar nahi chal sakti",
+   "why_en": "Some commands manage their own transactions and refuse to run inside one: VACUUM (SQLite and PostgreSQL), a journal_mode change (SQLite), CREATE INDEX CONCURRENTLY and CREATE / DROP DATABASE (PostgreSQL). A migration tool or driver that wraps every script in BEGIN ... COMMIT (or autocommit turned off) puts them inside one without you writing BEGIN.",
+   "why_hi": "Kuch commands apni transaction khud sambhalti hain aur kisi transaction ke andar nahi chalti: VACUUM, journal_mode badalna (SQLite), CREATE INDEX CONCURRENTLY aur CREATE/DROP DATABASE (PostgreSQL). Migration tool ya driver jo har script BEGIN ... COMMIT mein lapet de, unhe andar daal deta hai.",
+   "confirm_en": "Run the command on its own, after COMMIT (or with the driver's autocommit on): it goes through.",
+   "confirm_hi": "Command ko alag se, COMMIT ke baad (ya driver ka autocommit on karke) chalao: chal jayegi.",
+   "prevent_en": "Keep such commands in their own step of a migration, marked to run outside a transaction (most migration tools have a flag for it).",
+   "prevent_hi": "Aisi commands migration ke alag step mein rakho, transaction ke bahar chalne ke liye mark karke.",
+   "needs": [],
+   "short_en": "It refuses to run inside a transaction",
+   "short_hi": "Transaction ke andar chalne se mana",
+   "shown_by": "outside_txn_only"
+  },
+  "txn_aborted": {
+   "layer": "transactions",
+   "family": "any",
+   "engines": [
+    "postgresql"
+   ],
+   "explains": {
+    "query_error": 1.0,
+    "save_fails": 1.0,
+    "random_fail": 0.4
+   },
+   "prior": 0.1,
+   "title_en": "An earlier statement failed, so PostgreSQL ignores everything until the transaction ends",
+   "title_hi": "Pehle ka statement fail hua, isliye transaction khatam hone tak PostgreSQL sab ignore karta hai",
+   "why_en": "When any statement inside BEGIN ... fails, PostgreSQL marks the whole transaction failed: every statement after it gets 25P02 'current transaction is aborted', and a COMMIT then rolls everything back. This error is never the real problem; the first error before it is. In application code it usually means an exception was caught and the code carried on with the same connection without ROLLBACK.",
+   "why_hi": "BEGIN ke andar koi bhi statement fail ho to PostgreSQL poori transaction ko failed maanta hai: uske baad har statement 25P02 deta hai aur COMMIT sab rollback kar deta hai. Asli problem pehla error hai. App code mein aksar exception pakad ke bina ROLLBACK ke wahi connection chalate rehna.",
+   "confirm_en": "Find the first error in the log before this one; after ROLLBACK (and fixing that statement) the next statements run.",
+   "confirm_hi": "Log mein isse pehle ka pehla error dhundo; ROLLBACK (aur wo statement theek karne) ke baad agle statements chalenge.",
+   "prevent_en": "On any error inside a transaction, ROLLBACK (or ROLLBACK TO a savepoint taken before the risky statement) before using the connection again.",
+   "prevent_hi": "Transaction mein kisi bhi error pe connection dobara use karne se pehle ROLLBACK (ya risky statement se pehle liye savepoint tak ROLLBACK TO).",
+   "needs": [],
+   "short_en": "The transaction already failed earlier",
+   "short_hi": "Transaction pehle hi fail ho chuki",
+   "shown_by": "txn_aborted"
+  },
+  "txn_settings_late": {
+   "layer": "transactions",
+   "family": "any",
+   "engines": [
+    "mysql",
+    "mariadb",
+    "postgresql"
+   ],
+   "explains": {
+    "query_error": 1.0
+   },
+   "prior": 0.05,
+   "title_en": "The isolation level was set at the wrong moment",
+   "title_hi": "Isolation level galat waqt pe set kiya",
+   "why_en": "An isolation level (or READ ONLY) is fixed when a transaction starts. MySQL/MariaDB's SET TRANSACTION sets it for the NEXT transaction, so it is refused while one is open (1568); PostgreSQL's SET TRANSACTION sets the CURRENT one, so it must come right after BEGIN, before any query (25001).",
+   "why_hi": "Isolation level transaction shuru hote hi tay hota hai. MySQL/MariaDB ka SET TRANSACTION AGLI transaction ke liye hai, isliye khuli transaction mein mana (1568); PostgreSQL ka SET TRANSACTION ABHI wali ke liye hai, isliye BEGIN ke turant baad, kisi query se pehle (25001).",
+   "confirm_en": "Move it: before START TRANSACTION on MySQL/MariaDB, right after BEGIN on PostgreSQL (or BEGIN ISOLATION LEVEL ...): it is accepted.",
+   "confirm_hi": "MySQL/MariaDB pe START TRANSACTION se pehle, PostgreSQL pe BEGIN ke turant baad likho.",
+   "prevent_en": "Say the level where the transaction starts: START TRANSACTION ISOLATION LEVEL is not MySQL, so SET TRANSACTION just before it; BEGIN ISOLATION LEVEL ... on PostgreSQL.",
+   "prevent_hi": "Level transaction shuru hote waqt batao: MySQL pe SET TRANSACTION uske theek pehle, PostgreSQL pe BEGIN ISOLATION LEVEL ...",
+   "needs": [],
+   "short_en": "SET TRANSACTION in the wrong place",
+   "short_hi": "SET TRANSACTION galat jagah",
+   "shown_by": "txn_settings_late"
+  },
+  "statement_still_open": {
+   "layer": "transactions",
+   "family": "any",
+   "engines": [
+    "sqlite"
+   ],
+   "explains": {
+    "query_error": 1.0,
+    "lock_problem": 0.8,
+    "save_fails": 0.5
+   },
+   "prior": 0.05,
+   "title_en": "A statement on the same connection is still reading the table",
+   "title_hi": "Usi connection ka ek statement abhi table padh raha hai",
+   "why_en": "'database table is locked' (SQLITE_LOCKED) is not another program: it is your own connection. A SELECT whose rows weren't all fetched (a cursor still open, a loop that changes the table it is reading) keeps the table busy, and dropping or rebuilding that table on the same connection is refused until it finishes. With a shared cache, other connections in the same process count too.",
+   "why_hi": "'database table is locked' (SQLITE_LOCKED) koi doosra program nahi: aapka apna connection hai. Jis SELECT ki saari rows fetch nahi hui (cursor khula, loop jo wahi table badal raha hai jo padh raha hai) wo table busy rakhta hai, aur usi connection pe us table ko DROP/rebuild mana hai.",
+   "confirm_en": "Fetch all rows (or close the cursor / reset the statement) first: the DROP / change then runs.",
+   "confirm_hi": "Pehle saari rows fetch karo (ya cursor band karo): phir DROP / badlav chalega.",
+   "prevent_en": "Read the rows into a list before changing the table, close cursors you stop reading early, and don't share one cache between connections.",
+   "prevent_hi": "Table badalne se pehle rows list mein padh lo, jo cursor beech mein chhodo use band karo.",
+   "needs": [],
+   "short_en": "The same connection is still reading it",
+   "short_hi": "Usi connection ka read abhi chal raha hai",
+   "shown_by": "statement_still_open"
+  },
+  "read_upgrade_busy": {
+   "layer": "transactions",
+   "family": "any",
+   "engines": [
+    "sqlite"
+   ],
+   "explains": {
+    "lock_problem": 1.0,
+    "save_fails": 0.9,
+    "random_fail": 0.8
+   },
+   "prior": 0.05,
+   "title_en": "A transaction that read first could not get the write lock (its snapshot is out of date)",
+   "title_hi": "Pehle padhne wali transaction ko write lock nahi mila (uska snapshot purana ho gaya)",
+   "why_en": "A plain (DEFERRED) BEGIN holds only a read lock until its first write. If another connection wrote and committed after this transaction began reading, its view is out of date and SQLite can't let it write: the write fails at once with 'database is locked' (SQLITE_BUSY_SNAPSHOT in WAL mode), and a busy timeout does not help, because waiting can't make the old snapshot current. Retrying the same transaction from BEGIN works.",
+   "why_hi": "Saadha BEGIN pehle write tak sirf read lock rakhta hai. Agar is transaction ke padhne ke baad kisi aur ne likh ke commit kiya, to iska snapshot purana hai aur SQLite ise likhne nahi deta: write turant 'database is locked' (WAL mein SQLITE_BUSY_SNAPSHOT) deta hai, aur busy timeout madad nahi karta. BEGIN se dobara chalana kaam karta hai.",
+   "confirm_en": "Start the transaction with BEGIN IMMEDIATE: it waits for the write lock at the start (the busy timeout works there) and the error stops.",
+   "confirm_hi": "Transaction BEGIN IMMEDIATE se shuru karo: shuru mein hi write lock ka intezaar karta hai aur error band.",
+   "prevent_en": "Begin every transaction that will write with BEGIN IMMEDIATE (most drivers have an option), keep it short, and retry the whole transaction on SQLITE_BUSY.",
+   "prevent_hi": "Har likhne wali transaction BEGIN IMMEDIATE se shuru karo, chhoti rakho, aur SQLITE_BUSY pe poori transaction dobara chalao.",
+   "needs": [],
+   "short_en": "A read-then-write transaction lost the race for the write lock",
+   "short_hi": "Padh-kar-likhne wali transaction write lock ki race haar gayi",
+   "shown_by": "read_upgrade_busy"
   }
  }
 }

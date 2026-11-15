@@ -255,11 +255,12 @@ def test_same_text_different_values(engines):
 
 
 def test_sqlite_notes_are_lab_checked():
-    """SQLite stays notes-only, but every note with a lab line was run on SQLite itself (Python's sqlite3)."""
+    """Every SQLite note with a lab line was run on SQLite itself (Python's sqlite3). (SQLite left notes-only at E1 night 4,
+    tests/practice/test_e1_sqlite4.py; its notes stay, still lab-checked.)"""
     from app.dbknow import engines as E
 
     d = E.dialect("sqlite")
-    assert d["notes_only"] and d["lab"]
+    assert d["notes"] and d["lab"]
     for item in d["lab"]:
         assert item["note"] in d["notes"], item
         if tuple(item.get("since", (0,))) > sqlite3.sqlite_version_info:

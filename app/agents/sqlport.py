@@ -17,7 +17,7 @@ Two uses:
   '^' on MySQL/MariaDB -> 'check' (it is XOR there; maybe meant).
 - translate(): 'convert this query to PostgreSQL': every rewrite applied, plus the meaning notes a translation must not hide
   (case-sensitive text comparison, integer division, NULL in CONCAT / GREATEST, LENGTH in bytes), and an honest list of what
-  couldn't be translated automatically. SQL Server / Oracle / SQLite targets get notes only (no lab-tested rules yet).
+  couldn't be translated automatically. SQL Server / Oracle targets get notes only (no lab-tested rules yet); SQLite is rewritten (E1).
 Returns [(Finding, [edits])], edit = (start, end, new text) on the original statement.
 """
 

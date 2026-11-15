@@ -45,6 +45,8 @@ MY = {  # MySQL / MariaDB: (code, sqlstate, message)
     "source_log_purged": lambda r: ("1236", "HY000", "Got fatal error 1236 from source when reading data from binary log: 'Could not find first log file name in binary log index file'"),
     "write_on_replica": lambda r: ("1290", "HY000", "The MySQL server is running with the --super-read-only option so it cannot execute this statement"),
     "two_primary_keys": lambda r: ("1068", "42000", "Multiple primary key defined"),
+    "savepoint_missing": lambda r: ("1305", "42000", f"SAVEPOINT before_{r['c']} does not exist"),
+    "txn_settings_late": lambda r: ("1568", "25001", "Transaction characteristics can't be changed while a transaction is in progress"),
 }
 PG = {  # PostgreSQL: (sqlstate, message, detail)
     "duplicate_key": lambda r: ("23505", f"duplicate key value violates unique constraint \"{r['t']}_{r['c']}_key\"", f"Key ({r['c']})=({r['v']}) already exists."),
@@ -85,6 +87,11 @@ PG = {  # PostgreSQL: (sqlstate, message, detail)
     "fk_target_not_key": lambda r: ("42830", f"there is no unique constraint matching given keys for referenced table \"{r['t']}\"", ""),
     "two_primary_keys": lambda r: ("42P16", f"multiple primary keys for table \"{r['t']}\" are not allowed", ""),
     "replication_stopped": lambda r: ("23505", f"duplicate key value violates unique constraint \"{r['t']}_pkey\"\nCONTEXT:  processing remote data for replication origin \"pg_16393\" during message type \"INSERT\" for replication target relation \"public.{r['t']}\"", f"Key (id)=({r['v']}) already exists."),
+    # E1 night 4: transactions (formats seen on PostgreSQL 16 through tests/practice/txnlab.py)
+    "txn_aborted": lambda r: ("25P02", "current transaction is aborted, commands ignored until end of transaction block", ""),
+    "savepoint_missing": lambda r: ("3B001", f"savepoint \"before_{r['c']}\" does not exist", ""),
+    "outside_txn_only": lambda r: ("25001", "CREATE INDEX CONCURRENTLY cannot run inside a transaction block", ""),
+    "txn_settings_late": lambda r: ("25001", "SET TRANSACTION ISOLATION LEVEL must be called before any query", ""),
 }
 LITE = {  # SQLite: (extended result code name, message), each produced on SQLite 3.53 (Python's sqlite3) or the 3.45 command line
     "duplicate_key": lambda r: ("SQLITE_CONSTRAINT_UNIQUE", f"UNIQUE constraint failed: {r['t']}.{r['c']}"),
@@ -113,6 +120,13 @@ LITE = {  # SQLite: (extended result code name, message), each produced on SQLit
     "fk_target_not_key": lambda r: ("SQLITE_ERROR", f"foreign key mismatch - \"{r['t']}\" referencing \"customers\""),
     "two_primary_keys": lambda r: ("SQLITE_ERROR", f"table \"{r['t']}\" has more than one primary key"),
     "drop_column_blocked": lambda r: ("SQLITE_ERROR", f"cannot drop UNIQUE column: \"{r['c']}\""),
+    # E1 night 4: transactions (each produced on SQLite 3.53 by tests/practice/txnlab.py and the lab scripts)
+    "txn_nested": lambda r: ("SQLITE_ERROR", "cannot start a transaction within a transaction"),
+    "txn_not_active": lambda r: ("SQLITE_ERROR", "cannot rollback - no transaction is active"),
+    "savepoint_missing": lambda r: ("SQLITE_ERROR", f"no such savepoint: before_{r['c']}"),
+    "outside_txn_only": lambda r: ("SQLITE_ERROR", "cannot VACUUM from within a transaction"),
+    "statement_still_open": lambda r: ("SQLITE_LOCKED", "database table is locked"),
+    "read_upgrade_busy": lambda r: ("SQLITE_BUSY_SNAPSHOT", "database is locked"),
 }
 LITE_WRAP = [
     "sqlite3.{cls}: {msg}",
@@ -178,6 +192,8 @@ def case(i, seed):
         cause = rng.choice(list(LITE))
         code, msg = LITE[cause](r)
         wrap = rng.choice(LITE_WRAP)
+        if cause == "read_upgrade_busy" and "{code}" not in wrap:
+            wrap = rng.choice([w for w in LITE_WRAP if "{code}" in w])   # only the extended code tells it from any other lock
         if "Error: in prepare" in wrap and code != "SQLITE_ERROR":
             wrap = "Error: stepping, {msg} (19)"     # the command line says 'in prepare' only for errors found before running
         cls = "IntegrityError" if "CONSTRAINT" in code or code == "SQLITE_MISMATCH" else "OperationalError"

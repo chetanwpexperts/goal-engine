@@ -408,7 +408,7 @@ def _once_derived(sql, s, cl, bs, sel_at, where_at, ord_at) -> str | None:
     where = (" WHERE " + " AND ".join(outer_where)) if outer_where else ""
     if not where and not ord_at:
         return None
-    return f"SELECT * FROM ({inner_sql}) AS once_t{where}{order}"
+    return f"SELECT * FROM ({inner_sql.strip()}) AS once_t{where}{order}"     # (a code string's indentation isn't the query)
 
 
 def _once_cross(sql, s, cl, bs) -> str | None:

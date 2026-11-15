@@ -916,7 +916,7 @@ def _code_turn(db: Session, goal: Goal, text: str, hi: bool):
 def _translate_turn(db: Session, goal: Goal, text: str, hi: bool, query: str | None = None):
     """A query to be written in another database's words (night 10): the target named after to / into / mein is remembered
     for the conversation (rule A); each construct is rewritten in its words (lab-proven on MariaDB and PostgreSQL), the
-    differences in meaning are named, and what couldn't be translated is said. SQL Server / Oracle / SQLite: notes only."""
+    differences in meaning are named, and what couldn't be translated is said. SQL Server / Oracle: notes only (SQLite is lab-tested from E1)."""
     from app.agents import sqlport
     from app.dbknow import engines as E
 

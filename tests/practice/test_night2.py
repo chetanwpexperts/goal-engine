@@ -274,8 +274,9 @@ def test_every_rule_says_where_it_was_proven():
     for fam, eng in (("mysql", "mariadb"), ("postgresql", "postgresql")):
         refuses = json.loads((d / f"{fam}.json").read_text(encoding="utf-8"))["refuses"]
         assert refuses and all(eng in r["proven"] for r in refuses), fam
-    for notes in ("sqlserver", "oracle", "sqlite"):
+    for notes in ("sqlserver", "oracle"):
         assert json.loads((d / f"{notes}.json").read_text(encoding="utf-8"))["notes_only"] is True
+    assert json.loads((d / "sqlite.json").read_text(encoding="utf-8"))["notes_only"] is False   # lab-proven from E1 night 4
 
 
 def test_postgresql_findings_use_its_own_error_codes():

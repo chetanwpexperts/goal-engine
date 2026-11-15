@@ -252,7 +252,7 @@ def analyze_sql(query: str, extra: str = "", engine: str | None = None) -> dict:
         out = _analyze_sql(query, extra)
         out["engine"] = engine
         if _notes_only(engine):
-            out["notes_for"] = query            # SQL Server / Oracle / SQLite: the notes that speak to this query
+            out["notes_for"] = query            # SQL Server / Oracle: the notes that speak to this query
         return out
     finally:
         CHOSEN.reset(token)
@@ -268,8 +268,10 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
         original, extra = both[1], (extra + "\n" + both[0]).strip()
     if not original:
         return {"ok": False, "error": "No query given", "findings": []}
-    from app.agents import sqllock
+    from app.agents import sqllock, sqltxn
 
+    if sqltxn.is_script(_strip_comments(original)) and sqltxn.has_control(_strip_comments(original)):
+        return _analyze_other(original, said)        # BEGIN ... COMMIT: a transaction script, read statement by statement
     many = sqllock.n_plus_one(_strip_comments(original))
     if many:                                          # a log of the same statement per value (N+1): one statement does the work
         sql_one = many.pop("sql")
@@ -284,7 +286,7 @@ def _analyze_sql(query: str, extra: str = "") -> dict:
     head = _strip_comments(original)
     from app.agents import sqlschema
 
-    if re.match(r"^\s*(insert|replace)\b", head, re.I) or ROUTINE_RE.match(head) or sqlschema.is_schema(head):
+    if re.match(r"^\s*(insert|replace)\b", head, re.I) or ROUTINE_RE.match(head) or sqlschema.is_schema(head) or sqltxn.is_script(head):
         return _analyze_other(original, said)        # INSERT / REPLACE / CREATE PROCEDURE, FUNCTION, TRIGGER: correctness only
     if not re.match(r"^\s*(\(|with\b|select\b|update\b|delete\b)", head, re.I):
         if re.match(r"^\s*(truncate|show|describe|desc|alter)\b", head, re.I):

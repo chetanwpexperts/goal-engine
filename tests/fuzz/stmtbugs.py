@@ -109,7 +109,14 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         # SUM / COUNT), ANY / ALL and MINUS it doesn't have, OFFSET without LIMIT, a scalar subquery that silently keeps its first
         # row, and UPDATE / DELETE with LIMIT or a table name in SET; each rewrite run on SQLite against the intended statement
         "s3_plus_concat", "s3_count_share", "s3_sum_count", "s3_eq_any", "s3_ne_all", "s3_minus", "s3_offset", "s3_first_row",
-        "s3_update_limit", "s3_delete_limit", "s3_set_qualified"]
+        "s3_update_limit", "s3_delete_limit", "s3_set_qualified",
+        # E1 (SQLite) night 4: transaction scripts on SQLite, MariaDB and PostgreSQL (tests/practice/txnlab.py runs each one the
+        # way the database's command line does, and what is SAVED is compared): other databases' transaction words, a second
+        # BEGIN, ROLLBACK with no transaction, table changes inside a MariaDB transaction, VACUUM / CREATE INDEX CONCURRENTLY /
+        # journal_mode inside one, a savepoint name typed wrong, a transaction left open, SET TRANSACTION in the wrong place, and
+        # SQLite's read-then-write BEGIN (BEGIN IMMEDIATE)
+        "s4_start", "s4_lock_tables", "s4_nested", "s4_rollback_no_begin", "s4_ddl_inside", "s4_outside_only", "s4_savepoint_typo",
+        "s4_left_open", "s4_set_txn", "s4_deferred"]
 SL_TOPIC = {b: "dialect" for b in BUGS if b.startswith("sl_")}
 SL_TOPIC.update({"sl_cast_date": "cast_date", "sl_date_minus": "date_math", "sl_date_plus": "date_math"})
 SL_TOPIC.update({"s2_int_pk": "sqlite_rowid_pk", "s2_autoinc_int": "sqlite_rowid_pk", "s2_string": "sqlite_affinity",
@@ -119,6 +126,8 @@ SL_TOPIC.update({"s2_int_pk": "sqlite_rowid_pk", "s2_autoinc_int": "sqlite_rowid
 SL_TOPIC.update({"s3_plus_concat": "concat", "s3_count_share": "division", "s3_sum_count": "division", "s3_eq_any": "dialect",
                  "s3_ne_all": "dialect", "s3_minus": "dialect", "s3_offset": "dialect", "s3_first_row": "subquery",
                  "s3_update_limit": "change_limit", "s3_delete_limit": "change_limit", "s3_set_qualified": "set_qualified"})
+SL_TOPIC.update({b: "transaction" for b in BUGS if b.startswith("s4_")})
+SL_TOPIC.update({"s4_start": "dialect", "s4_lock_tables": "dialect"})
 SL_TOPIC.update({b: "ddl_dialect" for b in ("s2_auto_after", "s2_identity", "s2_options", "s2_inline_key", "s2_unique_key", "s2_enum",
                                             "s2_default_now", "s2_on_update")})
 TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": "subquery", "set_and": "set", "or_value": "or",
@@ -547,6 +556,8 @@ def make(seed: int):
         return _sqlite2_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("s3_"):
         return _sqlite3_bug(seed, bug, rnd, schema, tables, t)
+    elif bug.startswith("s4_"):
+        return _txn_bug(seed, bug, rnd, schema, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -1722,6 +1733,8 @@ def check(item, engines: dict) -> list[str]:
     extra = [f["title_en"] for f in res["findings"] if f["kind"] in ("error", "wrong") and f["topic"] != want]
     if extra:
         bad.append(f"{tag}: extra findings {extra}\n{item['broken']}")
+    if item.get("txn"):
+        return bad + _check_txn(item, res, tag)
     if item.get("lite_ddl"):
         return bad + _check_lite_ddl(item, res, tag)
     if item["stmt"] == "ddl":
@@ -2460,6 +2473,115 @@ def _sqlite3_bug(seed, bug, rnd, schema, tables, t):
     return {**out, "broken": broken, "truth": truth}
 
 
+TXN_LAB = {}
+
+
+def _txn_servers() -> set:
+    if not TXN_LAB:
+        from tests.practice import txnlab
+
+        TXN_LAB["up"] = {"sqlite"}
+        for eng in ("mariadb", "postgresql"):
+            try:
+                txnlab.run(eng, "SELECT 1")
+                TXN_LAB["up"].add(eng)
+            except Exception:  # noqa: BLE001 - that server isn't running here
+                pass
+    return TXN_LAB["up"]
+
+
+def _txn_bug(seed, bug, rnd, schema, t):
+    """E1 night 4: a transaction script with one planted slip, for the database it is written for, on the lab's scratch tables
+    (lab_tx (id, v) holding (1, 10); lab_log (id, note)). truth = what was meant, written independently."""
+    v1, v2 = rnd.sample(range(20, 99), 2)
+    note = rnd.choice(["paid", "moved", "checked", "v set", "done"])
+    up1, up2 = f"UPDATE lab_tx SET v = {v1} WHERE id = 1", f"UPDATE lab_tx SET v = {v2} WHERE id = 1"
+    log = f"INSERT INTO lab_log VALUES ({rnd.randint(1, 9)}, '{note}')"
+    eng = {"s4_start": "sqlite", "s4_lock_tables": "sqlite", "s4_deferred": "sqlite", "s4_ddl_inside": "mariadb"}.get(bug) or \
+        rnd.choice(["sqlite", "mariadb", "postgresql"] if bug != "s4_outside_only" else ["sqlite", "postgresql"])
+    beg = "START TRANSACTION" if eng == "mariadb" else rnd.choice(["BEGIN", "BEGIN TRANSACTION"]) if eng == "sqlite" else \
+        rnd.choice(["BEGIN", "START TRANSACTION"])
+    rb_to = "ROLLBACK TO SAVEPOINT" if eng != "sqlite" else rnd.choice(["ROLLBACK TO", "ROLLBACK TO SAVEPOINT"])
+    out = {"seed": seed, "bug": bug, "stmt": "script", "schema": schema, "table": t["name"], "engine": eng, "lab": eng, "txn": True}
+    if bug == "s4_start":
+        iso = rnd.choice(["", " ISOLATION LEVEL READ COMMITTED", " READ WRITE"])
+        broken, truth = f"START TRANSACTION{iso};\n{up1};\n{log};\nCOMMIT;", f"BEGIN;\n{up1};\n{log};\nCOMMIT;"
+    elif bug == "s4_lock_tables":
+        broken = f"LOCK TABLES lab_tx WRITE, lab_log WRITE;\n{up1};\n{log};\nUNLOCK TABLES;"
+        truth = f"BEGIN IMMEDIATE;\n{up1};\n{log};\nCOMMIT;"
+    elif bug == "s4_nested":
+        pick = rnd.random()
+        if pick < 0.3:                                  # an inner step kept with its own COMMIT: a savepoint released
+            broken = f"{beg};\n{up1};\n{beg};\n{log};\nCOMMIT;\nCOMMIT;"
+            truth = f"{beg};\n{up1};\nSAVEPOINT s;\n{log};\nRELEASE SAVEPOINT s;\nCOMMIT;"
+        elif pick < 0.65:                               # an inner part undone on its own, the outer one kept
+            broken = f"{beg};\n{up1};\n{beg};\n{up2};\nROLLBACK;\nCOMMIT;"
+            truth = f"{beg};\n{up1};\nSAVEPOINT s;\n{up2};\n{rb_to} s;\nCOMMIT;"
+        else:                                           # all of it or none: one transaction
+            broken = f"{beg};\n{up1};\n{beg};\n{log};\nROLLBACK;"
+            truth = f"{beg};\n{up1};\n{log};\nROLLBACK;"
+    elif bug == "s4_rollback_no_begin":
+        broken = f"{up1};\n{log};\nROLLBACK;"
+        truth = f"{beg};\n{up1};\n{log};\nROLLBACK;"
+    elif bug == "s4_ddl_inside":
+        ddl = rnd.choice(["CREATE TABLE lab_tx2 (a INT)", "DROP TABLE IF EXISTS lab_tx2", "TRUNCATE TABLE lab_log", "ALTER TABLE lab_log ADD COLUMN extra INT"])
+        broken = f"START TRANSACTION;\n{up1};\n{ddl};\nROLLBACK;"
+        truth = f"{ddl};\nSTART TRANSACTION;\n{up1};\nROLLBACK;"
+    elif bug == "s4_outside_only":
+        if eng == "sqlite":
+            cmd = rnd.choice(["VACUUM", "PRAGMA journal_mode = WAL"])
+            if cmd == "VACUUM":
+                broken, truth = f"BEGIN;\n{up1};\nVACUUM;\nCOMMIT;", f"BEGIN;\n{up1};\nCOMMIT;\nVACUUM;"
+            else:
+                broken, truth = f"BEGIN;\n{cmd};\n{up1};\nCOMMIT;", f"{cmd};\nBEGIN;\n{up1};\nCOMMIT;"
+        else:
+            cmd = rnd.choice(["VACUUM lab_tx", "CREATE INDEX CONCURRENTLY ix_lab_tx_v ON lab_tx (v)"])
+            broken, truth = f"BEGIN;\n{up1};\n{cmd};\nCOMMIT;", f"BEGIN;\n{up1};\nCOMMIT;\n{cmd};"
+    elif bug == "s4_savepoint_typo":
+        sp = rnd.choice(["before_log", "step_one", "after_update", "sp_main"])
+        typo = sp[:-2] + sp[-1] if len(sp) > 4 else sp + "x"
+        broken = f"{beg};\n{up1};\nSAVEPOINT {sp};\n{up2};\n{rb_to} {typo};\nCOMMIT;"
+        truth = f"{beg};\n{up1};\nSAVEPOINT {sp};\n{up2};\n{rb_to} {sp};\nCOMMIT;"
+    elif bug == "s4_left_open":
+        broken, truth = f"{beg};\n{up1};\n{log};", f"{beg};\n{up1};\n{log};\nCOMMIT;"
+    elif bug == "s4_set_txn":
+        if eng == "sqlite":
+            return None
+        lvl = rnd.choice(["SERIALIZABLE", "REPEATABLE READ", "READ COMMITTED"])
+        st = f"SET TRANSACTION ISOLATION LEVEL {lvl}"
+        if eng == "mariadb":
+            broken, truth = f"START TRANSACTION;\n{st};\n{up1};\nCOMMIT;", f"{st};\nSTART TRANSACTION;\n{up1};\nCOMMIT;"
+        else:
+            broken = f"{beg};\nSELECT v FROM lab_tx;\n{st};\n{up1};\nCOMMIT;"
+            truth = f"{beg};\n{st};\nSELECT v FROM lab_tx;\n{up1};\nCOMMIT;"
+    else:                                               # s4_deferred: SQLite, reads first, writes later
+        word = rnd.choice(["BEGIN", "BEGIN DEFERRED", "BEGIN TRANSACTION"])
+        broken = f"{word};\nSELECT v FROM lab_tx WHERE id = 1;\nUPDATE lab_tx SET v = v - 1 WHERE id = 1;\nCOMMIT;"
+        truth = "BEGIN IMMEDIATE;\nSELECT v FROM lab_tx WHERE id = 1;\nUPDATE lab_tx SET v = v - 1 WHERE id = 1;\nCOMMIT;"
+    if rnd.random() < 0.3:
+        broken = rnd.choice(["-- release script\n", "/* nightly job */\n"]) + broken
+    return {**out, "broken": broken, "truth": truth}
+
+
+def _check_txn(item, res, tag) -> list[str]:
+    """The corrected script, run on the database it is written for, saves exactly what the intended one saves (and ends its
+    transaction): v, the log rows, nothing left open, no error."""
+    from tests.practice import txnlab
+
+    fixed = res.get("corrected")
+    if not fixed:
+        return [f"{tag}: no corrected script\n{item['broken']}"]
+    if item["lab"] not in _txn_servers():
+        return []
+    want, got = txnlab.run(item["lab"], item["truth"]), txnlab.run(item["lab"], fixed)
+    keep = ("v", "log", "open")
+    if want["errors"]:
+        return [f"{tag}: the intended script itself fails on {item['lab']}: {want['errors']}\n{item['truth']}"]
+    if got["errors"] or {k: got[k] for k in keep} != {k: want[k] for k in keep}:
+        return [f"{tag}: on {item['lab']} the corrected script saves something else ({got} vs {want})\n{fixed}"]
+    return []
+
+
 def _lite_ddl_effect(script: str, item) -> tuple:
     """What a table script makes on SQLite: its columns (type, NOT NULL, default, key), its indexes (unique, columns), and the rows
     two INSERTs without an id leave. ('refused', why) when SQLite refuses the script."""
@@ -2684,6 +2806,9 @@ def _classes(item, res, tag) -> list[str]:
     sql = unwrap(item["broken"])
     K.annotate_findings(res["findings"], sql)
     bad = []
+    if item.get("txn"):                                   # a transaction script on the lab's own scratch tables
+        return [f"{tag}: finding {f['title_en']!r} ({f['kind']}) has class {(f.get('confidence') or {}).get('class')}\n{item['broken']}"
+                for f in res["findings"] if f["kind"] == "error" and (f.get("confidence") or {}).get("class") != "proven"]
     for f in res["findings"]:
         c = (f.get("confidence") or {}).get("class")
         if c not in ("proven", "likely_risk", "needs_schema", "needs_execution") or (f["kind"] == "error" and c != "proven"):

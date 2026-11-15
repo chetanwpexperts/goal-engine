@@ -86,12 +86,32 @@ def _rule(eng: str, key: str) -> dict:
     return sqlbasics.rules(eng).get(key, {}) if eng else {}
 
 
+def _behaviour(key: str, eng):
+    from app.agents import sqlbasics
+
+    return sqlbasics.behaviour(key, eng)
+
+
+def _own(eng) -> bool:
+    from app.agents import sqlbasics
+
+    return sqlbasics.own_rules(eng)
+
+
+def _says_hi(key: str, eng) -> str:
+    from app.agents import sqlbasics
+
+    return sqlbasics.says_hi(key, eng)
+
+
 def _says(key: str, eng) -> str:
     """The engine fact from the dialect files (rule B): for the known database only, else for each."""
     if eng == "mysql":
         return _rule("mysql", key).get("says", "")
     if eng == "postgresql":
         return _rule("postgresql", key).get("says", "")
+    if eng:
+        return _rule(eng, key).get("says", "")
     return f"{_rule('mysql', key).get('says', '')} {_rule('postgresql', key).get('says', '')}".strip()
 
 
@@ -510,7 +530,7 @@ def _case_rules(sql: str, s: str, intent: str, F, eng, levels) -> list:
             nums = sure + [i for i in named if i not in sure]
             if words and nums:
                 kind = ("error" if sure else "check") if eng == "postgresql" else "check"
-                cast = {"postgresql": "TEXT", "mysql": "CHAR"}.get(eng or "")
+                cast = {"postgresql": "TEXT", "mysql": "CHAR"}.get(eng or "")      # SQLite: text vs number compares wrongly either way
                 edits = []
                 if cast:
                     for i in nums:
@@ -681,8 +701,8 @@ def _cte_rules(sql: str, s: str, intent: str, F, eng, chosen) -> list:
             colm = re.fullmatch(r"(?:[`\"]?\w+[`\"]?\.)?[`\"]?[A-Za-z_]\w*[`\"]?", ax)
             if not (lit or colm) or ax.lower() in ("null",):
                 continue
-            if lit and eng == "postgresql":
-                continue
+            if lit and eng == "postgresql" or _behaviour("recursive_text_width", eng) == "works":
+                continue                             # SQLite gives text no width (lab, E1 night 3)
             kind = "error" if lit and eng == "mysql" else "check"
             cast = {"mysql": "CHAR(1000)", "postgresql": "TEXT"}.get(eng or "")
             st = a_items[k]["start"] + (len(a_items[k]["text"]) - len(a_items[k]["text"].lstrip()))
@@ -697,7 +717,7 @@ def _cte_rules(sql: str, s: str, intent: str, F, eng, chosen) -> list:
                           f"banata hai wo usme fit hona chahiye. Anchor ko jagah do: MySQL/MariaDB par CAST(... AS CHAR(1000)), "
                           f"PostgreSQL par CAST(... AS TEXT)."), edits))
         # ---- MariaDB's / MySQL's 1000-round limit
-        if has_where and eng != "postgresql":
+        if has_where and eng != "postgresql" and _behaviour("recursion_limit", eng) != "endless":
             for bm in re.finditer(r"([\w.]+)\s*(<|<=)\s*(\d+)\b", rtext[rcl["where"][0]:rcl["where"][1]]):
                 lim = int(bm.group(3))
                 if lim <= 1001 or bm.group(1).split(".")[-1].lower() not in cols:
@@ -880,7 +900,7 @@ def _window_rules(sql: str, s: str, intent: str, F, eng, levels) -> list:
             if fn == "row_number":
                 kind = "check"
             elif fn in NEEDS_ORDER:
-                kind = "wrong" if eng == "postgresql" else "error"
+                kind = "wrong" if eng == "postgresql" or _behaviour("window_needs_order", eng) == "arbitrary" else "error"
             else:
                 kind = "wrong"
             what = {"lag": "the row before", "lead": "the row after", "first_value": "the first row", "last_value": "the last row",
@@ -892,9 +912,10 @@ def _window_rules(sql: str, s: str, intent: str, F, eng, levels) -> list:
                              "Each database (and each run) may read the rows in another order: in the lab FIRST_VALUE() OVER () gave "
                              "a different row on MariaDB and on PostgreSQL. " if fn in ARBITRARY else "")
                           + "Add the ORDER BY that says which row comes first, e.g. OVER (PARTITION BY ... ORDER BY order_date, id).",
-                          f"Window ORDER BY na de to rows ka koi kram nahi, isliye {what} koi bhi row ho sakti hai. MariaDB LAG/LEAD/RANK "
-                          f"ko ORDER BY ke bina mana karta hai (4018), PostgreSQL koi bhi row deta hai. ORDER BY likho jo batata hai "
-                          f"kaunsi row pehle aati hai."), []))
+                          f"Window ORDER BY na de to rows ka koi kram nahi, isliye {what} koi bhi row ho sakti hai. "
+                          + (_says_hi("window_needs_order", eng) + " " if _own(eng) else
+                             "MariaDB LAG/LEAD/RANK ko ORDER BY ke bina mana karta hai (4018), PostgreSQL koi bhi row deta hai. ")
+                          + "ORDER BY likho jo batata hai kaunsi row pehle aati hai."), []))
             continue
         # ---- LAST_VALUE / NTH_VALUE with the default frame
         if fn in ("last_value", "nth_value") and has_order and not x["frame"]:

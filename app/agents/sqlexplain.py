@@ -10,6 +10,8 @@ scan of a big table (and why no index was used, when the plan shows it: an index
 wraps the column in a function), a join that reads the inner table again for every outer row, a sort or hash that spilled to
 disk, estimates far from the real row counts (statistics), an index that doesn't cover the filter, a full index scan.
 Everything here was checked against plans the lab produced on MariaDB 10.11 and PostgreSQL 16 (tests/practice/test_night8.py).
+E1 night 3: SQLite's EXPLAIN QUERY PLAN (the command line's tree, a driver's rows, or the pipe form): SCAN / SEARCH / USE TEMP
+B-TREE / CORRELATED SUBQUERY / AUTOMATIC INDEX lines, their meanings in sqlite.json ('explain'), checked on SQLite 3.53.
 """
 
 import json
@@ -20,6 +22,9 @@ from pathlib import Path
 PROVEN = {k: ["mariadb", "postgresql"] for k in ("plan_full_scan", "plan_index_ignored", "plan_function", "plan_join_scan",
                                                   "plan_filesort", "plan_temporary", "plan_spill", "plan_estimate", "plan_filter_after_index",
                                                   "plan_full_index", "plan_heap_fetches", "plan_dependent", "plan_impossible")}
+for _k in ("plan_full_scan", "plan_filesort", "plan_temporary", "plan_full_index", "plan_dependent"):
+    PROVEN[_k] = PROVEN[_k] + ["sqlite"]                  # E1 night 3: SQLite's EXPLAIN QUERY PLAN (tests/practice/test_e1_sqlite3.py)
+PROVEN_SQLITE_ONLY = {"plan_auto_index": ["sqlite"]}      # SQLite's own plan step (MariaDB / PostgreSQL build no such index)
 BIG = 1000                                     # rows: below this a full read is cheap and nothing is said
 
 FUNC_IN_FILTER = re.compile(r"\b(extract|date_part|date|year|month|lower|upper|\"left\"|left|substring|substr|coalesce|ifnull|trim|"
@@ -423,6 +428,104 @@ def _read_tree(text: str) -> dict | None:
     return {"engine": "mysql", "analyzed": any(m.group("arows") for m in lines), "steps": steps, "findings": _dedupe(finds)}
 
 
+# ------------------------------------------------------------------------------------------------ SQLite (E1 night 3)
+_LITE_LINE = re.compile(r"^(?:\s*(?:[|`]--|\|\s{2}|\s{3})*\s*(?P<tree>[|`]--)\s*|\s*\(?\s*(?P<id>\d+)\s*[,|]\s*(?P<parent>\d+)\s*[,|]"
+                        r"\s*\d+\s*[,|]\s*'?|\s*)(?P<detail>(?:SCAN|SEARCH|USE TEMP B-TREE|CORRELATED|SCALAR SUBQUERY|LIST SUBQUERY|"
+                        r"MATERIALIZE|CO-ROUTINE|MULTI-INDEX OR|INDEX \d+|BLOOM FILTER|MERGE|COMPOUND QUERY|UNION|LEFT|RIGHT)\b[^\n]*?)\s*$",
+                        re.M)
+
+
+def _lite_lines(text: str) -> list[dict]:
+    """SQLite's EXPLAIN QUERY PLAN as the command line draws it (QUERY PLAN / |--SCAN t / `--SEARCH ...), as driver rows
+    ((2, 0, 216, 'SCAN t') or 2|0|216|SCAN t), or the details alone; with the depth of each line."""
+    t = text or ""
+    if not (re.search(r"^\s*QUERY PLAN\s*$", t, re.M) or re.search(r"^\s*(?:[|`]--|\(?\d+\s*[,|]\s*\d+\s*[,|]\s*\d+\s*[,|])\s*'?"
+                                                                 r"(?:SCAN|SEARCH)\b", t, re.M)):
+        return []
+    out = []
+    for m in _LITE_LINE.finditer(t):
+        line = m.group(0)
+        if m.group("tree"):
+            depth = line.index(m.group("tree")) // 3
+        elif m.group("id"):
+            depth = 0 if m.group("parent") == "0" else 1
+        else:
+            continue
+        det = m.group("detail").strip()
+        if m.group("id"):
+            det = re.sub(r"'\s*\)?\s*,?$", "", det)          # (2, 0, 216, 'SCAN t'): the closing quote and bracket
+        out.append({"detail": det, "depth": depth})
+    return out if any(re.match(r"(SCAN|SEARCH)\b", x["detail"]) for x in out) else []
+
+
+def _read_sqlite(text: str) -> dict | None:
+    lines = _lite_lines(text)
+    if not lines:
+        return None
+    M = _meanings("sqlite")
+    steps, finds = [], []
+    for i, ln in enumerate(lines):
+        det = ln["detail"]
+        mean = {}
+        for st in M.get("steps", []):
+            mm = re.match(st["re"], det)
+            if mm:
+                fill = lambda s_: re.sub(r"\{(\d)\}", lambda g: mm.group(int(g.group(1))) or "", s_)   # noqa: E731
+                mean = {"en": fill(st["en"]), "hi": fill(st.get("hi", st["en"]))}
+                break
+        tm = re.match(r"(SCAN|SEARCH) (?:TABLE )?(\w+)", det)
+        steps.append({"table": tm.group(2) if tm else "", "access": det.split(" USING ")[0], "key": "", "rows": None,
+                      "en": f"{det}: {mean.get('en', '')}".rstrip(": "), "hi": f"{det}: {mean.get('hi', mean.get('en', ''))}".rstrip(": ")})
+        inside = i > 0 and ln["depth"] > 0 and any(re.match(r"CORRELATED", x["detail"]) for x in lines[:i] if x["depth"] < ln["depth"])
+        sm = re.match(r"SCAN (?:TABLE )?(\w+)(?: AS \w+)?$", det)
+        if sm and inside:
+            finds.append(_f(3, "plan_dependent", f"{sm.group(1)} is read in full for every outer row",
+                            f"Bahar ki har row ke liye {sm.group(1)} poori padhi jaati hai", det,
+                            f"The subquery runs again for each row of the outer query, and each time it scans all of {sm.group(1)}. An "
+                            f"index on the {sm.group(1)} column the subquery matches on (its WHERE ... = outer.column) turns each run "
+                            "into a SEARCH; or join and group once instead.",
+                            f"Subquery har row pe chalti hai aur har baar {sm.group(1)} poori padhti hai. Jis column pe match hota hai "
+                            "uska index lagao, ya ek baar join + group karo."))
+        elif sm:
+            finds.append(_f(2, "plan_full_scan", f"EXPLAIN QUERY PLAN shows a full table scan on {sm.group(1)}",
+                            f"EXPLAIN QUERY PLAN mein {sm.group(1)} ka poora table scan", det,
+                            f"Every row of {sm.group(1)} is read (SQLite's plan has no row counts: fine for a small table, slow for a "
+                            "big one). If the query filters or joins it, index those columns ('=' ones first) and compare them bare "
+                            "(no function around the column).",
+                            f"{sm.group(1)} ki har row padhi jaati hai. Filter/join columns pe index lagao aur unhe seedha compare karo."))
+        im = re.match(r"SCAN (?:TABLE )?(\w+)(?: AS \w+)? USING (?:COVERING )?INDEX (\w+)$", det)
+        if im:
+            finds.append(_f(1, "plan_full_index", f"Index {im.group(2)} is read from start to end",
+                            f"Index {im.group(2)} shuru se aakhir tak padha gaya", det,
+                            "A SCAN through an index reads all of it: it gives an order (GROUP BY / ORDER BY) or holds every needed "
+                            "column, but nothing narrows it. A function around the indexed column (substr, strftime, lower) or a "
+                            "LIKE on a case-sensitive index does this; a bare comparison or a range on the column makes it a SEARCH.",
+                            "Index ka SCAN poora index padhta hai. Column pe function ya LIKE iski wajah hote hain; seedha compare karo."))
+        if re.match(r"(?:SEARCH|.*) .*USING AUTOMATIC", det):
+            am = re.match(r"SEARCH (?:TABLE )?(\w+)(?: AS \w+)?(?: EXISTS)? USING AUTOMATIC (?:PARTIAL )?(?:COVERING )?INDEX \((.+)\)", det)
+            if am:
+                cols = ", ".join(re.findall(r"(\w+)=\?", am.group(2))) or am.group(2)
+                finds.append(_f(2, "plan_auto_index", f"SQLite builds a throw-away index on {am.group(1)} ({cols}) every time",
+                                f"SQLite har baar {am.group(1)} ({cols}) pe temporary index banata hai", det,
+                                f"No index on {am.group(1)} fits this join or filter, so each run first indexes the whole table and "
+                                f"then drops it. Create it once: CREATE INDEX {am.group(1)}_{cols.split(',')[0].strip()} ON "
+                                f"{am.group(1)} ({cols}).",
+                                f"{am.group(1)} pe koi index nahi, isliye har baar naya banta hai. Ek baar bana do: CREATE INDEX ... ON "
+                                f"{am.group(1)} ({cols})."))
+        if det == "USE TEMP B-TREE FOR ORDER BY" or det.startswith("USE TEMP B-TREE FOR RIGHT PART") or det.startswith("USE TEMP B-TREE FOR LAST"):
+            finds.append(_f(2, "plan_filesort", "Sorting without an index (USE TEMP B-TREE FOR ORDER BY)",
+                            "Bina index ke sorting (USE TEMP B-TREE FOR ORDER BY)", det,
+                            "The rows are sorted after they are found; an index on the WHERE's '=' columns then the ORDER BY columns "
+                            "returns them already in order (with LIMIT, only the first rows are read).",
+                            "Rows milne ke baad sort hoti hain; '=' columns phir ORDER BY columns ka index lagao."))
+        if det in ("USE TEMP B-TREE FOR GROUP BY", "USE TEMP B-TREE FOR DISTINCT"):
+            finds.append(_f(1, "plan_temporary", f"Grouping in a temporary tree ({det})", f"Temporary tree mein grouping ({det})", det,
+                            "The rows are put in order in a temporary tree to group them; an index that starts with the GROUP BY "
+                            "columns lets SQLite read them already grouped.",
+                            "Group karne ke liye temporary tree; GROUP BY columns se shuru hone wala index ise hata deta hai."))
+    return {"engine": "sqlite", "analyzed": False, "steps": steps, "findings": _dedupe(finds)}
+
+
 # ------------------------------------------------------------------------------------------------ entry
 def _f(sev, topic, ten, thi, ev, fen, fhi) -> dict:
     return {"severity": sev, "topic": topic, "title_en": ten, "title_hi": thi, "evidence": ev, "fix_en": fen, "fix_hi": fhi}
@@ -442,7 +545,8 @@ def looks_like_plan(text: str) -> bool:
     t = text or ""
     return bool(re.search(r"select_type", t, re.I) and re.search(r"possible_keys|\btype\b", t, re.I) or
                 re.search(r"\((?:cost=[\d.]+\.\.[\d.]+ rows=\d+|actual time=)", t) or
-                re.search(r"^\s*->\s+(Table scan|Index lookup|Index range scan|Filter:|Nested loop)", t, re.M))
+                re.search(r"^\s*->\s+(Table scan|Index lookup|Index range scan|Filter:|Nested loop)", t, re.M) or
+                bool(_lite_lines(t)))
 
 
 def read(text: str) -> dict | None:
@@ -453,7 +557,7 @@ def read(text: str) -> dict | None:
     if rows:
         out = _read_mysql(rows)
     else:
-        out = _read_tree(text) or _read_pg(text)
+        out = _read_tree(text) or _read_pg(text) or _read_sqlite(text)
     if not out or not out["steps"]:
         return None
     out["findings"] = _dedupe(out["findings"])
@@ -462,11 +566,16 @@ def read(text: str) -> dict | None:
 
 def render(plan: dict, hi: bool = False) -> str:
     """'How DBaba read the plan': the steps in the order they run, then what to change."""
-    eng = "MySQL/MariaDB" if plan["engine"] == "mysql" else "PostgreSQL"
-    if hi:
+    eng = {"mysql": "MySQL/MariaDB", "sqlite": "SQLite"}.get(plan["engine"], "PostgreSQL")
+    if plan["engine"] == "sqlite":
+        head = ("Ye SQLite ka EXPLAIN QUERY PLAN hai (format se pata chala). Ismein row counts aur time nahi hote, sirf har table tak "
+                "pahunchne ka tareeka." if hi else
+                "This is SQLite's EXPLAIN QUERY PLAN (its format shows it). It shows how each table is reached, with no row counts or "
+                "times (SQLite has no EXPLAIN ANALYZE).")
+    elif hi:
         head = (f"Ye {eng} ka plan hai (format se pata chala). " + ("ANALYZE ke saath: asli row counts hain." if plan["analyzed"] else
                                                                     "Sirf EXPLAIN: row counts andaaza hain, asli nahi (asli ke liye EXPLAIN ANALYZE)."))
-    else:
+    elif plan["engine"] != "sqlite":
         head = (f"This is a {eng} plan (its format shows it). " + ("It was run (ANALYZE), so the row counts are real." if plan["analyzed"] else
                                                                     "Plain EXPLAIN: the row counts are estimates, not what happened (EXPLAIN ANALYZE runs it)."))
     lines = [head, "", "Steps, in the order they run:" if not hi else "Steps, jis kram mein chalte hain:"]

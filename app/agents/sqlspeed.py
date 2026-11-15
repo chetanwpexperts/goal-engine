@@ -77,7 +77,7 @@ def _rule(eng: str, key: str) -> dict:
 
 def _says(key: str, eng) -> str:
     """The engine fact from the dialect files (rule B): for the known database only, else for each."""
-    if eng in ("mysql", "postgresql"):
+    if eng:
         return _rule(eng, key).get("says", "")
     return f"{_rule('mysql', key).get('says', '')} {_rule('postgresql', key).get('says', '')}".strip()
 

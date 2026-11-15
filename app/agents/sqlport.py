@@ -119,7 +119,7 @@ def convert_format(fmt: str, src: str, dst: str) -> str | None:
             return None                                   # a MySQL code we don't know
         if not pct and ch.isalpha():
             return None                                   # a PostgreSQL code (or a word) we don't know
-        out.append("%%" if (dst == "mysql" and ch == "%") else ch)
+        out.append("%%" if (dst in ("mysql", "sqlite") and ch == "%") else ch)
         i += 1
     return "'" + "".join(out) + "'"
 
@@ -132,6 +132,37 @@ def _calls(fam: str) -> dict:
     return out
 
 
+MOD_WORD = {"YEAR": ("years", 1), "QUARTER": ("months", 3), "MONTH": ("months", 1), "WEEK": ("days", 7), "DAY": ("days", 1),
+            "HOUR": ("hours", 1), "MINUTE": ("minutes", 1), "SECOND": ("seconds", 1)}
+
+
+def modifier(amount: str, unit: str, sign: str = "+") -> str:
+    """SQLite's way to move a date: a modifier text, '+7 days' / '-3 months' (weeks in days, quarters in months). An amount
+    that isn't a plain number is built into the text, (n) || ' days'; never '+' || n, since '+-3 days' gives NULL (lab)."""
+    word, k = MOD_WORD[unit]
+    n = _int(amount)
+    if n is not None:
+        v = n * k * (-1 if sign == "-" else 1)
+        return f"'{'+' if v >= 0 else ''}{v} {word}'"
+    a = amount.strip()
+    plain = re.fullmatch(r"[A-Za-z_][\w.$]*|\d+", a) is not None
+    a = (f"{a} * {k}" if plain else f"({a}) * {k}") if k != 1 else a
+    inner = a if plain and k == 1 else f"({a})"
+    return f"{'(-' + inner + ')' if sign == '-' else inner} || ' {word}'"
+
+
+def date_or_time(op: str, unit: str | None = None) -> str:
+    """date() when the value plainly holds a date only (a date-named column, a 'YYYY-MM-DD' text, CURRENT_DATE) and the
+    step is days or more; datetime() otherwise, so no time is lost. On SQLite date() of a date and time drops the time
+    and datetime() of a date adds 00:00:00 (lab)."""
+    o = op.strip()
+    if unit in ("HOUR", "MINUTE", "SECOND"):
+        return "datetime"
+    if re.fullmatch(r"'\d{4}-\d{2}-\d{2}'", o) or re.fullmatch(r"date\s*\([\s\S]*\)", o, re.I):
+        return "date"
+    return "date" if _is_date(o, o) == "date" else "datetime"
+
+
 def _render(tpl: str, args: list[str], fam: str, rule: dict) -> str | None:
     """Fill a template: {0} {1} args, {U0} the date part named by arg 0, {IV:a:u} an interval of arg a in the unit of arg u,
     {IVARG1} arg 1's MySQL 'INTERVAL n UNIT' in this database's words, {F1} arg 1's date format in this database's codes."""
@@ -139,6 +170,26 @@ def _render(tpl: str, args: list[str], fam: str, rule: dict) -> str | None:
         return _unit(args[k]) if k < len(args) else None
 
     out = tpl
+    for m in list(re.finditer(r"\{MOD:(\d+):U(\d+)\}", out)):
+        u = unit_of(int(m.group(2)))
+        if not u:
+            return None
+        out = out.replace(m.group(0), modifier(args[int(m.group(1))], u))
+    for m in list(re.finditer(r"\{MOD(ARG|NEG)(\d+)\}", out)):
+        im = re.fullmatch(r"\s*interval\s+(.+?)\s+" + UNIT_WORD + r"\s*", args[int(m.group(2))], re.I | re.S)
+        if not im:
+            return None
+        amount = im.group(1).strip().strip("'")
+        out = out.replace(m.group(0), modifier(amount, UNITS[im.group(2).lower()], "-" if m.group(1) == "NEG" else "+"))
+    for m in list(re.finditer(r"\{DT(\d+)\}", out)):
+        k = int(m.group(1))
+        unit = None
+        im = next((re.search(r"\binterval\s+.+?\s+" + UNIT_WORD, a, re.I | re.S) for a in args if re.search(r"\binterval\b", a, re.I)), None)
+        if im:
+            unit = UNITS[im.group(1).lower()]
+        elif rule.get("fn") == "dateadd" and args:
+            unit = unit_of(0)
+        out = out.replace(m.group(0), date_or_time(args[k], unit) if k < len(args) else "datetime")
     for m in list(re.finditer(r"\{IV:(\d+):U(\d+)\}", tpl)):
         u = unit_of(int(m.group(2)))
         if not u:
@@ -181,6 +232,10 @@ def _pick(rule: dict, args: list[str]) -> str | None:
 
 def _special(fn: str, args: list[str], fam: str, inner: str) -> tuple[bool, str | None]:
     """Calls whose rewrite moves words around: text aggregation (ORDER BY / SEPARATOR inside) and CONVERT (two orders)."""
+    if fam == "sqlite":
+        done, new = _special_sqlite(fn, args, inner)
+        if done:
+            return done, new
     if fn == "group_concat" and fam == "postgresql":
         m = re.fullmatch(r"\s*(distinct\s+)?([\s\S]+?)(?:\s+order\s+by\s+([\s\S]+?))?(?:\s+separator\s+('(?:[^'\\]|\\.|'')*'))?\s*", inner, re.I)
         if not m or len(_args(m.group(2))) != 1:
@@ -215,6 +270,45 @@ def _special(fn: str, args: list[str], fam: str, inner: str) -> tuple[bool, str 
     return False, None
 
 
+SQLITE_PART = {"YEAR": "%Y", "MONTH": "%m", "DAY": "%d", "HOUR": "%H", "MINUTE": "%M", "SECOND": "%S"}
+
+
+def _special_sqlite(fn: str, args: list[str], inner: str) -> tuple[bool, str | None]:
+    """SQLite's own words for calls whose rewrite isn't a plain template (each lab-run on SQLite 3.53)."""
+    if fn == "position":                                   # POSITION('@' IN email) -> instr(email, '@')
+        m = re.fullmatch(r"\s*([\s\S]+?)\s+in\s+([\s\S]+?)\s*", inner, re.I)
+        return True, (f"instr({m.group(2).strip()}, {m.group(1).strip()})" if m else None)
+    if fn == "extract":                                    # EXTRACT(YEAR FROM d) -> CAST(strftime('%Y', d) AS INTEGER)
+        m = re.fullmatch(r"\s*(\w+)\s+from\s+([\s\S]+?)\s*", inner, re.I)
+        code = SQLITE_PART.get(UNITS.get(m.group(1).lower(), "")) if m else None
+        return True, (f"CAST(strftime('{code}', {m.group(2).strip()}) AS INTEGER)" if code else None)
+    if fn in ("greatest", "least") and len(args) >= 2:     # several arguments: SQLite's max() / min() of them
+        return True, f"{'max' if fn == 'greatest' else 'min'}({', '.join(a.strip() for a in args)})"
+    if fn == "right" and len(args) == 2:                   # the last n characters
+        n = _int(args[1])
+        return True, f"substr({args[0].strip()}, {-n if n is not None else '-(' + args[1].strip() + ')'})"
+    if fn == "group_concat":                               # GROUP_CONCAT(x ORDER BY y SEPARATOR ';') -> group_concat(x, ';' ORDER BY y)
+        m = re.fullmatch(r"\s*(distinct\s+)?([\s\S]+?)(?:\s+order\s+by\s+([\s\S]+?))?\s+separator\s+('(?:[^'\\]|\\.|'')*')\s*", inner, re.I)
+        if not m:
+            return False, None                             # no SEPARATOR: SQLite reads it as it is
+        if m.group(1) or len(_args(m.group(2))) != 1:
+            return True, None                              # DISTINCT with a separator, or several columns: written by hand
+        order = f" ORDER BY {m.group(3).strip()}" if m.group(3) else ""
+        return True, f"group_concat({m.group(2).strip()}, {m.group(4)}{order})"
+    if fn == "convert" and len(args) == 2:
+        casts = spec("sqlite").get("cast_types", {})
+        for typ, val in ((args[0], args[1]), (args[1], args[0])):
+            base = re.sub(r"\s*\(.*$", "", typ.strip().lower())
+            if base in ("date",):
+                return True, f"date({val.strip()})"
+            if base in ("datetime", "datetime2", "timestamp"):
+                return True, f"datetime({val.strip()})"
+            if base in casts:
+                return True, f"CAST({val.strip()} AS {casts[base]})"
+        return True, None
+    return False, None
+
+
 def _cast(value: str, typ: str, fam: str, casts: dict) -> str | None:
     base = re.sub(r"\s+", " ", typ.strip().lower())
     name = re.sub(r"\s*\(.*$", "", base)
@@ -233,7 +327,7 @@ def rewrite_calls(sql: str, fam: str) -> tuple[str, list[dict]]:
     calls; a call with no safe rewrite keeps its text and has new = None."""
     s = _mask(sql)
     calls = _calls(fam)
-    names = "|".join(sorted(set(calls) | {"group_concat", "string_agg", "convert"}, key=len, reverse=True))
+    names = "|".join(sorted(set(calls) | {"group_concat", "string_agg", "convert"} | set(spec(fam).get("special", {})), key=len, reverse=True))
     out, pos, found = [], 0, []
     for m in re.finditer(rf"(?<![\w.$])({names})\s*\(", s, re.I):
         if m.start() < pos:
@@ -276,7 +370,7 @@ def _regex_rewrites(text: str, fam: str) -> str:
     s = _mask(text)
     edits = []
     for r in _refuses(fam):
-        if r.get("to") is None:
+        if r.get("to") is None or r.get("after") or (r.get("unless") and re.search(r["unless"], s, re.I)):
             continue
         for m in r["_re"].finditer(s):
             new = _bare_ident(m.group(1)) if r["to"] == "@bare" else m.expand(r["to"])
@@ -293,16 +387,25 @@ def port(sql: str, s: str, intent: str, F, is_select: bool) -> list:
     from app.dbknow import engines as E
 
     chosen = CHOSEN.get()
-    fam = E.family(chosen)
+    fam = E.syntax_family(chosen)
     out = []
+    skip = []
+    if fam == "sqlite":                                   # 'NOW() - INTERVAL 7 DAY' is one rewrite, said once
+        iv = _sqlite_intervals(sql, s, E.label(chosen), F)
+        out += iv
+        skip = [(e[0], e[1]) for _f, edits in iv for e in edits]
     if fam:
-        out += _foreign_calls(sql, fam, E.label(chosen), F)
+        out += _foreign_calls(sql, fam, E.label(chosen), F, skip)
         out += _top_rows(sql, s, fam, E.label(chosen), F)
-        out += _intervals(sql, s, fam, E.label(chosen), F)
+        if fam != "sqlite":
+            out += _intervals(sql, s, fam, E.label(chosen), F)
         out += _casts(sql, s, fam, E.label(chosen), F)
         out += _engine_syntax(sql, s, chosen, E.label(chosen), F)
     out += _date_math(sql, s, fam, E.label(chosen) if fam else "", F)
     out += _power(sql, s, fam, F)
+    if fam == "sqlite":                                   # E1 night 2: values compared across types, dates of two shapes
+        out += _sqlite_type_compare(sql, s, E.label(chosen), F)
+        out += _sqlite_date_shapes(sql, s, E.label(chosen), F)
     merged: dict = {}                                     # YEAR(d) in SELECT and in GROUP BY: one finding, both rewritten
     for f, edits in out:
         key = (f.kind, f.topic, f.evidence)
@@ -399,10 +502,12 @@ def C_depth(s: str, i: int) -> int:
     return _depths(s)[i] if i < len(s) else 0
 
 
-def _foreign_calls(sql: str, fam: str, name: str, F) -> list:
+def _foreign_calls(sql: str, fam: str, name: str, F, skip=()) -> list:
     _new, found = rewrite_calls(sql, fam)
     out = []
     for c in found:
+        if any(a <= c["start"] and c["end"] <= b for a, b in skip):
+            continue                                       # already rewritten as part of a wider expression
         r = c["rule"]
         fn = c["fn"].upper()
         ev = re.sub(r"\s+", " ", c["evidence"]).strip()[:90]
@@ -412,7 +517,9 @@ def _foreign_calls(sql: str, fam: str, name: str, F) -> list:
             fhi = f"{r.get('fix_hi', name + ' ke shabdon mein likho.')} Yahan: {ev} -> {c['new']}."
         else:
             fen, fhi = r.get("manual_en", r.get("fix_en", "")), r.get("manual_hi", r.get("fix_hi", ""))
-        out.append((F("error", "dialect", f"{name} has no {fn}() (that's {where})", f"{name} mein {fn}() nahi hota (wo {where} ka hai)", ev,
+        ten = r["title_en"].replace("{db}", name) if r.get("title_en") else f"{name} has no {fn}() (that's {where})"
+        thi = r["title_hi"].replace("{db}", name) if r.get("title_hi") else f"{name} mein {fn}() nahi hota (wo {where} ka hai)"
+        out.append((F("error", "dialect", ten, thi, ev,
                       f"{name} refuses it ({r['error']}). " + fen, f"{name} ise mana karta hai ({r['error']}). " + fhi),
                     [(c["start"], c["end"], c["new"])] if c["new"] is not None and not c.get("nested") else []))
     return out
@@ -552,6 +659,18 @@ def _casts(sql: str, s: str, fam: str, name: str, F) -> list:
         t0 = a + 1 + am.end()
         typ = re.sub(r"\s+", " ", sql[t0:b].strip()).lower()
         base = re.sub(r"\s*\(.*$", "", typ)
+        if fam == "sqlite" and base in ("date", "datetime", "timestamp", "datetime2"):
+            inner = sql[a + 1:a + 1 + am.start()].strip()
+            fn = "date" if base == "date" else "datetime"
+            out.append((F("wrong", "cast_date", f"CAST(... AS {base.upper()}) gives only the year on {name}",
+                          f"{name} pe CAST(... AS {base.upper()}) sirf saal deta hai", re.sub(r"\s+", " ", sql[m.start():b + 1])[:90],
+                          f"{name} has no date type: a {base.upper()} cast is read as a number, so only the leading digits stay "
+                          f"(lab: CAST('2024-01-05' AS DATE) gave 2024), with no error. {fn}(x) gives the "
+                          + ("YYYY-MM-DD text." if fn == "date" else "YYYY-MM-DD HH:MM:SS text.") + f" Here: {fn}({inner}).",
+                          f"{name} mein date type nahi: cast number ban jaata hai aur sirf saal bachta hai (lab: 2024), bina error. "
+                          f"{fn}({inner}) likho."),
+                        [(m.start(), b + 1, f"{fn}({inner})")]))
+            continue
         if fam == "postgresql" and typ == "char":
             out.append((F("wrong", "cast_char", f"CAST(... AS CHAR) keeps only the first character on {name}",
                           f"{name} pe CAST(... AS CHAR) sirf pehla akshar rakhta hai", re.sub(r"\s+", " ", sql[m.start():b + 1])[:90],
@@ -596,6 +715,8 @@ def _date_math(sql: str, s: str, fam: str | None, name: str, F) -> list:
     (2024-02-03 -> 20240203) and subtract those, silently (lab: 9 days came out as 78; 2024-03-01 - 1 as 20240300)."""
     if fam == "postgresql":
         return []
+    if fam == "sqlite":
+        return _sqlite_date_math(sql, s, name, F)
     out = []
     for m in re.finditer(rf"({OPER})\s*([-+])\s*({OPER})", s, re.I):
         before = s[:m.start()].rstrip()
@@ -641,10 +762,285 @@ def _date_math(sql: str, s: str, fam: str | None, name: str, F) -> list:
     return out
 
 
+DATE_LIT = re.compile(r"'(\d{4}-\d{2}-\d{2})( \d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?'")
+NOW_WORDS = re.compile(r"(?:now\s*\(\s*\)|current_timestamp(?:\s*\(\s*\))?|getdate\s*\(\s*\)|sysdate(?:\s*\(\s*\))?|localtimestamp|"
+                       r"curdate\s*\(\s*\)|current_date(?:\s*\(\s*\))?)", re.I)
+
+
+def _sqlite_kind(raw: str) -> str | None:
+    """'date' / 'time' for a SQLite operand: a 'YYYY-MM-DD' text, a date-named column, a date() / datetime() call ..."""
+    o = raw.strip()
+    m = DATE_LIT.fullmatch(o)
+    if m:
+        return "time" if m.group(2) else "date"
+    if re.fullmatch(r"date\s*\([\s\S]*\)", o, re.I):
+        return "date"
+    if re.fullmatch(r"datetime\s*\([\s\S]*\)|julianday\s*\([\s\S]*\)", o, re.I):
+        return "time"
+    return _is_date(o, o)
+
+
+def _sqlite_intervals(sql: str, s: str, name: str, F) -> list:
+    """d + INTERVAL 7 DAY (MySQL) / d - INTERVAL '7 days' (PostgreSQL): SQLite has no INTERVAL (lab: 'near "7": syntax error' /
+    'no such column: INTERVAL'); it moves a date with a modifier, date(d, '+7 days'). NOW() / CURRENT_DATE on the left
+    become SQLite's 'now'."""
+    out = []
+    calls = [(c.start(), _close(s, c.end() - 1)) for c in re.finditer(r"\b(?:date_add|date_sub|adddate|subdate)\s*\(", s, re.I)]
+    covered = []
+    pat = (rf"({OPER})\s*([-+])\s*interval\s+(?:(\d+|\([^()]*\)|'\s*\d+\s*')\s+{UNIT_WORD}\b|'\s*(\d+)\s*{UNIT_WORD}\s*')")
+    t = s
+    for q in re.finditer(r"\binterval\s+'[^']*'", sql, re.I):  # INTERVAL '7 days': its own text is read, other strings stay masked
+        if s[q.start()] == sql[q.start()]:
+            t = t[:q.start()] + sql[q.start():q.end()] + t[q.end():]
+    for m in re.finditer(pat, t, re.I):
+        if any(a < m.start() < b for a, b in calls):
+            continue
+        a_raw, sign = sql[m.start(1):m.end(1)].strip(), m.group(2)
+        if m.group(3) is not None:
+            amount, unit = sql[m.start(3):m.end(3)].strip().strip("'").strip(), UNITS[m.group(4).lower()]
+        else:
+            amount, unit = m.group(5), UNITS[m.group(6).lower()]
+        if NOW_WORDS.fullmatch(a_raw):
+            fn = "date" if re.match(r"cur(?:date|rent_date)", a_raw, re.I) and unit not in ("HOUR", "MINUTE", "SECOND") else "datetime"
+            base = "'now'"
+        else:
+            lit = re.fullmatch(r"(?:date|timestamp)\s*('[^']*')", a_raw, re.I)
+            base = lit.group(1) if lit else rewrite_calls(a_raw, "sqlite")[0]
+            k = _sqlite_kind(base)
+            fn = "datetime" if unit in ("HOUR", "MINUTE", "SECOND") or k == "time" else "date" if k == "date" else "datetime"
+        new = f"{fn}({base}, {modifier(amount, unit, sign)})"
+        ev = re.sub(r"\s+", " ", sql[m.start():m.end()]).strip()
+        covered.append((m.start(), m.end()))
+        month = unit in ("MONTH", "QUARTER", "YEAR")
+        out.append((F("error", "dialect", f"{name} has no INTERVAL", f"{name} mein INTERVAL nahi hota", ev,
+                      f"{name} refuses it ({spec('sqlite').get('interval', {}).get('error', 'a syntax error')}). It moves a date with a modifier "
+                      f"text: {ev} -> {new}." + (" date() keeps the date only; datetime() keeps the time too." if fn == "date" else
+                                                 " datetime() keeps the time (use date() when the column holds dates only).")
+                      + (MONTH_NOTE if month else "") + (" 'now' is UTC on SQLite ('localtime' gives the computer's time)." if base == "'now'" else ""),
+                      f"{name} ise mana karta hai. Date ko modifier se badhao: {ev} -> {new}."),
+                    [(m.start(), m.end(), new)]))
+    for m in re.finditer(r"\binterval\b", s, re.I):          # any other INTERVAL: refused, written by hand
+        if any(a <= m.start() < b for a, b in covered + calls):
+            continue
+        out.append((F("error", "dialect", f"{name} has no INTERVAL", f"{name} mein INTERVAL nahi hota", sql[m.start():m.start() + 30].strip(),
+                      f"{name} refuses it. Move a date with a modifier instead: date(d, '+7 days'), datetime(d, '-2 hours'), date(d, '+1 months').",
+                      f"{name} ise mana karta hai. date(d, '+7 days') jaisa modifier likho."), []))
+        break
+    return out
+
+
+MONTH_NOTE = (" Month-ends differ: MySQL keeps the month (2024-01-31 + 1 month = 2024-02-29), SQLite rolls over (2024-03-02) unless "
+              "the 'floor' modifier is added (SQLite 3.46+).")
+
+
+def _sqlite_date_math(sql: str, s: str, name: str, F) -> list:
+    """Dates are text on SQLite, so date - date and date + n do arithmetic on the leading number (the year), silently (lab:
+    '2024-02-03' - '2024-01-25' = 0, '2024-02-03' + 1 = 2025). julianday() turns a date into a day number; a modifier moves it."""
+    out = []
+    for m in re.finditer(rf"({OPER})\s*([-+])\s*({OPER})", s, re.I):
+        before = s[:m.start()].rstrip()
+        after = s[m.end():].lstrip()
+        if before.endswith(("*", "/", "%", "-", "+", "^", "||")) or after.startswith(("*", "/", "(")) or \
+                re.search(r"\binterval\s*$", before, re.I) or re.match(r"interval\b", after, re.I):
+            continue
+        a_raw, op, b_raw = sql[m.start(1):m.end(1)].strip(), m.group(2), sql[m.start(3):m.end(3)].strip()
+        if re.match(r"interval\b", b_raw, re.I) or re.fullmatch(r"(?:date|interval)", a_raw, re.I) or re.match(r"julianday\s*\(", a_raw, re.I):
+            continue
+        ka, kb = _sqlite_kind(a_raw), _sqlite_kind(b_raw)
+        num = re.fullmatch(r"\d+", b_raw)
+        ev = re.sub(r"\s+", " ", sql[m.start():m.end()]).strip()
+        if ka and kb and op == "-":
+            new = f"(julianday({a_raw}) - julianday({b_raw}))"
+            unit = "days" if ka == kb == "date" else "days, with the time as a fraction of a day (* 24 for hours)"
+            out.append((F("wrong", "date_math", f"date - date is not a number of days on {name}", f"{name} pe date - date din nahi deta", ev,
+                          f"On {name} dates are text, so - subtracts their leading numbers (the years): lab '2024-02-03' - '2024-01-25' gave 0, "
+                          f"with no error. julianday() makes each one a day number: {new} gives the {unit}.",
+                          f"{name} pe dates text hain, - sirf saal ghatata hai (lab: 0), bina error. {new} likho."),
+                        [(m.start(), m.end(), new)]))
+        elif ka and num:
+            fn = "date" if ka == "date" else "datetime"
+            new = f"{fn}({a_raw}, '{op}{b_raw} days')"
+            out.append((F("wrong", "date_math", f"date {op} {b_raw} is not a date on {name}", f"{name} pe date {op} {b_raw} date nahi deta", ev,
+                          f"On {name} the date text is read as its leading number (the year) and {b_raw} is {'added' if op == '+' else 'subtracted'}: "
+                          f"lab '2024-02-03' + 1 gave 2025, with no error. A modifier moves the date: {new}.",
+                          f"{name} pe date ka saal hi number banta hai (lab: 2025), bina error. {new} likho."),
+                        [(m.start(), m.end(), new)]))
+    return out
+
+
+# ---------------------------------------------------------------- SQLite: every value carries its own type (E1 night 2)
+# A column's type is only a preference (its affinity): comparing a column with a literal converts the literal to the column's
+# affinity ('2' = 2 finds the row in a TEXT column). An EXPRESSION has no affinity, so text from strftime / substr / trim ... is
+# never equal to a number (an INTEGER or REAL always sorts below any TEXT): strftime('%Y', d) = 2024 finds nothing and
+# strftime('%Y', d) >= 2025 finds everything, with no error. The facts and the lab are in sqlite.json's query_rules.
+TEXT_FNS = r"(?:strftime|substr|substring|trim|ltrim|rtrim|upper|lower|replace|printf|format|hex|quote|char)"
+NUM_FNS = r"(?:abs|length|octet_length|instr|unicode|julianday|unixepoch|count|round)"
+NUM_LIT = r"-?\d+(?:\.\d+)?"
+CMP = r"(?:==|=|<>|!=|<=|>=|<|>)"
+PADDED = {"%m", "%d", "%H", "%M", "%S", "%W", "%j", "%U"}
+
+
+def _rule(name: str) -> dict:
+    return dialect("sqlite").get("query_rules", {}).get(name, {})
+
+
+def _after_call(s: str, end: int) -> re.Match | None:
+    """What a call is compared with, right after its ')': '= 2024', 'BETWEEN 1 AND 3', 'IN (1, 2)', or a quoted value."""
+    return re.match(rf"\s*(?:(?P<op>{CMP})\s*(?P<lit>{NUM_LIT}|'[^']*')(?!\s*(?:[-+*/%|]|\.\w|\())|"
+                    rf"(?:not\s+)?between\s+(?P<lo>{NUM_LIT})\s+and\s+(?P<hi>{NUM_LIT})(?!\s*[-+*/%|])|"
+                    rf"(?:not\s+)?in\s*\((?P<lst>\s*{NUM_LIT}(?:\s*,\s*{NUM_LIT})*\s*)\))", s[end:], re.I)
+
+
+def _sqlite_type_compare(sql: str, s: str, name: str, F) -> list:
+    out = []
+    note = _rule("type_compare").get("lab_en", "")
+    for m in re.finditer(rf"\b({TEXT_FNS}|{NUM_FNS})\s*\(", s, re.I):
+        if re.search(r"\bcast\s*\(\s*$", s[:m.start()], re.I):
+            continue                                       # CAST(strftime(...) AS INTEGER): already a number
+        end = _close(s, m.end() - 1) + 1
+        call = sql[m.start():end]
+        after = _after_call(s, end)
+        fn = m.group(1).lower()
+        ph = re.match(r"\s*(?:==|=)\s*(\?\d*|[:@$][A-Za-z_]\w*)(?![\w(])", s[end:])
+        if not after and ph and re.fullmatch(TEXT_FNS, fn, re.I):  # a value the app binds: a number from the app never matches
+            ev = re.sub(r"\s+", " ", sql[m.start():end + ph.end()]).strip()
+            out.append((F("check", "type_compare", f"{fn}(...) gives text: if the app binds a number to {ph.group(1)}, nothing matches",
+                          f"{fn}(...) text deta hai: app {ph.group(1)} mein number bheje to kuch match nahi hoga", ev,
+                          f"On {name} {fn}() returns TEXT and an expression has no column type, so a parameter bound as a number (2024 "
+                          f"from Python / PHP / Java ints) is never equal to it ({note}). Bind it as text ('2024'), or compare numbers: "
+                          f"CAST({sql[m.start():end]} AS INTEGER) = {ph.group(1)} (and then bind a number: text would not match that).",
+                          f"{name} pe {fn}() TEXT deta hai: app number bheje to kabhi barabar nahi. Text bhejo ya CAST(... AS INTEGER) "
+                          f"likho."), []))                 # which one is right depends on how the app binds it: not rewritten
+            continue
+        if not after:
+            continue
+        lit = sql[end + after.start("lit"):end + after.end("lit")] if after.group("op") else None   # (s has its strings blanked)
+        quoted = lit is not None and lit.startswith("'")
+        a, b = end + after.start(), end + after.end()
+        ev = re.sub(r"\s+", " ", sql[m.start():b]).strip()
+        if re.fullmatch(TEXT_FNS, fn, re.I):
+            if quoted:                                     # strftime('%m', d) = '3': the text is '03'
+                fmt = re.match(r"strftime\s*\(\s*'(%\w)'", call, re.I)
+                val = sql[a:b][sql[a:b].find("'") + 1:sql[a:b].rfind("'")]
+                if fmt and fmt.group(1) in PADDED and re.fullmatch(r"\d", val):
+                    q = a + sql[a:b].find("'")
+                    out.append((F("wrong", "type_compare", f"{call} gives '0{val}', never '{val}', on {name}",
+                                  f"{name} pe {call} '0{val}' deta hai, '{val}' kabhi nahi", ev,
+                                  f"strftime pads {fmt.group(1)} to two digits, so it is text like '0{val}' and the text '{val}' never "
+                                  f"matches ({note}). Compare with '0{val}', or compare numbers: CAST({call} AS INTEGER) = {val}.",
+                                  f"strftime {fmt.group(1)} ko do digit mein deta hai ('0{val}'), '{val}' kabhi match nahi hota. "
+                                  f"'0{val}' likho."), [(q, q + len(val) + 2, f"'0{val}'")]))
+                continue
+            nums = [lit] if lit else re.findall(NUM_LIT, after.group(0))
+            typ = "REAL" if any("." in x for x in nums if x) else "INTEGER"
+            new = f"CAST({call} AS {typ})"
+            what = "never equal to" if after.group("op") in ("=", "==") or after.group("lst") else "compared as text with"
+            out.append((F("wrong", "type_compare", f"{fn}(...) gives text: {what} a number on {name}",
+                          f"{name} pe {fn}(...) text deta hai: number se {('kabhi barabar nahi' if what.startswith('never') else 'text ki tarah compare')}",
+                          ev,
+                          f"On {name} a value keeps its own type, and {fn}() returns TEXT. A column would convert the number to its own "
+                          f"type, but an expression has no column type, so text is compared with a number as it is: they are never equal, "
+                          f"and any number sorts below any text ({note}). No error, just the wrong rows. Make the text a number first: "
+                          f"{new}.",
+                          f"{name} pe {fn}() TEXT deta hai, aur expression ka column type nahi hota, isliye number se kabhi barabar nahi "
+                          f"hota aur har number text se chhota maana jaata hai: bina error galat rows. {new} likho."),
+                        [(m.start(), end, new)]))
+        elif quoted and re.fullmatch(NUM_LIT, lit.strip("'")):
+            out.append((F("wrong", "type_compare", f"{fn}(...) gives a number: never equal to the text {lit} on {name}",
+                          f"{name} pe {fn}(...) number deta hai: text {lit} se kabhi barabar nahi", ev,
+                          f"On {name} {fn}() returns a number, and an expression has no column type to convert the quoted {lit}, so the "
+                          f"number and the text never match ({note}). Write the number without quotes: {lit.strip(chr(39))}.",
+                          f"{name} pe {fn}() number deta hai, quote wala {lit} text hai: kabhi match nahi. Bina quote likho."),
+                        [(a + sql[a:b].find("'"), a + sql[a:b].rfind("'") + 1, lit.strip("'"))]))
+    return out
+
+
+DATE_YMD = re.compile(r"(\d{4})([-/.])(\d{1,2})\2(\d{1,2})(?:([ T])(\d{1,2}):(\d{2})(?::(\d{2}))?)?")
+DATE_DMY = re.compile(r"(\d{1,2})([-/.])(\d{1,2})\2(\d{4})")
+ISO = re.compile(r"\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?")
+
+
+def _iso_of(text: str) -> tuple[str | None, list[str]]:
+    """(the 'YYYY-MM-DD[ HH:MM:SS]' a literal means, or None; the readings when it could be either day or month first)."""
+    m = DATE_YMD.fullmatch(text)
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(3)), int(m.group(4))
+        if not (1 <= mo <= 12 and 1 <= d <= 31):
+            return None, []
+        tail = ""
+        if m.group(6):
+            tail = f" {int(m.group(6)):02d}:{m.group(7)}" + (f":{m.group(8)}" if m.group(8) else "")
+        return f"{y:04d}-{mo:02d}-{d:02d}{tail}", []
+    m = DATE_DMY.fullmatch(text)
+    if m:
+        a, b, y = int(m.group(1)), int(m.group(3)), int(m.group(4))
+        dm = f"{y:04d}-{b:02d}-{a:02d}" if 1 <= b <= 12 and 1 <= a <= 31 else None
+        md = f"{y:04d}-{a:02d}-{b:02d}" if 1 <= a <= 12 and 1 <= b <= 31 else None
+        if dm and md and dm != md:
+            return None, [dm, md]
+        return dm or md, []
+    return None, []
+
+
+def _sqlite_date_shapes(sql: str, s: str, name: str, F) -> list:
+    """A date written in another shape ('2024-3-1', '15/06/2024', '2024/03/09') compared with a date column. SQLite keeps dates
+    as text and compares them letter by letter, so only the one shape 'YYYY-MM-DD' sorts like time: '2024-03-09' >= '2024-3-1'
+    is false ('0' < '3'), and date('2024-3-1') is NULL. MySQL/MariaDB and PostgreSQL read such a literal as a date first."""
+    out = []
+    note = _rule("date_shape").get("lab_en", "")
+    for lm in re.finditer(r"'(x+)'", s):
+        raw = sql[lm.start() + 1:lm.end() - 1]
+        if ISO.fullmatch(raw) or not (DATE_YMD.fullmatch(raw) or DATE_DMY.fullmatch(raw)):
+            continue
+        base = max(0, lm.start() - 300)
+        before = s[base:lm.start()]
+        ctx = re.search(rf"({OPER})\s*{CMP}\s*$", before, re.I) or re.search(rf"({OPER})\s+(?:not\s+)?between\s+$", before, re.I) or \
+            re.search(rf"({OPER})\s+(?:not\s+)?between\s+'[^']*'\s+and\s+$", before, re.I)
+        inside = re.search(r"\b(?:date|datetime|julianday|unixepoch)\s*\(\s*$", before, re.I)
+        right = re.match(rf"\s*{CMP}\s*({OPER})", s[lm.end():], re.I)
+        operand = None
+        if ctx:
+            operand = sql[base + ctx.start(1):base + ctx.end(1)]
+        elif right:
+            operand = sql[lm.end() + right.start(1):lm.end() + right.end(1)]
+        if not inside and not (operand and (_sqlite_kind(operand) or re.match(r"(?:date|datetime|strftime)\s*\(", operand, re.I))):
+            continue
+        iso, both = _iso_of(raw)
+        if not iso and not both:
+            continue
+        lit = f"'{raw}'"
+        why = (f"{name} has no date type: dates are text, compared letter by letter, so only 'YYYY-MM-DD' (zero-padded, dashes) sorts "
+               f"like time, and the date functions read only that shape ({note}).")
+        if iso:
+            out.append((F("wrong", "date_shape", f"{lit} is not in SQLite's date shape: it is compared as text", f"{lit} SQLite ki date shape mein "
+                          f"nahi: text ki tarah compare hota hai", lit,
+                          why + f" No error, just the wrong rows. Write it as '{iso}'.",
+                          f"{name} mein date text hai, akshar se akshar compare hoti hai: sirf 'YYYY-MM-DD' sahi sort hota hai. '{iso}' likho."),
+                        [(lm.start(), lm.end(), f"'{iso}'")]))
+        else:
+            out.append((F("wrong", "date_shape", f"{lit} is not in SQLite's date shape, and could be two dates", f"{lit} SQLite ki date shape "
+                          f"mein nahi, aur do dates ho sakti hai", lit,
+                          why + f" It reads as '{both[0]}' (day first) or '{both[1]}' (month first): write the one you mean.",
+                          f"{name} pe sirf 'YYYY-MM-DD' sahi chalta hai. Ye '{both[0]}' (din pehle) ya '{both[1]}' (mahina pehle) hai: "
+                          f"jo matlab hai wo likho."), []))
+    return out
+
+
 def _power(sql: str, s: str, fam: str | None, F) -> list:
-    """a ^ b: a power on PostgreSQL (2 ^ 3 = 8), a bitwise XOR on MySQL/MariaDB (2 ^ 3 = 1), with no error."""
+    """a ^ b: a power on PostgreSQL (2 ^ 3 = 8), a bitwise XOR on MySQL/MariaDB (2 ^ 3 = 1), with no error; SQLite refuses it."""
     if fam == "postgresql":
         return []
+    if fam == "sqlite":
+        out = []
+        for m in re.finditer(rf"({OPER})\s*\^\s*({OPER})", s, re.I):
+            a, b = sql[m.start(1):m.end(1)].strip(), sql[m.start(2):m.end(2)].strip()
+            ev = sql[m.start():m.end()]
+            out.append((F("error", "dialect", "SQLite has no ^ operator", "SQLite mein ^ operator nahi hota", ev,
+                          f"SQLite refuses it (unrecognized token: \"^\"). It was a power on PostgreSQL and a bitwise XOR on MySQL/MariaDB: "
+                          f"for the power write power({a}, {b}) (SQLite 3.35+ with its math functions built in, 2 ^ 3 = 8.0); for the XOR "
+                          f"write (({a}) | ({b})) - (({a}) & ({b})) (2 XOR 3 = 1).",
+                          f"SQLite ise mana karta hai. Power ke liye power({a}, {b}), XOR ke liye (({a}) | ({b})) - (({a}) & ({b})) likho."), []))
+        return out
     out = []
     for m in re.finditer(rf"({OPER})\s*\^\s*({OPER})", s, re.I):
         a, b = sql[m.start(1):m.end(1)].strip(), sql[m.start(2):m.end(2)].strip()
@@ -659,7 +1055,7 @@ def _power(sql: str, s: str, fam: str | None, F) -> list:
 
 
 # ---------------------------------------------------------------- translation
-PORT_TOPICS = {"dialect", "date_math", "interval_unit", "cast_char", "power_xor", "update_join_syntax", "delete_join_syntax",
+PORT_TOPICS = {"dialect", "date_math", "cast_date", "type_compare", "date_shape", "interval_unit", "cast_char", "power_xor", "update_join_syntax", "delete_join_syntax",
                "set_qualified", "upsert_syntax", "change_limit", "ddl_dialect", "limit_in_subquery", "in_limit", "derived_alias",
                "null_fn", "concat", "quotes", "having_alias", "sum_bool", "count_multi"}
 
@@ -787,7 +1183,7 @@ def translate(sql: str, target: str, source: str | None = None) -> dict:
     from app.agents import sqlcorrect
     from app.dbknow import engines as E
 
-    fam = E.family(target)
+    fam = E.syntax_family(target)
     if source is None:
         shown, _why = E.shown(sql)
         source = shown
@@ -890,5 +1286,9 @@ def translation_text(sql: str, t: dict, lang: str) -> str:
     if t["notes"]:
         lines += ["", H["notes"]]
         lines += [f"- {n[0] if en else n[1]}" for n in t["notes"]]
-    lines += ["", H["lab"]]
+    lab = H["lab"]
+    if t.get("target") == "sqlite":                       # its rewrites were run on SQLite, not on the two servers
+        lab = {"en": "Rewrites checked on SQLite 3.53.", "hinglish": "Badlaav SQLite 3.53 pe jaanche gaye.",
+               "hindi": "बदलाव SQLite 3.53 पर जाँचे गए।"}.get(lang, "Rewrites checked on SQLite 3.53.")
+    lines += ["", lab]
     return "\n".join(lines).strip()

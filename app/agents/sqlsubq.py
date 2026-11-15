@@ -189,6 +189,8 @@ def _refused(key: str):
         return (None if my.get("behaviour") == "works" else "error"), my.get("says", "")
     if eng == "postgresql":
         return (None if pg.get("behaviour") == "works" else "error"), pg.get("says", "")
+    if sqlbasics.own_rules(eng):
+        return sqlbasics.verdict(key, eng), sqlbasics.says(key, eng)
     return "check", f"{my.get('says', '')} {pg.get('says', '')}".strip()
 
 

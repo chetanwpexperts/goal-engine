@@ -950,7 +950,7 @@ def _plan_turn(db: Session, goal: Goal, text: str, hi: bool, plan: dict):
     from app.dbknow import engines as E
 
     if not E.named(text) and not E.remembered(goal):     # rule A: the plan's own format shows the database
-        eid = plan["engine"] if plan["engine"] == "postgresql" else (
+        eid = plan["engine"] if plan["engine"] in ("postgresql", "sqlite") else (
             "mariadb" if re.search(r"\bBNL join\b|\br_rows\b|\br_filtered\b|MariaDB", text) else "mysql")
         E.remember(goal, eid, "detected", "the EXPLAIN plan's format")
     lines = (text or "").strip()

@@ -76,7 +76,7 @@
   "\\bdelete\\s+[\\w`]+(?:\\s*,\\s*[\\w`]+)*\\s+from\\b",
   "\\bon\\s+duplicate\\s+key\\s+update\\b",
   "\\binsert\\s+ignore\\b",
-  "\\breplace\\s+into\\b",
+  "(?<!or )(?<!OR )\\breplace\\s+into\\b",
   "(?m)^\\s*delimiter\\s+\\S+"
  ],
  "query_rules": {

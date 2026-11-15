@@ -66,8 +66,30 @@ def _said(key: str, fam: str) -> str:
     return sqlbasics.rules(fam).get(key, {}).get("says", "")
 
 
+def _own(eng) -> bool:
+    from app.agents import sqlbasics
+
+    return sqlbasics.own_rules(eng)
+
+
+def _name(eng) -> str:
+    from app.dbknow import engines as E
+
+    return E.label(eng)
+
+
+def _says_hi(key: str, eng) -> str:
+    from app.agents import sqlbasics
+
+    return sqlbasics.says_hi(key, eng)
+
+
 def _verdict(key: str, eng, works_on: str):
     """An engine-syntax rule: works_on = the family whose syntax this is. (kind or None, text naming the engines)."""
+    from app.agents import sqlbasics
+
+    if sqlbasics.own_rules(eng):
+        return sqlbasics.verdict(key, eng), _said(key, eng)
     other = "postgresql" if works_on == "mysql" else "mysql"
     if eng == works_on:
         return None, ""
@@ -332,7 +354,7 @@ def _update(sql: str, s: str, intent: str, F) -> list:
                    f"FROM {frm}" + (f" WHERE {' AND '.join(conds)}" if conds else ""))
             if kind == "error" and not tail.strip():
                 edits = [(0, len(sql.rstrip().rstrip(';').rstrip()), new)]
-        if kind:
+        if kind and not _own(eng):                    # SQLite: its dialect finding says it in its own words (E1 night 1)
             out.append((F(kind, "update_join_syntax", "UPDATE ... JOIN ... SET is MySQL/MariaDB syntax",
                           "UPDATE ... JOIN ... SET MySQL/MariaDB ka syntax hai", head_ev,
                           f"{says} Each target row is still changed once. "
@@ -368,8 +390,9 @@ def _update(sql: str, s: str, intent: str, F) -> list:
                 kind, says = "error", _said("set_qualified", "postgresql")
             if kind:
                 edits = [(cs, ce, col.split(".", 1)[1]) for col, cs, ce in quals] if kind == "error" else []
-                out.append((F(kind, "set_qualified", f"SET {quals[0][0]} = ...: PostgreSQL doesn't allow the table name in SET",
-                              f"SET {quals[0][0]} = ...: PostgreSQL SET mein table ka naam nahi maanta", _short(sql[quals[0][1]:quals[0][2] + 30]),
+                who = _name(eng) if _own(eng) else "PostgreSQL"
+                out.append((F(kind, "set_qualified", f"SET {quals[0][0]} = ...: {who} doesn't allow the table name in SET",
+                              f"SET {quals[0][0]} = ...: {who} SET mein table ka naam nahi maanta", _short(sql[quals[0][1]:quals[0][2] + 30]),
                               f"{says} Write the bare column: SET {quals[0][0].split('.', 1)[1]} = ... (the right side may still use the alias).",
                               f"{says} Sirf column likho: SET {quals[0][0].split('.', 1)[1]} = ... (right side pe alias chal jaata hai)."), edits))
 
@@ -544,17 +567,23 @@ def _limit_rule(sql, s, eng, st, t, verb, F) -> list:
         return []
     edits = []
     lim = _flat(sql[st["limit"][0]:st["limit"][1]])
-    if kind == "error" and re.fullmatch(r"\d+", lim):
+    if (kind == "error" or _own(eng)) and re.fullmatch(r"\d+", lim):    # SQLite: the rowid form runs on every build
         cl = st["cl"]
         where = st["where"]
         cond = _flat(sql[where[0]:where[1]]) if where else ""
         order = _flat(sql[st["order"][0]:st["order"][1]]) if st.get("order") else ""
         cut = min(v for k, v in cl.items() if k.startswith("@") and k in ("@where", "@order by", "@limit"))
         head = sql[:cut].rstrip()
-        sub = f"SELECT ctid FROM {t.name}" + (f" WHERE {cond}" if cond else "") + (f" ORDER BY {order}" if order else "") + f" LIMIT {lim}"
-        new = f"{head} WHERE ctid IN ({sub})"
+        rid = "rowid" if _own(eng) else "ctid"           # SQLite's row id (lab, E1 night 3); PostgreSQL's row address
+        sub = f"SELECT {rid} FROM {t.name}" + (f" WHERE {cond}" if cond else "") + (f" ORDER BY {order}" if order else "") + f" LIMIT {lim}"
+        new = f"{head} WHERE {rid} IN ({sub})"
         if verb == "UPDATE" and st["form"] == "plain" or verb == "DELETE" and st["form"] == "plain":
             edits = [(0, len(sql.rstrip().rstrip(';').rstrip()), new)]
+    if _own(eng):
+        return [(F(kind, "change_limit", f"{verb} ... LIMIT: only some {_name(eng)} builds take LIMIT on {verb}",
+                   f"{verb} ... LIMIT: {_name(eng)} ke kuch builds hi {verb} pe LIMIT lete hain", _short(sql[:st["end"]]),
+                   f"{says} Without ORDER BY, which rows are taken is up to the engine: fine for batches, wrong when you mean the "
+                   f"oldest or newest.", _says_hi("change_limit", eng)), edits)]
     return [(F(kind, "change_limit", f"{verb} ... LIMIT: PostgreSQL has no LIMIT on {verb}",
                f"{verb} ... LIMIT: PostgreSQL mein {verb} pe LIMIT nahi hota", _short(sql[:st["end"]]),
                f"{says} In PostgreSQL pick the rows in a subquery: {verb} ... WHERE ctid IN (SELECT ctid FROM t WHERE ... ORDER BY ... "
@@ -600,7 +629,7 @@ def _delete(sql: str, s: str, intent: str, F) -> list:
         if kind == "error" and len(d["targets"]) == 1 and not d["using"]:
             pg = _pg_delete(sql, s, d, next((x for x in srcs if _uq(x.alias) == d["targets"][0]), t))
             edits = [(0, len(sql.rstrip().rstrip(';').rstrip()), pg)] if pg else []
-        if kind:
+        if kind and not _own(eng):
             out.append((F(kind, "delete_join_syntax", "DELETE a FROM a JOIN b is MySQL/MariaDB syntax",
                           "DELETE a FROM a JOIN b MySQL/MariaDB ka syntax hai", ev,
                           f"{says} PostgreSQL: DELETE FROM a USING b WHERE a.x = b.y AND ...",
@@ -608,7 +637,17 @@ def _delete(sql: str, s: str, intent: str, F) -> list:
     if d["form"] == "using":
         kind, says = _verdict("delete_using", eng, "postgresql")
         edits = []
-        if kind == "error":
+        if kind == "error" and _own(eng):
+            # SQLite (lab, E1 night 3): no USING and no join in DELETE; the other tables become an EXISTS on the same condition
+            new = (f"DELETE FROM {_flat(sql[d['section'][0]:d['section'][1]])} WHERE EXISTS (SELECT 1 FROM "
+                   f"{_flat(sql[d['using'][0]:d['using'][1]])}" + (f" WHERE {_flat(sql[where[0]:where[1]])}" if where else "") + ")")
+            if where and not d["order"] and not d["limit"]:
+                edits = [(0, len(sql.rstrip().rstrip(';').rstrip()), new)]
+            out.append((F(kind, "delete_join_syntax", f"DELETE FROM a USING b: {_name(eng)} has no USING in DELETE",
+                          f"DELETE FROM a USING b: {_name(eng)} mein DELETE ke saath USING nahi", ev,
+                          f"{says} The same rows go with: {new}" if edits else says, f"{_says_hi('delete_using', eng)}"), edits))
+            kind = None
+        elif kind == "error":
             new = (f"DELETE {t.alias} FROM {_flat(sql[d['section'][0]:d['section'][1]])}, {_flat(sql[d['using'][0]:d['using'][1]])}"
                    + (f" WHERE {_flat(sql[where[0]:where[1]])}" if where else ""))
             if not d["order"] and not d["limit"] and not d["cl"].get("returning"):
@@ -773,14 +812,19 @@ def _insert(sql: str, s: str, intent: str, F) -> list:
             new = _to_conflict(sql, s, ins)
             if new:
                 edits = [(ins["dup_at"], _trim(sql, ins["end"]), new)]
-        if kind:
+        if kind and not _own(eng):
             out.append((F(kind, "upsert_syntax", "ON DUPLICATE KEY UPDATE is MySQL/MariaDB syntax",
                           "ON DUPLICATE KEY UPDATE MySQL/MariaDB ka syntax hai", ev,
                           f"{says} PostgreSQL: ON CONFLICT (key column) DO UPDATE SET col = EXCLUDED.col, where EXCLUDED is the row "
                           f"that was being inserted and the key column must have a PRIMARY KEY or UNIQUE constraint.",
                           f"{says} PostgreSQL: ON CONFLICT (key column) DO UPDATE SET col = EXCLUDED.col (EXCLUDED = jo row insert ho "
                           f"rahi thi; key column pe PRIMARY KEY ya UNIQUE hona chahiye)."), edits))
-    if ins["conflict"]:
+    from app.agents import sqlbasics
+
+    lite = sqlbasics.CHOSEN.get() == "sqlite"
+    if ins["conflict"] and lite:
+        pass                       # SQLite's own upsert words (3.24+; DO UPDATE without a target from 3.35, lab: 3.53 takes it)
+    elif ins["conflict"]:
         ctext = s[ins["conflict"][0]:ins["conflict"][1]]
         kind, says = _verdict("on_conflict", eng, "postgresql")
         edits = []
@@ -837,21 +881,22 @@ def _insert(sql: str, s: str, intent: str, F) -> list:
         kind, says = _verdict("insert_ignore", eng, "mysql")
         kind = kind or "check"
         key = _key_guess(cols, ins["table"])
-        if kind == "error":
+        if kind == "error" and not _own(eng):
             k = re.search(r"\bignore\s+", s[:ins["end"]], re.I)
             edits = [(k.start(), k.end(), "")] + [(_trim(sql, ins["end"]), _trim(sql, ins["end"]), " ON CONFLICT DO NOTHING")]
         else:
             edits = []
-        out.append((F(kind, "insert_ignore", "INSERT IGNORE skips more than duplicate rows",
-                      "INSERT IGNORE duplicate ke alawa bhi bahut kuch chhod deta hai", ev,
-                      (f"{says} " if kind == "error" else "") +
-                      "IGNORE turns every error into a warning: a duplicate key row is skipped, but so is a row breaking a foreign key, and "
-                      "a value too long or of the wrong type is cut or changed to fit, all without an error. To skip only duplicates: "
-                      + (f"ON DUPLICATE KEY UPDATE {key} = {key} (MySQL/MariaDB) or " if key else "")
-                      + "ON CONFLICT DO NOTHING (PostgreSQL).",
-                      "IGNORE har error ko warning bana deta hai: duplicate row chhoot-ti hai, par foreign key todne wali row bhi, aur "
-                      "lambi/galat type ki value kaat ke fit kar di jaati hai, bina error. Sirf duplicate chhodne hain to "
-                      + (f"ON DUPLICATE KEY UPDATE {key} = {key} (MySQL) ya " if key else "") + "ON CONFLICT DO NOTHING (PostgreSQL)."), edits))
+        if not _own(eng):                             # SQLite: its dialect finding says it, as INSERT OR IGNORE (E1 night 1)
+            out.append((F(kind, "insert_ignore", "INSERT IGNORE skips more than duplicate rows",
+                          "INSERT IGNORE duplicate ke alawa bhi bahut kuch chhod deta hai", ev,
+                          (f"{says} " if kind == "error" else "") +
+                          "IGNORE turns every error into a warning: a duplicate key row is skipped, but so is a row breaking a foreign key, and "
+                          "a value too long or of the wrong type is cut or changed to fit, all without an error. To skip only duplicates: "
+                          + (f"ON DUPLICATE KEY UPDATE {key} = {key} (MySQL/MariaDB) or " if key else "")
+                          + "ON CONFLICT DO NOTHING (PostgreSQL).",
+                          "IGNORE har error ko warning bana deta hai: duplicate row chhoot-ti hai, par foreign key todne wali row bhi, aur "
+                          "lambi/galat type ki value kaat ke fit kar di jaati hai, bina error. Sirf duplicate chhodne hain to "
+                          + (f"ON DUPLICATE KEY UPDATE {key} = {key} (MySQL) ya " if key else "") + "ON CONFLICT DO NOTHING (PostgreSQL)."), edits))
     if ins["verb"] == "replace":
         kind, says = _verdict("replace_into", eng, "mysql")
         kind = kind or "check"
@@ -861,7 +906,9 @@ def _insert(sql: str, s: str, intent: str, F) -> list:
         if key and listed and ins["rows"] and not ins["dup"]:
             upd = [c for c in listed if c != key]
             k = re.match(r"\s*replace\b", s, re.I)
-            if kind == "error":
+            if _own(eng):
+                tail = f" ON CONFLICT ({key}) DO UPDATE SET " + ", ".join(f"{c} = excluded.{c}" for c in upd)
+            elif kind == "error":
                 tail = f" ON CONFLICT ({key}) DO UPDATE SET " + ", ".join(f"{c} = EXCLUDED.{c}" for c in upd)
             else:
                 tail = " ON DUPLICATE KEY UPDATE " + ", ".join(f"{c} = VALUES({c})" for c in upd)
@@ -869,6 +916,12 @@ def _insert(sql: str, s: str, intent: str, F) -> list:
                 edits = [(k.start(), k.end(), sql[k.start():k.end()].replace("REPLACE", "INSERT").replace("replace", "insert")
                           if "REPLACE" in sql[k.start():k.end()] or "replace" in sql[k.start():k.end()] else "INSERT"),
                          (_trim(sql, ins["end"]), _trim(sql, ins["end"]), tail)]
+        if _own(eng):
+            out.append((F(kind, "replace_into", "REPLACE deletes the old row, then inserts a new one",
+                          "REPLACE purani row hata ke nayi daalta hai", ev,
+                          f"{says} ON DELETE CASCADE (with foreign keys on) removes the row's children and delete triggers fire too.",
+                          _says_hi("replace_into", eng)), edits))
+            return out
         out.append((F(kind, "replace_into", "REPLACE deletes the old row, then inserts a new one",
                       "REPLACE purani row hata ke nayi daalta hai", ev,
                       (f"{says} " if kind == "error" else "") +

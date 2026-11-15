@@ -79,6 +79,8 @@ def _says(key: str) -> tuple[str | None, str]:
         return eng, my.get("says", "")
     if eng == "postgresql":
         return eng, pg.get("says", "")
+    if sqlbasics.own_rules(eng):
+        return eng, sqlbasics.says(key, eng)
     return None, f"{my.get('says', '')} {pg.get('says', '')}".strip()
 
 

@@ -120,6 +120,21 @@ becomes a rule; an engine stops being "notes only" (rule A) once its own lab-pro
 - [ ] **E1. SQLite (3-4 nights).** Its own dialect file; loose column types (type affinity), no RIGHT/FULL JOIN in older
   versions, date functions (date(), strftime), ALTER TABLE limits, || for text, LIMIT/OFFSET; its error messages; every
   query rule re-checked on it; concepts for SQLite questions.
+  - [x] Night 1: its own error messages in the diagnoser (command line and driver formats, the file-level ones: locked,
+    read-only, can't open, full, damaged), detection from its words and errors, the other databases' words it refuses with
+    rewrites run on SQLite (dates, text functions, TOP / FETCH, ::casts, INSERT IGNORE, ON DUPLICATE KEY, SHOW TABLES ...),
+    date arithmetic that runs but means something else (CAST AS DATE, date - date, date + n), 16 concepts.
+  - [x] Night 2: types and tables: type affinity in comparisons ('1' = 1, dates of two shapes), STRICT tables, INT PRIMARY
+    KEY / AUTO_INCREMENT / SERIAL giving NULL ids, VARCHAR(n) not enforced, foreign keys off, ALTER TABLE rebuilds: the
+    CREATE TABLE checker on SQLite.
+  - [x] Night 3: every existing query rule re-checked on SQLite in the lab (NULLs, joins, bare columns in GROUP BY, integer
+    division, LIMIT, subqueries, windows, upserts) and kept or recorded as different in sqlite.json; EXPLAIN QUERY PLAN.
+    Done: all 50 MySQL/PostgreSQL query_rules plus 9 of SQLite's own (ANY / ALL, a SELECT name in WHERE, a scalar subquery's
+    first row, x / 0, ORDER BY inside a UNION part, OFFSET without LIMIT, CAST's leading number ...) with lab lines; findings
+    in SQLite's words (wording / not_here / kinds); SQLite rewrites for + on text, UPDATE / DELETE LIMIT, DELETE ... USING,
+    REPLACE, random() twice (MATERIALIZED); its plans read; 16 concepts; 37 problems + 5 changes; 11 s3_* families.
+  - [ ] Night 4: transactions and locking (BEGIN IMMEDIATE, WAL, busy timeout), a practice exam across the nights, and
+    SQLite stops being notes-only.
 - [ ] **E2. SQL Server (6-8 nights).** TOP / OFFSET-FETCH, ISNULL vs COALESCE, GETDATE, [brackets], string + concatenation,
   MERGE and OUTPUT, identity, its error numbers (Msg 207, 208, 515, 2627, 8152 ...), T-SQL procedures, the plan format,
   NOLOCK and snapshot isolation; each lab-run on the server.
@@ -497,3 +512,26 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   subquery gave 0; RAND() / random() written twice draw twice, while a derived table keeps one value per row on both engines;
   MariaDB sorts NULLs first in ASC, PostgreSQL last; (a, b) > (x, y) works on both and skips NULL rows; PostgreSQL refuses an
   alias inside an ORDER BY expression (42703), MariaDB allows it; 'lines' is a reserved word on MariaDB (1064 as an alias).
+- **E1 night 2 (15 Nov 2026).** SQLite's types and tables (`app/agents/sqllite.py`, facts in sqlite.json's schema_rules and
+  query_rules, rule B). A table script for SQLite is read the way SQLite takes it: the declared type only gives an affinity
+  (INT -> INTEGER, CHAR/CLOB/TEXT -> TEXT, BLOB or none -> BLOB, REAL/FLOA/DOUB -> REAL, else NUMERIC). Found: ids that don't
+  number themselves (INT, BIGINT, INTEGER(11), SERIAL, 'INT AUTO_INCREMENT', INTEGER PRIMARY KEY DESC: NULL ids), other keys that
+  take NULL, VARCHAR(n) / UNSIGNED not enforced (CHECK offered), DATE / DATETIME taking any shape (TEXT + CHECK (d IS date(d))),
+  no exact decimal (INTEGER paise advised, not rewritten), STRING as NUMERIC, STRICT's six type names, foreign keys off unless
+  the connection turns them on, no index on a child column, a link to a non-key column, SQLite's reserved words, and MySQL /
+  PostgreSQL table words it refuses (AUTO_INCREMENT after PRIMARY KEY, IDENTITY, ENGINE= / CHARSET=, KEY inside CREATE TABLE,
+  ENUM, DEFAULT now(), ON UPDATE) rewritten in its words. ALTER TABLE forms it refuses (ADD CONSTRAINT / UNIQUE / INDEX / KEY,
+  IF NOT EXISTS, two ADDs, a UNIQUE or PRIMARY KEY column, DROP CONSTRAINT) with rewrites where one exists, and the ones that
+  fail only on a table with rows (NOT NULL without a default, CURRENT_TIMESTAMP default) or before 3.53 (SET / DROP NOT NULL)
+  as checks. Queries: text from strftime / substr / trim compared with a number (never equal; numbers sort below text) and a
+  number from length / abs compared with quoted text, rewritten with CAST or padded text; dates written in another shape
+  ('2024-3-1', '15/06/2024', '2024/03/09') padded to ISO, a day/month date that could be either said, not guessed. The
+  diagnoser reads STRICT's 'unknown/missing datatype', 'AUTOINCREMENT is only allowed ...', 'foreign key mismatch', 'more than
+  one primary key', DROP COLUMN's blockers and 'non-constant default'; two new general causes with MariaDB's 1068 and
+  PostgreSQL's 42830 / 42P16 messages. 17 concepts, two general question shapes ('how does X decide / store / pick', 'X कब ...
+  चाहिए'), a 51-problem practice bank + 12 ALTER forms, 18 s2_* stmtbugs families. Lab lessons worth keeping: INT AUTO_INCREMENT
+  PRIMARY KEY is accepted with the type 'INT AUTO_INCREMENT' and NULL ids, while INTEGER PRIMARY KEY AUTO_INCREMENT is a syntax
+  error; INTEGER(11) and INTEGER PRIMARY KEY DESC are not the rowid; a STRING column turned '012345' into 12345; DECIMAL(10,2)
+  kept 0.1 + 0.2 as 0.30000000000000004; strftime('%Y', d) = 2024 found nothing and >= 2025 found everything; d >= '2024-3-1'
+  missed every March row; date('2024-02-30') rolls over to 2024-03-01, so CHECK (d IS date(d)) refuses it; SQLite 3.53 runs
+  ALTER COLUMN SET / DROP NOT NULL and ADD CONSTRAINT ... CHECK, the 3.45 command line refuses both.

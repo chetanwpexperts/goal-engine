@@ -1,9 +1,9 @@
 {
   "name": "SQLite",
-  "notes_only": true,
+  "notes_only": false,
   "query_rules_proven": true,
   "family": "relational",
-  "about": "SQLite (E1 in docs/dbaba-curriculum.md). Lab-tested on SQLite 3.53 (Python's sqlite3) and the 3.45 command line: its own error messages (the diagnoser), the other databases' words it refuses with their SQLite rewrites, date arithmetic that runs but means something else (night 1), table designs: type affinity, ids, keys, STRICT tables, foreign keys and ALTER TABLE's limits (night 2), and every query rule of nights 1-15 re-checked on SQLite with its own query_rules, wording and EXPLAIN QUERY PLAN (night 3). Transactions and locking are night 4; until then SQLite stays notes-only for them.",
+  "about": "SQLite (E1 in docs/dbaba-curriculum.md). Lab-tested on SQLite 3.53 (Python's sqlite3) and the 3.45 command line: its own error messages (the diagnoser), the other databases' words it refuses with their SQLite rewrites, date arithmetic that runs but means something else (night 1), table designs: type affinity, ids, keys, STRICT tables, foreign keys and ALTER TABLE's limits (night 2), every query rule of nights 1-15 re-checked on SQLite with its own query_rules, wording and EXPLAIN QUERY PLAN (night 3), and transactions and locking: BEGIN DEFERRED / IMMEDIATE, WAL, busy timeout, savepoints, its transaction errors and the other databases' transaction words (night 4, txn_rules). From night 4 SQLite is no longer notes-only: its answers come from this lab-proven knowledge.",
   "named": [
     "\\bsqlite3?\\b",
     "एसक्यूलाइट"
@@ -22,7 +22,8 @@
     "\\bwithout\\s+rowid\\b",
     "\\blast_insert_rowid\\s*\\(",
     "\\bpragma_table_info\\b",
-    "\\)\\s*strict\\s*(?:,|;|$)"
+    "\\)\\s*strict\\s*(?:,|;|$)",
+    "\\bbegin\\s+(?:immediate|exclusive|deferred)\\b"
   ],
   "weak_marks": [],
   "error_marks": [
@@ -221,7 +222,7 @@
       ]
     }
   ],
-  "lab_about": "The notes were run on SQLite 3.53 (Python's sqlite3) by tests/practice/test_night10.py; the query_rules' lab lines are run again by tests/practice/test_e1_sqlite3.py on the tables in query_lab_setup, and were also tried on Ubuntu's libsqlite3 3.45.1: the same results except UPDATE / DELETE ... LIMIT (that build has the option) and the plan of a correlated EXISTS. SQLite stays notes-only until E1 night 4 (locking).",
+  "lab_about": "The notes were run on SQLite 3.53 (Python's sqlite3) by tests/practice/test_night10.py; the query_rules' lab lines are run again by tests/practice/test_e1_sqlite3.py on the tables in query_lab_setup, and were also tried on Ubuntu's libsqlite3 3.45.1: the same results except UPDATE / DELETE ... LIMIT (that build has the option) and the plan of a correlated EXISTS. SQLite left notes-only at E1 night 4 (transactions and locking, txn_rules).",
   "own_formats": true,
   "words": [
     "sqlite",
@@ -237,7 +238,7 @@
     "SQLITE_CONSTRAINT_CHECK": "check_violation",
     "SQLITE_CONSTRAINT_FOREIGNKEY": "fk_missing_parent",
     "SQLITE_BUSY": "db_file_locked",
-    "SQLITE_BUSY_SNAPSHOT": "db_file_locked",
+    "SQLITE_BUSY_SNAPSHOT": "read_upgrade_busy",
     "SQLITE_BUSY_TIMEOUT": "db_file_locked",
     "SQLITE_READONLY": "file_readonly",
     "SQLITE_READONLY_DIRECTORY": "file_readonly",
@@ -245,7 +246,9 @@
     "SQLITE_FULL": "disk_full",
     "SQLITE_CORRUPT": "file_corrupt",
     "SQLITE_NOTADB": "file_corrupt",
-    "SQLITE_MISMATCH": "bad_value_type"
+    "SQLITE_MISMATCH": "bad_value_type",
+    "SQLITE_LOCKED": "statement_still_open",
+    "SQLITE_LOCKED_SHAREDCACHE": "statement_still_open"
   },
   "style": [
     "\\bError: (?:in prepare|stepping), ",
@@ -358,7 +361,7 @@
     },
     {
       "cause": "db_file_locked",
-      "re": "\\bdatabase is locked\\b|\\bdatabase table is locked\\b"
+      "re": "\\bdatabase is locked\\b"
     },
     {
       "cause": "file_readonly",
@@ -375,6 +378,26 @@
     {
       "cause": "file_corrupt",
       "re": "database disk image is malformed|file is not a database|file is encrypted or is not a database"
+    },
+    {
+      "cause": "statement_still_open",
+      "re": "\\bdatabase table is locked(?::\\s*(?P<table>[\\w$]+))?|cannot commit transaction - SQL statements in progress"
+    },
+    {
+      "cause": "txn_nested",
+      "re": "cannot start a transaction within a transaction"
+    },
+    {
+      "cause": "txn_not_active",
+      "re": "cannot (?P<what>commit|rollback) - no transaction is active"
+    },
+    {
+      "cause": "savepoint_missing",
+      "re": "no such savepoint: (?P<savepoint>[\\w$]+)"
+    },
+    {
+      "cause": "outside_txn_only",
+      "re": "cannot (?P<what>VACUUM) from within a transaction|cannot change (?:into|out of) (?P<mode>wal) mode from within a transaction"
     }
   ],
   "fix": {
@@ -475,6 +498,24 @@
     "drop_column_blocked": [
       "-- DROP COLUMN refuses a column that an index, view, trigger, CHECK, foreign key or key still uses. See them:\nSELECT type, name, sql FROM sqlite_master WHERE sql LIKE '%{column}%';\n-- Drop (or change) those first, e.g. DROP INDEX ix_name; DROP VIEW v; then ALTER TABLE t DROP COLUMN {column};",
       "-- A PRIMARY KEY or UNIQUE column can't be dropped at all: rebuild the table without it\n-- (CREATE TABLE t_new ..., INSERT INTO t_new SELECT ..., DROP TABLE t, ALTER TABLE t_new RENAME TO t, in one transaction)."
+    ],
+    "statement_still_open": [
+      "# Python: read every row first (or close the cursor) before changing the table it reads\nrows = conn.execute(\"SELECT id FROM items\").fetchall()\nconn.execute(\"DROP TABLE items_old\")"
+    ],
+    "txn_nested": [
+      "-- One transaction; the inner part as a savepoint\nBEGIN;\n-- ... outer work ...\nSAVEPOINT inner_step;\n-- ... inner work ...\nRELEASE inner_step;     -- or ROLLBACK TO inner_step to undo only the inner part\nCOMMIT;"
+    ],
+    "txn_not_active": [
+      "-- Start the transaction before the first change, end it once\nBEGIN;\n-- ... the changes ...\nCOMMIT;   -- or ROLLBACK;"
+    ],
+    "savepoint_missing": [
+      "-- A savepoint is made inside the transaction, then released or rolled back to by the same name\nBEGIN;\nSAVEPOINT before_payment;\n-- ...\nROLLBACK TO before_payment;\nCOMMIT;"
+    ],
+    "outside_txn_only": [
+      "-- Outside the transaction: the journal mode before BEGIN, VACUUM after COMMIT\nPRAGMA journal_mode = WAL;\nBEGIN;\n-- ... changes ...\nCOMMIT;\nVACUUM;"
+    ],
+    "read_upgrade_busy": [
+      "-- Take the write lock at the start (the busy timeout waits here), then read and write\nPRAGMA busy_timeout = 5000;\nBEGIN IMMEDIATE;\n-- ... SELECT ... then UPDATE ...\nCOMMIT;"
     ]
   },
   "refuses": [
@@ -1066,6 +1107,188 @@
       "title_hi": "{db} UNION ke ek hisse mein ORDER BY / LIMIT nahi maanta",
       "fix_en": "One ORDER BY / LIMIT at the very end sorts the whole result. To limit one part, wrap it: SELECT * FROM (SELECT ... ORDER BY ... LIMIT n) UNION SELECT ....",
       "fix_hi": "Ek ORDER BY / LIMIT bilkul aakhir mein; ek hisse ke liye use subquery mein lapeto.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "start_transaction",
+      "re": "^\\s*start\\s+transaction\\b(?:\\s*,?\\s*(?:isolation\\s+level\\s+(?:read\\s+(?:un)?committed|repeatable\\s+read|serializable|snapshot)|read\\s+(?:only|write)|(?:not\\s+)?deferrable|with\\s+consistent\\s+snapshot))*",
+      "to": "BEGIN",
+      "error": "near \"START\": syntax error",
+      "title_en": "{db} has no START TRANSACTION",
+      "title_hi": "{db} mein START TRANSACTION nahi hota",
+      "fix_en": "SQLite starts a transaction with BEGIN (DEFERRED unless you say BEGIN IMMEDIATE, which takes the write lock at once). Every SQLite transaction is SERIALIZABLE, so isolation and READ ONLY words have nothing to set.",
+      "fix_hi": "SQLite mein transaction BEGIN se shuru hoti hai (BEGIN IMMEDIATE turant write lock leta hai). Har SQLite transaction SERIALIZABLE hai.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "begin_options",
+      "re": "^\\s*begin(?:\\s+(?:transaction|work|tran))?\\s+(?:isolation\\s+level\\s+(?:read\\s+(?:un)?committed|repeatable\\s+read|serializable|snapshot)|read\\s+(?:only|write)|(?:not\\s+)?deferrable|with\\s+consistent\\s+snapshot)(?:\\s*,?\\s*(?:isolation\\s+level\\s+(?:read\\s+(?:un)?committed|repeatable\\s+read|serializable|snapshot)|read\\s+(?:only|write)|(?:not\\s+)?deferrable|with\\s+consistent\\s+snapshot))*",
+      "to": "BEGIN",
+      "error": "near \"LEVEL\": syntax error (near \"READ\" for READ ONLY)",
+      "title_en": "{db}'s BEGIN takes no isolation level or READ ONLY",
+      "title_hi": "{db} ka BEGIN isolation level / READ ONLY nahi leta",
+      "fix_en": "SQLite transactions are always SERIALIZABLE (one writer at a time, each reader sees one snapshot): plain BEGIN, or BEGIN IMMEDIATE when the transaction will write.",
+      "fix_hi": "SQLite ki transaction hamesha SERIALIZABLE hai: saadha BEGIN, ya likhna ho to BEGIN IMMEDIATE.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "work_word",
+      "re": "^\\s*(begin|commit|rollback)\\s+work\\b",
+      "to": "\\1",
+      "error": "near \"WORK\": syntax error",
+      "title_en": "{db} has no WORK after BEGIN / COMMIT / ROLLBACK",
+      "title_hi": "{db} mein BEGIN / COMMIT / ROLLBACK ke baad WORK nahi hota",
+      "fix_en": "Drop WORK (SQLite accepts the optional word TRANSACTION instead).",
+      "fix_hi": "WORK hata do (SQLite TRANSACTION shabd maan leta hai).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "tran_word",
+      "re": "^\\s*(begin|commit|rollback)\\s+tran\\b",
+      "to": "\\1",
+      "error": "near \"TRAN\": syntax error",
+      "title_en": "{db} has no BEGIN TRAN / COMMIT TRAN (that's SQL Server)",
+      "title_hi": "{db} mein BEGIN TRAN nahi hota (wo SQL Server ka hai)",
+      "fix_en": "Write BEGIN / COMMIT / ROLLBACK (optionally followed by TRANSACTION).",
+      "fix_hi": "BEGIN / COMMIT / ROLLBACK likho.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "set_transaction",
+      "re": "^\\s*set\\s+(?:session\\s+|global\\s+|local\\s+)?transaction\\b[^;]*",
+      "to": "",
+      "error": "near \"SET\": syntax error",
+      "title_en": "{db} has no SET TRANSACTION",
+      "title_hi": "{db} mein SET TRANSACTION nahi hota",
+      "fix_en": "There is nothing to set: every SQLite transaction is SERIALIZABLE. (PRAGMA read_uncommitted only matters for connections sharing one cache in one process.)",
+      "fix_hi": "Set karne ko kuch nahi: SQLite ki har transaction SERIALIZABLE hai.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "autocommit_off",
+      "re": "^\\s*set\\s+(?:@@)?autocommit\\s*=\\s*(?:0|off|false)\\s*$",
+      "to": "BEGIN",
+      "error": "near \"SET\": syntax error",
+      "title_en": "{db} has no SET autocommit",
+      "title_hi": "{db} mein SET autocommit nahi hota",
+      "fix_en": "SQLite is in autocommit until a BEGIN, and back in it after COMMIT / ROLLBACK: write BEGIN where the transaction starts.",
+      "fix_hi": "SQLite BEGIN tak autocommit mein hai: jahan transaction shuru ho wahan BEGIN likho.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "autocommit_on",
+      "re": "^\\s*set\\s+(?:@@)?autocommit\\s*=\\s*(?:1|on|true)\\s*$",
+      "to": "COMMIT",
+      "error": "near \"SET\": syntax error",
+      "title_en": "{db} has no SET autocommit",
+      "title_hi": "{db} mein SET autocommit nahi hota",
+      "fix_en": "COMMIT ends the transaction and SQLite is back in autocommit.",
+      "fix_hi": "COMMIT transaction khatam karta hai aur SQLite phir autocommit mein.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "lock_tables",
+      "re": "^\\s*lock\\s+tables?\\b[^;]*",
+      "to": "BEGIN IMMEDIATE",
+      "error": "near \"LOCK\": syntax error",
+      "title_en": "{db} has no LOCK TABLE(S)",
+      "title_hi": "{db} mein LOCK TABLES nahi hota",
+      "fix_en": "SQLite locks the whole database file, never one table: BEGIN IMMEDIATE takes the write lock (readers go on), BEGIN EXCLUSIVE also keeps readers out unless the database is in WAL mode, and COMMIT releases it.",
+      "fix_hi": "SQLite poori file lock karta hai, ek table nahi: BEGIN IMMEDIATE write lock leta hai, COMMIT chhodta hai.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "unlock_tables",
+      "re": "^\\s*unlock\\s+tables\\b",
+      "to": "COMMIT",
+      "error": "near \"UNLOCK\": syntax error",
+      "title_en": "{db} has no UNLOCK TABLES",
+      "title_hi": "{db} mein UNLOCK TABLES nahi hota",
+      "fix_en": "The lock ends with the transaction: COMMIT.",
+      "fix_hi": "Lock transaction ke saath khatam hota hai: COMMIT.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "lock_wait_seconds",
+      "re": "^\\s*set\\s+(?:session\\s+|global\\s+)?(?:innodb_lock_wait_timeout|lock_wait_timeout)\\s*=\\s*(\\d+)\\s*$",
+      "to": "PRAGMA busy_timeout = \\g<1>000",
+      "error": "near \"SET\": syntax error",
+      "title_en": "{db} sets its lock wait with PRAGMA busy_timeout",
+      "title_hi": "{db} mein lock ka intezaar PRAGMA busy_timeout se",
+      "fix_en": "PRAGMA busy_timeout = milliseconds, on every connection (it isn't saved in the file; the drivers' timeout setting does the same).",
+      "fix_hi": "Har connection pe PRAGMA busy_timeout = milliseconds (file mein save nahi hota).",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "lock_timeout_seconds",
+      "re": "^\\s*set\\s+(?:session\\s+|local\\s+)?lock_timeout\\s*(?:=|to)\\s*'(\\d+)\\s*s'\\s*$",
+      "to": "PRAGMA busy_timeout = \\g<1>000",
+      "error": "near \"SET\": syntax error",
+      "title_en": "{db} sets its lock wait with PRAGMA busy_timeout",
+      "title_hi": "{db} mein lock ka intezaar PRAGMA busy_timeout se",
+      "fix_en": "PRAGMA busy_timeout = milliseconds, on every connection.",
+      "fix_hi": "Har connection pe PRAGMA busy_timeout = milliseconds.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "lock_timeout_ms",
+      "re": "^\\s*set\\s+(?:session\\s+|local\\s+)?lock_timeout\\s*(?:=|to)?\\s*'?(\\d+)(?:\\s*ms)?'?\\s*$",
+      "to": "PRAGMA busy_timeout = \\1",
+      "error": "near \"SET\": syntax error",
+      "title_en": "{db} sets its lock wait with PRAGMA busy_timeout",
+      "title_hi": "{db} mein lock ka intezaar PRAGMA busy_timeout se",
+      "fix_en": "PRAGMA busy_timeout = milliseconds, on every connection.",
+      "fix_hi": "Har connection pe PRAGMA busy_timeout = milliseconds.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "for_share",
+      "re": "\\s+(?:for\\s+(?:share|key\\s+share|no\\s+key\\s+update)|lock\\s+in\\s+share\\s+mode)(?:\\s+of\\s+[\\w.,\\s]+?)?(?:\\s+(?:nowait|skip\\s+locked))?(?=\\s*(?:;|$|\\)))",
+      "to": "",
+      "error": "near \"FOR\": syntax error (near \"IN\" for LOCK IN SHARE MODE)",
+      "title_en": "{db} has no FOR SHARE / LOCK IN SHARE MODE",
+      "title_hi": "{db} mein FOR SHARE nahi hota",
+      "fix_en": "Inside a transaction SQLite's reads already see one unchanging snapshot, and nobody else can write until your transaction ends if it starts with BEGIN IMMEDIATE.",
+      "fix_hi": "SQLite transaction ke andar reads ek hi snapshot dekhte hain; BEGIN IMMEDIATE se doosre likh nahi sakte.",
+      "proven": [
+        "sqlite"
+      ]
+    },
+    {
+      "id": "nolock",
+      "re": "\\s+with\\s*\\(\\s*nolock\\s*\\)",
+      "to": "",
+      "error": "near \"(\": syntax error",
+      "title_en": "{db} has no WITH (NOLOCK) (that's SQL Server)",
+      "title_hi": "{db} mein WITH (NOLOCK) nahi hota (wo SQL Server ka hai)",
+      "fix_en": "Remove it: SQLite readers never block on a writer in WAL mode (and never read uncommitted rows).",
+      "fix_hi": "Hata do: WAL mode mein SQLite readers writer pe nahi rukte.",
       "proven": [
         "sqlite"
       ]
@@ -4135,5 +4358,268 @@
         "hi": "us query ka ek hissa"
       }
     ]
+  },
+  "txn_rules": {
+    "about": "How SQLite reads a transaction script (E1 night 4, app/agents/sqltxn.py): each lab line is a script run by tests/practice/txnlab.py (autocommit, one connection, then what is saved read from a second one) and run again by tests/practice/test_e1_sqlite4.py.",
+    "nested_begin": {
+      "kind": "error",
+      "error": "cannot start a transaction within a transaction",
+      "says": "SQLite refuses a second BEGIN while one is open ('cannot start a transaction within a transaction'); what follows still runs inside the first transaction, so a ROLLBACK then undoes all of it (lab).",
+      "says_hi": "SQLite khuli transaction mein doosra BEGIN mana karta hai ('cannot start a transaction within a transaction'); baaki statements pehli transaction mein hi chalte hain, ROLLBACK sab wapas leta hai.",
+      "lab": [
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 20 WHERE id = 1;\nBEGIN;\nUPDATE lab_tx SET v = 30 WHERE id = 1;\nROLLBACK;",
+          {
+            "v": 10,
+            "errors": [
+              "cannot start a transaction within a transaction"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "end_without_begin": {
+      "kind": "check",
+      "error": "cannot commit - no transaction is active / cannot rollback - no transaction is active",
+      "says": "With no BEGIN, SQLite saved each statement as it ran; COMMIT / ROLLBACK then fail with 'cannot commit - no transaction is active' / 'cannot rollback - no transaction is active', and the ROLLBACK undoes nothing (lab). Python's sqlite3 module (unless autocommit is on) opens a transaction itself before INSERT / UPDATE / DELETE, so there it does end one.",
+      "says_hi": "BEGIN ke bina SQLite har statement chalte hi save kar deta hai; phir COMMIT / ROLLBACK 'no transaction is active' dete hain aur ROLLBACK kuch wapas nahi karta. (Python ka sqlite3 khud INSERT/UPDATE/DELETE se pehle transaction kholta hai.)",
+      "lab": [
+        [
+          "UPDATE lab_tx SET v = 11 WHERE id = 1;\nROLLBACK;",
+          {
+            "v": 11,
+            "errors": [
+              "cannot rollback - no transaction is active"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "UPDATE lab_tx SET v = 11 WHERE id = 1;\nCOMMIT;",
+          {
+            "v": 11,
+            "errors": [
+              "cannot commit - no transaction is active"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "ddl_commits": {
+      "kind": "none",
+      "says": "SQLite keeps CREATE / ALTER / DROP inside the transaction: ROLLBACK undoes them too (lab).",
+      "says_hi": "SQLite mein CREATE / ALTER / DROP transaction ke andar rehte hain: ROLLBACK unhe bhi wapas leta hai.",
+      "lab": [
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 12 WHERE id = 1;\nCREATE TABLE lab_tx2 (a INT);\nROLLBACK;",
+          {
+            "v": 10,
+            "errors": [],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 13 WHERE id = 1;\nDROP TABLE lab_nothere;\nROLLBACK;",
+          {
+            "v": 10,
+            "errors": [
+              "no such table: lab_nothere"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "outside_only": {
+      "kind": "error",
+      "error": "cannot VACUUM from within a transaction / cannot change into wal mode from within a transaction",
+      "says": "VACUUM and a change of journal_mode refuse to run inside a transaction ('cannot VACUUM from within a transaction', 'cannot change into wal mode from within a transaction'); the rest of the transaction carries on (lab). Run VACUUM after COMMIT and set the journal mode before BEGIN.",
+      "says_hi": "VACUUM aur journal_mode badalna transaction ke andar mana hai; VACUUM COMMIT ke baad, journal mode BEGIN se pehle.",
+      "lab": [
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 14 WHERE id = 1;\nVACUUM;\nCOMMIT;",
+          {
+            "v": 14,
+            "errors": [
+              "cannot VACUUM from within a transaction"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "BEGIN;\nPRAGMA journal_mode = WAL;\nUPDATE lab_tx SET v = 27 WHERE id = 1;\nCOMMIT;",
+          {
+            "v": 27,
+            "errors": [
+              "cannot change into wal mode from within a transaction"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "savepoint_missing": {
+      "kind": "error",
+      "error": "no such savepoint: <name>",
+      "says": "SQLite stops at a RELEASE / ROLLBACK TO of a name that was never made ('no such savepoint: name'); the transaction stays open and goes on (lab).",
+      "says_hi": "Jo savepoint bana hi nahi uska RELEASE / ROLLBACK TO SQLite mana karta hai ('no such savepoint').",
+      "lab": [
+        [
+          "BEGIN;\nSAVEPOINT a;\nUPDATE lab_tx SET v = 15 WHERE id = 1;\nROLLBACK TO b;\nCOMMIT;",
+          {
+            "v": 15,
+            "errors": [
+              "no such savepoint: b"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "savepoint_outside": {
+      "kind": "none",
+      "says": "On SQLite a SAVEPOINT outside a transaction starts one, and RELEASE of it commits (lab); ROLLBACK TO keeps it open.",
+      "says_hi": "SQLite mein transaction ke bahar SAVEPOINT nayi transaction shuru karta hai; uska RELEASE commit karta hai.",
+      "lab": [
+        [
+          "SAVEPOINT a;\nUPDATE lab_tx SET v = 28 WHERE id = 1;\nRELEASE a;",
+          {
+            "v": 28,
+            "errors": [],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "SAVEPOINT a;\nUPDATE lab_tx SET v = 16 WHERE id = 1;\nROLLBACK TO a;",
+          {
+            "v": 10,
+            "errors": [],
+            "warnings": [],
+            "open": true
+          }
+        ]
+      ]
+    },
+    "left_open": {
+      "kind": "check",
+      "says": "The transaction stays open: SQLite keeps the whole database locked for every other writer ('database is locked') until it ends, and closing the connection rolls it back (lab: nothing was saved).",
+      "says_hi": "Transaction khuli reh jaati hai: jab tak khatam na ho, SQLite poori database ko baaki writers ke liye lock rakhta hai ('database is locked'); connection band hone pe rollback.",
+      "lab": [
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 19 WHERE id = 1;",
+          {
+            "v": 10,
+            "errors": [],
+            "warnings": [],
+            "open": true
+          }
+        ],
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 17 WHERE id = 1;\nSAVEPOINT a;\nUPDATE lab_tx SET v = 18 WHERE id = 1;\nROLLBACK TO a;",
+          {
+            "v": 10,
+            "errors": [],
+            "warnings": [],
+            "open": true
+          }
+        ]
+      ]
+    },
+    "deferred_upgrade": {
+      "kind": "check",
+      "says": "A plain BEGIN (DEFERRED) takes no lock until its first read, and only a read lock then; its first write must upgrade to the write lock, and if another connection wrote in between, that write fails at once with 'database is locked' (SQLITE_BUSY, or SQLITE_BUSY_SNAPSHOT in WAL mode); a busy timeout does not make it wait (lab: it failed after 0.00 s with a 3-second timeout, in both journal modes). BEGIN IMMEDIATE takes the write lock at the start, where the busy timeout does wait (lab: it waited about 0.5 s and went through).",
+      "says_hi": "Saadha BEGIN pehle sirf read lock leta hai; baad ka write lock upgrade karta hai, aur beech mein kisi aur ne likha to turant 'database is locked' (busy timeout bhi nahi rukwata). BEGIN IMMEDIATE shuru mein hi write lock leta hai, wahan timeout intezaar karata hai.",
+      "lab": [
+        [
+          "two connections, rollback journal: A BEGIN; SELECT; (B holds BEGIN IMMEDIATE + UPDATE, commits after 0.5 s); A UPDATE with busy timeout 3 s",
+          {
+            "error": "database is locked",
+            "waited": "0.00 s"
+          }
+        ],
+        [
+          "two connections, WAL: A BEGIN; SELECT; B UPDATE (commits); A UPDATE",
+          {
+            "error": "database is locked",
+            "code": "SQLITE_BUSY_SNAPSHOT"
+          }
+        ],
+        [
+          "the same with A BEGIN IMMEDIATE (busy timeout 3 s)",
+          {
+            "ok": true,
+            "waited": "about 0.5 s"
+          }
+        ]
+      ]
+    },
+    "no_txn_writes": {
+      "kind": "check",
+      "says": "With no BEGIN, SQLite saves each change on its own: if a later one fails, the earlier ones stay (lab), and each one waits for its own disk sync (lab: 500 single-row INSERTs took about 0.5 s one by one and 0.002 s inside one BEGIN ... COMMIT). Inside a transaction a failed statement is undone alone and the transaction goes on: ROLLBACK on the error to undo the rest (lab: COMMIT kept the change before the error).",
+      "says_hi": "BEGIN ke bina SQLite har badlav alag save karta hai: baad wala fail ho to pehle wale reh jaate hain, aur har ek apna disk sync leta hai (500 INSERT: 0.5 s alag-alag, 0.002 s ek transaction mein).",
+      "lab": [
+        [
+          "UPDATE lab_tx SET v = 21 WHERE id = 1;\nINSERT INTO lab_tx VALUES (1, 99);",
+          {
+            "v": 21,
+            "errors": [
+              "UNIQUE constraint failed: lab_tx.id"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 22 WHERE id = 1;\nINSERT INTO lab_tx VALUES (1, 99);\nROLLBACK;",
+          {
+            "v": 10,
+            "errors": [
+              "UNIQUE constraint failed: lab_tx.id"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 23 WHERE id = 1;\nINSERT INTO lab_tx VALUES (1, 99);\nCOMMIT;",
+          {
+            "v": 23,
+            "errors": [
+              "UNIQUE constraint failed: lab_tx.id"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "proven": [
+      "sqlite"
+    ]
+  },
+  "verify": {
+    "nullable": "SELECT name AS column_name, CASE WHEN \"notnull\" = 1 OR (pk = 1 AND upper(type) = 'INTEGER') THEN 'NO' ELSE 'YES' END AS is_nullable, type AS data_type FROM pragma_table_info('{table}') WHERE name IN ({cols})",
+    "nulls_now": "SELECT COUNT(*) AS null_rows FROM {table} WHERE {col} IS NULL",
+    "dupes": "SELECT {cols}, COUNT(*) AS n FROM {table} GROUP BY {cols} HAVING COUNT(*) > 1 LIMIT 5",
+    "structure": "SELECT name, type, \"notnull\", dflt_value, pk FROM pragma_table_info('{table}') ORDER BY cid",
+    "indexes": "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = '{table}'",
+    "plan": "EXPLAIN QUERY PLAN {query}",
+    "plan_run": "EXPLAIN QUERY PLAN {query}",
+    "plan_run_note": "SQLite has no EXPLAIN ANALYZE: read the plan, then time the query itself (.timer on in the sqlite3 shell). A primary key column that isn't exactly INTEGER can hold NULL in an ordinary table, so 'pk' alone doesn't mean NOT NULL.",
+    "proven": [
+      "sqlite"
+    ],
+    "lab": "pragma_table_info, sqlite_master and EXPLAIN QUERY PLAN on SQLite 3.53 (E1 night 4); run again by tests/practice/test_e1_sqlite4.py."
   }
 }

@@ -235,8 +235,9 @@ def test_every_refused_word_is_refused_by_sqlite_and_every_rewrite_runs(lite):
     d = E.dialect("sqlite")
     from tests.practice.test_e1_sqlite2 import REFUSED_TONIGHT       # night 2's ALTER TABLE entries are tried there
     from tests.practice.test_e1_sqlite3 import REFUSED_NIGHT3         # night 3's query words (ANY / ALL, MINUS ...) there
+    from tests.practice.test_e1_sqlite4 import REFUSED_NIGHT4         # night 4's transaction words (START TRANSACTION ...) there
 
-    assert {r["id"] for r in d["refuses"]} == set(samples) | set(REFUSED_TONIGHT) | set(REFUSED_NIGHT3)
+    assert {r["id"] for r in d["refuses"]} == set(samples) | set(REFUSED_TONIGHT) | set(REFUSED_NIGHT3) | set(REFUSED_NIGHT4)
     for r in d["refuses"]:
         if r["id"] not in samples:
             continue
@@ -455,11 +456,10 @@ def test_rule_a_detection_from_sqlite_words_and_errors():
 
 
 def test_the_notes_line_says_what_is_lab_tested():
-    line = E.notes_line("sqlite", "en", "SELECT 1")
-    assert "lab-tested on SQLite so far" in line and "error messages" in line and "general SQL reasoning" in line
-    assert "no lab-tested SQLite knowledge" not in line
+    """Nights 1-3 said which parts were lab-tested; from night 4 SQLite is lab-proven as a whole and has no notes line."""
+    assert E.notes_line("sqlite", "en", "SELECT 1") == "" and not E.notes_only("sqlite")
     assert "no lab-tested SQL Server knowledge" in E.notes_line("sqlserver", "en", "SELECT 1")    # still notes only
-    assert E.syntax_family("sqlite") == "sqlite" and E.family("sqlite") is None and E.notes_only("sqlite")
+    assert E.syntax_family("sqlite") == "sqlite" and E.family("sqlite") is None
     assert E.syntax_family("sqlserver") is None and E.syntax_family("mariadb") == "mysql"
     assert "sqlite" in R.engines() and "sqlserver" not in R.engines()
 

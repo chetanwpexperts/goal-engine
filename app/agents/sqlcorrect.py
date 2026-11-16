@@ -1075,6 +1075,10 @@ _SURE_ONLY = contextvars.ContextVar("dbaba_sure_only", default=False)
 
 
 def _check(sql: str, _again: bool = False, intent: str = "") -> dict:
+    from app.agents import sqltxn
+
+    if sqltxn.is_script(sql):                         # BEGIN ... COMMIT: read as a transaction script (E1 night 4)
+        return _check_once(sql, _again, intent)
     out = _check_once(sql, _again, intent)
     if not _again and re.search(r"\(\s*select\b|^\s*with\b", _mask(sql), re.I):
         from app.agents import sqlblocks
@@ -1104,14 +1108,18 @@ def _keep(pair, needs: list) -> list:
 
 
 def _check_once(sql: str, _again: bool = False, intent: str = "") -> dict:
-    from app.agents import sqllock, sqlroutine
+    from app.agents import sqllock, sqlroutine, sqltxn
 
+    if sqltxn.is_script(sql) and sqltxn.has_control(sql):   # a transaction script: statement by statement (E1 night 4)
+        return sqltxn.check(sql, intent, Finding)
     many = sqllock.n_plus_one(sql)
     if many:                                          # the same statement once per value (N+1): one statement does the same work
         one = many.pop("sql")
         return {"findings": [Finding(many["kind"], many["topic"], many["title_en"], many["title_hi"], many["evidence"], many["fix_en"],
                                      many["fix_hi"]).as_dict()], "corrected": one, "guesses": []}
 
+    if sqltxn.is_script(sql):                         # several changes and no transaction: all-or-nothing is the question
+        return sqltxn.check(sql, intent, Finding)
     if sqlroutine.is_routine(sql):                    # CREATE PROCEDURE / FUNCTION / TRIGGER, DO: read as a routine (night 5)
         order = {"error": 0, "wrong": 1, "check": 2}
         found = sqlroutine.routines(sql, intent, Finding)

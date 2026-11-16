@@ -56,7 +56,8 @@
   "1044": "permission_denied",
   "1227": "permission_denied",
   "3159": "ssl_required",
-  "1047": "syntax_error"
+  "1047": "syntax_error",
+  "1568": "txn_settings_late"
  },
  "code_patterns": [
   "\\bERROR\\s+(\\d{4})\\b",
@@ -244,6 +245,14 @@
   {
    "cause": "ssl_required",
    "re": "insecure transport are prohibited|require_secure_transport|SSL connection error"
+  },
+  {
+    "cause": "savepoint_missing",
+    "re": "SAVEPOINT (?P<savepoint>[\\w$]+) does not exist"
+  },
+  {
+    "cause": "txn_settings_late",
+    "re": "Transaction characteristics can't be changed while a transaction is in progress"
   }
  ],
  "fix": {
@@ -405,6 +414,12 @@
    "SELECT @@log_bin, @@binlog_expire_logs_seconds;\nSHOW BINARY LOGS;   -- how many files and how big (needs REPLICATION CLIENT / BINLOG MONITOR)",
    "-- First check what every replica still needs: SHOW REPLICA STATUS\\G on each (Source_Log_File; MariaDB: Master_Log_File).\n-- Then remove only older files, and set an expiry that outlasts the slowest replica (here 7 days):\nPURGE BINARY LOGS BEFORE NOW() - INTERVAL 7 DAY;\nSET GLOBAL binlog_expire_logs_seconds = 604800;   -- and the same in my.cnf, or it resets on restart",
    "-- Common mistake: rm on binary log files, or turning log_bin off to save space.\n-- rm leaves the .index list and replicas out of step; log_bin off breaks replication and point-in-time restore."
+  ],
+  "savepoint_missing": [
+    "START TRANSACTION;\nSAVEPOINT before_payment;\n-- ...\nROLLBACK TO SAVEPOINT before_payment;\nCOMMIT;"
+  ],
+  "txn_settings_late": [
+    "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;   -- applies to the next transaction\nSTART TRANSACTION;\n-- ...\nCOMMIT;"
   ]
  },
  "settings": {
@@ -524,7 +539,7 @@
  ],
  "named": ["\\bmysql\\b", "\\bmysqli\\b", "माय\\s?एसक्यूएल"],
  "error_marks": ["\\bERROR \\d{4} \\(\\w{5}\\)", "your MySQL server version", "\\bmysqli?_sql_exception\\b"],
- "refuses": [{"id": "pg_cast_text", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*(?:text|varchar)\\b", "to": "CAST(\\1 AS CHAR)", "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS type), which works on every database.", "fix_hi": "CAST(x AS type) likho, ye har database pe chalta hai.", "proven": ["mariadb"]}, {"id": "pg_cast_int", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*(?:int|integer|bigint|int4|int8)\\b", "to": "CAST(\\1 AS SIGNED)", "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS SIGNED) (MySQL/MariaDB's integer cast).", "fix_hi": "CAST(x AS SIGNED) likho (MySQL/MariaDB ka integer cast).", "proven": ["mariadb"]}, {"id": "pg_cast_date", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*date\\b", "to": "CAST(\\1 AS DATE)", "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS DATE) (or DATE(x)).", "fix_hi": "CAST(x AS DATE) (ya DATE(x)) likho.", "proven": ["mariadb"]}, {"id": "pg_cast_other", "re": "::\\s*(?!(?:text|varchar|int|integer|bigint|int4|int8|date)\\b)[a-z]\\w*", "to": null, "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS type) with {db}'s type names (CHAR, SIGNED, DECIMAL(p,s), DATE, DATETIME).", "fix_hi": "CAST(x AS type) likho, {db} ke type naamon ke saath (CHAR, SIGNED, DECIMAL(p,s), DATE, DATETIME).", "proven": ["mariadb"]}, {"id": "ilike", "re": "\\bilike\\b", "to": "LIKE", "error": "error 1064, syntax error near 'ILIKE'", "title_en": "{db} has no ILIKE (that's PostgreSQL)", "title_hi": "{db} mein ILIKE nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use LIKE: with the usual case-insensitive (_ci) collation it already ignores case. On a _bin or _cs column, compare LOWER(col) LIKE LOWER('...').", "fix_hi": "LIKE likho: aam _ci collation pe ye pehle se case ignore karta hai. _bin/_cs column pe LOWER(col) LIKE LOWER('...').", "proven": ["mariadb"]}, {"id": "distinct_on", "re": "\\bdistinct\\s+on\\s*\\(", "to": null, "error": "error 1064, syntax error near 'ON ('", "title_en": "{db} has no DISTINCT ON (that's PostgreSQL)", "title_hi": "{db} mein DISTINCT ON nahi hota (wo PostgreSQL ka hai)", "fix_en": "For one row per group, number the rows with ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...) in a subquery and keep rn = 1 (MySQL 8 / MariaDB 10.2+).", "fix_hi": "Har group ki ek row ke liye subquery mein ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...) lagao aur rn = 1 rakho.", "proven": ["mariadb"]}, {"id": "nulls_last", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)((?:\\s+(?:asc|desc))?)\\s+nulls\\s+last\\b", "to": "\\1 IS NULL, \\1\\2", "error": "error 1064, syntax error near 'NULLS'", "title_en": "{db} has no NULLS LAST (that's PostgreSQL)", "title_hi": "{db} mein NULLS LAST nahi hota (wo PostgreSQL ka hai)", "fix_en": "Sort on 'x IS NULL' first (false before true), then on x.", "fix_hi": "Pehle 'x IS NULL' pe sort karo (false pehle), phir x pe.", "proven": ["mariadb"]}, {"id": "nulls_first", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)((?:\\s+(?:asc|desc))?)\\s+nulls\\s+first\\b", "to": "\\1 IS NOT NULL, \\1\\2", "error": "error 1064, syntax error near 'NULLS'", "title_en": "{db} has no NULLS FIRST (that's PostgreSQL)", "title_hi": "{db} mein NULLS FIRST nahi hota (wo PostgreSQL ka hai)", "fix_en": "Sort on 'x IS NOT NULL' first (NULL rows first), then on x.", "fix_hi": "Pehle 'x IS NOT NULL' pe sort karo (NULL rows pehle), phir x pe.", "proven": ["mariadb"]}, {"id": "getdate", "re": "\\bgetdate\\s*\\(\\s*\\)", "to": "NOW()", "error": "error 1305, FUNCTION GETDATE does not exist", "title_en": "{db} has no GETDATE() (that's SQL Server)", "title_hi": "{db} mein GETDATE() nahi hota (wo SQL Server ka hai)", "fix_en": "Use NOW() (date and time) or CURDATE() (date only).", "fix_hi": "NOW() (date aur time) ya CURDATE() (sirf date) likho.", "proven": ["mariadb"]}, {"id": "dollar_param", "re": "(?<![\\w$])\\$\\d+\\b", "to": null, "once": true, "error": "error 1064, syntax error near '$1'", "title_en": "{db} doesn't use $1 placeholders (that's PostgreSQL)", "title_hi": "{db} mein $1 placeholder nahi hote (wo PostgreSQL ke hain)", "fix_en": "MySQL/MariaDB drivers use ? (or named :name placeholders in PDO).", "fix_hi": "MySQL/MariaDB drivers ? (ya PDO mein :name) use karte hain.", "proven": ["mariadb"]}, {"id": "brackets", "re": "(?<![\\w\\]\\)'])\\[([A-Za-z_][\\w ]*)\\]", "to": "`\\1`", "error": "error 1064, syntax error near '['", "title_en": "{db} doesn't quote names with [brackets] (that's SQL Server)", "title_hi": "{db} naam [brackets] mein nahi maanta (wo SQL Server ka hai)", "fix_en": "Quote a name with `backticks` (or leave a plain name bare).", "fix_hi": "Naam `backticks` mein likho (ya saadharan naam bina quote ke).", "proven": ["mariadb"]}, {"id": "sysdate_bare", "re": "\\bsysdate\\b(?!\\s*\\()", "to": "NOW()", "error": "error 1054, Unknown column 'SYSDATE'", "title_en": "{db} reads SYSDATE without () as a column (that's Oracle)", "title_hi": "{db} bina () ke SYSDATE ko column samajhta hai (wo Oracle ka hai)", "fix_en": "Use NOW() (or SYSDATE() with brackets).", "fix_hi": "NOW() likho.", "proven": ["mariadb"]}, {"id": "sysdatetime", "re": "\\b(?:sysdatetime|getutcdate)\\s*\\(\\s*\\)", "to": "NOW()", "error": "error 1305, FUNCTION does not exist", "title_en": "{db} has no SYSDATETIME() / GETUTCDATE() (that's SQL Server)", "title_hi": "{db} mein SYSDATETIME() nahi hota", "fix_en": "Use NOW() (UTC_TIMESTAMP() for UTC).", "fix_hi": "NOW() likho (UTC ke liye UTC_TIMESTAMP()).", "proven": ["mariadb"]}, {"id": "pg_regex", "re": "!~\\*?(?=\\s*')", "to": "NOT REGEXP", "error": "error 1064, syntax error near '!~'", "title_en": "{db} has no !~ operator (that's PostgreSQL)", "title_hi": "{db} mein !~ nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use NOT REGEXP (it ignores case with the usual _ci collation).", "fix_hi": "NOT REGEXP likho.", "proven": ["mariadb"]}, {"id": "pg_regex_match", "re": "(?<![!~\\w])~\\*?(?=\\s*')", "to": "REGEXP", "error": "error 1064, syntax error near '~'", "title_en": "{db} has no ~ regex operator (that's PostgreSQL)", "title_hi": "{db} mein ~ regex nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use REGEXP (it ignores case with the usual _ci collation, like PostgreSQL's ~*).", "fix_hi": "REGEXP likho.", "proven": ["mariadb"]}, {"id": "similar_to", "re": "\\bsimilar\\s+to\\b", "to": null, "error": "error 1064, syntax error near 'SIMILAR TO'", "title_en": "{db} has no SIMILAR TO (that's PostgreSQL)", "title_hi": "{db} mein SIMILAR TO nahi hota", "fix_en": "Use LIKE for % and _ patterns, or REGEXP for a regular expression (rewrite the pattern: SIMILAR TO's | and () mean the regex ones, but it must match the whole text, so add ^ and $).", "fix_hi": "LIKE ya REGEXP likho (pattern ke aage ^ aur peeche $).", "proven": ["mariadb"]}, {"id": "update_returning", "re": "^\\s*update\\b[\\s\\S]*?\\breturning\\b", "to": null, "once": true, "error": "error 1064, syntax error near 'RETURNING'", "title_en": "{db} has no UPDATE ... RETURNING (that's PostgreSQL)", "title_hi": "{db} mein UPDATE ... RETURNING nahi hota", "fix_en": "Run the UPDATE, then SELECT the same rows (same WHERE) inside the same transaction. (MariaDB 10.5+ has RETURNING for INSERT and DELETE only; MySQL has none.)", "fix_hi": "UPDATE ke baad usi transaction mein wahi rows SELECT karo.", "proven": ["mariadb"]}, {"id": "generate_series", "re": "\\bgenerate_series\\s*\\(", "to": null, "error": "error 1305, FUNCTION generate_series does not exist (1064 in FROM)", "title_en": "{db} has no generate_series() (that's PostgreSQL)", "title_hi": "{db} mein generate_series() nahi hota", "fix_en": "Make the numbers with a recursive WITH: WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM s WHERE n < 10) SELECT n FROM s (MariaDB also has seq_1_to_10 tables with its Sequence engine).", "fix_hi": "WITH RECURSIVE se numbers banao.", "proven": ["mariadb"]}],
+ "refuses": [{"id": "pg_cast_text", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*(?:text|varchar)\\b", "to": "CAST(\\1 AS CHAR)", "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS type), which works on every database.", "fix_hi": "CAST(x AS type) likho, ye har database pe chalta hai.", "proven": ["mariadb"]}, {"id": "pg_cast_int", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*(?:int|integer|bigint|int4|int8)\\b", "to": "CAST(\\1 AS SIGNED)", "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS SIGNED) (MySQL/MariaDB's integer cast).", "fix_hi": "CAST(x AS SIGNED) likho (MySQL/MariaDB ka integer cast).", "proven": ["mariadb"]}, {"id": "pg_cast_date", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)\\s*::\\s*date\\b", "to": "CAST(\\1 AS DATE)", "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS DATE) (or DATE(x)).", "fix_hi": "CAST(x AS DATE) (ya DATE(x)) likho.", "proven": ["mariadb"]}, {"id": "pg_cast_other", "re": "::\\s*(?!(?:text|varchar|int|integer|bigint|int4|int8|date)\\b)[a-z]\\w*", "to": null, "error": "error 1064, syntax error near '::'", "title_en": "{db} has no :: cast (that's PostgreSQL)", "title_hi": "{db} mein :: cast nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use CAST(x AS type) with {db}'s type names (CHAR, SIGNED, DECIMAL(p,s), DATE, DATETIME).", "fix_hi": "CAST(x AS type) likho, {db} ke type naamon ke saath (CHAR, SIGNED, DECIMAL(p,s), DATE, DATETIME).", "proven": ["mariadb"]}, {"id": "ilike", "re": "\\bilike\\b", "to": "LIKE", "error": "error 1064, syntax error near 'ILIKE'", "title_en": "{db} has no ILIKE (that's PostgreSQL)", "title_hi": "{db} mein ILIKE nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use LIKE: with the usual case-insensitive (_ci) collation it already ignores case. On a _bin or _cs column, compare LOWER(col) LIKE LOWER('...').", "fix_hi": "LIKE likho: aam _ci collation pe ye pehle se case ignore karta hai. _bin/_cs column pe LOWER(col) LIKE LOWER('...').", "proven": ["mariadb"]}, {"id": "distinct_on", "re": "\\bdistinct\\s+on\\s*\\(", "to": null, "error": "error 1064, syntax error near 'ON ('", "title_en": "{db} has no DISTINCT ON (that's PostgreSQL)", "title_hi": "{db} mein DISTINCT ON nahi hota (wo PostgreSQL ka hai)", "fix_en": "For one row per group, number the rows with ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...) in a subquery and keep rn = 1 (MySQL 8 / MariaDB 10.2+).", "fix_hi": "Har group ki ek row ke liye subquery mein ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...) lagao aur rn = 1 rakho.", "proven": ["mariadb"]}, {"id": "nulls_last", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)((?:\\s+(?:asc|desc))?)\\s+nulls\\s+last\\b", "to": "\\1 IS NULL, \\1\\2", "error": "error 1064, syntax error near 'NULLS'", "title_en": "{db} has no NULLS LAST (that's PostgreSQL)", "title_hi": "{db} mein NULLS LAST nahi hota (wo PostgreSQL ka hai)", "fix_en": "Sort on 'x IS NULL' first (false before true), then on x.", "fix_hi": "Pehle 'x IS NULL' pe sort karo (false pehle), phir x pe.", "proven": ["mariadb"]}, {"id": "nulls_first", "re": "(?<![\\w$.])([A-Za-z_][\\w$]*(?:\\.[A-Za-z_][\\w$]*)?)((?:\\s+(?:asc|desc))?)\\s+nulls\\s+first\\b", "to": "\\1 IS NOT NULL, \\1\\2", "error": "error 1064, syntax error near 'NULLS'", "title_en": "{db} has no NULLS FIRST (that's PostgreSQL)", "title_hi": "{db} mein NULLS FIRST nahi hota (wo PostgreSQL ka hai)", "fix_en": "Sort on 'x IS NOT NULL' first (NULL rows first), then on x.", "fix_hi": "Pehle 'x IS NOT NULL' pe sort karo (NULL rows pehle), phir x pe.", "proven": ["mariadb"]}, {"id": "getdate", "re": "\\bgetdate\\s*\\(\\s*\\)", "to": "NOW()", "error": "error 1305, FUNCTION GETDATE does not exist", "title_en": "{db} has no GETDATE() (that's SQL Server)", "title_hi": "{db} mein GETDATE() nahi hota (wo SQL Server ka hai)", "fix_en": "Use NOW() (date and time) or CURDATE() (date only).", "fix_hi": "NOW() (date aur time) ya CURDATE() (sirf date) likho.", "proven": ["mariadb"]}, {"id": "dollar_param", "re": "(?<![\\w$])\\$\\d+\\b", "to": null, "once": true, "error": "error 1064, syntax error near '$1'", "title_en": "{db} doesn't use $1 placeholders (that's PostgreSQL)", "title_hi": "{db} mein $1 placeholder nahi hote (wo PostgreSQL ke hain)", "fix_en": "MySQL/MariaDB drivers use ? (or named :name placeholders in PDO).", "fix_hi": "MySQL/MariaDB drivers ? (ya PDO mein :name) use karte hain.", "proven": ["mariadb"]}, {"id": "brackets", "re": "(?<![\\w\\]\\)'])\\[([A-Za-z_][\\w ]*)\\]", "to": "`\\1`", "error": "error 1064, syntax error near '['", "title_en": "{db} doesn't quote names with [brackets] (that's SQL Server)", "title_hi": "{db} naam [brackets] mein nahi maanta (wo SQL Server ka hai)", "fix_en": "Quote a name with `backticks` (or leave a plain name bare).", "fix_hi": "Naam `backticks` mein likho (ya saadharan naam bina quote ke).", "proven": ["mariadb"]}, {"id": "sysdate_bare", "re": "\\bsysdate\\b(?!\\s*\\()", "to": "NOW()", "error": "error 1054, Unknown column 'SYSDATE'", "title_en": "{db} reads SYSDATE without () as a column (that's Oracle)", "title_hi": "{db} bina () ke SYSDATE ko column samajhta hai (wo Oracle ka hai)", "fix_en": "Use NOW() (or SYSDATE() with brackets).", "fix_hi": "NOW() likho.", "proven": ["mariadb"]}, {"id": "sysdatetime", "re": "\\b(?:sysdatetime|getutcdate)\\s*\\(\\s*\\)", "to": "NOW()", "error": "error 1305, FUNCTION does not exist", "title_en": "{db} has no SYSDATETIME() / GETUTCDATE() (that's SQL Server)", "title_hi": "{db} mein SYSDATETIME() nahi hota", "fix_en": "Use NOW() (UTC_TIMESTAMP() for UTC).", "fix_hi": "NOW() likho (UTC ke liye UTC_TIMESTAMP()).", "proven": ["mariadb"]}, {"id": "pg_regex", "re": "!~\\*?(?=\\s*')", "to": "NOT REGEXP", "error": "error 1064, syntax error near '!~'", "title_en": "{db} has no !~ operator (that's PostgreSQL)", "title_hi": "{db} mein !~ nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use NOT REGEXP (it ignores case with the usual _ci collation).", "fix_hi": "NOT REGEXP likho.", "proven": ["mariadb"]}, {"id": "pg_regex_match", "re": "(?<![!~\\w])~\\*?(?=\\s*')", "to": "REGEXP", "error": "error 1064, syntax error near '~'", "title_en": "{db} has no ~ regex operator (that's PostgreSQL)", "title_hi": "{db} mein ~ regex nahi hota (wo PostgreSQL ka hai)", "fix_en": "Use REGEXP (it ignores case with the usual _ci collation, like PostgreSQL's ~*).", "fix_hi": "REGEXP likho.", "proven": ["mariadb"]}, {"id": "similar_to", "re": "\\bsimilar\\s+to\\b", "to": null, "error": "error 1064, syntax error near 'SIMILAR TO'", "title_en": "{db} has no SIMILAR TO (that's PostgreSQL)", "title_hi": "{db} mein SIMILAR TO nahi hota", "fix_en": "Use LIKE for % and _ patterns, or REGEXP for a regular expression (rewrite the pattern: SIMILAR TO's | and () mean the regex ones, but it must match the whole text, so add ^ and $).", "fix_hi": "LIKE ya REGEXP likho (pattern ke aage ^ aur peeche $).", "proven": ["mariadb"]}, {"id": "update_returning", "re": "^\\s*update\\b[\\s\\S]*?\\breturning\\b", "to": null, "once": true, "error": "error 1064, syntax error near 'RETURNING'", "title_en": "{db} has no UPDATE ... RETURNING (that's PostgreSQL)", "title_hi": "{db} mein UPDATE ... RETURNING nahi hota", "fix_en": "Run the UPDATE, then SELECT the same rows (same WHERE) inside the same transaction. (MariaDB 10.5+ has RETURNING for INSERT and DELETE only; MySQL has none.)", "fix_hi": "UPDATE ke baad usi transaction mein wahi rows SELECT karo.", "proven": ["mariadb"]}, {"id": "generate_series", "re": "\\bgenerate_series\\s*\\(", "to": null, "error": "error 1305, FUNCTION generate_series does not exist (1064 in FROM)", "title_en": "{db} has no generate_series() (that's PostgreSQL)", "title_hi": "{db} mein generate_series() nahi hota", "fix_en": "Make the numbers with a recursive WITH: WITH RECURSIVE s(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM s WHERE n < 10) SELECT n FROM s (MariaDB also has seq_1_to_10 tables with its Sequence engine).", "fix_hi": "WITH RECURSIVE se numbers banao.", "proven": ["mariadb"]}, {"id": "begin_transaction", "re": "^\\s*begin\\s+(?:transaction|tran|deferred|immediate|exclusive)\\b(?:\\s+transaction)?", "to": "START TRANSACTION", "error": "error 1064, syntax error near 'TRANSACTION'", "title_en": "{db} has no BEGIN TRANSACTION", "title_hi": "{db} mein BEGIN TRANSACTION nahi hota", "fix_en": "Write START TRANSACTION (or BEGIN alone, or BEGIN WORK).", "fix_hi": "START TRANSACTION likho (ya sirf BEGIN).", "proven": ["mariadb"]}, {"id": "commit_tran", "re": "^\\s*(commit|rollback)\\s+(?:transaction|tran)\\b", "to": "\\1", "error": "error 1064, syntax error near 'TRANSACTION'", "title_en": "{db} has no COMMIT TRANSACTION", "title_hi": "{db} mein COMMIT TRANSACTION nahi hota", "fix_en": "Write COMMIT / ROLLBACK (or COMMIT WORK).", "fix_hi": "COMMIT / ROLLBACK likho.", "proven": ["mariadb"]}],
  "query_marks": [
   "`[^`]+`",
   "\\blimit\\s+\\d+\\s*,\\s*\\d+",
@@ -1149,5 +1164,202 @@
   "unknown_column": {"behaviour": "error", "code": "1054", "says": "Error 1054 (42S22) Unknown column.", "proven": ["mariadb"]},
   "fk_makes_index": {"behaviour": "index_made", "says": "InnoDB creates an index for every FOREIGN KEY that has none.", "proven": ["mariadb"]}
  },
- "verify": {"nullable": "SELECT column_name, is_nullable, data_type FROM information_schema.columns WHERE table_name = '{table}' AND column_name IN ({cols})", "nulls_now": "SELECT COUNT(*) AS null_rows FROM {table} WHERE {col} IS NULL", "dupes": "SELECT {cols}, COUNT(*) AS n FROM {table} GROUP BY {cols} HAVING COUNT(*) > 1 LIMIT 5", "structure": "SHOW CREATE TABLE {table}", "indexes": "SHOW INDEX FROM {table}", "plan": "EXPLAIN {query}", "plan_run": "EXPLAIN ANALYZE {query}", "plan_run_note": "EXPLAIN ANALYZE (MySQL 8.0.18+) really runs a SELECT and shows the time and rows of each step; on a change statement use plain EXPLAIN.", "proven": ["mariadb"], "lab": "information_schema, SHOW INDEX and EXPLAIN were run on MariaDB 10.11 (the MySQL family); EXPLAIN ANALYZE is MySQL 8.0.18+ syntax (MySQL manual), MariaDB refuses it with 1064."}
+ "verify": {"nullable": "SELECT column_name, is_nullable, data_type FROM information_schema.columns WHERE table_name = '{table}' AND column_name IN ({cols})", "nulls_now": "SELECT COUNT(*) AS null_rows FROM {table} WHERE {col} IS NULL", "dupes": "SELECT {cols}, COUNT(*) AS n FROM {table} GROUP BY {cols} HAVING COUNT(*) > 1 LIMIT 5", "structure": "SHOW CREATE TABLE {table}", "indexes": "SHOW INDEX FROM {table}", "plan": "EXPLAIN {query}", "plan_run": "EXPLAIN ANALYZE {query}", "plan_run_note": "EXPLAIN ANALYZE (MySQL 8.0.18+) really runs a SELECT and shows the time and rows of each step; on a change statement use plain EXPLAIN.", "proven": ["mariadb"], "lab": "information_schema, SHOW INDEX and EXPLAIN were run on MariaDB 10.11 (the MySQL family); EXPLAIN ANALYZE is MySQL 8.0.18+ syntax (MySQL manual), MariaDB refuses it with 1064."},
+  "txn_rules": {
+    "about": "How MySQL / MariaDB read a transaction script (E1 night 4, app/agents/sqltxn.py), lab-run on MariaDB 10.11 with autocommit on (the command line's default) by tests/practice/txnlab.py, run again by tests/practice/test_e1_sqlite4.py.",
+    "nested_begin": {
+      "kind": "wrong",
+      "says": "START TRANSACTION (or BEGIN) inside an open transaction first COMMITS it, with no warning: a ROLLBACK after it undoes only the part after the second one (lab: the first UPDATE stayed).",
+      "says_hi": "Khuli transaction mein START TRANSACTION pehle use chupchaap COMMIT kar deta hai: baad ka ROLLBACK sirf doosre hisse ko wapas leta hai.",
+      "lab": [
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 20 WHERE id = 1;\nBEGIN;\nUPDATE lab_tx SET v = 30 WHERE id = 1;\nROLLBACK;",
+          {
+            "v": 20,
+            "errors": [],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "end_without_begin": {
+      "kind": "check",
+      "says": "With autocommit on (the default) each statement was saved as it ran; a COMMIT / ROLLBACK with no transaction open does nothing and says nothing, so the ROLLBACK undoes nothing (lab). Only a client that turned autocommit off (SET autocommit = 0, many drivers) has a transaction there.",
+      "says_hi": "Autocommit on (default) mein har statement chalte hi save hota hai; bina transaction ka ROLLBACK chupchaap kuch nahi karta.",
+      "lab": [
+        [
+          "UPDATE lab_tx SET v = 11 WHERE id = 1;\nROLLBACK;",
+          {
+            "v": 11,
+            "errors": [],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "ddl_commits": {
+      "kind": "wrong",
+      "says": "CREATE, ALTER, DROP, TRUNCATE, RENAME and LOCK TABLES end the open transaction with a COMMIT before they run, even when they then fail: the changes before them are saved, and a ROLLBACK after them undoes neither those nor the table change (lab: the UPDATE stayed after ROLLBACK, also when the DROP TABLE failed). Temporary tables are the exception.",
+      "says_hi": "CREATE, ALTER, DROP, TRUNCATE, RENAME aur LOCK TABLES chalne se pehle khuli transaction ko COMMIT kar dete hain (fail hon tab bhi): baad ka ROLLBACK kuch wapas nahi leta.",
+      "lab": [
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 12 WHERE id = 1;\nCREATE TABLE lab_tx2 (a INT);\nROLLBACK;",
+          {
+            "v": 12,
+            "errors": [],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 13 WHERE id = 1;\nDROP TABLE lab_nothere;\nROLLBACK;",
+          {
+            "v": 13,
+            "errors": [
+              "Unknown table 'shop_db.lab_nothere'"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "START TRANSACTION;\nUPDATE lab_tx SET v = 29 WHERE id = 1;\nLOCK TABLES lab_tx WRITE;\nROLLBACK;\nUNLOCK TABLES;",
+          {
+            "v": 29,
+            "errors": [],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "savepoint_missing": {
+      "kind": "error",
+      "error": "1305 SAVEPOINT <name> does not exist",
+      "says": "Error 1305: 'SAVEPOINT name does not exist'. With autocommit on, a SAVEPOINT outside START TRANSACTION is forgotten at once, so a later ROLLBACK TO it fails the same way and the change in between stays saved (lab).",
+      "says_hi": "Error 1305 'SAVEPOINT naam does not exist'. Autocommit mein START TRANSACTION ke bahar ka SAVEPOINT turant bhool jaata hai.",
+      "lab": [
+        [
+          "BEGIN;\nSAVEPOINT a;\nUPDATE lab_tx SET v = 15 WHERE id = 1;\nROLLBACK TO b;\nCOMMIT;",
+          {
+            "v": 15,
+            "errors": [
+              "SAVEPOINT b does not exist"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "SAVEPOINT a;\nUPDATE lab_tx SET v = 16 WHERE id = 1;\nROLLBACK TO a;",
+          {
+            "v": 16,
+            "errors": [
+              "SAVEPOINT a does not exist"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "left_open": {
+      "kind": "check",
+      "says": "The transaction stays open, holding the row locks it took (other writers wait, then get 1205); the client disconnecting rolls it back (lab: nothing was saved).",
+      "says_hi": "Transaction khuli rehti hai aur row locks pakde rehti hai (baaki writers rukte hain, phir 1205); client disconnect hone pe rollback.",
+      "lab": [
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 19 WHERE id = 1;",
+          {
+            "v": 10,
+            "errors": [],
+            "warnings": [],
+            "open": true
+          }
+        ],
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 17 WHERE id = 1;\nSAVEPOINT a;\nUPDATE lab_tx SET v = 18 WHERE id = 1;\nROLLBACK TO a;",
+          {
+            "v": 10,
+            "errors": [],
+            "warnings": [],
+            "open": true
+          }
+        ]
+      ]
+    },
+    "set_txn_place": {
+      "kind": "error",
+      "error": "1568 Transaction characteristics can't be changed while a transaction is in progress",
+      "says": "SET TRANSACTION (for the next transaction) is refused while one is open: error 1568 'Transaction characteristics can't be changed while a transaction is in progress'. Put it before START TRANSACTION (lab: there it is accepted).",
+      "says_hi": "Khuli transaction mein SET TRANSACTION mana hai (1568); use START TRANSACTION se pehle likho.",
+      "lab": [
+        [
+          "START TRANSACTION;\nSET TRANSACTION ISOLATION LEVEL SERIALIZABLE;\nUPDATE lab_tx SET v = 24 WHERE id = 1;\nCOMMIT;",
+          {
+            "v": 24,
+            "errors": [
+              "Transaction characteristics can't be changed while a transaction is in progress"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;\nBEGIN;\nUPDATE lab_tx SET v = 26 WHERE id = 1;\nCOMMIT;",
+          {
+            "v": 26,
+            "errors": [],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "no_txn_writes": {
+      "kind": "check",
+      "says": "With autocommit on, each change is saved on its own: if a later one fails, the earlier ones stay (lab). Inside START TRANSACTION, MariaDB undoes only the failed statement and a COMMIT keeps the rest, so the client must ROLLBACK on an error (lab).",
+      "says_hi": "Autocommit mein har badlav alag save hota hai: baad wala fail ho to pehle wale reh jaate hain. Transaction mein error pe client ko ROLLBACK karna padta hai.",
+      "lab": [
+        [
+          "UPDATE lab_tx SET v = 21 WHERE id = 1;\nINSERT INTO lab_tx VALUES (1, 99);",
+          {
+            "v": 21,
+            "errors": [
+              "Duplicate entry '1' for key 'PRIMARY'"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 22 WHERE id = 1;\nINSERT INTO lab_tx VALUES (1, 99);\nROLLBACK;",
+          {
+            "v": 10,
+            "errors": [
+              "Duplicate entry '1' for key 'PRIMARY'"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 23 WHERE id = 1;\nINSERT INTO lab_tx VALUES (1, 99);\nCOMMIT;",
+          {
+            "v": 23,
+            "errors": [
+              "Duplicate entry '1' for key 'PRIMARY'"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "proven": [
+      "mariadb"
+    ]
+  }
 }

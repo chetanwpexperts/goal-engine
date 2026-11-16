@@ -117,7 +117,7 @@ lab/cases/<engine>/, pushes its branch, and reads what each engine really did fr
 LAB-RESULTS-BEGIN and LAB-RESULTS-END). SQLite runs right in the nightly sandbox (Python's sqlite3). Only what the lab shows
 becomes a rule; an engine stops being "notes only" (rule A) once its own lab-proven knowledge covers the basics.
 
-- [ ] **E1. SQLite (3-4 nights).** Its own dialect file; loose column types (type affinity), no RIGHT/FULL JOIN in older
+- [x] **E1. SQLite (3-4 nights).** Its own dialect file; loose column types (type affinity), no RIGHT/FULL JOIN in older
   versions, date functions (date(), strftime), ALTER TABLE limits, || for text, LIMIT/OFFSET; its error messages; every
   query rule re-checked on it; concepts for SQLite questions.
   - [x] Night 1: its own error messages in the diagnoser (command line and driver formats, the file-level ones: locked,
@@ -133,8 +133,14 @@ becomes a rule; an engine stops being "notes only" (rule A) once its own lab-pro
     first row, x / 0, ORDER BY inside a UNION part, OFFSET without LIMIT, CAST's leading number ...) with lab lines; findings
     in SQLite's words (wording / not_here / kinds); SQLite rewrites for + on text, UPDATE / DELETE LIMIT, DELETE ... USING,
     REPLACE, random() twice (MATERIALIZED); its plans read; 16 concepts; 37 problems + 5 changes; 11 s3_* families.
-  - [ ] Night 4: transactions and locking (BEGIN IMMEDIATE, WAL, busy timeout), a practice exam across the nights, and
-    SQLite stops being notes-only.
+  - [x] Night 4: transactions and locking (BEGIN IMMEDIATE, WAL, busy timeout), a practice exam across the nights, and
+    SQLite stops being notes-only. Done: a transaction-script reader (app/agents/sqltxn.py) with each database's own txn_rules
+    (SQLite, MariaDB, PostgreSQL: a second BEGIN, ROLLBACK with none open, DDL committing on MySQL, VACUUM / CREATE INDEX
+    CONCURRENTLY / journal_mode inside one, missing savepoints, SET TRANSACTION's place, a transaction left open, SQLite's
+    read-then-write BEGIN), 14 SQLite refuses for other databases' transaction words (+ 2 MySQL, 4 PostgreSQL), 8 new
+    diagnoser causes (25P02, 3B001, 1568, SQLITE_LOCKED, SQLITE_BUSY_SNAPSHOT ...), SQLite's verify queries and batched
+    changes by rowid, 18 concepts, 42 practice scripts + 14 valid ones + an exam across the four nights (20
+    questions), 10 s4_* families. SQLite is no longer notes-only.
 - [ ] **E2. SQL Server (6-8 nights).** TOP / OFFSET-FETCH, ISNULL vs COALESCE, GETDATE, [brackets], string + concatenation,
   MERGE and OUTPUT, identity, its error numbers (Msg 207, 208, 515, 2627, 8152 ...), T-SQL procedures, the plan format,
   NOLOCK and snapshot isolation; each lab-run on the server.

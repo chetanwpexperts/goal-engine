@@ -590,7 +590,8 @@
    ],
    "proven": [
     "mariadb",
-    "postgresql"
+    "postgresql",
+    "sqlite"
    ]
   },
   "portability": {
@@ -759,6 +760,27 @@
    "proven": [
     "mariadb",
     "postgresql"
+   ]
+  },
+  "transactions": {
+   "title_en": "A transaction is all-or-nothing, and each database says differently when one begins and ends",
+   "title_hi": "Transaction sab-ya-kuch-nahi hai, aur har database alag batata hai ki wo kab shuru aur khatam hoti hai",
+   "rule_en": "Statements between BEGIN and COMMIT are saved together; ROLLBACK (or a lost connection) undoes them together; outside a transaction each statement is saved on its own as it runs, so a ROLLBACK later undoes nothing and a failure halfway leaves half the changes. Read a script as a sequence of states (is a transaction open, what has it read and written, which savepoints exist) and check each statement against the database's own rules: a second BEGIN (SQLite refuses it, MySQL/MariaDB commit the first part, PostgreSQL ignores it), table changes inside a transaction (MySQL/MariaDB commit first; PostgreSQL and SQLite keep them inside), commands that can't run inside one (VACUUM, CREATE INDEX CONCURRENTLY, a journal-mode change), savepoints that don't exist, where SET TRANSACTION goes (before START TRANSACTION on MySQL, right after BEGIN on PostgreSQL), what an error inside a transaction does (MySQL/MariaDB and SQLite undo only that statement, PostgreSQL refuses everything until ROLLBACK), and a transaction left open (its locks stay; on SQLite the whole database). On SQLite, one connection writes at a time: a transaction that reads and then writes starts with BEGIN IMMEDIATE, because a plain BEGIN's later write fails at once if another connection wrote in between, busy timeout or not.",
+   "rule_hi": "BEGIN aur COMMIT ke beech ke statements saath save hote hain; ROLLBACK unhe saath hatata hai; transaction ke bahar har statement chalte hi save hota hai, isliye baad ka ROLLBACK kuch nahi karta aur beech mein fail aadhe badlav chhod deta hai. Script ko states ki tarah padho (transaction khuli hai ya nahi, kya padha/likha, kaunse savepoints) aur har statement ko database ke apne rule se jaancho: doosra BEGIN (SQLite mana, MySQL/MariaDB pehla hissa commit, PostgreSQL ignore), transaction mein table badlaav (MySQL/MariaDB pehle commit), transaction mein na chalne wali commands (VACUUM, CREATE INDEX CONCURRENTLY, journal mode), na bane savepoints, SET TRANSACTION ki jagah, transaction mein error (PostgreSQL ROLLBACK tak sab mana karta hai), aur khuli chhodi transaction. SQLite mein ek waqt ek writer: padh-kar-likhne wali transaction BEGIN IMMEDIATE se.",
+   "topics": [
+    "transaction"
+   ],
+   "source": "https://www.sqlite.org/lang_transaction.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html",
+    "https://www.postgresql.org/docs/current/tutorial-transactions.html",
+    "https://dba.stackexchange.com/questions/tagged/transaction",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
    ]
   }
  }

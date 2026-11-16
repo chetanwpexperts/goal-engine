@@ -28,8 +28,9 @@ ENGINES = {                                   # how people name each database, a
     "oracle": (r"\boracle\b|\bpl/?sql\b", "Oracle"),
     "sqlite": (r"\bsqlite3?\b", "SQLite"),
 }
-NOTES_ONLY = {"sqlserver", "oracle", "sqlite"}   # no lab-tested knowledge yet: their notes are general guidance (unless the
-                                                # concept itself was proven on that engine: SQLite's own concepts, E1)
+NOTES_ONLY = {"sqlserver", "oracle", "sqlite"}   # engines whose note on a concept is labelled 'notes only' unless the concept
+                                                # itself was proven on that engine (SQLite is lab-tested as a database from E1
+                                                # night 4, but an older concept's SQLite note from the docs still says so)
 
 SHAPES = [                                     # (shape, pattern) in the order they are tried
     # 'how many types of joins', 'types of keys in sql', 'join ke kitne types hote hain', 'index के प्रकार': a kinds question

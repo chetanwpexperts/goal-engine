@@ -51,7 +51,11 @@
   "57P01": "connection_lost",
   "3D000": "unknown_database",
   "42501": "permission_denied",
-  "25006": "write_on_replica"
+  "25006": "write_on_replica",
+  "25P02": "txn_aborted",
+  "3B001": "savepoint_missing",
+  "25P01": "txn_not_active",
+  "25001": "outside_txn_only"
  },
  "code_patterns": [
   "SQLSTATE\\[?\\s*([0-9A-Z]{5})\\]?",
@@ -216,6 +220,30 @@
   {
    "cause": "permission_denied",
    "re": "permission denied for (?:table|relation|schema|database|sequence) (?P<table>[\\w.\\\"]+)"
+  },
+  {
+    "cause": "txn_nested",
+    "re": "there is already a transaction in progress"
+  },
+  {
+    "cause": "txn_not_active",
+    "re": "there is no transaction in progress|(?P<what>RELEASE SAVEPOINT|ROLLBACK TO SAVEPOINT|SAVEPOINT) can only be used in transaction blocks"
+  },
+  {
+    "cause": "savepoint_missing",
+    "re": "savepoint \"(?P<savepoint>[^\"]+)\" does not exist"
+  },
+  {
+    "cause": "outside_txn_only",
+    "re": "(?P<what>VACUUM|CREATE INDEX CONCURRENTLY|DROP INDEX CONCURRENTLY|CREATE DATABASE|DROP DATABASE|ALTER SYSTEM|REINDEX CONCURRENTLY|CREATE TABLESPACE|[A-Z][A-Z ]{2,40}?) cannot run inside a transaction block"
+  },
+  {
+    "cause": "txn_aborted",
+    "re": "current transaction is aborted, commands ignored until end of transaction block"
+  },
+  {
+    "cause": "txn_settings_late",
+    "re": "SET TRANSACTION ISOLATION LEVEL must be called before any query|SET TRANSACTION can only be used in transaction blocks"
   }
  ],
  "fix": {
@@ -386,6 +414,24 @@
    "SHOW max_wal_size; SHOW checkpoint_timeout;\n-- PostgreSQL 17+: SELECT num_timed, num_requested FROM pg_stat_checkpointer;\n-- PostgreSQL 16 and older: SELECT checkpoints_timed, checkpoints_req FROM pg_stat_bgwriter;   -- many 'requested' = max_wal_size too small",
    "ALTER SYSTEM SET max_wal_size = '4GB';   -- size it for your busiest hour; needs that much free disk headroom\nSELECT pg_reload_conf();",
    "-- Common mistake: lowering max_wal_size to save disk. It makes checkpoints even more frequent and usually writes MORE WAL (full-page writes after each checkpoint)."
+  ],
+  "txn_nested": [
+    "-- One BEGIN; an inner part that can be undone alone is a savepoint\nBEGIN;\nSAVEPOINT inner_step;\n-- ...\nRELEASE SAVEPOINT inner_step;   -- or ROLLBACK TO SAVEPOINT inner_step\nCOMMIT;"
+  ],
+  "txn_not_active": [
+    "BEGIN;\n-- ... the changes ...\nCOMMIT;   -- or ROLLBACK;"
+  ],
+  "savepoint_missing": [
+    "BEGIN;\nSAVEPOINT before_payment;\n-- ...\nROLLBACK TO SAVEPOINT before_payment;\nCOMMIT;"
+  ],
+  "outside_txn_only": [
+    "-- Run it on its own, with no BEGIN around it (psql: outside a transaction; migration tools: mark the step as non-transactional)\nCREATE INDEX CONCURRENTLY ix_orders_customer ON orders (customer_id);"
+  ],
+  "txn_aborted": [
+    "-- The transaction failed earlier: end it, fix the first error, run again\nROLLBACK;\n-- in code: on an exception inside a transaction, roll back before using the connection again\n-- or keep the good part: SAVEPOINT s; <risky statement>; on error ROLLBACK TO SAVEPOINT s;"
+  ],
+  "txn_settings_late": [
+    "BEGIN ISOLATION LEVEL SERIALIZABLE;\n-- or: BEGIN; SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;  (before any query)\n-- ...\nCOMMIT;"
   ]
  },
  "settings": {
@@ -510,7 +556,7 @@
  ],
  "named": ["\\bpostgre(s|sql)?\\b", "\\bpgsql\\b", "\\bpsql\\b", "पोस्टग्रे\\w*"],
  "error_marks": ["\\bERROR:\\s{1,2}[a-z]", "\\bDETAIL:\\s", "\\bpsycopg2?\\.", "\\bPSQLException\\b"],
- "refuses": [{"id": "backticks", "re": "`([^`]+)`", "to": "@bare", "error": "42601 syntax error at or near \"`\"", "title_en": "{db} doesn't accept `backticks` (that's MySQL/MariaDB)", "title_hi": "{db} `backticks` nahi maanta (wo MySQL/MariaDB ke hain)", "fix_en": "Leave the name bare (plain names), or put it in double quotes when it is a reserved word or has spaces; a double-quoted name keeps its exact upper/lower case, a bare one is matched in lower case.", "fix_hi": "Naam bina quote ke likho, ya double quotes mein (double quotes mein naam ka case waisa hi rehta hai).", "proven": ["postgresql"]}, {"id": "limit_comma", "re": "\\blimit\\s+(\\d+)\\s*,\\s*(\\d+)", "to": "LIMIT \\2 OFFSET \\1", "error": "LIMIT #,# syntax is not supported", "title_en": "{db} has no LIMIT offset, count (that's MySQL/MariaDB)", "title_hi": "{db} mein LIMIT offset, count nahi hota", "fix_en": "Write LIMIT count OFFSET offset (this also works on MySQL/MariaDB).", "fix_hi": "LIMIT count OFFSET offset likho (ye MySQL/MariaDB pe bhi chalta hai).", "proven": ["postgresql"]}, {"id": "curdate", "re": "\\bcurdate\\s*\\(\\s*\\)", "to": "CURRENT_DATE", "error": "42883 function curdate() does not exist", "title_en": "{db} has no CURDATE() (that's MySQL/MariaDB)", "title_hi": "{db} mein CURDATE() nahi hota", "fix_en": "Use CURRENT_DATE (works on MySQL/MariaDB too).", "fix_hi": "CURRENT_DATE likho (MySQL/MariaDB pe bhi chalta hai).", "proven": ["postgresql"]}, {"id": "unix_timestamp", "re": "\\bunix_timestamp\\s*\\(\\s*\\)", "to": "EXTRACT(EPOCH FROM now())", "error": "42883 function unix_timestamp() does not exist", "title_en": "{db} has no UNIX_TIMESTAMP() (that's MySQL/MariaDB)", "title_hi": "{db} mein UNIX_TIMESTAMP() nahi hota", "fix_en": "Use EXTRACT(EPOCH FROM now()) (seconds, with a fraction).", "fix_hi": "EXTRACT(EPOCH FROM now()) likho.", "proven": ["postgresql"]}, {"id": "getdate", "re": "\\bgetdate\\s*\\(\\s*\\)", "to": "now()", "error": "42883 function getdate() does not exist", "title_en": "{db} has no GETDATE() (that's SQL Server)", "title_hi": "{db} mein GETDATE() nahi hota", "fix_en": "Use now() (or CURRENT_DATE for the date only).", "fix_hi": "now() (ya sirf date ke liye CURRENT_DATE) likho.", "proven": ["postgresql"]}, {"id": "brackets", "re": "(?<![\\w\\]\\)'])\\[([A-Za-z_][\\w ]*)\\]", "to": "@bare", "error": "42601 syntax error at or near \"[\"", "title_en": "{db} doesn't quote names with [brackets] (that's SQL Server)", "title_hi": "{db} naam [brackets] mein nahi maanta (wo SQL Server ka hai)", "fix_en": "Leave a plain name bare, or put it in double quotes when it is a reserved word or has spaces.", "fix_hi": "Naam bina quote ke likho, ya double quotes mein.", "proven": ["postgresql"]}, {"id": "from_dual", "re": "\\s+from\\s+dual\\b", "to": "", "error": "42P01 relation \"dual\" does not exist", "title_en": "{db} has no DUAL table (that's Oracle / MySQL)", "title_hi": "{db} mein DUAL table nahi hoti", "fix_en": "Leave FROM DUAL out: a SELECT needs no FROM on {db} (a WHERE without FROM works too).", "fix_hi": "FROM DUAL hata do: {db} pe bina FROM ke SELECT chalta hai.", "proven": ["postgresql"]}, {"id": "sysdate_bare", "re": "\\bsysdate\\b(?!\\s*\\()", "to": "now()", "error": "42703 column \"sysdate\" does not exist", "title_en": "{db} has no SYSDATE (that's Oracle / MySQL)", "title_hi": "{db} mein SYSDATE nahi hota", "fix_en": "Use now() (CURRENT_DATE for the date only).", "fix_hi": "now() likho.", "proven": ["postgresql"]}, {"id": "sysdatetime", "re": "\\b(?:sysdatetime|getutcdate)\\s*\\(\\s*\\)", "to": "now()", "error": "42883 function does not exist", "title_en": "{db} has no SYSDATETIME() / GETUTCDATE() (that's SQL Server)", "title_hi": "{db} mein SYSDATETIME() nahi hota", "fix_en": "Use now() (now() AT TIME ZONE 'UTC' for UTC).", "fix_hi": "now() likho.", "proven": ["postgresql"]}, {"id": "regexp", "re": "\\bnot\\s+(?:regexp|rlike)\\b", "to": "!~*", "error": "42601 syntax error", "title_en": "{db} has no NOT REGEXP (that's MySQL/MariaDB)", "title_hi": "{db} mein NOT REGEXP nahi hota", "fix_en": "Use !~* (no match, ignoring case, as REGEXP does with a _ci collation; !~ matches case).", "fix_hi": "!~* likho.", "proven": ["postgresql"]}, {"id": "regexp_match", "re": "\\b(?:regexp|rlike)\\b(?!\\s*\\()", "to": "~*", "error": "42601 syntax error at or near the pattern", "title_en": "{db} has no REGEXP / RLIKE (that's MySQL/MariaDB)", "title_hi": "{db} mein REGEXP nahi hota", "fix_en": "Use ~* (a regex match ignoring case, as REGEXP does with a _ci collation; ~ matches case).", "fix_hi": "~* likho.", "proven": ["postgresql"]}, {"id": "div", "re": "(?<![\\w.])([A-Za-z_][\\w.]*|\\d+)\\s+div\\s+([A-Za-z_][\\w.]*|\\d+)\\b", "to": "DIV(\\1, \\2)", "error": "42601 syntax error at or near the number", "title_en": "{db} has no DIV operator (that's MySQL/MariaDB)", "title_hi": "{db} mein DIV operator nahi hota", "fix_en": "Use the function DIV(a, b): the whole-number quotient, cut toward zero like MySQL's DIV.", "fix_hi": "DIV(a, b) function likho.", "proven": ["postgresql"]}, {"id": "pg_backslash_g", "re": "\\\\G\\s*$", "to": ";", "error": "\\G is a mysql client command", "title_en": "{db}'s psql has no \\G (that's the mysql client)", "title_hi": "psql mein \\G nahi hota", "fix_en": "End with ; (for one column per line in psql, turn on \\x first).", "fix_hi": "; lagao (psql mein \\x).", "proven": ["postgresql"]}],
+ "refuses": [{"id": "backticks", "re": "`([^`]+)`", "to": "@bare", "error": "42601 syntax error at or near \"`\"", "title_en": "{db} doesn't accept `backticks` (that's MySQL/MariaDB)", "title_hi": "{db} `backticks` nahi maanta (wo MySQL/MariaDB ke hain)", "fix_en": "Leave the name bare (plain names), or put it in double quotes when it is a reserved word or has spaces; a double-quoted name keeps its exact upper/lower case, a bare one is matched in lower case.", "fix_hi": "Naam bina quote ke likho, ya double quotes mein (double quotes mein naam ka case waisa hi rehta hai).", "proven": ["postgresql"]}, {"id": "limit_comma", "re": "\\blimit\\s+(\\d+)\\s*,\\s*(\\d+)", "to": "LIMIT \\2 OFFSET \\1", "error": "LIMIT #,# syntax is not supported", "title_en": "{db} has no LIMIT offset, count (that's MySQL/MariaDB)", "title_hi": "{db} mein LIMIT offset, count nahi hota", "fix_en": "Write LIMIT count OFFSET offset (this also works on MySQL/MariaDB).", "fix_hi": "LIMIT count OFFSET offset likho (ye MySQL/MariaDB pe bhi chalta hai).", "proven": ["postgresql"]}, {"id": "curdate", "re": "\\bcurdate\\s*\\(\\s*\\)", "to": "CURRENT_DATE", "error": "42883 function curdate() does not exist", "title_en": "{db} has no CURDATE() (that's MySQL/MariaDB)", "title_hi": "{db} mein CURDATE() nahi hota", "fix_en": "Use CURRENT_DATE (works on MySQL/MariaDB too).", "fix_hi": "CURRENT_DATE likho (MySQL/MariaDB pe bhi chalta hai).", "proven": ["postgresql"]}, {"id": "unix_timestamp", "re": "\\bunix_timestamp\\s*\\(\\s*\\)", "to": "EXTRACT(EPOCH FROM now())", "error": "42883 function unix_timestamp() does not exist", "title_en": "{db} has no UNIX_TIMESTAMP() (that's MySQL/MariaDB)", "title_hi": "{db} mein UNIX_TIMESTAMP() nahi hota", "fix_en": "Use EXTRACT(EPOCH FROM now()) (seconds, with a fraction).", "fix_hi": "EXTRACT(EPOCH FROM now()) likho.", "proven": ["postgresql"]}, {"id": "getdate", "re": "\\bgetdate\\s*\\(\\s*\\)", "to": "now()", "error": "42883 function getdate() does not exist", "title_en": "{db} has no GETDATE() (that's SQL Server)", "title_hi": "{db} mein GETDATE() nahi hota", "fix_en": "Use now() (or CURRENT_DATE for the date only).", "fix_hi": "now() (ya sirf date ke liye CURRENT_DATE) likho.", "proven": ["postgresql"]}, {"id": "brackets", "re": "(?<![\\w\\]\\)'])\\[([A-Za-z_][\\w ]*)\\]", "to": "@bare", "error": "42601 syntax error at or near \"[\"", "title_en": "{db} doesn't quote names with [brackets] (that's SQL Server)", "title_hi": "{db} naam [brackets] mein nahi maanta (wo SQL Server ka hai)", "fix_en": "Leave a plain name bare, or put it in double quotes when it is a reserved word or has spaces.", "fix_hi": "Naam bina quote ke likho, ya double quotes mein.", "proven": ["postgresql"]}, {"id": "from_dual", "re": "\\s+from\\s+dual\\b", "to": "", "error": "42P01 relation \"dual\" does not exist", "title_en": "{db} has no DUAL table (that's Oracle / MySQL)", "title_hi": "{db} mein DUAL table nahi hoti", "fix_en": "Leave FROM DUAL out: a SELECT needs no FROM on {db} (a WHERE without FROM works too).", "fix_hi": "FROM DUAL hata do: {db} pe bina FROM ke SELECT chalta hai.", "proven": ["postgresql"]}, {"id": "sysdate_bare", "re": "\\bsysdate\\b(?!\\s*\\()", "to": "now()", "error": "42703 column \"sysdate\" does not exist", "title_en": "{db} has no SYSDATE (that's Oracle / MySQL)", "title_hi": "{db} mein SYSDATE nahi hota", "fix_en": "Use now() (CURRENT_DATE for the date only).", "fix_hi": "now() likho.", "proven": ["postgresql"]}, {"id": "sysdatetime", "re": "\\b(?:sysdatetime|getutcdate)\\s*\\(\\s*\\)", "to": "now()", "error": "42883 function does not exist", "title_en": "{db} has no SYSDATETIME() / GETUTCDATE() (that's SQL Server)", "title_hi": "{db} mein SYSDATETIME() nahi hota", "fix_en": "Use now() (now() AT TIME ZONE 'UTC' for UTC).", "fix_hi": "now() likho.", "proven": ["postgresql"]}, {"id": "regexp", "re": "\\bnot\\s+(?:regexp|rlike)\\b", "to": "!~*", "error": "42601 syntax error", "title_en": "{db} has no NOT REGEXP (that's MySQL/MariaDB)", "title_hi": "{db} mein NOT REGEXP nahi hota", "fix_en": "Use !~* (no match, ignoring case, as REGEXP does with a _ci collation; !~ matches case).", "fix_hi": "!~* likho.", "proven": ["postgresql"]}, {"id": "regexp_match", "re": "\\b(?:regexp|rlike)\\b(?!\\s*\\()", "to": "~*", "error": "42601 syntax error at or near the pattern", "title_en": "{db} has no REGEXP / RLIKE (that's MySQL/MariaDB)", "title_hi": "{db} mein REGEXP nahi hota", "fix_en": "Use ~* (a regex match ignoring case, as REGEXP does with a _ci collation; ~ matches case).", "fix_hi": "~* likho.", "proven": ["postgresql"]}, {"id": "div", "re": "(?<![\\w.])([A-Za-z_][\\w.]*|\\d+)\\s+div\\s+([A-Za-z_][\\w.]*|\\d+)\\b", "to": "DIV(\\1, \\2)", "error": "42601 syntax error at or near the number", "title_en": "{db} has no DIV operator (that's MySQL/MariaDB)", "title_hi": "{db} mein DIV operator nahi hota", "fix_en": "Use the function DIV(a, b): the whole-number quotient, cut toward zero like MySQL's DIV.", "fix_hi": "DIV(a, b) function likho.", "proven": ["postgresql"]}, {"id": "pg_backslash_g", "re": "\\\\G\\s*$", "to": ";", "error": "\\G is a mysql client command", "title_en": "{db}'s psql has no \\G (that's the mysql client)", "title_hi": "psql mein \\G nahi hota", "fix_en": "End with ; (for one column per line in psql, turn on \\x first).", "fix_hi": "; lagao (psql mein \\x).", "proven": ["postgresql"]}, {"id": "lock_tables", "re": "^\\s*lock\\s+tables\\s+([\\w$.]+)\\s+(?:write|read(?:\\s+local)?)\\s*$", "to": "LOCK TABLE \\1 IN EXCLUSIVE MODE", "error": "42601 syntax error at or near the table name", "title_en": "{db} has no LOCK TABLES (that's MySQL)", "title_hi": "{db} mein LOCK TABLES nahi hota (wo MySQL ka hai)", "fix_en": "Inside BEGIN, LOCK TABLE t IN EXCLUSIVE MODE (others can still read) or IN ACCESS EXCLUSIVE MODE; it is released at COMMIT / ROLLBACK, there is no UNLOCK. Usually row locks (SELECT ... FOR UPDATE) are enough.", "fix_hi": "BEGIN ke andar LOCK TABLE t IN EXCLUSIVE MODE; COMMIT pe chhoot jaata hai, UNLOCK nahi hota.", "proven": ["postgresql"]}, {"id": "unlock_tables", "re": "^\\s*unlock\\s+tables\\b", "to": "COMMIT", "error": "42601 syntax error at or near \"UNLOCK\"", "title_en": "{db} has no UNLOCK TABLES", "title_hi": "{db} mein UNLOCK TABLES nahi hota", "fix_en": "A table lock ends with its transaction: COMMIT.", "fix_hi": "Lock transaction ke saath khatam: COMMIT.", "proven": ["postgresql"]}, {"id": "set_autocommit", "re": "^\\s*set\\s+(?:@@)?autocommit\\s*(?:=|to)\\s*(?:0|off|false)\\s*$", "to": "BEGIN", "error": "42704 unrecognized configuration parameter \"autocommit\"", "title_en": "{db} has no SET autocommit on the server", "title_hi": "{db} server pe SET autocommit nahi hota", "fix_en": "Autocommit is the client's setting in PostgreSQL (psql: \\set AUTOCOMMIT off; drivers: their autocommit flag); in SQL, start the transaction with BEGIN.", "fix_hi": "PostgreSQL mein autocommit client ki setting hai; SQL mein BEGIN likho.", "proven": ["postgresql"]}, {"id": "begin_tran", "re": "^\\s*(begin|commit|rollback)\\s+(?:tran|immediate|deferred|exclusive)\\b", "to": "\\1", "error": "42601 syntax error at or near \"TRAN\"", "title_en": "{db} has no BEGIN TRAN / BEGIN IMMEDIATE", "title_hi": "{db} mein BEGIN TRAN / IMMEDIATE nahi hota", "fix_en": "Write BEGIN (or BEGIN ISOLATION LEVEL ...); COMMIT / ROLLBACK end it.", "fix_hi": "BEGIN likho; COMMIT / ROLLBACK se khatam.", "proven": ["postgresql"]}],
  "wording": [{"re": "MySQL refuses the query \\(error 1055[^)]*\\) or, with it off, shows one random value", "to": "PostgreSQL refuses the query (error 42803: must appear in the GROUP BY clause)"}, {"re": "MySQL error 1055 deta hai \\(ya random value dikhata hai\\)", "to": "PostgreSQL error 42803 deta hai"}, {"re": "MySQL refuses this \\(error 1140\\) or squashes everything into one row", "to": "PostgreSQL refuses this (error 42803: must appear in the GROUP BY clause)"}, {"re": "MySQL error 1140 deta hai ya sab ek row mein daba deta hai", "to": "PostgreSQL error 42803 deta hai"}, {"re": "MySQL stops with error 1242 \\(Subquery returns more than 1 row\\) and PostgreSQL with", "to": "PostgreSQL stops with error 21000:"}, {"re": "MySQL error 1242 deta hai aur PostgreSQL", "to": "PostgreSQL error 21000 deta hai:"}, {"re": "MySQL stops with error 1111 \\(Invalid use of group function\\), PostgreSQL with", "to": "PostgreSQL stops with error 42803:"}, {"re": "MySQL error 1111, PostgreSQL", "to": "PostgreSQL error 42803:"}, {"re": "\\(MySQL error 1054 Unknown column '[^']*', PostgreSQL: (column [^)]*)\\)", "to": "(PostgreSQL error 42703: \\1)"}, {"re": "\\(MySQL error 1054, PostgreSQL: column does not exist\\)", "to": "(PostgreSQL error 42703: column does not exist)"}, {"re": "\\bMySQL stops with error 1054(?: \\(Unknown column '[^']*'\\))?", "to": "PostgreSQL stops with error 42703 (column does not exist)"}, {"re": "\\bMySQL error 1054\\b", "to": "PostgreSQL error 42703"}, {"re": "\\(error 1054(?: Unknown column '[^']*')?\\)", "to": "(error 42703: column does not exist)"}, {"re": "\\berror 1054\\b", "to": "error 42703"}, {"re": "\\bMySQL stops with error 1052", "to": "PostgreSQL stops with error 42702 (column reference is ambiguous)"}, {"re": "\\bMySQL stops \\(error 1052(, ambiguous)?\\)", "to": "PostgreSQL stops (error 42702, ambiguous)"}, {"re": "\\bMySQL error 1052\\b", "to": "PostgreSQL error 42702"}, {"re": "\\berror 1052\\b", "to": "error 42702"}, {"re": "\\bMySQL only knows the alias", "to": "PostgreSQL only knows the alias"}, {"re": "\\bMySQL sirf alias pehchanta hai", "to": "PostgreSQL sirf alias pehchanta hai"}, {"re": "\\bMySQL reads joins top to bottom", "to": "PostgreSQL reads joins top to bottom"}, {"re": "\\bMySQL joins upar se neeche padhta hai", "to": "PostgreSQL joins upar se neeche padhta hai"}],
  "not_here": ["^FULL OUTER JOIN .*: MySQL doesn't have FULL OUTER JOIN", "^The subquery reads \\S+, the table being changed"],
  "query_marks": [
@@ -1403,5 +1449,244 @@
   "unknown_column": {"behaviour": "error", "code": "42703", "says": "42703 column does not exist (unquoted names are folded to lower case first).", "proven": ["postgresql"]},
   "fk_makes_index": {"behaviour": "no_index", "says": "A FOREIGN KEY gets no index of its own: create one on the referencing column.", "proven": ["postgresql"]}
  },
- "verify": {"nullable": "SELECT column_name, is_nullable, data_type FROM information_schema.columns WHERE table_name = '{table}' AND column_name IN ({cols})", "nulls_now": "SELECT COUNT(*) AS null_rows FROM {table} WHERE {col} IS NULL", "dupes": "SELECT {cols}, COUNT(*) AS n FROM {table} GROUP BY {cols} HAVING COUNT(*) > 1 LIMIT 5", "structure": "SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name = '{table}' ORDER BY ordinal_position", "indexes": "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = '{table}'", "plan": "EXPLAIN {query}", "plan_run": "EXPLAIN (ANALYZE, BUFFERS) {query}", "plan_run_note": "EXPLAIN ANALYZE really runs the statement; for UPDATE/DELETE wrap it in BEGIN; ... ROLLBACK; (in psql, \\d table shows the same structure).", "proven": ["postgresql"], "lab": "EXPLAIN ANALYZE, pg_indexes and information_schema.columns (temporary tables included) on PostgreSQL 16."}
+ "verify": {"nullable": "SELECT column_name, is_nullable, data_type FROM information_schema.columns WHERE table_name = '{table}' AND column_name IN ({cols})", "nulls_now": "SELECT COUNT(*) AS null_rows FROM {table} WHERE {col} IS NULL", "dupes": "SELECT {cols}, COUNT(*) AS n FROM {table} GROUP BY {cols} HAVING COUNT(*) > 1 LIMIT 5", "structure": "SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name = '{table}' ORDER BY ordinal_position", "indexes": "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = '{table}'", "plan": "EXPLAIN {query}", "plan_run": "EXPLAIN (ANALYZE, BUFFERS) {query}", "plan_run_note": "EXPLAIN ANALYZE really runs the statement; for UPDATE/DELETE wrap it in BEGIN; ... ROLLBACK; (in psql, \\d table shows the same structure).", "proven": ["postgresql"], "lab": "EXPLAIN ANALYZE, pg_indexes and information_schema.columns (temporary tables included) on PostgreSQL 16."},
+  "txn_rules": {
+    "about": "How PostgreSQL reads a transaction script (E1 night 4, app/agents/sqltxn.py), lab-run on PostgreSQL 16 (psql's autocommit) by tests/practice/txnlab.py, run again by tests/practice/test_e1_sqlite4.py.",
+    "nested_begin": {
+      "kind": "check",
+      "says": "PostgreSQL ignores a second BEGIN with WARNING 25001 'there is already a transaction in progress', so the first ROLLBACK or COMMIT ends everything: one ROLLBACK undid both parts (lab), and a later COMMIT only warns 'there is no transaction in progress'.",
+      "says_hi": "PostgreSQL doosre BEGIN ko warning ke saath ignore karta hai, isliye pehla ROLLBACK/COMMIT sab kuch khatam kar deta hai.",
+      "lab": [
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 20 WHERE id = 1;\nBEGIN;\nUPDATE lab_tx SET v = 30 WHERE id = 1;\nROLLBACK;",
+          {
+            "v": 10,
+            "errors": [],
+            "warnings": [
+              "there is already a transaction in progress"
+            ],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "end_without_begin": {
+      "kind": "check",
+      "says": "With no BEGIN each statement was saved on its own; COMMIT / ROLLBACK then only warn 'there is no transaction in progress' (25P01), and the ROLLBACK undoes nothing (lab).",
+      "says_hi": "BEGIN ke bina har statement khud save hota hai; COMMIT/ROLLBACK sirf warning dete hain aur kuch wapas nahi hota.",
+      "lab": [
+        [
+          "UPDATE lab_tx SET v = 11 WHERE id = 1;\nROLLBACK;",
+          {
+            "v": 11,
+            "errors": [],
+            "warnings": [
+              "there is no transaction in progress"
+            ],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "ddl_commits": {
+      "kind": "none",
+      "says": "CREATE / ALTER / DROP are part of the transaction: ROLLBACK undoes them too (lab).",
+      "says_hi": "CREATE / ALTER / DROP transaction ka hissa hain: ROLLBACK unhe bhi wapas leta hai.",
+      "lab": [
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 12 WHERE id = 1;\nCREATE TABLE lab_tx2 (a INT);\nROLLBACK;",
+          {
+            "v": 10,
+            "errors": [],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "outside_only": {
+      "kind": "error",
+      "error": "25001 ... cannot run inside a transaction block",
+      "says": "VACUUM, CREATE INDEX CONCURRENTLY and CREATE / DROP DATABASE refuse to run inside a transaction block (25001 'cannot run inside a transaction block'), and the error aborts the whole transaction: its COMMIT then rolls everything back (lab).",
+      "says_hi": "VACUUM, CREATE INDEX CONCURRENTLY, CREATE/DROP DATABASE transaction block mein nahi chalte (25001), aur error poori transaction rok deta hai: COMMIT rollback ban jaata hai.",
+      "lab": [
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 14 WHERE id = 1;\nVACUUM;\nCOMMIT;",
+          {
+            "v": 10,
+            "errors": [
+              "VACUUM cannot run inside a transaction block"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 35 WHERE id = 1;\nCREATE INDEX CONCURRENTLY ix_lab_tx_v ON lab_tx (v);\nCOMMIT;",
+          {
+            "v": 10,
+            "errors": [
+              "CREATE INDEX CONCURRENTLY cannot run inside a transaction block"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "savepoint_missing": {
+      "kind": "error",
+      "error": "3B001 savepoint \"<name>\" does not exist",
+      "says": "3B001 'savepoint \"name\" does not exist', and the error aborts the transaction: everything after it is refused (25P02) and COMMIT rolls back (lab).",
+      "says_hi": "3B001 'savepoint does not exist', aur error transaction rok deta hai: COMMIT rollback ban jaata hai.",
+      "lab": [
+        [
+          "BEGIN;\nSAVEPOINT a;\nUPDATE lab_tx SET v = 15 WHERE id = 1;\nROLLBACK TO b;\nCOMMIT;",
+          {
+            "v": 10,
+            "errors": [
+              "savepoint \"b\" does not exist"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "savepoint_outside": {
+      "kind": "error",
+      "error": "25P01 SAVEPOINT can only be used in transaction blocks",
+      "says": "Outside BEGIN ... COMMIT, SAVEPOINT, RELEASE and ROLLBACK TO are refused (25P01 'can only be used in transaction blocks'), so the change in between was saved for good (lab).",
+      "says_hi": "BEGIN ke bahar SAVEPOINT / RELEASE / ROLLBACK TO mana hain (25P01), isliye beech ka badlav pakka save ho gaya.",
+      "lab": [
+        [
+          "SAVEPOINT a;\nUPDATE lab_tx SET v = 16 WHERE id = 1;\nROLLBACK TO a;",
+          {
+            "v": 16,
+            "errors": [
+              "SAVEPOINT can only be used in transaction blocks",
+              "ROLLBACK TO SAVEPOINT can only be used in transaction blocks"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "left_open": {
+      "kind": "check",
+      "says": "The transaction stays open ('idle in transaction'), holding its row locks and keeping VACUUM from removing old row versions; the client disconnecting rolls it back (lab: nothing was saved).",
+      "says_hi": "Transaction khuli rehti hai ('idle in transaction'), row locks pakde aur VACUUM ko rokte hue; disconnect pe rollback.",
+      "lab": [
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 19 WHERE id = 1;",
+          {
+            "v": 10,
+            "errors": [],
+            "warnings": [],
+            "open": true
+          }
+        ],
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 17 WHERE id = 1;\nSAVEPOINT a;\nUPDATE lab_tx SET v = 18 WHERE id = 1;\nROLLBACK TO a;",
+          {
+            "v": 10,
+            "errors": [],
+            "warnings": [],
+            "open": true
+          }
+        ]
+      ]
+    },
+    "set_txn_outside": {
+      "kind": "wrong",
+      "says": "Outside a transaction block SET TRANSACTION only warns (25P01 'SET TRANSACTION can only be used in transaction blocks') and changes nothing: the next BEGIN runs at the default level (lab). Put it right after BEGIN (or write BEGIN ISOLATION LEVEL ...).",
+      "says_hi": "Transaction block ke bahar SET TRANSACTION sirf warning deta hai aur kuch nahi badalta; ise BEGIN ke turant baad likho.",
+      "lab": [
+        [
+          "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;\nBEGIN;\nUPDATE lab_tx SET v = 26 WHERE id = 1;\nCOMMIT;",
+          {
+            "v": 26,
+            "errors": [],
+            "warnings": [
+              "SET TRANSACTION can only be used in transaction blocks"
+            ],
+            "open": false
+          }
+        ],
+        [
+          "BEGIN;\nSET TRANSACTION ISOLATION LEVEL SERIALIZABLE;\nUPDATE lab_tx SET v = 36 WHERE id = 1;\nCOMMIT;",
+          {
+            "v": 36,
+            "errors": [],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "set_txn_late": {
+      "kind": "error",
+      "error": "25001 SET TRANSACTION ISOLATION LEVEL must be called before any query",
+      "says": "'SET TRANSACTION ISOLATION LEVEL must be called before any query' (25001), and the error aborts the transaction (25P02): nothing after it runs and COMMIT rolls back (lab). Put it right after BEGIN.",
+      "says_hi": "Query ke baad SET TRANSACTION ISOLATION LEVEL mana hai (25001), aur transaction ruk jaati hai; ise BEGIN ke turant baad likho.",
+      "lab": [
+        [
+          "BEGIN;\nSELECT v FROM lab_tx;\nSET TRANSACTION ISOLATION LEVEL SERIALIZABLE;\nUPDATE lab_tx SET v = 25 WHERE id = 1;\nCOMMIT;",
+          {
+            "v": 10,
+            "errors": [
+              "SET TRANSACTION ISOLATION LEVEL must be called before any query",
+              "current transaction is aborted, commands ignored until end of transaction block"
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "no_txn_writes": {
+      "kind": "check",
+      "says": "With no BEGIN each change is saved on its own: if a later one fails, the earlier ones stay (lab). Inside BEGIN, an error aborts the whole transaction (25P02 for everything after it) and COMMIT then rolls back (lab), so the changes are all or nothing.",
+      "says_hi": "BEGIN ke bina har badlav alag save hota hai; BEGIN ke andar error poori transaction rok deta hai aur COMMIT rollback ban jaata hai.",
+      "lab": [
+        [
+          "UPDATE lab_tx SET v = 21 WHERE id = 1;\nINSERT INTO lab_tx VALUES (1, 99);",
+          {
+            "v": 21,
+            "errors": [
+              "duplicate key value violates unique constraint \"lab_tx_pkey\""
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 22 WHERE id = 1;\nINSERT INTO lab_tx VALUES (1, 99);\nROLLBACK;",
+          {
+            "v": 10,
+            "errors": [
+              "duplicate key value violates unique constraint \"lab_tx_pkey\""
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ],
+        [
+          "BEGIN;\nUPDATE lab_tx SET v = 23 WHERE id = 1;\nINSERT INTO lab_tx VALUES (1, 99);\nCOMMIT;",
+          {
+            "v": 10,
+            "errors": [
+              "duplicate key value violates unique constraint \"lab_tx_pkey\""
+            ],
+            "warnings": [],
+            "open": false
+          }
+        ]
+      ]
+    },
+    "proven": [
+      "postgresql"
+    ]
+  }
 }

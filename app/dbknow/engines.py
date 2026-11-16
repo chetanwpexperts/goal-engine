@@ -11,9 +11,10 @@
 
 Everything one engine owns (how it is named, its syntax marks, its error format) is in its dialect file
 (app/dbknow/dialects/<engine>.json: 'named', 'query_marks', 'weak_marks', 'error_marks'); this file only reasons over them.
-SQL Server, Oracle and SQLite are 'notes_only': recognised, answered with general SQL reasoning plus notes, and said so.
-SQLite's errors and its refused syntax are lab-tested already (E1 night 1, syntax_family), and from E1 night 3 its query rules
-answer for it on their own (query_family), so its notes line says which parts are lab-tested.
+SQL Server and Oracle are 'notes_only': recognised, answered with general SQL reasoning plus notes, and said so. SQLite was
+notes-only until E1 night 4: its errors and refused syntax (night 1, syntax_family), its table designs (night 2), its query
+rules (night 3, query_family) and its transactions and locking (night 4, txn_rules) are lab-proven, so it answers for itself.
+An engine part-way through its nights says which parts are lab-tested (its dialect file's 'proven_parts').
 """
 
 import json
@@ -268,7 +269,7 @@ def detected_line(rec: dict, lang: str) -> tuple[str, list[str]]:
 
 
 def notes_line(eid: str, lang: str, sql: str = "") -> str:
-    """For SQL Server / Oracle / SQLite: which parts are general SQL reasoning and which are only notes (the notes that speak
+    """For a notes-only database (SQL Server / Oracle): which parts are general SQL reasoning and which are only notes (the notes that speak
     to what the query uses, when it shows any: LIMIT, IFNULL, NOW(), ...)."""
     if not notes_only(eid):
         return ""

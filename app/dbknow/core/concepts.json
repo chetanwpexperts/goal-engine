@@ -39248,6 +39248,1681 @@
     "postgresql"
    ],
    "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_transaction",
+   "kind": "concept",
+   "title": {
+    "en": "Transactions in SQLite (BEGIN, COMMIT, ROLLBACK)",
+    "hinglish": "SQLite mein transaction (BEGIN, COMMIT, ROLLBACK)",
+    "hindi": "SQLite में transaction (BEGIN, COMMIT, ROLLBACK)"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "transactions?"
+    ],
+    [
+     "sqlite3?",
+     "(begin|commit|rollback)"
+    ],
+    [
+     "sqlite3?",
+     "(end transaction|atomic\\w*|all or nothing)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a transaction in sqlite",
+     "how do commit and rollback work in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein transaction kya hota hai",
+     "sqlite mein commit rollback kaise kaam karta hai"
+    ],
+    "hindi": [
+     "SQLite में transaction क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A transaction groups statements so they are saved together or not at all. With no BEGIN, SQLite runs each statement as its own little transaction and saves it at once (autocommit). BEGIN starts one; COMMIT (or its other name, END) saves everything since BEGIN; ROLLBACK throws it all away. Until COMMIT, other connections don't see the changes. SQLite has no START TRANSACTION or BEGIN WORK: write BEGIN, or BEGIN IMMEDIATE when the transaction will write.",
+    "hinglish": "Transaction kai statements ko jodta hai taaki sab ek saath save hon ya koi nahi. BEGIN ke bina SQLite har statement ko alag chhoti transaction mein chala ke turant save karta hai (autocommit). BEGIN shuru karta hai, COMMIT (ya END) sab save karta hai, ROLLBACK sab hata deta hai. COMMIT tak doosre connections badlav nahi dekhte. START TRANSACTION nahi hota: BEGIN likho (likhna ho to BEGIN IMMEDIATE).",
+    "hindi": "Transaction कई statements को जोड़ता है ताकि सब एक साथ save हों या कोई नहीं। BEGIN शुरू करता है, COMMIT save करता है, ROLLBACK सब हटा देता है।"
+   },
+   "mistake": {
+    "en": "Running several related changes without BEGIN: if the third one stops, the first two are already saved and the data is half-changed.",
+    "hinglish": "Kai jude badlav bina BEGIN ke chalana: teesra ruk gaya to pehle do save ho chuke, data aadha badla.",
+    "hindi": "बिना BEGIN के कई जुड़े बदलाव चलाना: बीच में रुका तो आधा data बदल गया।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "BEGIN;\nUPDATE products SET stock = stock - 1 WHERE id = 1;\nROLLBACK;\nSELECT id, stock FROM products WHERE id = 1"
+     },
+     "columns": [
+      "id",
+      "stock"
+     ],
+     "result": [
+      [
+       "1",
+       "12"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): the UPDATE inside BEGIN ... ROLLBACK left stock at 12; with no BEGIN a later ROLLBACK fails with 'cannot rollback - no transaction is active' and the change stays; START TRANSACTION is a syntax error.",
+    "mysql": "Lab (MariaDB 10.11): START TRANSACTION or BEGIN; a ROLLBACK with no transaction open does nothing and says nothing.",
+    "mariadb": "Lab: START TRANSACTION / BEGIN; ROLLBACK outside a transaction is silent.",
+    "postgresql": "Lab (PostgreSQL 16): BEGIN or START TRANSACTION; COMMIT / ROLLBACK with none open only warn 'there is no transaction in progress'.",
+    "sqlserver": "Notes only (not lab-tested here): BEGIN TRAN / COMMIT TRAN.",
+    "oracle": "Notes only (not lab-tested here): no BEGIN: a transaction starts with the first change and ends with COMMIT / ROLLBACK."
+   },
+   "fundamentals": [
+    "changes_safety",
+    "transactions"
+   ],
+   "related": [
+    "sqlite_begin_immediate",
+    "sqlite_savepoint",
+    "transaction"
+   ],
+   "source": "https://www.sqlite.org/lang_transaction.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_begin_immediate",
+   "kind": "concept",
+   "title": {
+    "en": "BEGIN IMMEDIATE vs plain BEGIN (DEFERRED) in SQLite",
+    "hinglish": "SQLite mein BEGIN IMMEDIATE vs saadha BEGIN (DEFERRED)",
+    "hindi": "SQLite में BEGIN IMMEDIATE बनाम साधारण BEGIN"
+   },
+   "terms": [
+    [
+     "begin",
+     "immediate"
+    ],
+    [
+     "sqlite3?",
+     "deferred"
+    ],
+    [
+     "begin",
+     "deferred"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is begin immediate in sqlite",
+     "begin immediate vs begin deferred in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein begin immediate kab use kare",
+     "begin immediate aur begin mein kya farak hai"
+    ],
+    "hindi": [
+     "SQLite में BEGIN IMMEDIATE क्या है"
+    ]
+   },
+   "answer": {
+    "en": "A plain BEGIN is DEFERRED: it takes no lock until the first read, and only a read lock then. Its first write must upgrade to the write lock, and if another connection wrote in between, that write fails at once with 'database is locked', without waiting for the busy timeout. BEGIN IMMEDIATE takes the write lock at the start, where the busy timeout does wait, so a transaction that reads and then writes (check the stock, then take one) should start with BEGIN IMMEDIATE. Readers are not blocked by it. Use plain BEGIN for transactions that only read.",
+    "hinglish": "Saadha BEGIN DEFERRED hai: pehle read tak koi lock nahi, phir sirf read lock. Pehla write lock upgrade karta hai, aur beech mein kisi aur ne likha to wo write turant 'database is locked' deta hai, busy timeout ka intezaar kiye bina. BEGIN IMMEDIATE shuru mein hi write lock leta hai, jahan timeout intezaar karta hai; isliye padh-kar-likhne wali transaction (stock dekho, phir ghatao) BEGIN IMMEDIATE se. Readers nahi rukte.",
+    "hindi": "साधारण BEGIN पहले सिर्फ़ read lock लेता है; बाद का write fail हो सकता है। पढ़कर लिखने वाली transaction BEGIN IMMEDIATE से शुरू करें।"
+   },
+   "mistake": {
+    "en": "Raising the busy timeout to fix 'database is locked' in a transaction that reads first: the upgrade never waits, so it keeps failing.",
+    "hinglish": "Padh-kar-likhne wali transaction ka 'database is locked' busy timeout badha ke theek karna: upgrade intezaar karta hi nahi.",
+    "hindi": "busy timeout बढ़ाना: upgrade इंतज़ार करता ही नहीं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "BEGIN IMMEDIATE;\nSELECT stock FROM products WHERE id = 3;\nUPDATE products SET stock = stock - 1 WHERE id = 3;\nCOMMIT;\nSELECT id, stock FROM products WHERE id = 3"
+     },
+     "columns": [
+      "id",
+      "stock"
+     ],
+     "result": [
+      [
+       "3",
+       "4"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): with another connection writing, BEGIN; SELECT; UPDATE failed after 0.00 s with a 3-second busy timeout ('database is locked'; SQLITE_BUSY_SNAPSHOT in WAL mode), while BEGIN IMMEDIATE waited about 0.5 s and went through.",
+    "mysql": "Lab (MariaDB 10.11): rows are locked, not the file; SELECT ... FOR UPDATE locks the rows you read. BEGIN IMMEDIATE is a syntax error.",
+    "mariadb": "Lab: row locks; BEGIN IMMEDIATE is a syntax error (use SELECT ... FOR UPDATE).",
+    "postgresql": "Lab (PostgreSQL 16): row locks; BEGIN IMMEDIATE is a syntax error (use SELECT ... FOR UPDATE).",
+    "sqlserver": "Notes only (not lab-tested here): UPDLOCK hints or SERIALIZABLE for read-then-write.",
+    "oracle": "Notes only (not lab-tested here): SELECT ... FOR UPDATE."
+   },
+   "fundamentals": [
+    "locking",
+    "transactions"
+   ],
+   "related": [
+    "sqlite_busy_snapshot",
+    "sqlite_busy_timeout",
+    "sqlite_transaction"
+   ],
+   "source": "https://www.sqlite.org/lang_transaction.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_busy_timeout",
+   "kind": "concept",
+   "title": {
+    "en": "busy_timeout in SQLite",
+    "hinglish": "SQLite mein busy_timeout",
+    "hindi": "SQLite में busy_timeout"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "busy[_ ]?timeout"
+    ],
+    [
+     "busy[_ ]?handler"
+    ],
+    [
+     "pragma busy_timeout"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is busy_timeout in sqlite",
+     "what does busy_timeout do in sqlite"
+    ],
+    "hinglish": [
+     "sqlite busy_timeout kya karta hai"
+    ],
+    "hindi": [
+     "SQLite में busy_timeout क्या करता है"
+    ]
+   },
+   "answer": {
+    "en": "busy_timeout is how long (in milliseconds) a connection keeps retrying when the database is locked by another connection, before giving up with 'database is locked'. SQLite's own default is 0 (give up at once); Python's sqlite3 sets 5 seconds (its timeout argument). It is set per connection (PRAGMA busy_timeout = 5000) and is not saved in the file, so every connection must set it. It helps a writer waiting for another writer to finish, but not a read transaction trying to upgrade to a write (that fails at once: start it with BEGIN IMMEDIATE).",
+    "hinglish": "busy_timeout batata hai ki database doosre connection ne lock kiya ho to connection kitne milliseconds tak dobara koshish kare, phir 'database is locked'. SQLite ka default 0 (turant haar), Python ka sqlite3 5 second. Ye har connection pe lagta hai (PRAGMA busy_timeout = 5000), file mein save nahi hota. Ek writer ko doosre ke khatam hone ka intezaar karata hai, par padhne wali transaction ke write upgrade pe kaam nahi karta (BEGIN IMMEDIATE lo).",
+    "hindi": "busy_timeout = lock मिलने तक कितने milliseconds इंतज़ार करें; हर connection पर लगाना पड़ता है।"
+   },
+   "mistake": {
+    "en": "Setting it once in a migration or the sqlite3 shell and expecting the app's connections to have it: it lives only on the connection that set it.",
+    "hinglish": "Ek baar shell mein set karke sochna ki app ke connections pe bhi laga: ye sirf usi connection pe rehta hai.",
+    "hindi": "एक बार shell में set करना: ये उसी connection पर रहता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "PRAGMA busy_timeout = 3000;\nSELECT * FROM pragma_busy_timeout"
+     },
+     "columns": [
+      "timeout"
+     ],
+     "result": [
+      [
+       "3000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): a new connection reported busy_timeout 0 (Python's module 5000); a value set on one connection was 0 on the next; a writer with 3000 waited for the other writer and went through.",
+    "mysql": "Lab (MariaDB 10.11): innodb_lock_wait_timeout (seconds) ends a row-lock wait with 1205.",
+    "mariadb": "Lab: innodb_lock_wait_timeout, then 1205.",
+    "postgresql": "Lab (PostgreSQL 16): lock_timeout ends a wait with 55P03 (default: wait for ever).",
+    "sqlserver": "Notes only (not lab-tested here): SET LOCK_TIMEOUT ms (error 1222).",
+    "oracle": "Notes only (not lab-tested here): FOR UPDATE WAIT n / NOWAIT."
+   },
+   "fundamentals": [
+    "locking"
+   ],
+   "related": [
+    "sqlite_database_locked",
+    "sqlite_busy_snapshot",
+    "lock_wait_timeout"
+   ],
+   "source": "https://www.sqlite.org/pragma.html#pragma_busy_timeout",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_busy_snapshot",
+   "kind": "concept",
+   "title": {
+    "en": "'database is locked' even with a busy timeout (SQLite)",
+    "hinglish": "Busy timeout ke baad bhi 'database is locked' (SQLite)",
+    "hindi": "busy timeout के बाद भी 'database is locked' (SQLite)"
+   },
+   "terms": [
+    [
+     "sqlite_busy_snapshot"
+    ],
+    [
+     "busy_snapshot"
+    ],
+    [
+     "database is locked",
+     "(busy[_ ]?timeout|even|despite|bhi|फिर भी)"
+    ],
+    [
+     "sqlite3?",
+     "locked",
+     "(busy[_ ]?timeout|despite)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is sqlite_busy_snapshot",
+     "why does sqlite say database is locked even with busy_timeout"
+    ],
+    "hinglish": [
+     "busy_timeout ke baad bhi sqlite database is locked kyun deta hai"
+    ],
+    "hindi": [
+     "busy_timeout होने पर भी SQLite database is locked क्यों देता है"
+    ]
+   },
+   "answer": {
+    "en": "It happens in a transaction that read first and wrote later: a plain BEGIN holds only a read view of the data, and if another connection wrote and committed after that view was taken, SQLite can't let this transaction write on top of an out-of-date view. The write fails at once with 'database is locked' (SQLITE_BUSY_SNAPSHOT in WAL mode) and the busy timeout is not used, because waiting can't make the old view current. Fix: start such transactions with BEGIN IMMEDIATE, or retry the whole transaction from BEGIN.",
+    "hinglish": "Ye us transaction mein hota hai jo pehle padhti hai, baad mein likhti hai: saadha BEGIN data ka ek purana view rakhta hai, aur agar baad mein kisi aur ne likh ke commit kiya to SQLite is transaction ko purane view pe likhne nahi deta. Write turant 'database is locked' (WAL mein SQLITE_BUSY_SNAPSHOT) deta hai, busy timeout use nahi hota. Ilaaj: BEGIN IMMEDIATE, ya poori transaction BEGIN se dobara.",
+    "hindi": "पहले पढ़कर बाद में लिखने वाली transaction में होता है; BEGIN IMMEDIATE से शुरू करें या पूरी transaction दोबारा चलाएँ।"
+   },
+   "mistake": {
+    "en": "Retrying only the failed UPDATE inside the same transaction: the view is still old, so it fails again; roll back and start over.",
+    "hinglish": "Usi transaction mein sirf UPDATE dobara chalana: view abhi bhi purana hai; rollback karke shuru se.",
+    "hindi": "उसी transaction में सिर्फ़ UPDATE दोबारा: फिर fail; rollback करके शुरू से।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "BEGIN IMMEDIATE;\nUPDATE products SET stock = stock - 1 WHERE id = 1;\nCOMMIT;\nSELECT id, stock FROM products WHERE id = 1"
+     },
+     "columns": [
+      "id",
+      "stock"
+     ],
+     "result": [
+      [
+       "1",
+       "11"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53, WAL): connection A ran BEGIN; SELECT; B updated and committed; A's UPDATE then failed with 'database is locked' (SQLITE_BUSY_SNAPSHOT) at once. In rollback-journal mode B's write itself was refused while A held its read lock.",
+    "mysql": "Lab (MariaDB 10.11): no such case; a plain read doesn't lock, and the UPDATE reads the newest row (use FOR UPDATE to lock what you read).",
+    "mariadb": "Lab: the UPDATE uses the newest row.",
+    "postgresql": "Lab (PostgreSQL 16): at REPEATABLE READ the same story ends in 40001 'could not serialize access' (retry the transaction).",
+    "sqlserver": "Notes only (not lab-tested here): UPDLOCK / SERIALIZABLE.",
+    "oracle": "Notes only (not lab-tested here): ORA-08177 at SERIALIZABLE."
+   },
+   "fundamentals": [
+    "locking",
+    "transactions"
+   ],
+   "related": [
+    "sqlite_begin_immediate",
+    "sqlite_busy_timeout",
+    "sqlite_database_locked"
+   ],
+   "source": "https://www.sqlite.org/rescode.html#busy_snapshot",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_one_writer",
+   "kind": "concept",
+   "title": {
+    "en": "Many writers at once in SQLite",
+    "hinglish": "SQLite mein ek saath kai writers",
+    "hindi": "SQLite में एक साथ कई writers"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "(concurren\\w*|parallel|simultaneous\\w*|same time|ek saath|at once)",
+     "(writes?|writers?|likh\\w*)"
+    ],
+    [
+     "sqlite3?",
+     "(one|single|ek) writer"
+    ],
+    [
+     "sqlite3?",
+     "(many|multiple|kai) writers"
+    ],
+    [
+     "sqlite3?",
+     "एक साथ",
+     "(लिख\\w*|writers?)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can sqlite handle concurrent writes",
+     "how many writers can sqlite have at once"
+    ],
+    "hinglish": [
+     "sqlite mein ek saath kai writers kaise kaam karte hain"
+    ],
+    "hindi": [
+     "क्या SQLite में एक साथ कई लोग लिख सकते हैं"
+    ]
+   },
+   "answer": {
+    "en": "One at a time. SQLite locks the whole database file for a write, never a row or a table: while one connection is writing (from its first change, or from BEGIN IMMEDIATE, until COMMIT), every other writer waits (up to its busy timeout) or gets 'database is locked'. Readers can go on: always in WAL mode, and in the default rollback-journal mode except during the moment of commit. So keep write transactions short, turn on WAL, set a busy timeout everywhere, and send many small writes through one transaction. Many writers busy at the same moment (a big web app) is the job of a client-server database.",
+    "hinglish": "Ek waqt mein ek. SQLite likhte waqt poori file lock karta hai, row ya table nahi: jab ek connection likh raha hai (pehle badlav ya BEGIN IMMEDIATE se COMMIT tak), baaki writers intezaar karte hain (busy timeout tak) ya 'database is locked'. Readers chalte rehte hain (WAL mein hamesha). Isliye write transactions chhoti, WAL on, har jagah busy timeout, aur chhote writes ek transaction mein. Ek saath bahut writers ke liye client-server database chahiye.",
+    "hindi": "एक समय में एक writer। SQLite पूरी file lock करता है; WAL, busy timeout और छोटी transactions रखें।"
+   },
+   "mistake": {
+    "en": "Opening one long transaction per request in a web app and keeping it while the page renders: every other request's write waits behind it.",
+    "hinglish": "Web app mein har request pe lambi transaction kholna aur page banne tak rakhna: baaki sab writes uske peeche rukte hain.",
+    "hindi": "लंबी write transaction रखना: बाकी सब writes रुकते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "BEGIN IMMEDIATE;\nINSERT INTO categories (id, name, parent_id) VALUES (6, 'Games', NULL);\nCOMMIT;\nSELECT COUNT(*) FROM categories"
+     },
+     "columns": [
+      "COUNT(*)"
+     ],
+     "result": [
+      [
+       "6"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): while connection A held a write, B's UPDATE and B's BEGIN IMMEDIATE got 'database is locked' (timeout 0) and B's SELECT still read; with a 3-second timeout B waited and went through once A committed.",
+    "mysql": "Lab (MariaDB 10.11): writers lock rows; two writers on different rows don't wait for each other.",
+    "mariadb": "Lab: row locks.",
+    "postgresql": "Lab (PostgreSQL 16): row locks; different rows don't wait.",
+    "sqlserver": "Notes only (not lab-tested here): row and page locks.",
+    "oracle": "Notes only (not lab-tested here): row locks."
+   },
+   "fundamentals": [
+    "locking"
+   ],
+   "related": [
+    "sqlite_database_locked",
+    "sqlite_wal",
+    "sqlite_busy_timeout"
+   ],
+   "source": "https://www.sqlite.org/lockingv3.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_savepoint",
+   "kind": "concept",
+   "title": {
+    "en": "SAVEPOINT in SQLite",
+    "hinglish": "SQLite mein SAVEPOINT",
+    "hindi": "SQLite में SAVEPOINT"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "savepoints?"
+    ],
+    [
+     "sqlite3?",
+     "rollback to"
+    ],
+    [
+     "sqlite3?",
+     "release",
+     "savepoint"
+    ],
+    [
+     "sqlite3?",
+     "(undo|wapas)\\w*",
+     "(part|hissa)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a savepoint in sqlite",
+     "how to undo part of a transaction in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein savepoint kya hota hai"
+    ],
+    "hindi": [
+     "SQLite में savepoint क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A savepoint is a named point inside a transaction you can go back to. SAVEPOINT name marks it; ROLLBACK TO name undoes everything after it but keeps the transaction open (you still need COMMIT or ROLLBACK); RELEASE name keeps the work and forgets the mark. Savepoints nest, which is how SQLite does 'a transaction inside a transaction' (a second BEGIN is refused). In SQLite a SAVEPOINT outside any transaction starts one, and RELEASE of that outermost savepoint commits it.",
+    "hinglish": "Savepoint transaction ke andar ek naam wala point hai jahan wapas ja sakte ho. SAVEPOINT naam mark karta hai; ROLLBACK TO naam uske baad ka sab hata deta hai par transaction khuli rehti hai (COMMIT/ROLLBACK phir bhi chahiye); RELEASE naam kaam rakhta hai aur mark bhool jaata hai. SQLite mein transaction ke andar transaction aise hi hoti hai (doosra BEGIN mana hai). Bahar ka SAVEPOINT nayi transaction shuru karta hai, uska RELEASE commit karta hai.",
+    "hindi": "Savepoint transaction के अंदर वापस जाने का नाम वाला बिंदु है: SAVEPOINT, ROLLBACK TO, RELEASE।"
+   },
+   "mistake": {
+    "en": "Ending a script with ROLLBACK TO and thinking the transaction is over: it is still open and still holds the write lock.",
+    "hinglish": "Script ROLLBACK TO pe khatam karke sochna transaction khatam: wo abhi bhi khuli hai aur lock pakde hai.",
+    "hindi": "ROLLBACK TO के बाद transaction खुली रहती है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "BEGIN;\nUPDATE products SET stock = 50 WHERE id = 4;\nSAVEPOINT before_toys;\nUPDATE products SET stock = 0 WHERE id = 5;\nROLLBACK TO before_toys;\nCOMMIT;\nSELECT id, stock FROM products WHERE id IN (4, 5) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "stock"
+     ],
+     "result": [
+      [
+       "4",
+       "50"
+      ],
+      [
+       "5",
+       "15"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): ROLLBACK TO kept the transaction open (in_transaction stayed true); a SAVEPOINT with no BEGIN started a transaction and RELEASE saved it; RELEASE / ROLLBACK TO an unknown name: 'no such savepoint: name'.",
+    "mysql": "Lab (MariaDB 10.11): SAVEPOINT / ROLLBACK TO SAVEPOINT / RELEASE SAVEPOINT; outside START TRANSACTION a savepoint is forgotten at once (1305 'SAVEPOINT a does not exist').",
+    "mariadb": "Lab: 1305 for an unknown or forgotten savepoint.",
+    "postgresql": "Lab (PostgreSQL 16): only inside BEGIN (25P01 'can only be used in transaction blocks' outside); an unknown name is 3B001 and aborts the transaction.",
+    "sqlserver": "Notes only (not lab-tested here): SAVE TRANSACTION name / ROLLBACK TRANSACTION name.",
+    "oracle": "Notes only (not lab-tested here): SAVEPOINT name / ROLLBACK TO name."
+   },
+   "fundamentals": [
+    "transactions",
+    "changes_safety"
+   ],
+   "related": [
+    "savepoint",
+    "sqlite_nested_transactions",
+    "sqlite_transaction"
+   ],
+   "source": "https://www.sqlite.org/lang_savepoint.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_wal_checkpoint",
+   "kind": "concept",
+   "title": {
+    "en": "WAL checkpoints in SQLite (why the -wal file grows)",
+    "hinglish": "SQLite mein WAL checkpoint (-wal file kyun badhti hai)",
+    "hindi": "SQLite में WAL checkpoint"
+   },
+   "terms": [
+    [
+     "(wal|-wal)",
+     "(checkpoint\\w*|grow\\w*|badh\\w*|bad[ia]|large|size)"
+    ],
+    [
+     "wal_checkpoint"
+    ],
+    [
+     "wal_autocheckpoint"
+    ],
+    [
+     "sqlite3?",
+     "checkpoint\\w*"
+    ],
+    [
+     "wal",
+     "(बड़ी|बढ़\\w*|बड़ा)"
+    ],
+    [
+     "sqlite3?",
+     "wal",
+     "file",
+     "(क्यों|kyun|kyon|why|grow\\w*|badh\\w*)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a wal checkpoint in sqlite",
+     "why does the sqlite wal file keep growing"
+    ],
+    "hinglish": [
+     "sqlite ki wal file badi kyun hoti jaati hai"
+    ],
+    "hindi": [
+     "SQLite की WAL file बड़ी क्यों होती जाती है"
+    ]
+   },
+   "answer": {
+    "en": "In WAL mode a change is first appended to the -wal file next to the database; a checkpoint copies those pages back into the main file so the -wal file can start over. SQLite does it automatically after about 1000 pages (wal_autocheckpoint), but a checkpoint can't move past a reader that is still looking at an older view, so a long-open read transaction (a cursor never finished, a report left running) lets the -wal file grow without limit. Finish reads, and run PRAGMA wal_checkpoint(TRUNCATE) at a quiet moment to shrink it.",
+    "hinglish": "WAL mode mein badlav pehle -wal file mein judta hai; checkpoint un pages ko main file mein copy karta hai taaki -wal file phir se shuru ho. SQLite ~1000 pages ke baad khud karta hai (wal_autocheckpoint), par checkpoint us reader se aage nahi ja sakta jo purana view dekh raha hai, isliye lambi khuli read transaction (adhoora cursor) -wal file ko badhata jaata hai. Reads khatam karo, aur shaant waqt PRAGMA wal_checkpoint(TRUNCATE).",
+    "hindi": "Checkpoint -wal file के pages main file में डालता है; लंबा खुला reader उसे रोकता है, इसलिए -wal file बढ़ती है।"
+   },
+   "mistake": {
+    "en": "Deleting the -wal file to save space: committed changes that weren't checkpointed yet are lost.",
+    "hinglish": "Jagah bachane ke liye -wal file delete karna: commit hue par checkpoint na hue badlav kho jaate hain.",
+    "hindi": "-wal file delete करना: बदलाव खो जाते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "PRAGMA wal_autocheckpoint"
+     },
+     "columns": [
+      "wal_autocheckpoint"
+     ],
+     "result": [
+      [
+       "1000"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): with a reader's transaction open, wal_checkpoint(TRUNCATE) returned busy = 1 and the -wal file stayed at about 1 MB; after the reader ended it returned 0 and the file was 0 bytes; wal_autocheckpoint is 1000.",
+    "mysql": "Lab (MariaDB 10.11): the redo log is recycled by the server; a long transaction holds back purge (the undo history grows).",
+    "mariadb": "Lab: a long transaction holds back purge.",
+    "postgresql": "Lab (PostgreSQL 16): checkpoints are the server's; a long transaction keeps VACUUM from removing old row versions.",
+    "sqlserver": "Notes only (not lab-tested here): the log grows until a log backup / checkpoint.",
+    "oracle": "Notes only (not lab-tested here): undo retention."
+   },
+   "fundamentals": [
+    "locking"
+   ],
+   "related": [
+    "sqlite_wal",
+    "sqlite_journal_modes",
+    "long_transaction"
+   ],
+   "source": "https://www.sqlite.org/wal.html#checkpointing",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_journal_modes",
+   "kind": "concept",
+   "title": {
+    "en": "Rollback journal vs WAL in SQLite",
+    "hinglish": "SQLite mein rollback journal vs WAL",
+    "hindi": "SQLite में rollback journal बनाम WAL"
+   },
+   "terms": [
+    [
+     "rollback journal"
+    ],
+    [
+     "sqlite3?",
+     "journal",
+     "(modes?|delete|truncate|persist)"
+    ],
+    [
+     "journal_mode",
+     "(delete|truncate|persist|memory|off)"
+    ],
+    [
+     "sqlite3?",
+     "rollback journal"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the rollback journal in sqlite",
+     "rollback journal vs wal in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein journal mode kya hota hai"
+    ],
+    "hindi": [
+     "SQLite में journal mode क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "The journal is how SQLite makes a write all-or-nothing. In the default rollback-journal mode (journal_mode DELETE) the old pages are copied to a -journal file and the database file is changed in place; at commit the writer needs the file to itself, so an open read transaction makes another connection's write fail with 'database is locked'. In WAL mode new pages go to a -wal file instead: readers and the one writer don't block each other. WAL needs all connections on the same machine (not a network share), and the setting is saved in the file.",
+    "hinglish": "Journal se SQLite write ko sab-ya-kuch-nahi banata hai. Default rollback journal (DELETE) mein purane pages -journal file mein copy hote hain aur database file wahin badalti hai; commit pe writer ko file akele chahiye, isliye khuli read transaction doosre ka write 'database is locked' kar deti hai. WAL mein naye pages -wal file mein jaate hain: readers aur ek writer ek doosre ko nahi rokte. WAL ke liye sab connections ek hi machine pe (network share nahi), aur setting file mein save hoti hai.",
+    "hindi": "Rollback journal में reader writer को रोक सकता है; WAL में नहीं। WAL network share पर नहीं चलता।"
+   },
+   "mistake": {
+    "en": "Putting a WAL-mode database on a network drive (NFS / SMB): WAL needs shared memory on one machine.",
+    "hinglish": "WAL database ko network drive pe rakhna: WAL ko ek machine ki shared memory chahiye.",
+    "hindi": "WAL database network drive पर रखना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "PRAGMA journal_mode"
+     },
+     "columns": [
+      "journal_mode"
+     ],
+     "result": [
+      [
+       "delete"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): in DELETE mode, with B's read transaction open, A's autocommit UPDATE and A's COMMIT got 'database is locked'; in WAL mode the same UPDATE went through and B kept reading its old view; journal_mode=WAL stayed set for the next connection.",
+    "mysql": "Lab (MariaDB 10.11): no journal modes; readers don't wait for writers (MVCC).",
+    "mariadb": "Lab: readers don't wait.",
+    "postgresql": "Lab (PostgreSQL 16): one write-ahead log for the server; readers don't wait.",
+    "sqlserver": "Notes only (not lab-tested here): readers wait for writers unless snapshot isolation is on.",
+    "oracle": "Notes only (not lab-tested here): readers never wait."
+   },
+   "fundamentals": [
+    "locking"
+   ],
+   "related": [
+    "sqlite_wal",
+    "sqlite_wal_checkpoint",
+    "sqlite_one_writer"
+   ],
+   "source": "https://www.sqlite.org/pragma.html#pragma_journal_mode",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_exclusive",
+   "kind": "concept",
+   "title": {
+    "en": "BEGIN EXCLUSIVE in SQLite",
+    "hinglish": "SQLite mein BEGIN EXCLUSIVE",
+    "hindi": "SQLite में BEGIN EXCLUSIVE"
+   },
+   "terms": [
+    [
+     "begin",
+     "exclusive"
+    ],
+    [
+     "sqlite3?",
+     "exclusive",
+     "(lock|transaction|mode)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is begin exclusive in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein begin exclusive kya karta hai"
+    ],
+    "hindi": [
+     "SQLite में BEGIN EXCLUSIVE क्या करता है"
+    ]
+   },
+   "answer": {
+    "en": "BEGIN EXCLUSIVE takes the write lock at once like BEGIN IMMEDIATE, and in the default rollback-journal mode it also keeps every other connection from reading until COMMIT. In WAL mode it is the same as IMMEDIATE (readers go on). It is for rare maintenance work that must not be read half-done; for ordinary read-then-write work IMMEDIATE is enough.",
+    "hinglish": "BEGIN EXCLUSIVE BEGIN IMMEDIATE ki tarah turant write lock leta hai, aur default rollback-journal mode mein COMMIT tak baaki connections ko padhne bhi nahi deta. WAL mein ye IMMEDIATE jaisa hi hai. Ye kabhi-kabhi ke maintenance ke liye hai; aam padh-kar-likhne ke liye IMMEDIATE kaafi.",
+    "hindi": "BEGIN EXCLUSIVE write lock लेता है और rollback-journal mode में दूसरों को पढ़ने भी नहीं देता।"
+   },
+   "mistake": {
+    "en": "Using EXCLUSIVE everywhere 'to be safe': in rollback-journal mode every reader then gets 'database is locked' too.",
+    "hinglish": "Har jagah EXCLUSIVE 'safe' ke liye: readers bhi locked.",
+    "hindi": "हर जगह EXCLUSIVE: readers भी रुकते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "BEGIN EXCLUSIVE;\nUPDATE categories SET name = 'Gadgets' WHERE id = 1;\nCOMMIT;\nSELECT id, name FROM categories WHERE id = 1"
+     },
+     "columns": [
+      "id",
+      "name"
+     ],
+     "result": [
+      [
+       "1",
+       "Gadgets"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): during BEGIN EXCLUSIVE another connection's SELECT got 'database is locked' in rollback-journal mode and read normally in WAL mode; during BEGIN IMMEDIATE (with a write) readers read in both.",
+    "mysql": "Lab (MariaDB 10.11): LOCK TABLES t WRITE keeps others out of one table (and commits an open transaction).",
+    "mariadb": "Lab: LOCK TABLES commits the open transaction first.",
+    "postgresql": "Lab (PostgreSQL 16): LOCK TABLE t IN ACCESS EXCLUSIVE MODE inside BEGIN; LOCK TABLES is a syntax error.",
+    "sqlserver": "Notes only (not lab-tested here): TABLOCKX hint.",
+    "oracle": "Notes only (not lab-tested here): LOCK TABLE t IN EXCLUSIVE MODE."
+   },
+   "fundamentals": [
+    "locking"
+   ],
+   "related": [
+    "sqlite_begin_immediate",
+    "sqlite_journal_modes",
+    "row_vs_table_lock"
+   ],
+   "source": "https://www.sqlite.org/lang_transaction.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_isolation",
+   "kind": "concept",
+   "title": {
+    "en": "Isolation level in SQLite",
+    "hinglish": "SQLite mein isolation level",
+    "hindi": "SQLite में isolation level"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "isolation"
+    ],
+    [
+     "sqlite3?",
+     "(serializable|read[ _]uncommitted|dirty reads?|read committed)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is the isolation level in sqlite",
+     "does sqlite have read committed"
+    ],
+    "hinglish": [
+     "sqlite mein isolation level kya hota hai"
+    ],
+    "hindi": [
+     "SQLite में isolation level क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "SQLite has one level, SERIALIZABLE: there is only ever one writer, and each read transaction sees the database as it was when it started, never someone else's uncommitted changes. There is no SET TRANSACTION ISOLATION LEVEL (it is a syntax error). The only exception is PRAGMA read_uncommitted, which matters only for connections sharing one cache inside one process. So the question in SQLite isn't which level, but when the write lock is taken (BEGIN vs BEGIN IMMEDIATE).",
+    "hinglish": "SQLite mein ek hi level hai, SERIALIZABLE: hamesha ek writer, aur har read transaction database ko waisa dekhti hai jaisa shuru mein tha, kisi ki uncommitted cheez nahi. SET TRANSACTION ISOLATION LEVEL syntax error hai. Sirf PRAGMA read_uncommitted (ek process mein shared cache ke liye). Isliye SQLite mein sawaal level ka nahi, write lock kab lete ho (BEGIN vs BEGIN IMMEDIATE) ka hai.",
+    "hindi": "SQLite में एक ही level है: SERIALIZABLE; SET TRANSACTION नहीं होता।"
+   },
+   "mistake": {
+    "en": "Copying SET TRANSACTION ISOLATION LEVEL READ COMMITTED from MySQL code: SQLite refuses it ('near SET: syntax error').",
+    "hinglish": "MySQL code se SET TRANSACTION copy karna: syntax error.",
+    "hindi": "SET TRANSACTION copy करना: syntax error।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "PRAGMA read_uncommitted"
+     },
+     "columns": [
+      "read_uncommitted"
+     ],
+     "result": [
+      [
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): SET TRANSACTION ISOLATION LEVEL ... and BEGIN TRANSACTION ISOLATION LEVEL ... are syntax errors; a read transaction kept seeing 90 after another connection committed 89 (its own view); read_uncommitted is 0.",
+    "mysql": "Lab (MariaDB 10.11): REPEATABLE READ by default; SET TRANSACTION ... before START TRANSACTION, refused inside one (1568).",
+    "mariadb": "Lab: SET TRANSACTION goes before START TRANSACTION (1568 inside).",
+    "postgresql": "Lab (PostgreSQL 16): READ COMMITTED by default; SET TRANSACTION right after BEGIN (before any query, else 25001; outside a block it only warns).",
+    "sqlserver": "Notes only (not lab-tested here): READ COMMITTED by default.",
+    "oracle": "Notes only (not lab-tested here): READ COMMITTED by default."
+   },
+   "fundamentals": [
+    "transactions"
+   ],
+   "related": [
+    "isolation_levels",
+    "sqlite_begin_immediate",
+    "sqlite_transaction"
+   ],
+   "source": "https://www.sqlite.org/isolation.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_bulk_insert",
+   "kind": "concept",
+   "title": {
+    "en": "Many INSERTs fast in SQLite (one transaction)",
+    "hinglish": "SQLite mein bahut saare INSERT tez (ek transaction)",
+    "hindi": "SQLite में बहुत सारे INSERT तेज़"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "(inserts?|bulk|many rows|lakhs?|thousands)",
+     "(slow\\w*|fast\\w*|speed\\w*|tez|quick\\w*|jaldi)"
+    ],
+    [
+     "sqlite3?",
+     "bulk",
+     "(insert\\w*|load\\w*)"
+    ],
+    [
+     "sqlite3?",
+     "(bahut|saare|sare|lakhs?|hazaar\\w*|many|बहुत|सारे)",
+     "inserts?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "why are single inserts slow in sqlite",
+     "how to insert many rows fast in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein bahut saare insert ek saath kaise daale"
+    ],
+    "hindi": [
+     "SQLite में बहुत सारे insert एक साथ कैसे डालें"
+    ]
+   },
+   "answer": {
+    "en": "Each statement outside a transaction is its own transaction, and SQLite waits for the disk to confirm every commit. Ten thousand single INSERTs are ten thousand disk syncs. Put them in one transaction (BEGIN; ... the INSERTs ...; COMMIT) and there is one sync: in the lab 500 rows went from about 0.5 s to 0.002 s. Reusing one prepared INSERT with parameters (executemany) helps too. Very large loads can be committed every few thousand rows.",
+    "hinglish": "Transaction ke bahar har statement apni transaction hai, aur SQLite har commit pe disk ki pushti ka intezaar karta hai. Das hazaar alag INSERT = das hazaar disk sync. Unhe ek transaction mein daalo (BEGIN; ... INSERTs ...; COMMIT): ek sync. Lab mein 500 rows 0.5 s se 0.002 s. Ek prepared INSERT parameters ke saath (executemany) bhi madad karta hai.",
+    "hindi": "सारे INSERT एक transaction (BEGIN ... COMMIT) में डालें: एक ही disk sync।"
+   },
+   "mistake": {
+    "en": "Turning off synchronous (PRAGMA synchronous = OFF) to speed up inserts: a power cut can then damage the database; one transaction gives the speed safely.",
+    "hinglish": "Insert tez karne ke liye synchronous OFF karna: bijli jaane pe database kharab ho sakta hai; ek transaction safe tareeka hai.",
+    "hindi": "synchronous OFF करना खतरनाक है; एक transaction सुरक्षित है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "BEGIN;\nINSERT INTO categories (id, name, parent_id) VALUES (6, 'Games', NULL);\nINSERT INTO categories (id, name, parent_id) VALUES (7, 'Music', NULL);\nCOMMIT;\nSELECT COUNT(*) FROM categories"
+     },
+     "columns": [
+      "COUNT(*)"
+     ],
+     "result": [
+      [
+       "7"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53, a file database): 500 single-row INSERTs took 0.51 s in autocommit and 0.002 s inside one BEGIN ... COMMIT.",
+    "mysql": "Lab (MariaDB 10.11): autocommit also syncs per statement (innodb_flush_log_at_trx_commit = 1); one transaction or a multi-row INSERT is faster.",
+    "mariadb": "Lab: one transaction or a multi-row INSERT.",
+    "postgresql": "Lab (PostgreSQL 16): each autocommit statement waits for its WAL flush; COPY or one transaction is faster.",
+    "sqlserver": "Notes only (not lab-tested here): BULK INSERT / one transaction.",
+    "oracle": "Notes only (not lab-tested here): INSERT /*+ APPEND */ or one transaction."
+   },
+   "fundamentals": [
+    "transactions",
+    "repeated_work"
+   ],
+   "related": [
+    "sqlite_transaction",
+    "autocommit",
+    "sqlite_one_writer"
+   ],
+   "source": "https://www.sqlite.org/faq.html#q19",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_python_commit",
+   "kind": "concept",
+   "title": {
+    "en": "Saving changes with Python's sqlite3 (commit)",
+    "hinglish": "Python ke sqlite3 mein changes save karna (commit)",
+    "hindi": "Python के sqlite3 में बदलाव save करना"
+   },
+   "terms": [
+    [
+     "python",
+     "(sqlite3?|commit)"
+    ],
+    [
+     "sqlite3?",
+     "(not saved|save nahi|changes? (lost|gone|missing|disappear\\w*))"
+    ],
+    [
+     "sqlite3?",
+     "isolation_level"
+    ],
+    [
+     "sqlite3?",
+     "(autocommit|auto commit)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "is commit needed in python sqlite3",
+     "how does commit work in python sqlite3"
+    ],
+    "hinglish": [
+     "python sqlite3 mein commit kab karna chahiye"
+    ],
+    "hindi": [
+     "Python sqlite3 में commit कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "Python's sqlite3 module (in its default, older mode) quietly runs BEGIN before an INSERT, UPDATE or DELETE and leaves the transaction open until you call conn.commit(). If the program ends or the connection is closed without commit(), the changes are rolled back, and while it stays open every other connection gets 'database is locked' when it tries to write. Call commit() after each unit of work (or use 'with conn:', which commits or rolls back for you), or open the connection with autocommit=True (Python 3.12+) / isolation_level=None and write BEGIN / COMMIT yourself.",
+    "hinglish": "Python ka sqlite3 (default purane mode mein) INSERT/UPDATE/DELETE se pehle chupchaap BEGIN chalata hai aur conn.commit() tak transaction khuli rakhta hai. commit() ke bina program band ya connection close hua to badlav rollback, aur khuli rehte baaki connections ko likhne pe 'database is locked'. Har kaam ke baad commit() (ya 'with conn:'), ya autocommit=True (3.12+) / isolation_level=None leke khud BEGIN/COMMIT.",
+    "hindi": "Python sqlite3 में INSERT के बाद conn.commit() ज़रूरी है; नहीं तो बदलाव खो जाते हैं और lock बना रहता है।"
+   },
+   "mistake": {
+    "en": "Calling commit() only at the very end of a long loop or a long-running script: the write lock is held the whole time and other programs get 'database is locked'.",
+    "hinglish": "Lambe loop ke bilkul end mein hi commit(): poore waqt lock pakda rehta hai.",
+    "hindi": "बहुत देर बाद commit(): पूरे समय lock बना रहता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "BEGIN;\nINSERT INTO categories (id, name, parent_id) VALUES (6, 'Games', NULL);\nCOMMIT;\nSELECT id, name FROM categories WHERE id = 6"
+     },
+     "columns": [
+      "id",
+      "name"
+     ],
+     "result": [
+      [
+       "6",
+       "Games"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53, Python 3.13): after an INSERT without commit() in_transaction was true, another connection saw 0 rows and its INSERT got 'database is locked'; after commit() it saw the row; a SELECT alone opened no transaction.",
+    "mysql": "Lab (MariaDB 10.11): drivers like PyMySQL start with autocommit off, so their changes also need commit().",
+    "mariadb": "Lab: PyMySQL needs commit() unless autocommit=True.",
+    "postgresql": "Lab (PostgreSQL 16): psycopg starts a transaction on the first statement; commit() or autocommit=True.",
+    "sqlserver": "Notes only (not lab-tested here): pyodbc autocommit is off by default.",
+    "oracle": "Notes only (not lab-tested here): python-oracledb needs commit()."
+   },
+   "fundamentals": [
+    "transactions"
+   ],
+   "related": [
+    "sqlite_transaction",
+    "autocommit",
+    "sqlite_database_locked"
+   ],
+   "source": "https://www.sqlite.org/lang_transaction.html",
+   "seen_at": [
+    "https://docs.python.org/3/library/sqlite3.html#transaction-control",
+    "https://stackoverflow.com/questions/tagged/sqlite3+python",
+    "https://www.reddit.com/r/learnpython/"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_table_locked",
+   "kind": "concept",
+   "title": {
+    "en": "'database table is locked' in SQLite",
+    "hinglish": "SQLite mein 'database table is locked'",
+    "hindi": "SQLite में 'database table is locked'"
+   },
+   "terms": [
+    [
+     "database table is locked"
+    ],
+    [
+     "sqlite_locked"
+    ],
+    [
+     "sqlite3?",
+     "table",
+     "locked"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what does database table is locked mean in sqlite",
+     "what is sqlite_locked"
+    ],
+    "hinglish": [
+     "sqlite mein database table is locked kyun aata hai"
+    ],
+    "hindi": [
+     "SQLite में database table is locked का क्या मतलब है"
+    ]
+   },
+   "answer": {
+    "en": "Unlike 'database is locked' (another connection is writing), 'database table is locked' (SQLITE_LOCKED) comes from your own connection: a SELECT on it hasn't finished (rows not all fetched, a cursor left open, a loop changing the table it is reading), and you tried to drop or rebuild that table meanwhile. Fetch all rows (fetchall) or close the cursor first. With a shared cache, other connections in the same process can cause it too.",
+    "hinglish": "'database is locked' (doosra connection likh raha) se alag, 'database table is locked' (SQLITE_LOCKED) aapke apne connection se aata hai: uska ek SELECT abhi khatam nahi hua (rows poori fetch nahi, cursor khula, loop wahi table badal raha jo padh raha), aur usi beech table DROP/rebuild ki. Pehle fetchall() ya cursor band karo.",
+    "hindi": "'database table is locked' आपके अपने connection का अधूरा SELECT है; पहले सारी rows पढ़ें।"
+   },
+   "mistake": {
+    "en": "Retrying with a longer busy timeout: it is not another connection, so waiting doesn't help.",
+    "hinglish": "Busy timeout badha ke dobara koshish: ye doosra connection nahi, intezaar se kuch nahi hoga.",
+    "hindi": "busy timeout बढ़ाना बेकार है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "SELECT id FROM returns ORDER BY id;\nDROP TABLE returns;\nSELECT COUNT(*) FROM sqlite_master WHERE name = 'returns'"
+     },
+     "columns": [
+      "COUNT(*)"
+     ],
+     "result": [
+      [
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): with a cursor on the same connection still holding unread rows, DROP TABLE got 'database table is locked' (SQLITE_LOCKED) in both journal modes; after the cursor was closed it went through.",
+    "mysql": "Lab (MariaDB 10.11): no such error; a DROP waits for the metadata lock of other sessions' open transactions.",
+    "mariadb": "Lab: metadata locks.",
+    "postgresql": "Lab (PostgreSQL 16): no such error; DROP waits for other sessions' locks on the table.",
+    "sqlserver": "Notes only (not lab-tested here): no such error.",
+    "oracle": "Notes only (not lab-tested here): ORA-00054 resource busy."
+   },
+   "fundamentals": [
+    "locking"
+   ],
+   "related": [
+    "sqlite_database_locked",
+    "sqlite_one_writer"
+   ],
+   "source": "https://www.sqlite.org/rescode.html#locked",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_nested_transactions",
+   "kind": "concept",
+   "title": {
+    "en": "Nested transactions in SQLite",
+    "hinglish": "SQLite mein transaction ke andar transaction",
+    "hindi": "SQLite में transaction के अंदर transaction"
+   },
+   "terms": [
+    [
+     "nested",
+     "transactions?"
+    ],
+    [
+     "transactions?",
+     "(inside|within|andar|अंदर)",
+     "transactions?"
+    ],
+    [
+     "sqlite3?",
+     "begin",
+     "(twice|again|dobara|two)"
+    ],
+    [
+     "sqlite3?",
+     "nest\\w*",
+     "transactions?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "can i nest transactions in sqlite",
+     "what happens if i call begin twice in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein transaction ke andar transaction kaise kare"
+    ],
+    "hindi": [
+     "SQLite में transaction के अंदर transaction कैसे करें"
+    ]
+   },
+   "answer": {
+    "en": "BEGIN doesn't nest. In SQLite a second BEGIN while one is open is refused ('cannot start a transaction within a transaction') and the work goes on inside the first one. The way to get an inner part that can succeed or be undone on its own is a savepoint: SAVEPOINT inner; ... RELEASE inner (keep it) or ROLLBACK TO inner (undo only it). Other databases treat a second BEGIN differently: MySQL/MariaDB silently commit the first part, PostgreSQL ignores it with a warning.",
+    "hinglish": "BEGIN nest nahi hota. SQLite khuli transaction mein doosra BEGIN mana karta hai aur kaam pehli mein hi chalta hai. Andar ka hissa alag se rakhne/hatane ke liye savepoint: SAVEPOINT inner; ... RELEASE inner (rakho) ya ROLLBACK TO inner (sirf use hatao). MySQL/MariaDB pehla hissa chupchaap commit kar dete hain, PostgreSQL warning deke ignore karta hai.",
+    "hindi": "BEGIN nest नहीं होता; अंदर के हिस्से के लिए SAVEPOINT।"
+   },
+   "mistake": {
+    "en": "A helper function that runs its own BEGIN / COMMIT, called from code that already opened a transaction: on SQLite the inner BEGIN is refused, on MySQL it commits the caller's half-done work.",
+    "hinglish": "Helper function jo apna BEGIN/COMMIT chalata hai, aise code se bulaya jisne transaction pehle hi kholi: SQLite mana karta hai, MySQL caller ka adhoora kaam commit kar deta hai.",
+    "hindi": "अंदर वाला BEGIN: SQLite मना करता है, MySQL commit कर देता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "BEGIN;\nUPDATE products SET stock = 11 WHERE id = 1;\nSAVEPOINT inner_step;\nUPDATE products SET stock = 0 WHERE id = 2;\nRELEASE inner_step;\nCOMMIT;\nSELECT id, stock FROM products WHERE id IN (1, 2) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "stock"
+     ],
+     "result": [
+      [
+       "1",
+       "11"
+      ],
+      [
+       "2",
+       "0"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): BEGIN; UPDATE; BEGIN; UPDATE; ROLLBACK: the second BEGIN failed ('cannot start a transaction within a transaction') and the ROLLBACK undid both updates.",
+    "mysql": "Lab (MariaDB 10.11): the same script kept the first UPDATE: the second START TRANSACTION committed it.",
+    "mariadb": "Lab: the second START TRANSACTION commits the first part.",
+    "postgresql": "Lab (PostgreSQL 16): WARNING 'there is already a transaction in progress'; the ROLLBACK undid both.",
+    "sqlserver": "Notes only (not lab-tested here): @@TRANCOUNT counts nested BEGIN TRAN; only the outer COMMIT saves.",
+    "oracle": "Notes only (not lab-tested here): no BEGIN; savepoints or autonomous transactions."
+   },
+   "fundamentals": [
+    "transactions"
+   ],
+   "related": [
+    "sqlite_savepoint",
+    "savepoint",
+    "sqlite_transaction"
+   ],
+   "source": "https://www.sqlite.org/lang_transaction.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_statement_in_transaction",
+   "kind": "concept",
+   "title": {
+    "en": "When one statement in a SQLite transaction goes wrong",
+    "hinglish": "SQLite transaction mein ek statement galat ho jaye to",
+    "hindi": "SQLite transaction में एक statement गलत हो जाए तो"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "transactions?",
+     "(goes wrong|went wrong|galat|गलत|breaks?|half)"
+    ],
+    [
+     "statement",
+     "(goes wrong|went wrong|galat|गलत)",
+     "transactions?"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what happens if one statement goes wrong in a sqlite transaction"
+    ],
+    "hinglish": [
+     "sqlite transaction mein ek statement galat ho jaye to kya hota hai"
+    ],
+    "hindi": [
+     "SQLite transaction में एक statement गलत हो जाए तो क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "In SQLite only that statement is undone and the transaction stays open: the changes made before it are still there, and a COMMIT saves them. So all-or-nothing is your job: on any failure, run ROLLBACK (or ROLLBACK TO a savepoint taken just before the risky statement). MySQL/MariaDB behave the same; PostgreSQL is stricter and refuses everything after the failure until the transaction ends, and its COMMIT then rolls back. INSERT OR ROLLBACK (an ON CONFLICT choice) makes SQLite roll back the whole transaction itself on a constraint failure.",
+    "hinglish": "SQLite mein sirf wahi statement wapas hota hai aur transaction khuli rehti hai: pehle ke badlav maujood, COMMIT unhe save kar deta hai. Isliye sab-ya-kuch-nahi aapki zimmedari: kuch bhi fail ho to ROLLBACK (ya savepoint tak ROLLBACK TO). MySQL/MariaDB bhi aise hi; PostgreSQL sakht hai: fail ke baad sab mana, aur COMMIT rollback ban jaata hai. INSERT OR ROLLBACK constraint fail pe poori transaction khud rollback karta hai.",
+    "hindi": "SQLite में सिर्फ़ वही statement वापस होता है; ROLLBACK आपको करना होता है।"
+   },
+   "mistake": {
+    "en": "Catching the exception and calling COMMIT anyway: on SQLite and MySQL that saves half the work.",
+    "hinglish": "Exception pakad ke phir bhi COMMIT: aadha kaam save.",
+    "hindi": "exception के बाद भी COMMIT: आधा काम save।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "BEGIN;\nUPDATE products SET stock = 99 WHERE id = 1;\nINSERT OR IGNORE INTO products (id, name) VALUES (1, 'Copy');\nROLLBACK;\nSELECT id, stock FROM products WHERE id = 1"
+     },
+     "columns": [
+      "id",
+      "stock"
+     ],
+     "result": [
+      [
+       "1",
+       "12"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): BEGIN; UPDATE; a duplicate INSERT failed; COMMIT kept the UPDATE (v = 23). With ROLLBACK instead, nothing stayed. INSERT OR ROLLBACK ended the whole transaction itself.",
+    "mysql": "Lab (MariaDB 10.11): the same: COMMIT after the failed INSERT kept the UPDATE.",
+    "mariadb": "Lab: COMMIT keeps the part before the failure.",
+    "postgresql": "Lab (PostgreSQL 16): after the failure everything was refused (25P02) and COMMIT rolled back: the UPDATE was gone.",
+    "sqlserver": "Notes only (not lab-tested here): XACT_ABORT ON rolls back the whole transaction.",
+    "oracle": "Notes only (not lab-tested here): statement-level rollback."
+   },
+   "fundamentals": [
+    "transactions",
+    "changes_safety"
+   ],
+   "related": [
+    "sqlite_transaction",
+    "sqlite_savepoint",
+    "transaction"
+   ],
+   "source": "https://www.sqlite.org/lang_transaction.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_lost_update",
+   "kind": "concept",
+   "title": {
+    "en": "Two users changing the same row in SQLite (lost update)",
+    "hinglish": "SQLite mein do log ek hi row badlein (lost update)",
+    "hindi": "SQLite में दो लोग एक ही row बदलें"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "lost updates?"
+    ],
+    [
+     "sqlite3?",
+     "(stock|balance|counter|quantity)",
+     "(two|2|both|dono|same time|ek saath|दो|एक साथ)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to prevent lost updates in sqlite",
+     "two users reduce stock at the same time in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein do log ek saath stock kam karein to kya hota hai"
+    ],
+    "hindi": [
+     "SQLite में दो लोग एक साथ stock कम करें तो क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "If the app reads a value, works out the new one, and writes it back as a number (read 5, write 4), two users doing it at once both write 4 and one sale is lost. In SQLite let the statement do the arithmetic and the check in one go: UPDATE products SET stock = stock - 1 WHERE id = ? AND stock >= 1, and look at the changed-row count (0 means none left). When the app must read first and decide, wrap read and write in BEGIN IMMEDIATE ... COMMIT so nobody can write in between (SQLite has no SELECT ... FOR UPDATE).",
+    "hinglish": "App value padh ke naya hisaab karke number likhe (5 padha, 4 likha) to do log ek saath dono 4 likhte hain aur ek sale kho jaati hai. SQLite mein hisaab aur jaanch ek statement mein: UPDATE products SET stock = stock - 1 WHERE id = ? AND stock >= 1, aur badli rows ginti dekho. Padh ke faisla karna ho to BEGIN IMMEDIATE ... COMMIT (SQLite mein FOR UPDATE nahi).",
+    "hindi": "stock = stock - 1 WHERE stock >= 1 एक statement में लिखें, या BEGIN IMMEDIATE।"
+   },
+   "mistake": {
+    "en": "SELECT stock, then UPDATE stock = <value computed in the app> with no transaction: the last writer wins.",
+    "hinglish": "SELECT stock, phir app mein hisaab karke UPDATE: aakhri writer jeetta hai.",
+    "hindi": "पढ़कर app में हिसाब करके लिखना: आखिरी writer जीतता है।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "UPDATE products SET stock = stock - 1 WHERE id = 1 AND stock >= 1;\nSELECT id, stock FROM products WHERE id = 1"
+     },
+     "columns": [
+      "id",
+      "stock"
+     ],
+     "result": [
+      [
+       "1",
+       "11"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): two connections each read 5 and wrote 4 (autocommit): 4, one sale lost; with stock = stock - 1 WHERE stock >= 1 both went in (3), and at 0 it changed 0 rows.",
+    "mysql": "Lab (MariaDB 10.11): the same arithmetic UPDATE is safe; read-then-write needs SELECT ... FOR UPDATE.",
+    "mariadb": "Lab: SELECT ... FOR UPDATE for read-then-write.",
+    "postgresql": "Lab (PostgreSQL 16): the arithmetic UPDATE is safe; read-then-write needs SELECT ... FOR UPDATE.",
+    "sqlserver": "Notes only (not lab-tested here): UPDLOCK hint.",
+    "oracle": "Notes only (not lab-tested here): SELECT ... FOR UPDATE."
+   },
+   "fundamentals": [
+    "locking",
+    "changes_safety"
+   ],
+   "related": [
+    "sqlite_begin_immediate",
+    "sqlite_job_queue",
+    "deadlock"
+   ],
+   "source": "https://www.sqlite.org/lang_update.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "sqlite_job_queue",
+   "kind": "concept",
+   "title": {
+    "en": "A job queue in SQLite (no SKIP LOCKED)",
+    "hinglish": "SQLite mein job queue (SKIP LOCKED nahi)",
+    "hindi": "SQLite में job queue"
+   },
+   "terms": [
+    [
+     "sqlite3?",
+     "(queue|jobs?|workers?)"
+    ],
+    [
+     "sqlite3?",
+     "skip locked"
+    ],
+    [
+     "sqlite3?",
+     "for update"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to build a job queue in sqlite",
+     "is there select for update in sqlite"
+    ],
+    "hinglish": [
+     "sqlite mein job queue kaise banaye"
+    ],
+    "hindi": [
+     "SQLite में job queue कैसे बनाएँ"
+    ]
+   },
+   "answer": {
+    "en": "SQLite has no SELECT ... FOR UPDATE or SKIP LOCKED: only one connection can write at a time anyway. So a worker claims the next job in one statement that picks and marks it: UPDATE jobs SET taken_by = ? WHERE id = (SELECT id FROM jobs WHERE taken_by IS NULL ORDER BY id LIMIT 1) RETURNING id (RETURNING from 3.35). Each worker gets a different job, because the claims run one after another; keep it short and give every worker a busy timeout.",
+    "hinglish": "SQLite mein SELECT ... FOR UPDATE ya SKIP LOCKED nahi: ek waqt ek hi writer. Isliye worker agla job ek hi statement mein chun ke mark karta hai: UPDATE jobs SET taken_by = ? WHERE id = (SELECT id FROM jobs WHERE taken_by IS NULL ORDER BY id LIMIT 1) RETURNING id (3.35 se). Har worker ko alag job milta hai; chhota rakho aur har worker pe busy timeout.",
+    "hindi": "एक ही UPDATE ... RETURNING से अगला job लें।"
+   },
+   "mistake": {
+    "en": "Copying SELECT ... FOR UPDATE SKIP LOCKED from PostgreSQL: SQLite refuses it ('near FOR: syntax error'); and a separate SELECT then UPDATE can hand the same job to two workers.",
+    "hinglish": "PostgreSQL se FOR UPDATE SKIP LOCKED copy karna: syntax error; alag SELECT phir UPDATE ek job do workers ko de sakta hai.",
+    "hindi": "FOR UPDATE SKIP LOCKED: SQLite में syntax error।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "sqlite": "UPDATE products SET sku = 'CLAIMED' WHERE id = (SELECT id FROM products WHERE stock = 0 ORDER BY id LIMIT 1) RETURNING id"
+     },
+     "columns": [
+      "id"
+     ],
+     "result": [
+      [
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "sqlite": "Lab (SQLite 3.53): two workers each ran BEGIN IMMEDIATE + UPDATE ... RETURNING and got jobs 1 and 2; FOR UPDATE SKIP LOCKED is a syntax error.",
+    "mysql": "Lab (MariaDB 10.11): SELECT ... FOR UPDATE SKIP LOCKED (10.6+) lets workers take different rows.",
+    "mariadb": "Lab: SKIP LOCKED from 10.6.",
+    "postgresql": "Lab (PostgreSQL 16): FOR UPDATE SKIP LOCKED.",
+    "sqlserver": "Notes only (not lab-tested here): READPAST hint.",
+    "oracle": "Notes only (not lab-tested here): FOR UPDATE SKIP LOCKED."
+   },
+   "fundamentals": [
+    "locking"
+   ],
+   "related": [
+    "skip_locked_nowait",
+    "sqlite_lost_update",
+    "sqlite_one_writer"
+   ],
+   "source": "https://www.sqlite.org/lang_returning.html",
+   "seen_at": [
+    "https://stackoverflow.com/questions/tagged/sqlite",
+    "https://www.reddit.com/r/sqlite/",
+    "https://berthub.eu/articles/posts/a-brief-post-on-sqlite3-database-locked-despite-timeout",
+    "https://sqlite.org/forum/forumpost/04ed1d235b"
+   ],
+   "proven": [
+    "sqlite",
+    "mariadb",
+    "postgresql"
+   ],
+   "engine": "sqlite"
+  },
+  {
+   "id": "savepoint",
+   "kind": "concept",
+   "title": {
+    "en": "SAVEPOINT (undo part of a transaction)",
+    "hinglish": "SAVEPOINT (transaction ka ek hissa wapas lena)",
+    "hindi": "SAVEPOINT (transaction का एक हिस्सा वापस लेना)"
+   },
+   "terms": [
+    [
+     "savepoints?"
+    ],
+    [
+     "rollback to"
+    ],
+    [
+     "release",
+     "savepoint"
+    ],
+    [
+     "सेवपॉइंट"
+    ],
+    [
+     "(undo|wapas)\\w*",
+     "(part|hissa)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "what is a savepoint",
+     "how to undo part of a transaction",
+     "what does rollback to savepoint do"
+    ],
+    "hinglish": [
+     "savepoint kya hota hai",
+     "transaction ka ek hissa kaise wapas le"
+    ],
+    "hindi": [
+     "savepoint क्या होता है"
+    ]
+   },
+   "answer": {
+    "en": "A savepoint is a named mark inside a transaction. SAVEPOINT name sets it; ROLLBACK TO SAVEPOINT name undoes only what came after it and keeps the transaction open; RELEASE SAVEPOINT name keeps the work and drops the mark. The transaction still ends with COMMIT or ROLLBACK. It is how you try a risky step and back out of just that step, or get 'a transaction inside a transaction'.",
+    "hinglish": "Savepoint transaction ke andar ek naam wala nishaan hai. SAVEPOINT naam lagata hai; ROLLBACK TO SAVEPOINT naam sirf uske baad ka hata deta hai aur transaction khuli rehti hai; RELEASE SAVEPOINT naam kaam rakh ke nishaan hatata hai. Transaction phir bhi COMMIT/ROLLBACK se khatam hoti hai.",
+    "hindi": "Savepoint transaction के अंदर एक नाम वाला निशान है: ROLLBACK TO उसके बाद का हटाता है, RELEASE रखता है।"
+   },
+   "mistake": {
+    "en": "Making a savepoint outside BEGIN / START TRANSACTION: MySQL forgets it at once (autocommit), PostgreSQL refuses it, and the later ROLLBACK TO fails.",
+    "hinglish": "BEGIN ke bahar savepoint banana: MySQL turant bhool jaata hai, PostgreSQL mana karta hai.",
+    "hindi": "BEGIN के बाहर savepoint बनाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "mysql": "START TRANSACTION;\nUPDATE products SET stock = 50 WHERE id = 4;\nSAVEPOINT before_toys;\nUPDATE products SET stock = 0 WHERE id = 5;\nROLLBACK TO SAVEPOINT before_toys;\nCOMMIT;\nSELECT id, stock FROM products WHERE id IN (4, 5) ORDER BY id",
+      "postgresql": "BEGIN;\nUPDATE products SET stock = 50 WHERE id = 4;\nSAVEPOINT before_toys;\nUPDATE products SET stock = 0 WHERE id = 5;\nROLLBACK TO SAVEPOINT before_toys;\nCOMMIT;\nSELECT id, stock FROM products WHERE id IN (4, 5) ORDER BY id"
+     },
+     "columns": [
+      "id",
+      "stock"
+     ],
+     "result": [
+      [
+       "4",
+       "50"
+      ],
+      [
+       "5",
+       "15"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Lab (MariaDB 10.11): outside START TRANSACTION a savepoint is forgotten at once: ROLLBACK TO it is 1305 'SAVEPOINT a does not exist'.",
+    "mariadb": "Lab: 1305 for an unknown or forgotten savepoint.",
+    "postgresql": "Lab (PostgreSQL 16): only inside BEGIN (25P01 outside); an unknown name is 3B001 and aborts the transaction.",
+    "sqlite": "Lab (SQLite 3.53): a SAVEPOINT outside a transaction starts one; ROLLBACK TO keeps it open; an unknown name is 'no such savepoint: name'.",
+    "sqlserver": "Notes only (not lab-tested here): SAVE TRANSACTION name / ROLLBACK TRANSACTION name.",
+    "oracle": "Notes only (not lab-tested here): SAVEPOINT name / ROLLBACK TO name."
+   },
+   "fundamentals": [
+    "transactions",
+    "changes_safety"
+   ],
+   "related": [
+    "transaction",
+    "sqlite_savepoint",
+    "sqlite_nested_transactions"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/savepoint.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/sql-savepoint.html",
+    "https://www.sqlite.org/lang_savepoint.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
   }
  ]
 }

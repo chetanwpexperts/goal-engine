@@ -176,8 +176,8 @@ def _from_stmtbugs(seed, engine, rnd):
 
     for k in range(40):
         item = stmtbugs.make(seed * 97 + k)
-        if not item or item["bug"] in SKIP_BUGS or item.get("stmt") == "ddl":
-            continue
+        if not item or item["bug"] in SKIP_BUGS or item.get("stmt") == "ddl" or item.get("txn"):
+            continue                                    # (a transaction script is several statements, not one in code)
         if item.get("engine") not in (None, engine):
             continue
         sql = unwrap(item["broken"])

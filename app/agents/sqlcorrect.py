@@ -216,7 +216,7 @@ def _grain(srcs, alias_of, removed) -> str | None:
         if kb is not None:
             return kb
         c = col.lower().replace("_", "")
-        return c == "id" or bool(t and t.name and c in {x.replace("_", "") + "id" for x in _singulars(t.name)})
+        return c == "id" or bool(t and t.name and _names_own_key(t.name, c))
 
     links = [(alias_of(m.group(1)), m.group(2).lower(), alias_of(m.group(3)), m.group(4).lower())
              for x in srcs if x.on for m in EQ.finditer(x.on)]
@@ -390,11 +390,35 @@ def _singulars(name: str) -> set:
         out |= _singulars(n.split("_", 1)[1])
     if n.endswith("ies"):
         out.add(n[:-3] + "y")
+    if n.endswith("ves"):                          # shelves -> shelf, knives -> knife
+        out |= {n[:-3] + "f", n[:-3] + "fe"}
     if n.endswith("es"):
         out.add(n[:-2])
     if n.endswith("s") and not n.endswith("ss"):
         out.add(n[:-1])
     return out
+
+
+def _names_own_key(table: str, c: str) -> bool:
+    """c (without '_') is the table's own key by its name: students.studentid, and the short forms people write for a one-word
+    table: departments.deptid, employees.empid, categories.catid (3 or more letters of the singular, in order, from its first). A table
+    named of two words (order_items) keeps only the exact forms: order_id there points at another table."""
+    if not c.endswith("id"):
+        return False
+    sing = _singulars(table)
+    if c in {x.replace("_", "") + "id" for x in sing}:
+        return True
+    stem = c[:-2]
+    word = table.lower().split(".")[-1]
+    return "_" not in word and len(stem) >= 3 and any(x != stem and _abbrev(stem, x) for x in sing if "_" not in x)
+
+
+def _abbrev(short: str, word: str) -> bool:
+    """dept of department, emp of employee, cust of customer: same first letter, the rest in order."""
+    if not short or short[0] != word[:1]:
+        return False
+    it = iter(word)
+    return all(ch in it for ch in short)
 
 
 def _singular(name: str) -> str:
@@ -1041,6 +1065,25 @@ def check(sql: str, _again: bool = False, intent: str = "", engine: str | None =
     statement; plain SELECTs are read in depth. engine: the database the answer is for (rule A), when known."""
     from app.agents.sqlbasics import CHOSEN
 
+    if not _again and not _ALTS.get():                # night X1: every honest repair written out (app/agents/sqlalts.py)
+        tok = _ALTS.set(True)
+        try:
+            out = check(sql, _again, intent, engine)
+            etok = CHOSEN.set(engine) if engine is not None else None
+            try:
+                from app.agents import sqlalts
+
+                alts = sqlalts.alternatives(out.get("repaired") or sql, out, intent)
+            except Exception:  # noqa: BLE001 - the other readings are an extra; the check itself stands
+                alts = []
+            finally:
+                if etok is not None:
+                    CHOSEN.reset(etok)
+            if alts:
+                out["alternatives"] = alts
+            return out
+        finally:
+            _ALTS.reset(tok)
     if BLOCK_KEYS.get() is None:                      # night 12: what the query's own blocks prove about their keys
         from app.agents import sqlblocks
 
@@ -1063,6 +1106,9 @@ def check(sql: str, _again: bool = False, intent: str = "", engine: str | None =
     return _check(sql, _again, intent)
 
 
+_ALTS = contextvars.ContextVar("dbaba_alternatives", default=False)
+
+
 def _meaning_checks() -> set:
     from app.agents.sql import MEANING_CHECKS
 
@@ -1075,8 +1121,12 @@ _SURE_ONLY = contextvars.ContextVar("dbaba_sure_only", default=False)
 
 
 def _check(sql: str, _again: bool = False, intent: str = "") -> dict:
-    from app.agents import sqltxn
+    from app.agents import sqlbasics, sqlrepair, sqltxn
 
+    if not sqltxn.is_script(sql):                     # night X1: what the parser refuses is put right first, then read for meaning
+        fixed, pre = sqlrepair.repair(sql, Finding, sqlbasics.CHOSEN.get())
+        if pre:
+            return _after_repair(fixed, pre, _check(fixed, _again, intent))
     if sqltxn.is_script(sql):                         # BEGIN ... COMMIT: read as a transaction script (E1 night 4)
         return _check_once(sql, _again, intent)
     out = _check_once(sql, _again, intent)
@@ -1096,7 +1146,24 @@ def _check(sql: str, _again: bool = False, intent: str = "") -> dict:
         finally:
             _SURE_ONLY.reset(token)
         if again.get("corrected"):
+            if again["corrected"] != out["corrected"]:
+                out["meant"] = out["corrected"]        # the sure fix AND what the 'check' items offer: 'if that's what you meant'
             out["corrected"] = again["corrected"]
+    return out
+
+
+def _after_repair(fixed: str, pre: list, out: dict) -> dict:
+    """The repaired statement's own reading, with the repair said first. The repair alone is the sure fix; a rewrite that only
+    a 'check' item offers (it changes what the query means) stays an offer: 'if that's what you meant'."""
+    inner = out.get("findings") or []
+    corrected = out.get("corrected")
+    sure_inner = any(f["kind"] in ("error", "wrong") for f in inner)
+    if corrected and not sure_inner and any(f["kind"] == "check" and f["topic"] in _meaning_checks() for f in inner):
+        out["meant"] = corrected
+        corrected = None
+    out["findings"] = [f.as_dict() for f in pre] + inner
+    out["corrected"] = corrected or fixed
+    out["repaired"] = fixed
     return out
 
 
@@ -1702,7 +1769,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
             if kb is not None:
                 return kb
             c = col.lower().replace("_", "")
-            return c == "id" or bool(t and t.name and c in {x.replace("_", "") + "id" for x in _singulars(t.name)})
+            return c == "id" or bool(t and t.name and _names_own_key(t.name, c))
 
         single = {q for q, c in gref if is_key(q, c)}       # grouped by its key: one row per group
         changed = True

@@ -110,6 +110,22 @@ label the rest, upgrade to verified when schema, EXPLAIN or data arrive.
   planted findings with the right confidence class, a proven rewrite; the same query with CREATE TABLE / EXPLAIN upgrades or
   drops inferred findings. (tests/fuzz/bigq.py: 19 families; a pasted EXPLAIN confirms a speed risk or rules it out.)
 
+## Exam gaps (before the new databases)
+
+The exam (tests/exam/): Paper 1 is the practice paper, papers 2-5 stay unseen. First sitting 4/30. One gap per night.
+
+- [x] **X1. Debugging returns the fixed query.** The corrected statement itself, runnable, in the reply (a change only as a
+  preview), and every other honest reading written out under "if that's what you meant". Done (26 Nov 2026): clauses out of
+  order and ==, =<, => repaired first (app/agents/sqlrepair.py, fundamental 'statement_shape'); AND/OR brackets applied
+  when the person's words name the precedence bug; a LEFT JOIN undone by WHERE rewritten with the condition in ON (the fix
+  when the words want every row, an offer otherwise, INNER JOIN the other reading); columns that aren't grouped: one row per
+  group, the column grouped too, or the row holding each group's MAX/MIN (app/agents/sqlalts.py); the words before a pasted
+  query read as its intent; a pasted statement inside an error question gets its fix after the explanation; key names like
+  dept_id / emp_id read as their table's key (no false "multiplied" total), id IN (SELECT MIN(id) ... GROUP BY g) no longer
+  called wrong. 5 dx_* stmtbugs families, 36 practice problems + 6 chat checks. Paper 1: 4/30 -> 8/30.
+- [ ] **X2 (+X3). Writing a query from a description** (tests/fuzz/nl2sql.py).
+- [ ] **X4. Theory and traps** (concepts by family).
+
 ## New databases (after night 15, in this order)
 
 SQL Server, Oracle and MongoDB run on the night lab on our own server (docs/lab-server.md): the nightly run writes lab cases in

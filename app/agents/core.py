@@ -123,13 +123,12 @@ def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up:
         left_t = {x["title_en"] for x in result["correct"].get("left") or []}
         fixed = [f for f in sorted(fs, key=lambda f: "ewc".index(f["kind"][0])) if f["kind"] != "check" and f["title_en"] not in left_t]
         top, n = fixed[:3], len(fixed)
-        out = [(f"{n} galti theek ki; sahi query card mein hai." if hi else
-                f"Fixed {n} mistake{'s' if n != 1 else ''}; the corrected query is in the card.")]
+        out = [(f"{n} galti theek ki:" if hi else f"Fixed {n} mistake{'s' if n != 1 else ''}:")]
         out += [f"- {f['title_hi' if hi else 'title_en']}" for f in top]
         if result["correct"].get("left"):
             out.append("GROUP BY/total wala hissa waisa hi chhoda: wo aapke data ke hisaab se badlega." if hi else
                        "The GROUP BY/total part is left as written: the right version depends on the result you want.")
-        return "\n".join(out)
+        return "\n".join(out) + statements_text(result, hi, sure=True)
     out = [", ".join(bits) + ":"]
     tag = {"error": "✗", "wrong": "!", "check": "?"}
     for k, f in enumerate(sorted(fs, key=lambda f: "ewc".index(f["kind"][0])), 1):
@@ -140,18 +139,60 @@ def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up:
     if left and not follow_up:
         out.append(("Aapka faisla: " if hi else "Your call: ") + "; ".join(f["title_hi" if hi else "title_en"] for f in left) + ".")
     if result["correct"].get("corrected") and not follow_up:
-        out.append(("Har database pe chalne wali query card mein hai." if hi else
-                    "A version that runs on every database is in the card.") if not n_err + n_wrong and
-                   all(f["topic"] == "same_table" for f in fs) else
-                   ("Tez roop card mein hai: rows wahi, bas index kaam aa sakta hai (EXPLAIN se milao)." if hi else
-                    "The faster form is in the card: the same rows, written so an index can be used (compare with EXPLAIN).")
-                   if not n_err + n_wrong and all(f["topic"] in ("sargable", "or_union", "keyset") for f in fs) else
-                   ("Agar aapka matlab yahi tha, to wo query card mein hai." if hi else
-                    "If that's what you meant, the query for it is in the card.") if not n_err + n_wrong and
-                   any(f["topic"] in ("count", "not_in", "date_range") for f in fs) else
-                   ("Theek ki hui query card mein hai ('-- check' wale naam andaze se)." if hi else
-                    "Corrected query is in the card ('-- check' marks names I guessed)."))
+        return "\n".join(out) + statements_text(result, hi, sure=bool(n_err + n_wrong), fs=fs) + ruled_out_text(result, hi)
     return "\n".join(out) + ("" if follow_up else ruled_out_text(result, hi))
+
+
+def _stmt(q: str) -> str:
+    """The statement ended with ';' (before a '-- note' on its last line, so the note can't swallow it)."""
+    from app.agents.sqlcorrect import _mask
+
+    q = q.strip()
+    m = re.search(r"--[^\n]*$|#[^\n]*$", _mask(q).rstrip() and q)
+    if m and _mask(q)[m.start()] == " ":                # the mask blanks comments: this '--' is a comment, not text in quotes
+        body = q[:m.start()].rstrip()
+        return (body if body.endswith(";") else body + ";") + "   " + q[m.start():]
+    return q if q.endswith(";") else q + ";"
+
+
+def statements_text(result: dict, hi: bool, sure: bool, fs: list | None = None) -> str:
+    """Night X1: the corrected statement itself, runnable, in the reply (not only in the card), and every other honest reading
+    of the mistake written out under 'if that's what you meant'. A change (UPDATE / DELETE / INSERT) is a preview: shown,
+    never run here."""
+    c = result.get("correct") or {}
+    q = c.get("corrected")
+    if not q:
+        return ""
+    fs = fs if fs is not None else c.get("findings") or []
+    change = bool(re.match(r"\s*(update|delete|insert|replace|merge)\b", q, re.I))
+    topics = {f["topic"] for f in fs}
+    from app.agents.sql import MEANING_CHECKS, SPEED_OFFERS
+
+    if sure:
+        head = (("Sahi statement (preview: main ise chalata nahi; pehle neeche wali query se dekh lo kaunsi rows badlengi):" if hi else
+                 "Corrected statement (a preview: I don't run it; first see the rows it will change with the query below):")
+                if change else ("Sahi query:" if hi else "Corrected query:"))
+    elif any(f["topic"] == "join" and "cancels the" in f["title_en"] for f in fs):
+        head = ("Agar sirf match wali rows chahiye (INNER JOIN):" if hi else "If you only want rows that have a match (INNER JOIN):")
+    elif topics and topics <= SPEED_OFFERS | {"sargable"}:
+        head = ("Tez roop (rows wahi):" if hi else "The faster form (the same rows):")
+    elif topics and topics <= {"same_table"}:
+        head = ("Har database pe chalne wala roop:" if hi else "A version that runs on every database:")
+    elif topics & MEANING_CHECKS:
+        head = ("Agar aapka matlab yahi tha:" if hi else "If that's what you meant:")
+    else:
+        head = ("Theek ki hui query ('check' wale naam andaze se):" if hi else "Corrected query ('check' marks names I guessed):")
+    if change and not sure:
+        head = head.rstrip(":") + (" (preview: main ise chalata nahi):" if hi else " (a preview: I don't run it):")
+    out = f"\n\n{head}\n\n{_stmt(q)}"
+    meant = c.get("meant")
+    if sure and meant and meant.strip() != q.strip():
+        out += "\n\n" + ("Aur agar aapka matlab yahi tha (upar ke 'check' wale point bhi):" if hi else
+                          "And if that's what you meant (the points to check above, applied too):") + f"\n\n{_stmt(meant)}"
+    for a in c.get("alternatives") or []:
+        if a["sql"].strip() not in (q.strip(), (meant or "").strip()):
+            out += f"\n\n{a['hi' if hi else 'en']}\n\n{_stmt(a['sql'])}"
+    return out
 
 
 def ruled_out_text(result: dict, hi: bool) -> str:
@@ -198,7 +239,7 @@ def _run_website(inputs: dict) -> dict:
 
 def _run_sql(inputs: dict) -> dict:
     rec = inputs.get("engine_rule") or {}
-    out = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=rec.get("id") or None)
+    out = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=rec.get("id") or None, said=inputs.get("said") or "")
     if rec:
         out["engine_rule"] = rec
         from app.dbknow import engines
@@ -280,6 +321,11 @@ def query_in(text: str) -> str | None:
     from app.agents.sql import _strip_comments, unwrap
 
     lines = (text or "").strip().splitlines()
+    m = re.match(r"\s*([^\n:]{1,60}):[ \t]*(?=\(?\s*(?:select|with|update|delete|insert|replace)\b)", lines[0] if lines else "", re.I)
+    if m and len(m.group(1).split()) <= 8:          # 'MariaDB: UPDATE ...' / 'fix this: SELECT ...' on one line (night X1)
+        lines = [lines[0][m.end():]] + lines[1:]
+        text = m.group(1) + "\n" + "\n".join(lines)
+        lines = text.splitlines()
     for k in range(min(len(lines), 4)):
         lead, rest = " ".join(lines[:k]), "\n".join(lines[k:])
         if len(lead.split()) > 15:

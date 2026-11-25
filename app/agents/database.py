@@ -1068,7 +1068,49 @@ def _error_turn(db: Session, goal: Goal, text: str, hi: bool, visitor_id: str):
         reply += "\n\n" + line
     elif eid and E.notes_only(eid):
         reply += "\n\n" + E.notes_line(eid, lang)
+    reply += _pasted_statement_fix(text, eid, hi)
     return reply, taps, "agent_plan"
+
+
+def _statement_in(text: str) -> str | None:
+    """The SQL statement written inside a message that is mostly about an error ('why does this fail ...: SELECT ...'): from its
+    first word to its ';' (outside quotes) or the end."""
+    m = re.search(r"(?im)(?:^|[:?.]\s)\s*((?:select|with|update|delete)\b)", text or "")
+    if not m:
+        return None
+    rest = text[m.start(1):]
+    q, out = None, []
+    for ch in rest:
+        if q:
+            q = None if ch == q else q
+        elif ch in "'\"`":
+            q = ch
+        elif ch == ";":
+            break
+        out.append(ch)
+    stmt = "".join(out).strip()
+    return stmt if NEW_SQL_RE.search(stmt) and len(stmt) < 20000 else None
+
+
+def _pasted_statement_fix(text: str, eid: str | None, hi: bool) -> str:
+    """Night X1: an error explained in general is half the answer when the person pasted the statement too: their own
+    statement, put right, follows (a change only as a preview, never run)."""
+    stmt = _statement_in(text)
+    if not stmt:
+        return ""
+    from app.agents.core import statements_text
+    from app.agents.sql import analyze_sql
+
+    try:
+        res = analyze_sql(stmt, engine=eid or None, said=text.replace(stmt, " ")[:300])
+    except Exception:  # noqa: BLE001 - the explanation above already answers; the fix is an extra
+        return ""
+    c = res.get("correct") or {}
+    sure = [f for f in c.get("findings") or [] if f["kind"] in ("error", "wrong")]
+    if not sure or not c.get("corrected"):
+        return ""
+    head = ("Aapki query mein:" if hi else "In your query:") + "\n" + "\n".join(f"- {f['title_hi' if hi else 'title_en']}" for f in sure[:3])
+    return "\n\n" + head + statements_text(res, hi, sure=True)
 
 
 # ------------------------------------------------------------------ after a query check: "optimize it", "why slow", "kya karu"

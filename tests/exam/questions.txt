@@ -1,0 +1,380 @@
+Sample Paper 1: Core SQL, Joins, NULL Traps & Fundamental Logic
+MySQL, PostgreSQL & MariaDB | 30 Questions (Easy to Tough) | Questions Only
+Reference Schema:
+employees(emp_id, first_name, last_name, email, dept_id, manager_id, salary, hire_date)
+departments(dept_id, dept_name, location)  | projects(proj_id, proj_name, dept_id, budget)
+Section A: Easy Level (Questions 1–10)
+Q1. THEORY  What is the exact difference between CHAR(10)  and VARCHAR(10)  regarding trailing spaces and
+storage in MySQL vs. PostgreSQL? 
+Q2. QUERY  Write a query to fetch first_name , last_name , and salary  of employees in dept_id  10 or 30 who
+earn at least 55,000, sorted by hire_date  newest first. 
+Q3. DEBUGGING  Fix the bug in this query meant to find employees without a department:
+SELECT emp_id, first_name FROM employees WHERE dept_id = NULL;
+Q4. THEORY  Which default ports and default transactional storage engines are used by MySQL, MariaDB, and
+PostgreSQL? 
+Q5. QUERY  Write a query to retrieve the top 5 lowest-paid employees who have a non-null manager_id . 
+Q6. LOGIC TRAP  If a table T  has 5 rows with bonus  values (100, NULL, 200, NULL, 300) , what do 
+COUNT(*) , COUNT(bonus) , and AVG(bonus)  return? 
+Q7. DEBUGGING  Fix this query intended to update salaries by 8% for employees hired before January 1, 2024:
+UPDATE employees SET salary == salary * 1.08 WHERE hire_date < '2024-01-01';
+Q8. QUERY  Write a query to list all unique location  values from departments  in uppercase (compatible across
+all three databases). 
+Q9. THEORY  Explain the difference between DELETE , TRUNCATE , and DROP  in terms of transaction rollback and
+auto-increment counters. 
+Q10. DEBUGGING  Fix the clause order and operator precedence bug:
+SELECT * FROM employees ORDER BY salary DESC WHERE dept_id = 10 OR dept_id = 20 AND salary > 
+60000;
+Section B: Intermediate Level (Questions 11–20)
+Q11. QUERY  Write a query to display every department name and its employee count, ensuring departments with 0
+employees appear with a count of 0 . 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 1 of 15
+Q12. DEBUGGING  Why does this LEFT JOIN  fail to return empty departments? Rewrite it properly:
+SELECT d.dept_name, COUNT(e.emp_id) FROM departments d LEFT JOIN employees e ON d.dept_id = 
+e.dept_id WHERE e.salary > 50000 GROUP BY d.dept_name;
+Q13. LOGIC TRAP  Given Table A with values (1, 1, NULL)  and Table B with values (1, 1, 1, NULL) , how many
+rows are returned by INNER JOIN , LEFT JOIN , and FULL OUTER JOIN ? Which of the three DBMS engines does
+not natively support FULL OUTER JOIN ? 
+Q14. QUERY  Write a query to display each employee's name alongside their direct manager's name, including the
+CEO whose manager_id  is NULL . 
+Q15. DEBUGGING  Why does this query return 0 rows whenever even a single employee has manager_id IS NULL ?
+Fix it:
+SELECT first_name FROM employees WHERE emp_id NOT IN (SELECT manager_id FROM employees);
+Q16. QUERY  Write a query to find all departments whose average salary is higher than the overall company average
+salary. 
+Q17. THEORY  Explain why LIKE 'abc%'  behaves case-insensitively by default in MySQL/MariaDB but case-
+sensitively in PostgreSQL, and how to make it case-insensitive in PostgreSQL. 
+Q18. QUERY  Write a query to find duplicate email  addresses in employees  along with their occurrence count,
+showing only emails appearing more than once. 
+Q19. DEBUGGING  Fix the grouping and alias error in this query:
+SELECT CASE WHEN salary >= 80000 THEN 'High' ELSE 'Low' END AS band, COUNT(*) FROM employees 
+WHERE band = 'High' GROUP BY band;
+Q20. QUERY  Write a query to find departments that have no active projects assigned in the projects  table. 
+Section C: Tough / Advanced Level (Questions 21–30)
+Q21. QUERY  Write a single SQL statement to swap the salaries of the highest-paid employee and the lowest-paid
+employee in employees  without hardcoding IDs or values. 
+Q22. LOGIC PUZZLE  What is the exact difference between placing a filter condition in the ON  clause versus the 
+WHERE  clause of a LEFT JOIN ? Give a concrete example using departments  and employees . 
+Q23. QUERY  Write a query to find the 3rd highest distinct salary in each department without using window
+functions. 
+Q24. DEBUGGING  Why does this query fail or violate SQL standards in PostgreSQL and MySQL
+( ONLY_FULL_GROUP_BY )? Rewrite it cleanly:
+SELECT d.dept_name, e.first_name, MAX(e.salary) FROM departments d JOIN employees e ON d.dept_id 
+= e.dept_id GROUP BY d.dept_name;
+Q25. LOGIC TRAP  Explain three-valued logic ( TRUE , FALSE , UNKNOWN ) in SQL and why WHERE col = NULL  and 
+WHERE col <> NULL  both evaluate to empty result sets. 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 2 of 15
+Q26. QUERY  Write a query to find employees who earn more than their direct manager AND were hired before their
+direct manager. 
+Q27. DEBUGGING  Fix the MySQL/MariaDB self-referencing table error in this deduplication query:
+DELETE FROM employees WHERE emp_id NOT IN (SELECT MIN(emp_id) FROM employees GROUP BY email);
+Q28. QUERY  Write a query to calculate the percentage of total company payroll consumed by each department,
+rounded to 2 decimal places (avoid integer division traps in PostgreSQL). 
+Q29. THEORY  Compare how PostgreSQL 's SERIAL  / IDENTITY  sequences behave on a rolled-back INSERT  vs.
+MySQL/MariaDB AUTO_INCREMENT . 
+Q30. QUERY  Write a query to find pairs of employees working in the same department who have the exact same
+salary, without listing duplicate pairs like (A, B)  and (B, A) . 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 3 of 15
+Sample Paper 2: Aggregations, Subqueries, Dates & E-Commerce Logic
+MySQL, PostgreSQL & MariaDB | 30 Questions (Easy to Tough) | Questions Only
+Reference Schema:
+customers(customer_id, full_name, city, signup_date)  | products(product_id, product_name,
+category, price)
+orders(order_id, customer_id, order_date, total_amount, status)  | order_items(item_id,
+order_id, product_id, quantity, unit_price)
+Section A: Easy Level (Questions 1–10)
+Q1. QUERY  Write a query to calculate total revenue, minimum order value, maximum order value, and average order
+value for all 'Completed'  orders. 
+Q2. DEBUGGING  Fix this query intended to count distinct customers who placed orders:
+SELECT DISTINCT COUNT(customer_id) FROM orders;
+Q3. THEORY  What is the difference between UNION  and UNION ALL  regarding duplicate removal and execution
+performance? 
+Q4. QUERY  Write a query to find all products priced between 500 and 2,000 whose product_name  contains the
+word 'Pro'  (case-insensitive). 
+Q5. DEBUGGING  Identify the bug in this INSERT  statement:
+INSERT INTO products (product_id, product_name, category, price) VALUE (101, 'Wireless Mouse', 
+'Electronics', 1200);
+Q6. QUERY  Write a query to find all orders placed in the last 30 days from the current timestamp. 
+Q7. LOGIC TRAP  Why will SELECT customer_id, status, SUM(total_amount) FROM orders GROUP BY
+customer_id;  throw an error in PostgreSQL and strict MySQL/MariaDB? 
+Q8. QUERY  Write a query to list cities that have more than 25 registered customers. 
+Q9. THEORY  What does COALESCE(a, b, c)  do, and how does it differ from MySQL 's IFNULL(a, b) ? 
+Q10. DEBUGGING  Fix this query meant to delete all 'Cancelled'  orders from 2024:
+DELETE * FROM orders WHERE status = 'Cancelled' AND order_date LIKE '2024%';
+Section B: Intermediate Level (Questions 11–20)
+Q11. QUERY  Write a query to find customers who have placed orders in both 'Completed'  and 'Returned'
+statuses. 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 4 of 15
+Q12. DEBUGGING  Assuming order_date  is a TIMESTAMP / DATETIME  column, why might this query miss orders
+placed at 2026-06-15 14:30:00 ? Fix it so it stays index-friendly:
+SELECT * FROM orders WHERE order_date = '2026-06-15';
+Q13. QUERY  Write a query to detect orders where orders.total_amount  does not match SUM(quantity *
+unit_price)  in order_items . 
+Q14. LOGIC TRAP  In a join between orders  (1 row per order) and order_items  (multiple rows per order), why
+does SUM(o.total_amount)  inflate the total revenue? Write the corrected query. 
+Q15. QUERY  Write a query to pivot order counts by status so each row shows customer_id , completed_count , 
+pending_count , and cancelled_count . 
+Q16. DEBUGGING  Fix the syntax and sorting logic in this combined query:
+SELECT full_name FROM customers ORDER BY full_name UNION ALL SELECT product_name FROM products 
+ORDER BY product_name;
+Q17. QUERY  Write a query to find the top 3 best-selling products by total quantity sold, excluding 'Cancelled'
+orders. 
+Q18. THEORY  Compare DATETIME  vs. TIMESTAMP  in MySQL/MariaDB and TIMESTAMP  vs. TIMESTAMPTZ  in
+PostgreSQL. 
+Q19. QUERY  Write a query to find customers who signed up in 2025 but have placed zero orders so far (use NOT
+EXISTS ). 
+Q20. DEBUGGING  Fix the correlated subquery bug in this query meant to find customers with at least one order:
+SELECT c.customer_id FROM customers c WHERE EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = 
+o.customer_id);
+Section C: Tough / Advanced Level (Questions 21–30)
+Q21. QUERY  Write a query to find customers who have purchased every single product in the 'Electronics'
+category (Relational Division problem). 
+Q22. LOGIC PUZZLE  Compare the output of SELECT AVG(total_amount) FROM orders  vs. SELECT
+SUM(total_amount) / COUNT(*) FROM orders  when 20% of rows have total_amount IS NULL . 
+Q23. QUERY  Write a query to find the first order and most recent order amount for every customer in a single row,
+breaking same-day ties using order_id . 
+Q24. DEBUGGING  Fix this query intended to update orders.total_amount  from order_items  (ensure
+compatibility or note dialect differences):
+UPDATE orders o SET total_amount = SUM(oi.quantity * oi.unit_price) FROM order_items oi WHERE 
+o.order_id = oi.order_id;
+Q25. QUERY  Write a query to identify frequently bought together product pairs (pairs of distinct products appearing
+in the same order_id ) ranked by co-occurrence count. 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 5 of 15
+Q26. LOGIC TRAP  Explain why WHERE col_a <> 'X'  silently excludes rows where col_a IS NULL , and write the
+NULL-safe equality/inequality syntax for PostgreSQL vs. MySQL/MariaDB. 
+Q27. QUERY  Write a query to compute customer retention: for each signup month, count how many customers
+placed an order within 30 days of their signup_date . 
+Q28. DEBUGGING  Why does this query fail when trying to filter by a window/aggregate result in a subquery? Fix it:
+SELECT customer_id, SUM(total_amount) AS spend FROM orders GROUP BY customer_id HAVING spend > 
+5000;
+Q29. QUERY  Write a query to find the median order amount across all 'Completed'  orders. 
+Q30. LOGIC PUZZLE  Given a table of overlapping promotional discount periods promos(promo_id, start_date,
+end_date) , write a query to detect any two promotions whose date ranges overlap. 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 6 of 15
+Sample Paper 3: Window Functions, CTEs & Analytical SQL Puzzles
+MySQL 8.0+, PostgreSQL & MariaDB 10.2+ | 30 Questions (Easy to Tough) | Questions Only
+Reference Schema:
+sales(sale_id, rep_id, region, sale_date, revenue)  | user_logins(user_id, login_timestamp)
+employees(emp_id, name, manager_id, dept_id, salary)  | transactions(txn_id, account_id,
+txn_type, amount, txn_time)
+Section A: Easy Level (Questions 1–10)
+Q1. THEORY  Explain the exact difference between ROW_NUMBER() , RANK() , and DENSE_RANK()  when three rows
+share the highest score. 
+Q2. QUERY  Write a query using a window function to display each sale alongside the total revenue of its region . 
+Q3. DEBUGGING  Fix the window clause error in this query:
+SELECT sale_id, region, revenue, SUM(revenue) OVER (GROUP BY region) FROM sales;
+Q4. THEORY  What is a Common Table Expression (CTE), and how does it differ from a derived table (inline
+subquery)? 
+Q5. QUERY  Write a query to assign a sequential row number to each sale per rep_id , ordered by sale_date
+ascending. 
+Q6. DEBUGGING  Why does this query fail with a column-not-found error? Fix it:
+SELECT rep_id, revenue, RANK() OVER (ORDER BY revenue DESC) AS rnk FROM sales WHERE rnk <= 5;
+Q7. THEORY  What do the LAG()  and LEAD()  window functions do, and what happens on the first/last row of a
+partition if no default value is supplied? 
+Q8. QUERY  Write a query to display each transaction along with the previous transaction's amount  for the same 
+account_id . 
+Q9. LOGIC TRAP  In a query containing both GROUP BY  and a Window Function, which one executes first in the
+logical SQL query processing order? 
+Q10. DEBUGGING  Fix the syntax error in this CTE:
+WITH regional_sales (SELECT region, SUM(revenue) AS total FROM sales GROUP BY region) SELECT * 
+FROM regional_sales;
+Section B: Intermediate Level (Questions 11–20)
+Q11. QUERY  Write a query to find the top 2 highest-earning sales reps in each region  based on total revenue
+(include ties). 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 7 of 15
+Q12. DEBUGGING  Why does this query calculate the grand total instead of a running total per region? Fix it:
+SELECT region, sale_date, revenue, SUM(revenue) OVER (PARTITION BY region) AS running_total FROM 
+sales;
+Q13. QUERY  Write a query to calculate the Month-over-Month (MoM) percentage revenue growth across the
+entire company. 
+Q14. LOGIC TRAP  What is the subtle difference between ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+and RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW  when duplicate sale_date  values exist? 
+Q15. QUERY  Write a query to calculate a 7-day rolling average of daily revenue per region. 
+Q16. DEBUGGING  Why does LAST_VALUE(revenue) OVER (PARTITION BY region ORDER BY sale_date)  often
+return the current row's revenue instead of the partition's true last value? Fix the frame specification. 
+Q17. QUERY  Write a query to divide employees into 4 salary quartiles within each department using NTILE(4) . 
+Q18. THEORY  What is the difference between a standard CTE and a RECURSIVE  CTE? Name the two required
+members inside a Recursive CTE. 
+Q19. QUERY  Write a query to find the difference between each employee's salary and the highest salary in their
+department. 
+Q20. DEBUGGING  Fix this query meant to calculate each account's running balance (where 'DEPOSIT'  adds and 
+'WITHDRAWAL'  subtracts):
+SELECT account_id, txn_time, SUM(amount) OVER (PARTITION BY account_id ORDER BY txn_time) AS 
+balance FROM transactions;
+Section C: Tough / Advanced Level (Questions 21–30)
+Q21. QUERY Gaps & Islands: Given user_logins(user_id, login_timestamp)  where users can log in multiple
+times per day, write a query to find the longest consecutive-day login streak for each user. 
+Q22. QUERY Recursive Hierarchy: Write a Recursive CTE to output the full reporting chain for every employee
+( emp_id , name , level , and a concatenated path like 'CEO -> VP -> Manager -> Emp' ). 
+Q23. LOGIC PUZZLE  Given a ledger table transactions(txn_id, account_id, txn_type, amount, txn_time) ,
+write a query to flag any account whose running balance ever dipped below 0  at any point in time. 
+Q24. QUERY Sessionization Puzzle: Given user clickstream timestamps events(user_id, event_time) , assign
+a session_id  to each user's events such that a new session starts whenever the gap between consecutive events
+exceeds 30 minutes. 
+Q25. DEBUGGING  A Recursive CTE traversing a graph/manager table runs infinitely due to a circular reference (A
+reports to B, B reports to A). How do you prevent infinite loops in PostgreSQL vs. MySQL/MariaDB? 
+Q26. QUERY  Write a query using PERCENT_RANK()  or CUME_DIST()  to find the top 10% highest-revenue
+transactions in each region. 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 8 of 15
+Q27. LOGIC TRAP  Why can't you nest one window function directly inside another (e.g., SUM(LAG(revenue) OVER
+(...)) OVER (...) ), and how do you structure the query to achieve that result? 
+Q28. QUERY Island Merging: Given overlapping time intervals bookings(room_id, check_in, check_out) ,
+write a query to merge contiguous or overlapping intervals into continuous occupied blocks per room. 
+Q29. QUERY  Write a query to find the first date on which each sales rep's cumulative revenue crossed 100,000 . 
+Q30. LOGIC PUZZLE  Using a Recursive CTE (without helper tables), generate a calendar of all dates for the current
+year and identify all Fridays that fall on the 13th of a month. 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 9 of 15
+Sample Paper 4: Indexing, Query Optimization, Locking & Internals
+MySQL (InnoDB), PostgreSQL & MariaDB | 30 Questions (Easy to Tough) | Questions Only
+Focus Areas: B-Tree & Specialized Indexes, SARGability, Execution Plans (EXPLAIN ), MVCC, Transaction Isolation Levels,
+Deadlocks & Storage Engines.
+Section A: Easy Level (Questions 1–10)
+Q1. THEORY  What is a database index, and what is the primary performance trade-off of adding too many indexes to
+a write-heavy table? 
+Q2. LOGIC TRAP  Given a composite B-Tree index on (dept_id, hire_date, salary) , which of these WHERE
+clauses can use the index effectively?
+a) WHERE dept_id = 10 AND hire_date > '2025-01-01'
+b) WHERE hire_date > '2025-01-01'
+c) WHERE dept_id = 10 AND salary > 80000
+Q3. DEBUGGING  Rewrite this non-SARGable query so it can utilize an index on order_date :
+SELECT * FROM orders WHERE YEAR(order_date) = 2026 AND MONTH(order_date) = 5;
+Q4. THEORY  What is the difference between EXPLAIN  and EXPLAIN ANALYZE  in PostgreSQL vs. MySQL/
+MariaDB? 
+Q5. THEORY  What is a Covering Index (Index-Only Scan), and why does it avoid table heap/clustered lookups? 
+Q6. DEBUGGING  Why will this query bypass an index on email , and how can you optimize it if suffix search isn't
+strictly needed?
+SELECT * FROM users WHERE LOWER(email) = 'alex@example.com';
+Q7. THEORY  Define the four ACID properties and explain which component in PostgreSQL and InnoDB guarantees 
+Durability. 
+Q8. LOGIC TRAP  Why does a query with WHERE status <> 'Active'  or WHERE phone IS NOT NULL  frequently
+choose a Full Table Scan over an index scan? 
+Q9. THEORY  What is a Foreign Key index trap in MySQL/MariaDB vs. PostgreSQL when deleting a parent row? 
+Q10. DEBUGGING  Rewrite this query so an index on salary  can be used:
+SELECT emp_id, salary FROM employees WHERE salary * 1.10 > 100000;
+Section B: Intermediate Level (Questions 11–20)
+Q11. THEORY  Contrast MySQL/MariaDB InnoDB's Clustered Index table organization with PostgreSQL 's Heap
+Table + Non-Clustered Index architecture. 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 10 of 15
+Q12. THEORY  Explain how MVCC (Multi-Version Concurrency Control) is implemented differently in PostgreSQL
+(tuple versions in heap + VACUUM ) vs. InnoDB (in-place updates + Undo Logs). 
+Q13. LOGIC TRAP  Name the default transaction isolation level in PostgreSQL vs. MySQL/MariaDB (InnoDB), and
+explain how their behavior differs when two concurrent transactions update the same row. 
+Q14. SCENARIO  Why does OFFSET 500000 LIMIT 20  degrade in performance as the offset grows, and how do you
+rewrite it using Keyset (Cursor) Pagination on (created_at, id) ? 
+Q15. THEORY  What is a Partial Index (Filtered Index) in PostgreSQL, and when does it dramatically outperform a
+full-table B-Tree index? 
+Q16. DEBUGGING  A table events(id, payload, created_at)  has a composite index (created_at, id) . Why
+is SELECT * FROM events ORDER BY created_at DESC LIMIT 10  much slower than selecting only id  first and
+joining back (Deferred Join)? 
+Q17. THEORY  Compare B-Tree, Hash, GIN, and BRIN indexes in PostgreSQL—when should each be chosen? 
+Q18. LOGIC TRAP  Why can SELECT COUNT(*) FROM large_table  be slow in both PostgreSQL and MySQL
+InnoDB compared to legacy MyISAM? 
+Q19. THEORY  What is Index Condition Pushdown (ICP) in MySQL and MariaDB, and how does it reduce disk I/O? 
+Q20. SCENARIO  You have a composite index on (status, created_at) . Explain how a range condition on 
+status IN ('NEW', 'OPEN')  vs. status > 'A'  affects index usage on created_at . 
+Section C: Tough / Advanced Level (Questions 21–30)
+Q21. LOGIC PUZZLE  Transaction A executes SELECT * FROM accounts WHERE id = 1 FOR UPDATE;  (without
+committing yet). Transaction B executes SELECT * FROM accounts WHERE id = 1;  (plain SELECT ). Does
+Transaction B block in PostgreSQL or InnoDB? What if Transaction B runs SELECT ... FOR UPDATE  or LOCK IN
+SHARE MODE ? 
+Q22. THEORY  What is a Phantom Read, and how does MySQL InnoDB prevent it under REPEATABLE READ  using 
+Next-Key Locks (Record Lock + Gap Lock)? 
+Q23. THEORY  Explain Transaction ID (XID) Wraparound in PostgreSQL, why it can force a database shutdown,
+and how autovacuum  / VACUUM FREEZE  prevents it. 
+Q24. SCENARIO  A 100-million-row orders  table has 99.2% rows with status = 'COMPLETED'  and 0.8% with 
+status = 'PENDING' . Queries frequently fetch pending orders sorted by created_at . Design the optimal indexing
+strategy for PostgreSQL vs. MySQL/MariaDB. 
+Q25. THEORY  Explain Write Amplification in InnoDB caused by secondary indexes storing primary key values and
+the Doublewrite Buffer, and compare it with PostgreSQL 's HOT (Heap-Only Tuple) updates. 
+Q26. DEBUGGING  Two transactions frequently deadlock when updating rows in inventory  in different orders. How
+do PostgreSQL and InnoDB detect and resolve deadlocks, and how do you redesign the SQL/application pattern to
+eliminate them? 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 11 of 15
+Q27. THEORY  What is CREATE INDEX CONCURRENTLY  in PostgreSQL (and Online DDL ALGORITHM=INPLACE,
+LOCK=NONE  in MySQL/MariaDB), and what happens if a concurrent index build fails midway? 
+Q28. SCENARIO  Why does using random UUIDv4 values as a Primary Key severely degrade insert throughput and
+page fill factor in MySQL/MariaDB InnoDB, and how do UUIDv7 or UUID_TO_BIN(uuid, 1)  solve it? 
+Q29. THEORY  What is a Visibility Map in PostgreSQL, and how does it enable fast Index-Only Scans? 
+Q30. LOGIC PUZZLE  Under PostgreSQL 's REPEATABLE READ  isolation level, what happens when two concurrent
+transactions read the same row and both attempt to update it (Serialization Anomaly / First-Committer-Wins), and
+how does this differ from InnoDB's locking behavior? 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 12 of 15
+Sample Paper 5: Cross-Dialect Mastery, JSON, UPSERT, Partitioning &
+Replication
+MySQL vs. PostgreSQL vs. MariaDB | 30 Questions (Easy to Tough) | Questions Only
+Focus Areas: Dialect Syntax Translation, JSON/JSONB Operations, Conflict Resolution (UPSERT), Table Partitioning,
+Temporal Tables, Replication & High Availability.
+Section A: Easy Level (Questions 1–10)
+Q1. THEORY  How do string concatenation ( ||  vs. CONCAT ) and identifier quoting (double quotes vs. backticks)
+differ between PostgreSQL and MySQL/MariaDB? 
+Q2. QUERY  Write a query to extract a top-level string field 'city'  from a JSON column profile  in PostgreSQL
+( ->> ) AND in MySQL/MariaDB ( JSON_UNQUOTE(JSON_EXTRACT(...))  or ->> ). 
+Q3. DEBUGGING  Fix this query written for MySQL so it runs cleanly in PostgreSQL:
+SELECT emp_id, CONCAT(first_name, ' ', last_name) AS name FROM employees LIMIT 10, 5;
+Q4. THEORY  What is the difference between JSON  and JSONB  data types in PostgreSQL? 
+Q5. QUERY  Write a query to retrieve the current database version and current database name in PostgreSQL vs.
+MySQL/MariaDB. 
+Q6. DEBUGGING  Fix this PostgreSQL query intended to filter employees whose metadata  JSONB column has 
+'role' = 'Admin' :
+SELECT emp_id FROM employees WHERE metadata->'role' = 'Admin';
+Q7. THEORY  How does boolean representation differ across PostgreSQL ( BOOLEAN ) vs. MySQL/MariaDB
+( TINYINT(1) )? 
+Q8. QUERY  Write an INSERT ... RETURNING  statement in PostgreSQL (and its MariaDB 10.5+ equivalent) to insert
+a department and immediately return the generated dept_id . 
+Q9. DEBUGGING  Fix this date arithmetic query so it works in PostgreSQL:
+SELECT * FROM orders WHERE order_date >= DATE_SUB(NOW(), INTERVAL 7 DAY);
+Q10. THEORY  What is the difference between a standard View and a Materialized View in PostgreSQL? 
+Section B: Intermediate Level (Questions 11–20)
+Q11. QUERY  Write an UPSERT query to insert (dept_id=10, dept_name='AI', location='Chandigarh')  or
+update dept_name  and location  on conflict—write both the PostgreSQL ( ON CONFLICT ) and MySQL/MariaDB
+( ON DUPLICATE KEY UPDATE ) versions. 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 13 of 15
+Q12. DEBUGGING  Fix this PostgreSQL query designed to increment a numeric counter 'views'  inside a JSONB
+column stats  ( {"views": 10} ):
+UPDATE articles SET stats['views'] = stats['views'] + 1 WHERE article_id = 1;
+Q13. QUERY  Write a query to generate a complete date series from '2026-01-01'  to '2026-01-31'  and left-join 
+orders  so days with zero orders display 0  (use generate_series  for PostgreSQL or a Recursive CTE for MySQL/
+MariaDB). 
+Q14. THEORY  Compare Statement-Based Replication (SBR), Row-Based Replication (RBR), and Mixed
+Replication in MySQL and MariaDB. 
+Q15. QUERY  Write a query to search inside a JSON array tags  (e.g., ["sql", "cloud", "linux"] ) for rows
+containing 'cloud'  in PostgreSQL ( @> ) vs. MySQL/MariaDB ( JSON_CONTAINS ). 
+Q16. DEBUGGING  Why does GROUP_CONCAT(name ORDER BY name SEPARATOR ', ')  fail in PostgreSQL? Write
+the exact PostgreSQL equivalent. 
+Q17. THEORY  Explain how Table Partitioning (Range, List, Hash) works and what Partition Pruning means during
+query execution. 
+Q18. QUERY  Write a query using FILTER (WHERE ...)  in PostgreSQL to compute conditional aggregates, and
+rewrite it using standard CASE WHEN  for MySQL/MariaDB. 
+Q19. THEORY  How do System-Versioned (Temporal) Tables work natively in MariaDB 10.3+ ( FOR SYSTEM_TIME
+AS OF ... )? 
+Q20. DEBUGGING  Why does SELECT * FROM users WHERE username ~ '^[a-z]+$'  fail in MySQL/MariaDB?
+Rewrite it using MySQL/MariaDB regex syntax. 
+Section C: Tough / Advanced Level (Questions 21–30)
+Q21. QUERY Batch Deduplication & UPSERT: A staging table staging_users(email, name, updated_at)
+contains duplicate emails within the same batch. Write a single query to deduplicate by latest updated_at  and upsert
+into users(email, name, updated_at)  without triggering PostgreSQL 's "ON CONFLICT DO UPDATE command
+cannot affect row a second time" error. 
+Q22. THEORY  Compare PostgreSQL Streaming Replication (Physical WAL vs. Logical Replication) with MariaDB
+Galera Cluster (virtually synchronous multi-master certification-based replication). 
+Q23. QUERY JSON Array Expansion & Aggregation: Given orders(order_id, items_json)  where 
+items_json  is an array of objects [{"sku": "A1", "qty": 2, "price": 50}, ...] , write a query using 
+jsonb_array_elements  (PostgreSQL) or JSON_TABLE  (MySQL 8.0+/MariaDB 10.6+) to compute total revenue per 
+sku . 
+Q24. LOGIC TRAP  In MySQL 8.0.19+, why is the VALUES()  function inside ON DUPLICATE KEY UPDATE col =
+VALUES(col)  deprecated, and what is the modern row-alias syntax replacement? 
+Q25. THEORY  Explain Split-Brain in database high-availability clusters and how Quorum / Fencing (STONITH)
+prevents data divergence. 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 14 of 15
+Q26. QUERY  Write a query using LATERAL  join (PostgreSQL / MySQL 8.0.14+) to fetch each customer along with
+their top 2 most expensive orders. 
+Q27. SCENARIO  You need to partition a 500-million-row logs  table by month on created_at , while enforcing
+uniqueness on log_uuid . Explain the Primary Key / Unique Constraint rule imposed on partitioned tables in both
+PostgreSQL and MySQL/MariaDB. 
+Q28. THEORY  Compare Connection Pooling architectures: why does PostgreSQL (process-per-connection model)
+rely heavily on external poolers like PgBouncer compared to MySQL/MariaDB's thread-per-connection / thread-pool
+model? 
+Q29. QUERY  Write a query in PostgreSQL using DISTINCT ON (customer_id)  to retrieve each customer's latest
+order, and write the equivalent query for MySQL/MariaDB where DISTINCT ON  does not exist. 
+Q30. LOGIC PUZZLE  Explain how SKIP LOCKED  in SELECT ... FOR UPDATE SKIP LOCKED  (supported in
+PostgreSQL, MySQL 8.0+, and MariaDB 10.6+) solves contention when building a high-throughput database-backed
+job queue. 
+MySQL • PostgreSQL • MariaDB — 5-Paper Practice Exam Pack (150 Questions) Page 15 of 15

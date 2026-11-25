@@ -7,3 +7,5 @@ logs/
 .pytest_cache/
 /data/
 .kvenv/
+tests/exam/.exam.db
+tests/exam/exam_report.json

@@ -110,6 +110,39 @@ label the rest, upgrade to verified when schema, EXPLAIN or data arrive.
   planted findings with the right confidence class, a proven rewrite; the same query with CREATE TABLE / EXPLAIN upgrades or
   drops inferred findings. (tests/fuzz/bigq.py: 19 families; a pasted EXPLAIN confirms a speed risk or rules it out.)
 
+## Sprint to Wednesday 2 December 2026: DBaba on the user's own server
+
+Ready to install on a user's own server (Linux first), with every way in: browser screen, `dbaba` command line, pip,
+Docker, local API, desktop app, VS Code extension, Windows / cPanel. No third-party AI. Tick an item in the PR that does
+it. Claude items live in `app/` and the knowledge; ChatGPT items live ONLY in their own folders (never `app/`), and Claude
+reviews them before they are merged.
+
+Claude (daytime sessions and the nightly run, in this order):
+- [ ] S1. X2: write a query from plain words (EN / Hinglish / Hindi), with tests/fuzz/nl2sql.py
+- [ ] S2. X3 + X4: the rest of query writing; theory and trap concepts
+- [ ] S3. DBaba to Excel: a Data sheet, a pivot sheet (live SUMIFS / COUNTIFS) and a chart from a query's result, plus the
+  chart in the chat (reusing app/office's workbook builders)
+- [ ] S4. Local mode: `python -m app.local serve --port N`; no accounts / captcha / admin / coming-soon; 127.0.0.1 only;
+  a screen password (hash in dbaba.json); API keys (`Authorization: Bearer`); DATABASE_URL in its own data folder
+- [ ] S5. DBA jobs 1: scheduler; health check every 5 min (connections, locks, long queries, replication lag, disk); daily
+  backup with a test restore into a scratch database; email alerts
+- [ ] S6. DBA jobs 2: slow queries (slow log / pg_stat_statements) checked and rewritten; missing and unused indexes from the
+  real workload; the error log explained; every change waits for approval, with preview and Undo
+- [ ] S7. DBA jobs 3: security audit (users, grants, remote root, empty passwords, open port, old version); growth (days
+  until the disk is full); maintenance (statistics, bloat, VACUUM / OPTIMIZE when safe)
+- [ ] S8. Signed knowledge updates: packs of rules (never user data) signed on our server, checked before use, switchable off
+- [ ] S9. Review and merge ChatGPT's items; install tests on clean Ubuntu, Debian, AlmaLinux and Docker
+- [ ] S10. Exam papers 2-5 (keys written and proved), fixes by family; security review of everything on the user's server
+
+ChatGPT (repo connected; master prompt + one task per chat; its own folders only):
+- [ ] A. Linux installer + systemd service + uninstall (deploy/onprem/)
+- [ ] B. Docker image (deploy/onprem/Dockerfile)
+- [ ] C. pip package + `dbaba` command line (pyproject.toml, dbaba_cli/)
+- [ ] D. API docs + examples in curl, Python, Node, PHP (docs/onprem/, examples/)
+- [ ] E. Desktop app, Tauri (desktop/)
+- [ ] F. VS Code extension (vscode/)
+- [ ] G. Windows service + cPanel lite (deploy/onprem/windows/, deploy/onprem/cpanel/)
+
 ## Exam gaps (before the new databases)
 
 The exam (tests/exam/): Paper 1 is the practice paper, papers 2-5 stay unseen. First sitting 4/30. One gap per night.

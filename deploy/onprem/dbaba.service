@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 @SERVICE_USER@
-WorkingDirectory=@DIR@
+WorkingDirectory=@RELEASE@
 ExecStart=@COMMAND@
 Environment="SITE_MODE=open"
 Environment="ENGINE_MODE=ml"

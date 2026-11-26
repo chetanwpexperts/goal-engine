@@ -61,6 +61,26 @@ def _uq(n: str) -> str:
     return (n or "").strip('`"').lower()
 
 
+def _own_key_extreme(sql: str, blk: dict, left_txt: str, agg_col: str) -> bool:
+    """x IN (SELECT MIN(x) FROM t GROUP BY g) where x is t's own key and the outer row is a t row too: every MIN/MAX value is
+    exactly one row (a key value belongs to one row only), so the list says which rows, with no other group to mix up
+    (lab, night X1: the keep-one-row-per-group DELETE keeps the same rows as the pair form)."""
+    from app.agents import sqlcorrect as C
+
+    col = _uq(agg_col.split(".")[-1])
+    if col != _uq(left_txt.split(".")[-1]) or len(blk["srcs"]) != 1 or not blk["srcs"][0].name:
+        return False
+    inner = _uq(blk["srcs"][0].name)
+    if not (col == "id" or C._names_own_key(inner, col.replace("_", ""))):
+        return False
+    lq = _uq(left_txt.rsplit(".", 1)[0]) if "." in left_txt else ""
+    outer = next((x for x in blk["psrcs"] if not lq or lq in (_uq(x.alias), _uq(x.name))), None)
+    if outer is not None and outer.name:
+        return _uq(outer.name) == inner
+    m = re.match(r"\s*(?:delete\s+from|update)\s+[`\"]?([\w$]+)", sql, re.I)
+    return bool(m) and _uq(m.group(1)) == inner
+
+
 # ------------------------------------------------------------------------------------------------ reading the blocks
 def _scope(text: str):
     """The FROM sources of one query level (text is masked, positions relative to it). UPDATE t / DELETE FROM t count too."""
@@ -348,7 +368,9 @@ def subqueries(sql: str, s: str, intent: str, F) -> list:
             am = re.fullmatch(r"(max|min)\s*\(\s*(" + QNAME + r")\s*\)(?:\s+(?:as\s+)?" + NAME + r")?", items[0][1], re.I)
             gx, gy = cl["group by"]
             gtext = sub[gx:gy].strip()
-            if am and re.fullmatch(QNAME, gtext) and "having" not in cl:
+            if am and re.fullmatch(QNAME, gtext) and "having" not in cl and _own_key_extreme(sql, blk, left_txt, am.group(2)):
+                pass                                   # id IN (SELECT MIN(id) ... GROUP BY g): each value IS one row (night X1)
+            elif am and re.fullmatch(QNAME, gtext) and "having" not in cl:
                 g = gtext
                 gname = g.split(".")[-1]
                 lq = left_txt.rsplit(".", 1)[0] + "." if "." in left_txt else ""

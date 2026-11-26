@@ -293,7 +293,7 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
             stop = re.search(r"\border\s+by\b|\blimit\b|\breturning\b|;", s[w.end():], re.I)
             wm = (w.end(), w.end() + stop.start() if stop else len(s))
     if wm:
-        out += _and_or(sql, s, *wm, F)
+        out += _and_or(sql, s, *wm, F, intent)
 
     # 10. NULL in arithmetic: price - discount is NULL where discount is NULL (and SUM then skips that row)
     if is_select:
@@ -495,7 +495,12 @@ def _double_quoted(sql, s, eng, F) -> list:
     return out
 
 
-def _and_or(sql, s, a, b, F) -> list:
+# the person's own words say the bug is in how AND and OR combine: the brackets they ask for are the fix, not an offer
+SAID_PRECEDENCE = re.compile(r"\b(precedence|bracket\w*|parenthes\w*|operator order|order of (?:operations|evaluation)|and\s*/\s*or|"
+                             r"or\s*/\s*and)\b|कोष्ठक|प्राथमिकता", re.I)
+
+
+def _and_or(sql, s, a, b, F, intent: str = "") -> list:
     """WHERE a = 1 OR a = 2 AND b > 3: AND is done first, so it means a = 1 OR (a = 2 AND b > 3)."""
     from app.agents.sqlcorrect import _depths
 
@@ -534,7 +539,8 @@ def _and_or(sql, s, a, b, F) -> list:
         k = j
     ev = re.sub(r"\s+", " ", sql[a:a + len(text)]).strip()[:100]
     fixed = out_edit[2] if out_edit else ""
-    return [(F("check", "and_or", "AND and OR mixed without brackets: AND is done first",
+    said = bool(out_edit) and bool(SAID_PRECEDENCE.search(intent or ""))
+    return [(F("wrong" if said else "check", "and_or", "AND and OR mixed without brackets: AND is done first",
                "AND aur OR bina brackets ke: AND pehle lagta hai", ev,
                "AND binds tighter than OR on every database, so a OR b AND c means a OR (b AND c): the condition after AND only "
                "applies to the last OR part. " + (f"If the OR is one choice, bracket it: {fixed}." if fixed else

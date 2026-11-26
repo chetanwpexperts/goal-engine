@@ -3687,6 +3687,33 @@
       "proven": [
         "sqlite"
       ]
+    },
+    "double_equals": {
+      "behaviour": "works",
+      "says": "SQLite reads == as = (both are its equality operator), so it runs there; MySQL, MariaDB and PostgreSQL refuse it.",
+      "says_hi": "SQLite mein == bhi = hi hai, isliye wahan chalta hai; MySQL, MariaDB aur PostgreSQL mana karte hain.",
+      "lab": [
+        [
+          "SELECT id FROM t WHERE cat == 1",
+          [
+            [
+              1
+            ],
+            [
+              2
+            ]
+          ]
+        ],
+        [
+          "SELECT id FROM t WHERE amount =< 100",
+          {
+            "error": "near \"<\": syntax error"
+          }
+        ]
+      ],
+      "proven": [
+        "sqlite"
+      ]
     }
   },
   "schema_rules": {

@@ -80,6 +80,7 @@
   "(?m)^\\s*delimiter\\s+\\S+"
  ],
  "query_rules": {
+  "double_equals": {"behaviour": "error", "says": "MariaDB refuses it with error 1064 (a syntax error).", "proven": ["mariadb"]},
   "pipes": "or",
   "plus_on_text": "number",
   "int_division": "decimal",

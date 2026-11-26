@@ -782,6 +782,26 @@
     "postgresql",
     "sqlite"
    ]
+  },
+  "statement_shape": {
+   "title_en": "A statement has a fixed shape before it has a meaning",
+   "title_hi": "Statement ka ek tay dhancha hota hai, matlab baad mein",
+   "rule_en": "The parser reads clauses in one order (SELECT: FROM, JOIN, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT; UPDATE: SET, WHERE, ORDER BY, LIMIT; DELETE: FROM, WHERE, ORDER BY, LIMIT) and knows only its own comparison operators (=, <>, !=, <, <=, >, >=). A clause out of place or an operator from another language (==, =<, =>) stops the statement before any row is read. Each clause keeps its own text, so putting it back in its place has exactly one meaning and that repair is sure; what the statement then means is checked next.",
+   "rule_hi": "Parser clauses ek hi order mein padhta hai (SELECT: FROM, JOIN, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT) aur sirf apne operators jaanta hai (=, <>, <=, >=). Galat jagah ka clause ya doosri language ka operator (==, =<, =>) query ko pehli row padhne se pehle rok deta hai. Har clause apna text rakhta hai, isliye use sahi jagah rakhna pakka fix hai; matlab uske baad check hota hai.",
+   "topics": [
+    "clause_order",
+    "operator"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/select.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/sql-select.html",
+    "https://mariadb.com/kb/en/select/",
+    "https://www.postgresql.org/docs/current/functions-comparison.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
   }
  }
 }

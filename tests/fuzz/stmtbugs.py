@@ -116,7 +116,13 @@ BUGS = ["unquoted_date", "unquoted_word", "scalar_subquery", "set_and", "or_valu
         # journal_mode inside one, a savepoint name typed wrong, a transaction left open, SET TRANSACTION in the wrong place, and
         # SQLite's read-then-write BEGIN (BEGIN IMMEDIATE)
         "s4_start", "s4_lock_tables", "s4_nested", "s4_rollback_no_begin", "s4_ddl_inside", "s4_outside_only", "s4_savepoint_typo",
-        "s4_left_open", "s4_set_txn", "s4_deferred"]
+        "s4_left_open", "s4_set_txn", "s4_deferred",
+        # night X1: debugging returns the fixed statement itself: clauses out of order (moved back, the same rows), == / =< / =>
+        # (the comparison meant), AND/OR when the person's words name the precedence bug (bracketed), a LEFT JOIN undone by
+        # WHERE (the condition moved into ON when their words want every row, INNER JOIN offered; both readings run), and a
+        # column that isn't grouped (one row per group, the column added to GROUP BY, and the row holding each group's MAX/MIN:
+        # every reading run against a query written independently, NOT EXISTS for the last)
+        "dx_clause_order", "dx_double_eq", "dx_and_or_said", "dx_left_on", "dx_group_loose"]
 SL_TOPIC = {b: "dialect" for b in BUGS if b.startswith("sl_")}
 SL_TOPIC.update({"sl_cast_date": "cast_date", "sl_date_minus": "date_math", "sl_date_plus": "date_math"})
 SL_TOPIC.update({"s2_int_pk": "sqlite_rowid_pk", "s2_autoinc_int": "sqlite_rowid_pk", "s2_string": "sqlite_affinity",
@@ -186,6 +192,8 @@ TOPIC = {"unquoted_date": "value", "unquoted_word": "value", "scalar_subquery": 
          "bq_unused": "cte_unused", "bq_distinct_alias": "distinct_join", "bq_quiet_cols": "column", "bq_quiet_cte_ids": "sub_key"}
 # night 12: a correct query: the planted topic must NOT be said, and no error / wrong at all
 TOPIC.update(SL_TOPIC)
+TOPIC.update({"dx_clause_order": "clause_order", "dx_double_eq": "operator", "dx_and_or_said": "and_or", "dx_left_on": "join",
+              "dx_group_loose": "group"})
 QUIET = {"gr_block_key", "st_quiet_corr", "bq_quiet_cols", "bq_quiet_cte_ids"}
 # night 11: the class the planted finding must carry (sqlconfidence.classify); and for every statement, every finding has one
 CLASS = {"bq_having": "proven", "bq_lag_default": "proven", "bq_cte_delete": "proven", "bq_cte_update": "proven",
@@ -558,6 +566,8 @@ def make(seed: int):
         return _sqlite3_bug(seed, bug, rnd, schema, tables, t)
     elif bug.startswith("s4_"):
         return _txn_bug(seed, bug, rnd, schema, t)
+    elif bug.startswith("dx_"):
+        return _debug_bug(seed, bug, rnd, schema, tables, t)
     else:                                     # eq_null_dml
         if not nums:
             return None
@@ -1741,7 +1751,11 @@ def check(item, engines: dict) -> list[str]:
         return bad + _check_ddl(item, engines, res, tag)
     if item["bug"].startswith("pf_"):
         return bad + _check_proof(item, engines, res, tag)
+    if item.get("alts"):                           # night X1: every other honest reading, run against its own independent query
+        bad += _check_alts(item, engines, res, tag)
     sure = any(f["topic"] == want and f["kind"] in ("error", "wrong") for f in res["findings"])
+    if item.get("want_kind") and not any(f["topic"] == want and f["kind"] == item["want_kind"] for f in res["findings"]):
+        bad.append(f"{tag}: {want} not said as {item['want_kind']} ({[(f['topic'], f['kind']) for f in res['findings']]})\n{item['broken']}")
     if item["bug"] in FIX_THE_CHECK:
         sure = True
     if item["bug"] in ("lk_batch_delete", "lk_batch_update", "lk_nplus"):
@@ -1769,6 +1783,169 @@ def check(item, engines: dict) -> list[str]:
         except Exception as exc:  # noqa: BLE001
             bad.append(f"{tag}: on {name} the corrected statement fails: {exc}\n{fixed}")
     return bad
+
+
+def _check_alts(item, engines, res, tag) -> list[str]:
+    bad = []
+    got = {a["key"]: a["sql"] for a in res.get("alternatives") or []}
+    for key, truth in item["alts"].items():
+        if key not in got:
+            bad.append(f"{tag}: the '{key}' reading is not written out (have {sorted(got)})\n{item['broken']}")
+            continue
+        for name, eng in engines.items():
+            try:
+                if _effect(eng, got[key], item["table"], "1") != _effect(eng, truth, item["table"], "1"):
+                    bad.append(f"{tag}: on {name} the '{key}' reading returns other rows\n{got[key]}\n--\n{truth}")
+            except Exception as exc:  # noqa: BLE001
+                bad.append(f"{tag}: on {name} the '{key}' reading fails: {exc}\n{got[key]}")
+    return bad
+
+
+DX_PRECEDENCE = ["fix the operator precedence bug", "the AND/OR brackets are wrong here", "precedence wala bug theek karo",
+                 "bracket galat lage hain", "AND और OR की प्राथमिकता ठीक करो", "fix the parentheses"]
+DX_KEEP_ALL = ["show every {p} including those with none", "all {p} should appear, even empty ones", "khali {p} bhi dikhne chahiye",
+               "sab {p} chahiye, zero wale bhi", "सभी {p} दिखाओ, खाली भी", "why does it fail to return {p} with no rows? rewrite it"]
+DX_EXTREME = ["which {c} has the highest {m} in each {g}?", "who has the top {m} per {g}", "har {g} mein sabse zyada {m} kiska hai",
+              "हर {g} में सबसे ज़्यादा {m} किसका है"]
+
+
+def _debug_bug(seed, bug, rnd, schema, tables, t):
+    """Night X1: the mistakes a debugging question shows, each with the statement meant written independently."""
+    engine = rnd.choice(["mariadb", "postgresql", None])
+    pk = t["pk"]
+    nums = _cols(t, "int", "money")
+    pairs = [(schema["tables"][c["ref"]], x, c) for x in tables for c in x["cols"] if c["kind"] == "fk" and c.get("ref") != x["name"]]
+
+    def item(broken, truth, table, stmt="select", **kw):
+        return {"seed": seed, "bug": bug, "stmt": stmt, "schema": schema, "table": table, "broken": broken, "truth": truth,
+                "engine": engine, **kw}
+
+    def cond_of(x, alias=""):
+        a = alias + "." if alias else ""
+        cats = [c for c in _cols(x, "cat") if c["params"]]
+        ns = _cols(x, "int", "money")
+        if ns and (not cats or rnd.random() < 0.6):
+            c = rnd.choice(ns)
+            return f"{a}{c['name']} {rnd.choice(['>', '<', '>=', '<='])} {rnd.randint(*_range(c))}"
+        if not cats:
+            return f"{a}{x['pk']} > {rnd.randint(0, 5)}"
+        c = rnd.choice(cats)
+        return f"{a}{c['name']} = '{rnd.choice(c['params'])}'"
+
+    if bug == "dx_clause_order":
+        shape = rnd.choice(["plain", "grouped", "join", "update"])
+        if shape == "update":
+            if not nums:
+                return None
+            n = rnd.choice(nums)["name"]
+            cond = cond_of(t)
+            truth = f"UPDATE {t['name']}\nSET {n} = {n} + 1\nWHERE {cond}"
+            return item(f"UPDATE {t['name']}\nWHERE {cond}\nSET {n} = {n} + 1", truth, t["name"], "update")
+        if shape == "join" and pairs:
+            p, x, fk = rnd.choice(pairs)
+            head = f"SELECT c.{x['pk']}, p.{p['pk']}\nFROM {x['name']} c"
+            parts = [("JOIN", f"{p['name']} p ON p.{p['pk']} = c.{fk['name']}"), ("WHERE", cond_of(x, "c")), ("ORDER BY", f"c.{x['pk']}")]
+            table = x["name"]
+        elif shape == "grouped":
+            cats = _cols(t, "cat")
+            if not cats:
+                return None
+            g = rnd.choice(cats)["name"]
+            head = f"SELECT {g}, COUNT(*) AS n\nFROM {t['name']}"
+            parts = [("WHERE", cond_of(t)), ("GROUP BY", g), ("HAVING", "COUNT(*) >= 1"), ("ORDER BY", g)]
+            table = t["name"]
+        else:
+            head = f"SELECT {pk}\nFROM {t['name']}"
+            parts = [("WHERE", cond_of(t)), ("ORDER BY", pk)] + ([("LIMIT", str(rnd.randint(1, 9)))] if rnd.random() < 0.5 else [])
+            table = t["name"]
+        order = list(range(len(parts)))
+        while order == sorted(order):
+            rnd.shuffle(order)
+        if parts[0][0] == "JOIN" and order[0] != 0 and rnd.random() < 0.5:
+            pass                                       # a JOIN written after WHERE: moved back right after FROM
+        truth = head + "".join(f"\n{k} {v}" for k, v in parts)
+        broken = head + "".join(f"\n{parts[i][0]} {parts[i][1]}" for i in order)
+        return item(broken, truth, table)
+    if bug == "dx_double_eq":
+        if not nums:
+            return None
+        c = rnd.choice(nums)
+        k = rnd.randint(*_range(c))
+        bad_op, good_op = rnd.choice([("==", "="), ("===", "="), ("=<", "<="), ("=>", ">=")])
+        if rnd.random() < 0.3 and len(nums) >= 1:
+            n = c["name"]
+            return item(f"UPDATE {t['name']}\nSET {n} == {n} + 1\nWHERE {pk} {bad_op} {k}",
+                        f"UPDATE {t['name']}\nSET {n} = {n} + 1\nWHERE {pk} {good_op} {k}", t["name"], "update")
+        stmt = rnd.choice(["select", "update", "delete"])
+        body = {"select": f"SELECT {pk}\nFROM {t['name']}\nWHERE {c['name']} {{}} {k}\nORDER BY {pk}",
+                "update": f"UPDATE {t['name']}\nSET {c['name']} = {c['name']}\nWHERE {c['name']} {{}} {k}",
+                "delete": f"DELETE FROM {t['name']}\nWHERE {c['name']} {{}} {k}"}[stmt]
+        return item(body.format(bad_op), body.format(good_op), t["name"], stmt)
+    if bug == "dx_and_or_said":
+        cats = [c for c in _cols(t, "cat") if len(c["params"]) >= 2]
+        if not cats or not nums:
+            return None
+        c = rnd.choice(cats)
+        v1, v2 = rnd.sample(c["params"], 2)
+        n = rnd.choice(nums)
+        k = rnd.randint(*_range(n))
+        body = f"SELECT {pk}\nFROM {t['name']}\nWHERE {{}}\nORDER BY {pk}"
+        broken = body.format(f"{c['name']} = '{v1}' OR {c['name']} = '{v2}' AND {n['name']} > {k}") + ";\n" + rnd.choice(DX_PRECEDENCE)
+        return item(broken, body.format(f"({c['name']} = '{v1}' OR {c['name']} = '{v2}') AND {n['name']} > {k}"), t["name"],
+                    want_kind="wrong")
+    if bug == "dx_left_on":
+        pairs = [(p, x, fk) for p, x, fk in pairs if _cols(x, "int", "money")]
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        m = rnd.choice(_cols(x, "int", "money"))
+        k = rnd.randint(*_range(m))
+        cond = f"c.{m['name']} > {k}"
+        grouped = rnd.random() < 0.6
+        if grouped:
+            sel, tail = f"p.{p['pk']}, COUNT(c.{x['pk']}) AS n", f"\nGROUP BY p.{p['pk']}\nORDER BY p.{p['pk']}"
+        else:
+            sel, tail = f"p.{p['pk']}, c.{x['pk']}", f"\nORDER BY p.{p['pk']}"
+        extra = f" AND p.{p['pk']} > {rnd.randint(0, 3)}" if rnd.random() < 0.4 else ""
+        broken = f"SELECT {sel}\nFROM {p['name']} p\nLEFT JOIN {x['name']} c ON c.{fk['name']} = p.{p['pk']}\nWHERE {cond}{extra}{tail}"
+        on = (f"SELECT {sel}\nFROM {p['name']} p\nLEFT JOIN (SELECT * FROM {x['name']} WHERE {m['name']} > {k}) c "
+              f"ON c.{fk['name']} = p.{p['pk']}" + (f"\nWHERE {extra[5:]}" if extra else "") + tail)
+        inner = f"SELECT {sel}\nFROM {p['name']} p\nJOIN {x['name']} c ON c.{fk['name']} = p.{p['pk']}\nWHERE {cond}{extra}{tail}"
+        word = p["name"].split("_", 1)[-1]
+        if rnd.random() < 0.6:
+            return item(broken + ";\n" + rnd.choice(DX_KEEP_ALL).format(p=word), on, p["name"], want_kind="wrong", alts={"inner": inner})
+        return item(broken, inner, p["name"], alts={"on": on}, no_fix=True)
+    if bug == "dx_group_loose":
+        pairs = [(p, x, fk) for p, x, fk in pairs if _cols(x, "int", "money") and _cols(p, "cat") and
+                 [c for c in x["cols"] if c["kind"] in ("name", "cat")]]
+        if not pairs:
+            return None
+        p, x, fk = rnd.choice(pairs)
+        m = rnd.choice(_cols(x, "int", "money"))["name"]
+        g = rnd.choice(_cols(p, "cat"))["name"]
+        nc = rnd.choice([c for c in x["cols"] if c["kind"] in ("name", "cat")])["name"]
+        fn = rnd.choice(["MAX", "MIN"])
+        src = f"FROM {x['name']} c\nJOIN {p['name']} p ON p.{p['pk']} = c.{fk['name']}"
+        broken = f"SELECT p.{g}, c.{nc}, {fn}(c.{m})\n{src}\nGROUP BY p.{g}\nORDER BY p.{g}"
+        drop = f"SELECT p.{g}, {fn}(c.{m})\n{src}\nGROUP BY p.{g}\nORDER BY p.{g}"
+        add = f"SELECT p.{g}, c.{nc}, {fn}(c.{m})\n{src}\nGROUP BY p.{g}, c.{nc}\nORDER BY p.{g}"
+        cmp_ = ">" if fn == "MAX" else "<"
+        extreme = (f"SELECT p.{g}, c.{nc}, c.{m}\n{src}\nWHERE p.{g} IS NOT NULL AND c.{m} IS NOT NULL AND NOT EXISTS (\n"
+                   f"  SELECT 1 FROM {x['name']} c2 JOIN {p['name']} p2 ON p2.{p['pk']} = c2.{fk['name']}\n"
+                   f"  WHERE p2.{g} = p.{g} AND c2.{m} {cmp_} c.{m})")
+        if rnd.random() < 0.5:
+            words = rnd.choice(DX_EXTREME).format(c=nc, m=m, g=g)
+            if fn == "MIN":
+                words = words.replace("highest", "lowest").replace("top", "lowest").replace("zyada", "kam").replace("ज़्यादा", "कम")
+            return item(broken + ";\n" + words, extreme, x["name"], alts={"drop": drop, "add": add})
+        return item(broken, drop, x["name"], alts={"add": add, "extreme": extreme})
+    return None
+
+
+def _range(c):
+    pr = c.get("params") or (0, 100)
+    lo, hi = (pr[0], pr[1]) if len(pr) >= 2 and all(isinstance(v, (int, float)) for v in pr[:2]) else (0, 100)
+    return int(lo), int(max(lo, hi))
 
 
 def _port_bug(seed, bug, rnd, schema, tables, t):

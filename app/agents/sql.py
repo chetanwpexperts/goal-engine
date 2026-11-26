@@ -240,16 +240,16 @@ def _notes_only(engine: str | None) -> bool:
     return E.notes_only(engine)
 
 
-def analyze_sql(query: str, extra: str = "", engine: str | None = None) -> dict:
+def analyze_sql(query: str, extra: str = "", engine: str | None = None, said: str = "") -> dict:
     """query: the SQL. extra: optional EXPLAIN output and/or CREATE TABLE statements. engine: the database the person named,
     chose or that was detected (standing rule A: app/dbknow/engines.py); None = not known, each engine's behaviour is said."""
     from app.agents.sqlbasics import CHOSEN
 
     if engine is None:
-        return _analyze_sql(query, extra)
+        return _analyze_sql(query, extra, said)
     token = CHOSEN.set(engine)
     try:
-        out = _analyze_sql(query, extra)
+        out = _analyze_sql(query, extra, said)
         out["engine"] = engine
         if _notes_only(engine):
             out["notes_for"] = query            # SQL Server / Oracle: the notes that speak to this query
@@ -258,9 +258,9 @@ def analyze_sql(query: str, extra: str = "", engine: str | None = None) -> dict:
         CHOSEN.reset(token)
 
 
-def _analyze_sql(query: str, extra: str = "") -> dict:
+def _analyze_sql(query: str, extra: str = "", lead: str = "") -> dict:
     original = unwrap(query)
-    said = request_words(query)
+    said = " ".join(x for x in (request_words(query), lead.strip()) if x)   # the words after it, and before it (night X1)
     from app.agents import sqlverify
 
     both = sqlverify.split_paste(original)            # CREATE TABLE ... ; then one query: the tables are the query's schema (10B)

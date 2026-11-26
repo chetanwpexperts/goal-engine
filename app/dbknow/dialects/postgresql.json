@@ -576,6 +576,7 @@
   "\\bupdate\\s+[\\w\\\".]+(?:\\s+(?:as\\s+)?\\w+)?\\s+set\\b[^;(]*\\bfrom\\b"
  ],
  "query_rules": {
+  "double_equals": {"behaviour": "error", "says": "PostgreSQL refuses it: operator does not exist: integer == integer.", "proven": ["postgresql"]},
   "pipes": "concat",
   "plus_on_text": "error",
   "int_division": "truncates",

@@ -2,6 +2,7 @@
 and valid ones (tests/fuzz/db.py) that must get no false 'error' or 'wrong'."""
 
 import random
+import re
 from pathlib import Path
 
 import pytest
@@ -59,8 +60,10 @@ def test_the_conversation(client, ml_mode):
     assert [a["recipe"] for a in r["agents"]] == ["sql_review"]
     goal = r["goal"]["id"]
     r = say_sql(client, BROKEN, goal_id=goal)
-    assert "in the card" in r["reply"] and "ALTER TABLE" not in r["reply"]
-    assert len(r["reply"].splitlines()) <= 5 and "Fixed" in r["reply"]
+    assert "ALTER TABLE" not in r["reply"]
+    head, _, fixed = r["reply"].partition("\n\nCorrected query:\n\n")      # night X1: the fix itself is in the reply
+    assert len(head.splitlines()) <= 5 and "Fixed" in head
+    assert re.match(r"\s*SELECT\b", fixed) and ";" in fixed and "JOIN" in fixed
     assert r["options"] == ["Optimize it"] and r["next"] == []                                  # no quiz buttons
     r = client.post("/api/message", json={"text": "In this query join galat tha join sahi krna tha", "goal_id": goal}).json()
     assert "'products.id'" in r["reply"] and "Self join" in r["reply"] and "'!= NULL'" not in r["reply"]

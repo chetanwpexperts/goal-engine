@@ -4,7 +4,7 @@ mod ssh;
 use model::{Connection, ApiState};
 use std::{collections::HashMap, path::PathBuf, sync::Mutex, time::Duration};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, AppHandle, State, Emitter};
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{Menu, MenuItem, Submenu, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
@@ -19,17 +19,45 @@ fn entry(id: Uuid) -> Result<keyring::Entry,String> {
 fn lookup(d: &Data,id: Uuid) -> Result<Connection,String> {
     d.rows.iter().find(|r|r.id==id).cloned().ok_or("Connection not found.".into())
 }
+fn restore_window(window: &tauri::WebviewWindow) -> Result<(),String> {
+    // Attempt all three operations in order, even if one fails.
+    let unminimize = window.unminimize();
+    let show = window.show();
+    let focus = window.set_focus();
+    unminimize.and(show).and(focus).map_err(|_| "Could not bring the window forward.".into())
+}
+fn restore_connection(app: &AppHandle, id: Uuid) -> Option<Result<(),String>> {
+    app.get_webview_window(&format!("server-{id}")).map(|w| restore_window(&w))
+}
 fn refresh(app: &AppHandle) -> tauri::Result<()> {
     let store = app.state::<Store>();
-    let d = store.data.lock().unwrap();
+    // Do not hold the store lock while updating native menus.
+    let rows: Vec<_> = {
+        let d = store.data.lock().unwrap();
+        d.rows.iter().map(|r| (r.id,r.label.clone(),d.live.contains_key(&r.id))).collect()
+    };
     let menu = Menu::new(app)?;
     menu.append(&MenuItem::with_id(app,"manager","Connections",true,None::<&str>)?)?;
-    for row in &d.rows {
-        let title = format!("{} — {}",row.label,if d.live.contains_key(&row.id) {"Connected"} else {"Disconnected"});
-        menu.append(&MenuItem::with_id(app,row.id.to_string(),title,true,None::<&str>)?)?;
+    for (id,label,connected) in &rows {
+        let title = format!("{} — {}",label,if *connected {"Connected"} else {"Disconnected"});
+        menu.append(&MenuItem::with_id(app,id.to_string(),title,true,None::<&str>)?)?;
     }
     menu.append(&MenuItem::with_id(app,"quit","Quit DBaba",true,None::<&str>)?)?;
     if let Some(tray)=app.tray_by_id("dbaba") { tray.set_menu(Some(menu))?; }
+
+    let bar = Menu::new(app)?;
+    let application = Submenu::new(app,"DBaba",true)?;
+    application.append(&PredefinedMenuItem::quit(app,None)?)?;
+    bar.append(&application)?;
+    let windows = Submenu::new(app,"Window",true)?;
+    windows.append(&MenuItem::with_id(app,"window-manager","Connections",true,None::<&str>)?)?;
+    for (id,label,connected) in &rows {
+        if *connected && app.get_webview_window(&format!("server-{id}")).is_some() {
+            windows.append(&MenuItem::with_id(app,format!("window-{id}"),label,true,None::<&str>)?)?;
+        }
+    }
+    bar.append(&windows)?;
+    app.set_menu(bar)?;
     Ok(())
 }
 fn manager_only(window:&tauri::WebviewWindow)->Result<(),String> {
@@ -78,6 +106,7 @@ async fn fingerprint_inner(app:AppHandle,id:Uuid)->Result<Option<String>,String>
     tauri::async_runtime::spawn_blocking(move || {
         let store=app.state::<Store>();
         let row=lookup(&store.data.lock().unwrap(),id)?;
+        if app.get_webview_window(&format!("server-{id}")).is_some() { return Ok(None); }
         let Some(s)=row.ssh else {return Ok(None)};
         if ssh::known(&s.host,&store.hosts) {return Ok(None)}
         let (line,fp)=ssh::scan(&s)?;
@@ -101,7 +130,7 @@ fn accept(window:tauri::WebviewWindow,store:State<Store>,id:Uuid,fingerprint:Str
 async fn connect(window:tauri::WebviewWindow,app:AppHandle,id:Uuid)->Result<(),String> { manager_only(&window)?; connect_inner(app,id).await }
 async fn connect_inner(app:AppHandle,id:Uuid)->Result<(),String> {
     let store=app.state::<Store>();
-    if let Some(w)=app.get_webview_window(&format!("server-{id}")) { let _=w.set_focus(); return Ok(()) }
+    if let Some(result)=restore_connection(&app,id) { return result; }
     let row=lookup(&store.data.lock().unwrap(),id)?;
     let hosts=store.hosts.clone();
     let remote=row.port;
@@ -220,6 +249,15 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init()).plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![list,add,remove,connect,disconnect,fingerprint,accept])
+        .on_menu_event(|app,event| {
+            let id = event.id().as_ref();
+            let result = if id == "window-manager" {
+                app.get_webview_window("main").map(|w| restore_window(&w))
+            } else if let Some(id) = id.strip_prefix("window-").and_then(|s| Uuid::parse_str(s).ok()) {
+                restore_connection(app,id)
+            } else { None };
+            if let Some(Err(error)) = result { let _=app.emit("connection-error",error); }
+        })
         .setup(|app| {
             let dir=app.path().app_config_dir()?;
             std::fs::create_dir_all(&dir)?;
@@ -230,12 +268,16 @@ fn main() {
             TrayIconBuilder::with_id("dbaba").icon(tauri::image::Image::new_owned(pixels,32,32))
                 .tooltip("DBaba").on_menu_event(|app,event| match event.id().as_ref() {
                     "quit"=>{app.state::<Store>().data.lock().unwrap().live.clear();app.exit(0)},
-                    "manager"=>{if let Some(w)=app.get_webview_window("main"){let _=w.show();let _=w.set_focus();}},
+                    "manager"=>{if let Some(w)=app.get_webview_window("main"){let _=restore_window(&w);}},
                     id=>if let Ok(id)=Uuid::parse_str(id) {
+                        if let Some(result)=restore_connection(app,id) {
+                            if let Err(error)=result { let _=app.emit("connection-error",error); }
+                            return;
+                        }
                         let a=app.clone();tauri::async_runtime::spawn(async move {
                             match fingerprint_inner(a.clone(),id).await {
                                 Ok(None)=>{if let Err(e)=connect_inner(a.clone(),id).await {let _=a.emit("connection-error",e);}},
-                                _=>{if let Some(w)=a.get_webview_window("main"){let _=w.show();let _=w.set_focus();}let _=a.emit("verify-host",id);}
+                                _=>{if let Some(w)=a.get_webview_window("main"){let _=restore_window(&w);}let _=a.emit("verify-host",id);}
                             }
                         });
                     }

@@ -4,8 +4,8 @@ set -euo pipefail
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 command -v docker >/dev/null || { echo "Please install Docker to run this integration test."; exit 1; }
 docker info >/dev/null
-tag="dbaba-onprem-test:$"
-container="dbaba-onprem-test-$"
+tag="dbaba-onprem-test:$$"
+container="dbaba-onprem-test-$$"
 cleanup() {
   if docker inspect "$container" >/dev/null 2>&1; then
     docker rm -f "$container" >/dev/null

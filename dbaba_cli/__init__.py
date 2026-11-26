@@ -29,14 +29,21 @@ def version():
         return "0.1.0"
 
 
+def config_paths():
+    return (Path.cwd() / "dbaba.json", Path.home() / "dbaba" / "dbaba.json",
+            Path("/opt/dbaba/dbaba.json"))
+
+
 def configuration():
-    for root in (Path.cwd(), Path.home() / "dbaba", Path("/opt/dbaba")):
-        path = root / "dbaba.json"
-        if path.is_file():
+    override = os.environ.get("DBABA_CONFIG")
+    # An explicit path is authoritative: do not silently use another installation.
+    paths = (Path(override).expanduser().resolve(),) if override else config_paths()
+    for path in paths:
+        if override or path.is_file():
             config = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(config, dict):
                 raise ValueError("Invalid configuration.")
-            return root, config
+            return path.parent, config
     return Path.cwd(), {}
 
 
@@ -144,9 +151,8 @@ def secret_values(value):
     elif isinstance(value, list):
         for item in value:
             yield from secret_values(item)
-    elif isinstance(value, (str, int, float)) and not isinstance(value, bool):
-        if str(value):
-            yield str(value)
+    elif isinstance(value, str) and len(value) >= 8:
+        yield value
 
 
 def clean_config(value, secrets):
@@ -181,16 +187,15 @@ def safe_config(value, secrets):
         return [safe_config(v, secrets) for v in value]
     if isinstance(value, str):
         return redact(value, secrets)
-    if isinstance(value, (int, float)) and str(value) in secrets:
-        return "***"
     return value
 
 
 def report(root, config):
     secrets = set()
     cleaned = clean_config(config, secrets)
-    if os.environ.get("DBABA_API_KEY"):
-        secrets.add(os.environ["DBABA_API_KEY"])
+    api_key = os.environ.get("DBABA_API_KEY", "")
+    if len(api_key) >= 8:
+        secrets.add(api_key)
     notes = ["DBaba " + version(), "Python " + platform.python_version(),
              "OS " + platform.system() + " " + platform.release()]
     for package in ("fastapi", "uvicorn", "SQLAlchemy"):

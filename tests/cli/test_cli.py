@@ -7,13 +7,25 @@ import zipfile
 
 import pytest
 
-from dbaba_cli import main, base_url
+from dbaba_cli import main, base_url, configuration, secret_values
+
+
+@pytest.fixture(autouse=True)
+def isolated_config(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    path = tmp_path / "dbaba.json"
+    path.write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("DBABA_CONFIG", str(path))
+    monkeypatch.setattr("dbaba_cli.config_paths", lambda: (path, tmp_path / "fallback.json"))
+    # Never read the host's systemd journal during report tests.
+    monkeypatch.setattr("dbaba_cli.platform.system", lambda: "TestOS")
+    return path
 
 
 @pytest.fixture
 def local(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.delenv("DBABA_ALLOW_REMOTE", raising=False)
     monkeypatch.setenv("DBABA_API_KEY", "test-only")
     calls = []
@@ -172,3 +184,58 @@ def test_redirect_not_followed(local, monkeypatch):
         server.shutdown()
         server.server_close()
         thread.join()
+
+
+def test_config_override_precedes_search(isolated_config, monkeypatch):
+    isolated_config.write_text('{"port": 9123}', encoding="utf-8")
+    fallback = isolated_config.parent / "fallback.json"
+    fallback.write_text('{"port": 9999}', encoding="utf-8")
+    monkeypatch.setattr("dbaba_cli.config_paths", lambda: (fallback,))
+    assert configuration() == (isolated_config.parent, {"port": 9123})
+    monkeypatch.delenv("DBABA_CONFIG")
+    assert configuration() == (fallback.parent, {"port": 9999})
+    fallback.unlink()
+    assert configuration() == (isolated_config.parent, {})
+
+
+def test_missing_explicit_config_does_not_fall_back(isolated_config):
+    isolated_config.unlink()
+    with pytest.raises(FileNotFoundError):
+        configuration()
+
+
+def test_secret_values_only_long_strings():
+    assert set(secret_values({"n": 16384, "r": 8, "p": 1, "enabled": True,
+                              "short": "1234567", "long": "12345678",
+                              "nested": ["long-secret", False, 123456789]})) == {
+        "12345678", "long-secret"
+    }
+
+
+def test_report_preserves_host_and_versions(isolated_config, monkeypatch):
+    monkeypatch.setattr("dbaba_cli.version", lambda: "0.1.8")
+    isolated_config.write_text(json.dumps({
+        "port": 8765,
+        "database": {"host": "127.0.0.1", "password": "long-password"},
+        "screen_password": {"algorithm": "scrypt", "n": 16384, "r": 8, "p": 1,
+                            "hash": "long-hash", "salt": "long-salt"},
+        "nested": {"secret": "1", "token": "8", "key": True},
+        "number": 12345678,
+        "another_secret": "12345678",
+    }), encoding="utf-8")
+    Path("dbaba.log").write_text(
+        "127.0.0.1 version 0.1.8 n=16384 r=8 p=1 long-password long-hash long-salt\n",
+        encoding="utf-8",
+    )
+    assert main(["report"]) == 0
+    with zipfile.ZipFile(next(Path.cwd().glob("dbaba-report-*.zip"))) as archive:
+        config = json.loads(archive.read("dbaba.json"))
+        assert config["database"] == {"host": "127.0.0.1"}
+        assert config["number"] == 12345678
+        assert config["nested"] == {}
+        assert "screen_password" not in config
+        assert b"DBaba 0.1.8" in archive.read("versions.txt")
+        log = archive.read("dbaba.log").decode()
+        assert "127.0.0.1 version 0.1.8 n=16384 r=8 p=1" in log
+        for secret in ("long-password", "long-hash", "long-salt"):
+            assert secret not in log

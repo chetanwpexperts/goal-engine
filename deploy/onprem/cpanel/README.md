@@ -66,7 +66,7 @@ including static files and API routes. Do not expose an unprotected copy.
 This is a request-driven edition. Scheduled jobs, persistent background
 work and WebSockets are not supported. Passenger does not run ASGI lifespan
 events through this adapter; the entry point initializes the database
-explicitly. Full application behavior must be verified on the target host.
+and the local request model explicitly, without resuming background jobs. Full application behavior must be verified on the target host.
 No external AI provider is configured. Keep the application private and
 do not configure external integrations. To remove it, stop and delete the
 Python App, remove its dedicated authentication configuration and, after

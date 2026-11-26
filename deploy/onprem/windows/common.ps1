@@ -56,12 +56,16 @@ function Wait-DBabaHealth($Port, $Task, $Seconds = 180) {
             $listeners = @(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue)
             if ($listeners.Count -gt 0 -and @($listeners | Where-Object LocalAddress -ne '127.0.0.1').Count -eq 0 -and
                 (Get-ScheduledTask -TaskName $Task).State -eq 'Running') {
-                $client = New-Object Net.WebClient
-                $client.Proxy = $null
+                $request = [Net.HttpWebRequest]::Create("http://127.0.0.1:$Port/api/health")
+                $request.Proxy = $null
+                $request.Timeout = 2000
+                $request.ReadWriteTimeout = 2000
+                $response = $request.GetResponse()
                 try {
-                    $result = $client.DownloadString("http://127.0.0.1:$Port/api/health") | ConvertFrom-Json
+                    $reader = [IO.StreamReader]::new($response.GetResponseStream())
+                    try { $result = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
                     if ($result.ok -eq $true) { return $true }
-                } finally { $client.Dispose() }
+                } finally { $response.Dispose() }
             }
         } catch {}
         Start-Sleep -Seconds 2
@@ -77,6 +81,15 @@ function Stop-DBabaTask($Task, $Port) {
         if ([DateTime]::UtcNow -gt $until) { throw 'The saved port is still in use. Your release is kept.' }
         Start-Sleep -Milliseconds 500
     }
+}
+function Remove-DBabaRelease($Path) {
+    Assert-RegularPath $Path
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $junction = Join-Path $Path 'data'
+    if ((Test-Path -LiteralPath $junction) -and ((Get-Item -LiteralPath $junction -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        [IO.Directory]::Delete($junction)
+    }
+    Remove-Item -LiteralPath $Path -Recurse -Force
 }
 function Switch-DBabaRelease($Root, [scriptblock]$Stop, [scriptblock]$Start, [scriptblock]$Health, [scriptblock]$RemoveTask) {
     $active = Join-Path $Root 'release'
@@ -108,5 +121,5 @@ function Switch-DBabaRelease($Root, [scriptblock]$Stop, [scriptblock]$Start, [sc
         } else { & $RemoveTask }
         throw $failure
     }
-    if ($moved) { Remove-Item -LiteralPath $old -Recurse -Force }
+    if ($moved) { Remove-DBabaRelease $old }
 }

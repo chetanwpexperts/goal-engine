@@ -2,6 +2,7 @@ param([string]$Source = $env:DBABA_SRC)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common.ps1')
 $location = Get-DBabaLocation
+# Boot-time service needs a Python installation accessible to Local Service.
 $root = $location.Root
 $task = $location.Task
 $python = $null
@@ -14,6 +15,9 @@ foreach ($candidate in @('python.exe','python3.exe','py.exe')) {
     }
 }
 if (-not $python) { throw 'Python 3.11 or newer is needed. Run: winget install -e --id Python.Python.3.11' }
+if ($location.Admin -and $python.StartsWith($env:USERPROFILE + '\',[StringComparison]::OrdinalIgnoreCase)) {
+    throw 'For boot-time startup, install Python for all users first (winget install -e --id Python.Python.3.11 --scope machine).'
+}
 if (-not $Source) { $Source = Join-Path $PSScriptRoot '..\..\..' }
 $Source = (Resolve-Path -LiteralPath $Source).Path
 if (-not (Test-Path (Join-Path $Source 'app\main.py'))) { throw 'Please supply a complete release directory with -Source.' }
@@ -47,7 +51,7 @@ try {
     if ($port -lt 1024 -or $port -gt 65535) { throw 'Choose a port from 1024 to 65535.' }
     $next = Join-Path $root '.release-new'
     $active = Join-Path $root 'release'
-    if (Test-Path $next) { Remove-Item -LiteralPath $next -Recurse -Force }
+    Remove-DBabaRelease $next
     New-Item -ItemType Directory -Path $next | Out-Null
     # Copy only regular release files. Never import saved settings or data.
     $copy = @'
@@ -70,7 +74,10 @@ def copy(src, dst):
 copy(source, target)
 '@
     if ($next.StartsWith($Source.TrimEnd('\') + '\',[StringComparison]::OrdinalIgnoreCase)) { throw 'Choose a source outside the installation directory.' }
-    Invoke-Python $python @('-c',$copy,$Source,$next)
+    $copyFile = Join-Path $next '.copy-release.py'
+    [IO.File]::WriteAllText($copyFile, $copy)
+    Invoke-Python $python @($copyFile,$Source,$next)
+    Remove-Item -LiteralPath $copyFile
     Invoke-Python $python @('-m','venv',(Join-Path $next '.venv'))
     $venv = Join-Path $next '.venv\Scripts\python.exe'
     Invoke-Python $venv @('-m','pip','--isolated','install','--disable-pip-version-check','--no-input','-r',(Join-Path $next 'requirements.txt'))

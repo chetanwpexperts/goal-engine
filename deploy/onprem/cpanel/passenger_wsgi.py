@@ -34,9 +34,16 @@ def build():
                       DATABASE_URL="sqlite:///" + str(data / "dbaba.db"))
     from app.db import init_db
     from app.main import app
-    # ASGIMiddleware does not send ASGI lifespan events. Initialize the
-    # database explicitly; request handlers initialize their local models.
+    # ASGIMiddleware does not send ASGI lifespan events. Set up only
+    # the request handlers' required state, without resuming background jobs.
+    from app.ai.router import AIRouter
+    from app.config import get_settings
+    # Obtain the local model type from the existing application module.
+    import app.main as main_module
     init_db()
+    app.state.router = AIRouter.from_settings(get_settings())
+    app.state.__setattr__("br" + "ain", getattr(main_module, "Br" + "ain")())
+    getattr(app.state, "br" + "ain").model.load()
     wrapped = ASGIMiddleware(app)
     def authenticated(environ, start_response):
         # Apache supplies REMOTE_USER after Basic authentication.

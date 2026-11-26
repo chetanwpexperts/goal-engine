@@ -624,6 +624,33 @@
     throw new Error("The connector isn't answering. Is it running on your server?");
   }
 
+  // S3: an export as a workbook (Data, a Pivot with live COUNTIFS / SUMIFS and its chart, About), and that chart here too
+  async function excelView(jobId, hi, opts) {
+    const box = el("div", "db-excel");
+    const draw = async (body) => {
+      box.replaceChildren(el("p", "cap", T(hi, "Excel file bana raha hoon…", "Making the Excel file…")));
+      const x = await api(`/api/connector-jobs/${jobId}/excel`, { method: "POST", body: JSON.stringify({ ...body, hi: !!hi }) });
+      const parts = [el("p", null, x.say)];
+      if (x.chart && x.chart.rows && x.chart.rows.length > 1) parts.push(barChart(x.chart.rows, x.chart.title, x.chart.line));
+      if (x.notes && x.notes.length) { const ul = el("ul", "notes"); for (const n of x.notes) ul.append(el("li", null, n)); parts.push(ul); }
+      const acts = el("div", "acts flat");
+      const dl = el("a", "btn solid", T(hi, "Excel download (.xlsx)", "Download Excel (.xlsx)")); dl.href = x.download;
+      const csv = el("a", "btn", "CSV"); csv.href = `/api/connector-jobs/${jobId}/download`;
+      acts.append(dl, csv);
+      if (x.columns && x.columns.length > 1) {
+        const pick = el("select"); pick.setAttribute("aria-label", T(hi, "Pivot kis column se", "Pivot by column"));
+        pick.append(el("option", null, T(hi, "Pivot kis column se…", "Pivot by…")));
+        for (const c of x.columns) { const o = el("option", null, c); o.value = c; if (x.pivot && x.pivot.by === c) o.selected = true; pick.append(o); }
+        pick.addEventListener("change", () => { if (pick.value) draw({ by: pick.value, measure: (x.pivot && x.pivot.measure) || "" }).catch((e) => box.replaceChildren(el("p", "err", e.message))); });
+        acts.append(pick);
+      }
+      parts.push(acts);
+      box.replaceChildren(...parts);
+    };
+    await draw(opts || {});
+    return box;
+  }
+
   function grid(result) {
     const wrap = el("div", "grid");
     const table = el("table");
@@ -1756,7 +1783,7 @@
             try {
               const j = await runJob(c.id, { kind: "export", table: t.name });
               out.replaceChildren(el("p", "cap", T(hi, `${j.result.row_count.toLocaleString("en-IN")} rows taiyar`, `${j.result.row_count.toLocaleString("en-IN")} rows ready`)));
-              window.location.href = `/api/connector-jobs/${j.id}/download`;
+              out.append(await excelView(j.id, hi, a.excel_words ? { words: a.excel_words } : {}));
             } catch (err) { fail(err); }
           });
           li.append(nm, info, dl);
@@ -1783,7 +1810,7 @@
         say(T(hi, "Chal raha hai…", "Running…"));
         try {
           const j = await runJob(c.id, { kind, sql: ta.value });
-          if (kind === "export") { out.replaceChildren(el("p", "cap", `${j.result.row_count} rows`)); window.location.href = `/api/connector-jobs/${j.id}/download`; }
+          if (kind === "export") { out.replaceChildren(el("p", "cap", `${j.result.row_count} rows`)); out.append(await excelView(j.id, hi, a.excel_words ? { words: a.excel_words } : {})); }
           else out.replaceChildren(el("p", "cap", kind === "explain" ? "EXPLAIN" : `${j.result.row_count} rows${j.result.limited ? T(hi, " (pehli 50)", " (first 50)") : ""}`), grid(j.result));
         } catch (err) { fail(err); }
       });

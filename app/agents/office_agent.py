@@ -170,6 +170,10 @@ def wants_office(goal: Goal | None, text: str, db: Session | None = None) -> boo
 
     if any(packs.mentions(name, text) for name, p in packs.all_packs().items() if "office" in p.get("outranks", [])):
         return False                                  # "database se excel chahiye": that agent's words win (its pack says so)
+    from app.dbknow import concepts as dbconcepts
+
+    if dbconcepts.DB_TO_SHEET.search(text or "") and dbconcepts.match(text):
+        return False                                  # "how do I get a query's result into Excel": a database lesson (S3)
     if not_yet(text):
         return True                                   # PowerPoint, macros, charts...: this agent answers honestly that it can't yet
     rec = brain.recognize(text)

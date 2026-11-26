@@ -4648,5 +4648,6 @@
       "sqlite"
     ],
     "lab": "pragma_table_info, sqlite_master and EXPLAIN QUERY PLAN on SQLite 3.53 (E1 night 4); run again by tests/practice/test_e1_sqlite4.py."
-  }
+  },
+ "grouping": {"case": "sensitive", "trailing_spaces": "kept", "accents": "kept", "says": "GROUP BY uses the BINARY collation by default: 'Red' and 'red' are two groups, 'a' and 'a ' two.", "proven": ["sqlite"]}
 }

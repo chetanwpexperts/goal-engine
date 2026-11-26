@@ -1362,5 +1362,6 @@
     "proven": [
       "mariadb"
     ]
-  }
+  },
+ "grouping": {"case": "insensitive", "trailing_spaces": "depends", "accents": "depends", "says": "GROUP BY on a text column follows the column's collation. The default *_ci collations put 'Red' and 'red' in one group; whether 'a' and 'a ' or 'e' and 'é' are one group depends on the collation (PAD SPACE or NO PAD, accent-insensitive or not).", "proven": ["mariadb (case rule; MySQL-compatible)"]}
 }

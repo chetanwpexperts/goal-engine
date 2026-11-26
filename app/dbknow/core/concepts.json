@@ -40933,6 +40933,203 @@
     "postgresql",
     "sqlite"
    ]
+  },
+  {
+   "id": "query_to_excel",
+   "kind": "concept",
+   "title": {
+    "en": "A query's result in Excel (and what Excel changes)",
+    "hinglish": "Query ka result Excel mein (aur Excel kya badal deta hai)",
+    "hindi": "Query का result Excel में (और Excel क्या बदल देता है)"
+   },
+   "terms": [
+    [
+     "(query|result|table|data|database|mysql|postgres\\w*|mariadb|sql)",
+     "(to|in|into|mein|me|में)",
+     "(excel|xlsx|spreadsheet)"
+    ],
+    [
+     "(export|nikaal\\w*|nikal\\w*|download)",
+     "(excel|xlsx|spreadsheet)"
+    ],
+    [
+     "excel",
+     "(leading zeros?|15 digits?|digits? (change|badal)\\w*|zeros? (gone|gayab|hat)\\w*)"
+    ],
+    [
+     "excel",
+     "(change[sd]?|changing|badal\\w*|round\\w*|zeros?|digits?|numbers?)",
+     "(database|query|mysql|maria ?db|postgre\\w*|sql)"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "how to export a query result to excel",
+     "why does excel change my numbers from the database"
+    ],
+    "hinglish": [
+     "query ka result excel mein kaise nikaale",
+     "database se excel mein export karne par zero kyu hat jaate hai"
+    ],
+    "hindi": [
+     "query का result Excel में कैसे निकालें"
+    ]
+   },
+   "answer": {
+    "en": "Run the query, save its rows (CSV is the plain way: MySQL/MariaDB's client with --batch, PostgreSQL's \\copy (query) TO 'file.csv' CSV HEADER) and open them in Excel; DBaba's Excel button does it for you as a real .xlsx with a Data sheet, a Pivot sheet with live COUNTIFS / SUMIFS and a chart. What goes wrong is Excel guessing types: a code like 00123 loses its zeros, a number with more than 15 digits (a 16-18 digit id) gets its last digits turned into zeros, text that starts with = + - @ can run as a formula when a CSV is opened, and NULL and empty text both become an empty cell. In .xlsx each cell carries its type, so codes stay text and long numbers can be kept as text, digit for digit.",
+    "hinglish": "Query chalao, rows save karo (CSV seedha tareeka hai: MySQL/MariaDB client --batch ke saath, PostgreSQL mein \\copy (query) TO 'file.csv' CSV HEADER) aur Excel mein kholo; DBaba ka Excel button asli .xlsx deta hai: Data sheet, live COUNTIFS / SUMIFS wali Pivot sheet aur chart. Galti Excel ke type guess karne se hoti hai: 00123 jaisa code apne zero kho deta hai, 15 digit se lamba number (16-18 digit id) ke aakhri digit zero ban jaate hain, = + - @ se shuru text CSV kholte hi formula ban sakta hai, aur NULL aur khaali text dono khaali cell bante hain. .xlsx mein har cell ka type saath jaata hai, isliye code text rehte hain aur lambe number text mein poore rakhe ja sakte hain.",
+    "hindi": "Query चलाएँ, rows CSV या .xlsx में save करें और Excel में खोलें। ध्यान दें: 00123 जैसे code के zero हट सकते हैं, 15 digit से लंबे number के आख़िरी digit शून्य हो जाते हैं, = से शुरू text formula बन सकता है; .xlsx में हर cell का type साथ जाता है।"
+   },
+   "mistake": {
+    "en": "Opening a CSV of ids and codes straight in Excel and saving it back: the zeros and the digits after the 15th are gone for good.",
+    "hinglish": "Ids aur codes wali CSV seedhe Excel mein khol ke wapas save karna: zero aur 15ve ke baad ke digit hamesha ke liye chale jaate hain.",
+    "hindi": "ids और codes वाली CSV सीधे Excel में खोलकर वापस save करना: zero और 15वें के बाद के digit हमेशा के लिए चले जाते हैं।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT '00123' AS code, 12345678901234567 AS big_no, '=1+1' AS note"
+     },
+     "columns": [
+      "code",
+      "big_no",
+      "note"
+     ],
+     "result": [
+      [
+       "00123",
+       "12345678901234567",
+       "=1+1"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "mysql --batch -e \"<query>\" > out.tsv (tab-separated), or SELECT ... INTO OUTFILE, which writes on the database server and only into secure_file_priv.",
+    "mariadb": "Lab: '00123', 12345678901234567 and '=1+1' come back exactly from the database; it is the spreadsheet's type guessing that changes them (lab, LibreOffice opening that CSV: 123, 12345678901234600 and a live formula). Same client options as MySQL.",
+    "postgresql": "Lab: the same three values come back exactly. \\copy (query) TO 'out.csv' CSV HEADER writes on your computer; COPY ... TO 'file' writes on the server and needs rights there.",
+    "sqlserver": "Notes only (not lab-tested here): SSMS: Results to file, or bcp \"<query>\" queryout out.csv -c -t,.",
+    "oracle": "Notes only (not lab-tested here): SQL*Plus: SET MARKUP CSV ON and SPOOL out.csv; SQL Developer: Export.",
+    "sqlite": "Notes only (not lab-tested here): .mode csv, .headers on, .once out.csv, then the query."
+   },
+   "fundamentals": [
+    "values_types",
+    "portability"
+   ],
+   "related": [
+    "group_by_capitals",
+    "collation"
+   ],
+   "source": "https://www.postgresql.org/docs/current/app-psql.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/mysql-command-options.html",
+    "https://stackoverflow.com/questions/tagged/export-to-excel"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  {
+   "id": "group_by_capitals",
+   "kind": "concept",
+   "title": {
+    "en": "GROUP BY and capitals ('Red' vs 'red')",
+    "hinglish": "GROUP BY aur capital/small ('Red' vs 'red')",
+    "hindi": "GROUP BY और capital/small ('Red' बनाम 'red')"
+   },
+   "terms": [
+    [
+     "group by",
+     "(ignores?|ignoring|sensitive|insensitive|merges?|alag|same|ek)",
+     "(case|capitals?|upper ?case|lower ?case|small letters?)"
+    ],
+    [
+     "group by",
+     "(case.?sensitive|case.?insensitive|capital\\w*|upper ?case|lower ?case|small letters?|trailing spaces?|accents?)"
+    ],
+    [
+     "(group|groups|grouping)",
+     "(capital|small) (letters?|aur|and)"
+    ],
+    [
+     "group by",
+     "\\bred\\b",
+     "\\bred\\b"
+    ]
+   ],
+   "phrasings": {
+    "en": [
+     "does group by ignore case",
+     "why does group by merge Red and red"
+    ],
+    "hinglish": [
+     "group by capital aur small letters ko alag kyu nahi karta",
+     "group by case sensitive hai kya"
+    ],
+    "hindi": [
+     "GROUP BY case sensitive है क्या"
+    ]
+   },
+   "answer": {
+    "en": "GROUP BY puts values in one group when the database says they are equal, and for text that is decided by the column's collation. MySQL and MariaDB's default collations ignore capitals, so 'Red', 'red' and 'RED' are one group (shown with one of the spellings); MariaDB's default also ignores accents ('e' = 'é') and trailing spaces ('a' = 'a '). PostgreSQL and SQLite compare exactly, so those are separate groups. To get the same answer everywhere, group by the cleaned value: GROUP BY LOWER(TRIM(v)), and show that same expression.",
+    "hinglish": "GROUP BY un values ko ek group mein rakhta hai jinhe database barabar maane, aur text ke liye ye column ka collation tay karta hai. MySQL aur MariaDB ke default collation capitals ignore karte hain: 'Red', 'red', 'RED' ek group (kisi ek spelling ke saath dikhega); MariaDB ka default accents ('e' = 'é') aur aakhri space ('a' = 'a ') bhi ignore karta hai. PostgreSQL aur SQLite bilkul barabar dekhte hain, wahan ye alag groups hain. Har jagah ek jawab chahiye to saaf value se group karo: GROUP BY LOWER(TRIM(v)), aur SELECT mein wahi likho.",
+    "hindi": "GROUP BY text को column के collation से मिलाता है: MySQL/MariaDB में 'Red' और 'red' एक group, PostgreSQL और SQLite में अलग। हर जगह एक जैसा चाहिए तो GROUP BY LOWER(TRIM(v)) लिखें।"
+   },
+   "mistake": {
+    "en": "Moving a report from MySQL to PostgreSQL (or to Excel's COUNTIFS, which also ignores capitals) and getting more groups than before without noticing.",
+    "hinglish": "Report MySQL se PostgreSQL pe le jaana (ya Excel ke COUNTIFS pe, jo capitals ignore karta hai) aur bina dhyan diye pehle se zyada groups aa jaana.",
+    "hindi": "Report को MySQL से PostgreSQL पर ले जाना और बिना ध्यान दिए ज़्यादा groups आ जाना।"
+   },
+   "examples": [
+    {
+     "sql": {
+      "all": "SELECT LOWER(v) AS v, COUNT(*) AS n FROM (SELECT 'Red' AS v UNION ALL SELECT 'red' UNION ALL SELECT 'Blue') t GROUP BY LOWER(v) ORDER BY 1"
+     },
+     "columns": [
+      "v",
+      "n"
+     ],
+     "result": [
+      [
+       "blue",
+       "1"
+      ],
+      [
+       "red",
+       "2"
+      ]
+     ]
+    }
+   ],
+   "engines": {
+    "mysql": "Default *_ci collations: one group for 'Red' and 'red'; trailing spaces and accents depend on the collation (PAD SPACE or NO PAD, _ai or not).",
+    "mariadb": "Lab (utf8mb4_general_ci): GROUP BY v gives Red 3 for 'Red','red','RED'; 'e' and 'é' one group; 'a' and 'a ' one group, even with utf8mb4_bin. GROUP BY LOWER(v): blue 1, red 2.",
+    "postgresql": "Lab: GROUP BY v keeps 'RED', 'Red', 'red' apart and 'a' / 'a ' apart (a char(n) column pads, so there they are equal). GROUP BY LOWER(v): blue 1, red 2.",
+    "sqlserver": "Notes only (not lab-tested here): The default collation (…_CI_AS) ignores capitals, so one group.",
+    "oracle": "Notes only (not lab-tested here): Compares exactly by default: separate groups.",
+    "sqlite": "Lab (BINARY collation): 'Red' and 'red' are two groups, 'a' and 'a ' two; COLLATE NOCASE makes ASCII capitals one group."
+   },
+   "fundamentals": [
+    "aggregation",
+    "portability"
+   ],
+   "related": [
+    "collation",
+    "case_insensitive_search",
+    "group_by",
+    "query_to_excel"
+   ],
+   "source": "https://mariadb.com/kb/en/setting-character-sets-and-collations/",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/collation.html",
+    "https://dba.stackexchange.com/questions/tagged/collation"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
   }
  ]
 }

@@ -1,0 +1,10 @@
+{
+  "identifier": "main",
+  "description": "Local connection manager only",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default"
+  ]
+}

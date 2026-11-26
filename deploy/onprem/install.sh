@@ -213,6 +213,7 @@ fi
 import socket, sys
 try:
     with socket.socket() as listener:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         listener.bind(("127.0.0.1", int(sys.argv[1])))
 except OSError:
     raise SystemExit("Please choose a screen port that is available on this server.")

@@ -6,6 +6,10 @@ if (!$key) {
     exit(1);
 }
 $query = $argv[1] ?? 'SELECT * FROM orders WHERE customer_id = 42;';
+$database = ($argv[2] ?? '') ?: (getenv('DBABA_DB') ?: 'MySQL');
+$isSql = preg_match('/^\s*(?:select|with|insert|update|delete|replace|merge|create|alter|drop|truncate|explain|show|describe|desc|grant|revoke|call|set|begin|commit|rollback)(?:\s|$)/i', $query)
+    && substr(rtrim($query), -1) !== '?';
+$text = $isSql ? $database . ': ' . $query : $query;
 $ch = curl_init();
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
@@ -36,7 +40,7 @@ function post($ch, $url, $key, $body = null) {
 
 try {
     post($ch, $base . '/api/new-chat', $key);
-    $result = post($ch, $base . '/api/message', $key, ['text' => $query]);
+    $result = post($ch, $base . '/api/message', $key, ['text' => $text]);
     echo $result['reply'] . PHP_EOL;
 } catch (Throwable $error) {
     fwrite(STDERR, $error->getMessage() . PHP_EOL);

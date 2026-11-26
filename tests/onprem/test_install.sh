@@ -66,7 +66,11 @@ before=$(run sha256sum /opt/dbaba/dbaba.json)
 run test -f /opt/dbaba/data/dbaba.db
 run touch /opt/dbaba/data/update-probe
 run touch /opt/dbaba/old-release-probe
-docker exec -i -w /src -e DBABA_SRC=. "$container" bash deploy/onprem/install.sh </dev/null
+# Update while the existing service still owns its saved port.
+health
+update_output=$(docker exec -i -w /src -e DBABA_SRC=. "$container" bash deploy/onprem/install.sh </dev/null)
+printf '%s\n' "$update_output"
+grep -Fq "Waiting for the saved screen port to close" <<<"$update_output"
 health
 [[ "$(run sha256sum /opt/dbaba/dbaba.json)" == "$before" ]]
 run test -f /opt/dbaba/data/update-probe

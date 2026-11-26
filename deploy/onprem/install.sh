@@ -192,7 +192,9 @@ fi
 as_owner mkdir -p "$DIR/data"
 as_owner chmod 700 "$DIR/data"
 
+updating=0
 if [[ -f "$DIR/dbaba.json" ]]; then
+  updating=1
   say "Keeping your existing configuration and data."
   as_owner chmod 600 "$DIR/dbaba.json"
   port=$(as_owner "$PY" -c 'import json, sys; print(json.load(open(sys.argv[1]))["port"])' "$DIR/dbaba.json")
@@ -205,11 +207,10 @@ fi
   die "Please choose a port from 1024 to 65535."
 port=$((10#$port))
 
-if [[ -f "$unit" ]]; then
-  "${ctl[@]}" stop "$SERVICE"
-fi
-
-"$PY" - "$port" <<'PY'
+# Only a fresh installation checks availability before stopping anything.
+# An update uses the saved port, which the running service may still own.
+if (( ! updating )); then
+  "$PY" - "$port" <<'PY'
 import socket, sys
 try:
     with socket.socket() as listener:
@@ -218,6 +219,40 @@ try:
 except OSError:
     raise SystemExit("Please choose a screen port that is available on this server.")
 PY
+fi
+
+if [[ -f "$unit" ]]; then
+  "${ctl[@]}" stop "$SERVICE"
+fi
+
+if (( updating )); then
+  say "Waiting for the saved screen port to close (up to 30 seconds)."
+  "$PY" - "$port" <<'PY'
+import sys
+import time
+from pathlib import Path
+
+port = int(sys.argv[1])
+
+def listening():
+    for filename in ("/proc/net/tcp", "/proc/net/tcp6"):
+        path = Path(filename)
+        if not path.exists():
+            continue
+        for line in path.read_text().splitlines()[1:]:
+            fields = line.split()
+            if fields[3] == "0A" and int(fields[1].rsplit(":", 1)[1], 16) == port:
+                return True
+    return False
+
+deadline = time.monotonic() + 30
+while listening():
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise SystemExit("The saved screen port is still in use. Please check which service is listening and run the update again. Your installed code and data are kept.")
+    time.sleep(min(0.5, remaining))
+PY
+fi
 
 if [[ ! -f "$DIR/dbaba.json" ]]; then
   say "Choose a screen password (at least 8 characters):"
@@ -358,7 +393,7 @@ if kind == "postgresql":
     cmd = prefix + [client, "-X", "-w", "-U", "postgres", "-h", admin_socket,
                     "-p", str(port), "-d", "postgres", "-v", "ON_ERROR_STOP=1",
                     "--single-transaction", "-f", "-"]
-    print("PostgreSQL read and monitoring roles cover the cluster. Existing PUBLIC privileges also apply.")
+    print("PostgreSQL read and monitoring roles cover the cluster. Ask your administrator to review PUBLIC schema permissions, especially on PostgreSQL 14 and older.")
 else:
     host = "localhost" if socket_path else "127.0.0.1"
     user = f"'dbaba_ro'@'{host}'"

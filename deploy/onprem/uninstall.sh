@@ -22,6 +22,12 @@ if [[ ! -d "$DIR" && ! -f "$unit" ]]; then
   exit 0
 fi
 [[ -f "$DIR/.dbaba-install" || -f "$unit" ]] || die "Please use the DBaba installation directory."
+command -v flock >/dev/null || die "Please install flock before removing DBaba."
+[[ ! -L "$DIR/.update-lock" ]] || die "Please use a regular update lock file."
+if [[ -d "$DIR" ]]; then
+  exec 9>"$DIR/.update-lock"
+  flock -n 9 || die "Please finish the active DBaba update before uninstalling."
+fi
 if [[ -t 0 ]]; then
   exec 3<&0
 elif ( : </dev/tty ) 2>/dev/null; then

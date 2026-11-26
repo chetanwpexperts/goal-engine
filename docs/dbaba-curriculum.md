@@ -110,6 +110,56 @@ label the rest, upgrade to verified when schema, EXPLAIN or data arrive.
   planted findings with the right confidence class, a proven rewrite; the same query with CREATE TABLE / EXPLAIN upgrades or
   drops inferred findings. (tests/fuzz/bigq.py: 19 families; a pasted EXPLAIN confirms a speed risk or rules it out.)
 
+## Sprint to Wednesday 2 December 2026: DBaba on the user's own server
+
+Ready to install on a user's own server (Linux first), with every way in: browser screen, `dbaba` command line, pip,
+Docker, local API, desktop app, VS Code extension, Windows / cPanel. No third-party AI. Tick an item in the PR that does
+it. Claude items live in `app/` and the knowledge; ChatGPT items live ONLY in their own folders (never `app/`), and Claude
+reviews them before they are merged.
+
+Claude (daytime sessions and the nightly run, in this order):
+- [x] S1. X2: write a query from plain words (EN / Hinglish / Hindi), with tests/fuzz/nl2sql.py. Done 26 Nov: app/agents/sqlwrite.py + core/write_words.json; 18 families, 400/400 on MySQL+PostgreSQL; Paper 1 8→12/30. Self-joins, Nth highest, percentages, pivots and data changes say "can't build yet" (S2).
+- [ ] S2. X3 + X4: the rest of query writing; theory and trap concepts
+- [ ] S3. DBaba to Excel: a Data sheet, a pivot sheet (live SUMIFS / COUNTIFS) and a chart from a query's result, plus the
+  chart in the chat (reusing app/office's workbook builders)
+- [ ] S4. DBaba's own screen when installed (never the whole website): `python -m app.local serve --port N`, 127.0.0.1
+  only, screen password from dbaba.json, API keys (`Authorization: Bearer`), no accounts / captcha / admin / other agents.
+  First run is a 3-step wizard a non-expert can follow: (1) "Which database do you want DBaba to look after?" with taps
+  MySQL / MariaDB / PostgreSQL / "Find it for me" (detects what runs on this machine); (2) connect: host, port, database,
+  read-only user prefilled from what was found, "Test connection", a plain-words reason for any failure; (3) the first scan
+  starts by itself. After that the screen has three parts: (a) CHAT, the main window: ask anything about databases
+  (EN / Hinglish / Hindi), answers proven on the connected database, fixes as preview + approve + Undo; (b) REPORT (S5), each
+  item with its fix and "ask about this" into the chat; (c) AUTOMATION (S6): every job listed, on/off and its time, last run
+  and result. The same screen on a server (reached by SSH tunnel, the desktop app or `dbaba` commands) and on a laptop.
+- [ ] S4b. Laptop-only DBaba (nothing installed on the server): the desktop app carries DBaba's engine (S4's screen) and
+  reaches the database through an SSH tunnel to the database's own port (or directly when it is reachable); chat and the
+  report work, automation runs while the laptop is on. The start screen offers the two choices plainly: "Try it now" (this
+  computer only) or "Let DBaba look after it 24/7" (install on the server)
+- [ ] S5. The full database report (first scan, then on a schedule): a health score and sections, worst first, each item with
+  what it is, why it matters, and the fix (a change only as preview + approve + Undo): problems right now (deadlocks, locks
+  and who waits on whom, long-running queries, connections near the limit, replication lag); slow queries (slow log /
+  pg_stat_statements: the worst ones, each checked and rewritten); indexes (missing from the real workload, unused,
+  duplicate); tables (size and growth, no primary key, bloat / fragmentation, stale statistics); settings (memory, buffer
+  pool / shared_buffers, max_connections, timeouts vs this server); backups (last one, tested restore); security (users and
+  grants, remote root, empty passwords, open port, old version). Downloadable (HTML / PDF / Excel via S3) and comparable
+  with the last report.
+- [ ] S6. DBA jobs that keep it healthy: scheduler; health check every 5 min with alerts (email, /api/state "alerts" in the
+  format the desktop app reads: id, level info|warning|critical, title, text, at, acknowledged); daily backup with a test
+  restore into a scratch database; approved fixes applied with preview and Undo
+- [ ] S7. Growth and maintenance: days until the disk is full; statistics, bloat, VACUUM / OPTIMIZE when safe and at quiet hours
+- [ ] S8. Signed knowledge updates: packs of rules (never user data) signed on our server, checked before use, switchable off
+- [ ] S9. Review and merge ChatGPT's items; install tests on clean Ubuntu, Debian, AlmaLinux and Docker
+- [ ] S10. Exam papers 2-5 (keys written and proved), fixes by family; security review of everything on the user's server
+
+ChatGPT (repo connected; master prompt + one task per chat; its own folders only):
+- [ ] A. Linux installer + systemd service + uninstall (deploy/onprem/)
+- [ ] B. Docker image (deploy/onprem/Dockerfile)
+- [ ] C. pip package + `dbaba` command line (pyproject.toml, dbaba_cli/)
+- [ ] D. API docs + examples in curl, Python, Node, PHP (docs/onprem/, examples/)
+- [ ] E. Desktop app, Tauri (desktop/)
+- [ ] F. VS Code extension (vscode/)
+- [ ] G. Windows service + cPanel lite (deploy/onprem/windows/, deploy/onprem/cpanel/)
+
 ## Exam gaps (before the new databases)
 
 The exam (tests/exam/): Paper 1 is the practice paper, papers 2-5 stay unseen. First sitting 4/30. One gap per night.

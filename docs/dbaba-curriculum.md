@@ -131,6 +131,10 @@ Claude (daytime sessions and the nightly run, in this order):
   (EN / Hinglish / Hindi), answers proven on the connected database, fixes as preview + approve + Undo; (b) REPORT (S5), each
   item with its fix and "ask about this" into the chat; (c) AUTOMATION (S6): every job listed, on/off and its time, last run
   and result. The same screen on a server (reached by SSH tunnel, the desktop app or `dbaba` commands) and on a laptop.
+- [ ] S4b. Laptop-only DBaba (nothing installed on the server): the desktop app carries DBaba's engine (S4's screen) and
+  reaches the database through an SSH tunnel to the database's own port (or directly when it is reachable); chat and the
+  report work, automation runs while the laptop is on. The start screen offers the two choices plainly: "Try it now" (this
+  computer only) or "Let DBaba look after it 24/7" (install on the server)
 - [ ] S5. The full database report (first scan, then on a schedule): a health score and sections, worst first, each item with
   what it is, why it matters, and the fix (a change only as preview + approve + Undo): problems right now (deadlocks, locks
   and who waits on whom, long-running queries, connections near the limit, replication lag); slow queries (slow log /

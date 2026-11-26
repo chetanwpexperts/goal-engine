@@ -1,0 +1,11 @@
+RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ - [F,L]
+AuthType Basic
+AuthName "DBaba private screen"
+AuthBasicProvider file
+AuthUserFile /home/REPLACE_ACCOUNT/.dbaba-htpasswd
+<RequireAll>
+    Require expr "%{HTTPS} == 'on'"
+    Require valid-user
+</RequireAll>

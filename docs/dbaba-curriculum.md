@@ -122,14 +122,24 @@ Claude (daytime sessions and the nightly run, in this order):
 - [ ] S2. X3 + X4: the rest of query writing; theory and trap concepts
 - [ ] S3. DBaba to Excel: a Data sheet, a pivot sheet (live SUMIFS / COUNTIFS) and a chart from a query's result, plus the
   chart in the chat (reusing app/office's workbook builders)
-- [ ] S4. Local mode: `python -m app.local serve --port N`; no accounts / captcha / admin / coming-soon; 127.0.0.1 only;
-  a screen password (hash in dbaba.json); API keys (`Authorization: Bearer`); DATABASE_URL in its own data folder
-- [ ] S5. DBA jobs 1: scheduler; health check every 5 min (connections, locks, long queries, replication lag, disk); daily
-  backup with a test restore into a scratch database; email alerts
-- [ ] S6. DBA jobs 2: slow queries (slow log / pg_stat_statements) checked and rewritten; missing and unused indexes from the
-  real workload; the error log explained; every change waits for approval, with preview and Undo
-- [ ] S7. DBA jobs 3: security audit (users, grants, remote root, empty passwords, open port, old version); growth (days
-  until the disk is full); maintenance (statistics, bloat, VACUUM / OPTIMIZE when safe)
+- [ ] S4. DBaba's own screen when installed (never the whole website): `python -m app.local serve --port N`, 127.0.0.1
+  only, screen password from dbaba.json, API keys (`Authorization: Bearer`), no accounts / captcha / admin / other agents.
+  First run is a 3-step wizard a non-expert can follow: (1) "Which database do you want DBaba to look after?" with taps
+  MySQL / MariaDB / PostgreSQL / "Find it for me" (detects what runs on this machine); (2) connect: host, port, database,
+  read-only user prefilled from what was found, "Test connection", a plain-words reason for any failure; (3) the first scan
+  starts by itself. Then the home screen is the database's report and the DBaba chat, answers proven on that database.
+- [ ] S5. The full database report (first scan, then on a schedule): a health score and sections, worst first, each item with
+  what it is, why it matters, and the fix (a change only as preview + approve + Undo): problems right now (deadlocks, locks
+  and who waits on whom, long-running queries, connections near the limit, replication lag); slow queries (slow log /
+  pg_stat_statements: the worst ones, each checked and rewritten); indexes (missing from the real workload, unused,
+  duplicate); tables (size and growth, no primary key, bloat / fragmentation, stale statistics); settings (memory, buffer
+  pool / shared_buffers, max_connections, timeouts vs this server); backups (last one, tested restore); security (users and
+  grants, remote root, empty passwords, open port, old version). Downloadable (HTML / PDF / Excel via S3) and comparable
+  with the last report.
+- [ ] S6. DBA jobs that keep it healthy: scheduler; health check every 5 min with alerts (email, /api/state "alerts" in the
+  format the desktop app reads: id, level info|warning|critical, title, text, at, acknowledged); daily backup with a test
+  restore into a scratch database; approved fixes applied with preview and Undo
+- [ ] S7. Growth and maintenance: days until the disk is full; statistics, bloat, VACUUM / OPTIMIZE when safe and at quiet hours
 - [ ] S8. Signed knowledge updates: packs of rules (never user data) signed on our server, checked before use, switchable off
 - [ ] S9. Review and merge ChatGPT's items; install tests on clean Ubuntu, Debian, AlmaLinux and Docker
 - [ ] S10. Exam papers 2-5 (keys written and proved), fixes by family; security review of everything on the user's server

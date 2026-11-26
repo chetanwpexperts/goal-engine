@@ -2,6 +2,9 @@
 const base = (process.env.DBABA_URL || "http://127.0.0.1:8000").replace(/\/+$/, "");
 const key = process.env.DBABA_API_KEY;
 const query = process.argv[2] || "SELECT * FROM orders WHERE customer_id = 42;";
+const database = process.argv[3] || process.env.DBABA_DB || "MySQL";
+const isSql = /^\s*(?:select|with|insert|update|delete|replace|merge|create|alter|drop|truncate|explain|show|describe|desc|grant|revoke|call|set|begin|commit|rollback)(?:\s|$)/i.test(query) && !query.trimEnd().endsWith("?");
+const text = isSql ? `${database}: ${query}` : query;
 const cookies = new Map();
 
 async function post(path, body) {
@@ -32,7 +35,7 @@ async function post(path, body) {
 async function main() {
   if (!key) throw new Error("Set DBABA_API_KEY in your environment.");
   await post("/api/new-chat");
-  const result = await post("/api/message", { text: query });
+  const result = await post("/api/message", { text });
   console.log(result.reply);
 }
 

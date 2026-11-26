@@ -65,7 +65,11 @@ assert "integration-test-screen" not in p.read_text()
 before=$(run sha256sum /opt/dbaba/dbaba.json)
 run test -f /opt/dbaba/data/dbaba.db
 run touch /opt/dbaba/data/update-probe
-run touch /opt/dbaba/old-release-probe
+run touch /opt/dbaba/release/old-release-probe
+# Exercise a cache created by a previous root-run maintenance command.
+run mkdir -p /opt/dbaba/release/app/__pycache__/root-owned-test
+run chmod 700 /opt/dbaba/release/app/__pycache__/root-owned-test
+run test -f /opt/dbaba/uninstall.sh
 # Update while the existing service still owns its saved port.
 health
 update_output=$(docker exec -i -w /src -e DBABA_SRC=. "$container" bash deploy/onprem/install.sh </dev/null)
@@ -74,9 +78,42 @@ grep -Fq "Waiting for the saved screen port to close" <<<"$update_output"
 health
 [[ "$(run sha256sum /opt/dbaba/dbaba.json)" == "$before" ]]
 run test -f /opt/dbaba/data/update-probe
-run test ! -e /opt/dbaba/old-release-probe
+run test ! -e /opt/dbaba/release/old-release-probe
+run test ! -e /opt/dbaba/.release-old
+run test ! -e /opt/dbaba/.release-new
 
-printf 'yes\n' | docker exec -i "$container" bash /opt/dbaba/deploy/onprem/uninstall.sh
+# A broken import must leave the previous process and persistent files intact.
+old_pid=$(run systemctl show -p MainPID --value dbaba.service)
+old_code=$(run sha256sum /opt/dbaba/release/app/main.py)
+run bash -ec 'mkdir /tmp/dbaba-broken; cp -a /src/app /src/connector /src/deploy /src/requirements.txt /tmp/dbaba-broken/; printf "raise RuntimeError(\"forced import failure\")\n" > /tmp/dbaba-broken/app/main.py'
+if docker exec -i -w /src -e DBABA_SRC=/tmp/dbaba-broken "$container" bash deploy/onprem/install.sh </dev/null; then
+  echo "The broken release should have been rejected."
+  exit 1
+fi
+health
+[[ "$(run systemctl show -p MainPID --value dbaba.service)" == "$old_pid" ]]
+[[ "$(run sha256sum /opt/dbaba/release/app/main.py)" == "$old_code" ]]
+[[ "$(run sha256sum /opt/dbaba/dbaba.json)" == "$before" ]]
+run test -f /opt/dbaba/data/update-probe
+run test -f /opt/dbaba/uninstall.sh
+run test ! -e /opt/dbaba/.release-new
+run test ! -e /opt/dbaba/.release-old
+
+# An importable release that serves an unhealthy response must roll back
+# after activation, not just pass the import preflight.
+run bash -ec 'printf "from fastapi import FastAPI\napp = FastAPI()\n@app.get(\"/api/health\")\ndef health():\n    return {\"ok\": False}\n" > /tmp/dbaba-broken/app/main.py; rm -f /tmp/dbaba-broken/app/local.py'
+if docker exec -i -w /src -e DBABA_SRC=/tmp/dbaba-broken "$container" bash deploy/onprem/install.sh </dev/null; then
+  echo "The unhealthy release should have rolled back."
+  exit 1
+fi
+health
+[[ "$(run sha256sum /opt/dbaba/release/app/main.py)" == "$old_code" ]]
+[[ "$(run sha256sum /opt/dbaba/dbaba.json)" == "$before" ]]
+run test -f /opt/dbaba/data/update-probe
+run test ! -e /opt/dbaba/.release-new
+run test ! -e /opt/dbaba/.release-old
+
+printf 'yes\n' | docker exec -i "$container" bash /opt/dbaba/uninstall.sh
 run test ! -e /opt/dbaba
 run test ! -e /etc/systemd/system/dbaba.service
 run test ! -e /etc/systemd/system/multi-user.target.wants/dbaba.service
@@ -92,4 +129,4 @@ if run getent passwd dbaba >/dev/null; then
   echo "Please review the remaining service account."
   exit 1
 fi
-echo "Install, update, loopback health, saved settings and uninstall checks passed."
+echo "Install, update, failed-import protection, health rollback, saved settings and uninstall checks passed."

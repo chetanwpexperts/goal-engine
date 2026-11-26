@@ -24,7 +24,7 @@ for candidate in python3 python3.14 python3.13 python3.12 python3.11; do
 done
 [[ -n "$PY" ]] || die "Python 3.11 or newer is needed. Run: $python_help"
 "$PY" -c 'import venv, ensurepip' >/dev/null 2>&1 || die "Python virtual environment support is needed. Run: $python_help"
-for tool in curl systemctl; do
+for tool in curl systemctl flock; do
   command -v "$tool" >/dev/null || die "Please install $tool and run the installer again."
 done
 
@@ -88,7 +88,8 @@ out = Path(output)
 out.mkdir()
 ignored = {".git", ".github", ".venv", "__pycache__", ".pytest_cache",
            ".mypy_cache", ".ruff_cache", "node_modules"}
-keep = {"data", "dbaba.json", ".dbaba-install", ".system-account-created"}
+keep = {"data", "dbaba.json", ".dbaba-install", ".system-account-created",
+        ".release-new", ".release-old", "release", ".update-lock", "uninstall.sh"}
 
 def skip(parts):
     return any(p in ignored or p == ".env" or p.startswith(".env.") for p in parts) or (
@@ -189,14 +190,22 @@ as_owner touch "$DIR/.dbaba-install"
 if (( created_account )); then
   as_owner touch "$DIR/.system-account-created"
 fi
-as_owner mkdir -p "$DIR/data"
-as_owner chmod 700 "$DIR/data"
+if [[ ! -d "$DIR/data" ]]; then
+  as_owner mkdir -m 700 "$DIR/data"
+fi
+
+# Serialize release changes, including uninstall.
+[[ ! -L "$DIR/.update-lock" ]] || die "Please use a regular update lock file."
+exec 9>"$DIR/.update-lock"
+flock -n 9 || die "Another DBaba installation or update is in progress."
+if (( system )); then
+  chown "$owner:$(id -gn "$owner")" "$DIR/.update-lock"
+fi
 
 updating=0
 if [[ -f "$DIR/dbaba.json" ]]; then
   updating=1
   say "Keeping your existing configuration and data."
-  as_owner chmod 600 "$DIR/dbaba.json"
   port=$(as_owner "$PY" -c 'import json, sys; print(json.load(open(sys.argv[1]))["port"])' "$DIR/dbaba.json")
 else
   say "Screen port [8765]:"
@@ -218,39 +227,6 @@ try:
         listener.bind(("127.0.0.1", int(sys.argv[1])))
 except OSError:
     raise SystemExit("Please choose a screen port that is available on this server.")
-PY
-fi
-
-if [[ -f "$unit" ]]; then
-  "${ctl[@]}" stop "$SERVICE"
-fi
-
-if (( updating )); then
-  say "Waiting for the saved screen port to close (up to 30 seconds)."
-  "$PY" - "$port" <<'PY'
-import sys
-import time
-from pathlib import Path
-
-port = int(sys.argv[1])
-
-def listening():
-    for filename in ("/proc/net/tcp", "/proc/net/tcp6"):
-        path = Path(filename)
-        if not path.exists():
-            continue
-        for line in path.read_text().splitlines()[1:]:
-            fields = line.split()
-            if fields[3] == "0A" and int(fields[1].rsplit(":", 1)[1], 16) == port:
-                return True
-    return False
-
-deadline = time.monotonic() + 30
-while listening():
-    remaining = deadline - time.monotonic()
-    if remaining <= 0:
-        raise SystemExit("The saved screen port is still in use. Please check which service is listening and run the update again. Your installed code and data are kept.")
-    time.sleep(min(0.5, remaining))
 PY
 fi
 
@@ -453,95 +429,95 @@ PY
   esac
 fi
 
-say "Installing the release in $DIR."
-# Replace code as the service owner. Retain persistent files and markers.
-as_owner "$PY" - "$stage/source" "$DIR" <<'PY'
-import shutil
-import sys
-from pathlib import Path
-src, dst = map(Path, sys.argv[1:])
-keep = {"data", "dbaba.json", ".venv", ".dbaba-install", ".system-account-created"}
-for item in dst.iterdir():
-    if item.name in keep:
-        continue
-    if item.is_symlink() or not item.is_dir():
-        item.unlink()
-    else:
-        shutil.rmtree(item)
-for item in src.iterdir():
-    if item.name in keep:
-        continue
-    target = dst / item.name
-    if item.is_dir():
-        shutil.copytree(item, target)
-    else:
-        shutil.copy2(item, target)
-PY
-
-as_owner rm -rf -- "$DIR/.venv"
-as_owner "$PY" -m venv "$DIR/.venv" || die "Please install Python virtual environment support: $python_help"
-as_owner "$DIR/.venv/bin/python" -m pip --isolated install --disable-pip-version-check --no-input -r "$DIR/requirements.txt"
-
-fallback=0
-if [[ -f "$DIR/app/local.py" ]]; then
-  command_line="$DIR/.venv/bin/python -m app.local serve --port $port"
-else
-  fallback=1
-  command_line="$DIR/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port $port"
-  say "Important: this release's screen has no password protection yet. Use the SSH tunnel only, and keep the server accessible to trusted users."
-fi
-
-if (( system )); then
-  service_user="User=$owner"
-  private_tmp=yes
-  saved_socket=$(as_owner "$PY" -c 'import json,sys; print((json.load(open(sys.argv[1])).get("database") or {}).get("socket") or "")' "$DIR/dbaba.json")
-  case "$saved_socket" in /tmp|/tmp/*|/var/tmp|/var/tmp/*) private_tmp=no ;; esac
-  hardening=$(printf 'PrivateTmp=%s\nProtectSystem=strict\nReadWritePaths=%s\nProtectHome=read-only' "$private_tmp" "$DIR")
-  target=multi-user.target
-else
-  service_user=""
-  hardening=""
-  target=default.target
-fi
-"$PY" - "$stage/source/deploy/onprem/dbaba.service" "$stage/rendered.service" \
-  "$DIR" "$command_line" "$service_user" "$hardening" "$target" <<'PY'
-import sys
-from pathlib import Path
-template, output, *values = sys.argv[1:]
-text = Path(template).read_text()
-for key, value in zip(("DIR", "COMMAND", "SERVICE_USER", "SYSTEM_HARDENING", "TARGET"), values):
-    text = text.replace("@" + key + "@", value)
-Path(output).write_text(text)
-PY
-mkdir -p "$(dirname "$unit")"
-install -m 644 "$stage/rendered.service" "$unit"
-"${ctl[@]}" daemon-reload
-"${ctl[@]}" enable "$SERVICE"
-"${ctl[@]}" restart "$SERVICE"
-
-say "Waiting for DBaba to start (up to 3 minutes)."
-healthy=0
-deadline=$((SECONDS + 180))
-while (( SECONDS < deadline )); do
-  if "${ctl[@]}" is-active --quiet "$SERVICE" &&
-    curl --noproxy '*' --fail --silent --show-error --max-time 2 \
-      "http://127.0.0.1:$port/api/health" 2>/dev/null |
-      "$PY" -c 'import json,sys; sys.exit(json.load(sys.stdin).get("ok") is not True)' 2>/dev/null; then
-    healthy=1
-    break
-  fi
-  sleep 2
+# Keep the installation root stable. Only code and its virtual environment
+# move between release directories. Persistent paths remain at the root.
+active="$DIR/release"
+next="$DIR/.release-new"
+old="$DIR/.release-old"
+for folder in "$active" "$next" "$old"; do
+  [[ ! -L "$folder" ]] || die "Please use regular release directories."
 done
-if (( ! healthy )); then
+[[ ! -e "$old" ]] || die "A previous update has a saved release. Please review .release-old before retrying."
+
+# Fix ownership of code only, without following symbolic links into data.
+fix_code_owner() {
   if (( system )); then
-    die "Please check the service log: sudo journalctl -u dbaba.service -n 50"
-  else
-    die "Please check the service log: journalctl --user -u dbaba.service -n 50"
+    chown -hR -P "$owner:$(id -gn "$owner")" -- "$@"
+  fi
+}
+remove_code() {
+  local folder=$1
+  if [[ -e "$folder" || -L "$folder" ]]; then
+    fix_code_owner "$folder" || return 1
+    as_owner rm -rf -- "$folder" || return 1
+  fi
+}
+
+# A stable uninstall copy is available even during the first attempted update
+# of an older, flat-layout installation.
+if [[ ! -f "$DIR/uninstall.sh" ]]; then
+  [[ ! -L "$DIR/uninstall.sh" ]] || die "Please use a regular uninstall file."
+  install -m 700 "$stage/source/deploy/onprem/uninstall.sh" "$DIR/uninstall.sh"
+  if (( system )); then
+    chown "$owner:$(id -gn "$owner")" "$DIR/uninstall.sh"
   fi
 fi
 
+transaction=0
+had_unit=0
+had_active=0
+new_active=0
+legacy=0
+committed=0
+was_enabled=0
+
+wait_for_port() {
+  say "Waiting for the saved screen port to close (up to 30 seconds)."
+  "$PY" - "$port" <<'PY'
+import sys
+import time
+from pathlib import Path
+
+port = int(sys.argv[1])
+
+def listening():
+    for filename in ("/proc/net/tcp", "/proc/net/tcp6"):
+        path = Path(filename)
+        if not path.exists():
+            continue
+        for line in path.read_text().splitlines()[1:]:
+            fields = line.split()
+            if fields[3] == "0A" and int(fields[1].rsplit(":", 1)[1], 16) == port:
+                return True
+    return False
+
+deadline = time.monotonic() + 30
+while listening():
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise SystemExit("The saved screen port is still in use. Please check which service is listening and run the update again. Your installed code and data are kept.")
+    time.sleep(min(0.5, remaining))
+PY
+}
+
+health_check() {
+  say "Waiting for DBaba to start (up to 3 minutes)."
+  local deadline=$((SECONDS + 180))
+  while (( SECONDS < deadline )); do
+    if "${ctl[@]}" is-active --quiet "$SERVICE" &&
+      curl --noproxy '*' --fail --silent --show-error --max-time 2 \
+        "http://127.0.0.1:$port/api/health" 2>/dev/null |
+        "$PY" -c 'import json,sys; sys.exit(json.load(sys.stdin).get("ok") is not True)' 2>/dev/null; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+verify_loopback() {
 # Verify the actual listening sockets as well as the HTTP response.
-if ! "$PY" - "$port" <<'PY'
+"$PY" - "$port" <<'PY'
 import socket, struct, sys
 from pathlib import Path
 port = int(sys.argv[1])
@@ -560,10 +536,223 @@ for filename in ("/proc/net/tcp", "/proc/net/tcp6"):
         found = True
 sys.exit(not found)
 PY
-then
-  "${ctl[@]}" stop "$SERVICE"
-  die "Please review the release's listener configuration. DBaba requires 127.0.0.1 only."
+}
+
+# The previous flat installation must return to its original paths on rollback,
+# since its virtual environment and unit may refer to those absolute paths.
+restore_old() {
+  if (( legacy )); then
+    if [[ -d "$old" ]]; then
+      as_owner "$PY" - "$old" "$DIR" <<'PY'
+import sys
+from pathlib import Path
+old, root = map(Path, sys.argv[1:])
+for item in old.iterdir():
+    target = root / item.name
+    if target.exists() or target.is_symlink():
+        raise SystemExit("Please review the saved release before restoring it.")
+    item.rename(target)
+old.rmdir()
+PY
+    fi
+  elif (( had_active )) && [[ -d "$old" ]]; then
+    as_owner mv -T -- "$old" "$active"
+  fi
+}
+
+rollback() {
+  say "The new release could not start. Restoring the previous installation."
+  if (( new_active )); then
+    "${ctl[@]}" stop "$SERVICE" || return 1
+    # Preserve the failed code in the staging path until rollback succeeds.
+    as_owner mv -T -- "$active" "$next" || return 1
+  fi
+  restore_old || return 1
+  if (( had_unit )); then
+    install -m 644 "$stage/previous.service" "$unit" || return 1
+    "${ctl[@]}" daemon-reload || return 1
+    if (( was_enabled )); then
+      "${ctl[@]}" enable "$SERVICE" || return 1
+    else
+      "${ctl[@]}" disable "$SERVICE" || return 1
+    fi
+    "${ctl[@]}" restart "$SERVICE" || return 1
+    health_check && verify_loopback || return 1
+    say "The update was not applied. Your previous DBaba release is running and healthy."
+  else
+    if [[ -f "$unit" ]]; then
+      "${ctl[@]}" disable "$SERVICE" || return 1
+      rm -f -- "$unit" || return 1
+      "${ctl[@]}" daemon-reload || return 1
+    fi
+    say "The release was not activated. Your saved settings and data are kept."
+  fi
+  return 0
+}
+
+cleanup() {
+  local status=$?
+  trap - EXIT HUP INT TERM
+  if (( transaction && ! committed )); then
+    if ! rollback; then
+      say "Please review the service log and the saved release directories before retrying."
+      say "The uninstall script remains at $DIR/uninstall.sh."
+      # Keep any saved unit and release for manual recovery.
+      say "Service recovery files are in $stage."
+      exit 1
+    fi
+    status=1
+  elif (( status != 0 && ! transaction )); then
+    say "The new release was not activated. Any running DBaba service was kept."
+  fi
+  if ! remove_code "$next"; then
+    say "Please review the temporary release directory: $next"
+    status=1
+  fi
+  rm -rf -- "$stage"
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
+remove_code "$next"
+say "Preparing the new release while the current service stays available."
+as_owner cp -a --no-preserve=ownership "$stage/source" "$next"
+as_owner chmod 700 "$next"
+# A fresh environment keeps the old environment independent for rollback.
+as_owner "$PY" -m venv "$next/.venv" || die "Please install Python virtual environment support: $python_help"
+as_owner "$next/.venv/bin/python" -m pip --isolated install --disable-pip-version-check --no-input -r "$next/requirements.txt"
+
+# Import from the staged tree, with no connection to the live application database.
+say "Checking the new release before stopping DBaba."
+as_owner bash -c '
+  cd "$1"
+  exec env -u PYTHONPATH SITE_MODE=open ENGINE_MODE=ml AGENT_SCHEDULER=off \
+    DBABA_LOCAL=1 DATABASE_URL=sqlite:///:memory: COOKIE_SECURE=false \
+    GEMINI_API_KEY= GROQ_API_KEY= AI_PROVIDER_ORDER= \
+    .venv/bin/python -c "import app.main"
+' bash "$next"
+
+# Virtual environments contain absolute paths in generated entry-point
+# scripts. Rewrite those paths for the final location before activation.
+# The service itself uses python -m rather than a generated entry point.
+as_owner "$PY" - "$next" "$active" <<'PY'
+import sys
+from pathlib import Path
+source, destination = map(Path, sys.argv[1:])
+before, after = str(source).encode(), str(destination).encode()
+for item in (source / ".venv" / "bin").iterdir():
+    if item.is_symlink() or not item.is_file():
+        continue
+    data = item.read_bytes()
+    if b"\x00" not in data and before in data:
+        item.write_bytes(data.replace(before, after))
+PY
+
+# These links are created only after the isolated import succeeds.
+# They point at the stable configuration and data, never copies.
+as_owner ln -s ../data "$next/data"
+as_owner ln -s ../dbaba.json "$next/dbaba.json"
+
+fallback=0
+if [[ -f "$next/app/local.py" ]]; then
+  command_line="$active/.venv/bin/python -m app.local serve --port $port"
+else
+  fallback=1
+  command_line="$active/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port $port"
+  say "Important: this release's screen has no password protection yet. Use the SSH tunnel only, and keep the server accessible to trusted users."
 fi
+
+if (( system )); then
+  service_user="User=$owner"
+  private_tmp=yes
+  saved_socket=$(as_owner "$PY" -c 'import json,sys; print((json.load(open(sys.argv[1])).get("database") or {}).get("socket") or "")' "$DIR/dbaba.json")
+  case "$saved_socket" in /tmp|/tmp/*|/var/tmp|/var/tmp/*) private_tmp=no ;; esac
+  hardening=$(printf 'PrivateTmp=%s\nProtectSystem=strict\nReadWritePaths=%s\nProtectHome=read-only' "$private_tmp" "$DIR")
+  target=multi-user.target
+else
+  service_user=""
+  hardening=""
+  target=default.target
+fi
+"$PY" - "$stage/source/deploy/onprem/dbaba.service" "$stage/rendered.service" \
+  "$DIR" "$command_line" "$service_user" "$hardening" "$target" "$active" <<'PY'
+import sys
+from pathlib import Path
+template, output, *values = sys.argv[1:]
+text = Path(template).read_text()
+for key, value in zip(("DIR", "COMMAND", "SERVICE_USER", "SYSTEM_HARDENING", "TARGET", "RELEASE"), values):
+    text = text.replace("@" + key + "@", value)
+Path(output).write_text(text)
+PY
+
+# Only now begin the short service interruption. Preserve the old unit too.
+if [[ -f "$unit" ]]; then
+  cp -- "$unit" "$stage/previous.service"
+  had_unit=1
+  if "${ctl[@]}" is-enabled --quiet "$SERVICE"; then
+    was_enabled=1
+  fi
+fi
+if [[ -d "$active" ]]; then
+  had_active=1
+elif [[ -d "$DIR/app" || -d "$DIR/.venv" ]]; then
+  legacy=1
+fi
+transaction=1
+if (( had_unit )); then
+  "${ctl[@]}" stop "$SERVICE"
+fi
+if (( updating )); then
+  wait_for_port
+fi
+
+if (( had_active )); then
+  fix_code_owner "$active"
+  as_owner mv -T -- "$active" "$old"
+elif (( legacy )); then
+  # First upgrade from the original flat layout. Move only release files;
+  # never move the persistent root, configuration, data or uninstall copy.
+  as_owner mkdir -m 700 "$old"
+  "$PY" - "$DIR" "$old" "$owner" "$system" <<'PY'
+import os
+import pwd
+import subprocess
+import sys
+from pathlib import Path
+root, old = map(Path, sys.argv[1:3])
+owner, system = sys.argv[3:]
+keep = {"data", "dbaba.json", ".dbaba-install", ".system-account-created",
+        ".release-new", ".release-old", "release", ".update-lock", "uninstall.sh"}
+for item in list(root.iterdir()):
+    if item.name in keep:
+        continue
+    if system == "1":
+        group = pwd.getpwnam(owner).pw_gid
+        subprocess.run(["chown", "-hR", "-P", f"{owner}:{group}", "--", str(item)], check=True)
+    item.rename(old / item.name)
+PY
+fi
+as_owner mv -T -- "$next" "$active"
+new_active=1
+
+mkdir -p "$(dirname "$unit")"
+install -m 644 "$stage/rendered.service" "$unit"
+"${ctl[@]}" daemon-reload
+"${ctl[@]}" enable "$SERVICE"
+"${ctl[@]}" restart "$SERVICE"
+health_check || die "The new release did not pass its health check."
+verify_loopback || die "Please review the release's listener configuration. DBaba requires 127.0.0.1 only."
+
+# Health and binding passed. Keep the new release and refresh the stable
+# uninstall copy before cleaning up the previous release.
+committed=1
+install -m 700 "$stage/source/deploy/onprem/uninstall.sh" "$DIR/.uninstall-new"
+if (( system )); then
+  chown "$owner:$(id -gn "$owner")" "$DIR/.uninstall-new"
+fi
+mv -fT -- "$DIR/.uninstall-new" "$DIR/uninstall.sh"
+remove_code "$old"
 say "DBaba is running and will start automatically after a reboot."
 if (( fallback )); then
   say "Important: screen authentication will be available in a later release. Use the SSH tunnel; other local server users can reach the loopback port."

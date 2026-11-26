@@ -106,10 +106,21 @@ async fn connect_inner(app:AppHandle,id:Uuid)->Result<(),String> {
     let hosts=store.hosts.clone();
     let remote=row.port;
     let s=row.ssh.clone();
-    let (port,tunnel)=tauri::async_runtime::spawn_blocking(move || match s {
+    let (port,mut tunnel)=tauri::async_runtime::spawn_blocking(move || match s {
         Some(s)=>ssh::start(&s,remote,&hosts).map(|(p,t)|(p,Some(t))),
         None=>Ok((remote,None))
     }).await.map_err(|_|"Could not open connection.")??;
+    let healthy = wait_for_health(port).await;
+    if let Some(t) = &mut tunnel {
+        match t.0.try_wait() {
+            Ok(Some(_)) => return Err(t.stopped_reason()),
+            Err(_) => return Err("Could not check SSH.".into()),
+            Ok(None) => ()
+        }
+    }
+    if !healthy {
+        return Err(format!("DBaba isn't running at port {remote} on that computer"));
+    }
     let generation=Uuid::new_v4();
     {
         let mut d=store.data.lock().unwrap();
@@ -140,6 +151,24 @@ async fn connect_inner(app:AppHandle,id:Uuid)->Result<(),String> {
     tauri::async_runtime::spawn(poll(app,id,generation));
     Ok(())
 }
+async fn wait_for_health(port: u16) -> bool {
+    let Ok(client) = reqwest::Client::builder().no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(2)).build() else { return false };
+    let url = model::base(port).join("api/health").unwrap();
+    tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            if let Ok(response) = client.get(url.clone()).send().await {
+                if response.status().is_success() {
+                    if let Ok(body) = response.json::<serde_json::Value>().await {
+                        if body.get("ok").and_then(|v| v.as_bool()) == Some(true) { return true; }
+                    }
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(250)).await;
+        }
+    }).await.unwrap_or(false)
+}
 async fn poll(app:AppHandle,id:Uuid,generation:Uuid) {
     let Ok(client)=reqwest::Client::builder().no_proxy().redirect(reqwest::redirect::Policy::none()).timeout(Duration::from_secs(10)).build() else {return};
     loop {
@@ -149,7 +178,16 @@ async fn poll(app:AppHandle,id:Uuid,generation:Uuid) {
             let Some(live)=d.live.get_mut(&id) else {return};
             if live.generation!=generation {return}
             if let Some(t)=&mut live.tunnel {
-                if !matches!(t.0.try_wait(),Ok(None)) {drop(d);disconnect_inner(&app,id);return}
+                match t.0.try_wait() {
+                    Ok(None) => (),
+                    result => {
+                        let reason = if result.is_ok() { t.stopped_reason() } else { "Could not check SSH.".into() };
+                        drop(d);
+                        disconnect_inner(&app,id);
+                        let _=app.emit("connection-error",reason);
+                        return;
+                    }
+                }
             }
             live.port
         };

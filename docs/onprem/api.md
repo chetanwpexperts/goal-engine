@@ -44,7 +44,7 @@ Send a SQL query or a database question.
 Request body:
 
 ```json
-{"text": "SELECT * FROM orders WHERE customer_id = 42;"}
+{"text": "MySQL: SELECT * FROM orders WHERE customer_id = 42;"}
 ```
 
 `text` is a required string. Supply between 1 and 10,000 characters after trimming whitespace (the upper limit is configurable through `MAX_MESSAGE_CHARS`). The optional `goal_id` is an integer or null; use the ID returned in `goal.id` to focus a follow-up on that goal. Omit it for the initial message.
@@ -88,6 +88,38 @@ Errors:
 - 503: the service can return an `error` message; check its local configuration and availability.
 
 Local mode uses per-minute request limits (20 per visitor, 60 per IP and 600 across the service). The `remaining_today` display is a daily counter, separate from those limits.
+
+## Tell DBaba which database
+
+DBaba uses the database named in your message, a database remembered in the conversation, or clues in the SQL syntax. When it needs your choice, the English `reply` starts with "Which database is this for?" and `options` contains:
+
+```json
+["MySQL", "MariaDB", "PostgreSQL", "SQL Server", "Oracle", "Not sure"]
+```
+
+In Hindi and Hinglish the last option is "Pata nahi". SQL Server and Oracle choices provide general SQL guidance and engine-specific notes.
+
+There are two ways to provide the database:
+
+1. Name it in the message (recommended for scripts):
+
+   ```json
+   {"text": "MySQL: SELECT * FROM orders WHERE customer_id = 42;"}
+   ```
+
+   Or use natural wording:
+
+   ```json
+   {"text": "this is a postgres query: SELECT * FROM orders WHERE customer_id = 42;"}
+   ```
+
+2. Answer the database question. Send another POST to `/api/message` using the same cookie jar and the previous response's `goal.id`. For example, if that ID is 42:
+
+   ```json
+   {"text": "MySQL", "goal_id": 42}
+   ```
+
+   DBaba remembers the choice and continues checking the original query. Use the actual goal ID and a choice from the returned `options`.
 
 ### GET /api/state
 
@@ -142,8 +174,8 @@ echo
 export DBABA_API_KEY
 ```
 
-1. Check a query: run `bash examples/dbaba.sh`. It starts a conversation and prints the answer to a sample SQL query.
-2. Ask a database question in a fresh session: run `bash examples/dbaba.sh 'How can I add an index in PostgreSQL?'`.
+1. Check a MySQL query: run `bash examples/dbaba.sh`. To check a PostgreSQL query instead, run `DBABA_DB=PostgreSQL bash examples/dbaba.sh 'SELECT * FROM orders;'` (or pass `PostgreSQL` as the second argument).
+2. Ask a database question in a fresh session: run `bash examples/dbaba.sh 'How can I add an index in PostgreSQL?'`. The script sends the question unchanged.
 3. Check that the service is up:
 
 ```bash
@@ -154,7 +186,7 @@ curl --fail --silent --show-error \
 
 ## Example clients
 
-Run from the repository root. Each script starts an anonymous chat, retains cookies, sends a query and prints the reply. Each accepts an optional SQL query or question as its first argument.
+Run from the repository root. Each script starts an anonymous chat, retains cookies, sends a query and prints the reply. Each accepts an optional SQL query or question as its first argument and a database name as its optional second argument. The second argument takes precedence over `DBABA_DB`, which defaults to `MySQL`. For SQL, each script sends `database: query`. For natural-language questions, it sends the original text unchanged. The examples use a simple leading SQL keyword check for common statements; for other SQL formats, include the database name explicitly in the first argument. Already named messages are passed through unchanged.
 
 - Bash: `bash examples/dbaba.sh` (curl and jq)
 - Python: `python -m pip install requests`, then `python examples/dbaba.py`

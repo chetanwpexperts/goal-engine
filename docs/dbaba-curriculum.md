@@ -127,7 +127,10 @@ Claude (daytime sessions and the nightly run, in this order):
   First run is a 3-step wizard a non-expert can follow: (1) "Which database do you want DBaba to look after?" with taps
   MySQL / MariaDB / PostgreSQL / "Find it for me" (detects what runs on this machine); (2) connect: host, port, database,
   read-only user prefilled from what was found, "Test connection", a plain-words reason for any failure; (3) the first scan
-  starts by itself. Then the home screen is the database's report and the DBaba chat, answers proven on that database.
+  starts by itself. After that the screen has three parts: (a) CHAT, the main window: ask anything about databases
+  (EN / Hinglish / Hindi), answers proven on the connected database, fixes as preview + approve + Undo; (b) REPORT (S5), each
+  item with its fix and "ask about this" into the chat; (c) AUTOMATION (S6): every job listed, on/off and its time, last run
+  and result. The same screen on a server (reached by SSH tunnel, the desktop app or `dbaba` commands) and on a laptop.
 - [ ] S5. The full database report (first scan, then on a schedule): a health score and sections, worst first, each item with
   what it is, why it matters, and the fix (a change only as preview + approve + Undo): problems right now (deadlocks, locks
   and who waits on whom, long-running queries, connections near the limit, replication lag); slow queries (slow log /

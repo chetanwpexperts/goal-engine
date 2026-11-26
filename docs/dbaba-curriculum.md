@@ -118,7 +118,7 @@ it. Claude items live in `app/` and the knowledge; ChatGPT items live ONLY in th
 reviews them before they are merged.
 
 Claude (daytime sessions and the nightly run, in this order):
-- [ ] S1. X2: write a query from plain words (EN / Hinglish / Hindi), with tests/fuzz/nl2sql.py
+- [x] S1. X2: write a query from plain words (EN / Hinglish / Hindi), with tests/fuzz/nl2sql.py. Done 26 Nov: app/agents/sqlwrite.py + core/write_words.json; 18 families, 400/400 on MySQL+PostgreSQL; Paper 1 8→12/30. Self-joins, Nth highest, percentages, pivots and data changes say "can't build yet" (S2).
 - [ ] S2. X3 + X4: the rest of query writing; theory and trap concepts
 - [ ] S3. DBaba to Excel: a Data sheet, a pivot sheet (live SUMIFS / COUNTIFS) and a chart from a query's result, plus the
   chart in the chat (reusing app/office's workbook builders)

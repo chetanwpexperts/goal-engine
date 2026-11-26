@@ -620,6 +620,32 @@ def concept_question(text: str):
         return None
 
 
+def _write_turn(db: Session, goal: Goal, text: str, hi: bool):
+    """A query written from the person's words, for their database (rule A: named, remembered, or the common form that runs
+    on MySQL, MariaDB, PostgreSQL and SQLite alike, said so)."""
+    from app.agents import sqlwrite
+    from app.dbknow import engines as E
+
+    named = E.named(text)
+    if named:
+        E.remember(goal, named, "named")
+    rec = E.remembered(goal)
+    eng = named or (rec["id"] if rec and rec.get("id") != E.NOT_SURE else None)
+    reply, res = sqlwrite.reply(text, eng, hi or E.lang_of(text) != "en")
+    goal.title = ("SQL: write a query" if res.get("ok") else "SQL: query to write")[:200]
+    goal.intent = goal.intent or "db_write"
+    goal.missing_info, goal.pending = "[]", None
+    if not res.get("ok"):
+        try:
+            from app import learning
+
+            learning.ask_to_learn(db, "database", text, guess="write")
+        except Exception:  # noqa: BLE001 - learning is an extra
+            db.rollback()
+    db.commit()
+    return reply, [], "concept"
+
+
 def _concept_turn(db: Session, goal: Goal, text: str, hi: bool, m: dict):
     from app.dbknow import concepts
     from app.dbknow import engines as E
@@ -656,6 +682,10 @@ def _concept_turn(db: Session, goal: Goal, text: str, hi: bool, m: dict):
 def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) -> bool:
     from app.agents.core import query_in
 
+    from app.agents import sqlwrite
+
+    if relation != "safety" and sqlwrite.is_request(text):
+        return True                       # 'write a query to list ...': written from the words (night S1)
     if relation != "safety" and concept_question(text) is not None:
         return True                       # 'what is a JOIN': the concepts pack, whatever the reader guessed
     from app.agents import sqlport
@@ -794,6 +824,10 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     """Database work: the agent works through a connector on the user's own server."""
     from app.agents.core import query_in
 
+    from app.agents import sqlwrite
+
+    if sqlwrite.is_request(text):         # 'write a query to ...': the query, built from the words (night S1)
+        return _write_turn(db, goal, text, turn.hi)
     m = concept_question(text)
     if m is not None:                     # a basic question gets its answer, never 'paste a query' / 'connect your database'
         return _concept_turn(db, goal, text, turn.hi, m)

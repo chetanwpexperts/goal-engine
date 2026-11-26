@@ -602,6 +602,16 @@
     ],
     [
      "नल"
+    ],
+    [
+     "three[- ]valued( logic)?"
+    ],
+    [
+     "(?:=|<>|!=)\\s*null"
+    ],
+    [
+     "unknown",
+     "null"
     ]
    ],
    "phrasings": {
@@ -619,9 +629,9 @@
     ]
    },
    "answer": {
-    "en": "NULL means 'no value / unknown', not zero and not an empty string. Any comparison with NULL (=, <>, >) is unknown, so WHERE drops the row; test it with IS NULL / IS NOT NULL. Arithmetic with NULL gives NULL; COUNT(col), SUM, AVG skip NULLs.",
-    "hinglish": "NULL ka matlab 'koi value nahi / pata nahi' hai, na zero, na khaali text. NULL se koi bhi tulna (=, <>, >) unknown hoti hai, isliye WHERE row hata deta hai; IS NULL / IS NOT NULL se jaancho. NULL ke saath hisaab NULL deta hai; COUNT(col), SUM, AVG NULL chhod dete hain.",
-    "hindi": "NULL का मतलब 'कोई value नहीं / पता नहीं' है, न ज़ीरो, न खाली text। NULL से कोई भी तुलना (=, <>, >) unknown होती है, इसलिए WHERE row हटा देता है; IS NULL / IS NOT NULL से जाँचिए। NULL के साथ हिसाब NULL देता है; COUNT(col), SUM, AVG NULL छोड़ देते हैं।"
+    "en": "NULL means 'no value / unknown', not zero and not an empty string. SQL logic has three values: TRUE, FALSE and UNKNOWN. Any comparison with NULL (=, <>, >, even NULL = NULL) is UNKNOWN, and WHERE keeps only TRUE rows, so col = NULL and col <> NULL both return nothing; test it with IS NULL / IS NOT NULL. Arithmetic with NULL gives NULL; COUNT(col), SUM, AVG skip NULLs.",
+    "hinglish": "NULL ka matlab 'koi value nahi / pata nahi' hai, na zero, na khaali text. SQL ki logic mein teen values hain: TRUE, FALSE aur UNKNOWN. NULL se koi bhi tulna (=, <>, >, NULL = NULL bhi) UNKNOWN hoti hai aur WHERE sirf TRUE rakhta hai, isliye col = NULL aur col <> NULL dono kuch nahi laate; IS NULL / IS NOT NULL se jaancho. NULL ke saath hisaab NULL deta hai; COUNT(col), SUM, AVG NULL chhod dete hain.",
+    "hindi": "NULL का मतलब 'कोई value नहीं / पता नहीं' है, न ज़ीरो, न खाली text। SQL में तीन values हैं: TRUE, FALSE और UNKNOWN। NULL से कोई भी तुलना (=, <>, >) UNKNOWN होती है और WHERE सिर्फ़ TRUE रखता है, इसलिए col = NULL और col <> NULL दोनों कुछ नहीं लाते; IS NULL / IS NOT NULL से जाँचिए। NULL के साथ हिसाब NULL देता है; COUNT(col), SUM, AVG NULL छोड़ देते हैं।"
    },
    "mistake": {
     "en": "Writing col = NULL or col != NULL (never true); and forgetting that city <> 'Pune' also drops the rows where city is NULL.",
@@ -5578,8 +5588,8 @@
     ]
    },
    "answer": {
-    "en": "MariaDB began as a copy (fork) of MySQL, so most SQL, the client, the error codes (1062, 1064 ...) and the port are the same. They have drifted apart since: different optimizers and versions, MariaDB-only features (RETURNING on INSERT/DELETE, sequences, NVL) and MySQL-only ones (some JSON functions, the 8.x data dictionary). Treat them as close cousins, not the same database.",
-    "hinglish": "MariaDB MySQL ki copy (fork) se shuru hua, isliye zyadatar SQL, error codes (1062, 1064 ...) aur port same hain. Ab dono alag ho gaye hain: alag optimizer aur versions, MariaDB ke apne features (INSERT/DELETE ... RETURNING, sequences, NVL) aur MySQL ke apne. Kareebi rishtedaar, ek hi database nahi.",
+    "en": "MariaDB began as a copy (fork) of MySQL, so most SQL, the client, the error codes (1062, 1064 ...) and the port (3306) are the same; both default to the InnoDB storage engine. They have drifted apart since: different optimizers and versions, MariaDB-only features (RETURNING on INSERT/DELETE, sequences, NVL) and MySQL-only ones (some JSON functions, the 8.x data dictionary). Treat them as close cousins, not the same database.",
+    "hinglish": "MariaDB MySQL ki copy (fork) se shuru hua, isliye zyadatar SQL, error codes (1062, 1064 ...) aur port (3306) same hain; dono ka default storage engine InnoDB hai. Ab dono alag ho gaye hain: alag optimizer aur versions, MariaDB ke apne features (INSERT/DELETE ... RETURNING, sequences, NVL) aur MySQL ke apne. Kareebi rishtedaar, ek hi database nahi.",
     "hindi": "MariaDB MySQL की copy (fork) से शुरू हुआ, इसलिए ज़्यादातर SQL और error codes same हैं। अब दोनों अलग हो गए हैं: MariaDB के अपने features (RETURNING, sequences, NVL) और MySQL के अपने।"
    },
    "mistake": {
@@ -5659,9 +5669,9 @@
     ]
    },
    "answer": {
-    "en": "Both are free relational databases that run standard SQL, with real differences: PostgreSQL is stricter (it refuses '5' + 'a', compares text case-sensitively, does integer division, puts NULLs last in ASC order) and has richer types (arrays, JSONB, ranges) and FULL JOIN; MySQL/MariaDB are looser by default, compare text case-blind with the usual collation, and use backticks, LIMIT a,b, IFNULL. Queries often need small changes to move between them.",
-    "hinglish": "Dono free relational databases hain jo standard SQL chalate hain, par farak asli hai: PostgreSQL zyada sakht hai (text + number mana, text case-sensitive compare, integer division, ASC mein NULL aakhir mein) aur types zyada (arrays, JSONB, ranges) aur FULL JOIN; MySQL/MariaDB default mein dheele hain, text case-blind compare karte hain, backticks, LIMIT a,b, IFNULL use karte hain.",
-    "hindi": "दोनों free relational databases हैं, पर PostgreSQL ज़्यादा सख़्त है (text case-sensitive, integer division) और types ज़्यादा हैं; MySQL/MariaDB default में ढीले हैं और backticks, LIMIT a,b, IFNULL use करते हैं।"
+    "en": "Both are free relational databases that run standard SQL, with real differences: PostgreSQL is stricter (it refuses '5' + 'a', compares text case-sensitively, does integer division, puts NULLs last in ASC order) and has richer types (arrays, JSONB, ranges) and FULL JOIN; MySQL/MariaDB are looser by default, compare text case-blind with the usual collation, and use backticks, LIMIT a,b, IFNULL. Default port: MySQL 3306, PostgreSQL 5432. Storage: MySQL keeps tables in pluggable storage engines (InnoDB by default, transactional); PostgreSQL has one built-in storage, always transactional. Queries often need small changes to move between them.",
+    "hinglish": "Dono free relational databases hain jo standard SQL chalate hain, par farak asli hai: PostgreSQL zyada sakht hai (text + number mana, text case-sensitive compare, integer division, ASC mein NULL aakhir mein) aur types zyada (arrays, JSONB, ranges) aur FULL JOIN; MySQL/MariaDB default mein dheele hain, text case-blind compare karte hain, backticks, LIMIT a,b, IFNULL use karte hain. Default port: MySQL 3306, PostgreSQL 5432. Storage: MySQL mein engines badal sakte hain (default InnoDB, transactional); PostgreSQL ka ek hi built-in storage hai, hamesha transactional.",
+    "hindi": "दोनों free relational databases हैं, पर PostgreSQL ज़्यादा सख़्त है (text case-sensitive, integer division) और types ज़्यादा हैं; MySQL/MariaDB default में ढीले हैं और backticks, LIMIT a,b, IFNULL use करते हैं। Default port: MySQL 3306, PostgreSQL 5432; MySQL का default storage engine InnoDB है।"
    },
    "mistake": {
     "en": "Expecting the same results from the same query: sorting of NULLs and text, division and string comparison differ.",
@@ -11490,9 +11500,9 @@
     ]
    },
    "answer": {
-    "en": "CHAR(n) is fixed width: shorter values are padded with spaces to n (and the spaces are dropped again when compared or read back). VARCHAR(n) stores just the characters given, up to n. Use CHAR only for codes that always have the same length (a 2-letter country code); everything else is VARCHAR.",
-    "hinglish": "CHAR(n) fixed width hai: chhoti value spaces se n tak bhari jaati hai (compare/read pe spaces hat jaate hain). VARCHAR(n) utne hi characters rakhta hai jitne diye, n tak. CHAR sirf same length wale code ke liye (2 akshar ka country code); baaki sab VARCHAR.",
-    "hindi": "CHAR(n) fixed width है (spaces से भरा जाता है); VARCHAR(n) उतने ही अक्षर रखता है। CHAR सिर्फ़ एक जैसी length वाले code के लिए।"
+    "en": "CHAR(n) is fixed width: shorter values are padded with spaces to n (and the spaces are dropped again when compared or read back). VARCHAR(n) is variable length: it stores just the characters given (trailing spaces included), up to n, plus a 1-2 byte length. Use CHAR only for codes that always have the same length (a 2-letter country code); everything else is VARCHAR.",
+    "hinglish": "CHAR(n) fixed width hai: chhoti value spaces se n tak bhari jaati hai (compare/read pe spaces hat jaate hain). VARCHAR(n) variable length hai: utne hi characters rakhta hai jitne diye (aakhri spaces bhi), n tak, saath mein 1-2 byte length. CHAR sirf same length wale code ke liye (2 akshar ka country code); baaki sab VARCHAR.",
+    "hindi": "CHAR(n) fixed width है (spaces से भरा जाता है); VARCHAR(n) variable length है: उतने ही अक्षर रखता है (आख़िरी spaces भी)। CHAR सिर्फ़ एक जैसी length वाले code के लिए।"
    },
    "mistake": {
     "en": "CHAR(255) for names or emails: every row carries the padding.",
@@ -11517,9 +11527,9 @@
     }
    ],
    "engines": {
-    "mysql": "CHAR max 255; trailing spaces are removed when read.",
+    "mysql": "CHAR max 255; CHAR's trailing spaces are removed when read, VARCHAR keeps them.",
     "mariadb": "Same as MySQL.",
-    "postgresql": "char(n) is padded; PostgreSQL's docs advise text or varchar instead (no speed gain from char)."
+    "postgresql": "char(n) is padded and its trailing spaces don't count when compared; varchar keeps them. PostgreSQL's docs advise text or varchar (no speed gain from char)."
    },
    "related": [
     "varchar_vs_text",
@@ -11844,9 +11854,9 @@
     ]
    },
    "answer": {
-    "en": "An auto-increment column gives each new row the next number by itself, so the id doesn't have to be sent with the INSERT. MySQL/MariaDB write it INT AUTO_INCREMENT (the column must be a key); PostgreSQL writes GENERATED BY DEFAULT AS IDENTITY (or the older SERIAL). The numbers are for naming rows, not counting them: gaps after a failed insert or a delete are normal.",
-    "hinglish": "Auto-increment column har nayi row ko agla number khud deta hai, INSERT mein id bhejni nahi padti. MySQL/MariaDB: INT AUTO_INCREMENT (column key honi chahiye); PostgreSQL: GENERATED BY DEFAULT AS IDENTITY (ya purana SERIAL). Number row ka naam hai, ginti nahi: failed insert ya delete ke baad gap normal hai.",
-    "hindi": "Auto-increment column हर नई row को अगला नंबर खुद देता है। MySQL: AUTO_INCREMENT; PostgreSQL: GENERATED ... AS IDENTITY या SERIAL। gaps सामान्य हैं।"
+    "en": "An auto-increment column gives each new row the next number by itself, so the id doesn't have to be sent with the INSERT. MySQL/MariaDB write it INT AUTO_INCREMENT (the column must be a key); PostgreSQL writes GENERATED BY DEFAULT AS IDENTITY (or the older SERIAL). The numbers are for naming rows, not counting them: gaps after a failed insert or a delete are normal. A rolled-back INSERT still uses up its number (the counter or sequence is not rolled back), and a used number is not reused.",
+    "hinglish": "Auto-increment column har nayi row ko agla number khud deta hai, INSERT mein id bhejni nahi padti. MySQL/MariaDB: INT AUTO_INCREMENT (column key honi chahiye); PostgreSQL: GENERATED BY DEFAULT AS IDENTITY (ya purana SERIAL). Number row ka naam hai, ginti nahi: failed insert ya delete ke baad gap normal hai. ROLLBACK hua INSERT bhi apna number kha jaata hai (counter/sequence rollback nahi hota), aur wo number dobara nahi milta.",
+    "hindi": "Auto-increment column हर नई row को अगला नंबर खुद देता है। MySQL: AUTO_INCREMENT; PostgreSQL: GENERATED ... AS IDENTITY या SERIAL। gaps सामान्य हैं: ROLLBACK हुआ INSERT भी अपना नंबर ले लेता है (counter/sequence वापस नहीं होता), और वह नंबर दोबारा नहीं मिलता।"
    },
    "mistake": {
     "en": "Writing AUTO_INCREMENT on PostgreSQL (syntax error) or GENERATED ... AS IDENTITY on MariaDB (1064); or treating the ids as a count with no gaps.",

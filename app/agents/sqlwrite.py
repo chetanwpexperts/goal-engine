@@ -35,7 +35,8 @@ ASK_RE = re.compile(
     r"\b(?:sql|query)\s+(?:to|for|that|which|jo|ke liye)\b|\bquery\s+(?:likho|likh do|banao|chahiye)|"
     r"\b(?:query|sql)\b[^.?!\n]{0,30}\bkaise\s+likh|\bkaise\s+likh\w*\b[^.?!\n]{0,30}\b(?:query|sql)\b|"
     r"(?<![\w\u0900-\u097F])(?:क्वेरी|query)[^.?!\n]{0,20}(?:लिखो|लिखें|लिखूं|बनाओ)|\bselect\s+statement\s+(?:to|for)\b", re.I)
-VERB_RE = re.compile(r"\b(?:fetch|list|show|display|find|retrieve|get|return|count|calculate|compute|select|pull)\b", re.I)
+VERB_RE = re.compile(r"\b(?:fetch|list|show|display|find|retrieve|get|return|count|calculate|compute|select|pull|rank|delete|remove|"
+                     r"increase|decrease|raise|reduce)\b", re.I)
 NUM = r"-?\d[\d,]*(?:\.\d+)?"
 # pasted code or a written query (for the checker), never a request to write one
 CODE_RE = re.compile(r"\bselect\s+[\w.*,`\"\s]+?\s+from\s+[\w.`\"]+\s*(?:\w+\s+)?(?:where|order|join|group|limit|inner|left|;|$)|"
@@ -72,6 +73,10 @@ def is_request(text: str) -> bool:
     t = text or ""
     if not t.strip() or query_in(t) or CODE_RE.search(t):
         return False
+    from app.agents import sqlpuzzle
+
+    if sqlpuzzle.is_puzzle(t):                                  # 'given (1, NULL, 3), what does AVG return?': worked out, not written
+        return False
     if re.search(r"\b(why|kyun|kyu|क्यों|error|slow|explain|what is|what does|difference|vs\.?)\b", t, re.I) and not ASK_RE.search(t):
         return False
     if _lesson(t):
@@ -86,6 +91,8 @@ def is_request(text: str) -> bool:
     # a single-word table ('staff', 'inventory') counts when it is clearly the thing asked from / filtered
     nouns += [w for w in re.findall(r"\b([a-z]{3,})\s+(?:where|whose|have|has|that|who)\b", norm) + re.findall(r"\bfrom\s+([a-z]{3,})\b", t.lower())
               if w not in skip and w not in ("many", "much", "data", "database", "table")]
+    if SHAPE_RE.search(norm):                       # night S2 shapes: manager rows, pairs, Nth, %, ranks, changes
+        return True
     asks = VERB_RE.search(norm) or re.search(r"\bhow many\b", norm) or re.search(
         r"\b(?:total|average|avg|sum|maximum|minimum|count)\b[^.?!]{0,40}\b(?:per|each|by)\b|"
         r"\b(?:per|each)\b[^.?!]{0,40}\b(?:total|average|avg|sum|maximum|minimum|count)\b", norm)
@@ -94,23 +101,46 @@ def is_request(text: str) -> bool:
         r"duplicate|oldest|newest|highest|lowest|between|starting|starts|begins?)\b|[<>=]", norm))
 
 
+SHAPE_RE = re.compile(
+    r"\b(?:their|his|her|its)\s+(?:direct\s+|immediate\s+)?(?:manager|lead|boss|supervisor|parent|mentor|referrer)\b|"
+    r"\bwithout (?:a |any )?(?:manager|lead|boss|supervisor|parent|mentor)\b|\bdirect reports\b|\bpairs? of\b|"
+    r"\b(?:\d+(?:st|nd|rd|th)|second|third|fourth|fifth)\s+(?:highest|lowest|largest|smallest|most|least|latest|newest|oldest)\b|"
+    r"\btop \d+\b.{0,60}\b(?:in each|per|for each|in every)\b|\b(?:in each|per|for each|each)\b.{0,40}\btop \d+\b|"
+    r"\baverage\b.{0,40}\b(?:than|above|below)\b.{0,20}\boverall\b|\boverall average\b|"
+    r"\bpercent(?:age)?\b.{0,60}\b(?:per|each|of total|in each|by)\b|\b(?:each|per)\b.{0,60}\bpercent(?:age)?\b|"
+    r"\brank(?:ed)?\b.{0,40}\bby\b|\bby\b.{0,40}\brank\b|\b(?:running|cumulative) (?:total|sum|count)\b|"
+    r"\b(?:previous|next|prior)\s+[a-z_]+'s\b|"
+    r"\b(?:set|update|change)\s+[a-z_ ]{1,30}\s+to\s+\S+.{0,60}\b(?:where|for|whose)\b|"
+    r"\b(?:increase|decrease|raise|reduce)\b.{0,40}\bby \d|\d+\s*%\s+(?:increase|decrease)\b|"
+    r"\b(?:delete|remove)\b.{0,40}\b(?:where|whose|duplicate)\b|\bduplicate\b.{0,20}\b(?:delete|remove)\b")
 GENERIC_Q = re.compile(r"^\s*(?:how|why|what|when|which|can|is|does|do|should)\b|\b(?:kaise|kyun|kyu|kya|hote|hota|hoti|farak|fark|farq|kaun|kaunsa|kaunsi|kab|kitne (?:\w+ )?types|prakar|lagana|lagani|lagaye|lagayen)\b|(?:कैसे|क्यों|क्या|कब|कौन|प्रकार|फ़र्क|फर्क)|\?\s*$|\binstead of\b|\b(?:records|rows|entries)\b", re.I)
-CONCRETE = re.compile(r"['\"`]|\b[a-z][a-z0-9]*_[a-z0-9_]+\b|\d{3,}|\w\s*(?:[<>]=?|!=|=)\s*[\'\"\w]|\b(?:more|less|greater|fewer) than\b|"
+CONCRETE = re.compile(r"(?<!\w)'[^']+'|\"[^\"]+\"|`[^`]+`|\b(?!(?:row_number|dense_rank|percent_rank|cume_dist|group_concat|string_agg|date_format|date_trunc|"
+                      r"date_add|date_sub|str_to_date|to_char|to_date|last_insert_id|found_rows|auto_increment|"
+                      r"current_date|current_timestamp|json_extract|order_by|group_by|is_null|not_null|sql_mode|"
+                      r"only_full_group_by|innodb_\w+|max_\w+|wp_\w+)\b)[a-z][a-z0-9]*_[a-z0-9_]+\b|\d{3,}|\w\s*(?:[<>]=?|!=|=)\s*[\'\"\w]|\b(?:more|less|greater|fewer) than\b|"
                       r"\bcreate\s+table\s+\S+\s*\(|\bnamed\b|\bcalled\b|\b(?:se|से)\s+(?:zyada|kam|ज़्यादा|ज्यादा|कम)", re.I)
 
 
 def _lesson(text: str) -> bool:
     """'how to count rows per category', 'update query kaise likhe': a general how-to that a known lesson answers, with no
     names or values of their own in it, is a lesson; 'query for employees whose salary is more than 50000' is a job."""
-    if not GENERIC_Q.search(text) or CONCRETE.search(text):
+    if CONCRETE.search(text):
         return False
+    if re.search(r"\b(?:farak|fark|farq|antar|difference|differences|vs|versus)\b|अंतर|फ़र्क|फर्क", text, re.I):
+        return True
     try:
         from app.dbknow import concepts as K
 
         m = K.match(text)
     except Exception:  # noqa: BLE001
         return False
-    return bool(m and m.get("concept"))
+    if not (m and m.get("concept")):
+        return False
+    if GENERIC_Q.search(text):
+        return True
+    # no question word: a lesson only when the words hold nothing of the person's own (no table-like names), or name a
+    # database engine ('delete in batches in mysql', 'two users reduce stock at the same time in sqlite')
+    return bool(re.search(r"\b(?:mysql|mariadb|postgres|postgresql|sqlite|sql server|oracle|wordpress)\b", text, re.I))
 
 
 # ------------------------------------------------------------------------------------------------ the schema
@@ -416,6 +446,11 @@ def build(text: str, schema: dict | None = None, engine: str | None = None) -> d
 
 
 def _build(r: Reader) -> str:
+    from app.agents import sqlshapes
+
+    sql = sqlshapes.build(r)                                 # night S2: self joins, Nth, top per group, %, ranks, changes
+    if sql:
+        return sql
     s = r.spec
     low = r.low
     for pat, what in words()["not_yet"]:                     # shapes the writer doesn't build yet: said, never faked
@@ -851,7 +886,7 @@ def _is_value(v: str, c: Col, r: Reader) -> bool:
     stop = set("""the a an and or of in on at to by for with from is are was be than more less who whose which that this these
     first last top newest oldest highest lowest sorted ordered order sort descending ascending desc asc where per each every
     all any some no not null missing empty only also their his her its show list fetch get find display along together
-    plus include including name names""".split())
+    plus include including name names second third fourth fifth sixth seventh eighth ninth tenth""".split())
     if v in stop or v in words()["desc_words"] or v in words()["asc_words"]:
         return False
     if any(v in t.forms() for t in r.schema.values()):
@@ -1079,7 +1114,11 @@ def _self_check(sql: str, engine: str | None, schema: dict | None = None) -> tup
             for tb in schema.values():
                 cols = ", ".join(f'"{c.name}"' for c in tb.cols.values()) or '"id"'
                 db.execute(f'CREATE TABLE "{tb.name}" ({cols})')
-            db.execute("SELECT * FROM (" + re.sub(r"\n-- check:.*$", "", sql) + ") LIMIT 0")
+            body = re.sub(r"\n-- check:.*$", "", sql)
+            if re.match(r"(?i)\s*(?:update|delete)\b", body):
+                db.execute("EXPLAIN " + body)                     # compiled, never run
+            else:
+                db.execute("SELECT * FROM (" + body + ") LIMIT 0")
         except sqlite3.Error as exc:
             return False, f"the query I built doesn't hold together yet ({str(exc)[:60]})"
         finally:

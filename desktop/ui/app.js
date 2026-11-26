@@ -10,7 +10,9 @@ async function reload(){
  for(const [row,live] of rows){
   const a=document.createElement("article"),h=document.createElement("strong"),p=document.createElement("p");
   h.textContent=row.label;p.textContent=(row.ssh?"SSH · "+row.ssh.host:"This computer")+" · "+(live?"Connected":"Disconnected");
-  a.append(h,p,button("Open",()=>open(row.id)),button("Disconnect",async()=>{await invoke("disconnect",{id:row.id});await reload();}),button("Remove",async()=>{if(window.confirm("Remove this connection and its API key?")){await invoke("remove",{id:row.id});await reload();}}));
+  a.append(h,p,button("Open",()=>open(row.id)));
+  if(live)a.append(button("Disconnect",async()=>{await invoke("disconnect",{id:row.id});await reload();}));
+  a.append(button("Remove",async()=>{if(window.confirm("Remove this connection and its API key?")){await invoke("remove",{id:row.id});await reload();}}));
   el("connections").append(a);
  }
 }

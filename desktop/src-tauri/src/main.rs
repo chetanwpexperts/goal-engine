@@ -203,6 +203,13 @@ fn main() {
                     }
                 }).build(app)?;
             refresh(app.handle())?;
+            if let Some(window)=app.get_webview_window("main") {
+                let a=app.handle().clone();
+                window.on_window_event(move |event| if matches!(event,tauri::WindowEvent::CloseRequested{..}) {
+                    a.state::<Store>().data.lock().unwrap().live.clear();
+                    a.exit(0);
+                });
+            }
             Ok(())
         }).build(tauri::generate_context!()).expect("Could not start DBaba desktop")
         .run(|app,event| match event {

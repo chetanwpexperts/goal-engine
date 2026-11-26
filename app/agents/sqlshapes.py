@@ -331,7 +331,8 @@ def _self(r: Reader, low: str) -> str | None:
         if name:
             shown.insert(1, f"{mm}.{name.name} AS {role}_{name.name}")
         s.steps.append(f"the table joined to itself: {e} is each row, {mm} the row its {ref.name} points to (its {role})")
-        s.steps.append("WHERE compares each row with its own " + role + ": " + ", ".join(f"{c.name} {op}" for c, op, _w in comps))
+        s.steps.append(f"WHERE compares each row with its own {role}: " +
+                       ", ".join(f"{e}.{c.name} {op} {mm}.{c.name}" for c, op, _w in comps))
         s.steps.append(f"rows with no {role} drop out, because there is nothing to compare with")
         return _finish(r, _lines("SELECT " + ", ".join(dict.fromkeys(shown)), f"FROM {t.name} {e}",
                                  f"JOIN {t.name} {mm} ON {e}.{ref.name} = {mm}.{pk.name}", _where(conds)))

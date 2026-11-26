@@ -1163,4 +1163,17 @@ def reply(text: str, engine: str | None = None, hi: bool = False, schema: dict |
         guess = ("\n\nIn naamon ka andaza lagaya hai, apni table se mila lo: " if hi else
                  "\n\nI guessed these names from your words; check them against your tables: ") + ", ".join(dict.fromkeys(res["guesses"])) + "."
     runs = (f"\n\n{where} pe chalti hai." if hi else f"\n\nRuns on {where}.")
+    res["parts"] = {"head": head, "body": body, "how": how, "guess": guess, "runs": runs, "where": where, "hi": hi}
     return f"{head}\n\n{body}{how}{guess}{runs}", res
+
+
+def card(title: str, res: dict) -> dict:
+    """The answer in parts for the page: the explanation in the chat, the query itself in the side panel (the same
+    form as a concept's worked example, app/dbknow/concepts.card)."""
+    p = res["parts"]
+    hi = p["hi"]
+    explain = (p["how"] + p["guess"] + p["runs"]).strip()
+    return {"id": "write", "lang": "hinglish" if hi else "en", "title": title, "answer": explain, "mistake": "",
+            "examples": [{"label": "", "sql": [{"label": p["where"], "query": p["body"]}]}], "engines": [],
+            "labels": {"example": "Query", "lab": "DBaba ke checker se jaancha" if hi else "checked by DBaba's own checker",
+                       "result": "Result", "mistake": "", "engines": "", "preview": "", "change": ""}}

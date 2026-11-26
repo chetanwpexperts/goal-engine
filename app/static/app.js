@@ -1894,7 +1894,7 @@
   function conceptTheory(c) {
     // '(1) INNER JOIN ... (2) LEFT JOIN ...': a list reads better than one long paragraph
     const answer = /\(1\)[\s\S]*\(2\)/.test(c.answer) ? c.answer.replace(/\s*\((\d{1,2})\)\s+/g, "\n- ") : c.answer;
-    return [c.title, answer, `${c.labels.mistake}: ${c.mistake}`].join("\n\n");
+    return [c.title, answer, c.mistake ? `${c.labels.mistake}: ${c.mistake}` : ""].filter(Boolean).join("\n\n");
   }
   // side by side only where there is room for two columns; on a phone the whole answer stays in the chat
   const sideBySide = () => window.matchMedia("(min-width: 900px)").matches;

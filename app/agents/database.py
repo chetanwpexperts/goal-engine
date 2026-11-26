@@ -632,6 +632,11 @@ def _write_turn(db: Session, goal: Goal, text: str, hi: bool):
     rec = E.remembered(goal)
     eng = named or (rec["id"] if rec and rec.get("id") != E.NOT_SURE else None)
     reply, res = sqlwrite.reply(text, eng, hi or E.lang_of(text) != "en")
+    if res.get("ok") and res.get("parts"):          # the query beside the chat, the explanation in it (like a concept's example)
+        head = res["parts"]["head"]
+        title = _card_title(goal, head)
+        reply = title + reply[len(head):]
+        _keep_card(goal, sqlwrite.card(title, res))
     goal.title = ("SQL: write a query" if res.get("ok") else "SQL: query to write")[:200]
     goal.intent = goal.intent or "db_write"
     goal.missing_info, goal.pending = "[]", None
@@ -644,6 +649,25 @@ def _write_turn(db: Session, goal: Goal, text: str, hi: bool):
             db.rollback()
     db.commit()
     return reply, [], "concept"
+
+
+def _card_title(goal: Goal, head: str) -> str:
+    """The first line of an answer that has a card: each answer keeps its own card, so a repeated head gets a number."""
+    taken = {c.get("title") for c in (loads(goal.slots, {}) or {}).get("_cards") or []}
+    if head not in taken:
+        return head
+    n = 2
+    while f"{head.rstrip(':')} ({n}):" in taken:
+        n += 1
+    return f"{head.rstrip(':')} ({n}):"
+
+
+def _keep_card(goal: Goal, card: dict):
+    slots = loads(goal.slots, {}) or {}
+    slots["_card"] = card
+    keep = [x for x in slots.get("_cards") or [] if x.get("title") != card["title"]]
+    slots["_cards"] = (keep + [card])[-12:]
+    goal.slots = dumps(slots)
 
 
 def _concept_turn(db: Session, goal: Goal, text: str, hi: bool, m: dict):
@@ -832,6 +856,12 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
 
     if sqlpuzzle.is_puzzle(text):         # 'a column holds (1, NULL, 3): what does AVG give?': worked out by running it
         out = sqlpuzzle.reply(text, turn.hi)
+        res = sqlpuzzle.solve(text) if out else None
+        if out and res:                   # the query it ran and its results beside the chat, the reasons in it
+            head = out.split("\n", 1)[0]
+            title = _card_title(goal, head)
+            out = title + out[len(head):]
+            _keep_card(goal, sqlpuzzle.card(title, res, turn.hi))
         if out:
             goal.title = "SQL: what a query returns"
             goal.intent = goal.intent or "db_concept"

@@ -1,0 +1,30 @@
+services:
+  dbaba:
+    build:
+      context: ../../..
+      dockerfile: deploy/onprem/docker/Dockerfile
+    ports:
+      - "127.0.0.1:8765:8765"
+    environment:
+      DBABA_PORT: "8765"
+      DBABA_PASSWORD: "${DBABA_PASSWORD:-}"
+      DBABA_DB_TYPE: "${DBABA_DB_TYPE:-}"
+      DBABA_DB_HOST: "${DBABA_DB_HOST:-}"
+      DBABA_DB_PORT: "${DBABA_DB_PORT:-}"
+      DBABA_DB_NAME: "${DBABA_DB_NAME:-}"
+      DBABA_DB_USER: "${DBABA_DB_USER:-}"
+      DBABA_DB_PASSWORD: "${DBABA_DB_PASSWORD:-}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - dbaba-data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # For a database on the host, set DBABA_DB_HOST=host.docker.internal.
+    # For another Compose service, set DBABA_DB_HOST to its service name
+    # and put both services on the same Docker network.
+volumes:
+  dbaba-data:

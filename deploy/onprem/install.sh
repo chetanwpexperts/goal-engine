@@ -209,6 +209,15 @@ if [[ -f "$unit" ]]; then
   "${ctl[@]}" stop "$SERVICE"
 fi
 
+"$PY" - "$port" <<'PY'
+import socket, sys
+try:
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", int(sys.argv[1])))
+except OSError:
+    raise SystemExit("Please choose a screen port that is available on this server.")
+PY
+
 if [[ ! -f "$DIR/dbaba.json" ]]; then
   say "Choose a screen password (at least 8 characters):"
   IFS= read -rs -u 3 screen || die "Please enter a screen password."
@@ -448,7 +457,10 @@ fi
 
 if (( system )); then
   service_user="User=$owner"
-  hardening=$(printf 'PrivateTmp=yes\nProtectSystem=strict\nReadWritePaths=%s\nProtectHome=read-only' "$DIR")
+  private_tmp=yes
+  saved_socket=$(as_owner "$PY" -c 'import json,sys; print((json.load(open(sys.argv[1])).get("database") or {}).get("socket") or "")' "$DIR/dbaba.json")
+  case "$saved_socket" in /tmp|/tmp/*|/var/tmp|/var/tmp/*) private_tmp=no ;; esac
+  hardening=$(printf 'PrivateTmp=%s\nProtectSystem=strict\nReadWritePaths=%s\nProtectHome=read-only' "$private_tmp" "$DIR")
   target=multi-user.target
 else
   service_user=""
@@ -492,6 +504,30 @@ if (( ! healthy )); then
   fi
 fi
 
+# Verify the actual listening sockets as well as the HTTP response.
+if ! "$PY" - "$port" <<'PY'
+import socket, struct, sys
+from pathlib import Path
+port = int(sys.argv[1])
+found = False
+for filename in ("/proc/net/tcp", "/proc/net/tcp6"):
+    path = Path(filename)
+    if not path.exists():
+        continue
+    for line in path.read_text().splitlines()[1:]:
+        fields = line.split()
+        address, number = fields[1].split(":")
+        if fields[3] != "0A" or int(number, 16) != port:
+            continue
+        if filename.endswith("tcp6") or socket.inet_ntoa(struct.pack("=I", int(address, 16))) != "127.0.0.1":
+            sys.exit(1)
+        found = True
+sys.exit(not found)
+PY
+then
+  "${ctl[@]}" stop "$SERVICE"
+  die "Please review the release's listener configuration. DBaba requires 127.0.0.1 only."
+fi
 say "DBaba is running and will start automatically after a reboot."
 if (( fallback )); then
   say "Important: screen authentication will be available in a later release. Use the SSH tunnel; other local server users can reach the loopback port."

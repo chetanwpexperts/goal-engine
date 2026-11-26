@@ -457,7 +457,11 @@ remove_code() {
 # of an older, flat-layout installation.
 if [[ ! -f "$DIR/uninstall.sh" ]]; then
   [[ ! -L "$DIR/uninstall.sh" ]] || die "Please use a regular uninstall file."
-  install -m 700 "$stage/source/deploy/onprem/uninstall.sh" "$DIR/uninstall.sh"
+  uninstall_source="$stage/source/deploy/onprem/uninstall.sh"
+  if [[ -f "$DIR/deploy/onprem/uninstall.sh" && ! -L "$DIR/deploy/onprem/uninstall.sh" ]]; then
+    uninstall_source="$DIR/deploy/onprem/uninstall.sh"
+  fi
+  install -m 700 "$uninstall_source" "$DIR/uninstall.sh"
   if (( system )); then
     chown "$owner:$(id -gn "$owner")" "$DIR/uninstall.sh"
   fi
@@ -576,6 +580,7 @@ rollback() {
     else
       "${ctl[@]}" disable "$SERVICE" || return 1
     fi
+    "${ctl[@]}" reset-failed "$SERVICE" >/dev/null 2>&1 || true
     "${ctl[@]}" restart "$SERVICE" || return 1
     health_check && verify_loopback || return 1
     say "The update was not applied. Your previous DBaba release is running and healthy."
@@ -650,7 +655,9 @@ for item in (source / ".venv" / "bin").iterdir():
 PY
 
 # These links are created only after the isolated import succeeds.
-# They point at the stable configuration and data, never copies.
+# Discard any temporary data made by the import; never touch the live paths.
+remove_code "$next/data"
+remove_code "$next/dbaba.json"
 as_owner ln -s ../data "$next/data"
 as_owner ln -s ../dbaba.json "$next/dbaba.json"
 
@@ -740,6 +747,7 @@ mkdir -p "$(dirname "$unit")"
 install -m 644 "$stage/rendered.service" "$unit"
 "${ctl[@]}" daemon-reload
 "${ctl[@]}" enable "$SERVICE"
+"${ctl[@]}" reset-failed "$SERVICE" >/dev/null 2>&1 || true
 "${ctl[@]}" restart "$SERVICE"
 health_check || die "The new release did not pass its health check."
 verify_loopback || die "Please review the release's listener configuration. DBaba requires 127.0.0.1 only."

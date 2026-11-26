@@ -1,0 +1,88 @@
+{
+  "name": "dbaba",
+  "displayName": "DBaba",
+  "description": "Check SQL with your local DBaba service.",
+  "version": "0.1.0",
+  "publisher": "dbaba",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "main": "./extension.js",
+  "scripts": {
+    "test": "node --test ../tests/vscode/*.test.js"
+  },
+  "activationEvents": [
+    "onView:dbaba.ask"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "dbaba.check",
+        "title": "DBaba: Check this query"
+      },
+      {
+        "command": "dbaba.checkAll",
+        "title": "DBaba: Check all queries in this file"
+      },
+      {
+        "command": "dbaba.setKey",
+        "title": "DBaba: Set API Key"
+      },
+      {
+        "command": "dbaba.removeKey",
+        "title": "DBaba: Remove API Key"
+      },
+      {
+        "command": "dbaba.ask",
+        "title": "Ask DBaba"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dbaba",
+          "title": "DBaba",
+          "icon": "dbaba.svg"
+        }
+      ]
+    },
+    "views": {
+      "dbaba": [
+        {
+          "id": "dbaba.ask",
+          "name": "Ask DBaba",
+          "type": "webview"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "DBaba",
+      "properties": {
+        "dbaba.url": {
+          "type": "string",
+          "default": "http://127.0.0.1:8765",
+          "scope": "application"
+        },
+        "dbaba.allowRemote": {
+          "type": "boolean",
+          "default": false,
+          "scope": "application"
+        },
+        "dbaba.database": {
+          "type": "string",
+          "enum": [
+            "mysql",
+            "mariadb",
+            "postgresql"
+          ],
+          "default": "mysql"
+        }
+      }
+    }
+  }
+}

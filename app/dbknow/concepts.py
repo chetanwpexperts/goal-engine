@@ -223,9 +223,16 @@ def _is_work(text: str) -> bool:
     return False
 
 
+ENGINE_PAIRS = {"mysql_vs_postgresql", "mysql_vs_mariadb", "sqlite_vs_mysql", "sqlite_vs_postgresql", "postgresql_vs_sqlite",
+                "mariadb_vs_postgresql"}
+
+
 def match(text: str) -> dict | None:
     """{'concept': <concept>, 'shape': ..., 'engine': ...} for a basic/concept question; {'concept': None, ...} for a
     database concept question we don't know yet; None when it isn't a concept question at all."""
+    if text and "\n" in text.strip() and not re.search(r"(?i)\b(?:select|insert|update|delete|create|alter|with)\b[\s\S]*?"
+                                                       r"\b(?:from|into|set|table|as)\b[\s\S]*[;(=]|```|^\s*at\s|Traceback", text):
+        text = re.sub(r"\s*\n\s*", " ", text.strip())          # a question wrapped over lines (no code in it): one line
     if not text or len(text) > 300 or "\n" in text.strip():
         return None
     sh = shape(text)
@@ -238,6 +245,10 @@ def match(text: str) -> dict | None:
         pair = [(s, c) for s, c in scored if s and c.get("kind") == "compare"]
         if pair and pair[0][0] >= top * 0.6:
             top, best = pair[0]
+    if top and best.get("id") in ENGINE_PAIRS:   # 'X in MySQL vs PostgreSQL': the topic's own lesson, when there is one
+        topic = [(s_, c) for s_, c in scored if s_ and c.get("id") not in ENGINE_PAIRS]
+        if topic and topic[0][0] >= top * 0.6:
+            top, best = topic[0]
     eng = engine_named(text)
     if top and eng:                             # a database's own concept answers a question that names that database (E1)
         own = [(s, c) for s, c in scored if s and c.get("engine") == eng]

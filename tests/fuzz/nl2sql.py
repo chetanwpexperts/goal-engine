@@ -19,7 +19,13 @@ from tests.fuzz.db import _norm_val, engines_up, make_schema
 
 FAMILIES = ["cols_filter", "in_list", "between", "is_null", "not_null", "starts_with", "order_limit", "superlative",
             "distinct", "group_count", "group_agg", "group_having", "child_count", "anti_join", "above_avg", "duplicates",
-            "parent_col", "count_rows"]
+            "parent_col", "count_rows",
+            # night S2 (app/agents/sqlshapes.py)
+            "self_cmp", "self_list", "self_none", "self_count", "pairs", "nth_value", "nth_group", "nth_rows", "top_per",
+            "group_avg", "pct_group", "pct_count", "rank", "rank_nowin", "running", "prev_row", "update_pct", "update_set",
+            "delete_where", "delete_dups"]
+S2 = set(FAMILIES[FAMILIES.index("self_cmp"):])
+ORDS = {2: ("2nd", "doosri", "दूसरी"), 3: ("3rd", "teesri", "तीसरी"), 4: ("4th", "chauthi", "चौथी"), 1: ("1st", "1st", "1st")}
 LANGS = ["en", "en", "hinglish", "hindi"]
 
 
@@ -241,6 +247,214 @@ def make(seed: int, family: str | None = None):
         req = {"en": f"how many {T} have {_say(c, rnd)} = '{v}'", "hinglish": f"kitne {T} hain jinka {_say(c, rnd)} '{v}' hai",
                "hindi": f"कितने {T} हैं जिनका {_say(c, rnd)} '{v}' है"}[lang]
         return done(req, f"SELECT COUNT(*) FROM {t['name']} WHERE {c['name']} = '" + v.replace("'", "''") + "'", "bag")
+    if fam in S2:
+        return _make_s2(item, fam, rnd, schema, tables, t, T, lang, nums, cats, texts, dates, pk, done)
+    return None
+
+
+def _self_col(t, rnd) -> str:
+    """Adds a column pointing at the same table (no constraint: rows are loaded in any order) and fills it."""
+    role = rnd.choice(["manager", "lead", "mentor", "supervisor"])
+    name = f"{role}_id"
+    t["cols"].append({"name": name, "kind": "fk", "params": t["name"], "ref": t["name"]})
+    n = len(t["rows"])
+    for k, row in enumerate(t["rows"]):
+        others = [i for i in range(1, n + 1) if i != k + 1]
+        row.append(None if rnd.random() < 0.15 or not others else rnd.choice(others[:max(3, n // 4)]))
+    return role
+
+
+def _make_s2(item, fam, rnd, schema, tables, t, T, lang, nums, cats, texts, dates, pk, done):
+    if fam.startswith("delete") and any(p == t["name"] for x in tables for _c, p, _pk in x["fks"]):
+        return None                                   # a parent row its children's FOREIGN KEY protects: not this test
+    tn = t["name"]
+    sing = _sing(T)
+    names = [c for c in _cols(t, "name")]
+    if fam in ("self_cmp", "self_list", "self_none", "self_count"):
+        if not names or not nums:
+            return None
+        role = _self_col(t, rnd)
+        ref = f"{role}_id"
+        v, nm = rnd.choice(nums), names[0]
+        if fam == "self_cmp":
+            more = rnd.random() < 0.6
+            d = rnd.choice(dates) if dates and rnd.random() < 0.4 else None
+            req = {"en": f"list {T} whose {_say(v, rnd)} is {'more' if more else 'less'} than their {role}'s"
+                         + (f" and whose {_say(d, rnd)} is before their {role}'s" if d else ""),
+                   "hinglish": f"{T} dikhao jinka {_say(v, rnd)} unke {role} se {'zyada' if more else 'kam'} hai",
+                   "hindi": f"{T} दिखाओ जिनका {_say(v, rnd)} उनके {role} से {'ज़्यादा' if more else 'कम'} है"}[lang]
+            if lang != "en":
+                d = None
+            truth = (f"SELECT c.{pk} FROM {tn} c JOIN {tn} p ON c.{ref} = p.{pk} WHERE c.{v['name']} {'>' if more else '<'} p.{v['name']}"
+                     + (f" AND c.{d['name']} < p.{d['name']}" if d else ""))
+            return done(req, truth, "col", pk)
+        if fam == "self_list":
+            keep = rnd.random() < 0.5
+            req = {"en": f"show {_say(nm, rnd)} of {'each ' + sing if keep else T} and their {role}'s {_say(nm, rnd)}"
+                         + (", including those without a " + role if keep and rnd.random() < 0.5 else ""),
+                   "hinglish": f"{'har ' + sing if keep else T} ka {_say(nm, rnd)} aur unke {role} ka {_say(nm, rnd)} dikhao",
+                   "hindi": f"{'हर ' + sing if keep else T} का {_say(nm, rnd)} और उनके {role} का {_say(nm, rnd)} दिखाओ"}[lang]
+            truth = (f"SELECT c.{nm['name']}, p.{nm['name']} FROM {tn} c {'LEFT JOIN' if keep else 'JOIN'} {tn} p "
+                     f"ON c.{ref} = p.{pk}")
+            return done(req, truth, "bag2")
+        if fam == "self_none":
+            req = {"en": f"list {T} without a {role}", "hinglish": f"aise {T} dikhao jinka koi {role} nahi hai",
+                   "hindi": f"ऐसे {T} दिखाओ जिनका कोई {role} नहीं है"}[lang]
+            return done(req, f"SELECT {pk} FROM {tn} WHERE {ref} IS NULL", "col", pk)
+        req = {"en": f"count of direct reports for each {role} in {T}", "hinglish": f"count of direct reports for each {role} in {T}",
+               "hindi": f"count of direct reports for each {role} in {T}"}[lang]
+        return done(req, f"SELECT p.{pk}, COUNT(*) FROM {tn} p JOIN {tn} c ON c.{ref} = p.{pk} GROUP BY p.{pk}", "fl")
+    if fam == "pairs":
+        if not cats or not names:
+            return None
+        a = rnd.choice(cats)
+        b = rnd.choice([c for c in cats + nums if c is not a]) if len(cats + nums) > 1 and rnd.random() < 0.5 else None
+        req = {"en": f"find pairs of {T} with the same {_say(a, rnd)}" + (f" and the same {_say(b, rnd)}" if b else ""),
+               "hinglish": f"{T} ke ek jaisi {_say(a, rnd)} wale jode dikhao",
+               "hindi": f"{T} के एक जैसी {_say(a, rnd)} वाले जोड़े दिखाओ"}[lang]
+        b = b if lang == "en" else None
+        on = f"a.{a['name']} = b.{a['name']}" + (f" AND a.{b['name']} = b.{b['name']}" if b else "")
+        return done(req, f"SELECT a.*, b.* FROM {tn} a JOIN {tn} b ON {on} AND a.{pk} < b.{pk}", "pairs")
+    if fam in ("nth_value", "nth_group", "nth_rows"):
+        if not nums:
+            return None
+        v = rnd.choice(nums)
+        n = rnd.choice([1, 2, 2, 3, 3, 4])
+        high = rnd.random() < 0.7
+        o = ORDS[n]
+        hw = {"en": "highest" if high else "lowest", "hinglish": "sabse zyada" if high else "sabse kam",
+              "hindi": "सबसे ज़्यादा" if high else "सबसे कम"}[lang]
+        rank = f"DENSE_RANK() OVER (ORDER BY {v['name']} {'DESC' if high else 'ASC'})"
+        if fam == "nth_value":
+            req = {"en": f"find the {o[0]} {hw} distinct {_say(v, rnd)} in {T}", "hinglish": f"{T} mein {o[1]} {hw} {_say(v, rnd)} dikhao",
+                   "hindi": f"{T} में {o[2]} {hw} {_say(v, rnd)} दिखाओ"}[lang]
+            return done(req, f"SELECT DISTINCT {v['name']} FROM (SELECT {v['name']}, {rank} AS rk FROM {tn} WHERE {v['name']} IS NOT NULL) x "
+                             f"WHERE rk = {n}")
+        if fam == "nth_rows":
+            req = {"en": f"show {T} who have the {o[0]} {hw} {_say(v, rnd)}", "hinglish": f"{o[1]} {hw} {_say(v, rnd)} wale {T} dikhao",
+                   "hindi": f"{o[2]} {hw} {_say(v, rnd)} वाले {T} दिखाओ"}[lang]
+            return done(req, f"SELECT {pk} FROM (SELECT {pk}, {rank} AS rk FROM {tn} WHERE {v['name']} IS NOT NULL) x WHERE rk = {n}",
+                        "col", pk)
+        if not cats:
+            return None
+        g = rnd.choice(cats)
+        req = {"en": f"find the {o[0]} {hw} {_say(v, rnd)} in each {_say(g, rnd)} from {T}",
+               "hinglish": f"{T} mein har {_say(g, rnd)} ki {o[1]} {hw} {_say(v, rnd)} dikhao",
+               "hindi": f"{T} में हर {_say(g, rnd)} की {o[2]} {hw} {_say(v, rnd)} दिखाओ"}[lang]
+        rank = f"DENSE_RANK() OVER (PARTITION BY {g['name']} ORDER BY {v['name']} {'DESC' if high else 'ASC'})"
+        return done(req, f"SELECT DISTINCT {g['name']}, {v['name']} FROM (SELECT {g['name']}, {v['name']}, {rank} AS rk FROM {tn} "
+                         f"WHERE {v['name']} IS NOT NULL AND {g['name']} IS NOT NULL) x WHERE rk = {n}")
+    if fam == "top_per":
+        if not nums or not cats:
+            return None
+        v, g, n = rnd.choice(nums), rnd.choice(cats), rnd.randint(1, 4)
+        req = {"en": f"top {n} {T} by {_say(v, rnd)} in each {_say(g, rnd)}",
+               "hinglish": f"har {_say(g, rnd)} ke top {n} {T} dikhao by {_say(v, rnd)}",
+               "hindi": f"हर {_say(g, rnd)} के top {n} {T} दिखाओ by {_say(v, rnd)}"}[lang]
+        return done(req, f"SELECT {pk} FROM (SELECT {pk}, RANK() OVER (PARTITION BY {g['name']} ORDER BY {v['name']} DESC) AS rk "
+                         f"FROM {tn} WHERE {v['name']} IS NOT NULL AND {g['name']} IS NOT NULL) x WHERE rk <= {n}", "col", pk)
+    pairs_ = [(schema["tables"][c["ref"]], x, c) for x in tables for c in x["cols"] if c["kind"] == "fk"]
+    if fam == "group_avg":
+        cand = [(p, ch, fk, v) for p, ch, fk in pairs_ for v in _cols(ch, "money", "int")
+                if not any(c.get("name") == v["name"] for c in p["cols"])]
+        if not cand:
+            return None
+        p, ch, fk, v = rnd.choice(cand)
+        P = _plain(p)
+        above = rnd.random() < 0.6
+        req = {"en": f"{P} whose average {_say(v, rnd)} is {'higher' if above else 'lower'} than the overall average",
+               "hinglish": f"{P} dikhao jinka average {_say(v, rnd)} overall average se {'zyada' if above else 'kam'} hai",
+               "hindi": f"{P} दिखाओ जिनका average {_say(v, rnd)} overall average से {'ज़्यादा' if above else 'कम'} है"}[lang]
+        return done(req, f"SELECT pp.{p['pk']} FROM {p['name']} pp JOIN {ch['name']} cc ON cc.{fk['name']} = pp.{p['pk']} "
+                         f"GROUP BY pp.{p['pk']} HAVING AVG(cc.{v['name']}) {'>' if above else '<'} (SELECT AVG({v['name']}) FROM {ch['name']})",
+                    "col", p["pk"])
+    if fam in ("pct_group", "pct_count"):
+        if not cats or (fam == "pct_group" and not _cols(t, "money")):
+            return None
+        g = rnd.choice(cats)
+        if fam == "pct_group":
+            v = rnd.choice(_cols(t, "money"))
+            req = {"en": f"percentage of total {_say(v, rnd)} per {_say(g, rnd)} in {T}",
+                   "hinglish": f"har {_say(g, rnd)} ka total {_say(v, rnd)} mein pratishat dikhao from {T}",
+                   "hindi": f"हर {_say(g, rnd)} का total {_say(v, rnd)} में प्रतिशत दिखाओ from {T}"}[lang]
+            return done(req, f"SELECT {g['name']}, ROUND(100.0 * SUM({v['name']}) / (SELECT SUM({v['name']}) FROM {tn}), 2) "
+                             f"FROM {tn} GROUP BY {g['name']}", "fl")
+        req = {"en": f"what percentage of {T} are in each {_say(g, rnd)}", "hinglish": f"har {_say(g, rnd)} ke {T} ka pratishat dikhao",
+               "hindi": f"हर {_say(g, rnd)} के {T} का प्रतिशत दिखाओ"}[lang]
+        return done(req, f"SELECT {g['name']}, ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM {tn}), 2) FROM {tn} GROUP BY {g['name']}", "fl")
+    if fam in ("rank", "rank_nowin"):
+        if not nums:
+            return None
+        v = rnd.choice(nums)
+        g = rnd.choice(cats) if cats and rnd.random() < 0.6 else None
+        dense = rnd.random() < 0.3
+        word = "dense rank" if dense else "rank"
+        nowin = " without window functions" if fam == "rank_nowin" else ""
+        req = {"en": f"{word} {T} by {_say(v, rnd)}" + (f" within each {_say(g, rnd)}" if g else "") + nowin,
+               "hinglish": (f"har {_say(g, rnd)} mein " if g else "") + f"{T} ko {_say(v, rnd)} ke hisaab se {word} karo" + nowin,
+               "hindi": (f"हर {_say(g, rnd)} में " if g else "") + f"{T} को {_say(v, rnd)} के हिसाब से {word} करो" + nowin}[lang]
+        fn = "DENSE_RANK" if dense else "RANK"
+        part = f"PARTITION BY {g['name']} " if g else ""
+        return done(req, f"SELECT {pk}, {fn}() OVER ({part}ORDER BY {v['name']} DESC) AS rank_no FROM {tn} WHERE {v['name']} IS NOT NULL"
+                         + (f" AND {g['name']} IS NOT NULL" if g else ""),
+                    "map", (pk, "rank_no"))
+    if fam in ("running", "prev_row"):
+        if not nums or not dates:
+            return None
+        v, d = rnd.choice(nums), rnd.choice(dates)
+        if fam == "running":
+            req = {"en": f"running total of {_say(v, rnd)} in {T} by {_say(d, rnd)}",
+                   "hinglish": f"{T} ka running total of {_say(v, rnd)} by {_say(d, rnd)} dikhao",
+                   "hindi": f"{T} का running total of {_say(v, rnd)} by {_say(d, rnd)} दिखाओ"}[lang]
+            return done(req, f"SELECT {pk}, SUM({v['name']}) OVER (ORDER BY {d['name']}, {pk} ROWS BETWEEN UNBOUNDED PRECEDING AND "
+                             f"CURRENT ROW) AS running_total FROM {tn}", "map", (pk, "running_total"))
+        req = {"en": f"each {sing} of {T} with the previous {sing}'s {_say(v, rnd)}, ordered by {_say(d, rnd)}",
+               "hinglish": f"{T} dikhao with the previous {sing}'s {_say(v, rnd)}, ordered by {_say(d, rnd)}",
+               "hindi": f"{T} दिखाओ with the previous {sing}'s {_say(v, rnd)}, ordered by {_say(d, rnd)}"}[lang]
+        return done(req, f"SELECT {pk}, LAG({v['name']}) OVER (ORDER BY {d['name']}, {pk}) AS previous_{v['name']} FROM {tn}",
+                    "map", (pk, f"previous_{v['name']}"))
+    if fam == "update_pct":
+        money = _cols(t, "money")
+        if not money or not cats:
+            return None
+        v, c = rnd.choice(money), rnd.choice(cats)
+        val, k, up = rnd.choice(c["params"]), rnd.choice([5, 10, 12.5, 20]), rnd.random() < 0.7
+        ks = f"{k:g}"
+        req = {"en": f"{'increase' if up else 'decrease'} {_say(v, rnd)} of {T} by {ks}% where {_say(c, rnd)} is '{val}'",
+               "hinglish": f"{T} ka {_say(v, rnd)} {ks}% {'badhao' if up else 'ghatao'} jinka {_say(c, rnd)} '{val}' hai",
+               "hindi": f"{T} का {_say(v, rnd)} {ks}% {'बढ़ाओ' if up else 'घटाओ'} जिनका {_say(c, rnd)} '{val}' है"}[lang]
+        f = 1 + k / 100 if up else 1 - k / 100
+        item["state"] = f"SELECT {pk}, {v['name']} FROM {tn}"
+        return done(req, f"SELECT {pk}, CASE WHEN {c['name']} = '{val}' THEN ROUND({v['name']} * {f}, 2) ELSE {v['name']} END FROM {tn}",
+                    "bag")
+    if fam == "update_set":
+        if not cats or not nums:
+            return None
+        c, v = rnd.choice(cats), rnd.choice(nums)
+        new = rnd.choice(c["params"])
+        k = int(rnd.choice(_vals(t, v) or [10]))
+        req = f"set {_say(c, rnd)} to '{new}' for {T} where {_say(v, rnd)} is less than {k}"
+        item["state"] = f"SELECT {pk}, {c['name']} FROM {tn}"
+        return done(req, f"SELECT {pk}, CASE WHEN {v['name']} < {k} THEN '{new}' ELSE {c['name']} END FROM {tn}", "bag")
+    if fam == "delete_where":
+        if not cats:
+            return None
+        c = rnd.choice(cats)
+        val = rnd.choice(c["params"])
+        req = {"en": f"delete {T} where {_say(c, rnd)} is '{val}'", "hinglish": f"{T} hatao jinka {_say(c, rnd)} '{val}' hai",
+               "hindi": f"{T} हटाओ जिनका {_say(c, rnd)} '{val}' है"}[lang]
+        item["state"] = f"SELECT {pk} FROM {tn}"
+        return done(req, f"SELECT {pk} FROM {tn} WHERE {c['name']} IS NULL OR {c['name']} <> '{val}'", "bag")
+    if fam == "delete_dups":
+        cand = _cols(t, "cat", "email", "name")
+        if not cand:
+            return None
+        c = rnd.choice(cand)
+        newest = rnd.random() < 0.4
+        req = f"delete duplicate {T} on {_say(c, rnd)} keeping the {'highest' if newest else 'lowest'} {pk}"
+        item["state"] = f"SELECT {pk} FROM {tn}"
+        return done(req, f"SELECT {pk} FROM {tn} x WHERE {c['name']} IS NULL OR {pk} = (SELECT {'MAX' if newest else 'MIN'}({pk}) "
+                         f"FROM {tn} y WHERE y.{c['name']} = x.{c['name']})", "bag")
     return None
 
 
@@ -266,6 +480,22 @@ def _same(item, got, want) -> bool:
         if k not in gn:
             return False
         return Counter(r[gn.index(k)] for r in gr) == Counter(r[wn.index(k)] for r in wr) and len(gr) == len(wr)
+    if item["cmp"] == "fl":                              # a group and its number: the first and the last column
+        return Counter((r[0], r[-1]) for r in gr) == Counter((r[0], r[-1]) for r in wr)
+    if item["cmp"] == "map":                             # row key -> a computed column
+        k, v = item["key"]
+        if k.lower() not in gn or v.lower() not in gn:
+            return False
+        return Counter((r[gn.index(k.lower())], r[gn.index(v.lower())]) for r in gr) == \
+            Counter((r[wn.index(k.lower())], r[wn.index(v.lower())]) for r in wr)
+    if item["cmp"] == "pairs":                           # (a, b) of the column the answer shows, each pair once
+        if len(gn) < 2 or not gn[0].endswith("_1"):
+            return False
+        base = gn[0][:-2]
+        idx = [i for i, n in enumerate(wn) if n == base]
+        if len(idx) != 2:
+            return False
+        return Counter((r[0], r[1]) for r in gr) == Counter((r[idx[0]], r[idx[1]]) for r in wr)
     if item["cmp"] == "bag2":                            # group value + total: the first two columns
         return Counter(r[:2] for r in gr) == Counter(r[:2] for r in wr) and all(len(r) >= 2 for r in gr)
     return Counter(gr) == Counter(wr)
@@ -284,7 +514,18 @@ def check(item, engines) -> tuple[list[str], bool]:
         bad.append(f"{tag}: guessed names although the schema was given {res['guesses']}\n{item['request']}\n{sql}")
     for name, eng in engines.items():
         try:
-            got, want = _run(eng, sql), _run(eng, item["truth"])
+            if item.get("state"):                        # a change: the table after it (inside a transaction, rolled back)
+                want = _run(eng, item["truth"])
+                cur = eng.conn.cursor()
+                cur.execute("BEGIN")
+                try:
+                    cur.execute(sql)
+                    got = _run(eng, item["state"])
+                finally:
+                    cur.execute("ROLLBACK")
+                    cur.close()
+            else:
+                got, want = _run(eng, sql), _run(eng, item["truth"])
         except Exception as exc:  # noqa: BLE001
             eng.rollback()
             bad.append(f"{tag}: on {name} the query fails: {str(exc).splitlines()[0][:120]}\n{item['request']}\n{sql}")

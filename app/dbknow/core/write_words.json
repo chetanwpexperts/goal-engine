@@ -2,6 +2,78 @@
  "about": "Night S1: the words people use to ask for a query, in English, Hinglish and Hindi, mapped to the shared meanings the query writer (app/agents/sqlwrite.py) reasons with. Shared by every database (rule B); the engine only decides the final syntax (LIMIT / TOP / FETCH FIRST). Each 'to' is plain English the writer already reads, so a new language only adds rows here. In 'phrases', {B} and {E} mark a word edge that also works for Devanagari letters (Python's \\b does not).",
  "phrases": [
   [
+   "{B}(?:unke|uske|apne|उनके|उसके|अपने)\\s+(manager|lead|boss|supervisor|parent|mentor|मैनेजर)\\s+(?:se|से)\\s+(?:zyada|jyada|adhik|ज़्यादा|ज्यादा|अधिक){E}",
+   "more than their \\1"
+  ],
+  [
+   "{B}(?:unke|uske|apne|उनके|उसके|अपने)\\s+(manager|lead|boss|supervisor|parent|mentor|मैनेजर)\\s+(?:se|से)\\s+(?:kam|कम){E}",
+   "less than their \\1"
+  ],
+  [
+   "{B}(?:unke|uske|apne|उनके|उसके|अपने)\\s+(manager|lead|boss|supervisor|parent|mentor|मैनेजर)\\s+(?:se|से)\\s+(?:pehle|pahle|पहले){E}",
+   "before their \\1"
+  ],
+  [
+   "{B}(?:unke|uske|apne|उनके|उसके|अपने)\\s+(manager|lead|boss|supervisor|parent|mentor|मैनेजर)\\s+(?:ke|के)\\s+(?:baad|बाद){E}",
+   "after their \\1"
+  ],
+  [
+   "{B}(?:unke|uske|apne|उनके|उसके|अपने)\\s+(manager|lead|boss|supervisor|parent|mentor|मैनेजर)(?:\\s+(?:ka|ki|ke|का|की|के))?\\s+(?:naam|नाम){E}",
+   "their \\1's name"
+  ],
+  [
+   "{B}(?:unke|uske|apne|उनके|उसके|अपने)\\s+(manager|lead|boss|supervisor|parent|mentor|मैनेजर)(?:\\s+(?:ka|ki|ke|का|की|के))?{E}",
+   "their \\1"
+  ],
+  [
+   "{B}(?:naam|नाम){E}",
+   "name"
+  ],
+  [
+   "{B}(?:doosri|doosra|dusri|dusra|doosre|दूसरी|दूसरा|दूसरे){E}",
+   "second"
+  ],
+  [
+   "{B}(?:teesri|teesra|tisri|tisra|teesre|तीसरी|तीसरा|तीसरे){E}",
+   "third"
+  ],
+  [
+   "{B}(?:chauthi|chautha|chauthe|चौथी|चौथा|चौथे){E}",
+   "fourth"
+  ],
+  [
+   "{B}(?:pratishat|pratishath|प्रतिशत|फ़ीसदी|फीसदी){E}",
+   "percentage"
+  ],
+  [
+   "{B}(?:hissa|हिस्सा){E}",
+   "share"
+  ],
+  [
+   "{B}(?:ek jaisi|ek jaisa|ek jaise|samaan|saman|एक जैसी|एक जैसा|एक जैसे|समान){E}",
+   "same"
+  ],
+  [
+   "{B}(?:jode|jodi|joda|जोड़े|जोड़ी|जोड़ा){E}",
+   "pairs"
+  ],
+  [
+   "{B}(?:badhao|badha do|badhaao|badha dijiye|बढ़ाओ|बढ़ा दो){E}",
+   "increase"
+  ],
+  [
+   "{B}(?:ghatao|ghata do|kam karo|kam kar do|घटाओ|घटा दो|कम करो|कम कर दो){E}",
+   "decrease"
+  ],
+  [
+   "{B}(?:hatao|hata do|mitao|mita do|delete karo|delete kar do|हटाओ|हटा दो|मिटाओ|मिटा दो){E}",
+   "delete"
+  ],
+  [
+   "{B}(?:rank karo|rank do|रैंक करो|रैंक दो){E}",
+   "rank"
+  ],
+  [
    "(\\d[\\d,\\.]*)\\s+(?:se|से)\\s+(?:zyada|jyada|zyaada|adhik|upar|bada|badi|ज़्यादा|ज्यादा|अधिक|ऊपर){E}",
    "more than \\1"
   ],

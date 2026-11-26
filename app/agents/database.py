@@ -684,7 +684,9 @@ def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) ->
 
     from app.agents import sqlwrite
 
-    if relation != "safety" and sqlwrite.is_request(text):
+    from app.agents import sqlpuzzle
+
+    if relation != "safety" and (sqlpuzzle.is_puzzle(text) or sqlwrite.is_request(text)):
         return True                       # 'write a query to list ...': written from the words (night S1)
     if relation != "safety" and concept_question(text) is not None:
         return True                       # 'what is a JOIN': the concepts pack, whatever the reader guessed
@@ -826,6 +828,16 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
 
     from app.agents import sqlwrite
 
+    from app.agents import sqlpuzzle
+
+    if sqlpuzzle.is_puzzle(text):         # 'a column holds (1, NULL, 3): what does AVG give?': worked out by running it
+        out = sqlpuzzle.reply(text, turn.hi)
+        if out:
+            goal.title = "SQL: what a query returns"
+            goal.intent = goal.intent or "db_concept"
+            goal.missing_info, goal.pending = "[]", None
+            db.commit()
+            return out, [], "concept"
     if sqlwrite.is_request(text):         # 'write a query to ...': the query, built from the words (night S1)
         return _write_turn(db, goal, text, turn.hi)
     m = concept_question(text)

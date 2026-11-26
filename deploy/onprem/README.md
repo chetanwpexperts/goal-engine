@@ -78,16 +78,22 @@ The installation directory contains:
 
 - `dbaba.json` (mode 600): version, screen port, scrypt password hash and random salt in hex, database settings, API key hashes, update preferences and alert preferences.
 - `data/`: private application data, including the local SQLite database.
-- `.venv/`: Python environment.
-- The release code and the local uninstall script.
+- `release/`: active code and its `.venv/` Python environment. Links inside the release point to the stable data and configuration paths.
+- `uninstall.sh`: a stable uninstall script outside the release.
 
 The screen password is saved only as a hash. A generated database password is saved in the private configuration for the application to use. Keep the configuration and data directory private, including any backups. The initial configuration enables updates, contains an empty API key list and sets the alert email to null.
 
 ### Update
 
-Run the same install command again using the same account and installation mode. The installer keeps `dbaba.json` and `data/`, stops the service, waits up to 30 seconds for the saved port to have no listeners, replaces the code, rebuilds the Python environment and restarts the service. The running service's own port is expected to be occupied before an update. If a listener remains after the wait, the installer keeps the existing code and data so you can review the listener and retry. A new installation checks port availability before setup. To change the port, stop the service, check that the new port is free, and update the saved port before reinstalling.
+Run the same install command again using the same account and installation mode. The installer prepares `.release-new/`, builds its own Python environment, and checks that the application imports before stopping the current service. The existing release continues serving during preparation.
 
-Back up your configuration and data before updating. Allow a maintenance window: the service stops while the new environment is installed. If a dependency installation needs attention, correct it and rerun the installer with a trusted release. Automatic rollback is not part of this installer.
+After preparation, the installer stops the service, waits up to 30 seconds for the saved port to have no listeners, moves the current code to `.release-old/`, activates the staged code as `release/`, and starts the service. Once health and loopback checks pass, it removes the old code. Existing flat-layout installations are migrated during this step.
+
+If preparation fails, the current service is left running. If activation or health checking fails, the installer restores the previous code and service unit, restarts it, checks its health, and exits with a nonzero status. If recovery itself needs attention, the saved release and service recovery files are retained and the installer prints their location.
+
+The installer leaves `dbaba.json` and `data/` at their existing paths throughout. Back up both before an update: code rollback does not reverse application-level changes to the database made during startup. Allow a maintenance window for the service switch. A sudden power loss or forced process termination may require manual recovery.
+
+A new installation checks port availability before setup. To change the saved port, stop the service, check the new port is free and update the configuration before reinstalling.
 
 ### Service commands
 
@@ -112,13 +118,13 @@ sudo journalctl -u dbaba.service -n 50
 Back up anything you want to retain. Run the matching uninstall command:
 
 ```bash
-bash ~/dbaba/deploy/onprem/uninstall.sh
+bash ~/dbaba/uninstall.sh
 ```
 
 Or, for a system installation:
 
 ```bash
-sudo bash /opt/dbaba/deploy/onprem/uninstall.sh
+sudo bash /opt/dbaba/uninstall.sh
 ```
 
 The uninstaller asks before removing the installation and its data. If a saved local dbaba_ro account is present, it shows the DROP statement and asks separately before removing that database account. Choose to keep the account if other applications use it; retain its password securely beforehand if needed. Remote or custom-port accounts can be reviewed separately by their administrator.
@@ -133,6 +139,6 @@ On a disposable Linux Docker host that supports systemd containers:
 bash tests/onprem/test_install.sh
 ```
 
-The test builds an Ubuntu 24.04 container with systemd, installs from the checkout without a database account, checks the health response and loopback listener, repeats the installation to verify preservation of settings and data, then uninstalls and checks cleanup. It uses a privileged test container with a private cgroup namespace; use a dedicated test host. The test publishes no service ports.
+The test builds an Ubuntu 24.04 container with systemd, installs from the checkout without a database account, checks the health response and loopback listener, repeats the installation to verify preservation of settings and data, rejects a broken import, checks rollback after an unhealthy release, then uninstalls and checks cleanup. It uses a privileged test container with a private cgroup namespace; use a dedicated test host. The test publishes no service ports.
 
 The Docker test covers the system installation path. User services, additional distributions, database grants and the future local entry point require their own integration checks.

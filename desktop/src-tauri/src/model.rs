@@ -75,5 +75,5 @@ pub fn eligible(alert: &Alert, seen: &BTreeSet<String>) -> bool {
     !alert.id.is_empty() && !alert.acknowledged && matches!(alert.level.as_str(), "warning" | "critical") && !seen.contains(&alert.id)
 }
 #[cfg(test)]
-#[path = "../../../tests/desktop/model.rs"]
+#[path = "../../../..//tests/desktop/model.rs"]
 mod tests;

@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DBaba connections</title><link rel="stylesheet" href="style.css"><script defer src="app.js"></script></head>
+<body><main><h1>DBaba connections</h1><p>Open DBaba on this computer or reach your server over SSH.</p><p id="status" role="status"></p><section id="connections" aria-label="Saved connections"></section>
+<h2>Add a connection</h2><form id="add"><label>Connection name<input id="label" required maxlength="120"></label><label>Connection type<select id="kind"><option value="local">This computer</option><option value="ssh">A server over SSH</option></select></label>
+<label>DBaba port<input id="port" type="number" min="1" max="65535" value="8765" required></label><fieldset id="ssh" hidden><label>SSH host<input id="host" maxlength="253"></label><label>SSH user<input id="user" maxlength="253"></label><label>Absolute SSH key path<input id="keypath" maxlength="4096"></label></fieldset>
+<label>API key (optional)<input id="key" type="password" maxlength="4096" autocomplete="off"></label><p>The key is saved in your operating system's keychain.</p><button>Add connection</button></form>
+<dialog id="verify"><h2>Verify your server</h2><p>Compare this fingerprint with your server administrator before accepting it.</p><pre id="fp"></pre><button id="trust">Accept this fingerprint</button><button id="cancel">Cancel</button></dialog></main></body></html>

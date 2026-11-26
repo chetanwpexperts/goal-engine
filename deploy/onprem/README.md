@@ -46,7 +46,15 @@ The installer offers to create a new account named `dbaba_ro`. It shows the SQL 
 
 MySQL and MariaDB receive SELECT, PROCESS, SHOW VIEW and REPLICATION CLIENT on the server. These privileges give broad read and monitoring access; the saved database name is the database DBaba should read, not a restriction on these grants. The account is created for 127.0.0.1 for TCP, or localhost for Unix socket access.
 
-PostgreSQL 14 or newer receives pg_read_all_data and pg_monitor, with read-only transactions as the role default and no superuser, database creation, role creation, replication or row-security bypass privileges. These roles cover the cluster. Existing PUBLIC grants, executable database functions and server access rules also affect what a PostgreSQL login can do. Have your administrator review those permissions for a strictly read-only deployment. The installer grants no data-changing privileges.
+PostgreSQL 14 or newer receives pg_read_all_data and pg_monitor, with read-only transactions as the role default and no superuser, database creation, role creation, replication or row-security bypass privileges. These roles cover the cluster. Existing PUBLIC grants, executable database functions and server access rules also affect what a PostgreSQL login can do. Have your administrator review those permissions for a strictly read-only deployment. The installer grants no data-changing privileges. The SQL preview includes `ALTER ROLE dbaba_ro SET default_transaction_read_only = on;`, which sets the transaction default rather than enforcing a privilege boundary.
+
+On PostgreSQL 14 and older, the public schema normally grants CREATE to PUBLIC, so every role can create tables there unless the administrator has revoked that permission. Databases upgraded from those versions can retain the same permission. Ask your database administrator to check the public schema in each relevant database. If appropriate, the administrator can review and run:
+
+```sql
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+```
+
+This affects other roles as well. The installer leaves existing PUBLIC privileges unchanged and never executes this REVOKE.
 
 The installer creates a new account rather than changing an existing account with the same name. If you prefer to arrange access yourself, choose to set up the database later. You can configure your existing read-only login when the local application supports database setup.
 
@@ -77,7 +85,7 @@ The screen password is saved only as a hash. A generated database password is sa
 
 ### Update
 
-Run the same install command again using the same account and installation mode. The installer keeps `dbaba.json` and `data/`, replaces the code, rebuilds the Python environment and restarts the service.
+Run the same install command again using the same account and installation mode. The installer keeps `dbaba.json` and `data/`, stops the service, waits up to 30 seconds for the saved port to have no listeners, replaces the code, rebuilds the Python environment and restarts the service. The running service's own port is expected to be occupied before an update. If a listener remains after the wait, the installer keeps the existing code and data so you can review the listener and retry. A new installation checks port availability before setup. To change the port, stop the service, check that the new port is free, and update the saved port before reinstalling.
 
 Back up your configuration and data before updating. Allow a maintenance window: the service stops while the new environment is installed. If a dependency installation needs attention, correct it and rerun the installer with a trusted release. Automatic rollback is not part of this installer.
 

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dbaba"
+version = "0.1.0"
+description = "DBaba local database assistant"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[project.scripts]
+dbaba = "dbaba_cli:main"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+include = ["app", "app.*", "dbaba_cli", "dbaba_cli.*", "connector", "docs"]
+namespaces = true
+
+[tool.setuptools.package-data]
+"*" = ["*.json", "**/*.json"]
+app = ["static/*"]
+connector = ["install.sh"]
+docs = ["dbaba-curriculum.md"]

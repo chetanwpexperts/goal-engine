@@ -32,13 +32,18 @@ fn refresh(app: &AppHandle) -> tauri::Result<()> {
     if let Some(tray)=app.tray_by_id("dbaba") { tray.set_menu(Some(menu))?; }
     Ok(())
 }
-#[tauri::command]
-fn list(store: State<Store>) -> Vec<(Connection,bool)> {
-    let d=store.data.lock().unwrap();
-    d.rows.iter().map(|r|(r.clone(),d.live.contains_key(&r.id))).collect()
+fn manager_only(window:&tauri::WebviewWindow)->Result<(),String> {
+    if window.label()=="main" {Ok(())} else {Err("Only the connection manager can do this.".into())}
 }
 #[tauri::command]
-fn add(app: AppHandle, store: State<Store>, label:String, port:u16, ssh:Option<model::Ssh>, key:String) -> Result<(),String> {
+fn list(window: tauri::WebviewWindow, store: State<Store>) -> Result<Vec<(Connection,bool)>,String> {
+    manager_only(&window)?;
+    let d=store.data.lock().unwrap();
+    Ok(d.rows.iter().map(|r|(r.clone(),d.live.contains_key(&r.id))).collect())
+}
+#[tauri::command]
+fn add(window:tauri::WebviewWindow, app: AppHandle, store: State<Store>, label:String, port:u16, ssh:Option<model::Ssh>, key:String) -> Result<(),String> {
+    manager_only(&window)?;
     let row=Connection{id:Uuid::new_v4(),label,port,ssh,seen:Default::default()};
     row.validate()?;
     if key.len()>4096 || key.chars().any(char::is_control) { return Err("Invalid API key.".into()); }
@@ -57,9 +62,10 @@ fn disconnect_inner(app:&AppHandle,id:Uuid) {
     let _=refresh(app); let _=app.emit("connections-changed",());
 }
 #[tauri::command]
-fn disconnect(app:AppHandle,id:Uuid) { disconnect_inner(&app,id); }
+fn disconnect(window:tauri::WebviewWindow,app:AppHandle,id:Uuid)->Result<(),String> { manager_only(&window)?; disconnect_inner(&app,id); Ok(()) }
 #[tauri::command]
-fn remove(app:AppHandle,store:State<Store>,id:Uuid)->Result<(),String> {
+fn remove(window:tauri::WebviewWindow,app:AppHandle,store:State<Store>,id:Uuid)->Result<(),String> {
+    manager_only(&window)?;
     disconnect_inner(&app,id);
     let mut d=store.data.lock().unwrap();
     let mut rows=d.rows.clone(); rows.retain(|r|r.id!=id);
@@ -67,7 +73,8 @@ fn remove(app:AppHandle,store:State<Store>,id:Uuid)->Result<(),String> {
     model::save(&store.path,&rows)?; d.rows=rows; d.pending.remove(&id); drop(d); let _=refresh(&app); Ok(())
 }
 #[tauri::command]
-async fn fingerprint(app:AppHandle,id:Uuid)->Result<Option<String>,String> {
+async fn fingerprint(window:tauri::WebviewWindow,app:AppHandle,id:Uuid)->Result<Option<String>,String> { manager_only(&window)?; fingerprint_inner(app,id).await }
+async fn fingerprint_inner(app:AppHandle,id:Uuid)->Result<Option<String>,String> {
     tauri::async_runtime::spawn_blocking(move || {
         let store=app.state::<Store>();
         let row=lookup(&store.data.lock().unwrap(),id)?;
@@ -79,7 +86,8 @@ async fn fingerprint(app:AppHandle,id:Uuid)->Result<Option<String>,String> {
     }).await.map_err(|_| "Could not check fingerprint.")?
 }
 #[tauri::command]
-fn accept(store:State<Store>,id:Uuid,fingerprint:String)->Result<(),String> {
+fn accept(window:tauri::WebviewWindow,store:State<Store>,id:Uuid,fingerprint:String)->Result<(),String> {
+    manager_only(&window)?;
     use std::io::Write;
     let mut d=store.data.lock().unwrap();
     let row=lookup(&d,id)?;
@@ -90,7 +98,8 @@ fn accept(store:State<Store>,id:Uuid,fingerprint:String)->Result<(),String> {
     f.write_all(line.as_bytes()).and_then(|_|f.sync_all()).map_err(|_|"Could not save known host.".into())
 }
 #[tauri::command]
-async fn connect(app:AppHandle,id:Uuid)->Result<(),String> {
+async fn connect(window:tauri::WebviewWindow,app:AppHandle,id:Uuid)->Result<(),String> { manager_only(&window)?; connect_inner(app,id).await }
+async fn connect_inner(app:AppHandle,id:Uuid)->Result<(),String> {
     let store=app.state::<Store>();
     if let Some(w)=app.get_webview_window(&format!("server-{id}")) { let _=w.set_focus(); return Ok(()) }
     let row=lookup(&store.data.lock().unwrap(),id)?;
@@ -186,8 +195,8 @@ fn main() {
                     "manager"=>{if let Some(w)=app.get_webview_window("main"){let _=w.show();let _=w.set_focus();}},
                     id=>if let Ok(id)=Uuid::parse_str(id) {
                         let a=app.clone();tauri::async_runtime::spawn(async move {
-                            match fingerprint(a.clone(),id).await {
-                                Ok(None)=>{if let Err(e)=connect(a.clone(),id).await {let _=a.emit("connection-error",e);}},
+                            match fingerprint_inner(a.clone(),id).await {
+                                Ok(None)=>{if let Err(e)=connect_inner(a.clone(),id).await {let _=a.emit("connection-error",e);}},
                                 _=>{if let Some(w)=a.get_webview_window("main"){let _=w.show();let _=w.set_focus();}let _=a.emit("verify-host",id);}
                             }
                         });

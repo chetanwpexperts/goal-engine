@@ -76,7 +76,7 @@
    panel.append(form,action("New chat",async()=>{await call("new_chat");chatStarted=true;messages=[];renderChat();}));
   }
   async function report(){
-   tab="report";panel.replaceChildren(node("h3","Report"),action("Start scan",async()=>{const r=await call("scan");status(r.started?"Scan started. Refresh when it finishes.":"Scan not started.");}),action("Refresh report",report));
+   tab="report";panel.replaceChildren(node("h3","Report"),action("Start scan",async()=>{const r=await call("scan");status(r.started?"Scan started. Refresh when it finishes.":"Scan not started.");}),action("Refresh report",report),action("Save HTML report",async()=>{const r=await call("report_html");status(r.saved?"HTML report saved.":"Save cancelled.");}));
    const data=await call("report");if(tab!=="report")return;
    panel.append(node("p","Score: "+data.score+"/100"));
    const rank={critical:0,warning:1,info:2};
@@ -92,7 +92,11 @@
     form.append(node("p",job.last_run?("Last run: "+job.last_run.at+" — "+(job.last_run.ok?"OK":"Failed")+" — "+job.last_run.text):"Not run yet"));
     form.append(action("Save",async()=>{await call("job",{id:job.id,enabled:on.checked,at:at.value||null});status("Job saved.");await jobs();}));panel.append(form);}
   }
+  async function alerts(){
+   tab="alerts";panel.replaceChildren(node("h3","Alerts"));const state=await call("state");if(tab!=="alerts")return;
+   for(const alert of state.alerts||[]){const a=node("article");a.append(node("strong",alert.level+": "+alert.title),node("p",alert.text),node("p",alert.at));if(alert.acknowledged)a.append(node("p","Acknowledged"));else a.append(action("Acknowledge",async()=>{await call("ack",{id:alert.id});await poll();await alerts();}));panel.append(a);}
+  }
   async function poll(){try{const state=await call("state");if(active)badge.textContent="Alerts: "+(state.alerts||[]).filter(a=>!a.acknowledged).length;}catch(e){if(active)badge.textContent="Alerts: unavailable";}}
-  nav.append(action("Chat",renderChat),action("Report",report),action("Automation",jobs));renderChat();await poll();clearInterval(timer);timer=setInterval(poll,60000);
+  nav.append(action("Chat",renderChat),action("Report",report),action("Automation",jobs),action("Alerts",alerts));renderChat();await poll();clearInterval(timer);timer=setInterval(poll,60000);
  }
 })();

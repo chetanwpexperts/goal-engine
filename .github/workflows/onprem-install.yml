@@ -9,7 +9,20 @@ on:
 permissions:
   contents: read
 jobs:
+  syntax:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate Bash syntax and ShellCheck errors
+        run: |
+          for script in deploy/onprem/tests/*.sh; do
+            bash -n "$script"
+          done
+          shellcheck -S error deploy/onprem/tests/*.sh deploy/onprem/install.sh deploy/onprem/uninstall.sh
   install:
+    needs: syntax
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     strategy:

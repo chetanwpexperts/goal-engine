@@ -3,7 +3,7 @@ use serde_json::{json, Value};
 use std::{io::{BufRead, BufReader}, net::TcpListener, path::Path, process::{Child, Command, Stdio}, sync::{Mutex, mpsc}, time::{Duration, Instant}};
 use tauri::{Manager, State, WebviewWindow};
 
-struct Engine { child: Child, port: u16, token: Option<String> }
+struct Engine { child: Child, port: u16, token: Option<String>, tunnel: Option<crate::ssh::Tunnel>, pending_host: Option<(crate::model::Ssh,String,String)> }
 impl Drop for Engine {
     fn drop(&mut self) { let _ = self.child.kill(); let _ = self.child.wait(); }
 }
@@ -44,7 +44,7 @@ fn spawn_engine(dir: &Path) -> Result<(Engine, mpsc::Receiver<String>), String> 
     let child = command.spawn().map_err(|e| if e.kind() == std::io::ErrorKind::NotFound {
         "DBaba engine is not installed. Install it with pip install . from the DBaba repository, or use deploy/onprem/install.sh on Linux. Then restart this app."
     } else { "Could not start the local DBaba engine." })?;
-    let mut engine = Engine { child, port, token: None };
+    let mut engine = Engine { child, port, token: None, tunnel: None, pending_host: None };
     let stdout = engine.child.stdout.take().ok_or("Cannot read local engine startup.")?;
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
@@ -116,6 +116,59 @@ fn job_path(id: &str) -> Result<String, String> {
 fn alert_path(id: &str) -> Result<String, String> {
     valid_id(id)?;
     Ok(format!("/api/alerts/{id}/ack"))
+}
+fn ssh_input(input: &Value) -> Result<crate::model::Ssh,String> {
+    let s = crate::model::Ssh {
+        host: input["host"].as_str().ok_or("Missing SSH host.")?.to_owned(),
+        user: input["user"].as_str().ok_or("Missing SSH user.")?.to_owned(),
+        key_path: input["key_path"].as_str().unwrap_or("").to_owned()
+    };
+    let valid = |v: &str, host: bool| !v.is_empty() && v.len() <= 253 && !v.starts_with('-') &&
+        v.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b) || (host && b == b':'));
+    if !valid(&s.host,true) || !valid(&s.user,false) || s.key_path.len()>4096 ||
+        (!s.key_path.is_empty() && !Path::new(&s.key_path).is_absolute()) ||
+        s.key_path.chars().any(char::is_control) { return Err("Enter valid SSH host, user and an absolute key path, or leave the key blank for SSH agent.".into()); }
+    Ok(s)
+}
+#[tauri::command]
+pub async fn trial_ssh(window: WebviewWindow, app: tauri::AppHandle, trial: State<'_, Trial>, action: String, input: Value) -> Result<Value,String> {
+    check_window(&window)?;
+    let dir = app.path().app_config_dir().map_err(|_| "Cannot locate app config.")?;
+    std::fs::create_dir_all(&dir).map_err(|_| "Cannot create app config.")?;
+    let hosts = dir.join("known_hosts");
+    let app2 = app.clone();
+    drop(trial);
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app2.state::<Trial>();
+        let mut slot = state.0.lock().map_err(|_| "Local engine lock failed.")?;
+        let engine = slot.as_mut().ok_or("Start local DBaba first.")?;
+        if engine.token.is_none() { return Err("SSH setup is only available during initial setup.".into()); }
+        if action == "close" { engine.tunnel = None; engine.pending_host = None; return Ok(json!({"ok":true})); }
+        let s = ssh_input(&input)?;
+        if action == "fingerprint" {
+            if crate::ssh::known(&s.host,&hosts) { return Ok(json!({"fingerprint":null})); }
+            let (line,fp) = crate::ssh::scan(&s)?;
+            engine.pending_host = Some((s,line,fp.clone()));
+            return Ok(json!({"fingerprint":fp}));
+        }
+        if action == "accept" {
+            let (pending,line,fp) = engine.pending_host.take().ok_or("Check fingerprint first.")?;
+            if pending.host!=s.host || pending.user!=s.user || pending.key_path!=s.key_path || input["fingerprint"].as_str()!=Some(fp.as_str()) { return Err("Check fingerprint again.".into()); }
+            if !crate::ssh::known(&s.host,&hosts) {
+                use std::io::Write;
+                let mut file = std::fs::OpenOptions::new().create(true).append(true).open(&hosts).map_err(|_| "Cannot save host key.")?;
+                file.write_all(line.as_bytes()).and_then(|_|file.sync_all()).map_err(|_| "Cannot save host key.")?;
+            }
+            return Ok(json!({"ok":true}));
+        }
+        if action == "open" {
+            let port = input["port"].as_u64().filter(|p| (1..=65535).contains(p)).ok_or("Invalid database port.")? as u16;
+            let (local,tunnel) = crate::ssh::start(&s,port,&hosts)?;
+            engine.tunnel = Some(tunnel);
+            return Ok(json!({"host":"127.0.0.1","port":local}));
+        }
+        Err("Unknown SSH action.".into())
+    }).await.map_err(|_| "SSH operation failed.")?
 }
 #[tauri::command]
 pub async fn trial_call(window: WebviewWindow, trial: State<'_, Trial>, action: String, input: Option<Value>) -> Result<Value, String> {

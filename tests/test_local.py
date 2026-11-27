@@ -330,3 +330,52 @@ def test_connected_is_known_right_after_a_restart(tmp_path):
         time.sleep(0.1)
     j.stop()
     assert j.connected is True
+
+
+# ---------------------------------------------------------------- after setup: a new database address, API keys
+@needs_maria
+def test_change_database_address_after_setup(fresh):
+    """An SSH tunnel's new local port (or a moved server): tested first, saved only if it works, password kept."""
+    app, c, path = fresh
+    H = {"X-DBaba-Setup": "TOKEN-1"}
+    assert c.post("/api/database", headers=H, json={"port": 3306}).status_code == 401     # the setup token can't do it
+    key = c.post("/api/setup/save", headers=H, json={**MARIA, "screen_password": "screen pass 7"}).json()["api_key"]
+    K = {"Authorization": "Bearer " + key}
+    bad = c.post("/api/database", headers=K, json={"host": "127.0.0.1", "port": 1}).json()
+    assert bad["ok"] is False and "Nothing answered at 127.0.0.1:1" in bad["reason"]
+    assert json.loads(path.read_text())["database"]["port"] == 3306                        # nothing changed
+    good = c.post("/api/database", headers=K, json={"engine": "mariadb", "host": "localhost", "port": 3306,
+                                                   "database": "shop_db", "user": "shopapp"}).json()   # no password: kept
+    assert good["ok"] is True and good["version"]
+    saved = json.loads(path.read_text())["database"]
+    assert saved["host"] == "localhost" and saved["password"] == "app pass"
+    assert c.post("/api/database", json={"port": 3306}).status_code == 401
+
+
+def test_change_database_needs_setup_first(fresh):
+    app, c, path = fresh
+    key = Config(path).new_api_key("x")
+    app.state.cfg.data = Config(path).data
+    assert c.post("/api/database", headers={"Authorization": "Bearer " + key}, json={"port": 3306}).status_code == 409
+
+
+def test_api_keys_made_and_revoked_only_from_the_screen(tmp_path):
+    cfg = installer_file(tmp_path / "dbaba.json")
+    app = make_app(str(cfg), 8765, None, announce=lambda line: None)
+    c = TestClient(app, base_url="http://127.0.0.1:8765")
+    assert c.post("/api/keys", json={"name": "cli"}).status_code == 401
+    c.post("/api/login", json={"password": "screen pass 1"})
+    assert c.post("/api/keys", json={"name": "<script>"}).status_code == 400
+    made = c.post("/api/keys", json={"name": "laptop cli"}).json()
+    key = made["api_key"]
+    assert key.startswith("dbk_") and key not in cfg.read_text() and [k["name"] for k in made["keys"]] == ["laptop cli"]
+    out = TestClient(app, base_url="http://127.0.0.1:8765")                                # no cookie: the key alone
+    K = {"Authorization": "Bearer " + key}
+    assert out.get("/api/state", headers=K).status_code == 200
+    assert out.get("/api/keys", headers=K).json()["keys"][0]["name"] == "laptop cli"
+    assert out.post("/api/keys", headers=K, json={"name": "more"}).status_code == 401      # a key can't make keys
+    kid = made["keys"][0]["id"]
+    assert out.post(f"/api/keys/{kid}/revoke", headers=K).status_code == 401              # ... nor revoke them
+    assert c.post("/api/keys/zzz/revoke", json={}).status_code == 404
+    assert c.post(f"/api/keys/{kid}/revoke", json={}).json()["keys"] == []
+    assert out.get("/api/state", headers=K).status_code == 401                             # revoked: refused at once

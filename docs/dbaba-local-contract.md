@@ -47,6 +47,7 @@ The format the installer and the Docker entrypoint already write. DBaba keeps ev
 | anyone who reaches the port | nothing | `GET /api/health`, `POST /api/login`, `GET /` |
 | an API key | `Authorization: Bearer <key>` | everything below |
 | the screen | `POST /api/login {"password"}` sets the `dbaba_session` cookie (HttpOnly, SameSite=Strict, 12 h idle) | everything below |
+| (an API key can't create or revoke keys: only a logged-in screen can) | | |
 | the setup token | `X-DBaba-Setup: <token>`, **only from 127.0.0.1**, only while setup isn't done | `GET /api/state` and `/api/setup/detect|test|save` |
 
 * The `Host` header must be `127.0.0.1`, `localhost` or `::1` (any port), or a name in `allowed_hosts` /
@@ -68,6 +69,10 @@ The format the installer and the Docker entrypoint already write. DBaba keeps ev
 | `POST /api/setup/test` `{"engine", "host", "port", "database", "user", "password"}` | `{"ok", "version", "reason", "warning"?}` (`reason` in plain words when not ok; `warning` when the user can change data) |
 | `POST /api/setup/save` `{same, "screen_password"?}` | `{"ok": true, "api_key", "warning"?}` or `{"ok": false, "reason"}`. `screen_password` (8+ characters) is required when the file has none. Starts the first scan and a health check. |
 | `POST /api/setup/reset` (key or session) | `{"ok": true}`; setup is open again and a new token is printed |
+| `POST /api/database` (key or session) `{"engine"?, "host"?, "port"?, "database"?, "user"?, "password"?}` | After setup: a new address for the same database (an SSH tunnel's new local port, a moved server). Missing fields keep the saved ones; a missing `password` keeps the saved password. Tested first: `{"ok": true, "version", "warning"?}` and saved, or `{"ok": false, "reason"}` (status 200) and nothing changed. 409 before setup. |
+| `GET /api/keys` (key or session) | `{"keys": [{"id", "name", "created"}]}`; `id` is the first 12 hex characters of the key's SHA-256, never the key |
+| `POST /api/keys` `{"name"}` (**session only**) | `{"api_key", "keys"}`; the key is shown this once. 400 for a name outside letters, digits, space, `.` `-` `_` (1–40) |
+| `POST /api/keys/{id}/revoke` (**session only**) | `{"ok": true, "keys"}`; the key is refused from the next request. 404 unknown id |
 | `GET /api/report` | `{"at", "score", "engine", "version", "pending", "changes", "sections": [{"id", "title", "items": [Item]}]}`; before the first scan `at` and `score` are null. `changes`: `{"first": true}` for the first report, else `{"first": false, "score_before", "at_before", "new": [titles], "gone": [titles]}` (warnings and criticals only) |
 | `GET /api/report.html` | the report as a downloadable HTML file |
 | `POST /api/report/scan` | `{"started": bool}` (false while a scan runs) |

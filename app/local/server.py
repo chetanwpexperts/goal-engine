@@ -271,6 +271,59 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             out["warning"] = res["warning"]
         return out
 
+    # ---------------------------------------------------------------- after setup: the database address, API keys
+    @app.post("/api/database")
+    async def change_database(req: Request):
+        """Point DBaba at a new address (an SSH tunnel's new local port, a moved server) without setting up again: the
+        new details are tested first and saved only if they work; a missing password keeps the saved one."""
+        if not need(req, "key", "session"):
+            return err(401, "Log in first.")
+        if not cfg.setup_done or not cfg.database:
+            return err(409, "Finish setup first.")
+        data = await body(req)
+        old = cfg.database
+        merged = {"engine": data.get("engine") or old["type"], "host": data.get("host") or old.get("host"),
+                  "port": data.get("port") or old.get("port"), "database": data.get("database") or old.get("name"),
+                  "user": data.get("user") or old.get("user"),
+                  "password": data["password"] if isinstance(data.get("password"), str) else old.get("password", "")}
+        db, why = database_from(merged)
+        if db is None:
+            return {"ok": False, "reason": why}
+        res = dbconn.test(db)
+        if not res["ok"]:
+            return {"ok": False, "reason": res["reason"]}
+        cfg.update(lambda d: d.__setitem__("database", {**(d.get("database") or {}), **db}))
+        jobs.connected = True
+        out = {"ok": True, "version": res["version"]}
+        if res.get("warning"):
+            out["warning"] = res["warning"]
+        return out
+
+    @app.get("/api/keys")
+    def keys(req: Request):
+        if not need(req, "key", "session"):
+            return err(401, "Log in first.")
+        return {"keys": cfg.list_api_keys()}
+
+    @app.post("/api/keys")
+    async def new_key(req: Request):
+        """Only a logged-in screen makes keys (a key can't make more keys). The key is shown once."""
+        if need(req, "session") != "session":
+            return err(401, "Log in on the screen to create an API key.")
+        name = (await body(req)).get("name")
+        if not isinstance(name, str) or not re.fullmatch(r"[\w .-]{1,40}", name.strip()):
+            return err(400, "Give the key a short name (letters, digits, space, . - _).")
+        key = cfg.new_api_key(name.strip())
+        return {"api_key": key, "keys": cfg.list_api_keys()}
+
+    @app.post("/api/keys/{kid}/revoke")
+    def revoke_key(kid: str, req: Request):
+        if need(req, "session") != "session":
+            return err(401, "Log in on the screen to revoke an API key.")
+        if not re.fullmatch(r"[0-9a-f]{12}", kid) or not cfg.revoke_api_key(kid):
+            return err(404, "No such key")
+        return {"ok": True, "keys": cfg.list_api_keys()}
+
     @app.post("/api/setup/reset")
     def setup_reset(req: Request):
         if not need(req, "key", "session"):

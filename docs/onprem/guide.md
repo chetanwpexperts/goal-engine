@@ -119,22 +119,32 @@ If you chose database setup later, log in to the screen and follow these steps. 
 
 The browser setup assumes the installer has already set a screen password. A fresh backend without one needs setup using the local setup token and a new password (see the [local API guide](api.md)); the browser login alone cannot initialize that password. Keep setup tokens and API keys private.
 
+If the same database moves to a new server or an SSH tunnel gets a new local port, an authenticated `POST /api/database` (for example from a script or using the `dbaba` command's API key) can update its address without repeating setup; DBaba tests the connection before saving and keeps the old settings if the test fails.
+
 ## 5. Read your report and alerts
 
-Open **Report**. Before the first scan finishes, there is no score. Afterward, you can see a score out of 100, the scan time and findings. The current checks cover:
+Open **Report**. Before the first scan finishes, there is no score. Afterward, you can see a score out of 100, the scan time and findings. The report has eight sections, with the worst findings first:
 
-- Connections near the limit and queries running over a minute.
-- Tables without a primary key and large tables read without an index.
-- Whether DBaba's database account can change data.
-- Database server version.
+- **Now (`now`):** connections compared with the limit, queries running over a minute, who is waiting for whom, and deadlocks.
+- **Slow queries (`slow`):** the slowest queries from `performance_schema` or `pg_stat_statements`, checked against the real tables, or an explanation of why they cannot be seen.
+- **Indexes (`indexes`):** duplicate indexes, indexes covered by another index, unused indexes after at least seven days of statistics, foreign keys without an index, and large tables read without an index.
+- **Tables (`tables`):** missing primary keys, wasted space, dead rows, stale statistics, and the biggest tables.
+- **Settings (`settings`):** memory set aside for data compared with the machine's memory, connections near the limit, and the slow-query log.
+- **Backups (`backups`):** whether point-in-time recovery is possible; this does not mean DBaba has made or tested a backup.
+- **Security (`security`):** whether DBaba's account can change data, remote root access, empty passwords, anonymous users, open network access, MD5 authentication, and versions no longer supported.
+- **Server (`server`):** the database server version.
+
+After the first report, each report is compared with the previous one: see the previous score and which warnings or critical findings are new or gone. A new critical finding also raises an alert.
 
 Read critical findings first, then warnings and information. Each finding explains what was found and why it matters. Use **Ask about this** for an explanation. Suggested SQL is not executed by this release; ask your administrator to review it before applying any change. Use **Scan now** to request another scan or **Download as HTML** to save the report privately.
 
-Open **Automation** to see alerts and jobs. **Mark as seen** acknowledges an alert; it does not fix the problem. An information alert is raised when a detected problem clears. The health job runs every five minutes; the daily scan defaults to 02:40 local server time. You can switch jobs on or off and change the daily scan time. Automated backups are not part of the S4 contract.
+Open **Automation** to see alerts and jobs. **Mark as seen** acknowledges an alert; it does not fix the problem. An information alert is raised when a detected problem clears. The health job runs every five minutes; the daily scan defaults to 02:40 local server time. You can switch jobs on or off and change the daily scan time. DBaba's own automated backups are not part of S5.
 
 ## 6. Use the dbaba command (optional)
 
-If you prefer a terminal, install the CLI from the trusted repository in a Python virtual environment using `python -m pip install .`. Keep the server running. Set `DBABA_URL` to your loopback screen address if using a different port. Authenticated commands require an API key, supplied privately through `DBABA_API_KEY` or the private key file described in the [API guide](api.md). The setup API returns its key only once; the browser wizard does not display it. Ask your administrator to arrange a key through supported setup rather than resetting a working installation just to obtain one.
+If you prefer a terminal, install the CLI from the trusted repository in a Python virtual environment using `python -m pip install .`. Keep the server running. Set `DBABA_URL` to your loopback screen address if using a different port. Authenticated commands require an API key, supplied privately through `DBABA_API_KEY` or the private key file described in the [API guide](api.md).
+
+To create an API key, log in to the screen, open **Automation**, find **API keys**, enter a name and click **Create API key**. The key is shown only once: copy it then and store it privately. To disable a key, click **Revoke** in the same list and confirm when asked; the key is refused from the next request. Only a logged-in screen can create or revoke keys; an API key cannot do either.
 
 ```bash
 dbaba status

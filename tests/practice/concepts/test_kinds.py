@@ -74,6 +74,20 @@ def test_earlier_answers_keep_their_examples(client, ml_mode):
     assert [c["title"] for c in r["goal"]["cards"]] == ["LEFT JOIN", "The types of JOIN"]     # asked again: once, as the latest
 
 
+def test_after_an_error_turn_a_concept_answer_still_has_its_examples(client, ml_mode):
+    """Asked from the live site: after a database error (which starts an agent), the next concept answers stopped showing
+    their examples beside the chat, and scrolling no longer changed the side panel. The answer still carries its card even
+    when the goal has an agent, and after a reload /api/state gives the earlier topics' cards too."""
+    fresh(client)
+    say(client, "what is a left join")
+    say(client, "ERROR 1062 (23000): Duplicate entry 5 for key PRIMARY")
+    r = say(client, "what is an index")
+    assert r["relation"] == "concept" and r["reply"].startswith(r["goal"]["card"]["title"] + "\n")
+    state = client.get("/api/state").json()
+    titles = {c["title"] for c in state["cards"]} | {c["title"] for c in state["current"]["cards"]}
+    assert {"LEFT JOIN", r["goal"]["card"]["title"]} <= titles
+
+
 @pytest.mark.parametrize("text,eid", [
     ("how many types of joins in postgrasql?", "postgresql"),     # asked on the live site: answered for every database
     ("postgress me left join kya hai", "postgresql"), ("posgres error", "postgresql"), ("mysq query", "mysql"),

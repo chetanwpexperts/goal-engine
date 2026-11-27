@@ -100,7 +100,7 @@ fn database_body(input: &Value, save: bool) -> Result<Value, String> {
     let port = input["port"].as_u64().filter(|p| (1..=65535).contains(p)).ok_or("Invalid database port.")?;
     body.insert("port".into(), json!(port));
     if save {
-        let s = input["screen_password"].as_str().filter(|s| !s.is_empty() && s.len() <= 4096 && !s.contains('\0')).ok_or("Invalid screen password.")?;
+        let s = input["screen_password"].as_str().filter(|s| s.chars().count() >= 8 && s.len() <= 4096 && !s.contains('\0')).ok_or("Invalid screen password.")?;
         body.insert("screen_password".into(), json!(s));
     }
     Ok(Value::Object(body))
@@ -179,10 +179,10 @@ pub async fn trial_call(window: WebviewWindow, trial: State<'_, Trial>, action: 
         credential("api-key")?.set_password(k).map_err(|_| "Backend saved setup, but the API key could not be saved in the OS keychain. Setup is not complete on this desktop; contact your administrator for recovery.")?;
         credential("database-password")?.set_password(input["password"].as_str().unwrap()).map_err(|_| "Backend saved setup, but the database password could not be saved in the OS keychain. Setup is not complete on this desktop; check your keychain before restarting.")?;
         if let Some(engine) = trial.0.lock().map_err(|_| "Local engine lock failed.")?.as_mut() { engine.token = None; }
-        result = json!({"ok":true});
+        result = json!({"ok":true,"warning":result["warning"]});
     }
     // Never return raw setup-save responses to the webview.
-    if action == "save" { return Ok(json!({"ok":result["ok"] == true})); }
+    if action == "save" { return Ok(json!({"ok":result["ok"] == true,"reason":result["reason"],"warning":result["warning"]})); }
     Ok(result)
 }
 

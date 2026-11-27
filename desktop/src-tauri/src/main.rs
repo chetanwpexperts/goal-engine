@@ -250,7 +250,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init()).plugin(tauri_plugin_opener::init())
         .manage(trial::Trial::default())
-        .invoke_handler(tauri::generate_handler![list,add,remove,connect,disconnect,fingerprint,accept,trial::trial_start,trial::trial_stop,trial::trial_call])
+        .invoke_handler(tauri::generate_handler![list,add,remove,connect,disconnect,fingerprint,accept,trial::trial_start,trial::trial_stop,trial::trial_call,trial::trial_ssh])
         .on_menu_event(|app,event| {
             let id = event.id().as_ref();
             let result = if id == "window-manager" {

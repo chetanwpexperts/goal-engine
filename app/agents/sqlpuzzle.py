@@ -102,6 +102,8 @@ def _aggs(db, text: str, lst) -> dict:
         seen.add(shown)
         v = db.execute(f"SELECT {expr} FROM t").fetchone()[0]
         lines.append((shown, _fmt(v)))
+    sql = (f"-- t({col}) holds: {', '.join(_fmt(v) for v in vals)}\n"
+           f"SELECT {', '.join(s for s, _v in lines)}\nFROM t")
     n, nulls = len(vals), sum(v is None for v in vals)
     notes = [f"{n} rows, {nulls} of them NULL."]
     if any(s.startswith("COUNT(*)") for s, _v in lines):
@@ -112,7 +114,7 @@ def _aggs(db, text: str, lst) -> dict:
         notes.append("SUM, AVG, MIN and MAX skip NULLs: AVG is the sum of the non-NULL values divided by how many there are, "
                      "not by all rows (to count NULL as 0: AVG(COALESCE(col, 0))).")
     notes.append("The same on MySQL, MariaDB, PostgreSQL and SQLite (AVG's decimals are shown differently).")
-    return {"lines": lines, "notes": notes}
+    return {"lines": lines, "notes": notes, "sql": sql}
 
 
 def _joins(db, text: str, lists, joins) -> dict:
@@ -124,11 +126,12 @@ def _joins(db, text: str, lists, joins) -> dict:
     db.execute("CREATE TABLE b (v)")
     db.executemany("INSERT INTO a VALUES (?)", [(v,) for v in va])
     db.executemany("INSERT INTO b VALUES (?)", [(v,) for v in vb])
-    lines = []
+    lines, queries = [], [f"-- {na}(v): {', '.join(_fmt(v) for v in va)}\n-- {nb}(v): {', '.join(_fmt(v) for v in vb)}"]
     for jn, _p in joins:
         on = "" if jn == "CROSS JOIN" else " ON a.v = b.v"
         n = db.execute(f"SELECT COUNT(*) FROM a {jn} b{on}").fetchone()[0]
         lines.append((f"{na} {jn} {nb}" + ("" if jn == "CROSS JOIN" else " ON the value"), str(n)))
+        queries.append(f"SELECT COUNT(*) FROM {na} {jn} {nb}" + ("" if jn == "CROSS JOIN" else f" ON {na}.v = {nb}.v") + ";")
     notes = [f"{na}: {', '.join(_fmt(v) for v in va)}; {nb}: {', '.join(_fmt(v) for v in vb)}.",
              "Each matching pair is one row: a value seen 2 times on one side and 3 times on the other gives 2 x 3 = 6 rows.",
              "NULL never equals anything, not even another NULL, so NULL rows never match."]
@@ -141,7 +144,19 @@ def _joins(db, text: str, lists, joins) -> dict:
                      "(write LEFT JOIN ... UNION ALL ... RIGHT JOIN ... WHERE left side IS NULL); PostgreSQL and SQLite 3.39+ do.")
     if any(j == "CROSS JOIN" for j, _p in joins):
         notes.append(f"CROSS JOIN pairs every row with every row: {len(va)} x {len(vb)}.")
-    return {"lines": lines, "notes": notes}
+    return {"lines": lines, "notes": notes, "sql": "\n".join(queries)}
+
+
+def card(title: str, res: dict, hi: bool = False) -> dict:
+    """For the page: the reasons in the chat, the query that was run and what it returned in the side panel."""
+    answer = "\n".join(f"- {a} = {b}" for a, b in res["lines"]) + ("\n\nKyun:\n" if hi else "\n\nWhy:\n") + \
+        "\n".join(f"- {n}" for n in res["notes"])
+    return {"id": "puzzle", "lang": "hinglish" if hi else "en", "title": title, "answer": answer, "mistake": "",
+            "examples": [{"label": "", "sql": [{"label": "SQLite", "query": res["sql"]}],
+                          "columns": ["expression" if not hi else "kya", "returns" if not hi else "nateeja"],
+                          "rows": [[a, b] for a, b in res["lines"]]}],
+            "engines": [], "labels": {"example": "Query", "lab": "SQLite pe chalaya" if hi else "run on SQLite", "result": "Result",
+                                      "mistake": "", "engines": "", "preview": "", "change": ""}}
 
 
 def reply(text: str, hi: bool = False) -> str | None:

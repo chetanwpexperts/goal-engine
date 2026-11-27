@@ -265,3 +265,24 @@ def test_a_puzzle_through_the_chat(client, ml_mode):
 
     r = say(client, PUZZLES[0][0])
     assert "COUNT(score) = 2" in r["reply"] and "AVG(score) = 15" in r["reply"], r["reply"]
+
+
+def test_the_query_goes_beside_the_chat(client, ml_mode):
+    """A written query is shown like a concept's worked example: the explanation in the chat, the SQL in the side panel."""
+    from tests.test_ml import say
+
+    r = say(client, "list employees who earn more than their manager")
+    card = r["goal"]["card"]
+    assert r["relation"] == "concept" and r["reply"].split("\n", 1)[0] == card["title"]
+    assert "JOIN employees m" in card["examples"][0]["sql"][0]["query"] and "JOIN employees m" not in card["answer"]
+    r2 = say(client, "list employees without a manager", r["goal"]["id"])
+    assert r2["goal"]["card"]["title"] != card["title"]                 # each answer keeps its own card
+    assert {c["title"] for c in r2["goal"]["cards"]} >= {card["title"], r2["goal"]["card"]["title"]}
+
+
+def test_a_puzzle_shows_its_query_and_result_beside_the_chat(client, ml_mode):
+    from tests.test_ml import say
+
+    r = say(client, PUZZLES[0][0])
+    ex = r["goal"]["card"]["examples"][0]
+    assert ["COUNT(score)", "2"] in ex["rows"] and "SELECT COUNT(*)" in ex["sql"][0]["query"]

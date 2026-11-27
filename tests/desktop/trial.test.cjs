@@ -28,13 +28,13 @@ async function fixture(t){
    case "/api/health":result={ok:true,version:"1.0.0"};break;
    case "/api/setup/detect":result={found:[{engine:"mysql",host:"127.0.0.1",port:3306,how:"Detected locally"}]};break;
    case "/api/setup/test":result={ok:body.password==="fixture-password",version:"8.0",reason:"Connection failed"};break;
-   case "/api/setup/save":done=true;result={ok:true,api_key:"fixture-key"};break;
+   case "/api/setup/save":if(body.screen_password==="bad-screen"){result={ok:false,reason:"Try another password"};break;}done=true;result={ok:true,api_key:"fixture-key"};break;
    case "/api/state":result={setup_done:done,alerts:[{id:"a",level:"warning",title:"Example alert",text:"Check indexes",at:"2026-01-01T00:00:00Z",acknowledged},{id:"b",level:"info",title:"Older alert",text:"Example",at:"2026-01-01T00:00:00Z",acknowledged:true}]};break;
    case "/api/alerts/a/ack":acknowledged=true;result={ok:true};break;
    case "/api/report.html":res.setHeader("Content-Type","text/html");res.end("<html>Example report</html>");return;
    case "/api/new-chat":result={ok:true};break;
    case "/api/message":result={reply:"Example answer"};break;
-   case "/api/report":result={score:70,sections:[{title:"Indexes",items:[{severity:"info",title:"Info",what:"Example",why:"Example",fix:null},{severity:"critical",title:"Missing index",what:"Scan",why:"Cost",fix:{sql:"CREATE INDEX example ON sample(id)",needs_approval:true}}]}]};break;
+   case "/api/report":result={at:null,score:null,pending:true,sections:[{title:"Indexes",items:[{severity:"info",title:"Info",what:"Example",why:"Example",fix:null},{severity:"critical",title:"Missing index",what:"Scan",why:"Cost",fix:{sql:"CREATE INDEX example ON sample(id)",needs_approval:true}}]}]};break;
    case "/api/report/scan":result={started:true};break;
    case "/api/jobs":result={jobs:[{id:"scan",name:"Scan",every:"day",enabled:true,at:"08:00",last_run:null}]};break;
    case "/api/jobs/scan":result={id:"scan",...body};break;
@@ -57,17 +57,18 @@ async function fixture(t){
  async function invoke(command,args){
   if(command==="trial_start"){await request("/api/health",null);return {setup_done:done};}
   if(command==="trial_stop"){stopped=true;return;}
+  if(command==="trial_ssh"){if(args.action==="close")return {ok:true};if(args.action==="fingerprint")return {fingerprint:"SHA256:fixture"};if(args.action==="accept")return {ok:true};if(args.action==="open")return {host:"127.0.0.1",port:43210};}
   assert.equal(command,"trial_call");
   const {action,input}=args,setup=["detect","test","save"].includes(action);
   const path=action==="ack"?"/api/alerts/"+input.id+"/ack":action==="report_html"?"/api/report.html":action==="job"?"/api/jobs/"+input.id:paths[action];
   const method=["state","report","jobs","report_html"].includes(action)?"GET":"POST";
   const body=action==="ack"?null:action==="job"?{enabled:input.enabled,at:input.at}:input;
   const result=await request(path,body,setup,method);
-  if(action==="save"){key=result.api_key;return {ok:result.ok};}
+  if(action==="save"){if(result.ok)key=result.api_key;return {ok:result.ok,reason:result.reason};}
   if(action==="report_html"){assert.equal(result,"<html>Example report</html>");return {saved:true};}
   return result;
  }
- vm.runInNewContext(source,{window:{__TAURI__:{core:{invoke}}},document:{getElementById:id=>elements[id],createElement:tag=>new Element(tag)},setInterval:(fn,ms)=>{assert.equal(ms,60000);poll=fn;return 1;},clearInterval:()=>{}});
+ vm.runInNewContext(source,{window:{confirm:()=>true,__TAURI__:{core:{invoke}}},document:{getElementById:id=>elements[id],createElement:tag=>new Element(tag)},setInterval:(fn,ms)=>{assert.equal(ms,60000);poll=fn;return 1;},clearInterval:()=>{}});
  return {elements,calls,root:elements["trial-content"],poll:()=>poll(),stopped:()=>stopped};
 }
 test("desktop wizard, tabs, alerts polling and stop use mock contract",async t=>{
@@ -80,12 +81,13 @@ test("desktop wizard, tabs, alerts polling and stop use mock contract",async t=>
  let form=descendants(root).find(x=>x.tagName==="form");
  await form.onsubmit({preventDefault(){}});assert.equal(elements.status.textContent,"Connection failed");
  field(root,"password").value="fixture-password";await form.onsubmit({preventDefault(){}});
- field(root,"screen_password").value="fixture-screen";
- form=descendants(root).find(x=>x.tagName==="form");await form.onsubmit({preventDefault(){}});
+ field(root,"screen_password").value="bad-screen";
+ form=descendants(root).find(x=>x.tagName==="form");await form.onsubmit({preventDefault(){}});assert.equal(elements.status.textContent,"Try another password");
+ field(root,"screen_password").value="fixture-screen";await form.onsubmit({preventDefault(){}});
  byText(root,"Alerts: 1");await f.poll();
  await byText(root,"Alerts").onclick();byText(root,"2026-01-01T00:00:00Z");
  await byText(root,"Acknowledge").onclick();byText(root,"Alerts: 0");
- await byText(root,"Report").onclick();
+ await byText(root,"Report").onclick();byText(root,"No scan yet");byText(root,"Scan in progress.");
  const titles=descendants(root).filter(x=>x.tagName==="strong").map(x=>x.textContent);
  assert.deepEqual(titles,["critical: Missing index","info: Info"]);
  await byText(root,"Start scan").onclick();
@@ -96,4 +98,16 @@ test("desktop wizard, tabs, alerts polling and stop use mock contract",async t=>
  assert.ok(calls.some(([p,b])=>p==="/api/jobs/scan"&&b.at==="09:30"));
  await elements["trial-back"].onclick();assert.ok(f.stopped());
  assert.equal(elements.start.hidden,false);
+});
+
+test("SSH database setup passes forwarded port to test and save",async t=>{
+ const {elements,root,calls}=await fixture(t);
+ await elements.try.onclick();await byText(root,"mysql · 127.0.0.1:3306 · Detected locally").onclick();
+ const tunnel=descendants(root).find(x=>x.type==="checkbox");tunnel.checked=true;tunnel.onchange();
+ field(root,"ssh_host").value="sample.invalid";field(root,"ssh_user").value="sample";
+ field(root,"database").value="sample";field(root,"user").value="sample";field(root,"password").value="fixture-password";
+ let form=descendants(root).find(x=>x.tagName==="form");await form.onsubmit({preventDefault(){}});
+ field(root,"screen_password").value="fixture-screen";form=descendants(root).find(x=>x.tagName==="form");await form.onsubmit({preventDefault(){}});
+ for(const path of ["/api/setup/test","/api/setup/save"]){const body=calls.find(([p])=>p===path)[1];assert.equal(body.host,"127.0.0.1");assert.equal(body.port,43210);}
+ await elements["trial-back"].onclick();
 });

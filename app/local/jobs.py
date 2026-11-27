@@ -158,8 +158,16 @@ class Jobs:
             return False
         self.scanning = True
         try:
+            old = self.last_report()
             rep = report.scan(db)
+            rep["changes"] = report.compare(rep, old)
+            if old:
+                report.save(self.report_path.with_name("report.prev.json"), old)
             report.save(self.report_path, rep)
+            for s in rep["sections"]:                    # a new critical problem is an alert too, not only a line in the report
+                for i in s["items"]:
+                    if i["severity"] == "critical" and i["id"] != "unreachable":
+                        self.raise_alert("report:" + i["id"], "critical", i["title"], i["what"])
             crit = sum(i["severity"] == "critical" for s in rep["sections"] for i in s["items"])
             self._record("scan", crit == 0, f"Score {rep['score']}/100")
             return True
@@ -201,6 +209,11 @@ class Jobs:
 
     def start(self, every: float = 30.0):
         def loop():
+            if self.cfg.setup_done:                      # right after a restart: say "connected" now, not in 5 minutes
+                try:
+                    self.health()
+                except Exception:  # noqa: BLE001
+                    pass
             while not self._stop.wait(every):
                 try:
                     self.tick()

@@ -161,6 +161,15 @@
     const dl = el("a", null, "Download as HTML"); dl.href = "/api/report.html"; head.append(dl);
     if (!r.at) { card.append(el("p", "muted", r.pending ? "The scan is running…" : "No scan yet."), head); return; }
     card.append(el("div", "score", `${r.score}/100`), el("p", "muted", `${r.engine} · ${r.at}`), head);
+    const ch = r.changes || {};
+    if (ch.first === false) {
+      const box = el("div", "item info");
+      box.append(el("h3", null, `Since the last report (${ch.at_before}): score ${ch.score_before} → ${r.score}`));
+      if ((ch.new || []).length) box.append(el("p", null, "New: " + ch.new.join("; ")));
+      if ((ch.gone || []).length) box.append(el("p", "good", "Fixed: " + ch.gone.join("; ")));
+      if (!(ch.new || []).length && !(ch.gone || []).length) box.append(el("p", "muted", "Nothing changed."));
+      card.append(box);
+    }
     for (const s of r.sections) {
       card.append(el("h2", null, s.title));
       for (const it of s.items) {

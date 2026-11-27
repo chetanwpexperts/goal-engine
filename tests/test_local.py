@@ -220,7 +220,7 @@ def test_scan_finds_a_table_without_primary_key_and_its_fix_runs(d, ddl, drop):
 
 def test_unreachable_database_is_one_critical_item():
     rep = report.scan(_db({**MARIA, "port": 1}))
-    assert rep["sections"][0]["items"][0]["severity"] == "critical" and rep["score"] == 70
+    assert rep["sections"][0]["items"][0]["severity"] == "critical" and rep["score"] == 75
 
 
 # ---------------------------------------------------------------- jobs
@@ -315,3 +315,18 @@ def test_settings_write_without_fchmod(tmp_path, monkeypatch):
     cfg = Config(tmp_path / "dbaba.json")
     cfg.update(lambda d: d.__setitem__("port", 9999))
     assert Config(tmp_path / "dbaba.json").data["port"] == 9999
+
+
+@needs_maria
+def test_connected_is_known_right_after_a_restart(tmp_path):
+    cfg = Config(tmp_path / "dbaba.json")
+    cfg.update(lambda d: d.update(database=_db(MARIA), setup_done=True))
+    j = Jobs(cfg)
+    assert j.connected is None
+    j.start(every=3600)
+    for _ in range(50):
+        if j.connected is not None:
+            break
+        time.sleep(0.1)
+    j.stop()
+    assert j.connected is True

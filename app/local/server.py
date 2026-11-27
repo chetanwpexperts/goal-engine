@@ -6,7 +6,7 @@ Never the whole website: no accounts, captcha, admin, enquiry or other agents. O
   GET  /api/health            open: {"ok": true, "version"}
   POST /api/login | /api/logout   the screen password (dbaba.json "screen_password", scrypt) -> a session cookie
   GET  /api/state             setup, database, alerts, last scan
-  POST /api/setup/detect | test | save | reset
+  POST /api/setup/detect | test | save | reset; POST /api/setup/ssh (an SSH server's key: see it, accept it)
   GET  /api/report, /api/report.html; POST /api/report/scan
   GET  /api/jobs; POST /api/jobs/{id}
   POST /api/alerts/{id}/ack
@@ -33,9 +33,10 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
-from app.local import dbconn
+from app.local import dbconn, tunnel
 from app.local.config import ENGINES, Config
 from app.local.jobs import Jobs
 
@@ -70,6 +71,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
     st.token = setup_token if not cfg.setup_done else None
     st.chat = None
     st.announce = announce
+    tunnel.manager.configure(cfg.data_dir / "known_hosts")     # DBaba's own list of accepted SSH server keys (S4b)
 
     # ---------------------------------------------------------------- who is asking
     def client_ip(req: Request) -> str:
@@ -189,7 +191,9 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         last = jobs.last_report()
         return {"version": version(), "setup_done": cfg.setup_done,
                 "database": ({"engine": db["type"], "host": db.get("host"), "port": db.get("port"), "name": db.get("name"),
-                              "connected": bool(jobs.connected)} if db else None),
+                              "connected": bool(jobs.connected), "via": dbconn.via(db),
+                              "ssh": ({k: db["ssh"].get(k) for k in ("host", "port", "user")} if db.get("ssh") else None)}
+                             if db else None),
                 "alerts": jobs.public_alerts(), "last_scan": {"at": last["at"], "score": last["score"]} if last else None,
                 "has_password": cfg.has_password()}
 
@@ -216,15 +220,71 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             return None, "One of the fields isn't valid text."
         if not fields["database"] or not fields["user"]:
             return None, "Give the database name and the user."
-        return {"type": engine, "host": (fields["host"] or "127.0.0.1").strip(), "port": port_,
-                "name": fields["database"].strip(), "user": fields["user"].strip(), "password": fields["password"] or ""}, ""
+        out = {"type": engine, "host": (fields["host"] or "127.0.0.1").strip(), "port": port_,
+               "name": fields["database"].strip(), "user": fields["user"].strip(), "password": fields["password"] or ""}
+        if data.get("ssh"):                       # S4b: the database is on another server, reached through SSH from here
+            ssh, why = tunnel.clean(data["ssh"])
+            if ssh is None:
+                return None, why
+            if not re.match(r"^[A-Za-z0-9._:-]{1,253}$", out["host"]) or out["host"].startswith("-"):
+                return None, "Give the database's address as the SSH server sees it (usually 127.0.0.1)."
+            out["ssh"] = ssh
+        return out, ""
+
+    def ssh_from(data: dict):
+        ssh, why = tunnel.clean(data.get("ssh"))
+        return ssh, why
 
     @app.post("/api/setup/detect")
-    def setup_detect(req: Request):
+    async def setup_detect(req: Request):
         gate = setup_gate(req)
         if gate:
             return gate
-        return {"found": [{k: f[k] for k in ("engine", "host", "port", "how")} for f in dbconn.detect()]}
+        data = await body(req)
+        if data.get("ssh"):                       # look on the SSH server instead of this computer
+            ssh, why = ssh_from(data)
+            if ssh is None:
+                return {"found": [], "reason": why}
+            try:
+                found = await run_in_threadpool(dbconn.detect_via_ssh, ssh)
+            except dbconn.ConnectError as exc:
+                out = {"found": [], "reason": str(exc), "code": exc.code}
+                if exc.host_keys:
+                    out["host_keys"] = [{"type": k["type"], "fingerprint": k["fingerprint"]} for k in exc.host_keys]
+                return out
+        else:
+            found = dbconn.detect()
+        return {"found": [{k: f[k] for k in ("engine", "host", "port", "how")} for f in found]}
+
+    @app.post("/api/setup/ssh")
+    async def setup_ssh(req: Request):
+        """An SSH server's host keys: {"ssh"} -> {"trusted", "keys": [{"type", "fingerprint"}]}; with "accept":
+        "SHA256:..." the key with that fingerprint is accepted (scanned again now, never replacing a known key)."""
+        if cfg.setup_done:
+            if not need(req, "key", "session"):
+                return err(401, "Log in first.")
+        else:
+            gate = setup_gate(req)
+            if gate:
+                return gate
+        data = await body(req)
+        ssh, why = ssh_from(data)
+        if ssh is None:
+            return {"ok": False, "reason": why}
+        kh = cfg.data_dir / "known_hosts"
+        try:
+            if data.get("accept"):
+                if not await run_in_threadpool(tunnel.trust, ssh, kh, data["accept"]):
+                    return {"ok": False, "reason": "The server didn't offer a key with that fingerprint just now. Check it again."}
+                return {"ok": True, "trusted": True, "keys": []}
+            if await run_in_threadpool(tunnel.trusted, ssh, kh):
+                return {"ok": True, "trusted": True, "keys": []}
+            keys = await run_in_threadpool(tunnel.host_keys, ssh)
+        except tunnel.TunnelError as exc:
+            return {"ok": False, "reason": str(exc)}
+        if not keys:
+            return {"ok": False, "reason": f"No SSH server answered at {ssh['host']} port {ssh['port']}."}
+        return {"ok": True, "trusted": False, "keys": [{"type": k["type"], "fingerprint": k["fingerprint"]} for k in keys]}
 
     @app.post("/api/setup/test")
     async def setup_test(req: Request):
@@ -234,7 +294,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         db, why = database_from(await body(req))
         if db is None:
             return {"ok": False, "version": "", "reason": why}
-        return dbconn.test(db)
+        return await run_in_threadpool(dbconn.test, db)
 
     @app.post("/api/setup/save")
     async def setup_save(req: Request):
@@ -251,9 +311,9 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             return {"ok": False, "reason": "The screen password needs at least 8 characters."}
         if not pw and not cfg.has_password():
             return {"ok": False, "reason": "Choose a screen password (at least 8 characters)."}
-        res = dbconn.test(db)
+        res = await run_in_threadpool(dbconn.test, db)
         if not res["ok"]:
-            return {"ok": False, "reason": res["reason"]}
+            return {k: v for k, v in res.items() if k in ("ok", "reason", "code", "host_keys")}
 
         def apply(d):
             d["database"] = db
@@ -285,14 +345,21 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         merged = {"engine": data.get("engine") or old["type"], "host": data.get("host") or old.get("host"),
                   "port": data.get("port") or old.get("port"), "database": data.get("database") or old.get("name"),
                   "user": data.get("user") or old.get("user"),
-                  "password": data["password"] if isinstance(data.get("password"), str) else old.get("password", "")}
+                  "password": data["password"] if isinstance(data.get("password"), str) else old.get("password", ""),
+                  "ssh": data["ssh"] if "ssh" in data else old.get("ssh")}     # "ssh": null -> reach it directly again
         db, why = database_from(merged)
         if db is None:
             return {"ok": False, "reason": why}
-        res = dbconn.test(db)
+        res = await run_in_threadpool(dbconn.test, db)
         if not res["ok"]:
-            return {"ok": False, "reason": res["reason"]}
-        cfg.update(lambda d: d.__setitem__("database", {**(d.get("database") or {}), **db}))
+            return {k: v for k, v in res.items() if k in ("ok", "reason", "code", "host_keys")}
+
+        def apply(d):
+            new = {**(d.get("database") or {}), **db}
+            if not db.get("ssh"):
+                new.pop("ssh", None)
+            d["database"] = new
+        cfg.update(apply)
         jobs.connected = True
         out = {"ok": True, "version": res["version"]}
         if res.get("warning"):

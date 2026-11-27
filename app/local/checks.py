@@ -418,13 +418,16 @@ def judge(g: dict, engine: str, db: dict, ram: int | None = None, slow_checks=No
             items["security"].append(_item("listen_all", "warning", "PostgreSQL listens on every network address",
                                            f"listen_addresses = '{val('listen_addresses')}'.",
                                            "Anyone who can reach this machine can try passwords. Limit it, and keep pg_hba.conf strict."))
-        if str(val("ssl")) == "off" and not _local(db):
+        if str(val("ssl")) == "off" and not _local(db) and not db.get("ssh"):      # an SSH tunnel already encrypts it
             items["security"].append(_item("ssl_off", "warning", "SSL is off",
                                            "Passwords and data cross the network unencrypted.", "Turn on ssl for connections from other machines."))
         if str(val("password_encryption")) == "md5":
             items["security"].append(_item("md5", "warning", "Passwords are stored with md5",
                                            "password_encryption = md5.", "Use scram-sha-256: md5 is the old, weaker method.",
                                            "ALTER SYSTEM SET password_encryption = 'scram-sha-256';  -- then set each password again"))
+
+    if not _local(db):
+        items["settings"].append(_remote_note(db))
 
     # ---- backups
     if my:
@@ -472,7 +475,17 @@ def judge(g: dict, engine: str, db: dict, ram: int | None = None, slow_checks=No
 
 
 def _local(db: dict) -> bool:
-    return (db.get("host") or "127.0.0.1") in ("127.0.0.1", "localhost", "::1")
+    """The database runs on the machine DBaba runs on, so this machine's memory is the database's memory. Through an SSH
+    tunnel the address is 127.0.0.1 too, but the database is on the SSH server: not local."""
+    return not db.get("ssh") and (db.get("host") or "127.0.0.1") in ("127.0.0.1", "localhost", "::1")
+
+
+def _remote_note(db: dict) -> dict:
+    via = "through SSH" if db.get("ssh") else "over the network"
+    return _item("memory_unseen", "info", "Memory settings not compared with the server's memory",
+                 f"DBaba reaches this database {via} from another computer, so it can't see how much memory the server has.",
+                 "The memory advice (buffer pool / shared_buffers against the machine's memory) needs DBaba on the database "
+                 "server itself: install it there to have it checked.")
 
 
 def memory() -> int | None:

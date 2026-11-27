@@ -56,29 +56,80 @@
     card.append(steps(step));
     if (step === 1) {
       card.append(el("h1", null, "Which database do you want DBaba to look after?"));
+      // where it is: on this computer (or an address DBaba can reach), or on a server reached through SSH (S4b)
+      const where = el("div", "row taps");
+      const sshBox = el("div");
+      const onSsh = pick.ssh !== undefined;
+      where.append(btn("On this computer, or an address I can reach", onSsh ? "ghost" : "on", () => wizard(1, {})),
+                   btn("On a server I reach by SSH", onSsh ? "on" : "ghost", () => wizard(1, { ssh: pick.ssh || null })));
+      card.append(where);
       const taps = el("div", "row taps");
-      for (const [id, [name, port]] of Object.entries(ENGINES)) taps.append(btn(name, null, () => wizard(2, { engine: id, host: "127.0.0.1", port })));
       const found = el("div");
-      taps.append(btn("Find it for me", "ghost", async () => {
-        found.replaceChildren(el("p", "muted", "Looking on this machine…"));
-        try {
-          const r = await api("/api/setup/detect", { method: "POST", body: {} });
-          if (!r.found.length) return found.replaceChildren(el("p", null, "Nothing found on this machine. Pick the database above and type its address."));
-          found.replaceChildren(el("p", null, "Found:"));
-          for (const f of r.found) found.append(btn(f.how, "ghost", () => wizard(2, { engine: f.engine, host: f.host, port: f.port })));
-        } catch (e) { found.replaceChildren(el("p", "err", e.message)); }
-      }));
-      card.append(taps, found);
+      const engineTaps = (ssh) => {
+        taps.replaceChildren();
+        for (const [id, [name, port]] of Object.entries(ENGINES)) taps.append(btn(name, null, () => wizard(2, { engine: id, host: "127.0.0.1", port, ssh })));
+        taps.append(btn("Find it for me", "ghost", async () => {
+          found.replaceChildren(el("p", "muted", ssh ? "Looking on the SSH server…" : "Looking on this machine…"));
+          try {
+            const r = await api("/api/setup/detect", { method: "POST", body: ssh ? { ssh } : {} });
+            if (r.reason) return found.replaceChildren(el("p", "err", r.reason));
+            if (!r.found.length) return found.replaceChildren(el("p", null, (ssh ? "Nothing found on that server" : "Nothing found on this machine") + ". Pick the database above and type its address."));
+            found.replaceChildren(el("p", null, "Found:"));
+            for (const f of r.found) found.append(btn(f.how, "ghost", () => wizard(2, { engine: f.engine, host: f.host, port: f.port, ssh })));
+          } catch (e) { found.replaceChildren(el("p", "err", e.message)); }
+        }));
+      };
+      if (!onSsh) {
+        engineTaps(undefined);
+      } else if (pick.ssh && pick.ssh.trusted) {
+        sshBox.append(el("p", "good", `SSH: ${pick.ssh.user}@${pick.ssh.host} (port ${pick.ssh.port}). Its key is accepted.`));
+        const { trusted, ...ssh } = pick.ssh;
+        engineTaps(ssh);
+      } else {
+        sshBox.append(el("p", "muted", "DBaba runs here and reaches the database through SSH: nothing is installed on the server. " +
+          "It uses a key file or this computer's ssh-agent; it never asks for or keeps an SSH password."));
+        const g = el("div", "grid2");
+        const p0 = pick.ssh || {};
+        g.append(field("SSH server (name or IP)", "host", p0.host || ""), field("SSH port", "port", p0.port || 22),
+                 field("SSH user", "user", p0.user || ""), field("Private key file (full path; empty = ssh-agent)", "key_file", p0.key_file || ""));
+        const out = el("div");
+        const read = () => { const v = {}; for (const i of g.querySelectorAll("input")) v[i.name] = i.value.trim(); v.port = Number(v.port || 22); return v; };
+        const check = btn("Check the server's key", null, async () => {
+          const ssh = read(); out.replaceChildren(el("p", "muted", "Asking the server for its key…"));
+          try {
+            const r = await api("/api/setup/ssh", { method: "POST", body: { ssh } });
+            if (!r.ok) return out.replaceChildren(el("p", "err", r.reason));
+            if (r.trusted) return wizard(1, { ssh: { ...ssh, trusted: true } });
+            out.replaceChildren(el("p", null, "First time on this server: compare this fingerprint with the one its administrator gives you " +
+              "(on the server: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub). Accept it only if it is the same."));
+            for (const k of r.keys) {
+              const row = el("div", "row");
+              row.append(el("code", null, `${k.type} ${k.fingerprint}`), btn("Yes, this is my server's key", "ghost", async () => {
+                try {
+                  const a = await api("/api/setup/ssh", { method: "POST", body: { ssh, accept: k.fingerprint } });
+                  if (!a.ok) return out.append(el("p", "err", a.reason));
+                  wizard(1, { ssh: { ...ssh, trusted: true } });
+                } catch (e) { out.append(el("p", "err", e.message)); }
+              }));
+              out.append(row);
+            }
+          } catch (e) { out.replaceChildren(el("p", "err", e.message)); }
+        });
+        const row = el("div", "row"); row.append(check);
+        sshBox.append(g, row, out);
+      }
+      card.append(sshBox, taps, found);
     } else if (step === 2) {
       const name = ENGINES[pick.engine][0];
       card.append(el("h1", null, `Connect to ${name}`),
         el("p", "muted", "Use a read-only user (SELECT rights only). DBaba never changes data without showing you first and asking."));
       const g = el("div", "grid2");
-      g.append(field("Host", "host", pick.host), field("Port", "port", pick.port), field("Database name", "database", pick.database || ""),
+      if (pick.ssh) card.append(el("p", "muted", `Through SSH as ${pick.ssh.user}@${pick.ssh.host}: the host is the database's address as that server sees it (usually 127.0.0.1).`));
+      g.append(field(pick.ssh ? "Database host (on the server)" : "Host", "host", pick.host), field("Port", "port", pick.port), field("Database name", "database", pick.database || ""),
                field("User", "user", pick.user || ""), field("Password", "password", "", "password"));
       card.append(g);
       const out = el("p");
-      const read = () => { const v = {}; for (const i of g.querySelectorAll("input")) v[i.name] = i.value; v.port = Number(v.port); v.engine = pick.engine; return v; };
+      const read = () => { const v = {}; for (const i of g.querySelectorAll("input")) v[i.name] = i.value; v.port = Number(v.port); v.engine = pick.engine; if (pick.ssh) v.ssh = pick.ssh; return v; };
       const test = btn("Test connection", "ghost", async () => {
         out.className = "muted"; out.textContent = "Testing…";
         try {
@@ -97,7 +148,7 @@
         } catch (e) { out.className = "err"; out.textContent = e.message; save.disabled = false; }
       });
       save.disabled = true;
-      const row = el("div", "row"); row.append(btn("Back", "ghost", () => wizard(1, {})), test, save);
+      const row = el("div", "row"); row.append(btn("Back", "ghost", () => wizard(1, pick.ssh ? { ssh: { ...pick.ssh, trusted: true } } : {})), test, save);
       card.append(row, out);
     } else {
       card.append(el("h1", null, "First scan running…"), el("p", "muted", "DBaba is reading the database's own status and catalog. Nothing is changed."));
@@ -122,7 +173,7 @@
       nav.append(b);
     }
     const db = state.database;
-    document.getElementById("who").textContent = db ? `${ENGINES[db.engine] ? ENGINES[db.engine][0] : db.engine} · ${db.name} on ${db.host}:${db.port} · ${db.connected ? "connected" : "not connected"}` : "";
+    document.getElementById("who").textContent = db ? `${ENGINES[db.engine] ? ENGINES[db.engine][0] : db.engine} · ${db.name} on ${db.host}:${db.port}${db.ssh ? ` via SSH ${db.ssh.user}@${db.ssh.host}` : ""} · ${db.connected ? "connected" : "not connected"}` : "";
     app.replaceChildren(nav, body);
     if (which === "chat") chat(body);
     else if (which === "report") reportView(body);
@@ -194,6 +245,9 @@
       card.append(box);
     }
     card.append(el("h2", null, "Jobs"));
+    if (state.database && state.database.via && state.database.via !== "here")
+      card.append(el("p", "muted", "DBaba runs on this computer, not on the database server: these jobs run only while this computer " +
+        "is on and DBaba is open (a missed daily scan runs when it is back). To have them run 24/7, install DBaba on the server."));
     let jobs; try { jobs = (await api("/api/jobs")).jobs; } catch (e) { card.append(el("p", "err", e.message)); return; }
     const table = el("table"); const hr = el("tr");
     for (const h of ["Job", "Runs", "On", "Time", "Last run"]) hr.append(el("th", null, h));

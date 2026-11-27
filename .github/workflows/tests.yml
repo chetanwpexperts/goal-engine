@@ -35,7 +35,7 @@ jobs:
           cache: pip
       - name: Install
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq mariadb-client postgresql-client >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq mariadb-client postgresql-client openssh-client openssh-server >/dev/null   # S4b: tests/test_local_ssh.py runs its own sshd
           pip install -r requirements.txt pytest httpx httpx2 -r deploy/onprem/cpanel/requirements-cpanel.txt
           # tests call the `mysql` client with no host; point it at the MariaDB service container
           printf '[client]\nhost=127.0.0.1\nuser=root\npassword=root\n' > ~/.my.cnf

@@ -1,5 +1,7 @@
 # DBaba local API
 
+The authoritative S4 contract is [docs/dbaba-local-contract.md](../dbaba-local-contract.md).
+
 All requests target `http://127.0.0.1:<port>` (port from dbaba.json). Do not use proxies, redirects or remote API hosts. For a server installation, use a verified SSH tunnel. No cloud AI, telemetry or paid service is needed.
 
 Use Authorization: Bearer <api key> and Content-Type: application/json. Keep the key in DBABA_API_KEY or a private key file (CLI: ~/.config/dbaba/key, mode 0600); desktop uses OS keychain. Never log credentials. Examples below assume BASE=http://127.0.0.1:8765; change the port to match config.
@@ -11,20 +13,23 @@ Run `dbaba serve --port 8765 --config /path/to/private/dbaba.json`. The local en
 | Method and path | Body | Response |
 |---|---|---|
 | GET /api/health | none | {ok, version} |
+| POST /api/login | password | {ok} and session cookie |
+| POST /api/logout | none | {ok} |
+| POST /api/setup/reset | none | {ok}; opens setup again |
 | GET /api/state | none | {version, setup_done, database, alerts, last_scan} |
 | POST /api/setup/detect | none | {found: [{engine, host, port, how}]} |
 | POST /api/setup/test | engine, host, port, database, user, password | {ok, version, reason} |
-| POST /api/setup/save | same as test plus screen_password | {ok, api_key} |
+| POST /api/setup/save | same as test plus screen_password (8+ characters) | {ok, api_key, warning?} or {ok:false, reason} |
 | POST /api/alerts/{id}/ack | none | {ok} |
 | POST /api/report/scan | none | {started} |
-| GET /api/report | none | {at, score, engine, sections} |
+| GET /api/report | none | {at, score, engine, version, pending, sections} (at and score null before first scan) |
 | GET /api/report.html | none | downloadable HTML |
 | GET /api/jobs | none | {jobs} |
 | POST /api/jobs/{id} | enabled, at | updated job |
 | POST /api/new-chat | none | starts a new conversation |
 | POST /api/message | text | {reply, ...} |
 
-Database state has engine, host, port, name, connected. Alerts have id, level, title, text, at, acknowledged. Last scan is null or {at, score}. Scores are 0–100. Report sections have id, title, items; each item has id, severity, title, what, why, fix (null or {sql, needs_approval}). Severity is critical, warning or info. Display fixes without executing them. Jobs have id, name, enabled, every (5min/day/week), at (HH:MM or null), last_run (null or {at, ok, text}). Scans are asynchronous; retrieve the report later.
+Database state has engine, host, port, name, connected. Alerts have id, level, title, text, at, acknowledged. Last scan is null or {at, score}. Scores are 0–100. Report sections have id, title, items; each item has id, severity, title, what, why, fix (null or {sql, needs_approval}). Severity is critical, warning or info. Display fixes without executing them. Jobs have id, name, enabled, every (5min/day), at (HH:MM or null), last_run (null or {at, ok, text}). Scans are asynchronous; retrieve the report later.
 
 ## CLI
 
@@ -76,3 +81,16 @@ unset SETUP_TOKEN
 Move the returned API key into protected storage and remove the private setup files. Use a separate cookie jar for each chat if the engine uses visitor cookies.
 
 The examples are contract-derived; live engine compatibility must be checked once the server implementation lands.
+
+## Python, Node and PHP endpoint groups
+
+Run from a private working directory, using the absolute path to the example in this repository. Python uses the standard library, Node requires Node 22+, PHP requires CLI cURL. Each supports the groups health, state, chat, alerts, report, jobs, setup, session and reset. Set DBABA_URL to the loopback port; set DBABA_API_KEY privately for authenticated groups. For alerts and jobs set DBABA_ALERT_ID or DBABA_JOB_ID to a real ID. Report starts a scan and saves the current HTML report; it does not wait for the scan to finish. Setup reads JSON from stdin and saves the one-time key to a new private dbaba-key file. Session reads password JSON from stdin (unset DBABA_API_KEY to exercise cookie authentication). Reset requires DBABA_CONFIRM_RESET=yes and is destructive; use a disposable setup. Move the key into secure storage; never commit it. Existing output files are not overwritten.
+
+```sh
+python examples/local_contract.py health
+node examples/local_contract.js state
+php examples/local_contract.php chat
+# Substitute any supported group in any of these three commands.
+```
+
+Tests: python -m pytest tests/cli/test_contract_examples.py. Missing Node/PHP cURL runtimes are reported as skips.

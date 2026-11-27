@@ -1689,5 +1689,6 @@
     "proven": [
       "postgresql"
     ]
-  }
+  },
+ "grouping": {"case": "sensitive", "trailing_spaces": "kept", "accents": "kept", "says": "GROUP BY on text compares exactly: 'Red', 'red' and 'RED' are three groups, 'a' and 'a ' two (varchar/text). A char(n) column pads every value with spaces, so there 'a' and 'a ' are the same value.", "proven": ["postgresql"]}
 }

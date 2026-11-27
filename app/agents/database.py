@@ -499,7 +499,8 @@ def blocks(mode: str, hi: bool) -> list[dict]:
               else "Connect to your database read-only; nothing gets changed"}]
     if mode == "export":
         steps += [{"kind": "think", "text": "Table ya query chuno, pehle 50 rows ka preview" if hi else "Pick a table or write a query; preview 50 rows first"},
-                  {"kind": "do", "text": "Poora data CSV/Excel file mein dunga" if hi else "Give you the full data as a CSV/Excel file"}]
+                  {"kind": "do", "text": "Poora data Excel mein dunga: Data sheet, live formulas (COUNTIFS / SUMIFS) wali Pivot sheet aur chart; CSV bhi"
+                   if hi else "Give you the full data in Excel: a Data sheet, a Pivot sheet with live formulas (COUNTIFS / SUMIFS) and a chart; CSV too"}]
     elif mode == "report":
         steps += [{"kind": "think", "text": "Report ki query chuno aur preview dekho" if hi else "Choose the report query and preview it"},
                   {"kind": "when", "text": "Aapke chune samay pe chalega" if hi else "Runs on the schedule you choose"},
@@ -537,6 +538,7 @@ def database_dict(db: Session, agent: Agent, hi: bool) -> dict:
         "available": mode not in ("backup", "write"), "blocks": _blocks_for(mode, hi, connector),
         "connector": connector_dict(connector, db) if connector else None, "connectors": others,
         "runs": [], "owner": _owner(db, agent.visitor_id), "needs_owner": mode == "report", "brain": _brain_view(inputs.get("brain"), hi),
+        "excel_words": inputs.get("excel_words", ""),
     }
 
 
@@ -578,13 +580,13 @@ def plan_reply(mode: str, hi: bool, has_connector: bool, later: list[str] | None
 
 
 def clean_exports(max_age_hours: int = 24) -> None:
-    """Exported files are kept for a day, then deleted."""
+    """Exported files (the CSV and any workbook made from it) are kept for a day, then deleted."""
     import time
 
     if not EXPORT_DIR.exists():
         return
     cutoff = time.time() - max_age_hours * 3600
-    for f in EXPORT_DIR.glob("job_*.csv"):
+    for f in EXPORT_DIR.glob("job_*"):            # job_N_x.csv.gz, job_N_x.csv.gz.<pick>.xlsx (a bare *.csv missed them)
         try:
             if f.stat().st_mtime < cutoff:
                 f.unlink()
@@ -916,6 +918,8 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     inputs = loads(agent.inputs, {}) or {}
     if mode != "explore":
         inputs["mode"] = mode
+    if mode == "export":                  # 'status wise, with total amount': the workbook's pivot follows these words (S3)
+        inputs["excel_words"] = (text or "")[:400]
     from app.dbknow import reasoning as _r
 
     if rec["kind"] in ("sql", "error") or (rec["kind"] == "do" and rec["confidence"] >= 0.35) or (

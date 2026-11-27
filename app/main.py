@@ -898,8 +898,19 @@ def _after_db_job(db: Session, job) -> None:
 
             data = gzip.decompress(data)
         rows = (loads(job.result, {}) or {}).get("row_count", "")
-        mailer().send(owner.email, f"{title} · {utcnow():%d %b}", f"{title}\n\nRows: {rows}\nThe CSV file is attached (opens in Excel).",
-                      from_name="Goal Engine", attachments=[(f"{title[:40]}.csv", data, "text/csv")])
+        files = [(f"{title[:40]}.csv", data, "text/csv")]
+        text = f"{title}\n\nRows: {rows}\nThe CSV file is attached (opens in Excel)."
+        try:                                        # S3: the same rows as a workbook with a live pivot and its chart
+            from app.agents import sqlexcel
+            from app.models import Connector
+
+            info = sqlexcel.for_job(job, db.get(Connector, job.connector_id))
+            with open(info["path"], "rb") as fh:
+                files.append((f"{title[:40]}.xlsx", fh.read(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+            text = f"{title}\n\nRows: {rows}\n{info['say']}\nAttached: the Excel workbook and the plain CSV."
+        except Exception:  # noqa: BLE001 - the CSV still goes
+            logging.getLogger(__name__).exception("Report workbook failed")
+        mailer().send(owner.email, f"{title} · {utcnow():%d %b}", text, from_name="Goal Engine", attachments=files)
     except Exception:  # noqa: BLE001 - the next run will try again
         logging.getLogger(__name__).exception("Database report email failed")
 
@@ -1170,6 +1181,41 @@ def download_db_job(job_id: int, db: Session = Depends(get_db), visitor: str = D
         return FileResponse(job.file_path, media_type="text/csv", filename=f"export_{job.id}.csv",
                             headers={"Content-Encoding": "gzip", "Cache-Control": "no-store"})
     return FileResponse(job.file_path, media_type="text/csv", filename=f"export_{job.id}.csv")
+
+
+class ExcelIn(BaseModel):
+    by: str = Field("", max_length=80)          # the column to group by (empty: DBaba picks one, or none)
+    measure: str = Field("", max_length=80)     # the number column to add up
+    words: str = Field("", max_length=400)      # or the person's own words: "status wise with total amount"
+    hi: bool = False
+
+
+@app.post("/api/connector-jobs/{job_id}/excel")
+def db_job_excel(job_id: int, body: ExcelIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    """S3: the export as a workbook: Data, a Pivot with live COUNTIFS / SUMIFS and a chart, About. Nothing is sent anywhere."""
+    from app.agents import sqlexcel
+    from app.models import Connector
+
+    job = _own_job(db, job_id, visitor)
+    try:
+        info = sqlexcel.for_job(job, db.get(Connector, job.connector_id), body.by or None, body.measure or None, body.hi, body.words)
+    except sqlexcel.ExcelError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    p = info["pivot"]
+    return {"say": info["say"], "notes": info["notes"], "chart": info["chart"], "rows": info["rows"], "sheets": info["sheets"],
+            "columns": info["columns"],
+            "pivot": {k: p[k] for k in ("by", "measure", "mode", "groups", "formulas")} if p else None,
+            "download": f"/api/connector-jobs/{job.id}/excel?tag={info['tag']}"}
+
+
+@app.get("/api/connector-jobs/{job_id}/excel")
+def db_job_excel_file(job_id: int, tag: str = "", db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
+    job = _own_job(db, job_id, visitor)
+    path = f"{job.file_path}.{tag}.xlsx" if job.file_path and re.fullmatch(r"[0-9a-f]{10}", tag or "") else ""
+    if not path or not os.path.exists(path):
+        raise HTTPException(404, "No workbook for this job")
+    return FileResponse(path, filename=f"export_{job.id}.xlsx", headers={"Cache-Control": "no-store"},
+                        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @app.get("/api/connectors/{connector_id}/activity")

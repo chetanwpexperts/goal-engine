@@ -120,8 +120,14 @@ reviews them before they are merged.
 Claude (daytime sessions and the nightly run, in this order):
 - [x] S1. X2: write a query from plain words (EN / Hinglish / Hindi), with tests/fuzz/nl2sql.py. Done 26 Nov: app/agents/sqlwrite.py + core/write_words.json; 18 families, 400/400 on MySQL+PostgreSQL; Paper 1 8→12/30. Self-joins, Nth highest, percentages, pivots and data changes say "can't build yet" (S2).
 - [x] S2. X3 + X4: the rest of query writing; theory and trap concepts. Done 26 Nov: app/agents/sqlshapes.py (a row vs its manager row, pairs, Nth highest overall / per group, top N per group, groups vs the overall average, percentages, ranks with and without window functions, running totals, previous row, UPDATE / DELETE / delete duplicates, never without WHERE) + app/agents/sqlpuzzle.py (what COUNT / AVG / joins return, worked out by running it); 20 new generator families; Paper 1 12→18/30. Still "can't build yet": swapping two rows' values, pivots, medians, INSERT.
-- [ ] S3. DBaba to Excel: a Data sheet, a pivot sheet (live SUMIFS / COUNTIFS) and a chart from a query's result, plus the
-  chart in the chat (reusing app/office's workbook builders)
+- [x] S3. DBaba to Excel: a Data sheet, a pivot sheet (live SUMIFS / COUNTIFS) and a chart from a query's result, plus the
+  chart in the chat (reusing app/office's workbook builders). Done 27 Nov: app/agents/sqlexcel.py (Data in real types: codes
+  keep zeros, 16+ digit numbers kept as text, '=...' never a formula; Pivot with COUNTIFS / SUMIFS / AVERAGEIFS, SUMPRODUCT
+  with = or EXACT where SUMIFS would read wildcards, digits or capitals wrongly, months with EDATE; chart from the pivot's
+  cells; About with every place Excel and the database disagree), grouping facts in each dialect's 'grouping' (lab: MariaDB
+  merges capitals, accents, trailing spaces; PostgreSQL / SQLite exact), POST/GET /api/connector-jobs/{id}/excel, the card's
+  chart and "Pivot by" pick, the workbook on the scheduled report email; tests/fuzz/dbexcel.py (LibreOffice recalculates,
+  compared with each engine's GROUP BY) 400/400; 2 concepts (query_to_excel, group_by_capitals).
 - [ ] S4. DBaba's own screen when installed (never the whole website): `python -m app.local serve --port N`, 127.0.0.1
   only, screen password from dbaba.json, API keys (`Authorization: Bearer`), no accounts / captcha / admin / other agents.
   First run is a 3-step wizard a non-expert can follow: (1) "Which database do you want DBaba to look after?" with taps

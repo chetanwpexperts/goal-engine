@@ -114,6 +114,9 @@ OWN_THING = re.compile(r"\b(my|our|this|mera|meri|mere|hamara|hamari|humara|apna
                        r"मेरा|मेरी|मेरे|हमारा|हमारी|ये|यह|इस|क्वेरी|डेटाबेस|साइट", re.I)
 # another field's file (a spreadsheet's duplicates are the office agent's work)
 OTHER_FIELD = re.compile(r"\b(excel|spreadsheets?|sheets?|xlsx?|csv|vlookup|xlookup|pivot table|word file|docx|google sheets?)\b|एक्सेल|शीट", re.I)
+# a question about getting a database's rows INTO a spreadsheet is a database lesson (S3), not a question about a sheet
+DB_TO_SHEET = re.compile(r"\b(query|queries|database|db|mysql|maria ?db|postgre\w*|sql|sqlite)\b.{0,40}\b(excel|xlsx|spreadsheets?)\b|"
+                         r"\b(excel|xlsx|spreadsheets?)\b.{0,40}\b(database|mysql|maria ?db|postgre\w*|sqlite)\b", re.I)
 # the words that make an unknown 'what is X' a question about databases (so it is answered honestly here, not elsewhere)
 DB_MARK = re.compile(r"\b(sql|mysql|maria ?db|postgre\w*|query|queries|table|tables|column|columns|rows?|database|databases|"
                      r"db|dbms|rdbms|schema|clause|keyword|statement|index(es)?|key|keys|join\w*|engine)\b|"
@@ -211,7 +214,7 @@ def _is_work(text: str) -> bool:
             return True
     except Exception:  # noqa: BLE001
         pass
-    if OTHER_FIELD.search(text or ""):
+    if OTHER_FIELD.search(text or "") and not DB_TO_SHEET.search(text or ""):
         return True
     if OWN_WORK.search(text or ""):
         # 'slow' alone in a general question ('why is a big OFFSET slow', 'do indexes slow down inserts', 'how to find slow

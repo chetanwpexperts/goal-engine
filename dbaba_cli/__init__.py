@@ -56,7 +56,28 @@ def port_number(value):
 
 
 def base_url(config, allow_remote):
-    return f"http://127.0.0.1:{port_number(config.get('port', DEFAULT_PORT))}"
+    value = os.environ.get("DBABA_URL") or f"http://127.0.0.1:{port_number(config.get('port', DEFAULT_PORT))}"
+    parsed = urlsplit(value)
+    host = parsed.hostname
+    if (parsed.scheme not in ("http", "https") or not host or parsed.username is not None
+            or parsed.password is not None or parsed.path not in ("", "/")
+            or parsed.query or parsed.fragment or "\\" in value
+            or any(c.isspace() or ord(c) < 32 for c in value)):
+        raise ValueError("Use an HTTP or HTTPS DBaba URL without credentials or a path.")
+    if parsed.port is not None:
+        port_number(parsed.port)
+    if host != "127.0.0.1":
+        if not allow_remote:
+            raise ValueError("Remote DBaba URLs require --allow-remote or DBABA_ALLOW_REMOTE=1.")
+        if parsed.scheme == "http":
+            try:
+                private = any(ipaddress.ip_address(host) in network for network in PRIVATE)
+            except ValueError:
+                private = False
+            if not private:
+                raise ValueError("Remote DBaba URLs require HTTPS unless using a private IPv4 address.")
+            print("Warning: HTTP sends the API key without encryption.", file=sys.stderr)
+    return value.rstrip("/")
 
 
 class NoRedirect(request.HTTPRedirectHandler):
@@ -242,7 +263,7 @@ def main(argv=None):
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("status", "ask", "check", "serve", "report", "support-report", "alerts", "jobs", "version"):
         command = commands.add_parser(name)
-        if name in ("status", "ask", "check"):
+        if name in ("status", "ask", "check", "alerts", "report", "jobs"):
             command.add_argument("--allow-remote", action="store_true", default=argparse.SUPPRESS)
         if name == "ask":
             command.add_argument("question")
@@ -281,7 +302,7 @@ def main(argv=None):
             return serve(root, port_number(args.port if args.port is not None else config.get("port", DEFAULT_PORT)))
         if args.command == "support-report":
             return report(root, config)
-        client = Client(base_url(config, args.allow_remote or os.environ.get("DBABA_ALLOW_REMOTE") == "1"))
+        client = Client(base_url(config, args.allow_remote))
         if args.command in ("status", "alerts", "report", "jobs"):
             return commands_for(client, args)
         database = (config.get("database") or {}).get("type", "mysql")

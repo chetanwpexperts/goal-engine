@@ -1,10 +1,12 @@
 name: desktop-build
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'desktop/**'
       - 'tests/desktop/**'
       - '.github/workflows/desktop-build.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -39,6 +41,6 @@ jobs:
       - run: node --check ui/trial.js
       - run: node --test ../tests/desktop/trial.test.cjs
       - run: npm run tauri -- icon icon.svg
-      - run: cargo check --manifest-path src-tauri/Cargo.toml
+      - run: cargo check --tests --manifest-path src-tauri/Cargo.toml
       - run: npm test
       - run: npm run tauri -- build --bundles ${{ matrix.bundles }}

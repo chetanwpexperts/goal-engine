@@ -74,11 +74,16 @@ For DBaba connecting by TCP from the database machine:
 
 ```sql
 CREATE USER 'dbaba_ro'@'127.0.0.1' IDENTIFIED BY 'REPLACE_WITH_STRONG_PASSWORD';
-GRANT SELECT ON \`your_database\`.* TO 'dbaba_ro'@'127.0.0.1';
+GRANT SELECT ON `your_database`.* TO 'dbaba_ro'@'127.0.0.1';
 GRANT PROCESS ON *.* TO 'dbaba_ro'@'127.0.0.1';
+GRANT SELECT ON performance_schema.* TO 'dbaba_ro'@'127.0.0.1';
 ```
 
-SELECT allows reading the chosen database. PROCESS allows reading server-wide process/status information, including other sessions' query text. For Docker or a separate server, ask the administrator to replace the account host with the actual trusted connection source; do not use a wildcard host. Do not grant INSERT, UPDATE, DELETE or administrative privileges.
+SELECT allows reading the chosen database. PROCESS allows reading server-wide process/status information, including other sessions' query text. With performance_schema enabled and collecting statistics, the full report (S5) uses this extra SELECT grant to show slow queries and unused indexes. Without access, it says it cannot see them rather than reporting that everything is fine.
+
+**Do not grant SELECT on `mysql.user`.** It holds password hashes. The full report will show "Accounts not checked", which is expected.
+
+For Docker or a separate server, ask the administrator to replace the account host with the actual trusted connection source; do not use a wildcard host. Do not grant INSERT, UPDATE, DELETE or administrative privileges.
 
 ### PostgreSQL
 
@@ -94,7 +99,7 @@ GRANT pg_monitor TO dbaba_ro;
 ALTER ROLE dbaba_ro SET default_transaction_read_only = on;
 ```
 
-CONNECT and USAGE let the account reach the database and schema; SELECT lets it read existing tables and views. pg_monitor provides monitoring access. Ask your administrator to grant SELECT on new tables when needed. The read-only transaction default is an extra precaution, not a permission boundary.
+CONNECT and USAGE let the account reach the database and schema; SELECT lets it read existing tables and views. pg_monitor provides monitoring access. For slow queries in the full report (S5), PostgreSQL also needs the `pg_stat_statements` extension: ask your administrator to include it in `shared_preload_libraries`, restart PostgreSQL and run `CREATE EXTENSION pg_stat_statements;` in the monitored database. The report itself explains this requirement. Ask your administrator to grant SELECT on new tables when needed. The read-only transaction default is an extra precaution, not a permission boundary.
 
 Existing PUBLIC permissions, role memberships and executable functions can still allow changes. PostgreSQL 14 and older (including upgraded databases) may allow everyone to create objects in the public schema. Ask your administrator to review these permissions before connecting. Where appropriate, they can revoke CREATE from PUBLIC with the following SQL, which affects other users too:
 

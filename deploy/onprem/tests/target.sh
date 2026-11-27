@@ -3,7 +3,7 @@ set -uo pipefail
 target=$1
 results=$2
 name="dbaba-it-$$"
-image="$name"
+image="$name-img"
 volume="$name-data"
 fresh="$name-fresh"
 net="$name-net"
@@ -160,7 +160,7 @@ finally:
     [[ "$before" != "$after" ]] && inside test ! -e /data/install-test-marker
   }
   step "fresh volume starts clean" fresh_start
-  remove_docker() { docker stop "$name" && docker rm "$name" && docker volume rm "$volume" "$fresh" && ! docker inspect "$name" >/dev/null 2>&1; }
+  remove_docker() { docker stop "$name" && docker rm "$name" && docker volume rm "$volume" "$fresh" && ! docker container inspect "$name" >/dev/null 2>&1; }
   step "remove container and volumes" remove_docker
 fi
 exit "$failed"

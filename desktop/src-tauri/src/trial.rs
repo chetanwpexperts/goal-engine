@@ -105,9 +105,17 @@ fn database_body(input: &Value, save: bool) -> Result<Value, String> {
     }
     Ok(Value::Object(body))
 }
+fn valid_id(id: &str) -> Result<(), String> {
+    if id.is_empty() || id.len() > 128 || !id.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_') { return Err("Invalid identifier.".into()); }
+    Ok(())
+}
 fn job_path(id: &str) -> Result<String, String> {
-    if id.is_empty() || id.len() > 128 || !id.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_') { return Err("Invalid job ID.".into()); }
+    valid_id(id)?;
     Ok(format!("/api/jobs/{id}"))
+}
+fn alert_path(id: &str) -> Result<String, String> {
+    valid_id(id)?;
+    Ok(format!("/api/alerts/{id}/ack"))
 }
 #[tauri::command]
 pub async fn trial_call(window: WebviewWindow, trial: State<'_, Trial>, action: String, input: Option<Value>) -> Result<Value, String> {
@@ -121,6 +129,24 @@ pub async fn trial_call(window: WebviewWindow, trial: State<'_, Trial>, action: 
     let setup = matches!(action.as_str(), "detect" | "test" | "save");
     if setup && token.is_none() { return Err("Setup is already complete.".into()); }
     if !setup && token.is_some() { return Err("Finish setup first.".into()); }
+    if action == "report_html" {
+        let key = credential("api-key")?.get_password().map_err(|_| "API key unavailable in OS keychain.")?;
+        let res = client()?.get(format!("http://127.0.0.1:{port}/api/report.html"))
+            .bearer_auth(key).send().await.map_err(|_| "Cannot reach local DBaba.")?;
+        if !res.status().is_success() { return Err(format!("Local DBaba returned HTTP {}.", res.status().as_u16())); }
+        let data = res.bytes().await.map_err(|_| "Could not read HTML report.")?;
+        let saved = tauri::async_runtime::spawn_blocking(move || -> Result<bool, String> {
+            let Some(path) = rfd::FileDialog::new().set_file_name("dbaba-report.html")
+                .add_filter("HTML report", &["html"]).save_file() else { return Ok(false); };
+            let parent = path.parent().ok_or("Invalid save location.")?;
+            let mut file = tempfile::NamedTempFile::new_in(parent).map_err(|_| "Could not create report file.")?;
+            use std::io::Write;
+            file.write_all(&data).and_then(|_| file.as_file().sync_all()).map_err(|_| "Could not write report.")?;
+            file.persist(path).map_err(|_| "Could not save report.")?;
+            Ok(true)
+        }).await.map_err(|_| "Could not open save dialog.")??;
+        return Ok(json!({"saved":saved}));
+    }
     let (method, path, body) = match action.as_str() {
         "detect" => (reqwest::Method::POST, "/api/setup/detect".into(), None),
         "test" | "save" => (reqwest::Method::POST, format!("/api/setup/{action}"), Some(database_body(&input, action == "save")?)),
@@ -131,6 +157,7 @@ pub async fn trial_call(window: WebviewWindow, trial: State<'_, Trial>, action: 
             let text = input["text"].as_str().filter(|s| !s.trim().is_empty() && s.len() <= 10000).ok_or("Enter a shorter message.")?;
             (reqwest::Method::POST, "/api/message".into(), Some(json!({"text":text})))
         },
+        "ack" => (reqwest::Method::POST, alert_path(input["id"].as_str().ok_or("Missing alert ID.")?)?, None),
         "job" => {
             let id = input["id"].as_str().ok_or("Missing job ID.")?;
             let enabled = input["enabled"].as_bool().ok_or("Missing job setting.")?;
@@ -145,14 +172,12 @@ pub async fn trial_call(window: WebviewWindow, trial: State<'_, Trial>, action: 
         _ => return Err("Unknown local action.".into())
     };
     let key = if setup { None } else { Some(credential("api-key")?.get_password().map_err(|_| "API key unavailable in OS keychain.")?) };
-    // Check that the keychain is writable before the one-time save.
-    if action == "save" {
-        credential("database-password")?.set_password(input["password"].as_str().unwrap()).map_err(|_| "Could not save database password in OS keychain.")?;
-    }
     let mut result = request(port, method, &path, if setup {token.as_deref()} else {None}, key.as_deref(), body.as_ref()).await?;
     if action == "save" && result["ok"] == true {
         let k = result["api_key"].as_str().filter(|k| !k.is_empty()).ok_or("Missing API key in setup response.")?;
-        credential("api-key")?.set_password(k).map_err(|_| "Could not save API key in OS keychain.")?;
+        // The backend has accepted setup. Keep the UI in setup if either credential write fails.
+        credential("api-key")?.set_password(k).map_err(|_| "Backend saved setup, but the API key could not be saved in the OS keychain. Setup is not complete on this desktop; contact your administrator for recovery.")?;
+        credential("database-password")?.set_password(input["password"].as_str().unwrap()).map_err(|_| "Backend saved setup, but the database password could not be saved in the OS keychain. Setup is not complete on this desktop; check your keychain before restarting.")?;
         if let Some(engine) = trial.0.lock().map_err(|_| "Local engine lock failed.")?.as_mut() { engine.token = None; }
         result = json!({"ok":true});
     }
@@ -169,6 +194,8 @@ mod tests {
         assert!(database_body(&body,false).is_ok());
         assert!(database_body(&body,true).is_err());
         assert!(job_path("../x").is_err());
+        assert!(alert_path("../x").is_err());
+        assert_eq!(alert_path("a-1").unwrap(), "/api/alerts/a-1/ack");
         assert_eq!(job_path("scan").unwrap(),"/api/jobs/scan");
     }
 }

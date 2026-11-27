@@ -29,14 +29,45 @@ def local(tmp_path, monkeypatch):
     monkeypatch.delenv("DBABA_ALLOW_REMOTE", raising=False)
     monkeypatch.setenv("DBABA_API_KEY", "test-only")
     calls = []
+    alerts = [{"id": "a", "level": "warning", "title": "Example alert", "text": "Check indexes", "at": "2026-01-01T00:00:00Z", "acknowledged": True}]
+    job = {"id": "j", "name": "Scan", "enabled": True, "every": "day", "at": "08:00", "last_run": None}
 
     class Handler(BaseHTTPRequestHandler):
         def handle_request(self):
             size = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(size)) if size else None
             calls.append((self.path, body, self.headers.get("Cookie"), self.headers.get("Authorization")))
+            if self.headers.get("Authorization") != "Bearer test-only":
+                self.send_error(401)
+                return
             if self.path == "/api/health":
+                result = {"ok": True, "version": "1.2.3"}
+            elif self.path == "/api/state":
+                result = {"version": "1.2.3", "setup_done": True,
+                          "database": {"engine": "mysql", "host": "127.0.0.1", "port": 3306, "name": "sample", "connected": True},
+                          "alerts": alerts, "last_scan": {"at": "2026-01-01T00:00:00Z", "score": 90}}
+            elif self.path == "/api/alerts/a/ack":
+                alerts[0]["acknowledged"] = True
                 result = {"ok": True}
+            elif self.path.startswith("/api/alerts/"):
+                self.send_error(404)
+                return
+            elif self.path == "/api/report/scan":
+                result = {"started": True}
+            elif self.path == "/api/report":
+                result = {"at": "2026-01-01T00:00:00Z", "score": 90, "engine": "mysql",
+                          "sections": [{"id": "s", "title": "Indexes", "items": [{"id": "i", "severity": "warning", "title": "Missing index", "what": "Scan", "why": "Cost", "fix": {"sql": "CREATE INDEX example ON sample(id)", "needs_approval": True}}]}]}
+            elif self.path == "/api/report.html":
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.end_headers()
+                self.wfile.write(b"<html>Sample report</html>")
+                return
+            elif self.path == "/api/jobs":
+                result = {"jobs": [job]}
+            elif self.path == "/api/jobs/j":
+                job.update(body)
+                result = job
             elif self.path == "/api/new-chat":
                 result = {"ok": True}
             elif body["text"] == "question":
@@ -68,7 +99,10 @@ def local(tmp_path, monkeypatch):
 
 def test_status(local, capsys):
     assert main(["status"]) == 0
-    assert capsys.readouterr().out.strip() == "running"
+    output = capsys.readouterr().out
+    assert "DBaba is running" in output
+    assert "1.2.3" in output
+    assert "connected" in output
 
 
 def test_ask(local, capsys):
@@ -146,7 +180,7 @@ def test_report(local):
     Path("dbaba.log").write_text("old-line\n" * 201 + " ".join(secrets) +
                                  " Bearer unknown-token password=unknown-pass pwd=unknown-pwd "
                                  "postgresql://user:unknown-url@host\n")
-    assert main(["report"]) == 0
+    assert main(["support-report"]) == 0
     with zipfile.ZipFile(next(Path.cwd().glob("dbaba-report-*.zip"))) as archive:
         all_text = "\n".join(archive.read(name).decode() for name in archive.namelist())
         for secret in secrets + ["unknown-token", "unknown-pass", "unknown-pwd", "unknown-url"]:
@@ -160,7 +194,7 @@ def test_report(local):
 
 def test_unreadable_log(local):
     Path("dbaba.log").write_bytes(b"\xff")
-    assert main(["report"]) == 0
+    assert main(["support-report"]) == 0
     with zipfile.ZipFile(next(Path.cwd().glob("dbaba-report-*.zip"))) as archive:
         assert "dbaba.log" not in archive.namelist()
         assert b"Log not included" in archive.read("versions.txt")
@@ -227,7 +261,7 @@ def test_report_preserves_host_and_versions(isolated_config, monkeypatch):
         "127.0.0.1 version 0.1.8 n=16384 r=8 p=1 long-password long-hash long-salt\n",
         encoding="utf-8",
     )
-    assert main(["report"]) == 0
+    assert main(["support-report"]) == 0
     with zipfile.ZipFile(next(Path.cwd().glob("dbaba-report-*.zip"))) as archive:
         config = json.loads(archive.read("dbaba.json"))
         assert config["database"] == {"host": "127.0.0.1"}
@@ -239,3 +273,80 @@ def test_report_preserves_host_and_versions(isolated_config, monkeypatch):
         assert "127.0.0.1 version 0.1.8 n=16384 r=8 p=1" in log
         for secret in ("long-password", "long-hash", "long-salt"):
             assert secret not in log
+
+
+def test_alerts(local, capsys):
+    assert main(["alerts"]) == 0
+    assert main(["alerts", "--ack", "a"]) == 0
+    assert main(["alerts", "--ack", "missing"]) == 2
+    captured = capsys.readouterr()
+    assert "Alert acknowledged" in captured.out
+    assert "test-only" not in captured.out + captured.err
+
+
+def test_health_report(local, capsys, tmp_path):
+    assert main(["report", "--scan"]) == 0
+    assert main(["report"]) == 1
+    dest = tmp_path / "report.html"
+    assert main(["report", "--html", str(dest)]) == 1
+    assert dest.read_bytes() == b"<html>Sample report</html>"
+    captured = capsys.readouterr()
+    assert "Requires approval" in captured.out
+    assert "test-only" not in captured.out + captured.err
+
+
+def test_jobs(local, capsys):
+    calls, _ = local
+    assert main(["jobs"]) == 0
+    assert main(["jobs", "j", "--off", "--at", "09:30"]) == 0
+    assert calls[-1][1] == {"enabled": False, "at": "09:30"}
+    assert main(["jobs", "j", "--on"]) == 0
+    assert calls[-1][1] == {"enabled": True, "at": "09:30"}
+    assert main(["jobs", "missing"]) == 1
+    assert main(["jobs", "j", "--at", "25:00"]) == 2
+    assert "test-only" not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("args", [["status"], ["alerts"], ["report"], ["jobs"], ["ask", "question"]])
+def test_missing_key(local, monkeypatch, capsys, args):
+    monkeypatch.delenv("DBABA_API_KEY")
+    assert main(args) == 2
+    captured = capsys.readouterr()
+    assert "test-only" not in captured.out + captured.err
+
+
+def test_key_file(local, monkeypatch, tmp_path):
+    monkeypatch.delenv("DBABA_API_KEY")
+    key = tmp_path / ".config" / "dbaba" / "key"
+    key.parent.mkdir(parents=True)
+    key.write_text("test-only")
+    key.chmod(0o600)
+    assert main(["status"]) == 0
+
+
+def test_support_migration(capsys):
+    assert main(["report", "--zip"]) == 1
+    assert capsys.readouterr().out.strip() == "The support ZIP is now: dbaba support-report"
+
+
+def test_remote_flag(local, monkeypatch):
+    calls, port = local
+    monkeypatch.setenv("DBABA_URL", f"http://localhost:{port}")
+    assert main(["status"]) == 2
+    assert not calls
+    monkeypatch.setenv("DBABA_URL", "https://example.invalid")
+    assert base_url({}, True) == "https://example.invalid"
+
+
+def test_explicit_serve_config(monkeypatch, tmp_path):
+    config = tmp_path / "new" / "dbaba.json"
+    monkeypatch.setattr("dbaba_cli.util.find_spec", lambda name: object())
+    def execute(exe, cmd, env):
+        assert cmd[-4:] == ["--port", "9123", "--config", str(config)]
+        assert env["DBABA_CONFIG"] == str(config)
+        assert env["GEMINI_API_KEY"] == ""
+        raise SystemExit(0)
+    monkeypatch.setattr("dbaba_cli.os.execve", execute)
+    with pytest.raises(SystemExit) as exc:
+        main(["serve", "--port", "9123", "--config", str(config)])
+    assert exc.value.code == 0

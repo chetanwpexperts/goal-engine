@@ -1941,11 +1941,11 @@
   let shownCard = null;
   let quietUntil = 0;                               // a new answer is being scrolled into view: don't switch while it moves
   // as the chat scrolls, the panel follows: it shows the examples of the question being read (the last question whose
-  // top has passed 45% of the screen; its answer's examples)
+  // top has passed 45% of the screen). An answer without examples (a diagnosis, a plan) shows the agents instead.
   function followScroll() {
     if (Date.now() < quietUntil || !sideBySide()) return;
-    const answers = [...thread.querySelectorAll(".concept-answer")];
-    if (!answers.length) return;
+    if (!thread.querySelector(".concept-answer")) return;
+    const answers = [...thread.querySelectorAll(".turn-machine")];
     const line = window.innerHeight * 0.45;
     let pick = answers[0];
     for (const a of answers) {
@@ -1953,7 +1953,15 @@
       while (q && !q.classList.contains("turn-user")) q = q.previousElementSibling;
       if ((q || a).getBoundingClientRect().top <= line) pick = a;
     }
-    if (pick._card !== shownCard) renderConcept(pick._card, pick);
+    const card = (pick && pick._card) || null;
+    if (card === shownCard) return;
+    if (card) renderConcept(card, pick);
+    else hideConcept();
+  }
+  function hideConcept() {
+    for (const old of $("#agents").querySelectorAll(".concept-card")) old.remove();
+    for (const a of thread.querySelectorAll(".concept-answer.showing")) a.classList.remove("showing");
+    shownCard = null;
   }
   let scrollTick = 0;
   window.addEventListener("scroll", () => {
@@ -2109,7 +2117,9 @@
     try {
       const data = await api("/api/message", { method: "POST", body: JSON.stringify({ text, goal_id: currentGoalId }) });
       wait.remove();
-      const concept = data.relation === "concept" && data.goal && !(data.agents || []).length;
+      // an answer with worked examples is split even when the goal already has an agent from an earlier turn
+      // (addConceptAnswer only splits a reply that starts with one of this goal's card titles)
+      const concept = data.relation === "concept" && data.goal;
       if (data.goal) {
         currentGoalId = data.goal.id;
         lastLang = data.goal.detected_language === "English" ? "en" : "hi";
@@ -2122,8 +2132,9 @@
         quietUntil = Date.now() + 1500;             // the new answer scrolls into view: it stays the one shown
         renderConcept(box._card, box);
         requestAnimationFrame(() => { const side = $("#machine"); if (side) side.scrollTop = 0; });
-      } else if ((data.agents || []).length || !concept) {
-        shownCard = null;
+      } else {
+        quietUntil = Date.now() + 1500;             // the new answer scrolls into view: its agents stay shown
+        hideConcept();
       }
       if (data.offer_expert && data.goal) box.append(expertOffer(data.goal, text, data.goal.detected_language !== "English"));
       if (data.next && data.next.length) box.append(nextChips(data.next, lastLang !== "en"));
@@ -2753,16 +2764,15 @@
     currentGoalId = id;
     setActive();
     thread.replaceChildren();
-    const plain = (data.agents || []).length > 0;
     rememberCards(data.goal);
     let last = null;
     for (const m of data.messages) {
       if (m.role === "user") thread.append(el("p", "turn-user", m.text));
-      else { const b = plain ? addMachine(m.text) : addConceptAnswer(m.text); if (b._card) last = b; }
+      else { const b = addConceptAnswer(m.text); last = b; }
     }
     renderUnderstood(data.goal);
     renderAgents(data.agents || []);
-    if (last) renderConcept(last._card, last);
+    if (last && last._card) renderConcept(last._card, last);
   }
 
   $("#open-goals").addEventListener("click", async () => {
@@ -2811,12 +2821,12 @@
       if (!state.messages.length) setIdle();          // remembered a chat that isn't there any more (new chat, logout, deleted)
       if (state.messages.length) {
         setActive();
-        const plain = (state.agents || []).length > 0;
+        rememberCards({ cards: state.cards || [] });   // earlier topics' examples first, the current topic's win
         rememberCards(state.current);
         let last = null;
         for (const m of state.messages) {
           if (m.role === "user") thread.append(el("p", "turn-user", m.text));
-          else { const b = plain ? addMachine(m.text) : addConceptAnswer(m.text); if (b._card) last = b; }
+          else { const b = addConceptAnswer(m.text); last = b; }
         }
         if (state.current) {
           currentGoalId = state.current.id;
@@ -2824,7 +2834,7 @@
           renderUnderstood(state.current);
         }
         renderAgents(state.agents || []);
-        if (last) renderConcept(last._card, last);
+        if (last && last._card) renderConcept(last._card, last);
         typeExamples();
       }
     } catch (_) { /* offline first load: the page still works */ }

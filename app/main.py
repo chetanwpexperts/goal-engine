@@ -642,6 +642,8 @@ def state(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)) -> 
         "current": goals[0].as_dict() if goals else None,
         "agents": [agent_dict(a, db, _goal_hi(goals[0])) for a in goal_agents(db, goals[0].id)] if goals else [],
         "messages": _messages(db, visitor, limit=40),
+        # the chat shows the latest messages across topics: earlier topics' worked examples, so their answers split too
+        "cards": [c for g in reversed(goals[1:5]) for c in g.as_dict()["cards"]],
         "remaining_today": max(0, settings.visitor_daily_cap - used["visitor"]),
     })
 

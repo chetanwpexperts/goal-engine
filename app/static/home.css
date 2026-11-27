@@ -102,8 +102,8 @@ body.typing .shot, body.typing .metrics, body.typing .pipe, body.typing .product
 .learn-art { width: 100%; height: auto; stroke: none; }
 .learn-art .dots circle { fill: #6C7BFF; }
 .learn-art .edge { fill: none; stroke: #39406B; stroke-width: 1.5; }
-.learn-art .node { fill: #18204A; stroke: #6C7BFF; stroke-width: 1.5; }
-.learn-art .node.ok { stroke: var(--teal); }
+.learn-art .lnode { fill: #18204A; stroke: #6C7BFF; stroke-width: 1.5; }
+.learn-art .lnode.ok { stroke: var(--teal); }
 .learn-art text { fill: #E6E9F8; font: 600 13px var(--font); stroke: none; }
 
 /* ---------------------------------------------------------------- agents */
@@ -117,7 +117,7 @@ body.typing .shot, body.typing .metrics, body.typing .pipe, body.typing .product
 .mini { display: block; width: 100%; height: auto; margin: 18px 0 6px; stroke: none; }
 .mini .cols rect { fill: #DCE0F5; }
 .mini .cols rect.hi { fill: #6C7BFF; }
-.mini .line { fill: none; stroke: var(--teal); stroke-width: 3; }
+.mini .trend { fill: none; stroke: var(--teal); stroke-width: 3; }
 .mini.grid .frame { fill: #fff; stroke: var(--line); stroke-width: 1; }
 .mini.grid .rule { fill: none; stroke: var(--line); stroke-width: 1; }
 .mini.grid .flag { fill: rgba(200, 70, 59, .16); }

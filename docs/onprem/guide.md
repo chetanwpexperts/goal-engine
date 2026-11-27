@@ -119,7 +119,7 @@ If you chose database setup later, log in to the screen and follow these steps. 
 
 The browser setup assumes the installer has already set a screen password. A fresh backend without one needs setup using the local setup token and a new password (see the [local API guide](api.md)); the browser login alone cannot initialize that password. Keep setup tokens and API keys private.
 
-If the same database moves to a new server or an SSH tunnel gets a new local port, the desktop app or authenticated `POST /api/database` can update its address without repeating setup; DBaba tests the connection before saving and keeps the old settings if the test fails.
+If the same database moves to a new server or an SSH tunnel gets a new local port, an authenticated `POST /api/database` (for example from a script or using the `dbaba` command's API key) can update its address without repeating setup; DBaba tests the connection before saving and keeps the old settings if the test fails.
 
 ## 5. Read your report and alerts
 
@@ -144,7 +144,7 @@ Open **Automation** to see alerts and jobs. **Mark as seen** acknowledges an ale
 
 If you prefer a terminal, install the CLI from the trusted repository in a Python virtual environment using `python -m pip install .`. Keep the server running. Set `DBABA_URL` to your loopback screen address if using a different port. Authenticated commands require an API key, supplied privately through `DBABA_API_KEY` or the private key file described in the [API guide](api.md).
 
-To create an API key, log in to the screen, open **Automation**, find **API keys**, enter a name and click **Create**. The key is shown only once: copy it then and store it privately. To disable a key, click **Revoke** in the same list; the key is refused from the next request. Only a logged-in screen can create or revoke keys; an API key cannot do either.
+To create an API key, log in to the screen, open **Automation**, find **API keys**, enter a name and click **Create API key**. The key is shown only once: copy it then and store it privately. To disable a key, click **Revoke** in the same list and confirm when asked; the key is refused from the next request. Only a logged-in screen can create or revoke keys; an API key cannot do either.
 
 ```bash
 dbaba status

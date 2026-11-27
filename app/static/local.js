@@ -209,6 +209,42 @@
       table.append(tr);
     }
     card.append(table);
+    await apiKeys(card);
+  }
+
+  // API keys for the dbaba command, the desktop app or a script: a new key is shown once, here only
+  async function apiKeys(card) {
+    card.append(el("h2", null, "API keys"),
+      el("p", "muted", "For the dbaba command, the desktop app or your own scripts. A key is shown once; DBaba keeps only a fingerprint of it."));
+    const list = el("div"); card.append(list);
+    const shown = el("div"); card.append(shown);
+    const draw = (keys) => {
+      list.replaceChildren();
+      if (!keys.length) list.append(el("p", "muted", "No API keys yet."));
+      for (const k of keys) {
+        const row = el("div", "row");
+        row.append(el("span", null, `${k.name} · created ${k.created}`), btn("Revoke", "link", async () => {
+          if (!confirm(`Revoke the key "${k.name}"? Anything using it stops working.`)) return;
+          try { draw((await api(`/api/keys/${encodeURIComponent(k.id)}/revoke`, { method: "POST", body: {} })).keys); }
+          catch (e) { shown.replaceChildren(el("p", "err", e.message)); }
+        }));
+        list.append(row);
+      }
+    };
+    try { draw((await api("/api/keys")).keys); } catch (e) { list.replaceChildren(el("p", "err", e.message)); return; }
+    const name = el("input"); name.placeholder = "Name, e.g. laptop cli"; name.maxLength = 40;
+    const make = btn("Create API key", null, async () => {
+      try {
+        const r = await api("/api/keys", { method: "POST", body: { name: name.value } });
+        draw(r.keys); name.value = "";
+        const box = el("div", "item warning");
+        const code = el("pre", null, r.api_key);
+        box.append(el("h3", null, "Copy this key now: it won't be shown again"), code,
+          el("p", "muted", "Use it as DBABA_API_KEY for the dbaba command, or paste it into the desktop app."));
+        shown.replaceChildren(box);
+      } catch (e) { shown.replaceChildren(el("p", "err", e.message)); }
+    });
+    const row = el("div", "row"); row.append(name, make); card.append(row);
   }
 
   start();

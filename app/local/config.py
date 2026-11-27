@@ -130,6 +130,19 @@ class Config:
         self.update(lambda d: d.setdefault("api_keys", []).append(rec))
         return key
 
+    def list_api_keys(self) -> list[dict]:
+        """Names and dates only; the id is the first 12 hex characters of the key's SHA-256 (never the key)."""
+        return [{"id": str(k.get("hash", ""))[:12], "name": k.get("name", ""), "created": k.get("created", "")}
+                for k in self.data.get("api_keys") or [] if isinstance(k, dict)]
+
+    def revoke_api_key(self, kid: str) -> bool:
+        hit = [k for k in self.data.get("api_keys") or [] if isinstance(k, dict) and str(k.get("hash", ""))[:12] == kid]
+        if len(hit) != 1:
+            return False
+        self.update(lambda d: d.__setitem__("api_keys", [k for k in d.get("api_keys") or []
+                                                          if not (isinstance(k, dict) and str(k.get("hash", ""))[:12] == kid)]))
+        return True
+
     def check_api_key(self, key: str) -> bool:
         if not key or len(key) > 4096:
             return False

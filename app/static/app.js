@@ -2215,6 +2215,12 @@
     for (const t of document.querySelectorAll(".brain-tile")) t.setAttribute("aria-pressed", String(t === tile));
   }
   for (const tile of document.querySelectorAll(".brain-tile")) tile.addEventListener("click", () => showScope(tile));
+  // "Try it free" on the home page: back to the input box at the top
+  for (const a of document.querySelectorAll("[data-focus-input]")) a.addEventListener("click", (e) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+    input.focus({ preventScroll: true });
+  });
   const syncTyping = () => body.classList.toggle("typing", !!input.value.trim() && !$("#options").hidden);
   input.addEventListener("input", syncTyping);
 

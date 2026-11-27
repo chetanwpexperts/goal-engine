@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Goal Engine: free help with database errors, slow queries and Excel problems</title>
-  <meta name="description" content="Free for everyone: no card, no UPI, no limits. Tell Goal Engine what is wrong with your Excel file, Word document or database error in English, Hindi or Hinglish. It finds the real cause, shows the proof and fixes it, with Undo. No AI.">
+  <title>Goal Engine: database and spreadsheet diagnostics</title>
+  <meta name="description" content="Goal Engine diagnoses database errors, slow SQL queries and spreadsheet problems in English, Hindi or Hinglish. It reads the query step by step, proves the cause on real MySQL, MariaDB and PostgreSQL engines, and gives a fix with Undo. Its own models, no outside AI service.">
   <meta name="theme-color" content="#EEF1F6">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/home.css">
 </head>
 <body data-state="idle">
   <script>try { if (localStorage.getItem("ge_chat") === "1") document.body.dataset.state = "active"; } catch (e) {}</script>
@@ -53,8 +54,9 @@
   <main class="home" id="home">
     <div id="status" class="status" aria-live="polite" hidden></div>
     <div class="hero" id="hero">
-      <h1>Tell it what's wrong.<br><span class="accent">It finds out why.</span></h1>
-      <p>Database errors, slow queries, Excel formulas that stopped working. Write it the way you'd tell a colleague, in English, Hindi or Hinglish. You get the cause, the proof from your own query or file, and a fix you can undo.</p>
+      <p class="eyebrow"><span class="pulse" aria-hidden="true"></span>Diagnostics engine for databases and spreadsheets</p>
+      <h1>Your data's problems,<br><span class="accent">diagnosed and proven.</span></h1>
+      <p>Paste a SQL query, an error or a spreadsheet problem. Goal Engine reads it step by step, proves the cause on real MySQL, MariaDB and PostgreSQL engines, and gives a fix you can undo. Its own models understand English, Hindi and Hinglish; no outside AI service is used.</p>
       <p class="free-line">MySQL · MariaDB · PostgreSQL · Excel · Word. Free to try, no sign-up needed.</p>
     </div>
     <div id="composer-slot" class="composer-slot">
@@ -86,6 +88,133 @@
       </button>
     </section>
     <div id="scope" class="scope" hidden aria-live="polite"></div>
+    <section class="shot" aria-label="What Goal Engine shows">
+      <div class="window">
+        <div class="win-bar"><span></span><span></span><span></span><b>DBaba · database report</b></div>
+        <div class="win-body">
+          <div class="win-chat">
+            <p class="q">why is my orders report slow?</p>
+            <div class="a">
+              <p class="a-head">Slow query found <span class="tag ok">Proven on the database</span></p>
+              <ol class="steps">
+                <li><span>1</span>Reads <code>orders</code>: 1.2M rows, no index used</li>
+                <li><span>2</span><code>YEAR(created_at) = 2026</code> hides the column from its index</li>
+                <li><span>3</span>Range on <code>created_at</code> uses the index instead</li>
+              </ol>
+              <pre><code>WHERE created_at &gt;= '2026-01-01'
+  AND created_at &lt;  '2027-01-01'</code></pre>
+              <p class="a-foot">Preview · Approve · Undo</p>
+            </div>
+          </div>
+          <div class="win-report">
+            <div class="score">
+              <svg viewBox="0 0 120 120" class="ring" aria-hidden="true">
+                <circle cx="60" cy="60" r="50" class="ring-bg"/>
+                <circle cx="60" cy="60" r="50" class="ring-fg" pathLength="100" stroke-dasharray="75 100"/>
+              </svg>
+              <div class="score-n"><b>75</b><span>health score</span></div>
+            </div>
+            <ul class="bars">
+              <li><span>Now</span><i style="--v:92%"></i></li>
+              <li><span>Slow queries</span><i class="warn" style="--v:55%"></i></li>
+              <li><span>Indexes</span><i class="warn" style="--v:64%"></i></li>
+              <li><span>Tables</span><i style="--v:86%"></i></li>
+              <li><span>Settings</span><i style="--v:80%"></i></li>
+              <li><span>Security</span><i class="bad" style="--v:40%"></i></li>
+            </ul>
+            <ul class="finds">
+              <li><b class="sev bad">critical</b>DBaba's account can change data</li>
+              <li><b class="sev warn">warning</b>2 duplicate indexes on <code>orders</code></li>
+              <li><b class="sev warn">warning</b>Table <code>logs</code> has no primary key</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <p class="shot-note">An example report. Each finding says what it is, why it matters and how to fix it.</p>
+    </section>
+
+    <section class="metrics" aria-label="Measured results">
+      <div><b>400<small>/400</small></b><span>queries written correctly from plain words, checked on MySQL and PostgreSQL</span></div>
+      <div><b>0<small>/6,000</small></b><span>false alarms on correct queries in the test suite</span></div>
+      <div><b>3</b><span>languages understood: English, Hindi and Hinglish</span></div>
+      <div><b>0</b><span>messages sent to any outside AI service</span></div>
+    </section>
+
+    <section class="pipe" aria-labelledby="pipe-h">
+      <p class="kicker">Under the hood</p>
+      <h2 id="pipe-h">Machine learning where it helps, proof where it matters</h2>
+      <p class="lede">A trained language model works out what you mean. Written rules and real database engines decide what is true, so every answer comes with evidence, not a guess.</p>
+      <ol class="flow">
+        <li>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><path d="M17 15l3 3-3 3"/></svg>
+          <b>Understand</b>
+          <span>Character and word n-grams, TF-IDF and logistic regression classify the request. Spelling slips and Hinglish are handled.</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M9 9v11"/></svg>
+          <b>Read</b>
+          <span>The query is split into blocks: which rows each step keeps, what it groups, where a join multiplies rows.</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6"/><path d="M9 13l2 2 4-4"/></svg>
+          <b>Prove</b>
+          <span>Each suspicion is checked on real MariaDB and PostgreSQL engines, read-only, and the answer says how sure it is.</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v4h4"/></svg>
+          <b>Fix</b>
+          <span>You see the change and the rows it touches first. Nothing runs without your approval, and every change can be undone.</span>
+        </li>
+      </ol>
+      <div class="learn">
+        <svg viewBox="0 0 340 90" class="learn-art" aria-hidden="true">
+          <g class="dots"><circle cx="20" cy="30" r="5"/><circle cx="20" cy="60" r="5"/><circle cx="44" cy="20" r="5"/><circle cx="44" cy="45" r="5"/><circle cx="44" cy="70" r="5"/></g>
+          <path class="edge" d="M25 30L39 20M25 30L39 45M25 60L39 45M25 60L39 70M49 20L110 45M49 45L110 45M49 70L110 45"/>
+          <rect x="110" y="30" width="80" height="30" rx="8" class="node"/>
+          <text x="150" y="50" text-anchor="middle">model</text>
+          <path class="edge" d="M190 45h40"/>
+          <rect x="230" y="30" width="104" height="30" rx="8" class="node ok"/>
+          <text x="282" y="50" text-anchor="middle">retrained</text>
+        </svg>
+        <p><b>It keeps learning, safely.</b> When three different people confirm what a sentence meant, that sentence becomes a training example and the model retrains within minutes. One person alone can't teach it, so it can't be poisoned, and nobody's details are kept.</p>
+      </div>
+    </section>
+
+    <section class="products" aria-label="Agents">
+      <article class="prod">
+        <div class="prod-head">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6"/></svg>
+          <div><h3>DBaba</h3><p>for MySQL, MariaDB and PostgreSQL</p></div>
+        </div>
+        <svg viewBox="0 0 280 70" class="mini" aria-hidden="true">
+          <g class="cols"><rect x="6" y="38" width="22" height="26" rx="3"/><rect x="36" y="26" width="22" height="38" rx="3"/><rect x="66" y="44" width="22" height="20" rx="3"/><rect x="96" y="14" width="22" height="50" rx="3" class="hi"/><rect x="126" y="32" width="22" height="32" rx="3"/></g>
+          <path d="M168 54 L196 40 L222 46 L248 22 L274 28" class="line"/>
+        </svg>
+        <ul>
+          <li>Explains database errors and finds the real cause</li>
+          <li>Writes SQL from plain words and checks it before you run it</li>
+          <li>Full health report: slow queries, indexes, tables, settings, security</li>
+          <li>Exports a query's result to Excel with a live pivot and chart</li>
+        </ul>
+      </article>
+      <article class="prod">
+        <div class="prod-head xl">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M3.5 15h17M9.5 4v16"/></svg>
+          <div><h3>Sheetu</h3><p>for Excel and Word files</p></div>
+        </div>
+        <svg viewBox="0 0 280 70" class="mini grid" aria-hidden="true">
+          <g><rect x="6" y="6" width="268" height="58" rx="5" class="frame"/><path d="M6 20h268M6 34h268M6 48h268M70 6v58M140 6v58M210 6v58" class="rule"/>
+          <rect x="141" y="21" width="69" height="13" class="flag"/><rect x="71" y="35" width="69" height="13" class="fixd"/></g>
+        </svg>
+        <ul>
+          <li>Finds #REF!, #N/A and broken formulas, and why they broke</li>
+          <li>Duplicate rows, mismatched totals and text stored as numbers</li>
+          <li>Shows the exact cells before anything changes</li>
+          <li>Every fix comes with Undo</li>
+        </ul>
+      </article>
+    </section>
+
     <section class="sample" aria-labelledby="sample-h">
       <h2 id="sample-h">What an answer looks like</h2>
       <div class="sample-card">
@@ -104,15 +233,18 @@ WHERE status = 'paid' OR 'shipped';</code></pre>
         </div>
       </div>
     </section>
-    <section class="how" aria-labelledby="how-h">
-      <h2 id="how-h">How it works</h2>
-      <ol class="how-list">
-        <li><b>It reads your query or file step by step.</b> Which rows it keeps, what it adds up, where a join copies rows. Then it points at the step that's wrong and shows why.</li>
-        <li><b>It tells you how sure it is.</b> Some mistakes are certain from the text alone. Others depend on your data or table structure, and it says so, with the query that settles it.</li>
-        <li><b>Nothing changes without you.</b> You see the rows before anything is changed, and every change can be undone.</li>
-      </ol>
-      <p class="how-note">There's no ChatGPT or other AI service behind it. DBaba and Sheetu work from written rules and checks, each one tested on real MariaDB and PostgreSQL databases before it goes live, and they run on this site's own server. Your files are never sent anywhere else.</p>
+
+    <section class="deploy" aria-labelledby="deploy-h">
+      <div>
+        <p class="kicker">Runs where your data is</p>
+        <h2 id="deploy-h">Install DBaba on your own server</h2>
+        <p>The database never leaves your machine. DBaba listens on 127.0.0.1 only, connects with a read-only account and keeps its reports next to its settings.</p>
+      </div>
+      <ul class="chips">
+        <li>Linux installer</li><li>Docker</li><li>Windows</li><li>cPanel</li><li>Desktop app</li><li>Command line</li><li>Local API</li>
+      </ul>
     </section>
+
     <section class="talk-cta" aria-labelledby="talk-h">
       <div>
         <h2 id="talk-h">Want it for your team or business?</h2>

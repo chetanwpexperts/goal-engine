@@ -41,10 +41,29 @@
   const name=input(form,"Database name","database","text",255);
   const user=input(form,"Database user","user","text",255);
   const password=input(form,"Database password","password","password",4096);
+  const tunnelLabel=node("label","Connect through SSH (database runs on the SSH server)");
+  const tunnel=node("input");tunnel.type="checkbox";tunnelLabel.append(tunnel);form.append(tunnelLabel);
+  const sshFields=node("fieldset");sshFields.hidden=true;form.append(sshFields);
+  const sshHost=input(sshFields,"SSH host","ssh_host","text",253);
+  const sshUser=input(sshFields,"SSH user","ssh_user","text",253);
+  const sshKey=input(sshFields,"Absolute key file path (blank uses SSH agent)","ssh_key","text",4096);
+  for(const i of [sshHost,sshUser,sshKey])i.required=false;
+  tunnel.onchange=()=>{sshFields.hidden=!tunnel.checked;sshHost.required=tunnel.checked;sshUser.required=tunnel.checked;};
   const submit=node("button","Test connection");submit.type="submit";form.append(submit);
   form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;
    const data={engine:engine.value,host:host.value.trim(),port:Number(port.value),database:name.value,user:user.value,password:password.value};
-   try{const result=await call("test",data);if(!result.ok){status(result.reason||"Connection failed.");return;}credentials=data;password.value="";status(result.warning||"Connection works.");saveScreen();}
+   try{
+    if(tunnel.checked){
+     const ssh={host:sshHost.value.trim(),user:sshUser.value.trim(),key_path:sshKey.value,port:data.port};
+     const cmd=(action,input)=>invoke("trial_ssh",{action,input});
+     const check=await cmd("fingerprint",ssh);
+     if(check.fingerprint){
+      if(!window.confirm("Verify this fingerprint with your server administrator before accepting:\n"+check.fingerprint)){status("SSH connection cancelled.");return;}
+      await cmd("accept",{...ssh,fingerprint:check.fingerprint});
+     }
+     const forwarded=await cmd("open",ssh);data.host=forwarded.host;data.port=forwarded.port;
+    }else await invoke("trial_ssh",{action:"close",input:{}});
+    const result=await call("test",data);if(!result.ok){status(result.reason||"Connection failed.");return;}credentials=data;password.value="";status(result.warning||"Connection works.");saveScreen();}
    catch(err){status(String(err));}finally{submit.disabled=false;}
   };
   root.append(form,action("Back to detection",detect));

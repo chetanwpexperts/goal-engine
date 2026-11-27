@@ -350,3 +350,20 @@ def test_explicit_serve_config(monkeypatch, tmp_path):
     with pytest.raises(SystemExit) as exc:
         main(["serve", "--port", "9123", "--config", str(config)])
     assert exc.value.code == 0
+
+
+def test_report_before_first_scan(monkeypatch, capsys):
+    from dbaba_cli.contract import commands_for
+    from argparse import Namespace
+
+    class EmptyReport:
+        def call(self, path):
+            assert path == "/api/report"
+            return {"at": None, "score": None, "engine": "mysql",
+                    "version": "1.0", "pending": True, "sections": []}
+
+    assert commands_for(EmptyReport(), Namespace(command="report", scan=False, html=None)) == 0
+    out = capsys.readouterr().out
+    assert "No scan yet" in out
+    assert "Scan in progress." in out
+    assert "None/100" not in out

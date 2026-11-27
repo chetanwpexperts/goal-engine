@@ -44,7 +44,7 @@
   const submit=node("button","Test connection");submit.type="submit";form.append(submit);
   form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;
    const data={engine:engine.value,host:host.value.trim(),port:Number(port.value),database:name.value,user:user.value,password:password.value};
-   try{const result=await call("test",data);if(!result.ok){status(result.reason||"Connection failed.");return;}credentials=data;password.value="";status("Connection works.");saveScreen();}
+   try{const result=await call("test",data);if(!result.ok){status(result.reason||"Connection failed.");return;}credentials=data;password.value="";status(result.warning||"Connection works.");saveScreen();}
    catch(err){status(String(err));}finally{submit.disabled=false;}
   };
   root.append(form,action("Back to detection",detect));
@@ -52,10 +52,11 @@
  function saveScreen(){
   screen("3 of 3 — Protect your DBaba screen");
   const form=node("form"),pass=input(form,"Screen password","screen_password","password",4096);
+  pass.minLength=8;
   const submit=node("button","Save and open DBaba");submit.type="submit";form.append(submit);
   form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{
-   const result=await call("save",{...credentials,screen_password:pass.value});if(!result.ok){status("Setup not saved.");return;}
-   credentials=null;pass.value="";status("");await dashboard();
+   const result=await call("save",{...credentials,screen_password:pass.value});if(!result.ok){status(result.reason||"Setup not saved.");return;}
+   credentials=null;pass.value="";status(result.warning||"");await dashboard();
   }catch(err){status(String(err));}finally{submit.disabled=false;}};
   root.append(form,action("Back to connection",()=>connection(credentials)));
  }
@@ -78,7 +79,7 @@
   async function report(){
    tab="report";panel.replaceChildren(node("h3","Report"),action("Start scan",async()=>{const r=await call("scan");status(r.started?"Scan started. Refresh when it finishes.":"Scan not started.");}),action("Refresh report",report),action("Save HTML report",async()=>{const r=await call("report_html");status(r.saved?"HTML report saved.":"Save cancelled.");}));
    const data=await call("report");if(tab!=="report")return;
-   panel.append(node("p","Score: "+data.score+"/100"));
+   panel.append(node("p",data.at==null||data.score==null?"No scan yet":"Score: "+data.score+"/100"));if(data.pending)panel.append(node("p","Scan in progress."));
    const rank={critical:0,warning:1,info:2};
    const items=(data.sections||[]).flatMap(s=>(s.items||[]).map(i=>({...i,section:s.title}))).sort((a,b)=>(rank[a.severity]??3)-(rank[b.severity]??3));
    for(const item of items){const a=node("article");a.append(node("strong",item.severity+": "+item.title),node("p",item.section+" — "+item.what),node("p","Why: "+item.why));

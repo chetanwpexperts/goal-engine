@@ -91,8 +91,8 @@ export PORT
 export SITE_MODE=open ENGINE_MODE=ml AGENT_SCHEDULER=on DBABA_LOCAL=1
 export COOKIE_SECURE=false EXPOSE_INTERNALS=0 DATABASE_URL=sqlite:////data/dbaba.db
 export GEMINI_API_KEY='' GROQ_API_KEY='' AI_PROVIDER_ORDER='' UVICORN_HOST=0.0.0.0
-if [ -f app/local.py ]; then
-    exec python -m app.local serve --port "$PORT"
+if python -c "import app.local" >/dev/null 2>&1; then
+    exec python -m app.local serve --port "$PORT" --config /data/dbaba.json --host 0.0.0.0
 fi
-printf '%s\n' "Important: this release's screen has no password protection yet. Use the SSH tunnel only, and keep the server accessible to trusted users." >&2
+printf '%s\n' "This image has no screen password yet; publish it only on 127.0.0.1." >&2
 exec uvicorn app.main:app --host 0.0.0.0 --port "$PORT"

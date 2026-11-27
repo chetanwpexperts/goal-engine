@@ -128,7 +128,7 @@ Claude (daytime sessions and the nightly run, in this order):
   merges capitals, accents, trailing spaces; PostgreSQL / SQLite exact), POST/GET /api/connector-jobs/{id}/excel, the card's
   chart and "Pivot by" pick, the workbook on the scheduled report email; tests/fuzz/dbexcel.py (LibreOffice recalculates,
   compared with each engine's GROUP BY) 400/400; 2 concepts (query_to_excel, group_by_capitals).
-- [ ] S4. DBaba's own screen when installed (never the whole website): `python -m app.local serve --port N`, 127.0.0.1
+- [x] S4. DBaba's own screen when installed (never the whole website): `python -m app.local serve --port N`, 127.0.0.1
   only, screen password from dbaba.json, API keys (`Authorization: Bearer`), no accounts / captcha / admin / other agents.
   First run is a 3-step wizard a non-expert can follow: (1) "Which database do you want DBaba to look after?" with taps
   MySQL / MariaDB / PostgreSQL / "Find it for me" (detects what runs on this machine); (2) connect: host, port, database,
@@ -137,6 +137,13 @@ Claude (daytime sessions and the nightly run, in this order):
   (EN / Hinglish / Hindi), answers proven on the connected database, fixes as preview + approve + Undo; (b) REPORT (S5), each
   item with its fix and "ask about this" into the chat; (c) AUTOMATION (S6): every job listed, on/off and its time, last run
   and result. The same screen on a server (reached by SSH tunnel, the desktop app or `dbaba` commands) and on a laptop.
+  Done 27 Nov: app/local (python -m app.local serve --port --config --host; reset), contract in docs/dbaba-local-contract.md.
+  Reads the installer's / Docker's dbaba.json as is (scrypt screen password); API keys stored as SHA-256 only; setup token
+  only from 127.0.0.1 and only before setup; Host-header guard, JSON-only cookie changes, login lock after 5 misses.
+  Setup: detect by the servers' own greetings (no password, no SQL), plain-words failures (lab: MariaDB answers 1044 for a
+  missing database), first scan; report sections now / tables / indexes / security / server (S5 adds the rest); jobs
+  health (5 min, alerts raised once and cleared) and scan (daily). Chat is DBaba's own reasoning. Not yet: chat answers
+  run on the connected database, and fixes as preview + approve + Undo (only suggestions so far). tests/test_local.py.
 - [ ] S4b. Laptop-only DBaba (nothing installed on the server): the desktop app carries DBaba's engine (S4's screen) and
   reaches the database through an SSH tunnel to the database's own port (or directly when it is reachable); chat and the
   report work, automation runs while the laptop is on. The start screen offers the two choices plainly: "Try it now" (this

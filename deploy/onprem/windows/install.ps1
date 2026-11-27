@@ -85,6 +85,12 @@ copy(source, target)
     try {
         Set-DBabaEnvironment $next -Check
         Invoke-Python $venv @('-c','import app.main')
+        # Probe the staged package with the same interpreter used by the task.
+        $hasLocal = $false
+        try {
+            & $venv -c 'import app.local' 2>$null | Out-Null
+            $hasLocal = ($LASTEXITCODE -eq 0)
+        } catch { $hasLocal = $false }
     } finally { Pop-Location }
     foreach ($name in @('data','dbaba.json')) {
         $path = Join-Path $next $name
@@ -118,7 +124,7 @@ copy(source, target)
     foreach ($name in @('uninstall.ps1','common.ps1','configure.py')) {
         Copy-Item -LiteralPath (Join-Path $active "deploy\onprem\windows\$name") -Destination (Join-Path $root $name) -Force
     }
-    if (-not (Test-Path (Join-Path $active 'app\local.py'))) {
+    if (-not $hasLocal) {
         Write-Host "This release's screen has no password protection yet; reach it only through an SSH tunnel."
     }
     if ($location.Admin) { Write-Host 'DBaba starts automatically at boot.' }

@@ -263,7 +263,11 @@ def main(argv=None):
             switches.add_argument("--on", action="store_true")
             switches.add_argument("--off", action="store_true")
             command.add_argument("--at")
-    args = parser.parse_args(argv)
+    supplied = list(sys.argv[1:] if argv is None else argv)
+    if supplied and supplied[0] == "report" and any(v in ("--zip", "--support", "--support-report") for v in supplied[1:]):
+        print("The support ZIP is now: dbaba support-report")
+        return 1
+    args = parser.parse_args(supplied)
     if args.command == "version":
         print(version())
         return 0

@@ -1,4 +1,5 @@
-param([string]$Source = $env:DBABA_SRC)
+param([string]$Source = $env:DBABA_SRC, [switch]$NonInteractive, [int]$Port = 8765)
+if ($NonInteractive -and $env:DBABA_PASSWORD.Length -lt 8) { throw 'Set DBABA_PASSWORD to at least 8 characters.' }
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'common.ps1')
 $location = Get-DBabaLocation
@@ -42,11 +43,15 @@ try {
         $port = [int](Get-Content -Raw -LiteralPath $config | ConvertFrom-Json).port
         Write-Host 'Keeping your existing configuration and data.'
     } else {
-        $answer = Read-Host 'Screen port [8765]'
-        $port = if ($answer) { [int]$answer } else { 8765 }
+        if (-not $NonInteractive) {
+            $answer = Read-Host 'Screen port [8765]'
+            if ($answer) { $port = [int]$answer }
+        }
         if ($port -lt 1024 -or $port -gt 65535) { throw 'Choose a port from 1024 to 65535.' }
         if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) { throw 'Choose an available port.' }
-        Invoke-Python $python @((Join-Path $PSScriptRoot 'configure.py'), $config, 'create', '--port', "$port")
+        $configArgs = @((Join-Path $PSScriptRoot 'configure.py'), $config, 'create', '--port', "$port")
+        if ($NonInteractive) { $configArgs += '--non-interactive' }
+        Invoke-Python $python $configArgs
     }
     if ($port -lt 1024 -or $port -gt 65535) { throw 'Choose a port from 1024 to 65535.' }
     $next = Join-Path $root '.release-new'
@@ -118,7 +123,7 @@ copy(source, target)
         Register-ScheduledTask -TaskName $task -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
         Start-ScheduledTask -TaskName $task
     }
-    $health = { Wait-DBabaHealth $port $task }
+    $health = { Wait-DBabaHealth $port $task -Seconds $(if ($NonInteractive) { 60 } else { 180 }) }
     $remove = { Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue }
     Switch-DBabaRelease $root $stop $start $health $remove
     foreach ($name in @('uninstall.ps1','common.ps1','configure.py')) {

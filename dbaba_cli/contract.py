@@ -69,7 +69,12 @@ def commands_for(client, args):
                 stream.write(data)
             print("HTML report saved.")
         report = client.call("/api/report")
-        print(f'Score: {report["score"]}/100 ({report["engine"]}, {report["at"]})')
+        if report.get("at") is None or report.get("score") is None:
+            print("No scan yet")
+        else:
+            print(f'Score: {report["score"]}/100 ({report["engine"]}, {report["at"]})')
+        if report.get("pending"):
+            print("Scan in progress.")
         items = [(section["title"], item) for section in report["sections"] for item in section["items"]]
         for section, item in sorted(items, key=lambda row: {"critical":0,"warning":1,"info":2}.get(row[1]["severity"], 3)):
             print(f'{item["severity"]}: {section}: {item["title"]}\n{item["what"]}\nWhy: {item["why"]}')

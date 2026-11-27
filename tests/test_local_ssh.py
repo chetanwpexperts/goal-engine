@@ -60,7 +60,14 @@ class Lab:
         (root / "sshd_config").write_text(
             f"Port {self.port}\nListenAddress 127.0.0.1\nHostKey {self.hostkey}\nAuthorizedKeysFile {root / 'authorized_keys'}\n"
             f"PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin prohibit-password\n"
-            f"AllowTcpForwarding {forwarding}\nPidFile {root / 'sshd.pid'}\nStrictModes no\nUsePAM no\n")
+            f"AllowTcpForwarding {forwarding}\nPidFile {root / 'sshd.pid'}\nStrictModes no\nUsePAM no\n"
+            f"MaxStartups 200\nLogLevel VERBOSE\n")
+        # The lab makes far more unauthenticated connections (host key scans, failure cases) than a person would. OpenSSH
+        # 9.8+ penalises a source address for that (PerSourcePenalties), which would block the lab, not test DBaba.
+        if subprocess.run([SSHD, "-t", "-f", str(root / "sshd_config"), "-o", "PerSourcePenalties=no"],
+                          capture_output=True).returncode == 0:
+            with open(root / "sshd_config", "a") as fh:
+                fh.write("PerSourcePenalties no\n")
         self.proc = subprocess.Popen([SSHD, "-D", "-f", str(root / "sshd_config"), "-E", str(root / "sshd.log")])
         for _ in range(100):
             try:
@@ -72,6 +79,15 @@ class Lab:
         fp = subprocess.run(["ssh-keygen", "-l", "-E", "sha256", "-f", str(root / "host.pub")], capture_output=True,
                             text=True).stdout.split()[1]
         self.fingerprint = fp
+
+    def log(self) -> str:
+        """sshd's version and the end of its log, for a failure message."""
+        ver = subprocess.run([SSHD, "-V"], capture_output=True, text=True).stderr.strip()
+        try:
+            tail = (self.root / "sshd.log").read_text(errors="replace").splitlines()[-15:]
+        except OSError:
+            tail = []
+        return f"{ver}; sshd alive={self.proc.poll() is None}; log:\n" + "\n".join(tail)
 
     def ssh(self, **kw):
         return {"host": "127.0.0.1", "port": self.port, "user": self.user, "key_file": str(self.key), **kw}
@@ -101,7 +117,7 @@ def kh(tmp_path, lab):
 
 
 def trusted_kh(kh, lab):
-    assert tunnel.trust(lab.ssh(), kh, lab.fingerprint)
+    assert tunnel.trust(lab.ssh(), kh, lab.fingerprint), lab.log()
     return kh
 
 
@@ -221,7 +237,7 @@ def test_a_changed_host_key_is_refused_and_never_replaced(lab, kh, tmp_path):
     kh.write_text(f"[127.0.0.1]:{lab.port} {kind} {blob}\n")
     os.chmod(kh, 0o600)
     res = dbconn.test(mdb(lab))
-    assert res["ok"] is False and res["code"] == "host_key_changed" and "CHANGED" in res["reason"]
+    assert res["ok"] is False and res["code"] == "host_key_changed" and "CHANGED" in res["reason"], (res, lab.log())
     assert tunnel.trust(lab.ssh(), kh, lab.fingerprint)          # "trusted" already: the old line stays
     assert kh.read_text().count("\n") == 1 and blob in kh.read_text() and fake.exists()
 
@@ -404,7 +420,7 @@ def test_screen_setup_over_ssh_end_to_end(lab, tmp_path):
     H = {"X-DBaba-Setup": "TOKEN-S"}
     body = {**MARIA, "host": "127.0.0.1", "ssh": lab.ssh()}
     first = c.post("/api/setup/test", headers=H, json=body).json()
-    assert first["ok"] is False and first["code"] == "host_key_unknown" and first["host_keys"]
+    assert first["ok"] is False and first["code"] == "host_key_unknown" and first["host_keys"], (first, lab.log())
     seen = c.post("/api/setup/ssh", headers=H, json={"ssh": lab.ssh()}).json()
     assert seen["trusted"] is False and lab.fingerprint in [k["fingerprint"] for k in seen["keys"]]
     assert c.post("/api/setup/ssh", headers=H, json={"ssh": lab.ssh(), "accept": "SHA256:" + "B" * 43}).json()["ok"] is False

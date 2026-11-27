@@ -2,6 +2,7 @@
 set -eu
 umask 077
 cd /opt/dbaba
+printf '%s\n' "Publish this port only on 127.0.0.1 (e.g. -p 127.0.0.1:8765:8765); never on all interfaces." >&2
 
 PORT=$(python - <<'PY'
 import hashlib

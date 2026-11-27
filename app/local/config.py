@@ -61,7 +61,8 @@ class Config:
     def _write(self, data: dict) -> None:
         fd, tmp = tempfile.mkstemp(dir=self.path.parent, prefix=".dbaba-", suffix=".json")
         try:
-            os.fchmod(fd, 0o600)
+            if hasattr(os, "fchmod"):                   # Linux / macOS; Windows has no fchmod (mkstemp is owner-only there)
+                os.fchmod(fd, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2)
                 fh.write("\n")

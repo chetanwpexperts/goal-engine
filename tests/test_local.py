@@ -307,3 +307,11 @@ def test_reset_command(tmp_path):
     r = subprocess.run([sys.executable, "-m", "app.local", "reset", "--config", str(cfg)], capture_output=True, text=True,
                        env={**os.environ, "PYTHONPATH": os.getcwd()})
     assert r.returncode == 0 and Config(cfg).setup_done is False
+
+
+def test_settings_write_without_fchmod(tmp_path, monkeypatch):
+    """Windows has no os.fchmod: the settings file must still be written (found reviewing the Windows runner, PR #58)."""
+    monkeypatch.delattr(os, "fchmod")
+    cfg = Config(tmp_path / "dbaba.json")
+    cfg.update(lambda d: d.__setitem__("port", 9999))
+    assert Config(tmp_path / "dbaba.json").data["port"] == 9999

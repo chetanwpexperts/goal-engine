@@ -241,7 +241,7 @@ async fn poll(app:AppHandle,id:Uuid,generation:Uuid) {
         if !notifications.is_empty() && model::save(&store.path,&rows).is_ok() {
             d.rows=rows;
             for alert in notifications {
-                let _=app.notification().builder().title(alert.title).body(alert.text).show();
+                let _=app.notification().builder().title(alert.title).body(format!("{}\n{}", alert.at, alert.text)).show();
             }
         }
     }

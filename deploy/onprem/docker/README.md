@@ -1,5 +1,7 @@
 # Run DBaba with Docker
 
+Publish this port only on 127.0.0.1 (e.g. -p 127.0.0.1:8765:8765); never on all interfaces.
+
 Run these commands from the repository root with Docker and the Compose plugin installed.
 
 Choose a screen password of at least eight characters. In Bash, enter it without showing it on screen:

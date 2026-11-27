@@ -1,0 +1,46 @@
+name: On-prem install matrix
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'deploy/onprem/**'
+      - '.github/workflows/onprem-install.yml'
+permissions:
+  contents: read
+jobs:
+  syntax:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate Bash syntax and ShellCheck errors
+        run: |
+          for script in deploy/onprem/tests/*.sh; do
+            bash -n "$script"
+          done
+          shellcheck -S error deploy/onprem/tests/*.sh deploy/onprem/install.sh deploy/onprem/uninstall.sh
+  install:
+    needs: syntax
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ['ubuntu:22.04', 'ubuntu:24.04', 'debian:12', 'almalinux:9', docker]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run target
+        env:
+          DBABA_TEST_TABLE: ${{ runner.temp }}/onprem-results.md
+        run: bash deploy/onprem/tests/run.sh '${{ matrix.target }}'
+      - name: Publish actual step results
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/onprem-results.md"; then
+            cat "$RUNNER_TEMP/onprem-results.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No test table produced; inspect failed setup.' >> "$GITHUB_STEP_SUMMARY"
+          fi

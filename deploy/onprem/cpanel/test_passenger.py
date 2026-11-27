@@ -39,7 +39,7 @@ def test_passenger(tmp_path, monkeypatch):
                    CONTENT_TYPE="application/json", CONTENT_LENGTH=str(len(body)))
         env["wsgi.input"] = BytesIO(body)
         result = []
-        response = app(env, lambda status, headers: result.extend([status, dict(headers)]))
+        response = app(env, lambda status, headers, *exc: result.extend([status, dict(headers)]))
         try:
             data = b"".join(response)
         finally:

@@ -145,11 +145,46 @@ finally:
   step "stop remove recreate preserves config and data" recreate
   # Check persisted password verifier, without asserting an unimplemented login works.
   step "same password verifier survives recreation" docker exec -e DBABA_PASSWORD "$name" python -c 'import os,json,hashlib,hmac; h=json.load(open("/data/dbaba.json"))["screen_password"]; assert hmac.compare_digest(hashlib.scrypt(os.environ["DBABA_PASSWORD"].encode(),salt=bytes.fromhex(h["salt"]),n=h["n"],r=h["r"],p=h["p"],dklen=64).hex(),h["hash"])'
-  # No authenticated screen protocol is documented yet. Fail closed when
-  # the endpoint exists until the real S4 login contract is available.
+  # Use the published host port and the real S4 session-cookie contract.
   actual_login() {
-    echo "S4 login contract must be implemented in this test before it can pass." >&2
-    return 1
+    python3 - <<'PY'
+import http.cookiejar
+import json
+import os
+import urllib.error
+import urllib.request
+
+base = "http://127.0.0.1:8765"
+jar = http.cookiejar.CookieJar()
+opener = urllib.request.build_opener(
+    urllib.request.ProxyHandler({}),
+    urllib.request.HTTPCookieProcessor(jar),
+)
+password = os.environ["DBABA_PASSWORD"]
+
+def login(value):
+    request = urllib.request.Request(
+        base + "/api/login",
+        data=json.dumps({"password": value}).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    return opener.open(request, timeout=5)
+
+try:
+    with login(password + "-wrong"):
+        raise AssertionError("Wrong password accepted")
+except urllib.error.HTTPError as exc:
+    assert exc.code == 401, "Wrong password must return 401"
+assert not any(c.name == "dbaba_session" for c in jar)
+with login(password) as response:
+    assert response.status == 200
+    assert json.load(response).get("ok") is True
+assert any(c.name == "dbaba_session" and c.value for c in jar)
+with opener.open(base + "/api/state", timeout=5) as response:
+    assert response.status == 200
+    assert json.load(response).get("has_password") is True
+PY
   }
   s4_step "same password actual screen login" actual_login
   fresh_start() {

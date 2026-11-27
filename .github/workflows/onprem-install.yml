@@ -1,7 +1,6 @@
 name: On-prem install matrix
 on:
-  push:
-    branches: [onprem-install-tests]
+  workflow_dispatch:
   pull_request:
     paths:
       - 'deploy/onprem/**'

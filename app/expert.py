@@ -42,7 +42,7 @@ def create(db: Session, visitor_id: str, form: dict) -> ExpertRequest:
     if form.get("website"):                           # hidden field only bots fill in
         raise ExpertError("Request not accepted")
     if not form.get("consent"):
-        raise ExpertError("Please tick the box so Chetan can contact you")
+        raise ExpertError("Please tick the box so we can contact you")
     name = (form.get("name") or "").strip()[:80]
     need = (form.get("need") or "").strip()[:2000]
     phone = clean_phone(form.get("phone", ""))
@@ -61,7 +61,7 @@ def create(db: Session, visitor_id: str, form: dict) -> ExpertRequest:
     now = time.time()
     recent = [t for t in _recent.get(visitor_id, []) if now - t < 86400]
     if len(recent) >= PER_VISITOR_PER_DAY:
-        raise ExpertError("You've already sent a few requests today. Chetan will get back to you")
+        raise ExpertError("You've already sent a few requests today. We'll get back to you")
     _recent[visitor_id] = recent + [now]
     goal = None
     if form.get("goal_id"):

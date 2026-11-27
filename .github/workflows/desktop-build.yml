@@ -1,0 +1,44 @@
+name: desktop-build
+on:
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - 'tests/desktop/**'
+      - '.github/workflows/desktop-build.yml'
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            bundles: deb,appimage
+          - os: macos-latest
+            bundles: dmg
+          - os: windows-latest
+            bundles: nsis
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libxdo-dev libssl-dev libdbus-1-dev
+      - run: npm install --no-audit --no-fund
+      - run: node --check ui/app.js
+      - run: node --check ui/trial.js
+      - run: node --test ../tests/desktop/trial.test.cjs
+      - run: npm run tauri -- icon icon.svg
+      - run: cargo check --manifest-path src-tauri/Cargo.toml
+      - run: npm test
+      - run: npm run tauri -- build --bundles ${{ matrix.bundles }}

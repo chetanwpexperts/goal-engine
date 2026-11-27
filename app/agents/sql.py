@@ -328,6 +328,11 @@ def _analyze_sql(query: str, extra: str = "", lead: str = "") -> dict:
 
     every_where = _all_wheres(sql) or where           # night 15: the filters of every block (a CTE's WHERE too), not only the first
     func = re.findall(r"\b(date|year|month|lower|upper|trim|substring|cast|concat|ifnull|coalesce)\s*\(\s*([`\w.]+)", every_where, re.I)
+    # PostgreSQL's date functions name the part first: EXTRACT(YEAR FROM d), date_trunc('month', d), date_part('year', d);
+    # the column is just as wrapped, whatever it is compared with (2025, ?, $1) (lab: S5, pg_stat_statements text)
+    func += [("EXTRACT", c) for c in re.findall(r"\bextract\s*\(\s*(?:\w+|\$\d+|\?)\s+from\s+([`\"\w.]+)", every_where, re.I)]
+    func += [(f.upper(), c) for f, c in re.findall(r"\b(date_trunc|date_part)\s*\(\s*(?:'[^']*'|\$\d+|\?)\s*,\s*([`\"\w.]+)",
+                                                   every_where, re.I)]
     rewritten = rewrite(original)
     reported = set()
     for f, c in func:
@@ -335,10 +340,12 @@ def _analyze_sql(query: str, extra: str = "", lead: str = "") -> dict:
         if f in reported:
             continue
         reported.add(f)
+        if any(getattr(x, "title_en", "").startswith(f"{f}() on a column in WHERE") for x in findings):
+            continue                                  # already said by the rewriting check (a literal year it can turn into a range)
         if f in ("DATE", "YEAR", "MONTH") and rewritten != original and re.search(rf"\b{f}\s*\(", rewritten, re.I) is None:
             fen, fhi = ("Compare the raw column with a range instead (see the rewritten query).",
                         "Column ko seedha range se compare karo (rewritten query dekho).")
-        elif f in ("DATE", "YEAR", "MONTH"):
+        elif f in ("DATE", "YEAR", "MONTH", "EXTRACT", "DATE_TRUNC", "DATE_PART"):
             fen, fhi = (f"Compare the raw column with a date range instead, e.g. {c} >= '2026-01-01' AND {c} < '2026-02-01'.",
                         f"Column ko seedha date range se compare karo, jaise {c} >= '2026-01-01' AND {c} < '2026-02-01'.")
         elif f in ("LOWER", "UPPER"):

@@ -148,7 +148,7 @@ Claude (daytime sessions and the nightly run, in this order):
   reaches the database through an SSH tunnel to the database's own port (or directly when it is reachable); chat and the
   report work, automation runs while the laptop is on. The start screen offers the two choices plainly: "Try it now" (this
   computer only) or "Let DBaba look after it 24/7" (install on the server)
-- [ ] S5. The full database report (first scan, then on a schedule): a health score and sections, worst first, each item with
+- [x] S5. The full database report (first scan, then on a schedule): a health score and sections, worst first, each item with
   what it is, why it matters, and the fix (a change only as preview + approve + Undo): problems right now (deadlocks, locks
   and who waits on whom, long-running queries, connections near the limit, replication lag); slow queries (slow log /
   pg_stat_statements: the worst ones, each checked and rewritten); indexes (missing from the real workload, unused,
@@ -156,6 +156,15 @@ Claude (daytime sessions and the nightly run, in this order):
   pool / shared_buffers, max_connections, timeouts vs this server); backups (last one, tested restore); security (users and
   grants, remote root, empty passwords, open port, old version). Downloadable (HTML / PDF / Excel via S3) and comparable
   with the last report.
+  Done 27 Nov: app/local/checks.py (gather: read-only catalog and statistics; judge: pure reasoning) + report.py, lab
+  tests/s5lab.py and tests/test_local_report.py on MariaDB (performance_schema on and off) and PostgreSQL (pg_stat_statements
+  on and off). Lab facts used: loading dominates statement stats (only SELECT/UPDATE/DELETE/WITH count); MariaDB says how
+  many runs used no index; PostgreSQL 16 plans $n statements (EXPLAIN (GENERIC_PLAN)); values are hidden, so LIKE ? never gets
+  an index; usage counts start at restart (unused only after 7 days); fresh InnoDB tables show a few MB DATA_FREE; MariaDB
+  shows no statement for an idle lock holder; PostgreSQL publishes row counts up to a second late; the read-only user can't
+  read mysql.user. Fixed on the way: MariaDB's spaced statement text gave the checker a false alarm (tidy()); the checker now
+  sees EXTRACT / date_trunc / date_part around a column with any value ($n, ?). Not yet: backups themselves (S6), PDF / Excel
+  of the report.
 - [ ] S6. DBA jobs that keep it healthy: scheduler; health check every 5 min with alerts (email, /api/state "alerts" in the
   format the desktop app reads: id, level info|warning|critical, title, text, at, acknowledged); daily backup with a test
   restore into a scratch database; approved fixes applied with preview and Undo

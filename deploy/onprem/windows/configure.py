@@ -100,16 +100,18 @@ def main():
     parser.add_argument("path", type=Path)
     parser.add_argument("action", choices=("create", "drop"))
     parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--non-interactive", action="store_true")
     args = parser.parse_args()
     if args.action == "create":
         if args.path.exists():
             return
-        password = getpass.getpass("Choose a screen password (at least 8 characters): ")
-        if len(password) < 8 or password != getpass.getpass("Enter it again: "):
+        password = os.environ.get("DBABA_PASSWORD", "") if args.non_interactive else getpass.getpass("Choose a screen password (at least 8 characters): ")
+        if len(password) < 8 or (not args.non_interactive and password != getpass.getpass("Enter it again: ")):
             raise SystemExit("Please enter matching passwords of at least 8 characters.")
         config = new_config(args.port, password)
         save(args.path, config)
-        create_account(args.path, config)
+        if not args.non_interactive:
+            create_account(args.path, config)
     elif args.path.exists():
         db = json.loads(args.path.read_text(encoding="utf-8")).get("database") or {}
         if db.get("user") != "dbaba_ro":

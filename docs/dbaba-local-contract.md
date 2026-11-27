@@ -68,7 +68,7 @@ The format the installer and the Docker entrypoint already write. DBaba keeps ev
 | `POST /api/setup/test` `{"engine", "host", "port", "database", "user", "password"}` | `{"ok", "version", "reason", "warning"?}` (`reason` in plain words when not ok; `warning` when the user can change data) |
 | `POST /api/setup/save` `{same, "screen_password"?}` | `{"ok": true, "api_key", "warning"?}` or `{"ok": false, "reason"}`. `screen_password` (8+ characters) is required when the file has none. Starts the first scan and a health check. |
 | `POST /api/setup/reset` (key or session) | `{"ok": true}`; setup is open again and a new token is printed |
-| `GET /api/report` | `{"at", "score", "engine", "version", "pending", "sections": [{"id", "title", "items": [Item]}]}`; before the first scan `at` and `score` are null |
+| `GET /api/report` | `{"at", "score", "engine", "version", "pending", "changes", "sections": [{"id", "title", "items": [Item]}]}`; before the first scan `at` and `score` are null. `changes`: `{"first": true}` for the first report, else `{"first": false, "score_before", "at_before", "new": [titles], "gone": [titles]}` (warnings and criticals only) |
 | `GET /api/report.html` | the report as a downloadable HTML file |
 | `POST /api/report/scan` | `{"started": bool}` (false while a scan runs) |
 | `GET /api/jobs` | `{"jobs": [Job]}` |
@@ -84,9 +84,14 @@ The format the installer and the Docker entrypoint already write. DBaba keeps ev
   A fix is only a suggestion; nothing in S4 changes the database.
 * **Job**: `{"id", "name", "enabled", "every": "5min|day", "at": "HH:MM" | null, "last_run": {"at", "ok", "text"} | null}`.
   S4 has `health` (every 5 minutes) and `scan` (daily, default 02:40 local time); S6 adds backups.
-* **Report sections in S4**: `now` (connections against the limit, queries running over a minute), `tables` (no primary
-  key), `indexes` (big tables read without an index), `security` (DBaba's user can change data), `server` (version). S5
-  adds the rest.
+* **Report sections** (S5), worst first; the score is 100 − 25 per critical − 5 per warning:
+  `now` (connections against the limit, queries over a minute, who waits on whom, deadlocks), `slow` (the slowest queries
+  from performance_schema / pg_stat_statements, each read by DBaba's query checker against the real tables; or why they
+  can't be seen), `indexes` (duplicate and covered, unused after 7 days of counts, foreign keys without an index, big tables
+  read without one), `tables` (no primary key, wasted space, dead rows, stale statistics, biggest tables), `settings`
+  (memory for data against this machine's, connections near the limit, the slow log), `backups` (point-in-time or not),
+  `security` (DBaba's user can change data, remote root, empty passwords, anonymous users, open network, md5, versions out of
+  support), `server` (version). A new critical item also raises an alert.
 
 ## Files DBaba keeps (next to dbaba.json, mode 0600)
 

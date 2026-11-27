@@ -662,8 +662,14 @@ as_owner ln -s ../data "$next/data"
 as_owner ln -s ../dbaba.json "$next/dbaba.json"
 
 fallback=0
-if [[ -f "$next/app/local.py" ]]; then
-  command_line="$active/.venv/bin/python -m app.local serve --port $port"
+if as_owner bash -c '
+  cd "$1"
+  exec env -u PYTHONPATH SITE_MODE=open ENGINE_MODE=ml AGENT_SCHEDULER=off \
+    DBABA_LOCAL=1 DATABASE_URL=sqlite:///:memory: COOKIE_SECURE=false \
+    GEMINI_API_KEY= GROQ_API_KEY= AI_PROVIDER_ORDER= \
+    .venv/bin/python -c "import app.local"
+' bash "$next" >/dev/null 2>&1; then
+  command_line="$active/.venv/bin/python -m app.local serve --port $port --config $DIR/dbaba.json --host 127.0.0.1"
 else
   fallback=1
   command_line="$active/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port $port"

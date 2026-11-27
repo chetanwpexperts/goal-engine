@@ -34,8 +34,9 @@ fn known_hosts_option(path: &Path) -> Result<String, String> {
 fn tunnel_command(s: &Ssh, port: u16, remote: u16, known_hosts: &Path) -> Result<Command,String> {
     let mut c = command();
     c.arg("-o").arg(known_hosts_option(known_hosts)?)
-        .args(["-o","GlobalKnownHostsFile=none","-i"]).arg(&s.key_path)
-        .args(["-N","-L",&format!("127.0.0.1:{port}:127.0.0.1:{remote}"),"-l",&s.user,"--",&s.host])
+        .args(["-o","GlobalKnownHostsFile=none"]);
+    if !s.key_path.is_empty() { c.arg("-i").arg(&s.key_path); }
+    c.args(["-N","-L",&format!("127.0.0.1:{port}:127.0.0.1:{remote}"),"-l",&s.user,"--",&s.host])
         .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
     Ok(c)
 }

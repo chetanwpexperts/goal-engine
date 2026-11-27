@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Self-hosted · Goal Engine</title>
+  <meta name="description" content="Install DBaba on your own server: Linux, Docker, Windows, cPanel, desktop app, command line and API. Read-only, 127.0.0.1 only, nothing leaves the server.">
+  <meta name="theme-color" content="#FFFFFF">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/site.css">
+</head>
+<body class="site">
+  <header class="snav"><div class="wrap">
+    <a class="brand" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="16" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="24" cy="24" r="4"/><path d="M12 16h4l4-6M16 16l4 6"/></svg>Goal Engine</a>
+    <nav class="snav-links" aria-label="Site"><a href="/product">Product</a><a href="/how-it-works">How it works</a><a href="/self-hosted" aria-current="page">Self-hosted</a><a href="/enquiry?from=nav">Contact</a></nav>
+    <a class="btn-s pri sm" href="/">Try it free</a>
+  </div></header>
+  <main>
+    <section class="page-hero center"><div class="wrap">
+      <p class="kick">Self-hosted</p>
+      <h1 class="h1">Run DBaba on your own server.</h1>
+      <p class="lead">Install it next to your database. It connects with a read-only account, scans every night and keeps everything on your machine.</p>
+      <div class="shot-frame"><img src="/static/img/shot-report.webp" width="1813" height="1124" alt="DBaba's own screen showing a health report"></div>
+      <p class="shot-cap">DBaba's own screen on a test PostgreSQL database.</p>
+    </div></section>
+
+    <section class="band soft"><div class="wrap">
+      <p class="kick">Install</p>
+      <h2 class="h2">Every way in.</h2>
+      <div class="cards">
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg></span><h3>Linux installer</h3><p>One command on Ubuntu, Debian or AlmaLinux. Tested on clean machines for each.</p></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg></span><h3>Docker</h3><p>One container, its port published on the host's 127.0.0.1 only.</p></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg></span><h3>Windows</h3><p>A PowerShell installer with a smoke test on every change.</p></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg></span><h3>cPanel</h3><p>Runs as a Python app behind the host's HTTPS and password protection.</p></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg></span><h3>Command line and API</h3><p><code>dbaba status</code>, <code>dbaba report</code> and a local API with keys for scripts.</p></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg></span><h3>Desktop app</h3><p>Open DBaba on your server from your laptop, with the key kept in the system keychain.</p></article>
+      </div>
+    </div></section>
+
+    <section class="band"><div class="wrap">
+      <div class="split2">
+        <div>
+          <p class="kick">Security</p>
+          <h2 class="h2">Built to sit next to production.</h2>
+          <ul class="list-check">
+            <li>Listens on 127.0.0.1 only and refuses unknown host names.</li>
+            <li>Connects with a read-only database account; it tells you if the account can change data.</li>
+            <li>The screen password is stored as a scrypt hash; API keys are stored as SHA-256 only and shown once.</li>
+            <li>Five wrong passwords lock the login for ten minutes.</li>
+            <li>No outside AI service, and nothing about your data leaves the server.</li>
+          </ul>
+        </div>
+<pre class="code-s"><span class="d">$</span> dbaba status
+<span class="g">●</span> connected   postgresql · read-only
+<span class="g">●</span> last scan   02:40
+
+<span class="d">$</span> dbaba report
+  score 75 · critical 1 · warning 4
+
+<span class="d">$</span> dbaba report --html report.html</pre>
+      </div>
+    </div></section>
+  </main>
+  <section class="cta-band"><div class="wrap">
+    <h2 class="h2">Want DBaba on your servers?</h2>
+    <p class="lead">Tell us about your databases and we will help you install it.</p>
+    <div class="row"><a class="btn-s pri" href="/">Try it free</a><a class="btn-s sec" href="/enquiry?from=self-hosted">Talk to us</a></div>
+  </div></section>
+  <footer class="sfoot"><div class="wrap">
+    <div class="cols">
+      <div><a class="brand" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="16" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="24" cy="24" r="4"/><path d="M12 16h4l4-6M16 16l4 6"/></svg>Goal Engine</a><p class="blurb">Diagnostics for databases and spreadsheets, with its own models and no outside AI service.</p></div>
+      <div><h4>Product</h4><ul><li><a href="/product#dbaba">DBaba</a></li><li><a href="/product#sheetu">Sheetu</a></li><li><a href="/product#report">Health report</a></li></ul></div>
+      <div><h4>Learn</h4><ul><li><a href="/how-it-works">How it works</a></li><li><a href="/how-it-works#model">The model</a></li><li><a href="/self-hosted">Self-hosted</a></li></ul></div>
+      <div><h4>Company</h4><ul><li><a href="/enquiry?from=footer">Contact</a></li><li><a href="/privacy">Privacy</a></li></ul></div>
+    </div>
+    <div class="base"><span>© 2026 Goal Engine</span><span>Please don't type passwords or card numbers into the chat.</span></div>
+  </div></footer>
+</body>
+</html>

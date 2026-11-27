@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod model;
 mod ssh;
+mod trial;
 use model::{Connection, ApiState};
 use std::{collections::HashMap, path::PathBuf, sync::Mutex, time::Duration};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, AppHandle, State, Emitter};
@@ -240,7 +241,7 @@ async fn poll(app:AppHandle,id:Uuid,generation:Uuid) {
         if !notifications.is_empty() && model::save(&store.path,&rows).is_ok() {
             d.rows=rows;
             for alert in notifications {
-                let _=app.notification().builder().title(alert.title).body(alert.text).show();
+                let _=app.notification().builder().title(alert.title).body(format!("{}\n{}", alert.at, alert.text)).show();
             }
         }
     }
@@ -248,7 +249,8 @@ async fn poll(app:AppHandle,id:Uuid,generation:Uuid) {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init()).plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![list,add,remove,connect,disconnect,fingerprint,accept])
+        .manage(trial::Trial::default())
+        .invoke_handler(tauri::generate_handler![list,add,remove,connect,disconnect,fingerprint,accept,trial::trial_start,trial::trial_stop,trial::trial_call,trial::trial_ssh])
         .on_menu_event(|app,event| {
             let id = event.id().as_ref();
             let result = if id == "window-manager" {
@@ -293,7 +295,7 @@ fn main() {
             Ok(())
         }).build(tauri::generate_context!()).expect("Could not start DBaba desktop")
         .run(|app,event| match event {
-            tauri::RunEvent::ExitRequested{..}|tauri::RunEvent::Exit=>{app.state::<Store>().data.lock().unwrap().live.clear();},
+            tauri::RunEvent::ExitRequested{..}|tauri::RunEvent::Exit=>{app.state::<trial::Trial>().stop();app.state::<Store>().data.lock().unwrap().live.clear();},
             _=>()
         });
 }

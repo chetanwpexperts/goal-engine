@@ -1,196 +1,96 @@
-# DBaba self-hosted API
+# DBaba local API
 
-DBaba helps you check SQL and ask database questions about MySQL, MariaDB and PostgreSQL using its local knowledge. Write your questions in English, Hinglish or Hindi.
+The authoritative S4 contract is [docs/dbaba-local-contract.md](../dbaba-local-contract.md).
 
-## Connection
+All requests target `http://127.0.0.1:<port>` (port from dbaba.json). Do not use proxies, redirects or remote API hosts. For a server installation, use a verified SSH tunnel. No cloud AI, telemetry or paid service is needed.
 
-Base URL: `http://127.0.0.1:<port>`. The examples use port 8000; replace it with your running service's port.
+Use Authorization: Bearer <api key> and Content-Type: application/json. Keep the key in DBABA_API_KEY or a private key file (CLI: ~/.config/dbaba/key, mode 0600); desktop uses OS keychain. Never log credentials. Examples below assume BASE=http://127.0.0.1:8765; change the port to match config.
 
-Send these headers:
+## Start and setup
 
-```http
-Authorization: Bearer <api key>
-Content-Type: application/json
+Run `dbaba serve --port 8765 --config /path/to/private/dbaba.json`. The local engine prints DBABA-SETUP-TOKEN followed by a token only before setup is complete. Wait up to 60 seconds for health. Setup routes accept X-DBaba-Setup instead of bearer authentication, only on loopback before setup, and return 409 after setup. Keep the token in memory and do not log stdout. The API key from save is shown once; store securely.
+
+| Method and path | Body | Response |
+|---|---|---|
+| GET /api/health | none | {ok, version} |
+| POST /api/login | password | {ok} and session cookie |
+| POST /api/logout | none | {ok} |
+| POST /api/setup/reset | none | {ok}; opens setup again |
+| GET /api/state | none | {version, setup_done, database, alerts, last_scan} |
+| POST /api/setup/detect | none | {found: [{engine, host, port, how}]} |
+| POST /api/setup/test | engine, host, port, database, user, password | {ok, version, reason} |
+| POST /api/setup/save | same as test plus screen_password (8+ characters) | {ok, api_key, warning?} or {ok:false, reason} |
+| POST /api/alerts/{id}/ack | none | {ok} |
+| POST /api/report/scan | none | {started} |
+| GET /api/report | none | {at, score, engine, version, pending, sections} (at and score null before first scan) |
+| GET /api/report.html | none | downloadable HTML |
+| GET /api/jobs | none | {jobs} |
+| POST /api/jobs/{id} | enabled, at | updated job |
+| POST /api/new-chat | none | starts a new conversation |
+| POST /api/message | text | {reply, ...} |
+
+Database state has engine, host, port, name, connected. Alerts have id, level, title, text, at, acknowledged. Last scan is null or {at, score}. Scores are 0–100. Report sections have id, title, items; each item has id, severity, title, what, why, fix (null or {sql, needs_approval}). Severity is critical, warning or info. Display fixes without executing them. Jobs have id, name, enabled, every (5min/day), at (HH:MM or null), last_run (null or {at, ok, text}). Scans are asynchronous; retrieve the report later.
+
+## CLI
+
+```sh
+dbaba status
+dbaba alerts
+dbaba alerts --ack ALERT_ID
+dbaba report --scan
+dbaba report --html report.html
+dbaba jobs
+dbaba jobs JOB_ID --on --at 09:30
+dbaba support-report
 ```
 
-Bearer authentication is the planned on-premises interface. Keep the key in a local environment variable. The current chat routes use a visitor cookie (`ge_vid`); retain response cookies and send them with subsequent requests. Use a separate cookie jar per conversation.
+Exit codes: 0 OK, 1 problem found, 2 unable to complete the request. The old support ZIP is now support-report.
 
-For the current application, run with `ENGINE_MODE=ml`, `SITE_MODE=open`, `EXPOSE_INTERNALS=0` and `COOKIE_SECURE=false` for local HTTP. With its application database configured, start it using:
+## Curl examples
 
-```bash
-ENGINE_MODE=ml SITE_MODE=open EXPOSE_INTERNALS=0 COOKIE_SECURE=false uvicorn app.main:app --host 127.0.0.1 --port 8000
-```
+Set BASE and read credentials privately. Do not enable shell tracing. Use actual IDs returned by state/jobs; the example IDs below are placeholders. Setup JSON files must be private and created locally; remove them when finished. The setup save response contains a secret and should not be printed or logged.
 
-## Endpoints
-
-### POST /api/new-chat
-
-Start a fresh anonymous conversation. Request body: none.
-
-HTTP 200:
-
-```json
-{"ok": true}
-```
-
-The response resets the visitor cookie and remembers earlier visitor IDs in a separate cookie. For a new anonymous client, begin with an empty cookie jar and use the cookies from the next request onward. The next message can create a goal; this endpoint returns an acknowledgement rather than a goal ID.
-
-Errors: see shared HTTP errors below.
-
-### POST /api/message
-
-Send a SQL query or a database question.
-
-Request body:
-
-```json
-{"text": "MySQL: SELECT * FROM orders WHERE customer_id = 42;"}
-```
-
-`text` is a required string. Supply between 1 and 10,000 characters after trimming whitespace (the upper limit is configurable through `MAX_MESSAGE_CHARS`). The optional `goal_id` is an integer or null; use the ID returned in `goal.id` to focus a follow-up on that goal. Omit it for the initial message.
-
-The local message handler returns HTTP 200. Its usual response includes:
-
-| Field | Meaning |
-| --- | --- |
-| reply | Answer text to display |
-| relation | Conversation action |
-| goal | Current goal object or null |
-| goals | List of goal summaries |
-| options | Suggested responses |
-| next | Suggested next questions |
-| ask_words | Integer supplied by the conversation handler |
-| agents | Agent details |
-| offer_expert | Boolean |
-| remaining_today | Current daily counter display |
-
-A goal summary contains `id`, `title`, `status` and `updated_at`. A public goal object also includes `detected_language`, `known_facts`, `missing_info`, `card`, `cards` and `created_at`. Additional details depend on server configuration.
-
-For a small reproducible response example, send `{"text":"list goals"}` in a fresh anonymous session. The following response is derived directly from the handler's literal return values and default settings (rather than captured from a running instance):
-
-```json
-{
-  "reply": "You don't have any goals yet. Tell me what's wrong.",
-  "relation": "list",
-  "goal": null,
-  "goals": [],
-  "remaining_today": 25
-}
-```
-
-This special list command returns a smaller payload than a SQL message. For SQL and questions, display `reply` and use optional fields when present. The answer and goal details depend on the query, language and conversation.
-
-Errors:
-
-- 400: supply text or shorten the message. Example: `{"error":"Please write something first."}`.
-- 422: supply a JSON object with a string `text` and, when used, an integer or null `goal_id`.
-- 429: allow a minute between bursts of requests. The response contains `error`.
-- 503: the service can return an `error` message; check its local configuration and availability.
-
-Local mode uses per-minute request limits (20 per visitor, 60 per IP and 600 across the service). The `remaining_today` display is a daily counter, separate from those limits.
-
-## Tell DBaba which database
-
-DBaba uses the database named in your message, a database remembered in the conversation, or clues in the SQL syntax. When it needs your choice, the English `reply` starts with "Which database is this for?" and `options` contains:
-
-```json
-["MySQL", "MariaDB", "PostgreSQL", "SQL Server", "Oracle", "Not sure"]
-```
-
-In Hindi and Hinglish the last option is "Pata nahi". SQL Server and Oracle choices provide general SQL guidance and engine-specific notes.
-
-There are two ways to provide the database:
-
-1. Name it in the message (recommended for scripts):
-
-   ```json
-   {"text": "MySQL: SELECT * FROM orders WHERE customer_id = 42;"}
-   ```
-
-   Or use natural wording:
-
-   ```json
-   {"text": "this is a postgres query: SELECT * FROM orders WHERE customer_id = 42;"}
-   ```
-
-2. Answer the database question. Send another POST to `/api/message` using the same cookie jar and the previous response's `goal.id`. For example, if that ID is 42:
-
-   ```json
-   {"text": "MySQL", "goal_id": 42}
-   ```
-
-   DBaba remembers the choice and continues checking the original query. Use the actual goal ID and a choice from the returned `options`.
-
-### GET /api/state
-
-Read the conversation using the same cookie jar. Request body: none.
-
-HTTP 200 for an empty anonymous session with default settings:
-
-```json
-{
-  "goals": [],
-  "current": null,
-  "agents": [],
-  "messages": [],
-  "remaining_today": 25
-}
-```
-
-`current` holds the most recently updated goal when available. `messages` contains up to 40 recent messages in chronological order, each with `role`, `text`, `relation` and `goal_id`. The goal ID can be null.
-
-Errors: see shared HTTP errors below.
-
-### GET /api/health
-
-Check service availability. Request body: none.
-
-HTTP 200 with the default public response:
-
-```json
-{"ok": true}
-```
-
-This is a service-level check. Use a chat request to check the complete conversation flow.
-
-Errors: see shared HTTP errors below.
-
-### Shared HTTP errors
-
-- 503: chat routes return `{"error":"Goal Engine is coming soon"}` while site access is closed. Set `SITE_MODE=open` for your local instance. The health route remains available in this mode.
-- 422: FastAPI returns validation details in a `detail` array for requests requiring input validation.
-- 500: check the service logs and application database configuration when the server encounters an unexpected problem.
-
-Authentication-specific status codes and payloads will follow the on-premises authentication implementation. The current source defines the chat contract above.
-
-## First 5 minutes
-
-Set your local connection values (provide the key in your shell environment):
-
-```bash
-export DBABA_URL=http://127.0.0.1:8000
-read -rs -p 'DBaba API key: ' DBABA_API_KEY
-echo
+```sh
+BASE=http://127.0.0.1:8765
+read -rs DBABA_API_KEY
 export DBABA_API_KEY
+api() { curl -q --noproxy '*' --fail --silent --show-error --max-time 30 -H "Authorization: Bearer $DBABA_API_KEY" -H 'Content-Type: application/json' "$@"; }
+api "$BASE/api/health"
+api "$BASE/api/state"
+api -X POST "$BASE/api/alerts/ALERT_ID/ack"
+api -X POST "$BASE/api/report/scan"
+api "$BASE/api/report"
+(umask 077; api "$BASE/api/report.html" > report.html)
+api "$BASE/api/jobs"
+api -X POST -d '{"enabled":true,"at":"09:30"}' "$BASE/api/jobs/JOB_ID"
+api -X POST "$BASE/api/new-chat"
+api -X POST -d '{"text":"How do indexes work?"}' "$BASE/api/message"
 ```
 
-1. Check a MySQL query: run `bash examples/dbaba.sh`. To check a PostgreSQL query instead, run `DBABA_DB=PostgreSQL bash examples/dbaba.sh 'SELECT * FROM orders;'` (or pass `PostgreSQL` as the second argument).
-2. Ask a database question in a fresh session: run `bash examples/dbaba.sh 'How can I add an index in PostgreSQL?'`. The script sends the question unchanged.
-3. Check that the service is up:
+For setup, use a private JSON file containing engine, host, port, database, user, password; save also requires screen_password. Supply the token from the local backend privately:
 
-```bash
-curl --fail --silent --show-error \
-  -H "Authorization: Bearer $DBABA_API_KEY" \
-  "$DBABA_URL/api/health"
+```sh
+read -rs SETUP_TOKEN
+setup() { curl -q --noproxy '*' --fail --silent --show-error --max-time 30 -H "X-DBaba-Setup: $SETUP_TOKEN" -H 'Content-Type: application/json' "$@"; }
+setup -X POST "$BASE/api/setup/detect"
+setup -X POST --data-binary @test-private.json "$BASE/api/setup/test"
+(umask 077; setup -X POST --data-binary @save-private.json "$BASE/api/setup/save" > setup-result-private.json)
+unset SETUP_TOKEN
 ```
 
-## Example clients
+Move the returned API key into protected storage and remove the private setup files. Use a separate cookie jar for each chat if the engine uses visitor cookies.
 
-Run from the repository root. Each script starts an anonymous chat, retains cookies, sends a query and prints the reply. Each accepts an optional SQL query or question as its first argument and a database name as its optional second argument. The second argument takes precedence over `DBABA_DB`, which defaults to `MySQL`. For SQL, each script sends `database: query`. For natural-language questions, it sends the original text unchanged. The examples use a simple leading SQL keyword check for common statements; for other SQL formats, include the database name explicitly in the first argument. Already named messages are passed through unchanged.
+The examples are contract-derived; live engine compatibility must be checked once the server implementation lands.
 
-- Bash: `bash examples/dbaba.sh` (curl and jq)
-- Python: `python -m pip install requests`, then `python examples/dbaba.py`
-- Node.js: `node examples/dbaba.js` (Node.js 22 or later)
-- PHP: `php examples/dbaba.php` (PHP CLI with the cURL extension)
+## Python, Node and PHP endpoint groups
 
-Response examples above are source-derived; values such as the reply, goal IDs and counters vary by session.
+Run from a private working directory, using the absolute path to the example in this repository. Python uses the standard library, Node requires Node 22+, PHP requires CLI cURL. Each supports the groups health, state, chat, alerts, report, jobs, setup, session and reset. Set DBABA_URL to the loopback port; set DBABA_API_KEY privately for authenticated groups. For alerts and jobs set DBABA_ALERT_ID or DBABA_JOB_ID to a real ID. Report starts a scan and saves the current HTML report; it does not wait for the scan to finish. Setup reads JSON from stdin and saves the one-time key to a new private dbaba-key file. Session reads password JSON from stdin (unset DBABA_API_KEY to exercise cookie authentication). Reset requires DBABA_CONFIRM_RESET=yes and is destructive; use a disposable setup. Move the key into secure storage; never commit it. Existing output files are not overwritten.
+
+```sh
+python examples/local_contract.py health
+node examples/local_contract.js state
+php examples/local_contract.php chat
+# Substitute any supported group in any of these three commands.
+```
+
+Tests: python -m pytest tests/cli/test_contract_examples.py. Missing Node/PHP cURL runtimes are reported as skips.

@@ -14,6 +14,7 @@ import subprocess
 import sys
 from urllib import request
 from urllib.parse import urlsplit, quote, quote_plus
+from .contract import commands_for, api_key
 import zipfile
 
 DATABASES = {"mysql": "MySQL", "mariadb": "MariaDB", "postgresql": "PostgreSQL"}
@@ -65,7 +66,7 @@ def base_url(config, allow_remote):
         raise ValueError("Use an HTTP or HTTPS DBaba URL without credentials or a path.")
     if parsed.port is not None:
         port_number(parsed.port)
-    if host not in ("localhost", "127.0.0.1", "::1"):
+    if host != "127.0.0.1":
         if not allow_remote:
             raise ValueError("Remote DBaba URLs require --allow-remote or DBABA_ALLOW_REMOTE=1.")
         if parsed.scheme == "http":
@@ -90,14 +91,16 @@ class Client:
         self.opener = request.build_opener(request.ProxyHandler({}),
                                           NoRedirect(), request.HTTPCookieProcessor(CookieJar()))
         self.headers = {"Content-Type": "application/json"}
-        key = os.environ.get("DBABA_API_KEY")
+        key = api_key()
         if key:
             self.headers["Authorization"] = "Bearer " + key
 
-    def call(self, path, method="GET", payload=None):
+    def call(self, path, method="GET", payload=None, raw=False):
         body = None if payload is None else json.dumps(payload).encode("utf-8")
         req = request.Request(self.base + path, data=body, headers=self.headers, method=method)
         with self.opener.open(req, timeout=120) as response:
+            if raw:
+                return response.read()
             result = json.load(response)
         if not isinstance(result, dict):
             raise ValueError("Invalid API response.")
@@ -117,7 +120,8 @@ class Client:
         return result["reply"]
 
 
-def serve(root, port):
+def serve(root, port, config_path=None):
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
     data = root / "data"
     data.mkdir(mode=0o700, exist_ok=True)
     env = dict(os.environ, SITE_MODE="open", ENGINE_MODE="ml", AGENT_SCHEDULER="on",
@@ -127,12 +131,21 @@ def serve(root, port):
                GROQ_API_KEY="", AI_PROVIDER_ORDER="", PYTHONUNBUFFERED="1")
     if util.find_spec("app.local") is not None:
         cmd = [sys.executable, "-m", "app.local", "serve", "--port", str(port)]
+        if config_path:
+            cmd += ["--config", str(config_path)]
+    elif config_path:
+        print("Install a DBaba engine with local setup support.", file=sys.stderr)
+        return 2
     else:
         print("Warning: this release's screen has no password protection yet; reach it only through an SSH tunnel.",
               file=sys.stderr)
         cmd = [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(port)]
     old = os.umask(0o077)
     try:
+        if config_path:
+            env["DBABA_CONFIG"] = str(config_path)
+            os.chdir(root)
+            os.execve(sys.executable, cmd, env)
         return subprocess.call(cmd, env=env, cwd=root)
     except KeyboardInterrupt:
         return 130
@@ -248,9 +261,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="dbaba")
     parser.add_argument("--allow-remote", action="store_true")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("status", "ask", "check", "serve", "report", "version"):
+    for name in ("status", "ask", "check", "serve", "report", "support-report", "alerts", "jobs", "version"):
         command = commands.add_parser(name)
-        if name in ("status", "ask", "check"):
+        if name in ("status", "ask", "check", "alerts", "report", "jobs"):
             command.add_argument("--allow-remote", action="store_true", default=argparse.SUPPRESS)
         if name == "ask":
             command.add_argument("question")
@@ -259,21 +272,39 @@ def main(argv=None):
             command.add_argument("--db", choices=DATABASES)
         if name == "serve":
             command.add_argument("--port", type=int)
-    args = parser.parse_args(argv)
+            command.add_argument("--config", type=Path)
+        if name == "alerts":
+            command.add_argument("--ack")
+        if name == "report":
+            command.add_argument("--scan", action="store_true")
+            command.add_argument("--html", type=Path)
+        if name == "jobs":
+            command.add_argument("id", nargs="?")
+            switches = command.add_mutually_exclusive_group()
+            switches.add_argument("--on", action="store_true")
+            switches.add_argument("--off", action="store_true")
+            command.add_argument("--at")
+    supplied = list(sys.argv[1:] if argv is None else argv)
+    if supplied and supplied[0] == "report" and any(v in ("--zip", "--support", "--support-report") for v in supplied[1:]):
+        print("The support ZIP is now: dbaba support-report")
+        return 1
+    args = parser.parse_args(supplied)
     if args.command == "version":
         print(version())
         return 0
     try:
+        if args.command == "serve" and args.config is not None:
+            path = args.config.expanduser().resolve()
+            config = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            return serve(path.parent, port_number(args.port if args.port is not None else config.get("port", DEFAULT_PORT)), path)
         root, config = configuration()
         if args.command == "serve":
             return serve(root, port_number(args.port if args.port is not None else config.get("port", DEFAULT_PORT)))
-        if args.command == "report":
+        if args.command == "support-report":
             return report(root, config)
-        client = Client(base_url(config, args.allow_remote or os.environ.get("DBABA_ALLOW_REMOTE") == "1"))
-        if args.command == "status":
-            running = client.call("/api/health").get("ok") is True
-            print("running" if running else "not running")
-            return 0 if running else 2
+        client = Client(base_url(config, args.allow_remote))
+        if args.command in ("status", "alerts", "report", "jobs"):
+            return commands_for(client, args)
         database = (config.get("database") or {}).get("type", "mysql")
         database = DATABASES.get(getattr(args, "db", None) or str(database).lower(), "MySQL")
         if args.command == "check":

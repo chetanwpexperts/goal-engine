@@ -1363,5 +1363,6 @@
       "mariadb"
     ]
   },
- "grouping": {"case": "insensitive", "trailing_spaces": "depends", "accents": "depends", "says": "GROUP BY on a text column follows the column's collation. The default *_ci collations put 'Red' and 'red' in one group; whether 'a' and 'a ' or 'e' and 'é' are one group depends on the collation (PAD SPACE or NO PAD, accent-insensitive or not).", "proven": ["mariadb (case rule; MySQL-compatible)"]}
+ "grouping": {"case": "insensitive", "trailing_spaces": "depends", "accents": "depends", "says": "GROUP BY on a text column follows the column's collation. The default *_ci collations put 'Red' and 'red' in one group; whether 'a' and 'a ' or 'e' and 'é' are one group depends on the collation (PAD SPACE or NO PAD, accent-insensitive or not).", "proven": ["mariadb (case rule; MySQL-compatible)"]},
+ "support_ended": {"versions": {"5.6": "2021-02-28", "5.7": "2023-10-31", "8.0": "2026-04-30"}, "source": "https://www.mysql.com/support/eol-notice.html", "note": "Published end-of-support dates (not lab-provable)."}
 }

@@ -1,0 +1,1469 @@
+{
+ "about": "What single words mean, in English, Hinglish and Hindi (Hindi script is transliterated first, so its Latin form is listed). No sentences: the agent reads a request as a set of meanings, in any order and any wording. Grows by adding words.",
+ "concepts": {
+  "act": [
+   "make",
+   "create",
+   "add",
+   "put",
+   "insert",
+   "apply",
+   "set",
+   "give",
+   "do",
+   "karo",
+   "kardo",
+   "kar",
+   "karde",
+   "kariye",
+   "kijiye",
+   "karein",
+   "karna",
+   "karni",
+   "banao",
+   "bana",
+   "banado",
+   "banaa",
+   "lagao",
+   "laga",
+   "lagado",
+   "lagaa",
+   "daalo",
+   "daal",
+   "dalo",
+   "daaldo",
+   "rakho",
+   "rakh",
+   "rakhdo",
+   "chahiye",
+   "want",
+   "need",
+   "build",
+   "draw",
+   "generate",
+   "prepare",
+   "turn",
+   "keep",
+   "use",
+   "karado",
+   "krdo",
+   "kro",
+   "bnao",
+   "bna",
+   "likho",
+   "likh",
+   "write",
+   "type",
+   "likhdo",
+   "kar",
+   "karo"
+  ],
+  "polite": [
+   "please",
+   "plz",
+   "pls",
+   "kindly",
+   "can",
+   "could",
+   "would",
+   "will",
+   "zara",
+   "kripya",
+   "aap",
+   "sakte",
+   "sakti",
+   "sakta",
+   "help"
+  ],
+  "remove": [
+   "remove",
+   "delete",
+   "drop",
+   "clear",
+   "erase",
+   "eliminate",
+   "hatao",
+   "hata",
+   "hatado",
+   "hataa",
+   "nikalo",
+   "nikal",
+   "nikaldo",
+   "mitao",
+   "mita",
+   "htao",
+   "saaf",
+   "get rid"
+  ],
+  "change": [
+   "change",
+   "convert",
+   "badlo",
+   "badal",
+   "badaldo",
+   "switch",
+   "modify",
+   "update",
+   "transform",
+   "bdlo",
+   "parivartan"
+  ],
+  "replace": [
+   "replace",
+   "substitute",
+   "swap",
+   "replacement"
+  ],
+  "highlight": [
+   "highlight",
+   "highlighted",
+   "colour",
+   "color",
+   "coloured",
+   "colored",
+   "mark",
+   "shade",
+   "fill",
+   "rang",
+   "rango",
+   "rangeen",
+   "paint",
+   "highlite",
+   "hilight",
+   "higlight",
+   "colur",
+   "rangna"
+  ],
+  "bold": [
+   "bold",
+   "mota",
+   "motaa",
+   "thick",
+   "dark",
+   "gadha",
+   "bolld"
+  ],
+  "header": [
+   "header",
+   "headers",
+   "heading",
+   "headings",
+   "headline",
+   "hedar",
+   "shirshak",
+   "titles",
+   "caption"
+  ],
+  "first": [
+   "first",
+   "top",
+   "pehli",
+   "pehla",
+   "pahli",
+   "pahla",
+   "upar",
+   "upper",
+   "starting",
+   "1st",
+   "initial",
+   "prathm",
+   "pratham"
+  ],
+  "last": [
+   "last",
+   "second",
+   "surname",
+   "doosra",
+   "dusra",
+   "aakhri",
+   "akhri"
+  ],
+  "row": [
+   "row",
+   "rows",
+   "line",
+   "lines",
+   "pankti",
+   "panktiyan",
+   "panktiyaan",
+   "record",
+   "records",
+   "entries",
+   "entry",
+   "raw",
+   "rowz",
+   "orders",
+   "transactions",
+   "bills",
+   "wale",
+   "wali",
+   "waale",
+   "waali",
+   "ones"
+  ],
+  "column": [
+   "column",
+   "columns",
+   "col",
+   "cols",
+   "coloum",
+   "colum",
+   "colums",
+   "field",
+   "fields",
+   "khana",
+   "kolam",
+   "stambh"
+  ],
+  "freeze": [
+   "freeze",
+   "frozen",
+   "stick",
+   "sticky",
+   "jama",
+   "pin",
+   "pinned",
+   "frz",
+   "freez"
+  ],
+  "lock": [
+   "lock",
+   "fix",
+   "fixed",
+   "stay",
+   "visible",
+   "dikhe",
+   "dikhta"
+  ],
+  "fit": [
+   "fit",
+   "autofit",
+   "adjust",
+   "resize",
+   "auto",
+   "theek",
+   "proper size"
+  ],
+  "width": [
+   "width",
+   "widths",
+   "chaudai",
+   "chaurai",
+   "wide",
+   "size",
+   "lambai"
+  ],
+  "filter_btn": [
+   "filter",
+   "filters",
+   "autofilter",
+   "filtar"
+  ],
+  "where": [
+   "where",
+   "jahan",
+   "jinka",
+   "jinki",
+   "jinke",
+   "only",
+   "sirf",
+   "whose",
+   "which have",
+   "jo"
+  ],
+  "blank": [
+   "blank",
+   "empty",
+   "khali",
+   "khaali",
+   "vacant",
+   "khaliyan",
+   "rikt",
+   "khaale"
+  ],
+  "serial": [
+   "serial",
+   "sno",
+   "srno",
+   "slno",
+   "numbering",
+   "sequence",
+   "kram",
+   "kramank",
+   "srl",
+   "serialno"
+  ],
+  "sheet": [
+   "sheet",
+   "sheets",
+   "tab",
+   "tabs",
+   "worksheet",
+   "worksheets",
+   "shit",
+   "shet"
+  ],
+  "file": [
+   "file",
+   "files",
+   "workbook",
+   "workbooks"
+  ],
+  "split": [
+   "split",
+   "separate",
+   "divide",
+   "break",
+   "tod",
+   "todo",
+   "alag",
+   "bant",
+   "baant",
+   "baanto",
+   "seperate",
+   "devide"
+  ],
+  "group": [
+   "by",
+   "per",
+   "each",
+   "wise",
+   "every",
+   "har",
+   "hisaab",
+   "hisab",
+   "according",
+   "basis",
+   "anusar",
+   "wize"
+  ],
+  "into": [
+   "into",
+   "in",
+   "mein",
+   "me",
+   "under",
+   "inside"
+  ],
+  "part": [
+   "part",
+   "parts",
+   "pieces",
+   "tukde",
+   "hisse"
+  ],
+  "name": [
+   "name",
+   "names",
+   "naam",
+   "nam",
+   "title"
+  ],
+  "rename": [
+   "rename",
+   "renamed",
+   "retitle"
+  ],
+  "to": [
+   "to",
+   "as",
+   "into",
+   "banake",
+   "ko",
+   "jagah"
+  ],
+  "with": [
+   "with",
+   "se",
+   "by",
+   "using"
+  ],
+  "dropdown": [
+   "dropdown",
+   "dropdowns",
+   "picklist",
+   "validation",
+   "selector",
+   "chooser",
+   "combobox",
+   "choice list"
+  ],
+  "options": [
+   "options",
+   "option",
+   "values",
+   "choices",
+   "items",
+   "vikalp",
+   "list"
+  ],
+  "date": [
+   "date",
+   "dates",
+   "tarikh",
+   "tareekh",
+   "dinank",
+   "day",
+   "dob"
+  ],
+  "format": [
+   "format",
+   "formatting",
+   "style",
+   "formatted",
+   "look",
+   "dikhe",
+   "pattern",
+   "formet",
+   "formate"
+  ],
+  "money": [
+   "rupee",
+   "rupees",
+   "rs",
+   "inr",
+   "currency",
+   "money",
+   "indian",
+   "comma",
+   "commas",
+   "paisa",
+   "rupaye",
+   "rupiya",
+   "rupay"
+  ],
+  "round": [
+   "round",
+   "rounding",
+   "rounded",
+   "roundoff",
+   "decimal",
+   "decimals",
+   "dashamlav",
+   "places",
+   "point",
+   "digits"
+  ],
+  "zero": [
+   "no",
+   "zero",
+   "whole",
+   "poore",
+   "bina",
+   "without"
+  ],
+  "upper": [
+   "upper",
+   "uppercase",
+   "capital",
+   "capitals",
+   "caps",
+   "bade",
+   "bada",
+   "badi",
+   "capitalised",
+   "capitalized"
+  ],
+  "lower": [
+   "lower",
+   "lowercase",
+   "small",
+   "chhote",
+   "chote",
+   "chhota",
+   "chota",
+   "chhoti"
+  ],
+  "proper": [
+   "proper",
+   "propercase",
+   "titlecase",
+   "capitalize",
+   "capitalise",
+   "sentence"
+  ],
+  "letter": [
+   "letter",
+   "letters",
+   "akshar",
+   "alphabet",
+   "alphabets",
+   "case",
+   "words",
+   "shabd"
+  ],
+  "chart": [
+   "chart",
+   "charts",
+   "graph",
+   "graphs",
+   "diagram",
+   "plot",
+   "visual",
+   "visualisation",
+   "visualization",
+   "graf",
+   "chaart"
+  ],
+  "pie": [
+   "pie",
+   "donut",
+   "doughnut",
+   "circle",
+   "gol"
+  ],
+  "line_kind": [
+   "line",
+   "trend",
+   "trendline",
+   "rekha"
+  ],
+  "bar_kind": [
+   "bar",
+   "bars",
+   "column",
+   "histogram",
+   "khamba"
+  ],
+  "month": [
+   "month",
+   "months",
+   "monthly",
+   "mahina",
+   "mahine",
+   "mahinewise",
+   "maah",
+   "mahino"
+  ],
+  "above": [
+   "above",
+   "over",
+   "more",
+   "greater",
+   "exceeding",
+   "exceeds",
+   "upar",
+   "zyada",
+   "jyada",
+   "adhik",
+   "higher",
+   "bigger",
+   "beyond",
+   "plus",
+   "uppar",
+   "jada"
+  ],
+  "below": [
+   "below",
+   "under",
+   "less",
+   "lower",
+   "smaller",
+   "kam",
+   "neeche",
+   "niche",
+   "beneath",
+   "fewer",
+   "kum"
+  ],
+  "between": [
+   "between",
+   "beech",
+   "bich",
+   "range",
+   "within"
+  ],
+  "equal": [
+   "equal",
+   "equals",
+   "exactly",
+   "barabar",
+   "same as",
+   "is"
+  ],
+  "duplicate": [
+   "duplicate",
+   "duplicates",
+   "duplicated",
+   "repeated",
+   "repeat",
+   "repeating",
+   "twice",
+   "dohra",
+   "dupliket",
+   "doubles",
+   "dupes",
+   "dubara"
+  ],
+  "overdue": [
+   "overdue",
+   "late",
+   "expired",
+   "lapsed",
+   "delayed",
+   "past"
+  ],
+  "top": [
+   "top",
+   "highest",
+   "biggest",
+   "largest",
+   "best",
+   "max",
+   "maximum",
+   "sabse"
+  ],
+  "bottom": [
+   "bottom",
+   "lowest",
+   "smallest",
+   "least",
+   "worst",
+   "minimum",
+   "min"
+  ],
+  "scale": [
+   "scale",
+   "gradient",
+   "heatmap",
+   "heat"
+  ],
+  "red": [
+   "red",
+   "laal",
+   "lal",
+   "rakt"
+  ],
+  "green": [
+   "green",
+   "hara",
+   "hari",
+   "hare"
+  ],
+  "yellow": [
+   "yellow",
+   "peela",
+   "pila",
+   "peeli",
+   "pili",
+   "peele"
+  ],
+  "orange": [
+   "orange",
+   "narangi",
+   "santri",
+   "kesariya"
+  ],
+  "blue": [
+   "blue",
+   "neela",
+   "nila",
+   "neeli",
+   "nili"
+  ],
+  "pink": [
+   "pink",
+   "gulabi"
+  ],
+  "grey": [
+   "grey",
+   "gray",
+   "sleti"
+  ],
+  "question": [
+   "how",
+   "what",
+   "which",
+   "who",
+   "whose",
+   "where",
+   "when",
+   "why",
+   "kitne",
+   "kitni",
+   "kitna",
+   "kya",
+   "kaun",
+   "kaunsa",
+   "kaunse",
+   "kaunsi",
+   "konse",
+   "konsa",
+   "kahan",
+   "kab",
+   "kyun",
+   "kyon",
+   "kaise",
+   "is",
+   "are",
+   "was",
+   "were",
+   "does",
+   "did",
+   "has",
+   "have",
+   "tell",
+   "batao",
+   "bataiye",
+   "bata",
+   "bataao"
+  ],
+  "show": [
+   "show",
+   "list",
+   "display",
+   "dikhao",
+   "dikha",
+   "batao",
+   "bata",
+   "find",
+   "see",
+   "view",
+   "check",
+   "dekho",
+   "count",
+   "nikalo"
+  ],
+  "all": [
+   "all",
+   "every",
+   "whole",
+   "entire",
+   "saari",
+   "saare",
+   "sabhi",
+   "sab",
+   "poori",
+   "puri",
+   "har"
+  ],
+  "beside": [
+   "beside",
+   "next",
+   "alongside",
+   "paas",
+   "saath",
+   "side",
+   "near"
+  ],
+  "cells": [
+   "cell",
+   "cells",
+   "values",
+   "value",
+   "data",
+   "entries",
+   "amounts"
+  ],
+  "macro": [
+   "macro",
+   "macros",
+   "vba",
+   "script"
+  ],
+  "pivot": [
+   "pivot"
+  ],
+  "comma_sep": [
+   "comma"
+  ],
+  "space_sep": [
+   "space",
+   "spaces"
+  ],
+  "hyphen_sep": [
+   "hyphen",
+   "dash"
+  ],
+  "slash_sep": [
+   "slash"
+  ],
+  "sort": [
+   "sort",
+   "sorting",
+   "sorted",
+   "arrange",
+   "ascending",
+   "descending",
+   "asc",
+   "desc"
+  ],
+  "total": [
+   "total",
+   "totals",
+   "sum",
+   "sums",
+   "jod",
+   "jodd",
+   "grand",
+   "average",
+   "avg",
+   "balance",
+   "tally",
+   "subtotal",
+   "totaling",
+   "totalling",
+   "joda"
+  ],
+  "wrong": [
+   "wrong",
+   "galat",
+   "incorrect",
+   "mismatch",
+   "mismatched",
+   "off",
+   "short",
+   "differ",
+   "different",
+   "difference",
+   "error",
+   "errors",
+   "issue",
+   "problem",
+   "weird",
+   "ajeeb",
+   "sahi",
+   "right",
+   "correct",
+   "accurate",
+   "kharab",
+   "gadbad",
+   "fark"
+  ],
+  "negation": [
+   "not",
+   "nahi",
+   "nhi",
+   "nai",
+   "dont",
+   "doesnt",
+   "doesn",
+   "won",
+   "wont",
+   "cant",
+   "cannot",
+   "isnt",
+   "never",
+   "na",
+   "no",
+   "don't",
+   "doesn't",
+   "won't",
+   "can't",
+   "isn't",
+   "didn't",
+   "didnt",
+   "aren't",
+   "arent"
+  ],
+  "lookup": [
+   "vlookup",
+   "xlookup",
+   "hlookup",
+   "lookup",
+   "lookups",
+   "index",
+   "vlook"
+  ],
+  "na": [
+   "na",
+   "n/a"
+  ],
+  "notfound": [
+   "missing",
+   "found",
+   "mil",
+   "mila",
+   "milta",
+   "dhoond",
+   "find",
+   "finding",
+   "gayab"
+  ],
+  "formula": [
+   "formula",
+   "formulas",
+   "formulae",
+   "function",
+   "functions"
+  ],
+  "broken": [
+   "broken",
+   "toot",
+   "toota",
+   "tooti",
+   "kharab",
+   "break",
+   "breaking"
+  ],
+  "update": [
+   "update",
+   "updating",
+   "updated",
+   "recalc",
+   "recalculate",
+   "recalculating",
+   "calculate",
+   "calculating",
+   "refresh",
+   "refreshing",
+   "change",
+   "changing",
+   "badal",
+   "badalta",
+   "chalta"
+  ],
+  "same": [
+   "same",
+   "wahi",
+   "vahi",
+   "stuck",
+   "frozen",
+   "constant"
+  ],
+  "count": [
+   "count",
+   "counts",
+   "countif",
+   "countifs",
+   "ginti",
+   "kitne",
+   "number"
+  ],
+  "double": [
+   "double",
+   "twice",
+   "duplicate",
+   "duplicates",
+   "extra",
+   "zyada",
+   "more",
+   "above"
+  ],
+  "less": [
+   "less",
+   "kam",
+   "short",
+   "lower",
+   "smaller",
+   "zero",
+   "0",
+   "below"
+  ],
+  "add": [
+   "add",
+   "adding",
+   "adds",
+   "jud",
+   "jod",
+   "jodta",
+   "sum",
+   "summing",
+   "tally",
+   "match",
+   "matching"
+  ],
+  "value": [
+   "value",
+   "values",
+   "price",
+   "prices",
+   "name",
+   "names",
+   "result",
+   "results",
+   "answer",
+   "data",
+   "discount",
+   "rate",
+   "amount"
+  ],
+  "mix": [
+   "mix",
+   "mixed",
+   "jumbled",
+   "random",
+   "order",
+   "properly",
+   "sahi",
+   "galat"
+  ]
+ },
+ "multiword": {
+  "drop down": "dropdown",
+  "auto fit": "autofit",
+  "s no": "sno",
+  "sr no": "srno",
+  "sl no": "slno",
+  "serial no": "serial",
+  "serial number": "serial",
+  "serial numbers": "serial",
+  "data validation": "validation",
+  "pick list": "picklist",
+  "title case": "titlecase",
+  "proper case": "propercase",
+  "all caps": "caps",
+  "upper case": "uppercase",
+  "lower case": "lowercase",
+  "round off": "roundoff",
+  "text to columns": "split columns",
+  "more than": "above",
+  "greater than": "above",
+  "less than": "below",
+  "past due": "overdue",
+  "colour scale": "scale",
+  "color scale": "scale",
+  "top row": "first row",
+  "first letter capital": "propercase",
+  "kar do": "kardo",
+  "bana do": "banado",
+  "laga do": "lagado",
+  "hata do": "hatado",
+  "badal do": "badaldo",
+  "daal do": "daaldo",
+  "rakh do": "rakhdo",
+  "kar de": "karde",
+  "nikal do": "nikaldo",
+  "kar dijiye": "kijiye",
+  "freeze panes": "freeze",
+  "sabse zyada": "top",
+  "sabse kam": "bottom",
+  "heat map": "heatmap",
+  "line chart": "line chart",
+  "find and replace": "replace"
+ },
+ "colours": {
+  "red": "FFFFC7CE",
+  "green": "FFC6EFCE",
+  "yellow": "FFFFEB9C",
+  "orange": "FFF4B183",
+  "blue": "FFBDD7EE",
+  "pink": "FFF8CBAD",
+  "grey": "FFD9D9D9"
+ },
+ "orders": {
+  "about": "Meaning recipes: an order is understood when every group in one of its recipes is present (any word for that meaning, any order); 'not' meanings must be absent. A group that only has everyday meanings ('generic') counts less than one with a distinctive meaning, so the most telling order wins.",
+  "conditional_format": [
+   {
+    "all": [
+     [
+      "highlight",
+      "red",
+      "green",
+      "yellow",
+      "orange",
+      "blue",
+      "pink",
+      "grey"
+     ],
+     [
+      "above",
+      "below",
+      "between",
+      "equal",
+      "duplicate",
+      "overdue",
+      "top",
+      "bottom",
+      "blank",
+      "VALUE",
+      "NUMBER"
+     ]
+    ],
+    "not": [
+     "chart",
+     "sort"
+    ]
+   },
+   {
+    "all": [
+     [
+      "scale"
+     ]
+    ],
+    "not": [
+     "chart",
+     "sort"
+    ]
+   }
+  ],
+  "chart": [
+   {
+    "all": [
+     [
+      "chart"
+     ],
+     [
+      "act",
+      "group",
+      "pie",
+      "line_kind",
+      "bar_kind",
+      "month",
+      "polite"
+     ]
+    ],
+    "not": [
+     "show_only"
+    ]
+   }
+  ],
+  "bold_header": [
+   {
+    "all": [
+     [
+      "bold"
+     ],
+     [
+      "header",
+      "FIRST_ROW"
+     ]
+    ]
+   }
+  ],
+  "freeze": [
+   {
+    "all": [
+     [
+      "freeze"
+     ],
+     [
+      "header",
+      "FIRST_ROW",
+      "FIRST_COL",
+      "row",
+      "column"
+     ]
+    ]
+   },
+   {
+    "all": [
+     [
+      "lock"
+     ],
+     [
+      "header",
+      "FIRST_ROW",
+      "FIRST_COL"
+     ]
+    ],
+    "not": [
+     "remove",
+     "highlight"
+    ]
+   }
+  ],
+  "autofit": [
+   {
+    "all": [
+     [
+      "fit"
+     ],
+     [
+      "width",
+      "column"
+     ]
+    ]
+   },
+   {
+    "all": [
+     [
+      "width"
+     ],
+     [
+      "act",
+      "change"
+     ],
+     [
+      "column"
+     ]
+    ]
+   }
+  ],
+  "filter": [
+   {
+    "all": [
+     [
+      "filter_btn"
+     ],
+     [
+      "act",
+      "polite"
+     ]
+    ],
+    "not": [
+     "where",
+     "VALUE",
+     "NUMBER",
+     "remove"
+    ]
+   }
+  ],
+  "remove_blank_rows": [
+   {
+    "all": [
+     [
+      "remove"
+     ],
+     [
+      "blank"
+     ],
+     [
+      "row"
+     ]
+    ]
+   }
+  ],
+  "serial": [
+   {
+    "all": [
+     [
+      "serial"
+     ],
+     [
+      "act",
+      "polite",
+      "column"
+     ]
+    ]
+   }
+  ],
+  "split_sheets": [
+   {
+    "all": [
+     [
+      "split",
+      "act"
+     ],
+     [
+      "sheet",
+      "file"
+     ],
+     [
+      "group",
+      "all"
+     ]
+    ],
+    "not": [
+     "chart"
+    ]
+   }
+  ],
+  "split": [
+   {
+    "all": [
+     [
+      "split"
+     ],
+     [
+      "into",
+      "part",
+      "column",
+      "name",
+      "comma_sep",
+      "space_sep",
+      "hyphen_sep",
+      "slash_sep",
+      "with"
+     ]
+    ],
+    "not": [
+     "sheet",
+     "file"
+    ]
+   }
+  ],
+  "dropdown": [
+   {
+    "all": [
+     [
+      "dropdown"
+     ]
+    ]
+   }
+  ],
+  "rename": [
+   {
+    "all": [
+     [
+      "rename"
+     ]
+    ]
+   },
+   {
+    "all": [
+     [
+      "name"
+     ],
+     [
+      "change",
+      "act"
+     ],
+     [
+      "COLUMN"
+     ]
+    ],
+    "not": [
+     "split",
+     "upper",
+     "lower",
+     "proper"
+    ]
+   }
+  ],
+  "delete_column": [
+   {
+    "all": [
+     [
+      "remove"
+     ],
+     [
+      "column"
+     ]
+    ],
+    "not": [
+     "blank",
+     "duplicate"
+    ]
+   }
+  ],
+  "date_format": [
+   {
+    "all": [
+     [
+      "date"
+     ],
+     [
+      "format",
+      "DATE_MASK"
+     ]
+    ]
+   }
+  ],
+  "money_format": [
+   {
+    "all": [
+     [
+      "money"
+     ],
+     [
+      "format",
+      "act",
+      "change"
+     ]
+    ],
+    "not": [
+     "above",
+     "below",
+     "between",
+     "highlight",
+     "sort"
+    ]
+   }
+  ],
+  "round": [
+   {
+    "all": [
+     [
+      "round"
+     ],
+     [
+      "act",
+      "change",
+      "NUMBER",
+      "zero",
+      "polite"
+     ]
+    ],
+    "not": [
+     "highlight",
+     "chart",
+     "sort"
+    ]
+   }
+  ],
+  "case": [
+   {
+    "all": [
+     [
+      "upper",
+      "lower",
+      "proper"
+     ],
+     [
+      "act",
+      "change",
+      "letter",
+      "COLUMN",
+      "polite"
+     ]
+    ],
+    "not": [
+     "highlight",
+     "chart",
+     "above",
+     "below",
+     "sort"
+    ]
+   }
+  ],
+  "replace": [
+   {
+    "all": [
+     [
+      "replace"
+     ]
+    ]
+   },
+   {
+    "all": [
+     [
+      "change",
+      "act"
+     ],
+     [
+      "to",
+      "with"
+     ],
+     [
+      "FIND_VALUE"
+     ]
+    ],
+    "not": [
+     "date",
+     "format",
+     "upper",
+     "lower",
+     "proper",
+     "name"
+    ]
+   }
+  ]
+ },
+ "generic": [
+  "act",
+  "polite",
+  "change",
+  "to",
+  "with",
+  "into",
+  "group",
+  "all",
+  "column",
+  "row",
+  "COLUMN",
+  "VALUE",
+  "NUMBER",
+  "FIND_VALUE",
+  "first",
+  "name",
+  "letter",
+  "format",
+  "part",
+  "cells",
+  "sheet",
+  "file",
+  "show",
+  "question"
+ ]
+}

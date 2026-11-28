@@ -77,6 +77,7 @@ from app.api.routes.db_reports import schedule_db_report
 
 logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="Goal Engine", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+app.state.permission_checks = {"api_key": connector_routes.service.api_key_allowed}
 app.include_router(accounts.router)
 app.include_router(dbarea.router)
 app.include_router(console.router)

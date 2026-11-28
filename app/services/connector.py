@@ -7,6 +7,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from app import accounts, dbarea
+from app.core.db import get_db
+from contextlib import contextmanager
 from app.products.dbaba import database as dbagent
 from app.products.shared import direct as dbagent_direct
 from app.domain.models import dumps, loads
@@ -23,6 +25,18 @@ def _connector_from(request: Request, db: Session):
     if connector is None:
         raise HTTPException(401, "Unknown or disconnected connector")
     return connector
+
+
+def api_key_allowed(request: Request) -> bool:
+    """Reuse connector authentication without importing product code into security."""
+    with contextmanager(get_db)() as db:
+        try:
+            _connector_from(request, db)
+        except HTTPException as exc:
+            if exc.status_code != 401:
+                raise
+            return False
+        return True
 
 
 async def connector_hello(request: Request, db: Session):

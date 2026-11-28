@@ -103,6 +103,13 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             return "token"
         return None
 
+    # Reuse the existing precedence and setup-token checks for declarations.
+    st.permission_checks = {
+        "api_key": lambda req: who(req) == "key",
+        "local_screen": lambda req: who(req) == "session",
+        "local_setup": lambda req: not cfg.setup_done and who(req) in ("session", "token"),
+    }
+
     @app.middleware("http")
     async def guard(request: Request, call_next):
         host = (request.headers.get("host") or "").rsplit(":", 1)[0].strip("[]").lower()

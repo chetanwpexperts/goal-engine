@@ -868,7 +868,7 @@ def _clean_now(db: Session, f: OfficeFile, ops: list[str], sheets: list[str], hi
                "Download the fixed copy from the card; type 'undo' to put it back.")
     if flags:
         try:
-            from app import learning
+            from app.agents import learn as learning
 
             learning.ask_to_learn(db, "office", text, guess="flagged: " + ", ".join(k for k in QUALITY_FLAGS if ch.get(k)))
         except ValueError:
@@ -1052,7 +1052,7 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
     pending = inputs.pop("pending_q", None)
     last_plan = inputs.get("mind_plan")
     if (text or "").strip() in TEACH and pending:
-        from app import learning
+        from app.agents import learn as learning
 
         learning.ask_to_learn(db, "office", pending)
         agent.inputs = dumps(inputs)
@@ -1085,7 +1085,7 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
         db.commit()
         mind.set_pattern("missing", None)
         try:
-            from app import learning
+            from app.agents import learn as learning
 
             learning.ask_to_learn(db, "office", text, guess="not in file: " + miss.concept)
         except ValueError:
@@ -1110,7 +1110,7 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
             try:
                 # it couldn't answer this directly: the sentence (scrubbed, nobody attached) goes to the learning list,
                 # so the agent learns to answer it straight away next time
-                from app import learning
+                from app.agents import learn as learning
 
                 learning.ask_to_learn(db, "office", text, guess="needed: " + (need.en[:60] if need.en else ""))
             except ValueError:
@@ -1143,7 +1143,7 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
     if (sig.get("repeat") or sig.get("frustrated")) and last_plan and mo._same(plan, last_plan) and not plan.get("derive"):
         alts = mo.other_readings(text, tables, plan, hi)
         try:                                       # the last answer missed: this sentence goes to the learning list
-            from app import learning
+            from app.agents import learn as learning
 
             learning.ask_to_learn(db, "office", text, guess="missed: " + mo.label_of(plan))
         except ValueError:

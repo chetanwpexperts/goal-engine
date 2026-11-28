@@ -644,7 +644,7 @@ def _write_turn(db: Session, goal: Goal, text: str, hi: bool):
     goal.missing_info, goal.pending = "[]", None
     if not res.get("ok"):
         try:
-            from app import learning
+            from app.agents import learn as learning
 
             learning.ask_to_learn(db, "database", text, guess="write")
         except Exception:  # noqa: BLE001 - learning is an extra
@@ -693,7 +693,7 @@ def _concept_turn(db: Session, goal: Goal, text: str, hi: bool, m: dict):
     goal.slots = dumps(slots)
     if c is None:                         # a database concept we don't know yet: said honestly, and kept to learn
         try:
-            from app import learning
+            from app.agents import learn as learning
 
             learning.ask_to_learn(db, "database", text, guess="concept")
         except Exception:  # noqa: BLE001 - learning is an extra
@@ -1307,7 +1307,7 @@ def continue_turn(db, goal, agent, text: str):
     saved = False
     if raw.strip():
         try:
-            from app import learning
+            from app.agents import learn as learning
 
             learning.report_miss(db, "database", text, mask_values(raw), (last_run.summary if last_run is not None else "") or "")
             saved = True

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 def learning_feed(key: str, db: Session):
     """For the nightly learning only (LEARN_KEY): scrubbed sentences people asked us to learn."""
-    from app import learning
+    from app.data import learning
 
     want = os.getenv("LEARN_KEY", "")
     if len(want) < 16 or not hmac.compare_digest(key, want):

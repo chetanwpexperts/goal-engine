@@ -61,7 +61,7 @@ def training_examples(include_learned: bool = True) -> tuple[list[str], list[str
             labels.append(intent)
     known = set(labels)
     if include_learned:
-        from app import learning
+        from app.engine import learning
 
         for text, label in learning.examples("general"):
             if label in known:

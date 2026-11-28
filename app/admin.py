@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app import enquiry, usage
 from app.core.db import get_db
+from app.security.audit import record
 from app.domain.models import (Agent, DbConnectLog, Enquiry, ExpertRequest, LearnedPhrase, LearnMiss, LearnRequest, Message,
                         User, UserSession, utcnow)
 
@@ -62,6 +63,8 @@ def _per_day(stamps, n: int = DAYS) -> list[int]:
 @router.get("/overview")
 def overview(request: Request, db: Session = Depends(get_db)):
     _admin(request)
+    record(db, "admin", "admin_action", "admin", request.client.host if request.client else "")
+    db.commit()
     since = utcnow() - timedelta(days=DAYS)
     week = utcnow() - timedelta(days=7)
     days = _days()
@@ -112,6 +115,8 @@ def overview(request: Request, db: Session = Depends(get_db)):
 @router.get("/users")
 def users(request: Request, db: Session = Depends(get_db)):
     _admin(request)
+    record(db, "admin", "admin_action", "account", request.client.host if request.client else "")
+    db.commit()
     rows = db.scalars(select(User).order_by(User.created_at.desc()).limit(500)).all()
     vids = [u.visitor_id for u in rows]
     ids = [u.id for u in rows]
@@ -141,6 +146,8 @@ def users(request: Request, db: Session = Depends(get_db)):
 @router.get("/enquiries")
 def enquiries(request: Request, status: str = "", db: Session = Depends(get_db)):
     _admin(request)
+    record(db, "admin", "admin_action", "enquiries", request.client.host if request.client else "")
+    db.commit()
     q = select(Enquiry).order_by(Enquiry.created_at.desc()).limit(500)
     if status:
         q = q.where(Enquiry.status == status)
@@ -158,6 +165,7 @@ def enquiry_update(eid: int, body: EnquiryUpdate, request: Request, db: Session 
         e.status = body.status
     if body.note is not None:
         e.note = body.note.strip()[:4000]
+    record(db, "admin", "admin_action", f"enquiries:{eid}", request.client.host if request.client else "")
     db.commit()
     return enquiry.as_dict(e)
 
@@ -170,6 +178,7 @@ def enquiry_delete(eid: int, request: Request, db: Session = Depends(get_db)):
     if e is None:
         raise HTTPException(404, "Not Found")
     db.delete(e)
+    record(db, "admin", "admin_action", f"enquiries:{eid}", request.client.host if request.client else "")
     db.commit()
     return {"ok": True}
 
@@ -232,6 +241,8 @@ def knowledge() -> dict:
 @router.get("/knowledge")
 def knowledge_view(request: Request, db: Session = Depends(get_db)):
     _admin(request)
+    record(db, "admin", "admin_action", "learning", request.client.host if request.client else "")
+    db.commit()
     misses = db.scalars(select(LearnMiss).where(LearnMiss.status == "new")
                         .order_by(LearnMiss.count.desc(), LearnMiss.last_seen.desc()).limit(100)).all()
     asked = db.scalars(select(LearnRequest).where(LearnRequest.status == "new")
@@ -253,12 +264,13 @@ def miss_update(mid: int, body: MissUpdate, request: Request, db: Session = Depe
     if m is None or body.status not in ("new", "learned", "ignored"):
         raise HTTPException(404, "Not Found")
     m.status = body.status
+    record(db, "admin", "admin_action", f"learning:{mid}", request.client.host if request.client else "")
     db.commit()
     return {"ok": True}
 
 
 @router.post("/knowledge/try")
-def try_dbaba(body: TryIn, request: Request):
+def try_dbaba(body: TryIn, request: Request, db: Session = Depends(get_db)):
     """Test box: DBaba's answer to anything, exactly as the workspace would give it (no database connected). Not kept."""
     from app import console
 
@@ -267,4 +279,6 @@ def try_dbaba(body: TryIn, request: Request):
     if not text:
         raise HTTPException(400, "Type something")
     blocks, engine = console.answer(text, None)
+    record(db, "admin", "admin_action", "learning", request.client.host if request.client else "")
+    db.commit()
     return {"blocks": blocks, "engine": engine}

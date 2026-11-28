@@ -106,6 +106,51 @@ crawlers that ignore it or disguise their identity.
 The supply-chain step adds a pinned, hashed dependency lock and automated
 dependency vulnerability and static security checks.
 
+## Permissions and audit
+
+Declare a permission at route registration with
+`dependencies=[Depends(require("visitor"))]`, choosing the permission from
+the Security model table. The factory in `app/security/permissions.py`
+rejects unknown permission names immediately. Missing authentication
+callbacks deny access. Hosted routes reuse the resolved visitor and account
+identities, administrator cookie validation, connector authentication and
+the learning-feed key check. Existing ownership checks remain in place.
+
+The local application in `app/products/dbaba/local/server.py` registers its
+own authentication callbacks. Its route declarations retain the existing
+credential alternatives: ordinary authenticated local operations accept a
+valid API key or screen session, while key creation and revocation require
+the screen session. State and setup routes retain their existing setup-token
+rules, including loopback restrictions and the 409 response for completed
+setup. Login, logout, health and screen assets retain their existing public
+entry behaviour and middleware safeguards. A declaration is not a substitute
+for the checks within the route.
+
+`AuditEvent` in `app/domain/models/__init__.py` stores the actor, action,
+target, UTC timestamp and keyed IP hash. The repository is
+`app/data/audit.py`; hosted callers use
+`app/security/audit.py` and its `record(db, who, action, target, ip)`
+function, then commit the transaction. Use fixed action and target labels
+or the supported numeric identifiers, never request bodies, passwords,
+tokens, key names, database addresses or message text. The helper rejects
+unrecognized metadata and hashes valid IP addresses with HMAC-SHA-256.
+
+On-server DBaba uses `record_local` with its installation's private
+`data/local/` directory. The audit records are kept in `audit.sqlite3`
+and the independent hashing secret in `.audit_key`; neither belongs in
+the monitored database. The files are created with restricted permissions
+on platforms supporting POSIX file modes. Local configuration writes and
+audit writes are separate operations, not one atomic transaction.
+
+Audit call sites cover account sessions, login lockouts, account and
+personal-data deletion, administrator operations, and local screen sessions,
+key creation/revocation, database changes and settings changes.
+`tests/test_permissions.py` and `tests/test_audit.py` exercise permission
+checks, credential alternatives, audit metadata validation and local audit
+storage. The architecture scanner and baseline are maintained separately;
+the remaining import debts and route coverage must be verified before
+declaring the migration fully validated.
+
 ## Architecture debts
 
 tests/architecture_baseline.json is the explicit baseline for existing

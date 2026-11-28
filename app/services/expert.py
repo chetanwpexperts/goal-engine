@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app import expert
 from app.domain.schemas.expert import ExpertIn, ExpertUpdate
 from app.security.admin import _is_admin
+from app.security.audit import record
 from app.services.urls import _public_base
 
 
@@ -26,13 +27,19 @@ def my_expert_requests(db: Session, visitor: str):
 def admin_requests(request: Request, status: str, db: Session):
     if not _is_admin(request):
         raise HTTPException(404, "Not Found")
-    return {"requests": expert.all_requests(db, status)}
+    result = {"requests": expert.all_requests(db, status)}
+    record(db, "admin", "admin_action", "expert_requests", request.client.host if request.client else "")
+    db.commit()
+    return result
 
 
 def admin_update(req_id: int, body: ExpertUpdate, request: Request, db: Session):
     if not _is_admin(request):
         raise HTTPException(404, "Not Found")
     try:
-        return expert.as_dict(expert.update(db, req_id, body.status, body.note), admin=True)
+        result = expert.as_dict(expert.update(db, req_id, body.status, body.note), admin=True)
+        record(db, "admin", "admin_action", f"expert_requests:{req_id}", request.client.host if request.client else "")
+        db.commit()
+        return result
     except expert.ExpertError:
         raise HTTPException(404, "Not Found")

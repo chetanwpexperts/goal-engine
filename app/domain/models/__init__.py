@@ -474,3 +474,14 @@ class Enquiry(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)                 # the admin's own note
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    who: Mapped[str] = mapped_column(String(80))
+    action: Mapped[str] = mapped_column(String(40), index=True)
+    target: Mapped[str] = mapped_column(String(80))
+    at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    ip_hash: Mapped[str] = mapped_column(String(64))

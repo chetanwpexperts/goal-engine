@@ -38,12 +38,20 @@ def require(perm: str) -> Callable:
             want = os.getenv("LEARN_KEY", "")
             allowed = len(want) >= 16 and hmac.compare_digest(request.query_params.get("key", ""), want)
         else:
-            checks = getattr(request.app.state, "permission_checks", {})
-            validator = checks.get(perm)
-            allowed = validator is not None and validator(request)
+            route_check = getattr(request.app.state, "route_permission", None)
+            result = route_check(request, perm) if route_check is not None else None
+            if result is None:
+                checks = getattr(request.app.state, "permission_checks", {})
+                validator = checks.get(perm)
+                allowed = validator is not None and validator(request)
+            else:
+                allowed = result
         if not allowed:
             if perm == "admin" or (perm == "api_key" and request.url.path == "/api/learning/feed"):
                 raise HTTPException(status_code=404, detail="Not Found")
+            reject = getattr(request.app.state, "permission_denied", None)
+            if reject is not None:
+                reject(request, perm)
             raise HTTPException(status_code=401, detail="Not authorized")
 
     return check

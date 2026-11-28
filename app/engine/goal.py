@@ -17,9 +17,9 @@ from app.agents.core import (YES_RE, AgentError, agent_dict, assign, goal_agents
 from app.agents import automation as auto
 from app.agents.core import URL_RE
 from app.agents.planner import plan as plan_automation
-from app.ml.brain import SKIP_RE, steps_text
-from app.ml.registry import domain_of
-from app.ml.normalize import normalize
+from app.engine.ml.brain import SKIP_RE, steps_text
+from app.engine.ml.registry import domain_of
+from app.engine.ml.normalize import normalize
 from app.mind import route
 from app.models import Agent, Goal, Message, dumps, loads
 

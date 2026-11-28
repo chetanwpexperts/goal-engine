@@ -27,7 +27,7 @@ Returns [(Finding, [edits])], edit = (start, end, new text) on the original quer
 
 import re
 
-from app.agents.sqlverify import keep as schema_keep
+from app.products.dbaba.sqlverify import keep as schema_keep
 
 # the engines each rule was reproduced on (tests/practice/test_night4.py, LAB) -- standing rule B
 PROVEN = {k: ["mariadb", "postgresql"] for k in (
@@ -43,7 +43,7 @@ NULL_FN = re.compile(r"\b(coalesce|ifnull|nvl|isnull)\s*\(\s*$", re.I)
 
 
 def _C():
-    from app.agents import sqlcorrect as C
+    from app.products.dbaba import sqlcorrect as C
 
     return C
 
@@ -65,7 +65,7 @@ def _own_key_extreme(sql: str, blk: dict, left_txt: str, agg_col: str) -> bool:
     """x IN (SELECT MIN(x) FROM t GROUP BY g) where x is t's own key and the outer row is a t row too: every MIN/MAX value is
     exactly one row (a key value belongs to one row only), so the list says which rows, with no other group to mix up
     (lab, night X1: the keep-one-row-per-group DELETE keeps the same rows as the pair form)."""
-    from app.agents import sqlcorrect as C
+    from app.products.dbaba import sqlcorrect as C
 
     col = _uq(agg_col.split(".")[-1])
     if col != _uq(left_txt.split(".")[-1]) or len(blk["srcs"]) != 1 or not blk["srcs"][0].name:
@@ -194,14 +194,14 @@ def _where_text(blk):
 
 
 def _engine():
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.engine_seen("")
 
 
 def _refused(key: str):
     """For an engine-specific rule: (kind or None to stay quiet, text naming the engines). Engine facts from the dialect files."""
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     eng = _engine()
     my, pg = sqlbasics.rules("mysql").get(key, {}), sqlbasics.rules("postgresql").get(key, {})
@@ -215,7 +215,7 @@ def _refused(key: str):
 
 
 def _engine_of(sql: str):
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.engine_seen(sql)
 
@@ -267,7 +267,7 @@ def subqueries(sql: str, s: str, intent: str, F) -> list:
                 outer = blk["psrcs"][0] if blk["psrcs"] else None
                 hint = ""
                 if outer is not None and inner.name and outer.name:
-                    from app.agents.sqljoins import _fk
+                    from app.products.dbaba.sqljoins import _fk
 
                     hint = f" (for example {inner.alias}.{_fk(outer.name)} = {outer.alias}.id)"
                 out.append((F("check", "exists_uncorr", f"The {'NOT ' if ctx == 'not_exists' else ''}EXISTS subquery never mentions the outer row",
@@ -295,7 +295,7 @@ def subqueries(sql: str, s: str, intent: str, F) -> list:
 
         # ---- S3b. c.id IN (SELECT id FROM orders): the subquery's own id (an order id) compared with another table's id
         if ctx in ("in", "not_in") and len(items) == 1 and len(blk["srcs"]) == 1 and left_txt and not grouped and blk["psrcs"]:
-            from app.agents.sqljoins import _fk
+            from app.products.dbaba.sqljoins import _fk
 
             im = re.fullmatch(rf"(?:({NAME})\.)?({NAME})", items[0][1])
             lm = re.fullmatch(rf"(?:({NAME})\.)?({NAME})", left_txt)
@@ -303,7 +303,7 @@ def subqueries(sql: str, s: str, intent: str, F) -> list:
             if im and lm and _uq(im.group(2)) == "id" and _uq(lm.group(2)) == "id" and inner.name:
                 lq = _uq(lm.group(1)) if lm.group(1) else ""
                 outer = next((x for x in blk["psrcs"] if not lq or lq in (_uq(x.alias), _uq(x.name))), None)
-                from app.agents import sqlcorrect as _SC
+                from app.products.dbaba import sqlcorrect as _SC
 
                 made = set(_SC.BLOCK_COLS.get() or {}) | set(_SC.BLOCK_KEYS.get() or {})
                 if _uq(inner.name).lower() in made:
@@ -419,7 +419,7 @@ def subqueries(sql: str, s: str, intent: str, F) -> list:
             ia = {_uq(inner.alias), _uq(inner.name)}
             keyed = False
             many = None
-            from app.agents.sqljoins import key_names
+            from app.products.dbaba.sqljoins import key_names
 
             for m in re.finditer(rf"({QNAME})\s*=\s*({QNAME}|'x*'|\d+)", C._no_subqueries(wt or "")):
                 for side in (m.group(1), m.group(2)):
@@ -526,7 +526,7 @@ def subqueries(sql: str, s: str, intent: str, F) -> list:
             im = re.fullmatch(rf"(?:({NAME})\.)?({NAME})", items[0][1])
             lm = re.fullmatch(rf"(?:({NAME})\.)?({NAME})", left_txt)
             inner = blk["srcs"][0]
-            from app.agents.sqljoins import key_names
+            from app.products.dbaba.sqljoins import key_names
 
             keys = {k.replace("_", "") for k in key_names(inner.name)} if inner.name else set()
             if im and lm and _uq(im.group(2)).replace("_", "") in keys and _uq(lm.group(2)) != "id" and inner.name:
@@ -592,8 +592,8 @@ REL = re.compile(r"\b(who|whose|that|which|with|having|jinhone|jinke|jinki|jinka
 
 def semi_join(sql: str, s: str, cl: dict, srcs: list, items: list, intent: str, F) -> list:
     """'customers who have a paid order' written as customers JOIN orders: each customer once per matching order."""
-    from app.agents import sqlread
-    from app.agents.sqljoins import _base, _one
+    from app.products.dbaba import sqlread
+    from app.products.dbaba.sqljoins import _base, _one
 
     C = _C()
     said = (intent or "").lower()

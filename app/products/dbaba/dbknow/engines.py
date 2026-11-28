@@ -172,7 +172,7 @@ def _strip_strings(t: str) -> str:
 
 # ------------------------------------------------------------------ the goal remembers it
 def remembered(goal) -> dict | None:
-    from app.models import loads
+    from app.domain.models import loads
 
     if goal is None:
         return None
@@ -180,7 +180,7 @@ def remembered(goal) -> dict | None:
 
 
 def remember(goal, eid: str, how: str, why: str = "") -> dict:
-    from app.models import dumps, loads
+    from app.domain.models import dumps, loads
 
     data = loads(goal.slots, {}) or {}
     rec = {"id": eid, "how": how, "why": why}
@@ -274,7 +274,7 @@ def notes_line(eid: str, lang: str, sql: str = "") -> str:
     if not notes_only(eid):
         return ""
     d = dialect(eid)
-    from app.agents.sqlport import notes_for
+    from app.products.dbaba.sqlport import notes_for
 
     notes = " ".join(n for n, _h in notes_for(eid, sql))
     part = d.get("proven_parts")                   # an engine part-way through its nights: say which parts are lab-tested
@@ -302,6 +302,6 @@ def not_sure_line(lang: str) -> str:
 
 
 def lang_of(text: str) -> str:
-    from app.ml.normalize import detect_language
+    from app.core.text import detect_language
 
     return {"Hindi": "hindi", "Hinglish": "hinglish"}.get(detect_language(text or ""), "en")

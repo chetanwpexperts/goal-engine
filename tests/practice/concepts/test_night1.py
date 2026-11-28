@@ -6,7 +6,7 @@ import re
 
 import pytest
 
-from app.dbknow import concepts as K
+from app.products.dbaba.dbknow import concepts as K
 from tests.test_ml import say, say_sql
 
 WRONG_PLACES = re.compile(r"I don't have a specific answer|paste (the|your|a) (sql )?query|query paste karo|Just tell me where your database is|"
@@ -103,8 +103,8 @@ def test_unknown_concepts_are_said_honestly_and_kept_to_learn(client, ml_mode):
     r = ask(client, "what is a tablespace in postgresql")      # (stored procedures were unknown here until night 5 taught them)
     assert r["relation"] == "concept" and "won't guess" in r["reply"] and not WRONG_PLACES.search(r["reply"])
     feed = client.get("/api/learning/feed").json() if False else None
-    from app.db import _SessionLocal
-    from app.models import LearnRequest
+    from app.core.db import _SessionLocal
+    from app.domain.models import LearnRequest
 
     with _SessionLocal() as db:
         rows = db.query(LearnRequest).filter(LearnRequest.brain == "database").all()

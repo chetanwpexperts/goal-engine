@@ -1,7 +1,8 @@
 """Microsoft brain: knowledge files are valid, and it understands NEW phrasings in English, Hinglish and Hindi script."""
 
-from app import learning, officeknow
-from app.officeknow import brain
+from app import learning
+from app.products.sheetu import officeknow
+from app.products.sheetu.officeknow import brain
 
 
 def test_knowledge_files_are_valid():

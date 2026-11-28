@@ -176,7 +176,7 @@ def case(i: int, seed: int):
 
 
 def check(text: str, want: dict, tables) -> str | None:
-    from app.office import ask, edits
+    from app.products.sheetu.office import ask, edits
 
     try:
         p = edits.plan_edit(text, tables)
@@ -201,7 +201,7 @@ def check(text: str, want: dict, tables) -> str | None:
 
 
 def run(count=2000, seed=1):
-    from app.office.sheetdata import load_tables
+    from app.products.sheetu.office.sheetdata import load_tables
 
     tables = load_tables(str(PRACTICE))
     errs = []

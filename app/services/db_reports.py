@@ -3,8 +3,9 @@ import logging
 from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
-from app.agents import automation, database as dbagent
-from app.agents.mailer import SmtpMailer
+from app.products.shared import automation
+from app.products.dbaba import database as dbagent
+from app.products.shared.mailer import SmtpMailer
 from app.domain.models import Agent, Goal, Message, dumps, loads, utcnow
 from app.domain.schemas.db_jobs import DbReportIn
 from app.services.agents import own_agent, _goal_hi, _agent_payload
@@ -14,7 +15,7 @@ mailer = SmtpMailer
 
 
 def _run_db_report(db: Session, agent: Agent) -> None:
-    from app.agents.spec import next_run
+    from app.products.shared.spec import next_run
     from app.domain.models import Connector
 
     inputs = loads(agent.inputs, {}) or {}
@@ -49,7 +50,7 @@ def _after_db_job(db: Session, job) -> None:
         files = [(f"{title[:40]}.csv", data, "text/csv")]
         text = f"{title}\n\nRows: {rows}\nThe CSV file is attached (opens in Excel)."
         try:                                        # S3: the same rows as a workbook with a live pivot and its chart
-            from app.agents import sqlexcel
+            from app.products.dbaba import sqlexcel
             from app.domain.models import Connector
 
             info = sqlexcel.for_job(job, db.get(Connector, job.connector_id))
@@ -75,7 +76,7 @@ def schedule_db_report(agent_id: int, body: DbReportIn, db: Session, visitor: st
     if owner is None or not owner.verified_at:
         return JSONResponse({"error": "Verify your email first, so the report has somewhere to go"}, status_code=400)
     schedule = {"every": body.every if body.every in ("day", "week", "month") else "day", "at": body.at, "weekday": body.weekday, "day": 1}
-    from app.agents.spec import next_run, schedule_text
+    from app.products.shared.spec import next_run, schedule_text
 
     goal = db.get(Goal, agent.goal_id)
     hi = _goal_hi(goal)

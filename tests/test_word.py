@@ -5,7 +5,7 @@ import io
 import pytest
 from docx import Document
 
-from app.office import ask, word
+from app.products.sheetu.office import ask, word
 from tests.make_docx import build
 from tests.test_ml import say
 from tests.test_office_agent import _upload, _wait
@@ -55,7 +55,7 @@ def test_changes_keep_the_rest(doc, tmp_path):
 
 
 def test_old_doc_and_fake_docx_are_explained(tmp_path):
-    from app import office
+    from app.products.sheetu import office
 
     p = tmp_path / "old.doc"
     p.write_bytes(b"\xd0\xcf\x11\xe0" + b"\0" * 100)

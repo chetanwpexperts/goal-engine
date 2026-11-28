@@ -11,7 +11,7 @@ import sys
 def test_zones_load_without_the_os_zone_files(tmp_path):
     code = ("import zoneinfo; assert zoneinfo.TZPATH == (), zoneinfo.TZPATH; "
             "zoneinfo.ZoneInfo('Asia/Kolkata'); zoneinfo.ZoneInfo('UTC'); "
-            "import app.agents.spec")
+            "import app.products.shared.spec")
     env = {"PYTHONTZPATH": "", "PATH": "/usr/bin:/bin"}
     r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, cwd=".")
     assert r.returncode == 0, r.stderr[-800:]

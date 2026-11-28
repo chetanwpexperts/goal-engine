@@ -22,7 +22,7 @@ import contextvars
 import difflib
 import re
 
-from app.agents import sqlproject as P
+from app.products.dbaba import sqlproject as P
 
 # the engines each schema fact was reproduced on (tests/practice/test_night10b.py, LAB) -- standing rule B; the engine-specific
 # behaviour is in the dialect files' "schema_facts"
@@ -42,7 +42,7 @@ FAMILY_WORD = {"number": "a number", "text": "text", "date": "a date", "time": "
 
 # ------------------------------------------------------------------------------------------------ reading the query
 def _mask(sql: str) -> str:
-    from app.agents.sqlcorrect import _mask as m
+    from app.products.dbaba.sqlcorrect import _mask as m
 
     return m(sql)
 
@@ -68,7 +68,7 @@ def aliases(sql: str) -> dict:
             if not sm or seg.lstrip().startswith("("):
                 dm = re.match(r"\s*\(", seg)
                 if dm:                                           # a derived table: (SELECT ...) alias
-                    from app.agents.sqlcorrect import _close
+                    from app.products.dbaba.sqlcorrect import _close
 
                     k = _close(s, i + dm.end() - 1)
                     am = re.match(rf"\s*(?:as\s+)?({NAME})", s[k + 1:], re.I)
@@ -258,7 +258,7 @@ def judge(needs: list, sql: str, sch: dict) -> dict:
                     say_hi.append(f"Project ke schema mein {t['name']} pe {nm} ({', '.join(ix['cols'])}) hai jo {cd['raw']} se shuru hota "
                                   f"hai: column seedha likhne par wo kaam aayega.")
                 else:
-                    from app.agents.sqlspeed import index_ddl
+                    from app.products.dbaba.sqlspeed import index_ddl
 
                     ddl = index_ddl(t["name"], f"ix_{t['name']}_{cd['name']}", [cd["name"]], fam)
                     say_en.append(f"No index in the project's schema starts with {t['name']}.{cd['raw']}, so even the rewrite reads the whole "
@@ -269,8 +269,8 @@ def judge(needs: list, sql: str, sch: dict) -> dict:
 
 
 def _family():
-    from app.agents.sqlbasics import CHOSEN
-    from app.dbknow import engines as E
+    from app.products.dbaba.sqlbasics import CHOSEN
+    from app.products.dbaba.dbknow import engines as E
 
     return E.family(CHOSEN.get()) if CHOSEN.get() else None
 
@@ -278,7 +278,7 @@ def _family():
 # ------------------------------------------------------------------------------------------------ checking with a schema
 def check(sql: str, sch: dict | None, intent: str = "", engine: str | None = None) -> dict:
     """sqlcorrect.check, with the project's schema deciding what depends on it (see the module text)."""
-    from app.agents import sqlcorrect
+    from app.products.dbaba import sqlcorrect
 
     if not sch or not sch.get("tables") or not re.match(r"[\s(]*(select|with|update|delete|insert|replace)\b", _mask(sql), re.I):
         return sqlcorrect.check(sql, intent=intent, engine=engine)
@@ -287,7 +287,7 @@ def check(sql: str, sch: dict | None, intent: str = "", engine: str | None = Non
     try:
         res = sqlcorrect.check(sql, intent=intent, engine=engine)
         if engine:
-            from app.agents.sqlbasics import CHOSEN
+            from app.products.dbaba.sqlbasics import CHOSEN
 
             tok = CHOSEN.set(engine)
             try:
@@ -367,7 +367,7 @@ KEYWORDS = None
 def _kw() -> set:
     global KEYWORDS
     if KEYWORDS is None:
-        from app.agents.sqlcorrect import KW
+        from app.products.dbaba.sqlcorrect import KW
 
         KEYWORDS = set(KW) | {"true", "false", "null", "unknown", "current_date", "current_timestamp", "current_time", "now", "localtime",
                               "localtimestamp", "interval", "day", "month", "year", "hour", "minute", "second", "week", "quarter",
@@ -499,7 +499,7 @@ def _index_findings(sql: str, amap: dict, sch: dict, told: set = frozenset()) ->
     """What exists and what is missing for this query's filters, from the schema: the existing index reader (a text column
     compared with a number, an index whose first column isn't filtered, a range before '=') plus a filter on a column no
     index starts with."""
-    from app.agents.sqlspeed import index_ddl, index_fit
+    from app.products.dbaba.sqlspeed import index_ddl, index_fit
 
     fam = _family()
     out = []
@@ -555,7 +555,7 @@ def _index_findings(sql: str, amap: dict, sch: dict, told: set = frozenset()) ->
 def split_paste(text: str) -> tuple[str, str] | None:
     """CREATE TABLE statements (with their ALTER / CREATE INDEX) and ONE query pasted together: (the schema part, the query).
     None for anything else (a design alone is checked as a design; several queries are code or a script)."""
-    from app.agents.sqlroutine import split_script
+    from app.products.dbaba.sqlroutine import split_script
 
     if not re.search(r"\bcreate\s+(?:temporary\s+)?table\b", text or "", re.I):
         return None

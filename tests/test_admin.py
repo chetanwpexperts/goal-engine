@@ -113,14 +113,14 @@ def test_enquiry_from_a_logged_in_person_is_linked_to_the_account(client, mail):
 
     client.post("/api/account/signup", json=new_user(n=71))
     assert client.post("/api/enquiry", json=good()).status_code == 200
-    from app.db import get_db
-    from app.models import Enquiry
+    from app.core.db import get_db
+    from app.domain.models import Enquiry
     assert next(get_db()).query(Enquiry).one().user_id is not None
 
 
 def test_bots_are_dropped_quietly(client, mail):
-    from app.db import get_db
-    from app.models import Enquiry
+    from app.core.db import get_db
+    from app.domain.models import Enquiry
 
     assert client.post("/api/enquiry", json={**good(), "website": "http://spam.example"}).json() == {"ok": True}
     assert client.post("/api/enquiry", json={**good(), "elapsed_ms": 800}).json() == {"ok": True}
@@ -151,8 +151,8 @@ def test_three_an_hour_from_one_address(client, mail):
 
 def test_delete_all_my_data_and_old_ones_expire(client, mail):
     from app import enquiry
-    from app.db import get_db
-    from app.models import Enquiry, utcnow
+    from app.core.db import get_db
+    from app.domain.models import Enquiry, utcnow
 
     client.post("/api/enquiry", json=good())
     client.post("/api/privacy/delete-all")
@@ -168,7 +168,7 @@ def test_delete_all_my_data_and_old_ones_expire(client, mail):
 def test_usage_counts_are_numbers_only(admin, mail):
     """A workspace question is counted per day; its words are stored nowhere."""
     from app import usage
-    from app.db import get_db, get_engine
+    from app.core.db import get_db, get_engine
 
     db = next(get_db())
     usage.count(db, "workspace_ask")
@@ -205,7 +205,7 @@ def test_overview_and_people_add_up(admin, mail, ml_mode):
 
 def test_dbaba_knowledge_view(admin):
     from app import learning
-    from app.db import get_db
+    from app.core.db import get_db
 
     k = admin.get("/api/admin/knowledge").json()
     assert k["dbaba"]["concepts"] > 50 and k["dbaba"]["phrasings"] > k["dbaba"]["concepts"]
@@ -246,8 +246,8 @@ def test_enquiry_open_before_launch(client, monkeypatch):
 
 # ---------------------------------------------------------------- our own captcha
 def test_captcha_is_needed_and_checked(client, mail):
-    from app.db import get_db
-    from app.models import Enquiry
+    from app.core.db import get_db
+    from app.domain.models import Enquiry
 
     no = client.post("/api/enquiry", json={**GOOD})
     assert no.status_code == 400 and no.json()["captcha"] is True
@@ -272,7 +272,7 @@ def test_captcha_expires(client):
     import time
 
     from app import captcha
-    from app.db import get_db
+    from app.core.db import get_db
 
     c = captcha.new(now=time.time() - 3600)
     with pytest.raises(captcha.CaptchaError, match="expired"):

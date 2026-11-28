@@ -216,7 +216,7 @@ def _same(a, b) -> bool:
 
 
 def check(seed: int, workdir: Path) -> list[str]:
-    from app import office
+    from app.products.sheetu import office
 
     wb, truth, spoiled, field = make(seed)
     src, out = workdir / f"m{seed}.xlsx", workdir / f"m{seed}.out.xlsx"

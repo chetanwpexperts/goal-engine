@@ -33,7 +33,7 @@ ROW_OF_EXTREME = re.compile(r"\b(who|which|whose|name\s+of|highest|lowest|top|mo
 def alternatives(sql: str, out: dict, intent: str = "") -> list[dict]:
     """The other honest repairs of this statement's mistakes, each {'key', 'en', 'hi', 'sql'}; may also make one of them the fix
     (out['corrected']) when the person's words say which reading they meant."""
-    from app.agents.sql import _split_tail
+    from app.products.dbaba.sql import _split_tail
 
     sql = _split_tail(sql)[0].strip().rstrip(";").rstrip()     # the statement only, never the words written after it
     fs = out.get("findings") or []
@@ -81,7 +81,7 @@ def _checked(q: str | None) -> str | None:
     """The rewrite, after the checker's own sure fixes; None if a database would still refuse it or answer wrongly."""
     if not q:
         return None
-    from app.agents import sqlcorrect
+    from app.products.dbaba import sqlcorrect
 
     try:
         r = sqlcorrect.check(q, _again=True)
@@ -98,7 +98,7 @@ def _checked(q: str | None) -> str | None:
 def where_to_on(sql: str) -> str | None:
     """Each AND-part of the WHERE that tests only a LEFT JOINed table (and isn't its IS NULL anti-join test) moved into that
     table's ON. None when the WHERE has a top-level OR (the parts don't stand alone) or nothing can move."""
-    from app.agents.sqlcorrect import _clauses, _depths, _mask, _qrefs, _sources
+    from app.products.dbaba.sqlcorrect import _clauses, _depths, _mask, _qrefs, _sources
 
     s = _mask(sql)
     dep = _depths(s)
@@ -154,7 +154,7 @@ def where_to_on(sql: str) -> str | None:
 
 
 def _bare_cols(text: str) -> list[str]:
-    from app.agents.sqlcorrect import _bare
+    from app.products.dbaba.sqlcorrect import _bare
 
     clean = re.sub(r"'[^']*'", "''", text)
     return [w for w in _bare(clean, set()) if not re.fullmatch(r"\d+", w)]
@@ -162,7 +162,7 @@ def _bare_cols(text: str) -> list[str]:
 
 # ------------------------------------------------------------------------------------------------ columns that aren't grouped
 def group_rewrites(sql: str) -> dict | None:
-    from app.agents.sqlcorrect import AGG, _clauses, _depths, _mask, _qrefs, _split_top
+    from app.products.dbaba.sqlcorrect import AGG, _clauses, _depths, _mask, _qrefs, _split_top
 
     s = _mask(sql)
     dep = _depths(s)
@@ -239,7 +239,7 @@ def group_rewrites(sql: str) -> dict | None:
 
 def _strip_alias(t: str) -> str:
     """The expression without its SELECT name: 'SUM(x) AS total' -> 'SUM(x)', 'e.name n' -> 'e.name'; CASE ... END keeps END."""
-    from app.agents.sqlcorrect import KW
+    from app.products.dbaba.sqlcorrect import KW
 
     m = re.fullmatch(r"(?is)(.*?[\w`\")\]])(\s+as)?\s+[`\"]?([A-Za-z_]\w*)[`\"]?\s*", t)
     if m and (m.group(2) or m.group(3).lower() not in KW) and m.group(3).lower() not in KW:

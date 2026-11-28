@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from app.agents import sqlcorrect
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqlcorrect
+from app.products.dbaba.sql import analyze_sql
 from tests.fuzz import db as dbfuzz
 from tests.fuzz import sqlbugs
 
@@ -103,8 +103,8 @@ def test_numbers_in_quotes_in_range_comparisons():
 
 
 def test_the_recognisers_are_ready_before_the_first_message():
-    from app.dbknow import brain as dbb
-    from app.officeknow import brain as ofb
+    from app.products.dbaba.dbknow import brain as dbb
+    from app.products.sheetu.officeknow import brain as ofb
 
     assert dbb._train() is dbb._train() and ofb._train() is ofb._train()
 
@@ -416,8 +416,8 @@ def test_two_child_tables_multiply_a_parent_total():
 def test_a_wrong_answer_is_kept_to_learn_from_with_values_hidden(client, ml_mode):
     """'Still not right' after a check: the query is kept for the nightly learning, every value hidden, one row per miss."""
     from app import learning
-    from app.db import _SessionLocal
-    from app.models import LearnMiss
+    from app.core.db import _SessionLocal
+    from app.domain.models import LearnMiss
     from tests.test_ml import say, say_sql
 
     q = "SELECT name FROM customers WHERE email = 'ravi@example.in' AND phone = '9876543210' AND city = 'Delhi' AND id = 1234567"

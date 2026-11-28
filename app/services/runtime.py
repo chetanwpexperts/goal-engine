@@ -7,11 +7,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app import accounts, console, dbarea, enquiry, privacy
 from app.ai.router import AIRouter
-from app.ml.brain import Brain
+from app.engine.ml.brain import Brain
 from app.core.config import get_settings
 from app.core.db import init_db
-from app.agents import automation
-from app.agents.core import AgentError, claim_due, run_agent
+from app.products.shared import automation
+from app.products.shared.core import AgentError, claim_due, run_agent
 from app.domain.models import Goal, utcnow
 from app.services.db_reports import _run_db_report
 
@@ -63,7 +63,7 @@ async def lifespan(application: FastAPI):
     from app.engine import learning as rules
     from app.data import learning as storage
     from app.services import learning as service
-    from app.agents import learn
+    from app.products.shared import learn
     # Legacy callers receive the same functions without an upward engine import.
     import sys
 
@@ -85,14 +85,14 @@ async def lifespan(application: FastAPI):
         application.state.brain = Brain()
     application.state.brain.model.load()  # train or load the ML model before the first visitor
     try:                                  # and the problem recognisers, so the first visitor never waits for training
-        from app.dbknow import brain as _dbb
-        from app.officeknow import brain as _ofb
+        from app.products.dbaba.dbknow import brain as _dbb
+        from app.products.sheetu.officeknow import brain as _ofb
 
         _dbb._train()
         _ofb._train()
     except Exception:  # noqa: BLE001
         logging.getLogger("goal-engine").warning("Recognisers not warmed", exc_info=True)
-    from app.agents import office_agent
+    from app.products.sheetu import office_agent
 
     try:
         office_agent.resume_interrupted(utcnow())   # file work cut off by a restart carries on by itself

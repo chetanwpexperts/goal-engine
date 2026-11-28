@@ -52,7 +52,7 @@ def is_day_number(v) -> bool:
 def _vocab() -> set[str]:
     words = set(json.loads((Path(__file__).resolve().parents[3] / "knowledge" / "data" / "heading_words.json").read_text()))
     try:
-        from app.mind import packs
+        from app.engine.mind import packs
 
         def walk(x):
             if isinstance(x, str):

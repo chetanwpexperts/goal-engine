@@ -8,7 +8,7 @@ from app.core.redact import scrub
 from app.core.text import normalize, fingerprint
 from app.engine import learning as rules
 from app.data import learning as storage
-from app.agents.learn import ask_to_learn, report_miss
+from app.products.shared.learn import ask_to_learn, report_miss
 from app.domain.models import utcnow
 from app.privacy import fingerprint as voter_fingerprint
 from app.data.learning import overview, feed, maintain

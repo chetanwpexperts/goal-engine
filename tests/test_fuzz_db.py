@@ -6,7 +6,7 @@ import socket
 
 import pytest
 
-from app.agents import sql as S
+from app.products.dbaba import sql as S
 from tests.fuzz import db as F
 
 
@@ -157,8 +157,8 @@ def test_follow_ups_in_every_language_stay_on_the_query(client, ml_mode):
 
 
 def test_a_known_docker_description_is_not_confidently_wrong():
-    from app.agents.database import _sure
-    from app.dbknow import brain
+    from app.products.dbaba.database import _sure
+    from app.products.dbaba.dbknow import brain
 
     rec = brain.recognize("hi, connection refused pg from. reach databse on host machine")
     assert rec["id"] == "docker-localhost-connection" or not _sure(rec), rec

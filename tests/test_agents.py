@@ -5,10 +5,10 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from app.agents import core
-from app.agents.safety import Page, UnsafeURL, normalize_url
-from app.agents.sql import analyze_sql
-from app.agents.website import check_website
+from app.products.shared import core
+from app.products.shared.safety import Page, UnsafeURL, normalize_url
+from app.products.dbaba.sql import analyze_sql
+from app.products.shared.website import check_website
 from tests.test_ml import say, say_sql
 
 GOOD_HTML = ("<html><head><title>Bakery</title><meta name='viewport' content='width=device-width'>"
@@ -105,8 +105,8 @@ def test_daily_watch_and_scheduler(client, ml_mode, fake_web):
     agents = {a["recipe"]: a for a in watch["agents"]}
     assert agents["website_watch"]["status"] == "active" and agents["website_watch"]["next_run_at"]
 
-    from app.db import get_db
-    from app.models import Agent
+    from app.core.db import get_db
+    from app.domain.models import Agent
     db = next(get_db())
     agent = db.query(Agent).filter_by(recipe="website_watch").one()
     agent.next_run_at = datetime.utcnow() - timedelta(minutes=1)

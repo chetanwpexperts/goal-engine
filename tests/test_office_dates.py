@@ -5,9 +5,9 @@ import datetime as dt
 
 from openpyxl import Workbook, load_workbook
 
-from app import office
-from app.office import ask, quality
-from app.office.sheetdata import load_tables
+from app.products.sheetu import office
+from app.products.sheetu.office import ask, quality
+from app.products.sheetu.office.sheetdata import load_tables
 
 EPOCH = dt.date(1899, 12, 30)
 

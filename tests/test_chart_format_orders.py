@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from openpyxl import load_workbook
 
-from app.office import ask, edits
-from app.office.sheetdata import Table, load_tables
+from app.products.sheetu.office import ask, edits
+from app.products.sheetu.office.sheetdata import Table, load_tables
 
 
 PRACTICE = Path(__file__).parent / "data" / "practice.xlsx"

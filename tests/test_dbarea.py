@@ -23,7 +23,7 @@ def locked(monkeypatch, mail):
     monkeypatch.setenv("DB_AREA_LOCK", "on")
     monkeypatch.setenv("DIRECT_DB_ALLOW_PRIVATE", "1")
     monkeypatch.setenv("DIRECT_DB_SYNC", "1")
-    from app.agents import direct
+    from app.products.shared import direct
     direct._attempts.clear()
     return mail
 
@@ -64,8 +64,8 @@ def test_unverified_then_locked_then_open(client, locked):
 
 @pytest.mark.skipif(not _mysql_up(), reason="needs local MySQL")
 def test_connect_emails_the_owner_logs_it_and_idle_wipes_the_password(client, locked):
-    from app.db import _SessionLocal
-    from app.models import Connector, DbConnectLog, UserSession, utcnow
+    from app.core.db import _SessionLocal
+    from app.domain.models import Connector, DbConnectLog, UserSession, utcnow
     from app import dbarea
 
     _verified(client, locked, 22)
@@ -91,8 +91,8 @@ def test_connect_emails_the_owner_logs_it_and_idle_wipes_the_password(client, lo
 
 @pytest.mark.skipif(not _mysql_up(), reason="needs local MySQL")
 def test_logout_wipes_typed_passwords(client, locked):
-    from app.db import _SessionLocal
-    from app.models import Connector
+    from app.core.db import _SessionLocal
+    from app.domain.models import Connector
 
     _verified(client, locked, 23)
     _open(client, locked, 23)
@@ -103,7 +103,7 @@ def test_logout_wipes_typed_passwords(client, locked):
 
 
 def test_no_probing_many_servers(client, locked, monkeypatch):
-    from app.agents import direct
+    from app.products.shared import direct
 
     monkeypatch.setattr(direct, "public_ip", lambda host, port: (_ for _ in ()).throw(direct.DirectError("Couldn't find the server")))
     _verified(client, locked, 24)
@@ -154,8 +154,8 @@ def test_account_holder_gets_an_answer_checked_on_their_database(client, locked,
 
 @pytest.mark.skipif(not _mysql_up(), reason="needs local MySQL")
 def test_password_reset_wipes_typed_passwords_at_once(client, locked):
-    from app.db import _SessionLocal
-    from app.models import Connector
+    from app.core.db import _SessionLocal
+    from app.domain.models import Connector
 
     _verified(client, locked, 27)
     _open(client, locked, 27)
@@ -227,7 +227,7 @@ def test_a_connection_problem_in_words_gets_its_likely_causes(client, monkeypatc
 
 
 def test_plain_english_with_to_stays_english():
-    from app.ml.normalize import detect_language
+    from app.core.text import detect_language
 
     assert detect_language("how to connect database") == "English"
     assert detect_language("cannot connect to database") == "English"
@@ -246,7 +246,7 @@ def test_asking_for_help_with_a_query_goes_to_the_query_checker(client, monkeypa
 
 
 def test_my_sql_as_mine_stays_two_words():
-    from app.ml.normalize import normalize
+    from app.core.text import normalize
 
     assert "mysql" not in normalize("can you correct my sql")
     assert "mysql" in normalize("my sql server is not starting")

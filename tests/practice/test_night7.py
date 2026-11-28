@@ -14,7 +14,7 @@ LAB below is what each engine really does with the wrong query (reproduced on Ma
 
 import pytest
 
-from app.agents.sql import analyze_sql
+from app.products.dbaba.sql import analyze_sql
 from tests.practice import schema as S
 
 TOP = "SELECT id, path FROM p ORDER BY id"
@@ -378,8 +378,8 @@ def test_every_rule_records_where_it_was_proven():
     """Standing rule B: each rule and each engine fact says which engines the lab proved it on."""
     import json
 
-    from app.agents import sqlwin
-    from app.agents.sqlread import fundamentals
+    from app.products.dbaba import sqlwin
+    from app.products.dbaba.sqlread import fundamentals
 
     topics = {p[3] for p in P} - {"ties"}           # 'keep the ties' said in words: the ranking rule of night 1
     assert topics <= set(sqlwin.PROVEN) and all(set(v) >= {"mariadb", "postgresql"} for v in sqlwin.PROVEN.values())

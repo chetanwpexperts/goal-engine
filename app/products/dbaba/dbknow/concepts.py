@@ -184,7 +184,7 @@ def engine_named(text: str) -> str | None:
     for eid, (rx, _label) in ENGINES.items():
         if re.search(rx, text or "", re.I):
             return eid
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     return E._misspelt(text or "")                    # 'postgrasql', 'mysq': the name typed with a slip
 
@@ -199,13 +199,13 @@ def _score(c: dict, t: str) -> int:
 
 def _is_work(text: str) -> bool:
     """A pasted query, a pasted error, or a complaint about their own query/database: the checker's or diagnoser's job."""
-    from app.agents.core import query_in
+    from app.products.shared.core import query_in
 
     if query_in(text) or re.search(r"\bselect\b[\s\S]+\bfrom\b|\b(update|delete\s+from|insert\s+into)\b\s+[`\"]?\w+[`\"]?\s+(set|where|values)\b",
                                    text or "", re.I):
         return True
     try:
-        from app.dbknow import reasoning
+        from app.products.dbaba.dbknow import reasoning
 
         facts = reasoning.evidence(text)
         # a question that only NAMES a setting ('what is ONLY_FULL_GROUP_BY') is a concept; a pasted message or code is work
@@ -289,7 +289,7 @@ def nearest(text: str, k: int = 3) -> list[dict]:
 
 
 def _lang(text: str) -> str:
-    from app.ml.normalize import detect_language
+    from app.core.text import detect_language
 
     return {"Hindi": "hindi", "Hinglish": "hinglish"}.get(detect_language(text), "en")
 

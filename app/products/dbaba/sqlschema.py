@@ -23,7 +23,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from app.agents.sqlroutine import _mask
+from app.products.dbaba.sqlroutine import _mask
 
 DIALECTS = Path(__file__).resolve().parent / "dbknow" / "dialects"
 PROVEN = {k: ["mariadb", "postgresql"] for k in (
@@ -75,7 +75,7 @@ def rules(engine: str) -> dict:
 
 
 def _fam_rules(fam: str | None) -> dict:
-    from app.agents.sqlbasics import CHOSEN
+    from app.products.dbaba.sqlbasics import CHOSEN
 
     chosen = CHOSEN.get()
     if fam == "postgresql":
@@ -85,8 +85,8 @@ def _fam_rules(fam: str | None) -> dict:
 
 def _family(sql: str) -> tuple[str | None, bool]:
     """(family, named): the database the person named or chose (rule A), else the one the script's syntax shows."""
-    from app.agents.sqlbasics import CHOSEN, engine_seen
-    from app.dbknow import engines as E
+    from app.products.dbaba.sqlbasics import CHOSEN, engine_seen
+    from app.products.dbaba.dbknow import engines as E
 
     chosen = CHOSEN.get()
     if chosen:
@@ -343,7 +343,7 @@ def _label(fam):
 
 
 def _db(fam):
-    from app.agents.sqlbasics import CHOSEN
+    from app.products.dbaba.sqlbasics import CHOSEN
 
     chosen = CHOSEN.get()
     return {"mysql": "MySQL", "mariadb": "MariaDB", "postgresql": "PostgreSQL"}.get(chosen) or _label(fam) or "MySQL/MariaDB"
@@ -750,8 +750,8 @@ def _list_col(t: dict, c: dict, add, ev: str) -> bool:
 
 def _is_lite(sql: str) -> bool:
     """SQLite: named or chosen (rule A), or shown by words only SQLite takes in a table script (AUTOINCREMENT, STRICT, WITHOUT ROWID)."""
-    from app.agents.sqlbasics import CHOSEN
-    from app.dbknow import engines as E
+    from app.products.dbaba.sqlbasics import CHOSEN
+    from app.products.dbaba.dbknow import engines as E
 
     chosen = CHOSEN.get()
     if chosen:
@@ -760,7 +760,7 @@ def _is_lite(sql: str) -> bool:
 
 
 def _lite_schema(sql: str, d: dict, F) -> list:
-    from app.agents import sqllite
+    from app.products.dbaba import sqllite
 
     return sqllite.design(sql, d, F)
 

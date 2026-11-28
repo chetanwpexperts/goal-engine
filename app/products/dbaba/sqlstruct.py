@@ -30,7 +30,7 @@ Returns [(Finding, [edits])], edit = (start, end, new text) on the original quer
 
 import re
 
-from app.agents.sqljoins import _fk
+from app.products.dbaba.sqljoins import _fk
 
 # the engines each rule was reproduced on (tests/practice/test_night13.py, LAB) -- standing rule B
 PROVEN = {k: ["mariadb", "postgresql"] for k in (
@@ -45,13 +45,13 @@ NAME = r"[`\"]?[A-Za-z_][\w$]*[`\"]?"
 
 
 def _C():
-    from app.agents import sqlcorrect as C
+    from app.products.dbaba import sqlcorrect as C
 
     return C
 
 
 def _S():
-    from app.agents import sqlsubq as S
+    from app.products.dbaba import sqlsubq as S
 
     return S
 
@@ -71,7 +71,7 @@ def _short(t: str, n: int = 100) -> str:
 
 def _says(key: str) -> tuple[str | None, str]:
     """(engine family or None, what it does) for an engine fact in the dialect files."""
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     eng = sqlbasics.engine_seen("")
     my, pg = sqlbasics.rules("mysql").get(key, {}), sqlbasics.rules("postgresql").get(key, {})
@@ -85,7 +85,7 @@ def _says(key: str) -> tuple[str | None, str]:
 
 
 def _engine(sql: str):
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.engine_seen(sql)
 
@@ -110,7 +110,7 @@ def structure(sql: str, s: str, intent: str, F, is_select: bool) -> list:
 def guess_link(x, earlier: list, hint: set = frozenset()) -> str | None:
     """The usual link between a joined table and one before it, from the names alone (child.parent_id = parent.id); the
     earlier table named in a broken ON is preferred, else the one just before. Always offered as a guess."""
-    from app.agents.sqljoins import _rank
+    from app.products.dbaba.sqljoins import _rank
 
     named = [y for y in earlier if y.name and y.name.split(".")[-1].lower() != x.name.split(".")[-1].lower()]
     if not named:
@@ -228,7 +228,7 @@ def _correlation(sql: str, s: str, F) -> list:
 
 
 def _one(word: str) -> str:
-    from app.agents.sqljoins import _one as one, _base
+    from app.products.dbaba.sqljoins import _one as one, _base
 
     return one(_base(word))
 

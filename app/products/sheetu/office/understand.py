@@ -16,7 +16,7 @@ from datetime import date, datetime
 from functools import lru_cache
 from pathlib import Path
 
-from app.mind import packs
+from app.engine.mind import packs
 from app.products.sheetu.office.sheetdata import Table
 
 NAMES_FILE = Path(__file__).resolve().parents[3] / "knowledge" / "data" / "first_names.json"

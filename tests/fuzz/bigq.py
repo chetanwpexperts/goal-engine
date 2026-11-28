@@ -345,7 +345,7 @@ def _rows(eng, sql):
 
 def exam(case: dict, engines: dict) -> list[str]:
     """The problems DBaba has with one generated query (empty = passed)."""
-    from app.agents.sql import analyze_sql
+    from app.products.dbaba.sql import analyze_sql
 
     P = []
     tag = f"[{case['family']} seed {case['seed']}]"
@@ -431,7 +431,7 @@ def explain_text(eng, sql: str) -> str:
 def upgrade(case: dict, engines: dict | None = None) -> list[str]:
     """The same query with the tables' CREATE TABLE: NEEDS SCHEMA findings verified or dropped, PROVEN ones stay. With its
     EXPLAIN: a NEEDS EXECUTION finding is confirmed by the plan (verified) or ruled out by it, never left hanging."""
-    from app.agents.sql import analyze_sql
+    from app.products.dbaba.sql import analyze_sql
 
     tag = f"[upgrade {case['family']} seed {case['seed']}]"
     P = []

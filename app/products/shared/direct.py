@@ -20,7 +20,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.models import Connector, ConnectorJob, dumps, loads, utcnow
+from app.domain.models import Connector, ConnectorJob, dumps, loads, utcnow
 
 log = logging.getLogger(__name__)
 
@@ -50,15 +50,15 @@ def on_done(fn):
     return fn
 
 
-# ---------------------------------------------------------------- secrets (see app/privacy.py)
+# ---------------------------------------------------------------- secrets (see app/security/secrets.py)
 def encrypt(data: dict) -> str:
-    from app import privacy
+    from app.security import secrets as privacy
 
     return privacy.encrypt(data, "db-credentials")
 
 
 def decrypt(token: str) -> dict:
-    from app import privacy
+    from app.security import secrets as privacy
 
     try:
         return privacy.decrypt(token, "db-credentials")
@@ -185,7 +185,7 @@ def _clean_form(form: dict) -> dict:
 
 
 def connect(db: Session, visitor_id: str, form: dict, name: str = "", allow_changes: bool = False, client_ip: str = "") -> Connector:
-    from app.agents import database as dbagent
+    from app.products.dbaba import database as dbagent
 
     details = _clean_form(form)
     _rate_limit(visitor_id, client_ip, details["host"])
@@ -226,7 +226,7 @@ def start(job_id: int) -> None:
 
 def _write_job(db: Session, connector: Connector, job: ConnectorJob) -> dict:
     """Approved change or its undo, for a database connected with typed details. The undo copy is kept encrypted."""
-    from app import privacy
+    from app.security import secrets as privacy
 
     payload = loads(job.payload, {}) or {}
     conn = _open({**decrypt(connector.secret or ""), "writer": True})
@@ -244,8 +244,8 @@ def _write_job(db: Session, connector: Connector, job: ConnectorJob) -> dict:
 
 
 def run_job(job_id: int) -> None:
-    from app.agents import database as dbagent
-    from app.db import get_db
+    from app.products.dbaba import database as dbagent
+    from app.core.db import get_db
 
     gen = get_db()
     db = next(gen)

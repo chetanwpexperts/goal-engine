@@ -12,7 +12,7 @@ import re
 
 import pytest
 
-from app.agents import sqlscan
+from app.products.dbaba import sqlscan
 from tests.practice import schema as S
 
 # (id, requirement, file, code, line, topic, the right query, values bound in order, database)
@@ -115,7 +115,7 @@ P = [
      "import psycopg2\n\ncur.execute(\"\"\"\n    SELECT id\n    FROM customers\n    WHERE middle_name = NULL\n    ORDER BY id\n\"\"\")\n",
      4, "null", "SELECT id FROM customers WHERE middle_name IS NULL ORDER BY id", [], "postgresql"),
     ("py_django_orm", "active users through the ORM", "views.py",
-     "from app.models import User\nusers = User.objects.filter(active=True).order_by('name')\n", 2, "unread", None, [], "postgresql"),
+     "from app.domain.models import User\nusers = User.objects.filter(active=True).order_by('name')\n", 2, "unread", None, [], "postgresql"),
     ("py_bound_safe", "orders of one customer, bound", "ok.py",
      "import pymysql\ncur.execute(\"SELECT id FROM orders WHERE customer_id = %s ORDER BY id\", (cid,))\n", 2, "clean", None, [], "mysql"),
     # ---- Java

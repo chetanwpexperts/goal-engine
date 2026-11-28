@@ -543,7 +543,7 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
         ev = re.sub(r"\s+", " ", sql[m.start():b + 1])
         ev = ev if len(ev) <= 90 else ev[:87] + "..."
         fix_in = op == "="
-        from app.agents import sqlbasics as _B
+        from app.products.dbaba import sqlbasics as _B
 
         _eng = _B.engine_seen(sql)
         if _B.behaviour("scalar_subquery_rows", _eng) == "first_row":
@@ -666,7 +666,7 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
 
     # portability (app/agents/sqlport.py): another database's words the chosen one refuses (rewritten in its own words), and
     # spellings that run but mean something else there (date - date, INTERVAL '2' WEEK, CAST AS CHAR, ^)
-    from app.agents import sqlport
+    from app.products.dbaba import sqlport
 
     for fnd, pedits in sqlport.port(sql, s, intent, Finding, is_select):
         if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
@@ -678,7 +678,7 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
             edits += pedits
 
     # subquery reasoning (app/agents/sqlsubq.py): shape (one value / a set / EXISTS), scope (the inner FROM first), NULLs
-    from app.agents import sqlsubq
+    from app.products.dbaba import sqlsubq
 
     for fnd, sedits in sqlsubq.subqueries(sql, s, intent, Finding):
         F.append(fnd)
@@ -686,7 +686,7 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
             edits += sedits
 
     # CASE, WITH and window functions (app/agents/sqlwin.py): first true WHEN wins, recursion must end, windows run last
-    from app.agents import sqlwin
+    from app.products.dbaba import sqlwin
 
     for fnd, wedits in sqlwin.windows(sql, s, intent, Finding):
         if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
@@ -699,7 +699,7 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
 
     # indexes and speed (app/agents/sqlspeed.py): a condition on the bare column, OR across two tables, deep OFFSET -> keyset.
     # Each rewrite returns exactly the same rows (lab-proven); only the speed changes, so it is a 'check'
-    from app.agents import sqlspeed
+    from app.products.dbaba import sqlspeed
 
     for fnd, pedits in sqlspeed.speed(sql, s, intent, Finding, is_select):
         if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
@@ -712,7 +712,7 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
 
     # structure (app/agents/sqlstruct.py, night 13): correlation that never names the outer row or names the wrong one, the
     # same subquery written twice, UNION vs UNION ALL, a CTE read twice and filtered outside, SELECT * across a join
-    from app.agents import sqlstruct
+    from app.products.dbaba import sqlstruct
 
     for fnd, tedits in sqlstruct.structure(sql, s, intent, Finding, is_select):
         if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
@@ -726,7 +726,7 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
     # safe rewrites with proof (app/agents/sqlproof.py, night 14): several correlated totals over one child table worked out
     # in one grouped pass, an expression repeated in SELECT and WHERE named once, and the form the person asked for (EXISTS,
     # IN, JOIN, CTE, keyset, UNION ALL) -- each one only when it returns the same rows, with what it keeps said
-    from app.agents import sqlproof
+    from app.products.dbaba import sqlproof
 
     for fnd, redits in sqlproof.rewrites(sql, s, intent, Finding, is_select, {f.topic for f in F}):
         if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
@@ -740,7 +740,7 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
             edits += redits
 
     # locks and big data (app/agents/sqllock.py): a huge change in batches, queue workers with SKIP LOCKED (offered, same rows)
-    from app.agents import sqllock
+    from app.products.dbaba import sqllock
 
     for fnd, ledits in sqllock.locks(sql, s, intent, Finding, is_select):
         if any(f.topic == fnd.topic and f.evidence == fnd.evidence for f in F):
@@ -753,7 +753,7 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
 
     # changing data (app/agents/sqlchange.py): which rows, how often, what value, which column, engine syntax
     if not is_select:
-        from app.agents import sqlchange
+        from app.products.dbaba import sqlchange
 
         for fnd, cedits in sqlchange.changes(sql, s, intent, Finding):
             if any(f.topic == fnd.topic and f.evidence == fnd.evidence and f.title_en == fnd.title_en for f in F):
@@ -769,7 +769,7 @@ def _statement_slips(sql: str, s: str, is_select: bool, intent: str = "") -> tup
             edits.append(edit)
 
     # 14. basic SELECT mistakes (app/agents/sqlbasics.py): text joining, NULL in sums, LIKE, AND/OR, division, sorted LIMIT
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     for fnd, edit in sqlbasics.basics(sql, s, is_select, intent, Finding):
         if any(f.evidence == fnd.evidence and f.topic == fnd.topic for f in F):
@@ -965,7 +965,7 @@ def _workbook_traps(sql: str, s: str, is_select: bool, intent: str) -> list:
     for m in re.finditer(r"(?<![\w$.:`\"])([`\"]?[A-Za-z_][\w$.]*[`\"]?)\s+between\s+'(\d{4}-\d{2}-\d{2})'\s+and\s+'(\d{4}-\d{2}-\d{2})'",
                          sql, re.I):                       # (x::date BETWEEN ...: a day cast, not a time column)
         col = m.group(1).split(".")[-1].strip('`"')
-        from app.agents.sqlverify import column_family
+        from app.products.dbaba.sqlverify import column_family
 
         if not TIME_COL.search(col) and column_family(m.group(1).split(".")[0].strip('`"') if "." in m.group(1) else None, col) != "time":
             continue                                       # the project's schema can say it holds a time even when the name doesn't
@@ -1063,7 +1063,7 @@ def _apply_plain(sql: str, edits: list) -> str | None:
 def check(sql: str, _again: bool = False, intent: str = "", engine: str | None = None) -> dict:
     """Returns {'findings': [...], 'corrected': str|None, 'guesses': [...] }. Values without quotes are checked in any
     statement; plain SELECTs are read in depth. engine: the database the answer is for (rule A), when known."""
-    from app.agents.sqlbasics import CHOSEN
+    from app.products.dbaba.sqlbasics import CHOSEN
 
     if not _again and not _ALTS.get():                # night X1: every honest repair written out (app/agents/sqlalts.py)
         tok = _ALTS.set(True)
@@ -1071,7 +1071,7 @@ def check(sql: str, _again: bool = False, intent: str = "", engine: str | None =
             out = check(sql, _again, intent, engine)
             etok = CHOSEN.set(engine) if engine is not None else None
             try:
-                from app.agents import sqlalts
+                from app.products.dbaba import sqlalts
 
                 alts = sqlalts.alternatives(out.get("repaired") or sql, out, intent)
             except Exception:  # noqa: BLE001 - the other readings are an extra; the check itself stands
@@ -1085,7 +1085,7 @@ def check(sql: str, _again: bool = False, intent: str = "", engine: str | None =
         finally:
             _ALTS.reset(tok)
     if BLOCK_KEYS.get() is None:                      # night 12: what the query's own blocks prove about their keys
-        from app.agents import sqlblocks
+        from app.products.dbaba import sqlblocks
 
         nested = bool(re.search(r"\(\s*select\b|^\s*with\b", _mask(sql), re.I))
         tok = BLOCK_KEYS.set(sqlblocks.keys(sql) if nested else {})
@@ -1110,7 +1110,7 @@ _ALTS = contextvars.ContextVar("dbaba_alternatives", default=False)
 
 
 def _meaning_checks() -> set:
-    from app.agents.sql import MEANING_CHECKS
+    from app.products.dbaba.sql import MEANING_CHECKS
 
     return MEANING_CHECKS
 
@@ -1121,7 +1121,9 @@ _SURE_ONLY = contextvars.ContextVar("dbaba_sure_only", default=False)
 
 
 def _check(sql: str, _again: bool = False, intent: str = "") -> dict:
-    from app.agents import sqlbasics, sqlrepair, sqltxn
+    from app.products.dbaba import sqlbasics
+    from app.products.dbaba import sqlrepair
+    from app.products.dbaba import sqltxn
 
     if not sqltxn.is_script(sql):                     # night X1: what the parser refuses is put right first, then read for meaning
         fixed, pre = sqlrepair.repair(sql, Finding, sqlbasics.CHOSEN.get())
@@ -1131,7 +1133,7 @@ def _check(sql: str, _again: bool = False, intent: str = "") -> dict:
         return _check_once(sql, _again, intent)
     out = _check_once(sql, _again, intent)
     if not _again and re.search(r"\(\s*select\b|^\s*with\b", _mask(sql), re.I):
-        from app.agents import sqlblocks
+        from app.products.dbaba import sqlblocks
 
         try:
             out = sqlblocks.with_block_findings(sql, out)      # night 12: every CTE / derived table / UNION part checked too
@@ -1169,13 +1171,15 @@ def _after_repair(fixed: str, pre: list, out: dict) -> dict:
 
 def _keep(pair, needs: list) -> list:
     """The pair, unless the project's schema rules the finding out (app/agents/sqlverify.py, night 10B)."""
-    from app.agents.sqlverify import keep
+    from app.products.dbaba.sqlverify import keep
 
     return keep(pair, needs)
 
 
 def _check_once(sql: str, _again: bool = False, intent: str = "") -> dict:
-    from app.agents import sqllock, sqlroutine, sqltxn
+    from app.products.dbaba import sqllock
+    from app.products.dbaba import sqlroutine
+    from app.products.dbaba import sqltxn
 
     if sqltxn.is_script(sql) and sqltxn.has_control(sql):   # a transaction script: statement by statement (E1 night 4)
         return sqltxn.check(sql, intent, Finding)
@@ -1199,7 +1203,7 @@ def _check_once(sql: str, _again: bool = False, intent: str = "") -> dict:
         if any(f.topic == "delimiter" for f in fs) and len(sqlroutine.split_script(sql, blocks=True)) == 1:
             fixed = sqlroutine.with_delimiter(fixed or sql)
         return {"findings": [f.as_dict() for f in fs], "corrected": fixed, "guesses": []}
-    from app.agents import sqlschema
+    from app.products.dbaba import sqlschema
 
     if sqlschema.is_schema(sql):                     # CREATE TABLE: a table design, read for keys, types and facts (night 6)
         order = {"error": 0, "wrong": 1, "check": 2}
@@ -1220,7 +1224,8 @@ def _check_once(sql: str, _again: bool = False, intent: str = "") -> dict:
     slips, slip_edits = _value_slips(sql, s, known)
     more, more_edits = _statement_slips(sql, s, bool(re.match(r"[\s(]*(select|with)\b", s.lower())), intent)
     slips, slip_edits = slips + more, slip_edits + more_edits
-    from app.agents import sqlbasics, sqlscan
+    from app.products.dbaba import sqlbasics
+    from app.products.dbaba import sqlscan
 
     for p in sqlscan.plain_param_slips(sql, sqlbasics.CHOSEN.get()):   # a placeholder inside quotes / as a name (night 10A)
         slips.append(Finding(p["kind"], p["topic"], p["title_en"], p["title_hi"], p["evidence"], p["fix_en"], p["fix_hi"]))
@@ -1371,7 +1376,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                 "CROSS JOIN mein ON nahi hota (har row har row se judti hai). MySQL ise INNER JOIN maan leta hai, PostgreSQL error deta hai. "
                 "Matching chahiye to INNER JOIN likho.")
         if x.kind in ("join", "left", "right", "full", "cross", "inner") and not x.on and not x.using and x.kind != "cross":
-            from app.agents import sqlstruct                 # night 13: what each engine does, and the link the names suggest
+            from app.products.dbaba import sqlstruct                 # night 13: what each engine does, and the link the names suggest
 
             fam, says = sqlstruct._says("join_without_on")
             link = sqlstruct.guess_link(x, srcs[:i]) if x.name else None
@@ -1386,7 +1391,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                 edits.append((pos, pos, f" ON {link} /* check: guessed from the names */"))
                 guesses.append(f"ON {link}")
         if x.on and a and a not in x.refs and i > 0 and not x.lateral:
-            from app.agents import sqlstruct
+            from app.products.dbaba import sqlstruct
 
             hint = {r[0] for r in refs} & {(y.alias or "").lower() for y in srcs[:i]}
             link = sqlstruct.guess_link(x, srcs[:i], hint) if x.name else None
@@ -1427,7 +1432,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
 
     # join and relationship reasoning (app/agents/sqljoins.py): cartesian links, wrong key columns, anti-joins, self-join
     # pairs, NATURAL JOIN / USING (id), DISTINCT hiding a join's copies
-    from app.agents import sqljoins
+    from app.products.dbaba import sqljoins
 
     whole = None                                     # a rewrite of the whole query (DISTINCT over a join -> EXISTS)
     for fnd, edit in sqljoins.joins(sql, s, cl, srcs, alias_of, items, intent, Finding, all_refs):
@@ -1441,7 +1446,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
 
     # aggregation reasoning (app/agents/sqlaggs.py): COUNT of a comparison or of CASE ... ELSE 0, totals inside totals,
     # windows in a grouped query, SUM over a LEFT JOIN, AVG with NULLs, averages of averages, shares, what was asked to count
-    from app.agents import sqlaggs
+    from app.products.dbaba import sqlaggs
 
     groups = []                                      # a finding and its edits ((None, edit) = one more edit of the one before)
     for fnd, edit in sqlaggs.aggs(sql, s, cl, srcs, alias_of, items, intent, Finding):
@@ -1464,7 +1469,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
     edits += agg_edits
 
     # a JOIN used only to keep the parents that have a child (app/agents/sqlsubq.py): EXISTS keeps each parent once
-    from app.agents import sqlsubq
+    from app.products.dbaba import sqlsubq
     for fnd, sedits in sqlsubq.semi_join(sql, s, cl, srcs, items, intent, Finding):
         F.append(fnd)
         whole = whole or next((e[2] for e in sedits if (e[0], e[1]) == (0, len(sql))), None)
@@ -1559,14 +1564,14 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
     where = cl.get("where")
     if where:
         wtext = _no_subqueries(s[where[0]:where[1]])     # a name inside a subquery is that subquery's own column
-        from app.agents import sqlwin
+        from app.products.dbaba import sqlwin
 
         win_names = sqlwin.window_names(s)                 # a window's name in WHERE: sqlwin's win_alias_where (wrapped, not repeated)
         for m in WORD.finditer(wtext):
             w = m.group(1)
             if w.lower() in win_names:
                 continue
-            from app.agents import sqlbasics as _B
+            from app.products.dbaba import sqlbasics as _B
 
             if _B.behaviour("alias_where", _B.engine_seen(sql)) == "works":
                 continue                                 # SQLite lets WHERE use a SELECT name (lab, E1 night 3)
@@ -1802,7 +1807,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                 if w.lower() not in gbare and not any(w.lower() == c for _q, c in gref):
                     loose.append(w)
         loose = list(dict.fromkeys(loose))
-        from app.agents import sqlbasics as _B
+        from app.products.dbaba import sqlbasics as _B
 
         _eng = _B.engine_seen(sql)
         if aggs and loose and _B.own_rules(_eng) and _B.behaviour("bare_columns", _eng) == "arbitrary":
@@ -1886,7 +1891,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
             kids = [y for y in live if y != A and A in to_one_from({y}) and y not in mine]
             if len(kids) != 1 or any(y not in mine and y != A and y not in kids for y in live):
                 continue
-            from app.agents.sqlverify import holds
+            from app.products.dbaba.sqlverify import holds
 
             k = by_alias[kids[0]]
             if group and kids[0] in single:
@@ -1909,7 +1914,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                 continue
             if k.kind not in ("join", "inner", "left") or not k.on or not k.name or not by_alias[A].name:
                 continue
-            from app.agents.sqlverify import holds
+            from app.products.dbaba.sqlverify import holds
 
             fnd = Finding("check", "join_fanout", f"{fm.group(1).upper()}({fm.group(3)}.{fm.group(4)}) counts each {by_alias[A].name} row "
                           f"once per {k.name} row", f"{fm.group(1).upper()}({fm.group(3)}.{fm.group(4)}) har {by_alias[A].name} row ko "
@@ -2042,8 +2047,8 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
         if any(ev in h for h in have):
             continue                                          # already said, in our own words
         # the engine's own words are the reason (proved); the drafted title and fix are only a pointer, with the example
-        from app.agents.sqlbasics import CHOSEN
-        from app.dbknow import engines as _E
+        from app.products.dbaba.sqlbasics import CHOSEN
+        from app.products.dbaba.dbknow import engines as _E
 
         mine = {"postgresql": ["postgres"], "mysql": [_x for _x in ("mariadb", "mysql") if CHOSEN.get() == _x] or ["mysql", "mariadb"]}.get(
             _E.family(CHOSEN.get()) or "", [])
@@ -2245,7 +2250,7 @@ def _in_engine_words(out: dict, engine: str) -> dict:
     import json
     from pathlib import Path
 
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     fam = E.query_family(engine)
     if fam not in ("postgresql", "sqlite"):

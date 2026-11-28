@@ -9,8 +9,8 @@ from collections import defaultdict
 import pytest
 from openpyxl import Workbook, load_workbook
 
-from app.office import ask
-from app.office.sheetdata import load_tables
+from app.products.sheetu.office import ask
+from app.products.sheetu.office.sheetdata import load_tables
 
 
 @pytest.fixture(scope="module")

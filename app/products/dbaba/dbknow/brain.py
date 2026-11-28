@@ -9,8 +9,8 @@ import os
 import re
 import threading
 
-from app import dbknow
-from app.ml.normalize import normalize
+from app.products.dbaba import dbknow
+from app.core.text import normalize
 
 SQL_RE = re.compile(r"\b(select\b[\s\S]+?\bfrom\b|update\s+[`\"\w.]+\s+set\b|delete\s+from\b|insert\s+into\b)", re.I)
 
@@ -69,7 +69,7 @@ def _train():
     fp = hashlib.sha256(repr((texts, labels)).encode()).hexdigest()
     if _model is not None and fp == _fingerprint:
         return _model
-    from app.ml.intent import DATA_DIR
+    from app.engine.ml.intent import DATA_DIR
     import joblib
 
     saved = DATA_DIR / "models" / "dbknow.joblib"

@@ -23,7 +23,7 @@ import sys
 import tempfile
 from collections import Counter
 
-from app.agents import sqlscan
+from app.products.dbaba import sqlscan
 from tests.fuzz import stmtbugs
 from tests.fuzz.db import engines_up, make_query, make_schema
 
@@ -171,8 +171,8 @@ def _call(stack, lit_lines, first, rnd, kind="select", params=""):
 
 def _from_stmtbugs(seed, engine, rnd):
     """A stmtbugs mistake whose database fits this file (none, or the file's own) and that is found from the SQL alone."""
-    from app.agents import sqlcorrect
-    from app.agents.sql import request_words, unwrap
+    from app.products.dbaba import sqlcorrect
+    from app.products.dbaba.sql import request_words, unwrap
 
     for k in range(40):
         item = stmtbugs.make(seed * 97 + k)
@@ -376,7 +376,7 @@ def make_project(seed: int):
                 if q.mysql_only and engine != "mysql" or "`" in sql or "?" in sql or "%" in sql and lang == "py" or \
                         "$" in sql or "{" in sql:
                     continue
-                from app.agents import sqlcorrect
+                from app.products.dbaba import sqlcorrect
 
                 alone = sqlcorrect.check(sql, engine=engine)
                 if [g for g in alone["findings"] if g["kind"] in ("error", "wrong")]:

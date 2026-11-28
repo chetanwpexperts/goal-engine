@@ -1,6 +1,6 @@
 from app.ai.providers import GeminiProvider, GroqProvider, ProviderError
 from app.ai.router import AIRouter
-from app.config import Settings
+from app.core.config import Settings
 
 
 class Resp:

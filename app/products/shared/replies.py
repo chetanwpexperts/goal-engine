@@ -1,5 +1,5 @@
 """Format completed agent replies and follow-up choices."""
-from app.models import loads
+from app.domain.models import loads
 from app.engine.goal import WATCH_LABELS
 
 def _sql_res(run) -> dict:

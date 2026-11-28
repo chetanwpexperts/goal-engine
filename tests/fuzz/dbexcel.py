@@ -188,7 +188,7 @@ def engine_key(v, engine_id):
         return ""
     if isinstance(v, str):
         if engine_id in ("mariadb", "mysql"):
-            from app.agents.sqlexcel import _fold
+            from app.products.dbaba.sqlexcel import _fold
 
             return _fold(v)
         return v
@@ -259,7 +259,7 @@ def make_cases(seed, rnd, schema, traps):
 
 
 def run(n_cases=40, seed=1, show=False) -> dict:
-    from app.agents import sqlexcel
+    from app.products.dbaba import sqlexcel
 
     if not soffice():
         return {"skipped": "LibreOffice is not installed", "problems": 0, "cases": 0}
@@ -317,7 +317,7 @@ def run(n_cases=40, seed=1, show=False) -> dict:
 
 
 def check(sheets, info, tg, case, raw, cols, eng) -> list[str]:
-    from app.agents import sqlexcel
+    from app.products.dbaba import sqlexcel
 
     out = []
     data = sheets.get("Data")

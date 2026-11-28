@@ -1,6 +1,6 @@
 """Filter internal details from public responses."""
 
-from app.config import get_settings
+from app.core.config import get_settings
 
 
 GOAL_INTERNAL = ("intent", "confidence", "interpreted_problem", "desired_goal", "sub_goals", "constraints", "next_action",

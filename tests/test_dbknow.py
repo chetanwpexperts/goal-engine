@@ -5,7 +5,7 @@ import socket
 
 import pytest
 
-from app import dbknow
+from app.products.dbaba import dbknow
 from tests.test_database import gc
 
 

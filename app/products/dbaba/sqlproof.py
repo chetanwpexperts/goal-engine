@@ -57,13 +57,13 @@ VERB = (r"(?:rewrite|re-?write|make|put|give|show|compute|calculate|evaluate|wor
 
 
 def _C():
-    from app.agents import sqlcorrect as C
+    from app.products.dbaba import sqlcorrect as C
 
     return C
 
 
 def _S():
-    from app.agents import sqlsubq as S
+    from app.products.dbaba import sqlsubq as S
 
     return S
 
@@ -521,7 +521,7 @@ def _compute_once(sql: str, q: dict, F, want: list) -> list:
         ev = _short(core, 80)
         if volatile:
             fn = VOLATILE.search(core_m).group(1).upper()
-            from app.agents import sqlbasics
+            from app.products.dbaba import sqlbasics
 
             eng = sqlbasics.engine_seen(sql)
             if sqlbasics.behaviour("volatile_once", eng) == "differs" and sqlbasics.own_rules(eng):
@@ -889,7 +889,8 @@ def _to_union_all(sql: str, s: str, F, have: set) -> list:
 
 
 def _to_keyset(sql: str, F, have: set) -> list:
-    from app.agents import sqlbasics, sqlspeed
+    from app.products.dbaba import sqlbasics
+    from app.products.dbaba import sqlspeed
 
     if "keyset" in have:
         return []

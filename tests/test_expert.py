@@ -76,8 +76,8 @@ def test_delete_all_removes_expert_requests(client, ml_mode, mail):
     client.post("/api/expert", json={"need": "Website banwani hai", "name": "Sita", "phone": "9876543210",
                                      "contact": "whatsapp", "consent": True})
     client.post("/api/privacy/delete-all")
-    from app.db import get_db
-    from app.models import ExpertRequest
+    from app.core.db import get_db
+    from app.domain.models import ExpertRequest
     assert next(get_db()).query(ExpertRequest).count() == 0
 
 

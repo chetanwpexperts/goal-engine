@@ -211,7 +211,7 @@ def mind_state(db, agent) -> dict:
     """What the shared mind may build next steps on: was a check done, which address."""
     from sqlalchemy import select
 
-    from app.models import AgentRun, loads
+    from app.domain.models import AgentRun, loads
 
     run = db.scalars(select(AgentRun).where(AgentRun.agent_id == agent.id).order_by(AgentRun.id.desc()).limit(1)).first()
     inputs = loads(agent.inputs, {}) or {}
@@ -235,7 +235,7 @@ def holds_conversation(db, goal, text: str, any_text: bool = False):
 
 
 def continue_turn(db, goal, agent, text: str):
-    from app.ml.normalize import detect_language
+    from app.core.text import detect_language
 
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 8)
     reply = ("Haan. Doosri website ka address bhejo (jaise example.com), main turant check karta hoon." if hi

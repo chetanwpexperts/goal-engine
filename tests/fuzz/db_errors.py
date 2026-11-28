@@ -219,7 +219,7 @@ def case(i, seed):
 
 
 def check(text, want):
-    from app.dbknow import reasoning as R
+    from app.products.dbaba.dbknow import reasoning as R
 
     res = R.diagnose(text)
     found = [x["cause"] for x in sorted(res["found"], key=lambda x: -x["score"])]

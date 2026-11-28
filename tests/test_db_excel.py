@@ -102,8 +102,8 @@ def test_scheduled_report_attaches_the_workbook(client, ml_mode, parcel_db, monk
     client.post("/api/owner/code", json={"email": "owner@parcel.test", "business": "Parcels"})
     client.post("/api/owner/verify", json={"code": re.search(r"\d{6}", mail.sent[-1]["body"]).group(0)})
     assert client.post(f"/api/agents/{agent['id']}/db-report", json={"table": "parcels", "every": "day", "at": "09:00"}).status_code == 200
-    from app.db import get_db
-    from app.models import Agent
+    from app.core.db import get_db
+    from app.domain.models import Agent
 
     s = next(main.app.dependency_overrides.get(get_db, get_db)())
     main._run_db_report(s, s.query(Agent).filter_by(recipe="db_report").one())
@@ -118,7 +118,7 @@ def test_old_exports_are_cleaned(tmp_path, monkeypatch):
     import os
     import time
 
-    from app.agents import database as dbagent
+    from app.products.dbaba import database as dbagent
 
     monkeypatch.setattr(dbagent, "EXPORT_DIR", tmp_path)
     old = [tmp_path / "job_1_ab.csv.gz", tmp_path / "job_1_ab.csv.gz.0123456789.xlsx"]
@@ -137,7 +137,7 @@ WRONG = re.compile(r"I don't have a specific answer|paste (the|your|a) (sql )?qu
 
 @pytest.mark.parametrize("cid", ["query_to_excel", "group_by_capitals"])
 def test_concept_phrasings(client, ml_mode, cid):
-    from app.dbknow import concepts as K
+    from app.products.dbaba.dbknow import concepts as K
 
     c = K.by_id(cid)
     titles = set(c["title"].values())

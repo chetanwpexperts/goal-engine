@@ -24,7 +24,7 @@ def test_a_borrowed_capability_loads_its_owner_in_a_fresh_process():
 
 
 def test_database_reasoning_reads_complaints_without_app_startup():
-    code = ("from app.dbknow import reasoning as R; "
+    code = ("from app.products.dbaba.dbknow import reasoning as R; "
             "res = R.diagnose('our read replica is lagging behind and shows old data'); "
             "import sys; print('replica_lag' in [x['cause'] for x in res['open'][:4]], 'app.products.sheetu' in sys.modules)")
     assert _fresh(code) == "True False"          # reads words through shared/meaning.py, without loading Sheetu

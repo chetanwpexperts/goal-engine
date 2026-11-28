@@ -5,7 +5,7 @@ from app.core.config import get_settings
 
 
 def health(router: AIRouter) -> dict:
-    from app.ml.slots import SPECS
+    from app.engine.ml.slots import SPECS
 
     if not get_settings().expose_internals:
         return {"ok": True}                                  # how the engine works isn't anyone's business

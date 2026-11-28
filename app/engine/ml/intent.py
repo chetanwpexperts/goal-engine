@@ -18,7 +18,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import FeatureUnion, Pipeline
 
-from app.engine.ml.normalize import normalize
+from app.core.text import normalize
 from app.engine.ml.seed_data import SEED
 
 

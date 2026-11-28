@@ -11,7 +11,7 @@ import re
 
 import pytest
 
-from app.dbknow import concepts as K
+from app.products.dbaba.dbknow import concepts as K
 from tests.test_ml import say, say_sql
 
 WRONG_PLACES = re.compile(r"I don't have a specific answer|paste (the|your|a) (sql )?query|query paste karo|Just tell me where your database is|"

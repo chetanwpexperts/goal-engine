@@ -13,7 +13,7 @@ import re
 
 import pytest
 
-from app.agents.sql import analyze_sql
+from app.products.dbaba.sql import analyze_sql
 from tests.practice import schema as S
 
 # (id, words, wrong query, topic, correct query or None, keep row order?, run only on, database said)
@@ -266,7 +266,7 @@ def test_every_rule_says_where_it_was_proven():
     import json
     from pathlib import Path
 
-    from app.agents import sqljoins
+    from app.products.dbaba import sqljoins
 
     assert set(sqljoins.PROVEN) == {"cartesian", "join_key", "natural_join", "anti_join", "self_join", "distinct_join"}
     assert all(set(v) >= {"mariadb", "postgresql"} for v in sqljoins.PROVEN.values())

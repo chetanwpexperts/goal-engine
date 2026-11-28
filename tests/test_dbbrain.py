@@ -1,6 +1,6 @@
 """The database brain recognises problems from how people actually say them (no AI)."""
 
-from app.dbknow import brain
+from app.products.dbaba.dbknow import brain
 
 
 def test_recognises_issues_errors_sql_and_tasks():
@@ -45,7 +45,7 @@ def test_diagnose_and_optimize_through_the_api(client, ml_mode, monkeypatch):
         cur.execute("CREATE TABLE big (id INT PRIMARY KEY, note VARCHAR(200))")
         cur.execute("INSERT INTO big SELECT seq, REPEAT('x', 150) FROM seq_1_to_20000")
     conn.close()
-    from app.agents import direct
+    from app.products.shared import direct
     monkeypatch.setenv("APP_SECRET", "s" * 32)
     monkeypatch.setenv("DIRECT_DB_ALLOW_PRIVATE", "1")
     monkeypatch.setenv("DIRECT_DB_SYNC", "1")
@@ -66,7 +66,7 @@ def test_diagnose_and_optimize_through_the_api(client, ml_mode, monkeypatch):
 
 def test_brain_understands_new_phrasings_of_every_problem():
     """Each playbook/question ships 2 sentences the brain never learned from. It must still recognise them."""
-    from app import dbknow
+    from app.products.dbaba import dbknow
     misses = []
     for name, kind in (("issues", "issue"), ("questions", "question")):
         for e in dbknow.load(name):
@@ -78,7 +78,7 @@ def test_brain_understands_new_phrasings_of_every_problem():
 
 
 def test_brain_understands_hindi_script_and_voice_style():
-    from app.dbknow import brain
+    from app.products.dbaba.dbknow import brain
 
     cases = {
         "मेरा डेटाबेस बहुत धीरे चल रहा है": "do:slow_query",

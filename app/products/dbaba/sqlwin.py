@@ -55,7 +55,7 @@ OLD_VERSION = re.compile(r"\bmysql\s*(?:version\s*)?5(?:\.\d+)?\b|\bmariadb\s*(?
 
 
 def _C():
-    from app.agents import sqlcorrect as C
+    from app.products.dbaba import sqlcorrect as C
 
     return C
 
@@ -75,31 +75,31 @@ def _uq(n: str) -> str:
 
 def _engine(sql: str):
     """('mysql' | 'postgresql' | None, the exact database chosen if any)."""
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.engine_seen(sql), (sqlbasics.CHOSEN.get() or "")
 
 
 def _rule(eng: str, key: str) -> dict:
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.rules(eng).get(key, {}) if eng else {}
 
 
 def _behaviour(key: str, eng):
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.behaviour(key, eng)
 
 
 def _own(eng) -> bool:
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.own_rules(eng)
 
 
 def _says_hi(key: str, eng) -> str:
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.says_hi(key, eng)
 

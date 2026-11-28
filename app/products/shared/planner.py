@@ -9,7 +9,7 @@ import json
 import re
 
 from app.products.shared.spec import clean, validate
-from app.ml.normalize import normalize
+from app.core.text import normalize
 
 
 NUM_WORDS = {"ek": 1, "do": 2, "teen": 3, "char": 4, "chaar": 4, "paanch": 5, "panch": 5, "saat": 7, "das": 10,
@@ -188,7 +188,7 @@ def plan_ai(text: str, router) -> dict | None:
 
 
 def plan(text: str, router=None, use_ai: bool = False) -> dict | None:
-    from app.agents.database import concept_question
+    from app.products.dbaba.database import concept_question
 
     if concept_question(text):
         return None              # 'har mahine ka total kaise nikale (sql)': a question to answer, not a job to schedule

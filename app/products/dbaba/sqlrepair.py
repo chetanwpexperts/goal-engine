@@ -35,7 +35,7 @@ OTHER_TOP = re.compile(r"\b(union|intersect|except|window|fetch|for\s+update|for
 
 def repair(sql: str, finding_cls, engine: str | None = None) -> tuple[str | None, list]:
     """(the statement repaired, the findings) or (None, []) when there's nothing a parser would refuse here."""
-    from app.agents.sqlcorrect import _depths, _mask
+    from app.products.dbaba.sqlcorrect import _depths, _mask
 
     out, found = sql, []
     fixed, fs = _operators(out, finding_cls, engine)
@@ -50,8 +50,8 @@ def repair(sql: str, finding_cls, engine: str | None = None) -> tuple[str | None
 
 # ------------------------------------------------------------------------------------------------ == / =< / =>
 def _operators(sql: str, F, engine: str | None) -> tuple[str | None, list]:
-    from app.agents.sqlbasics import behaviour, says
-    from app.agents.sqlcorrect import _depths, _mask
+    from app.products.dbaba.sqlbasics import behaviour, says
+    from app.products.dbaba.sqlcorrect import _depths, _mask
 
     s = _mask(sql)
     dep = _depths(s)

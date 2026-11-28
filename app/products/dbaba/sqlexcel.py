@@ -76,7 +76,7 @@ class ExcelError(ValueError):
 # ---------------------------------------------------------------- what the database says about grouping
 def grouping(engine: str | None) -> dict:
     """How the engine's GROUP BY compares text (lab-proven, dialect file). Unknown engine: compared exactly."""
-    from app.dbknow import engines
+    from app.products.dbaba.dbknow import engines
 
     try:
         return dict(engines.dialect(engine).get("grouping") or {}) if engine else {}
@@ -555,7 +555,7 @@ def build(columns, rows, out_path: str, *, engine: str | None = None, sql: str =
     ab = wb.create_sheet("About")
     ab.column_dimensions["A"].width = 22
     ab.column_dimensions["B"].width = 100
-    from app.dbknow import engines as _eng
+    from app.products.dbaba.dbknow import engines as _eng
 
     lines = [("What", title or ("Query ka result" if hi else "Query result")),
              ("Database", _eng.label(engine) if engine else ("Pata nahi" if hi else "Not named")),
@@ -689,7 +689,7 @@ def for_job(job, connector, by: str | None = None, measure: str | None = None, h
         by, measure = w.get("by"), w.get("measure")
     tag = hashlib.sha256(f"{by}|{measure}|{hi}".encode()).hexdigest()[:10]
     out = f"{job.file_path}.{tag}.xlsx"
-    from app.models import loads
+    from app.domain.models import loads
 
     payload = loads(job.payload, {}) or {}
     res = loads(job.result, {}) or {}

@@ -19,7 +19,7 @@ os.environ["SITE_MODE"] = "open"   # the coming-soon gate has its own test
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.ai.router import AIRouter  # noqa: E402
-from app.db import Base, get_engine, init_db  # noqa: E402
+from app.core.db import Base, get_engine, init_db  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -97,7 +97,7 @@ def use_provider():
 
 @pytest.fixture()
 def ml_mode():
-    from app.config import get_settings
+    from app.core.config import get_settings
 
     settings = get_settings()
     old_mode, old_cap, old_all = settings.engine_mode, settings.visitor_daily_cap, settings.ai_daily_cap

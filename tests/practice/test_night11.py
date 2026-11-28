@@ -17,8 +17,10 @@ import re
 
 import pytest
 
-from app.agents import sqlconfidence, sqlproject, sqlverify
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqlconfidence
+from app.products.dbaba import sqlproject
+from app.products.dbaba import sqlverify
+from app.products.dbaba.sql import analyze_sql
 from tests.fuzz.db import MYSQL, PG, Engine
 from tests.practice import schema as S
 
@@ -316,7 +318,7 @@ def test_the_lab_table_still_holds(engines):
 def test_every_class_rule_records_where_it_was_proven():
     import json
 
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     assert sqlconfidence.PROVEN_ON == ["mariadb", "postgresql"]
     funds = json.load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"]

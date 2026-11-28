@@ -6,8 +6,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import privacy
-from app.agents import automation, database as dbagent
-from app.agents.core import AgentError, agent_dict, goal_agents, run_agent
+from app.products.shared import automation
+from app.products.dbaba import database as dbagent
+from app.products.shared.core import AgentError, agent_dict, goal_agents, run_agent
 from app.services.goals import _after_run, all_goals
 from app.domain.models import Agent, Goal, Message, dumps, loads
 from app.domain.schemas.agents import StartIn, OwnerIn

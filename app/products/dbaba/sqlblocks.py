@@ -19,7 +19,7 @@ Every grain fact was reproduced on MariaDB and PostgreSQL (tests/practice/test_n
 
 import re
 
-from app.agents import sqlcorrect as C
+from app.products.dbaba import sqlcorrect as C
 
 PROVEN_ON = ["mariadb", "postgresql"]
 NAME = r"(?:`[^`]+`|\"[^\"]+\"|[A-Za-z_][\w$]*)"

@@ -15,9 +15,9 @@ from typing import Callable
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from app.agents.sql import analyze_sql
+from app.products.dbaba.sql import analyze_sql
 from app.products.shared.website import check_website
-from app.models import Agent, AgentRun, Goal, Message, dumps, loads, utcnow
+from app.domain.models import Agent, AgentRun, Goal, Message, dumps, loads, utcnow
 
 
 @dataclass(frozen=True)
@@ -72,7 +72,7 @@ def _sql_summary(result: dict, hi: bool) -> str:
                  "\n\nBefore running it, see the rows it will change (this only reads):") + f"\n\n{result['preview']}"
     rec = result.get("engine_rule") or {}
     if rec and result.get("ok"):
-        from app.dbknow import engines
+        from app.products.dbaba.dbknow import engines
 
         lang = rec.get("lang") or ("hinglish" if hi else "en")
         extra = engines.detected_line(rec, lang)[0] or engines.notes_line(rec["id"], lang, result.get("notes_for", ""))   # 'not sure': each finding names its engines
@@ -145,7 +145,7 @@ def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up:
 
 def _stmt(q: str) -> str:
     """The statement ended with ';' (before a '-- note' on its last line, so the note can't swallow it)."""
-    from app.agents.sqlcorrect import _mask
+    from app.products.dbaba.sqlcorrect import _mask
 
     q = q.strip()
     m = re.search(r"--[^\n]*$|#[^\n]*$", _mask(q).rstrip() and q)
@@ -166,7 +166,7 @@ def statements_text(result: dict, hi: bool, sure: bool, fs: list | None = None) 
     fs = fs if fs is not None else c.get("findings") or []
     change = bool(re.match(r"\s*(update|delete|insert|replace|merge)\b", q, re.I))
     topics = {f["topic"] for f in fs}
-    from app.agents.sql import MEANING_CHECKS, SPEED_OFFERS
+    from app.products.dbaba.sql import MEANING_CHECKS, SPEED_OFFERS
 
     if sure:
         head = (("Sahi statement (preview: main ise chalata nahi; pehle neeche wali query se dekh lo kaunsi rows badlengi):" if hi else
@@ -219,7 +219,7 @@ def correctness_options(result: dict, hi: bool) -> list[str]:
 
 def quiet_next(db, goal, text: str) -> bool:
     """The query checker is waiting for the query someone said they have: that is the next step, nothing else."""
-    from app.agents.database import QUERY_TALK
+    from app.products.dbaba.database import QUERY_TALK
 
     return goal is not None and QUERY_TALK.search(text or "") is not None and \
         any(a.recipe == "sql_review" and a.status == "proposed" for a in goal_agents(db, goal.id))
@@ -242,7 +242,7 @@ def _run_sql(inputs: dict) -> dict:
     out = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=rec.get("id") or None, said=inputs.get("said") or "")
     if rec:
         out["engine_rule"] = rec
-        from app.dbknow import engines
+        from app.products.dbaba.dbknow import engines
 
         out["taps"] = engines.detected_line(rec, rec.get("lang", "en"))[1]
     return out
@@ -318,7 +318,7 @@ def pasted_query(text: str) -> bool:
 def query_in(text: str) -> str | None:
     """The SQL query pasted in this message (maybe straight from code), after at most a short lead-in line like
     'here is my query:'; None when the message is a sentence that only mentions SQL."""
-    from app.agents.sql import _strip_comments, unwrap
+    from app.products.dbaba.sql import _strip_comments, unwrap
 
     lines = (text or "").strip().splitlines()
     m = re.match(r"\s*([^\n:]{1,60}):[ \t]*(?=\(?\s*(?:select|with|update|delete|insert|replace)\b)", lines[0] if lines else "", re.I)
@@ -352,11 +352,11 @@ def agent_dict(agent: Agent, db: Session, hi: bool) -> dict:
 
         return automation_dict(db, agent, hi)
     if agent.recipe == "database":
-        from app.agents.database import database_dict
+        from app.products.dbaba.database import database_dict
 
         return database_dict(db, agent, hi)
     if agent.recipe == "office":
-        from app.agents.office_agent import office_dict
+        from app.products.sheetu.office_agent import office_dict
 
         return office_dict(db, agent, hi)
     if agent.recipe == "db_report":
@@ -495,7 +495,7 @@ def run_agent(db: Session, agent: Agent, hi: bool, scheduled: bool = False) -> A
     if not scheduled and runs_today(db, agent.visitor_id) >= RUNS_PER_VISITOR_PER_DAY:
         raise AgentError("Today's limit for agent runs is reached. Please try again tomorrow.")
     if recipe.key == "sql_review" and not scheduled:
-        from app.agents.database import engine_gate
+        from app.products.dbaba.database import engine_gate
 
         inputs = engine_gate(db, agent, inputs, hi)       # rule A: which database decides the answer (may ask first)
 

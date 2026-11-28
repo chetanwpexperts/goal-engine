@@ -17,7 +17,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.agents import sqlexcel
+from app.products.dbaba import sqlexcel
 from tests.fuzz import dbexcel as DX
 
 HUBS = ["Mohali", "mohali", "MOHALI", "Kharar", "Zirakpur", "Panchkula", "Café Point", "Cafe Point", "Depot ", "Depot",
@@ -292,7 +292,7 @@ def test_the_say_in_hinglish():
 
 
 def test_grouping_facts_are_lab_marked():
-    from app.dbknow import engines
+    from app.products.dbaba.dbknow import engines
 
     for e, case in (("mariadb", "insensitive"), ("postgresql", "sensitive"), ("sqlite", "sensitive"), ("mysql", "insensitive")):
         g = engines.dialect(e)["grouping"]

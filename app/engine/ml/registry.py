@@ -6,7 +6,7 @@ from typing import Callable
 
 from app.engine.ml.answers import PLAYBOOKS
 from app.engine.ml.knowledge import ProblemType, all_types
-from app.engine.ml.normalize import normalize
+from app.core.text import normalize
 from app.engine.ml.slots import BUDGET, CITY, INTENT_LABELS, SINCE, SITE, SPECS, Slot, skill
 
 

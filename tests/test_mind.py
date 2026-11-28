@@ -6,11 +6,11 @@ import random
 import pytest
 from openpyxl import Workbook
 
-from app.office import mind as mo
+from app.products.sheetu.office import mind as mo
 from app.services.mind import predict
 from app.engine.mind import signals
-from app.office import ask
-from app.office.sheetdata import load_tables
+from app.products.sheetu.office import ask
+from app.products.sheetu.office.sheetdata import load_tables
 from tests.test_follow_orders import PRACTICE, open_file  # noqa: F401 - fixture
 from tests.test_ml import say
 from tests.test_office_agent import _upload, _wait
@@ -43,7 +43,7 @@ def test_the_same_words_again_is_a_repeat():
 def db_session(fresh_db):
     from sqlalchemy.orm import Session
 
-    from app.db import get_engine
+    from app.core.db import get_engine
 
     with Session(get_engine()) as s:
         yield s
@@ -71,7 +71,7 @@ def test_real_sessions_take_over_from_the_starting_chains(db_session):
 def test_old_habits_fade_once_a_day(db_session):
     predict.record(db_session, "office", ["rows"], "sort")
     db_session.flush()
-    from app.models import PatternStep
+    from app.domain.models import PatternStep
 
     w0 = sum(r.weight for r in db_session.query(PatternStep).filter_by(brain="office", nxt="sort"))
     predict.decay(db_session)
@@ -203,8 +203,8 @@ def test_privacy_delete_removes_the_working_style(client, open_file):  # noqa: F
     say(client, "always give me the formula", open_file)
     from sqlalchemy.orm import Session
 
-    from app.db import get_engine
-    from app.models import MindSession, VisitorStyle
+    from app.core.db import get_engine
+    from app.domain.models import MindSession, VisitorStyle
 
     with Session(get_engine()) as db:
         assert db.query(VisitorStyle).count() >= 1
@@ -246,7 +246,7 @@ def test_a_returning_persons_own_habits_come_first(db_session):
     s_bob = predict.scores(db_session, "office", ["upload", "sum_g"], visitor="v-bob")
     assert max(s_alice, key=s_alice.get) == "highlight"
     assert s_bob["highlight"] < s_alice["highlight"]
-    from app.models import PersonalStep
+    from app.domain.models import PersonalStep
 
     assert all(r.who.startswith("h:") and "alice" not in r.who for r in db_session.query(PersonalStep)), "only a one-way fingerprint"
     predict.delete_visitor(db_session, "v-alice")
@@ -256,7 +256,7 @@ def test_a_returning_persons_own_habits_come_first(db_session):
 def test_one_off_paths_are_dropped_as_noise(db_session):
     from datetime import timedelta
 
-    from app.models import PatternStep, utcnow
+    from app.domain.models import PatternStep, utcnow
 
     predict.record(db_session, "office", ["rows"], "aging")
     for r in db_session.query(PatternStep):
@@ -271,9 +271,9 @@ def test_after_a_long_pause_the_chain_starts_fresh(client, open_file):  # noqa: 
 
     from sqlalchemy.orm import Session
 
-    from app.db import get_engine
-    from app.mind import core
-    from app.models import MindSession, dumps, loads, utcnow
+    from app.core.db import get_engine
+    from app.engine.mind import core
+    from app.domain.models import MindSession, dumps, loads, utcnow
 
     say(client, "total sales by region", open_file)
     with Session(get_engine()) as db:
@@ -298,8 +298,8 @@ def test_how_many_sheets_gets_the_number(client, open_file):  # noqa: F811
 def test_what_it_could_not_answer_directly_goes_to_learning(client, open_file):  # noqa: F811
     from sqlalchemy.orm import Session
 
-    from app.db import get_engine
-    from app.models import LearnRequest
+    from app.core.db import get_engine
+    from app.domain.models import LearnRequest
 
     r = say(client, "blorp the quarterly zingers", open_file)
     assert r["options"] and r["next"] == [], "a question back, no suggestions next to it"
@@ -309,7 +309,7 @@ def test_what_it_could_not_answer_directly_goes_to_learning(client, open_file): 
 
 
 def test_a_single_answer_reads_the_file_once_and_writes_nothing(client, open_file):  # noqa: F811
-    from app.office import sheetdata
+    from app.products.sheetu.office import sheetdata
 
     r1 = say(client, "total sales kitni hai", open_file)
     hits = []
@@ -333,7 +333,7 @@ def test_suggestions_add_up_totals_not_unit_prices():
 
 
 def test_table_cache_stays_within_its_memory_budget(tmp_path, monkeypatch):
-    from app.office import sheetdata
+    from app.products.sheetu.office import sheetdata
 
     monkeypatch.setattr(sheetdata, "CACHE_BUDGET", 3 * 1024 * 1024)
     sheetdata._cache.clear()

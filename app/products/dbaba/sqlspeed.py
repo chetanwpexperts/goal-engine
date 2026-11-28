@@ -29,7 +29,7 @@ import datetime as _dt
 import re
 from decimal import Decimal, InvalidOperation
 
-from app.agents.sqlverify import keep as schema_keep
+from app.products.dbaba.sqlverify import keep as schema_keep
 
 # the engines each rule was reproduced on (tests/practice/test_night8.py, LAB) -- standing rule B
 PROVEN = {k: ["mariadb", "postgresql"] for k in ("sargable", "or_union", "keyset", "index_prefix", "index_range_first",
@@ -45,7 +45,7 @@ NOT_COLUMN = {"null", "true", "false", "and", "or", "not", "case", "when", "then
 
 
 def _C():
-    from app.agents import sqlcorrect as C
+    from app.products.dbaba import sqlcorrect as C
 
     return C
 
@@ -64,13 +64,13 @@ def _bare(col: str) -> str:
 
 
 def _engine(sql: str):
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.engine_seen(sql)
 
 
 def _rule(eng: str, key: str) -> dict:
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.rules(eng).get(key, {}) if eng else {}
 
@@ -85,7 +85,7 @@ def _says(key: str, eng) -> str:
 # ------------------------------------------------------------------------------------------------ where the WHEREs are
 def _where_spans(s: str) -> list[tuple[int, int]]:
     """(start, end) of the body of every WHERE, at every level (the statement and each subquery)."""
-    from app.agents import sqlwin
+    from app.products.dbaba import sqlwin
 
     C = _C()
     out = []
@@ -492,7 +492,7 @@ _LIMIT = re.compile(r"\blimit\s+(\d+)\s*,\s*(\d+)\s*$|\blimit\s+(\d+)\s+offset\s
 
 def _key_like(col: str, table: str) -> bool:
     """'id', or the table's own <singular>_id (students.student_id, wp_users.user_id, staff.staffId): the row's key."""
-    from app.agents.sql import _likely_primary
+    from app.products.dbaba.sql import _likely_primary
 
     parts = table.lower().split("_")
     return any(_likely_primary("_".join(parts[i:]), _bare(col)) for i in range(len(parts)))
@@ -621,7 +621,7 @@ _TN = r"[`\"]?(?:\w+[`\"]?\.[`\"]?)?(\w+)[`\"]?"
 def structure(extra: str) -> dict:
     """{table: {"cols": {name: type}, "indexes": [[col, ...], ...]}} from pasted CREATE TABLE / CREATE INDEX / ALTER TABLE /
     pg_dump text (names in lower case)."""
-    from app.agents.sql import _strip_comments
+    from app.products.dbaba.sql import _strip_comments
 
     text = _strip_comments(extra or "")
     out: dict = {}
@@ -662,7 +662,7 @@ TEXT_TYPES = re.compile(r"^(char|varchar|character|text|tinytext|mediumtext|long
 
 def index_fit(query: str, extra: str, eng=None) -> list[dict]:
     """With the structure pasted: why an index that exists can't serve this query. Speed findings (dicts like SqlFinding)."""
-    from app.agents.sql import _clause, _mask_strings, _strip_comments, _tables
+    from app.products.dbaba.sql import _clause, _mask_strings, _strip_comments, _tables
 
     st = structure(extra)
     if not st:

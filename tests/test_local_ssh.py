@@ -22,10 +22,10 @@ from pathlib import Path
 import pytest
 from starlette.testclient import TestClient
 
-from app.local import checks, dbconn, report, tunnel
-from app.local.config import Config
-from app.local.jobs import Jobs
-from app.local.server import make_app
+from app.products.dbaba.local import checks, dbconn, report, tunnel
+from app.products.dbaba.local.config import Config
+from app.products.dbaba.local.jobs import Jobs
+from app.products.dbaba.local.server import make_app
 from tests.test_local import MARIA, PG, needs_maria, needs_pg
 
 SSHD = shutil.which("sshd") or ("/usr/sbin/sshd" if os.path.exists("/usr/sbin/sshd") else None)

@@ -44,11 +44,13 @@ folder under app/products with its own logic and knowledge, use shared
 helpers and lower layers, and expose its use cases through services and
 routes. Do not modify another product to implement the new one.
 
-### Where the products live now (after Step 5)
+### Where the products live now (after Step 6)
 
 - `app/products/dbaba/`: the SQL agents (`sql*.py`), `database.py`, the knowledge in `dbknow/` (core, dialects,
-  issues, errors, questions), and `local/` (DBaba installed on a client's server; `python -m app.local serve` still
-  works through the forwarding package `app/local`).
+  issues, errors, questions), and `local/` (DBaba installed on a client's server).
+  `python -m app.local serve` still works: `app/local/` stays as the on-server entry path because the install files
+  (Docker, Windows, cPanel, `install.sh`, `dbaba_cli`) start DBaba that way. Each file there only forwards to
+  `app/products/dbaba/local/`.
 - `app/products/sheetu/`: `office_agent.py`, `office/` (reading and fixing workbooks) and `officeknow/`.
 - `app/products/shared/`: the agents both use (core, automation, website checker, mailer, planner, blocks, safety,
   direct, learn) and `bridge.py`.
@@ -58,8 +60,13 @@ routes. Do not modify another product to implement the new one.
   A new product registers its own names the same way and touches nothing else.
 - Knowledge files exist once, next to the code that reads them; code finds them with `Path(__file__)`, so after
   moving a module the number of `.parent` steps must be rechecked.
-- Old import paths (`app/agents/...`, `app/office`, `app/officeknow`, `app/dbknow`, `app/local`) are forwarding
-  modules only. They never alias a package or change a package's search path. Step 6 removes the ones nothing uses.
+- Step 6 removed the old import paths (`app/agents/`, `app/office/`, `app/officeknow/`, `app/dbknow/`, `app/mind/`,
+  `app/ml/`, `app/models.py`, `app/config.py`, `app/db.py`) and the lazy forwarding in `app/engine/__init__.py`.
+  Code imports the new homes directly. The only old path left is `app/local/` (see above).
+- The agent packs in `app/knowledge/agents/*.json` name their hooks as `"module:function"` strings; when a module
+  moves, those strings move with it (the import scan cannot see them).
+- Encryption, keys and one-way fingerprints live in `app/security/secrets.py`, so products encrypt what they keep
+  without importing services; `app/privacy.py` re-exports them.
 - Still to do (small follow-up PR): split `app/products/dbaba/database.py` and `app/products/sheetu/office_agent.py`
   (1,300-1,600 lines each) into smaller modules by topic.
 
@@ -106,6 +113,11 @@ import, database-session and undeclared-route debts. The lists may only
 shrink. Guard tests reject both new violations and stale entries for
 violations that have been fixed. Do not add exceptions to make a test pass.
 
+Two import debts remain after Step 6. `products.dbaba.database -> dbarea` is cleared in Step 7.
+`products.dbaba.local.server -> services` was always there but hidden behind a string import in
+`app/engine/__init__.py`; removing that made it visible. It goes when the on-server app gets its own startup that
+hands the chat handler in (Step 7).
+
 After a step removes debts, run:
 
 ```sh
@@ -126,11 +138,11 @@ coverage as code moves so that relocation alone cannot hide a violation.
 - Step 3: Split routes and services, leaving main as app wiring.
 - Step 4: Move reasoning and learning into a pure engine.
 - Step 5: Separate DBaba, Sheetu and shared product modules.
-- Step 6: Clear remaining debts and remove only unused compatibility shims.
+- Step 6: Clear remaining debts and remove only unused compatibility shims. (Done.)
 - Step 7: Centralize permissions and authentication, add audit logging and clear undeclared routes.
 - Step 8: Add crawler blocking, robots rules and response metadata.
 - Step 9: Lock dependencies and add supply-chain and static security checks.
 
-Keep legacy import paths and the local command entry points working during
+Keep the local command entry points (`python -m app.local`) working during
 the migration. Do not weaken existing tests. Each step is a separate
 reviewed branch and pull request; do not merge or advance before approval.

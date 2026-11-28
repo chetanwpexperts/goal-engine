@@ -7,7 +7,7 @@ not the same list again.
 import re
 from dataclasses import dataclass
 
-from app.engine.ml.normalize import normalize
+from app.core.text import normalize
 
 
 QUESTION_RE = re.compile(r"\b(kaise|kese|how|kya hai|kya hota|matlab|samjhao|samjha do|batao|bata do|bataiye|"

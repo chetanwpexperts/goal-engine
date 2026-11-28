@@ -16,7 +16,7 @@ Returns [(Finding, edit or None)], edit = (start, end, new text) on the original
 
 import re
 
-from app.agents.sqlverify import keep as schema_keep
+from app.products.dbaba.sqlverify import keep as schema_keep
 
 # the engines each rule was reproduced on (tests/practice/test_night2.py, LAB) -- standing rule B
 PROVEN = {"cartesian": ["mariadb", "postgresql"], "join_key": ["mariadb", "postgresql"], "natural_join": ["mariadb", "postgresql"],
@@ -106,7 +106,7 @@ def _trim(s: str, a: int, b: int) -> int:
 
 def _top_and(text: str) -> list[tuple[int, int]]:
     """Spans of the top-level AND parts of a condition (None-safe for OR: an OR at top level gives one part)."""
-    from app.agents.sqlcorrect import _depths
+    from app.products.dbaba.sqlcorrect import _depths
 
     d = _depths(text)
     if any(d[m.start()] == 0 for m in re.finditer(r"\bor\b", text, re.I)):
@@ -326,7 +326,7 @@ def joins(sql: str, s: str, cl: dict, srcs: list, alias_of, items: list, intent:
         k = _key(x, refs_cols) if _key(x, refs_cols) != "id" else _key(twin, refs_cols)
         if same[0].group(2).lower() == k.lower():
             continue                                                  # joined on its own key: each row with itself, on purpose
-        from app.agents.sqlcorrect import _block_key
+        from app.products.dbaba.sqlcorrect import _block_key
 
         if _block_key(x, same[0].group(2)):
             continue                                                  # night 13: a CTE's own GROUP BY makes it the key

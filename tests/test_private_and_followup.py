@@ -1,6 +1,6 @@
 """The browser never learns how the brain read a message; and after a query check, 'optimize it' gets the optimised query."""
 
-from app.config import get_settings  # noqa: F401
+from app.core.config import get_settings  # noqa: F401
 from tests.test_ml import say, say_sql
 
 QUERY = ("SELECT s.*, c.course_name, f.amount FROM Students s JOIN courses c ON c.course_id = s.course_id "

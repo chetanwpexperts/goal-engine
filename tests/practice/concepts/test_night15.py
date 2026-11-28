@@ -10,7 +10,7 @@ import re
 
 import pytest
 
-from app.dbknow import concepts as K
+from app.products.dbaba.dbknow import concepts as K
 from tests.fuzz import bigq
 from tests.test_ml import say, say_sql
 

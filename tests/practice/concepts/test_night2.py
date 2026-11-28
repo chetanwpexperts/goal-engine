@@ -7,8 +7,8 @@ import re
 
 import pytest
 
-from app.dbknow import concepts as K
-from app.dbknow import engines as E
+from app.products.dbaba.dbknow import concepts as K
+from app.products.dbaba.dbknow import engines as E
 from tests.test_ml import say
 
 ASK_EN = ["MySQL", "MariaDB", "PostgreSQL", "SQL Server", "Oracle", "Not sure"]

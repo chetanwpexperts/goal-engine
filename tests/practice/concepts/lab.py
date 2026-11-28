@@ -14,7 +14,7 @@ import json
 import re
 import sys
 
-from app.dbknow import concepts as K
+from app.products.dbaba.dbknow import concepts as K
 from tests.practice import schema as S
 
 DDL = re.compile(r"^\s*create\b", re.I)
@@ -34,7 +34,7 @@ def _exec(eng, sql: str):
     """(columns, rows) for a query, or (None, rowcount) for a change; several statements are run in order, the way the
     database's client runs a script (DELIMITER and $$ bodies understood). The last rows read are the result (a COMMIT after
     the SELECT doesn't hide them)."""
-    from app.agents.sqlroutine import split_script
+    from app.products.dbaba.sqlroutine import split_script
 
     out = (None, 0)
     for stmt in split_script(sql):
@@ -118,7 +118,7 @@ def run_sqlite(ex: dict) -> dict:
     import os
     import tempfile
 
-    from app.agents.sqlroutine import split_script
+    from app.products.dbaba.sqlroutine import split_script
 
     d = tempfile.mkdtemp()
     path = os.path.join(d, "lab.db")

@@ -15,8 +15,9 @@ import re
 
 import pytest
 
-from app.agents import sqlexplain, sqlspeed
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqlexplain
+from app.products.dbaba import sqlspeed
+from app.products.dbaba.sql import analyze_sql
 from tests.practice import schema as S
 
 JOIN = "FROM orders o JOIN customers c ON c.id = o.customer_id"
@@ -512,7 +513,7 @@ def test_every_rule_records_where_it_was_proven():
     """Standing rule B: each rule and each engine fact says which engines the lab proved it on."""
     import json
 
-    from app.agents.sqlread import fundamentals
+    from app.products.dbaba.sqlread import fundamentals
 
     assert all(set(v) >= {"mariadb", "postgresql"} for v in sqlspeed.PROVEN.values())
     assert all(set(v) >= {"mariadb", "postgresql"} for v in sqlexplain.PROVEN.values())

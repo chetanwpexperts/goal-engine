@@ -312,15 +312,15 @@ def check(item: dict, say: str, raised: str | None) -> tuple[bool, str]:
 
 
 def _fmt(v):
-    from app.office.ask import _fmt as f
+    from app.products.sheetu.office.ask import _fmt as f
 
     return f(v)
 
 
 def run(seeds, show=False) -> dict:
-    from app.office import ask
-    from app.office import understand as U
-    from app.office.sheetdata import load_tables
+    from app.products.sheetu.office import ask
+    from app.products.sheetu.office import understand as U
+    from app.products.sheetu.office.sheetdata import load_tables
 
     folder = tempfile.mkdtemp()
     stats, fails = defaultdict(lambda: [0, 0]), []

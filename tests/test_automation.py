@@ -6,10 +6,10 @@ from datetime import date, datetime, timedelta
 import pytest
 
 import app.main as main
-from app.agents import automation
-from app.agents.blocks import map_fields, parse_csv, select_rows, sheet_csv_url
-from app.agents.planner import plan
-from app.agents.spec import next_run, validate
+from app.products.shared import automation
+from app.products.shared.blocks import map_fields, parse_csv, select_rows, sheet_csv_url
+from app.products.shared.planner import plan
+from app.products.shared.spec import next_run, validate
 from tests.test_ml import say
 
 
@@ -111,8 +111,8 @@ def test_full_flow_preview_verify_activate_and_run(client, ml_mode, fake_mail):
     on = client.post(f"/api/agents/{agent['id']}/activate").json()
     assert on["agents"][0]["status"] == "active" and on["agents"][0]["next_run_at"]
 
-    from app.db import get_db
-    from app.models import Agent
+    from app.core.db import get_db
+    from app.domain.models import Agent
     db = next(get_db())
     row = db.get(Agent, agent["id"])
     before = len(fake_mail.sent)
@@ -142,8 +142,8 @@ def test_report_preview(client, ml_mode, fake_mail):
 
 
 def test_sheet_link_in_chat_triggers_preview(client, ml_mode, fake_mail, monkeypatch):
-    from app.agents import blocks
-    from app.agents.safety import Page
+    from app.products.shared import blocks
+    from app.products.shared.safety import Page
 
     monkeypatch.setattr(blocks, "fetch", lambda url, **_: Page(url=url, final_url=url, status=200, text=sheet()))
     say(client, "jinka payment baaki hai unko har Monday reminder chala jaye")
@@ -158,8 +158,8 @@ def test_daily_cap(client, ml_mode, fake_mail, monkeypatch):
     client.post(f"/api/agents/{agent_id}/preview", json={"inputs": {"csv_text": sheet()}})
     client.post("/api/owner/code", json={"email": "owner@shop.com"})
     client.post("/api/owner/verify", json={"code": re.search(r"\d{6}", fake_mail.sent[-1]["body"]).group(0)})
-    from app.db import get_db
-    from app.models import Agent
+    from app.core.db import get_db
+    from app.domain.models import Agent
     db = next(get_db())
     run = automation.run(db, db.get(Agent, agent_id), True, preview=False, mailer=fake_mail)
     result = __import__("json").loads(run.result)

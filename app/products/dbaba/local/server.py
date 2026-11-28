@@ -460,9 +460,9 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
     def chat_engine():
         if st.chat is None:
             from app.ai.router import AIRouter
-            from app.config import get_settings
-            from app.db import init_db
-            from app.ml.brain import Brain
+            from app.core.config import get_settings
+            from app.core.db import init_db
+            from app.engine.ml.brain import Brain
 
             init_db()
             brain = Brain()
@@ -502,9 +502,11 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         from starlette.concurrency import run_in_threadpool
 
         def run():
-            from app.config import get_settings
-            from app.db import get_db
-            from app.engine import InvalidMessage, handle_message
+            from app.core.config import get_settings
+            from app.core.db import get_db
+            from app.engine.goal import InvalidMessage
+            # known debt (tests/architecture_baseline.json): the on-server app has no startup of its own to hand the chat in
+            from app.services.goals import handle_message
 
             ce = chat_engine()
             gen = get_db()

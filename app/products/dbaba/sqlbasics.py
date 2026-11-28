@@ -15,7 +15,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from app.agents.sqlverify import keep as schema_keep
+from app.products.dbaba.sqlverify import keep as schema_keep
 
 DIALECTS = Path(__file__).resolve().parent / "dbknow" / "dialects"
 
@@ -54,7 +54,7 @@ CHOSEN: contextvars.ContextVar = contextvars.ContextVar("dbaba_engine", default=
 def engine_seen(sql: str) -> str | None:
     """'mysql' or 'postgresql': the database the person named or chose (rule A), else the one the query's own syntax shows,
     else None (then each rule says what happens on each)."""
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     chosen = CHOSEN.get()
     if chosen:
@@ -70,7 +70,7 @@ def _short(t: str, n: int = 40) -> str:
 
 
 def _label(eng) -> str:
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     return E.label(eng)
 
@@ -136,7 +136,7 @@ def _inside_null_fn(sql: str, pos: int) -> bool:
 
 def _own_port(chosen: str | None) -> bool:
     """A database whose refused words come from its own dialect file rather than the MySQL/PostgreSQL families (SQLite)."""
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     fam = E.syntax_family(chosen)
     return bool(fam) and fam not in ("mysql", "postgresql")
@@ -155,7 +155,7 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
     said = (intent or "").lower()
     low = s.lower()
     tsql = _sql_server(s)
-    from app.agents.sqlcorrect import _clauses, _depths
+    from app.products.dbaba.sqlcorrect import _clauses, _depths
 
     dep = _depths(s)
 
@@ -390,7 +390,7 @@ def basics(sql: str, s: str, is_select: bool, intent: str, finding_cls) -> list:
 
 
 def _order_limit(sql, s, dep, eng, F) -> list:
-    from app.agents.sqlcorrect import _clauses, _sources
+    from app.products.dbaba.sqlcorrect import _clauses, _sources
 
     out = []
     cl = _clauses(s, dep)
@@ -437,7 +437,7 @@ def _order_limit(sql, s, dep, eng, F) -> list:
     srcs = _sources(s, dep, *cl["from"]) if "from" in cl else []
     if len(srcs) == 1 and srcs[0].name and "group by" not in cl and "distinct" not in s[cl["select"][0]:cl["select"][1]].lower()[:12]:
         names = [_col(re.split(r"\s+", t.strip())[0]) for _p, t in keys]
-        from app.agents.sqljoins import key_names
+        from app.products.dbaba.sqljoins import key_names
 
         own = {k.replace("_", "") for k in key_names(srcs[0].name)}
         if names and not any(n in ("id", "uuid", "email", "sku", "code") or n.replace("_", "") in own for n in names) \
@@ -457,7 +457,7 @@ def _order_limit(sql, s, dep, eng, F) -> list:
 
 def _id_of(table: str) -> str:
     """The table's usual key name: customers -> customer_id (a prefix like wp_ or fz12_ is not part of it)."""
-    from app.agents.sqljoins import _fk
+    from app.products.dbaba.sqljoins import _fk
 
     return _fk(table)
 
@@ -502,7 +502,7 @@ SAID_PRECEDENCE = re.compile(r"\b(precedence|bracket\w*|parenthes\w*|operator or
 
 def _and_or(sql, s, a, b, F, intent: str = "") -> list:
     """WHERE a = 1 OR a = 2 AND b > 3: AND is done first, so it means a = 1 OR (a = 2 AND b > 3)."""
-    from app.agents.sqlcorrect import _depths
+    from app.products.dbaba.sqlcorrect import _depths
 
     text = s[a:b]
     stop = re.search(r"\bgroup\s+by\b|\border\s+by\b|\bhaving\b|\blimit\b|\bunion\b|;", text, re.I)
@@ -551,7 +551,7 @@ def _and_or(sql, s, a, b, F, intent: str = "") -> list:
 
 
 def _close(s: str, i: int) -> int:
-    from app.agents.sqlcorrect import _close as c
+    from app.products.dbaba.sqlcorrect import _close as c
 
     return c(s, i)
 
@@ -581,7 +581,7 @@ def _split_args(text: str) -> list[str]:
 
 
 def _split_top_(text: str) -> list[tuple[int, str]]:
-    from app.agents.sqlcorrect import _split_top
+    from app.products.dbaba.sqlcorrect import _split_top
 
     return [(p, t.rstrip().rstrip(";")) for p, t in _split_top(text) if t.strip().rstrip(";").strip()]
 
@@ -602,7 +602,7 @@ def _refuses(fam: str) -> list:
 def _foreign_syntax(sql: str, s: str, F) -> list:
     """The person named (or chose) a database, and the query uses syntax that database doesn't have: it refuses the query.
     What each database refuses, its own error, and the rewrite are in its dialect file ('refuses'), proven in the lab."""
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     chosen = CHOSEN.get()
     fam = E.syntax_family(chosen)

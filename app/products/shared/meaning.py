@@ -12,7 +12,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from app.ml.normalize import tokens
+from app.core.text import tokens
 
 LEX = Path(__file__).resolve().parents[1] / "sheetu" / "officeknow" / "lexicon.json"   # the default lexicon; DBaba passes its own
 UNITS = {"k": 1_000, "thousand": 1_000, "hazar": 1_000, "hazaar": 1_000, "l": 100_000, "lakh": 100_000, "lakhs": 100_000,

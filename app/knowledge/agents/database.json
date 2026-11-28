@@ -251,12 +251,12 @@
   ]
  },
  "hooks": {
-  "state": "app.agents.database:mind_state",
-  "wants": "app.agents.database:wants_turn",
-  "take": "app.agents.database:take_turn",
-  "labels": "app.dbknow.brain:labels",
-  "holds": "app.agents.database:holds_conversation",
-  "continue": "app.agents.database:continue_turn"
+  "state": "app.products.dbaba.database:mind_state",
+  "wants": "app.products.dbaba.database:wants_turn",
+  "take": "app.products.dbaba.database:take_turn",
+  "labels": "app.products.dbaba.dbknow.brain:labels",
+  "holds": "app.products.dbaba.database:holds_conversation",
+  "continue": "app.products.dbaba.database:continue_turn"
  },
  "outranks": [
   "office"

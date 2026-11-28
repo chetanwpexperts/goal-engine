@@ -166,8 +166,8 @@ def state(db: Session = Depends(get_db), visitor: str = Depends(_visitor)):
 @router.post("/connect")
 def connect(body: ConnectIn, request: Request, db: Session = Depends(get_db), visitor: str = Depends(_visitor)):
     from app import accounts, dbarea
-    from app.agents import database as dbagent
-    from app.agents import direct
+    from app.products.dbaba import database as dbagent
+    from app.products.shared import direct
 
     for old in _mine(db, visitor):                           # one console connection at a time
         _end(db, old)
@@ -208,8 +208,8 @@ def connect(body: ConnectIn, request: Request, db: Session = Depends(get_db), vi
 
 @router.post("/run")
 def run(body: SqlIn, db: Session = Depends(get_db), visitor: str = Depends(_visitor)):
-    from app.agents import database as dbagent
-    from app.agents import direct
+    from app.products.dbaba import database as dbagent
+    from app.products.shared import direct
 
     c, why = _live(db, visitor)
     if c is None:
@@ -251,7 +251,7 @@ def run(body: SqlIn, db: Session = Depends(get_db), visitor: str = Depends(_visi
 @router.post("/check")
 def check(body: SqlIn, db: Session = Depends(get_db), visitor: str = Depends(_visitor)):
     """DBaba reads the query (no database needed, nothing stored): mistakes, the fundamental behind each, a corrected query."""
-    from app.agents import sqlcorrect
+    from app.products.dbaba import sqlcorrect
 
     c, _why = _live(db, visitor)
     if c is not None:
@@ -278,7 +278,7 @@ LIVE_CHECK_ROWS = 50
 
 def _open_quiet(c: Connector | None):
     """The developer's connected database for read-only checks, or None (not connected / can't reach it now)."""
-    from app.agents import direct
+    from app.products.shared import direct
 
     if c is None or not c.secret:
         return None
@@ -297,7 +297,7 @@ def _open_quiet(c: Connector | None):
 
 def _query_blocks(q: str, engine: str | None, hi: bool, connected: bool) -> list[dict]:
     """A query (maybe inside PHP / .NET / Java / Node code): mistakes first, then speed, with the queries to use."""
-    from app.agents.sql import analyze_sql
+    from app.products.dbaba.sql import analyze_sql
 
     res = analyze_sql(q, engine=engine)
     if not res.get("ok"):
@@ -337,8 +337,8 @@ def _query_blocks(q: str, engine: str | None, hi: bool, connected: bool) -> list
 
 def _diagnosis_blocks(text: str, engine: str | None, hi: bool, conn) -> list[dict]:
     """An error, or a problem in words: the likely causes, proven or ruled out on the connected database when there is one."""
-    from app.dbknow import brain as dbbrain
-    from app.dbknow import reasoning, service
+    from app.products.dbaba.dbknow import brain as dbbrain
+    from app.products.dbaba.dbknow import reasoning, service
 
     blocks = []
     result = reasoning.diagnose(text, engine=engine)
@@ -472,11 +472,11 @@ def injection_finding(text: str, sql: str, hi: bool) -> dict | None:
 def answer(text: str, c: Connector | None = None) -> tuple[list[dict], str | None]:
     """DBaba's answer to one message, as blocks: a question, an error, a query or code with a query in it, or a problem in
     words. With a connected database (c), its read-only checks run on it. Shared by the workspace and the admin test box."""
-    from app.agents import direct
-    from app.agents.core import query_in
-    from app.dbknow import concepts
-    from app.dbknow import engines as E
-    from app.dbknow import reasoning
+    from app.products.shared import direct
+    from app.products.shared.core import query_in
+    from app.products.dbaba.dbknow import concepts
+    from app.products.dbaba.dbknow import engines as E
+    from app.products.dbaba.dbknow import reasoning
 
     lang = E.lang_of(text)
     hi = lang != "en"
@@ -557,7 +557,7 @@ def ask(body: AskIn, db: Session = Depends(get_db), visitor: str = Depends(_visi
 
 @router.get("/schema")
 def schema(db: Session = Depends(get_db), visitor: str = Depends(_visitor)):
-    from app.agents import direct
+    from app.products.shared import direct
 
     c, why = _live(db, visitor)
     if c is None:

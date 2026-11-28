@@ -387,7 +387,7 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
 
 def _new_guest_cookie(response: Response) -> None:
     # after logout this browser is a new guest: the account's chats must not stay visible here
-    from app.main import COOKIE
+    from app.security.visitor import COOKIE
 
     response.set_cookie(COOKIE, secrets.token_urlsafe(24), max_age=60 * 60 * 24 * 180, httponly=True, samesite="lax",
                         secure=get_settings().cookie_secure)

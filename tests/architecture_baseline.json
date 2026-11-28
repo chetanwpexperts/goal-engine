@@ -1,8 +1,6 @@
 {
   "_about": "Baseline for tests/test_layers.py and tests/test_route_permissions.py (scans in tests/arch_scan.py), taken from main on 2026-11-28 (routes keyed \"site|local METHOD /path\", wherever defined). These lists may only shrink: a test fails on any new entry and on any entry that no longer exists. Refresh with: python -m tests.arch_scan",
   "import_debts": [
-    "accounts -> main",
-    "admin -> main",
     "agents.automation -> privacy",
     "agents.database -> dbarea",
     "agents.direct -> privacy",

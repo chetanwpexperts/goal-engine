@@ -304,6 +304,6 @@ def test_every_grain_rule_records_where_it_was_proven():
     import json
 
     assert sqlblocks.PROVEN_ON == ["mariadb", "postgresql"]
-    funds = json.load(open("app/dbknow/core/query_fundamentals.json"))["fundamentals"]
+    funds = json.load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"]
     assert "cte_order" in funds["names_scope"]["topics"] and "join_fanout" in funds["cardinality"]["topics"]
     assert re.search(r"block", funds["grain"]["rule_en"], re.I)

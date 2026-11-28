@@ -319,7 +319,7 @@ def test_every_class_rule_records_where_it_was_proven():
     from app.dbknow import engines as E
 
     assert sqlconfidence.PROVEN_ON == ["mariadb", "postgresql"]
-    funds = json.load(open("app/dbknow/core/query_fundamentals.json"))["fundamentals"]
+    funds = json.load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"]
     assert funds["proof_classes"]["proven"] == ["mariadb", "postgresql"]
     for eid in ("mysql", "mariadb", "postgresql"):                     # rule B: each engine's own check words, in its own file
         v = E.dialect(eid)["verify"]

@@ -403,6 +403,6 @@ def test_every_rule_records_where_it_was_proven():
     assert all(set(v) >= {"mariadb", "postgresql"} for v in sqllock.PROVEN.values())
     assert set(sqllock.PROVEN) <= set(fundamentals()["fundamentals"]["locking"]["topics"])
     for eng in ("mysql", "mariadb", "postgresql"):
-        rules = json.load(open(f"app/dbknow/dialects/{eng}.json"))["query_rules"]
+        rules = json.load(open(f"app/products/dbaba/dbknow/dialects/{eng}.json"))["query_rules"]
         for key in ("skip_locked", "lock_scan", "gap_locks", "deadlock"):
             assert rules[key]["proven"] and rules[key]["says"], (eng, key)

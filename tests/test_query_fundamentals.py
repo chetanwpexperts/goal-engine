@@ -1,4 +1,4 @@
-"""Query fundamentals (app/dbknow/core/query_fundamentals.json) and reading a query stage by stage (app/agents/sqlread.py):
+"""Query fundamentals (app/products/dbaba/dbknow/core/query_fundamentals.json) and reading a query stage by stage (app/agents/sqlread.py):
 every finding names the fundamental it breaks, the card shows 'How DBaba read this query', and the chat answers 'what does
 this query do / ye query kya karti hai' with the reading and the fundamentals behind what's wrong."""
 
@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1] / "app"
 
 def test_every_checker_topic_has_a_fundamental():
     topics = set()
-    for f in ("agents/sqlcorrect.py", "agents/sqlbasics.py"):
+    for f in ("products/dbaba/sqlcorrect.py", "products/dbaba/sqlbasics.py"):
         text = (ROOT / f).read_text(encoding="utf-8")
         topics |= set(re.findall(r'(?:Finding|F|add)\((?:"(?:error|wrong|check)"|kind)(?: if [^,]+ else "\w+")?, "([a-z_]+)"', text))
     topics -= {"learned"}                       # rules learned from the manuals carry their own reason

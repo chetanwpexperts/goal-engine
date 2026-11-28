@@ -1,7 +1,7 @@
 """E1 (SQLite), night 3 of 4: every query rule the first fifteen nights proved on MariaDB and PostgreSQL, re-checked on SQLite.
 
 The lab is SQLite itself (Python's sqlite3: 3.53 when this was written). Three parts:
-- the dialect file's query_rules for SQLite (app/dbknow/dialects/sqlite.json, rule B): one entry for every rule MySQL and
+- the dialect file's query_rules for SQLite (app/products/dbaba/dbknow/dialects/sqlite.json, rule B): one entry for every rule MySQL and
   PostgreSQL have, plus SQLite's own (ANY / ALL, a SELECT name in WHERE, the first row of a scalar subquery, x / 0 ...), each
   with its lab lines. test_every_query_rule_lab_line_holds runs every line again and compares with what is stored;
 - the practice bank: a requirement, the query a person wrote, and the correct SQLite query. On SQLite (rule A: the database is

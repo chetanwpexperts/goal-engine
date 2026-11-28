@@ -1,0 +1,1304 @@
+"""The Microsoft agent: the person gives a file, the agent finds what's wrong and fixes it (a copy), or compares two.
+
+Files go to data/office/ in chunks (resumable, size capped by the RAM they'd need), work runs in the background one big file at a
+time, and the privacy clean-up deletes everything after an hour. No AI: app/officeknow (what's wrong) +
+app/office (doing it).
+"""
+
+import logging
+import os
+import json
+import re
+import secrets
+import shutil
+import threading
+from datetime import timedelta
+from pathlib import Path
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.products.sheetu import office
+from app.mind import packs
+from app.models import Agent, Goal, OfficeFile, dumps, loads, utcnow
+
+DATA = Path(__file__).resolve().parents[3] / "data" / "office"
+MAX_SIZE = 1536 * 1024 * 1024
+CHUNK_MAX = 8 * 1024 * 1024
+FILE_TTL = timedelta(hours=1)          # after the last thing done with the file
+FILE_MAX_AGE = timedelta(hours=8)      # whatever happens
+BIG = 50 * 1024 * 1024
+# Measured (Oct 2026, 300k rows): reading a file takes about this many MB of RAM per MB of file. Compressed formats
+# (xlsx is a zip) grow the most. Used to refuse files the server can't hold and to queue heavy ones one at a time.
+MEMORY_PER_MB = {".xlsx": 125, ".xlsm": 125, ".ods": 125, ".xlsb": 100, ".xls": 100, ".csv": 75, ".txt": 75,
+                 ".docx": 40, ".doc": 40}
+HEAVY_MB = 400                         # above this estimate a file waits for the one-at-a-time lane
+
+
+def memory_budget_mb() -> int:
+    try:
+        return max(200, int(os.getenv("OFFICE_MEMORY_MB", "2000")))
+    except ValueError:
+        return 2000
+
+
+def _factor(name: str) -> int:
+    return MEMORY_PER_MB.get(os.path.splitext(name or "")[1].lower(), 125)
+
+
+def memory_mb(name: str, size: int) -> float:
+    return size / (1024 * 1024) * _factor(name)
+
+
+def max_file_mb(name: str) -> int:
+    return max(1, int(memory_budget_mb() / _factor(name)))
+
+
+def heavy(f) -> bool:
+    return memory_mb(f.name, f.size) > HEAVY_MB or f.size > BIG
+OPEN_FILES_PER_VISITOR = 6
+class _ServerLane:
+    """One big file at a time on the WHOLE server (all app processes), so a few huge uploads can't use up the RAM
+    the server shares with other sites: a thread lock inside this process + a file lock across processes."""
+
+    def __init__(self):
+        self._threads = threading.Lock()
+        self._fh = None
+
+    def acquire(self):
+        import fcntl
+
+        self._threads.acquire()
+        try:
+            DATA.mkdir(parents=True, exist_ok=True)
+            self._fh = open(DATA / ".big-file.lock", "a")
+            fcntl.flock(self._fh, fcntl.LOCK_EX)        # waits while another process works on a big file
+        except Exception:  # noqa: BLE001 - no lock file: still one at a time within this process
+            self._fh = None
+
+    def release(self):
+        import fcntl
+
+        try:
+            if self._fh is not None:
+                fcntl.flock(self._fh, fcntl.LOCK_UN)
+                self._fh.close()
+        finally:
+            self._fh = None
+            self._threads.release()
+
+
+_big_lane = _ServerLane()                   # one big file at a time, so the VPS stays responsive
+FILE_WORDS = packs.words("office", "about")            # the field's words come from its knowledge pack
+ALLOWED = (".xlsx", ".xlsm", ".xls", ".xlsb", ".ods", ".csv", ".txt", ".docx", ".doc")
+STRONG_FILE = packs.words("office", "strong")
+# what a message describing a problem sounds like ('I need to work on my excel file' doesn't)
+SYMPTOM_WORDS = re.compile(r"\b(won'?t|wont|can'?t|cannot|not (open|opening|saving|loading|showing|calculating|updating)|nahi (khul|chal|ho|aa|dikh|ban)|"
+                           r"corrupt\w*|crash\w*|hang\w*|freez\w*|slow|stuck|missing|disappear\w*|lost|blank|#\w+[!?/]?\w*|"
+                           r"band ho|atak|gayab|khul nahi|open nahi|save nahi|nahi ho raha|nahi aa raha)\b|#", re.I)
+PROBLEM_WORDS = re.compile(r"\b(issues?|problems?|errors?|kharab|broken|galat|wrong|not working|nahi chal|help|fix|theek|check|messy|dikkat|gadbad)\b", re.I)
+
+
+# what people ask for that this agent can't do yet (its pack lists them): say so plainly, never pretend
+NOT_YET = [(item, packs._word_rx(item.get("words", []))) for item in packs.get("office").get("not_yet", [])]
+CAN_NOW_EN = ("fix extra spaces, duplicate rows, mixed capitals, numbers saved as text and broken formulas; make charts, pivot-style "
+              "summaries and highlighting; format dates and money, split or remove columns, add filters and dropdowns; compare two "
+              "files; and answer questions about your data (totals, counts, top 10)")
+CAN_NOW_HI = ("extra space, duplicate rows, capital/small letters, text wale numbers aur toote formula theek karna; chart, pivot jaisi "
+              "summary aur highlight banana; date/paise ka format, column todna ya hatana, filter aur dropdown; do files compare "
+              "karna; aur aapke data ke sawaal (total, count, top 10)")
+
+
+# 'the whole file', 'every sheet': a question about all sheets, not the one in focus
+WHOLE_FILE = re.compile(r"\b(whole|entire|full|poori|puri|saari|sari|all|every|har|sab|sabhi)\b.{0,8}\b(file|workbook|sheets?)\b", re.I)
+
+
+def _focus_table(text: str, tables: list, focus_name: str | None):
+    """The sheet the conversation is on, unless this question names or clearly points at another, or asks about all."""
+    from app.products.sheetu.office import ask as asker
+
+    if not focus_name or WHOLE_FILE.search(text or ""):
+        return None
+    focus = next((t for t in tables if t.name == focus_name), None)
+    if focus is None:
+        return None
+    other = asker.named_sheet(text, tables) or asker.pick_sheet(text, tables)
+    return None if other is not None and other is not focus else focus
+
+
+def _understand_in(asker, U, text: str, tables: list, focus):
+    """Try the sheet in focus first; if the question doesn't fit it, read it against the whole file."""
+    if focus is not None:
+        try:
+            return asker.understand(text, [focus])
+        except (asker.NeedMore, U.Missing):
+            pass
+    return asker.understand(text, tables)
+
+
+def not_yet(text: str) -> dict | None:
+    for item, rx in NOT_YET:
+        if rx is not None and rx.search(text or ""):
+            return item
+    return None
+
+
+def coming_soon(item: dict, hi: bool) -> str:
+    what = item.get("hi" if hi else "en") or item["en"]
+    if hi:
+        return (f"{what} mein main abhi madad nahi kar sakta, ye jald aa raha hai. Abhi main Excel, CSV aur Word files pe ye kar sakta hoon: "
+                f"{CAN_NOW_HI}. Agar {what} ka kaam abhi chahiye, to neeche 'expert se baat karo' dabao.")
+    return (f"I can't help with {what} yet; it's coming soon. Right now I work on Excel, CSV and Word "
+            f"files: {CAN_NOW_EN}. If you need this done now, tap \"Talk to an expert\" below.")
+
+
+class OfficeAgentError(Exception):
+    pass
+
+
+# ------------------------------------------------------------------ chat side
+def wants_office(goal: Goal | None, text: str, db: Session | None = None) -> bool:
+    if goal is None:
+        return False
+    if db is not None:                                # a file is already open in this conversation: follow-up tasks go to it
+        agent = goal_agent(db, goal)
+        if agent is not None and open_file(db, agent) is not None and (
+                UNDO_RE.search(text or "") or ALL_RE.search(text or "") or ops_in(text) or REPORT_RE.search(text or "")
+                or (pending_offer(agent) and YES_RE.search(text or ""))):
+            return True
+    from app.products.sheetu.officeknow import brain
+
+    if any(packs.mentions(name, text) for name, p in packs.all_packs().items() if "office" in p.get("outranks", [])):
+        return False                                  # "database se excel chahiye": that agent's words win (its pack says so)
+    from app.products.shared import bridge
+    from app.products.shared.bridge import DB_TO_SHEET
+
+    if DB_TO_SHEET.search(text or "") and bridge.call("dbaba.concept_match", text):
+        return False                                  # "how do I get a query's result into Excel": a database lesson (S3)
+    if not_yet(text):
+        return True                                   # PowerPoint, macros, charts...: this agent answers honestly that it can't yet
+    rec = brain.recognize(text)
+    if rec["confidence"] >= 0.99:
+        return True                                   # an Excel error value like #REF!
+    if STRONG_FILE.search(text or ""):
+        return True                                   # "my excel sheet has issues": it names Excel, that's enough
+    if FILE_WORDS.search(text or "") and PROBLEM_WORDS.search(text or ""):
+        return True                                   # "meri sheet kharab hai"
+    return bool(FILE_WORDS.search(text or "")) and rec["confidence"] >= 0.2
+
+
+def goal_agent(db: Session, goal: Goal) -> Agent | None:
+    return db.scalar(select(Agent).where(Agent.goal_id == goal.id, Agent.recipe == "office").order_by(Agent.id.desc()))
+
+
+def create_agent(db: Session, goal: Goal) -> Agent:
+    agent = Agent(visitor_id=goal.visitor_id, goal_id=goal.id, recipe="office", status="needs_input", inputs=dumps({}))
+    db.add(agent)
+    db.flush()
+    return agent
+
+
+SURE = 0.5
+
+
+def plan_reply(rec: dict, hi: bool) -> str:
+    from app.products.sheetu.officeknow import brain
+
+    seen = brain.describe(rec, hi) if rec.get("confidence", 0) >= SURE else ""
+    lead = (f"Samjha: {seen}. " if hi else f"Understood: {seen}. ") if seen else ""
+    if rec.get("kind") == "formula" and seen:
+        return lead + ("Formula card mein hai. File daaloge to main khud laga dunga." if hi
+                       else "The formula is on the card. Give me the file and I'll put it in for you.")
+    if seen:
+        return lead + ("File card mein daalo. Main khud check karke theek kar dunga, aur aapko fixed copy milegi." if hi
+                       else "Drop the file on the card. I'll check it myself, fix it, and give you a fixed copy.")
+    # not sure what's needed: no promise of a fix it may not be able to make
+    return (f"File card mein daalo, main dekhta hoon. Abhi main ye kar sakta hoon: {CAN_NOW_HI}. Agar aapka kaam inmein nahi hai, "
+            "main seedha bata dunga, aur aap expert se baat kar sakte ho." if hi else
+            f"Drop the file on the card and I'll look. Right now I can {CAN_NOW_EN}. If what you need is something else, "
+            "I'll tell you straight, and you can talk to an expert.")
+
+
+def office_dict(db: Session, agent: Agent, hi: bool) -> dict:
+    inputs = loads(agent.inputs, {}) or {}
+    files = list(db.scalars(select(OfficeFile).where(OfficeFile.agent_id == agent.id, OfficeFile.status != "removed")
+                            .order_by(OfficeFile.id.desc()).limit(6)))
+    has_file = any(f.status in ("ready", "queued", "working") for f in files)
+    if has_file:
+        inputs = {k: v for k, v in inputs.items() if k != "brain"}     # the agent works on the file; no generic formula
+    return {"id": agent.id, "lang": "hi" if hi else "en", "recipe": "office", "office": True, "status": agent.status,
+            "name": "Excel / file ka kaam" if hi else "Excel and file work", "access": "upload", "available": True,
+            "blocks": [], "runs": [], "brain": _brain_view(inputs.get("brain"), hi), "formula": inputs.get("file_formula") if has_file and inputs.get("file_formula") else _formula_view(inputs.get("brain"), hi),
+            "files": [file_dict(f) for f in files]}
+
+
+def _brain_view(rec, hi):
+    if not rec or not rec.get("kind"):
+        return None
+    from app.products.sheetu.officeknow import brain
+
+    return {**rec, "text": brain.describe(rec, hi)}
+
+
+def _formula_view(rec, hi):
+    if not rec or rec.get("kind") != "formula":
+        return None
+    from app.products.sheetu import officeknow
+
+    f = next((x for x in officeknow.load("formulas") if x["id"] == rec["id"]), None)
+    if not f:
+        return None
+    return {"title": f["title_hi" if hi else "title_en"], "explain": f["explain_hi" if hi else "explain_en"],
+            "excel": f["templates"].get("excel365", ""), "sheets": f["templates"].get("google_sheets", ""), "needs": f["needs"]}
+
+
+# ------------------------------------------------------------------ files
+def steps(f: OfficeFile) -> list[dict]:
+    return loads(f.versions, None) or [{"path": f.path, "ops": [], "changes": {}}]
+
+
+def file_dict(f: OfficeFile) -> dict:
+    st = steps(f)
+    return {"id": f.token, "name": f.name, "size": f.size, "received": f.received, "status": f.status, "task": f.task,
+            "report": loads(f.report, None), "result": loads(f.result, None), "error": f.error,
+            "steps": [{"ops": x["ops"], "changes": x["changes"], "say": x.get("say")} for x in st[1:]], "before": st[0].get("summary"),
+            "download": len(st) > 1 and bool(f.path and os.path.exists(f.path)),
+            "compare_download": bool(f.result_path and os.path.exists(f.result_path)), "result_name": f.result_name}
+
+
+def start_upload(db: Session, visitor_id: str, agent_id: int | None, name: str, size: int) -> OfficeFile:
+    name = os.path.basename(name or "file.xlsx")[:150]
+    if not name.lower().endswith(ALLOWED):
+        raise OfficeAgentError("Upload an Excel (.xlsx, .xls, .xlsm, .xlsb), OpenDocument (.ods), CSV or Word (.docx) file.")
+    if not 0 < size <= MAX_SIZE or memory_mb(name, size) > memory_budget_mb():
+        ext = os.path.splitext(name)[1].lower()
+        kind = "CSV" if ext in (".csv", ".txt") else "Word" if ext in (".docx", ".doc") else "Excel"
+        raise OfficeAgentError(f"This file is too big for Goal Engine right now: {kind} files up to {max_file_mb(name)} MB. "
+                               + ("Save it as CSV (that allows bigger files), split it, or remove sheets you don't need."
+                                  if kind == "Excel" else "Split it into smaller files."))
+    DATA.mkdir(parents=True, exist_ok=True)
+    if shutil.disk_usage(DATA).free < size * 3 + 2 * 1024**3:
+        raise OfficeAgentError("The server can't take a file this big right now. Please try again in a little while.")
+    open_now = db.scalars(select(OfficeFile).where(OfficeFile.visitor_id == visitor_id, OfficeFile.status.not_in(("removed",)))).all()
+    if len(open_now) >= OPEN_FILES_PER_VISITOR:
+        raise OfficeAgentError("Up to 6 files at a time. Older files are removed automatically an hour after you last used them.")
+    token = secrets.token_urlsafe(24)
+    f = OfficeFile(token=token, visitor_id=visitor_id, agent_id=agent_id, name=name, size=size,
+                   path=str(DATA / f"{token}{os.path.splitext(name)[1].lower()}"))
+    db.add(f)
+    db.commit()
+    open(f.path, "wb").close()
+    return f
+
+
+def own_file(db: Session, token: str, visitor_id: str) -> OfficeFile:
+    f = db.scalar(select(OfficeFile).where(OfficeFile.token == token))
+    if not f or f.visitor_id != visitor_id or f.status == "removed":
+        raise OfficeAgentError("File nahi mili (1 ghante baad files apne aap hat jaati hain).")
+    return f
+
+
+def add_chunk(db: Session, f: OfficeFile, offset: int, data: bytes) -> OfficeFile:
+    if f.status != "uploading":
+        raise OfficeAgentError("This upload has already finished.")
+    if offset != f.received:
+        return f                                     # the browser resumes from f.received
+    if len(data) > CHUNK_MAX or f.received + len(data) > f.size:
+        raise OfficeAgentError("A piece of the file arrived wrong. Please upload it again.")
+    with open(f.path, "r+b") as out:
+        out.seek(offset)
+        out.write(data)
+    f.received += len(data)
+    db.commit()
+    return f
+
+
+def finish_upload(db: Session, f: OfficeFile) -> OfficeFile:
+    if f.received != f.size:
+        raise OfficeAgentError("The file didn't arrive completely. Start the upload again; it carries on from where it stopped.")
+    try:
+        kind = office.kind_of(f.path)
+        if kind == "convert":
+            # old .xls / .ods / .xlsb: work on an .xlsx copy with the same sheets and values
+            new, notes = office.convert_to_xlsx(f.path)
+            _rm(f.path)
+            f.path = new
+            f.result = dumps({"task": "convert", **notes})
+    except office.OfficeError as exc:
+        f.status, f.error = "error", str(exc)
+        db.commit()
+        return f
+    except Exception:  # noqa: BLE001 - a broken file: say so plainly
+        f.status, f.error = "error", "This file couldn't be read. It may be damaged; try opening it in Excel and saving it again."
+        db.commit()
+        return f
+    return _start(db, f, "scan", {})
+
+
+def _fix_ops(f: OfficeFile, ops: list[str]) -> list[str]:
+    ops = [o for o in ops if o in office.FIX_OPS]
+    if f.status not in ("ready", "error") or not ops:
+        raise OfficeAgentError("Pehle check poora hone do.")
+    return ops
+
+
+def start_fix(db: Session, f: OfficeFile, ops: list[str], sheets: list[str] | None = None) -> OfficeFile:
+    return _start(db, f, "fix", {"ops": _fix_ops(f, ops), "sheets": sheets or []})
+
+
+def start_compare(db: Session, a: OfficeFile, b: OfficeFile, key: str = "") -> OfficeFile:
+    if a.status not in ("ready", "error") or b.status not in ("ready", "error"):
+        raise OfficeAgentError("Dono files ka upload aur check poora hone do.")
+    return _start(db, a, "compare", {"other": b.id, "key": key})
+
+
+# ------------------------------------------------------------------ a Google Sheet by its link
+GSHEET_RE = re.compile(r"https?://docs\.google\.com/spreadsheets/d/([A-Za-z0-9_-]{20,})", re.I)
+GSHEET_MAX = 200 * 1024 * 1024
+
+
+def fetch_sheet(sheet_id: str) -> bytes:
+    """The Google Sheet as an .xlsx file. Works when it's shared as 'Anyone with the link'; Google sends a sign-in page
+    otherwise, which is said plainly."""
+    import urllib.request
+
+    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 GoalEngine"})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        data = resp.read(GSHEET_MAX + 1)
+    if len(data) > GSHEET_MAX:
+        raise OfficeAgentError("This Google Sheet is too big to fetch by link (over 200 MB). Download it as .xlsx and upload the file.")
+    if data[:2] != b"PK":
+        raise OfficeAgentError("I can't open this Google Sheet: it isn't shared. In the sheet, click Share, set General access to "
+                               "\"Anyone with the link\" (Viewer), and send the link again.")
+    return data
+
+
+def import_link(db: Session, agent: Agent, text: str) -> OfficeFile | None:
+    m = GSHEET_RE.search(text or "")
+    if not m:
+        return None
+    data = fetch_sheet(m.group(1))
+    f = start_upload(db, agent.visitor_id, agent.id, "Google Sheet.xlsx", len(data))
+    with open(f.path, "wb") as out:
+        out.write(data)
+    f.received, f.status = len(data), "uploaded"
+    db.commit()
+    return finish_upload(db, f)
+
+
+def _start(db: Session, f: OfficeFile, task: str, args: dict) -> OfficeFile:
+    f.status, f.task, f.error, f.args = "queued", task, None, dumps(args)
+    db.commit()
+    threading.Thread(target=_work, args=(f.id, task, args), daemon=True).start()
+    return f
+
+
+def _work(file_id: int, task: str, args: dict) -> None:
+    from app.db import _SessionLocal, get_engine
+
+    get_engine()
+    with _SessionLocal() as db:
+        f = db.get(OfficeFile, file_id)
+        big = heavy(f) or task == "compare"
+        lane = _big_lane if big else None
+        if lane:
+            lane.acquire()
+        try:
+            f.status = "working"
+            db.commit()
+            if task == "scan":
+                rep = office.scan(f.path)
+                f.report = dumps(rep)
+                if not f.versions:                       # remember how the file looked on arrival, for before/after
+                    f.versions = dumps([{"path": f.path, "ops": [], "changes": {}, "summary": rep["summary"]}])
+            elif task == "fix":
+                # every fix builds on the latest version; the file stays open for the next task
+                st = steps(f)
+                root, ext = os.path.splitext(st[0]["path"])
+                out = f"{root}.v{len(st)}{ext}"
+                res = office.fix(f.path, out, args["ops"], args.get("sheets") or None)
+                st.append({"path": out, "ops": args["ops"], "changes": res["changes"]})
+                f.versions, f.path = dumps(st), out
+                f.result = dumps({"task": "fix", **res})
+                f.report = dumps(office.scan(out))
+            elif task == "extract":
+                st = steps(f)
+                root, ext = os.path.splitext(st[0]["path"])
+                res = office.extract_duplicates(f.path, f"{root}.v{len(st)}{ext}", args.get("sheets") or None)
+                out = res.pop("out")
+                st.append({"path": out, "ops": ["list_duplicates"], "changes": {"list_duplicates": res["count"]}})
+                f.versions, f.path = dumps(st), out
+                f.result = dumps({"task": "extract", **res})
+                f.report = dumps(office.scan(out))
+            elif task == "ask":
+                from app.products.sheetu.office import ask as asker
+
+                st = steps(f)
+                n = 1 + sum(1 for x in st if "answer" in x["ops"])
+                root, ext = os.path.splitext(st[0]["path"])
+                out = f"{root}.v{len(st)}{ext}"
+                res = asker.run(args["plan"], f.path, out, args.get("hi", True), n)
+                if os.path.exists(out):
+                    pl = args["plan"]
+                    edit = pl.get("op") if pl.get("job") == "edit" else pl.get("job") if str(pl.get("job", "")).startswith("word_") else None
+                    st.append({"path": out, "ops": [edit or "answer"], "changes": {edit or "answer": res.get("changes", 1) if edit else 1},
+                               **({"say": str(res.get("say", "")).split(". Download")[0].split(". Nayi copy")[0][:200]} if edit else {})})
+                    f.versions, f.path = dumps(st), out
+                f.result = dumps({"task": "ask", **res})
+            elif task == "undo":
+                st = steps(f)
+                if len(st) > 1:
+                    last = st.pop()
+                    _rm(last["path"])
+                    f.versions, f.path = dumps(st), st[-1]["path"]
+                    f.result = dumps({"task": "undo", "undone": last["ops"]})
+                f.report = dumps(office.scan(f.path))
+            elif task == "compare":
+                other = db.get(OfficeFile, args["other"])
+                out = f.path + ".compare.xlsx"
+                summary = office.compare(f.path, other.path, out, key=args.get("key", ""))
+                f.result = dumps({"task": "compare", "other": other.name, **summary})
+                _rm(f.result_path)
+                f.result_path, f.result_name = out, _named(f.name, "compare", ".xlsx")
+            f.status = "ready"
+        except office.OfficeError as exc:
+            f.status, f.error = "error", str(exc)
+        except Exception as exc:  # noqa: BLE001 - a broken file must not crash the worker
+            logging.getLogger(__name__).exception("Office %s job on file %s failed", task, f.id)
+            f.status, f.error = "error", (f"File padhi nahi ja saki ({type(exc).__name__}). Excel mein khol kar Save As .xlsx karke dobara daalo."
+                                          if (args or {}).get("hi") else
+                                          f"I couldn't work on this file ({type(exc).__name__}). Open it in Excel, Save As .xlsx and upload it again.")
+        finally:
+            if lane:
+                lane.release()
+            db.commit()
+
+
+def _named(name: str, suffix: str, ext: str = "") -> str:
+    base, e = os.path.splitext(name)
+    return f"{base} ({suffix}){ext or e}"
+
+
+def _rm(p) -> None:
+    try:
+        if p:
+            os.remove(p)
+    except OSError:
+        pass
+
+
+def start_undo(db: Session, f: OfficeFile) -> OfficeFile:
+    if f.status not in ("ready", "error") or len(steps(f)) < 2:
+        raise OfficeAgentError("Wapas lene ke liye koi badlav nahi hai.")
+    return _start(db, f, "undo", {})
+
+
+def remove_file(f: OfficeFile) -> None:
+    from app.products.sheetu.office.sheetdata import forget
+
+    for p in {f.path, f.result_path, *(x["path"] for x in steps(f))}:
+        if p:
+            forget(p)
+        _rm(p)
+    f.path = f.result_path = None
+    f.report = f.result = None
+    f.status = "removed"
+
+
+def maintain(db: Session, now=None) -> int:
+    now = now or utcnow()
+    n = 0
+    from sqlalchemy import or_
+
+    for f in db.scalars(select(OfficeFile).where(OfficeFile.status != "removed",
+                                                 or_(OfficeFile.updated_at < now - FILE_TTL, OfficeFile.created_at < now - FILE_MAX_AGE))):
+        if f.status in ("queued", "working") and f.created_at > now - FILE_MAX_AGE:
+            continue                                  # still working on a very big file
+        remove_file(f)
+        n += 1
+    for f in db.scalars(select(OfficeFile).where(OfficeFile.status == "removed", OfficeFile.created_at < now - timedelta(days=1))):
+        db.delete(f)
+    db.commit()
+    return n
+
+
+_resume_lock = None
+
+
+def _resume_owner() -> bool:
+    """Only one server process resumes work: the first to take this lock keeps it for its whole life."""
+    global _resume_lock
+    if _resume_lock is not None:
+        return True
+    import fcntl
+
+    DATA.mkdir(parents=True, exist_ok=True)
+    fh = open(DATA / ".resume.lock", "w")
+    try:
+        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        fh.close()
+        return False
+    _resume_lock = fh
+    return True
+
+
+def resume_interrupted(boot) -> int:
+    """After a restart (an update, a crash), carry on with work that was running, in one process only."""
+    from sqlalchemy import update
+
+    from app.db import _SessionLocal, get_engine
+
+    if not _resume_owner():
+        return 0
+    get_engine()
+    n = 0
+    with _SessionLocal() as db:
+        ids = list(db.scalars(select(OfficeFile.id).where(OfficeFile.status.in_(("queued", "working")), OfficeFile.updated_at < boot)))
+        for fid in ids:
+            claimed = db.execute(update(OfficeFile).where(OfficeFile.id == fid, OfficeFile.status.in_(("queued", "working")),
+                                                          OfficeFile.updated_at < boot).values(status="queued", updated_at=boot)).rowcount
+            db.commit()
+            if claimed:
+                f = db.get(OfficeFile, fid)
+                threading.Thread(target=_work, args=(f.id, f.task or "scan", loads(f.args, {}) or {}), daemon=True).start()
+                n += 1
+    return n
+
+
+# ------------------------------------------------------------------ tasks on the open file, typed in the chat
+# Keywords are matched loosely, so typos still work ("dupicate", "slaes sheet").
+OP_WORDS = {
+    "trim_spaces": ["space", "spaces", "spacing", "jagah"],
+    "remove_duplicates": ["duplicate", "duplicates", "duplicated", "repeat", "repeated", "dobara", "dohra"],
+    "fix_case": ["capital", "capitals", "lowercase", "uppercase", "case", "spelling"],
+    "text_to_number": ["numbers", "number", "numeric"],
+    "fix_broken_refs": ["#ref", "ref", "broken"],
+}
+FIND_WORDS = {"find", "show", "check", "list", "dhoondo", "dhundo", "dhoond", "dhund", "dikhao", "dikha", "batao", "bata", "kitne",
+              "kitni", "kaun", "kaunse", "konse", "kahan", "where", "which", "how", "many", "any", "pata", "highlight", "search"}
+DO_WORDS = {"remove", "delete", "hatao", "hata", "hatado", "hataye", "hatana", "fix", "theek", "thik", "saaf", "clean", "correct",
+            "sudharo", "badlo", "drop", "mitao", "delete karo"}
+YES_RE = re.compile(r"^\s*(haan|ha|haa|han|yes|yep|ok|okay|theek hai|thik hai|kar do|karo|hata do|hatao|do it|go ahead|please)\b", re.I)
+FORMULA_RE = re.compile(r"\b(formula|formule|formulae|fourmula|farmula|function)\b", re.I)
+UNDO_RE = re.compile(r"\b(undo|wapas|vapas|pehle jaisa|revert|purana wala)\b", re.I)
+ALL_RE = re.compile(r"\b(sab|saari|saare|everything|all)\b.{0,20}\b(theek|thik|fix|saaf|clean)|\b(fix|clean|correct)\b.{0,12}\b(everything|all|it all|them all|the file|my file)\b", re.I)
+REPORT_RE = re.compile(r"\b(kya galat|kya problem|what.{0,10}wrong|check (karo|my|the|this)|problems?|errors?|galti|galtiyan|issues?)\b", re.I)
+_OP_NAMES = {"trim_spaces": ("extra space", "extra spaces"), "remove_duplicates": ("duplicate rows", "duplicate rows"),
+             "fix_case": ("capital/small letters", "capital letters"), "text_to_number": ("text wale numbers", "text-numbers"),
+             "fix_broken_refs": ("toote formula", "broken formulas"),
+             "extend_ranges": ("total ki range", "total ranges"), "exact_lookup": ("lookup exact match", "lookups to exact match"),
+             "auto_calc": ("automatic calculation", "automatic calculation"), "restore_formulas": ("formula wapas", "formulas put back")}
+UPLOADED_RE = re.compile(r"^\s*(done|uploaded|ho gaya|daal di|daal diya|upload (kar )?(di|diya|kiya|ho gayi)|here|ye lo|yeh lo|check (it|this|karo)|dekho)\b", re.I)
+
+
+def _words(text: str) -> list[str]:
+    from app.ml.normalize import tokens
+
+    return tokens(text or "")
+
+
+def _close(word: str, choices) -> bool:
+    import difflib
+
+    return len(word) >= 3 and bool(difflib.get_close_matches(word, list(choices), n=1, cutoff=0.8 if len(word) > 4 else 0.9))
+
+
+def ops_in(text: str) -> list[str]:
+    ws = _words(text)
+    found = [op for op, kws in OP_WORDS.items() if any(w in kws or _close(w, kws) for w in ws)]
+    if "text_to_number" in found and not re.search(r"\b(text|number|numbers|total|sum|jod)\b", text or "", re.I):
+        found.remove("text_to_number")
+    if "fix_broken_refs" in found and not re.search(r"(#?ref|formula|broken)", text or "", re.I):
+        found.remove("fix_broken_refs")
+    return found
+
+
+def sheets_in(text: str, report: dict) -> list[str]:
+    """'from the sales sheet' -> ['Sales Data'] (typos allowed)."""
+    ws = set(_words(text))
+    out = []
+    for sh in report.get("sheets", []):
+        name = sh["name"]
+        key = [w for w in re.findall(r"[a-z0-9]+", name.lower()) if w not in ("data", "sheet", "sheets", "the", "and", "of")]
+        if key and all(any(w == k or _close(w, [k]) for w in ws) for k in key):
+            out.append(name)
+    return out
+
+
+def wants_do(text: str) -> bool:
+    """Only a clear 'remove / fix / hatao' changes the data. Anything else just finds and shows."""
+    ws = _words(text)
+    order = re.search(r"\b(ek jaise|ek jaisa|same kar|kar do|kardo|kar dijiye|badal do|badlo|convert|bana do|banao|sudhar)\b", text or "", re.I)
+    return (bool(order) or any(w in DO_WORDS or _close(w, DO_WORDS) for w in ws)) and not re.search(
+        r"\b(alag|separate|new sheet|nayi sheet|list|report|dikhao|check)\b", text or "", re.I)
+
+
+def wants_find(text: str) -> bool:
+    ws = _words(text)
+    finding = any(w in FIND_WORDS for w in ws) or "?" in (text or "") or bool(re.search(r"\bhai kya\b|\bhain kya\b", text or "", re.I))
+    doing = any(w in DO_WORDS or _close(w, DO_WORDS) for w in ws)
+    return finding and not doing
+
+
+def _findings(report: dict, op: str, sheets: list[str], hi: bool) -> tuple[str, int]:
+    """Plain words for what the scan found, for one kind of problem, in the asked sheets."""
+    lines, total = [], 0
+    for sh in report.get("sheets", []):
+        if sheets and sh["name"] not in sheets:
+            continue
+        if op == "remove_duplicates":
+            n, cells = sh.get("duplicate_rows", 0), [f"row {r} ({'row' if not hi else 'row'} {m} {'jaisi' if hi else 'again'})"
+                                                      for r, m in sh.get("duplicate_list", [])[:6]]
+        elif op == "trim_spaces":
+            n, cells = sh.get("spaces", 0), sh.get("space_cells", [])[:8]
+        elif op == "fix_case":
+            n, cells = sh.get("case_mixed", 0), sh.get("case_cells", [])[:8]
+        elif op == "text_to_number":
+            n, cells = sh.get("text_numbers", 0), sh.get("text_number_cells", [])[:8]
+        else:
+            n, cells = sh.get("broken_ref_count", 0), sh.get("broken_refs", [])[:8]
+        total += n
+        if n:
+            lines.append(f"{sh['name']}: {n} ({', '.join(cells)}{' …' if n > len(cells) else ''})")
+        elif sheets:
+            lines.append(f"{sh['name']}: " + ("koi nahi" if hi else "none"))
+    return "; ".join(lines), total
+
+
+def open_file(db: Session, agent: Agent) -> OfficeFile | None:
+    return db.scalar(select(OfficeFile).where(OfficeFile.agent_id == agent.id, OfficeFile.status.in_(("ready", "queued", "working")))
+                     .order_by(OfficeFile.updated_at.desc()))
+
+
+def answer_sheet(db: Session, goal: Goal, name: str) -> dict:
+    """An earlier answer, from its 'Answer N - ...' sheet in the file as it is now (View on an old answer)."""
+    from openpyxl import load_workbook
+
+    from app.products.sheetu.office import is_own_sheet
+
+    agent = goal_agent(db, goal)
+    f = open_file(db, agent) if agent else None
+    if f is None or not f.path or not os.path.exists(f.path):
+        raise OfficeAgentError("That file has been removed (files are deleted an hour after you last use them). Upload it again to see answers.")
+    if not name.startswith("Answer ") or not is_own_sheet(name):
+        raise OfficeAgentError("Only Goal Engine's answer sheets can be opened here.")
+    for path in [p for p in (f.result_path, f.path) if p and os.path.exists(p) and p.lower().endswith((".xlsx", ".xlsm"))]:
+        wb = load_workbook(path, read_only=True, data_only=True)
+        try:
+            if name not in wb.sheetnames:
+                continue
+            rows = []
+            for i, row in enumerate(wb[name].iter_rows(values_only=True)):
+                if i > 50:
+                    break
+                rows.append(["" if v is None else (v.strftime("%d-%m-%Y") if hasattr(v, "strftime") else v) for v in row])
+            return {"name": name, "columns": [str(c) for c in rows[0]] if rows else [], "rows": rows[1:], "more": i > 50}
+        finally:
+            wb.close()
+    raise OfficeAgentError("That answer isn't in the file any more (it was undone or the file was replaced).")
+
+
+def pending_offer(agent: Agent) -> dict | None:
+    return (loads(agent.inputs, {}) or {}).get("offer")
+
+
+def _set_offer(agent: Agent, offer: dict | None) -> None:
+    inputs = loads(agent.inputs, {}) or {}
+    if offer:
+        inputs["offer"] = offer
+    else:
+        inputs.pop("offer", None)
+    agent.inputs = dumps(inputs)
+
+
+def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
+    """Work on the file that's already open, from what the person typed. Returns the reply, or None if it isn't a file task."""
+    f = open_file(db, agent)
+    if f is None:
+        return None
+    if f.status != "ready":
+        return "Pichla kaam abhi chal raha hai, khatam hote hi agla karta hoon. Card pe dikhega." if hi else "Still working on the last task; the card shows when it's done."
+    report = loads(f.report, {}) or {}
+    offer = pending_offer(agent)
+    from app import mind
+
+    if offer and YES_RE.search(text or "") and not ops_in(text):
+        mind.set_pattern("fix")
+        _set_offer(agent, None)
+        f = start_fix(db, f, offer["ops"], offer.get("sheets"))
+        return _doing(f, offer["ops"], offer.get("sheets"), hi)
+    if UNDO_RE.search(text or ""):
+        mind.set_pattern("undo")
+        try:
+            start_undo(db, f)
+        except OfficeAgentError as exc:
+            return str(exc)
+        return "Aakhri badlav wapas le raha hoon." if hi else "Undoing the last change."
+    from app.products.sheetu.office import edits
+
+    if edits.is_order(text) and len(ops_in(text)) < 2 and _edit_plan(f, text):
+        # "make names UPPER CASE", "remove blank rows": the edit, not a scan fix. A message naming several of the
+        # agent's fixes ('clean it: duplicates, extra spaces, north/NORTH, numbers as text...') is a clean-up, not one edit.
+        return ask_task(db, agent, f, text, hi)
+    if (f.path or "").lower().endswith(".docx"):
+        return ask_task(db, agent, f, text, hi)           # a Word document: its own questions and changes
+    ops = ops_in(text)
+    from app.products.sheetu.officeknow import diagnose
+
+    inputs = loads(agent.inputs, {}) or {}
+    said_before = inputs.get("complaint")
+    if not ops and (diagnose.describes_problem(text) or (said_before and (REPORT_RE.search(text or "") or UPLOADED_RE.search(text or "")))):
+        # they say what's wrong: find WHY in their own file, prove it, and offer the fix
+        complaint = text if diagnose.describes_problem(text) else said_before
+        if said_before:
+            inputs.pop("complaint", None)
+            agent.inputs = dumps(inputs)
+        return _diagnose_reply(agent, f, report, complaint, hi)
+    sheets = sheets_in(text, report)
+    if FORMULA_RE.search(text or "") and ops:
+        # "duplicate ka formula do": they want the formula for THEIR file, not a change
+        mind.set_pattern("formula")
+        return formula_reply(agent, f, report, ops or ["remove_duplicates"], sheets, hi)
+    if not ops and ALL_RE.search(text or ""):
+        s = report.get("summary", {})
+        ops = [op for key, op in (("spaces", "trim_spaces"), ("text_numbers", "text_to_number"), ("broken_refs", "fix_broken_refs"),
+                                  ("case_mixed", "fix_case"), ("duplicate_rows", "remove_duplicates")) if s.get(key)]
+        mind.set_pattern("fix")
+        if not ops:
+            return "Is file mein theek karne layak kuch nahi bacha." if hi else "Nothing left to fix in this file."
+        return _doing(start_fix(db, f, ops, sheets), ops, sheets, hi)
+    if not ops and REPORT_RE.search(text or ""):
+        ops = [op for op in _OP_NAMES]          # "kya galat hai?" -> everything the scan knows
+        mind.set_pattern("review")
+        return _answer(agent, report, ops, sheets, hi, f)
+    if not ops:
+        return ask_task(db, agent, f, text, hi)
+    mind.set_pattern("fix" if wants_do(text) else "dups" if ops == ["remove_duplicates"] else "review")
+    if ops == ["remove_duplicates"] and not wants_do(text):
+        # "duplicates dhund ke do", "alag sheet mein daalo": list them in a new sheet, delete nothing
+        _set_offer(agent, {"ops": ["remove_duplicates"], "sheets": sheets})
+        where = f" ({', '.join(sheets)})" if sheets else ""
+        if not heavy(f):                         # small file: do it now and answer with the result
+            f.status, f.task, f.args = "queued", "extract", dumps({"sheets": sheets})
+            db.commit()
+            _work(f.id, "extract", {"sheets": sheets})
+            db.refresh(f)
+            r = loads(f.result, {}) or {}
+            if f.status == "ready" and r.get("task") == "extract":
+                return _extract_reply(f, r, sheets, report, hi)
+        _start(db, f, "extract", {"sheets": sheets})
+        return (f"{f.name}{where} ke saare duplicate ek nayi sheet \"Duplicates (Goal Engine)\" mein daal raha hoon: kaunsi row, "
+                "kis row jaisi, aur kaunsa ID/invoice/email do baar aaya. Aapka data nahi badlega. Ready hote hi card pe Download karo. "
+                "Baad mein hatane hain to 'duplicate hatao' likho." if hi else
+                f"Putting every duplicate in {f.name}{where} into a new sheet \"Duplicates (Goal Engine)\": which row, which row it repeats, "
+                "and any ID/invoice/email used twice. Your data isn't changed. Download it from the card when it's ready. "
+                "To remove them later, type 'remove duplicates'.")
+    if not wants_do(text):
+        return _answer(agent, report, ops, sheets, hi, f)
+    if len(ops) >= 2:
+        return _clean_now(db, f, ops, sheets, hi, text)    # a clean-up list: do it, then say exactly what changed and what didn't
+    return _doing(start_fix(db, f, ops, sheets), ops, sheets, hi)
+
+
+QUALITY_FIXES = {"fix_dates": ("dates ek format mein", "dates written one way"), "fix_rates": ("percent ek jaise", "rates written one way"),
+                 "fix_categories": ("naam ek jaise", "names made the same"), "fix_formulas": ("galat formula theek", "wrong formulas put right"),
+                 "fix_typed_total": ("type kiye total ki jagah formula", "typed-in totals replaced by the formula"),
+                 "fix_missing_formula": ("khaali totals bhare", "missing totals filled"), "fix_headings": ("heading ki spelling", "heading spelling")}
+QUALITY_FLAGS = {"flag_bad_date": ("galat dates", "impossible dates"), "flag_missing": ("khaali cells", "missing values"),
+                 "flag_bad_email": ("galat emails", "invalid emails"), "flag_negative": ("minus wale numbers", "negative numbers"),
+                 "flag_not_number": ("number ki jagah text", "text where a number belongs"),
+                 "flag_repeated_id": ("do baar aaye ID", "repeated IDs"),
+                 "flag_maybe_same": ("shayad spelling galti", "maybe misspelled")}
+
+
+def _cap(t: str) -> str:
+    return t[:1].upper() + t[1:]
+
+
+def _eg(e, hi) -> str:
+    if not e:
+        return ""
+    return f' (jaise {e[2]} → {e[3]}, {e[1]})' if hi else f' (e.g. "{e[2]}" → "{e[3]}" in {e[1]})'
+
+
+def _clean_now(db: Session, f: OfficeFile, ops: list[str], sheets: list[str], hi: bool, text: str) -> str:
+    """A clean-up request: every column checked by its own kind's rules (small files right away), then a report of only
+    what really happened: what was fixed, and what needs the person's look (never guessed)."""
+    ops = [o for o in ops if o in office.FIX_OPS]
+    if "data_quality" not in ops:
+        ops = [*ops, "data_quality"]
+    if heavy(f):
+        return _doing(start_fix(db, f, ops, sheets), ops, sheets, hi)
+    ops = _fix_ops(f, ops)                       # small file: run the fix here, once (a second, background run would
+    f.status, f.task, f.error, f.args = "queued", "fix", None, dumps({"ops": ops, "sheets": sheets or []})
+    db.commit()                                  # write the same new version at the same time and corrupt it)
+    _work(f.id, "fix", {"ops": ops, "sheets": sheets or []})
+    db.refresh(f)
+    if f.status != "ready":
+        return f.error or ("Ye file theek nahi ho payi." if hi else "I couldn't fix this file.")
+    r = loads(f.result, {}) or {}
+    ch, ex = r.get("changes") or {}, r.get("examples") or {}
+    lines = []
+    for op in ops:
+        if op in _OP_NAMES and ch.get(op):
+            lines.append(f"- {_OP_NAMES[op][0 if hi else 1].capitalize()}: {ch[op]}{_eg((ex.get(op) or [None])[0], hi)}")
+    for op, (nh, ne) in QUALITY_FIXES.items():
+        if ch.get(op):
+            lines.append(f"- {_cap(nh if hi else ne)}: {ch[op]}{_eg((ex.get(op) or [None])[0], hi)}")
+    if "remove_duplicates" in ops and ch.get("duplicates_skipped_sheets"):
+        lines.append("- Duplicate rows: hataye nahi, kyunki is sheet mein formulas hain jo rows hatane se toot sakte hain. "
+                     "'duplicate dikhao' likho, nayi sheet mein list kar dunga." if hi else
+                     "- Duplicate rows: not deleted, because this sheet has formulas that deleting rows could break. "
+                     "Type 'show duplicates' and I'll list them in a new sheet.")
+    flags = []
+    for op, (nh, ne) in QUALITY_FLAGS.items():
+        n = ch.get(op) or 0
+        if n:
+            cells = ", ".join(e[1] for e in (ex.get(op) or [])[:4]) + (" …" if n > 4 else "")
+            flags.append(f"- {_cap(nh if hi else ne)}: {n} ({cells})")
+    head = ((f"{f.name} mein ye theek kiya:" if lines else f"{f.name} mein theek karne layak kuch nahi mila.") if hi else
+            (f"Done in {f.name}:" if lines else f"Nothing in {f.name} needed fixing."))
+    out = [head, *lines]
+    if flags:
+        out += [("Ye aap dekho, main andaza nahi lagata (sab 'Changes by Goal Engine' sheet mein):" if hi else
+                 "Needs your look, I don't guess these (all listed in the 'Changes by Goal Engine' sheet):"), *flags]
+    left = (loads(f.report, {}) or {}).get("summary", {})
+    errs = left.get("errors") or 0
+    if errs:
+        out.append(f"Abhi bhi {errs} cells mein error dikh raha hai; card pe hain." if hi else
+                   f"Still {errs} cell{'s' if errs != 1 else ''} showing an error; they're on the card.")
+    out.append("Theek ki hui copy card pe Download karo; 'undo' likhoge to wapas ho jayega." if hi else
+               "Download the fixed copy from the card; type 'undo' to put it back.")
+    if flags:
+        try:
+            from app.products.shared import learn as learning
+
+            learning.ask_to_learn(db, "office", text, guess="flagged: " + ", ".join(k for k in QUALITY_FLAGS if ch.get(k)))
+        except ValueError:
+            pass
+    return "\n".join(out)
+
+
+def _answer(agent, report, ops, sheets, hi, f) -> str:
+    """Find, don't change: say exactly where, then offer to fix it."""
+    parts, fixable = [], []
+    for op in ops:
+        text, n = _findings(report, op, sheets, hi)
+        if n or sheets:
+            parts.append(f"{_OP_NAMES[op][0 if hi else 1].capitalize()}: {text or ('koi nahi' if hi else 'none')}")
+        if n:
+            fixable.append(op)
+    where = f" ({', '.join(sheets)})" if sheets else ""
+    if not fixable:
+        others = []
+        if sheets:                               # nothing in the asked sheet; maybe elsewhere
+            for op in ops:
+                t, n = _findings(report, op, [], hi)
+                if n:
+                    others.append(f"{_OP_NAMES[op][0 if hi else 1]}: {t}")
+        what = ", ".join(_OP_NAMES[o][0 if hi else 1] for o in ops) if len(ops) < 5 else ("koi galti" if hi else "problems")
+        place = ", ".join(sheets) if sheets else f.name
+        msg = (f"{place} mein ab koi {what} nahi hai." if hi else f"No {what} in {place}.")
+        if others:
+            msg += (" Baaki sheets mein: " if hi else " In other sheets: ") + "; ".join(others) + "."
+            _set_offer(agent, {"ops": [o for o in ops if _findings(report, o, [], hi)[1]], "sheets": []})
+            msg += " Theek kar doon? 'haan' likho." if hi else " Shall I fix those? Type 'yes'."
+        return msg
+    _set_offer(agent, {"ops": fixable, "sheets": sheets})
+    return ("Mila" if hi else "Found") + f"{where}. " + ". ".join(parts) + ". " + (
+        "Theek kar doon? 'haan' likho, ya card pe Theek karo dabao." if hi else "Shall I fix it? Type 'yes', or press Fix it on the card.")
+
+
+def _diagnose_reply(agent, f, report, text, hi) -> str:
+    from app import mind
+    from app.products.sheetu.officeknow import diagnose, evidence
+
+    facts = evidence.collect(f.path, report)
+    result = diagnose.diagnose(text, facts)
+    msg, ops = diagnose.report(result, hi, f.name)
+    mind.set_pattern("review")
+    _set_offer(agent, {"ops": ops, "sheets": []} if ops else None)
+    return msg
+
+
+def _doing(f, ops, sheets, hi) -> str:
+    what = ", ".join(_OP_NAMES[o][0 if hi else 1] for o in ops)
+    where = f" ({', '.join(sheets)})" if sheets else ""
+    return (f"{f.name}{where} mein {what} theek kar raha hoon. Pichle badlav bhi saath rahenge." if hi
+            else f"Fixing {what} in {f.name}{where}. Earlier changes stay in.")
+
+
+def cant_yet(f: OfficeFile, hi: bool) -> str:
+    return (f"{f.name} khuli hai. Is pe main abhi ye kar sakta hoon: extra space, duplicate rows, capital/small letters, text wale numbers, "
+            "toote formula dhoondna aur theek karna, aur doosri file se compare. Aapka ye kaam main abhi seekh raha hoon; "
+            "tab tak inmein se koi kaam bolo." if hi else
+            f"{f.name} is open. Right now I can find and fix extra spaces, duplicate rows, mixed capitals, numbers saved as text, "
+            "broken formulas, and compare with another file. I'm still learning this one; meanwhile ask for any of those.")
+
+
+def _extract_reply(f: OfficeFile, r: dict, sheets: list[str], report: dict, hi: bool) -> str:
+    where = ", ".join(sheets) if sheets else f.name
+    if not r["count"]:
+        msg = f"{where} mein koi duplicate nahi mila." if hi else f"No duplicates in {where}."
+        if sheets:                                           # say where they ARE, if anywhere
+            other = [f"{s['name']}: {s['duplicate_rows']}" for s in report.get("sheets", []) if s.get("duplicate_rows") and s["name"] not in sheets]
+            if other:
+                msg += (f" Doosri sheets mein hain ({', '.join(other)}). 'poori file ke duplicate dikhao' likho." if hi
+                        else f" Other sheets have some ({', '.join(other)}). Type 'show duplicates in the whole file'.")
+        return msg
+    parts = []
+    for g in r["groups"][:5]:
+        parts.append((f"{g['sheet']}: {g['count']} poori rows do baar" if hi else f"{g['sheet']}: {g['count']} whole rows repeated")
+                     if g["what"] == "row" else
+                     (f"{g['sheet']}: {g['count']} baar same {g['what']}" if hi else f"{g['sheet']}: same {g['what']} {g['count']} times"))
+    return ((f"{r['count']} duplicate mile ({'; '.join(parts)}). Sab ek nayi sheet \"Duplicates (Goal Engine)\" mein daal diye: kaunsi row, "
+             "kis row jaisi. Aapka data nahi badla. Card pe Download karo. Hatane hain to 'duplicate hatao' likho.") if hi else
+            (f"Found {r['count']} duplicates ({'; '.join(parts)}). They're all in a new sheet \"Duplicates (Goal Engine)\": which row, "
+             "and which row it repeats. Your data wasn't changed. Download it from the card. To remove them, type 'remove duplicates'."))
+
+
+# ------------------------------------------------------------------ "formula do": a formula written for the person's own sheet
+def _sheet_with(report: dict, key: str, sheets: list[str]) -> dict | None:
+    cands = [sh for sh in report.get("sheets", []) if not sheets or sh["name"] in sheets]
+    return max(cands, key=lambda sh: sh.get(key, 0) if not isinstance(sh.get(key), list) else len(sh[key]), default=None)
+
+
+def _col_of(cell: str) -> str:
+    return re.match(r"[A-Z]+", cell).group(0) if cell else "B"
+
+
+def formula_reply(agent: Agent, f: OfficeFile, report: dict, ops: list[str], sheets: list[str], hi: bool) -> str:
+    from openpyxl.utils import get_column_letter
+
+    op = ops[0]
+    sh = _sheet_with(report, {"remove_duplicates": "duplicate_rows", "trim_spaces": "spaces", "fix_case": "case_mixed",
+                              "text_to_number": "text_numbers"}.get(op, "rows"), sheets)
+    if sh is None:
+        return None
+    name, last = sh["name"], max(sh["rows"], 2)
+    header = sh.get("header", [])
+    q = f"'{name}'!" if re.search(r"\W", name) else f"{name}!"
+    if op == "remove_duplicates":
+        from app.products.sheetu.office import _ROWNO
+
+        cols = [get_column_letter(i + 1) for i, h in enumerate(header) if h and not _ROWNO.match(str(h))][:6] or ["A"]
+        new_col = get_column_letter(len(header) + 1)
+        parts = ",".join(f"${c}$2:${c}2,{c}2" for c in cols)
+        excel = f'=IF(COUNTIFS({parts})>1,"Duplicate","")'
+        names = ", ".join(header[ord(c) - 65] for c in cols if len(c) == 1 and ord(c) - 65 < len(header))
+        unique = f"=UNIQUE({q}{cols[0]}1:{cols[-1]}{last})"            # without a row-number column, or nothing looks repeated
+        title = (f"Duplicate pehchanne ka formula ({name})" if hi else f"Formula to mark duplicates ({name})")
+        explain = (f"{new_col}2 mein daalo aur {new_col}{last} tak neeche kheencho. Jo row upar wali kisi row jaisi hai ({names} sab same), "
+                   f"uspe \"Duplicate\" likha aayega; pehli wali nahi. Phir filter lagao, \"Duplicate\" chuno aur wo rows delete karo. "
+                   f"Excel 365 mein bina duplicate ki poori list ek nayi sheet mein: {unique}" if hi else
+                   f"Put it in {new_col}2 and drag down to {new_col}{last}. A row that repeats an earlier row ({names} all the same) "
+                   f"shows \"Duplicate\"; the first one doesn't. Then filter on \"Duplicate\" and delete those rows. "
+                   f"In Excel 365, the whole list without duplicates on a new sheet: {unique}")
+        tail = (" Excel mein formula khud kuch delete nahi karta; main ye aapke liye kar sakta hoon: 'duplicate hatao' likho." if hi
+                else " A formula can't delete rows by itself in Excel; I can do it for you: type 'remove duplicates'.")
+    else:
+        cell = {"trim_spaces": sh.get("space_cells"), "fix_case": sh.get("case_cells"), "text_to_number": sh.get("text_number_cells")}.get(op) or ["B2"]
+        col = _col_of(cell[0])
+        fx = {"trim_spaces": f"=TRIM({col}2)", "fix_case": f"=PROPER({col}2)", "text_to_number": f'=VALUE(SUBSTITUTE(SUBSTITUTE({col}2,",",""),"₹",""))',
+              "fix_broken_refs": None}[op]
+        if fx is None:
+            return ("Toote formula (#REF!) ka koi ek formula nahi hota; main inhe khud theek kar deta hoon: 'formula theek karo' likho." if hi
+                    else "There's no single formula for broken #REF! formulas; I can rebuild them for you: type 'fix formulas'.")
+        excel = fx
+        title = {"trim_spaces": ("Extra space hatane ka formula", "Formula to remove extra spaces"),
+                 "fix_case": ("Ek jaise capital letters ka formula", "Formula for consistent capitals"),
+                 "text_to_number": ("Text ko number banane ka formula", "Formula to turn text into numbers")}[op][0 if hi else 1] + f" ({name}, {col})"
+        explain = (f"Ek khaali column mein row 2 pe daalo aur {last} tak kheencho; phir Copy > Paste Special > Values se {col} column pe daal do." if hi
+                   else f"Put it in an empty column on row 2 and drag down to row {last}; then Copy > Paste Special > Values over column {col}.")
+        tail = (" Ya main seedha file mein kar deta hoon: 'theek karo' likho." if hi else " Or I can do it in the file directly: type 'fix it'.")
+    inputs = loads(agent.inputs, {}) or {}
+    inputs["file_formula"] = {"title": title, "excel": excel, "explain": explain, "sheets": "", "needs": []}
+    agent.inputs = dumps(inputs)
+    return f"{title}: {excel}  {explain}{tail}"
+
+
+# ------------------------------------------------------------------ any other question about the open file
+TEACH = ("Agent ko sikhao", "Teach the agent")
+
+
+LAST_FORMULA_RE = re.compile(r"^\s*(give me |show me |send me |what is |what's )?(the |its |iska |uska |is ka )?(excel )?"
+                             r"(formula|formule|fourmula|farmula)( (for|of) (this|that|it|the (last )?answer))?( do| dena| batao| bhi do| kya hai| kya hoga)?\s*[?.!]*\s*$"
+                             r"|^\s*(iska|uska|is ka) formula\b", re.I)
+
+
+def _edit_plan(f, text):
+    from app.products.sheetu.office import edits
+    from app.products.sheetu.office.sheetdata import load_tables
+
+    try:
+        return edits.plan_edit(text, load_tables(f.path))
+    except Exception:  # noqa: BLE001 - an unreadable sheet: the usual path explains it
+        return None
+
+
+def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
+    """Totals, counts, X-wise, lists, lookups, aging, combining, highlighting... on the person's own sheets.
+    Returns the reply, or (question, options) when one detail is missing. Never a random answer.
+
+    Before answering it checks the plan against the question and the person: the sheet they named, whether they
+    want changes or only the answer, formulas only when they want them, and a different reading when the same
+    question comes back because the last answer missed."""
+    from app import mind
+    from app.products.sheetu.office import mind as mo
+    from app.products.sheetu.office import ask as asker
+    from app.products.sheetu.office.sheetdata import load_tables
+
+    m = mind.now()
+    sig, prof = m.get("signals", {}), m.get("profile", {})
+    _set_offer(agent, None)
+    inputs = loads(agent.inputs, {}) or {}
+    pending = inputs.pop("pending_q", None)
+    last_plan = inputs.get("mind_plan")
+    if (text or "").strip() in TEACH and pending:
+        from app.products.shared import learn as learning
+
+        learning.ask_to_learn(db, "office", pending)
+        agent.inputs = dumps(inputs)
+        db.commit()
+        return ("Note kar liya. Ye kaam agent ki learning list mein chala gaya; seekhte hi ye bhi karega. Tab tak koi aur kaam bolo."
+                if hi else "Noted. It's on the agent's learning list; once learned it'll do this too. Meanwhile, ask for something else.")
+    # "give me the formula" right after an answer: the formula of that answer
+    last = loads(f.result, {}) or {}
+    if LAST_FORMULA_RE.search(text or "") and last.get("task") == "ask" and last.get("formula"):
+        f.result = dumps({**last, "show_formula": True})
+        agent.inputs = dumps(inputs)
+        db.commit()
+        mind.set_pattern("formula", last_plan)
+        return (f"Pichle jawab ka formula: {last['formula']}" if hi else f"The formula for the last answer: {last['formula']}")
+    if pending and len((text or "").split()) <= 5:
+        text = f"{pending} {text}"                        # the answer to "which sheet / which column?"
+    tables = load_tables(f.path)
+    m["tables"] = tables
+    from app.products.sheetu.office import understand as U
+
+    is_doc = (f.path or "").lower().endswith(".docx")
+    if is_doc:
+        from app.products.sheetu.office import word
+    focus = None if is_doc else _focus_table(text, tables, inputs.get("focus_sheet"))
+    try:
+        plan = (word.plan(text, f.path) if is_doc else None) or _understand_in(asker, U, text, tables, focus)
+    except U.Missing as miss:
+        # not in this file and can't be worked out from it: say so plainly, with what it does have
+        agent.inputs = dumps(inputs)
+        db.commit()
+        mind.set_pattern("missing", None)
+        try:
+            from app.products.shared import learn as learning
+
+            learning.ask_to_learn(db, "office", text, guess="not in file: " + miss.concept)
+        except ValueError:
+            pass
+        return miss.hi if hi else miss.en
+    except asker.NeedMore as need:
+        plan = word.fallback(text, f.path) if is_doc else None
+        if plan is None:
+            inputs["pending_q"] = text
+            agent.inputs = dumps(inputs)
+            db.commit()
+            opts = list(need.options)
+            msg = need.hi if hi else need.en
+            if is_doc and (not tables or need.en.startswith("I didn't fully get")):
+                msg = ("Ye document mein nahi mila. Document pe ye pooch sakte ho: summary, headings, kisi shabd ko dhoondo, "
+                       "kisi topic ke baare mein kya likha hai, saari dates / amounts / emails, ya \"X ko Y se badlo\"." if hi else
+                       "I couldn't find that in the document. You can ask for a summary, the headings, where a word appears, what it says "
+                       "about a topic, every date / amount / email in it, or \"replace X with Y\".")
+                need.hi = "Ye poori tarah samajh nahi aaya"
+                opts = ["Summarise this document", "Show the headings", "List all dates"] if not hi else \
+                       ["Is document ka summary do", "Headings dikhao", "Saari dates batao"]
+            try:
+                # it couldn't answer this directly: the sentence (scrubbed, nobody attached) goes to the learning list,
+                # so the agent learns to answer it straight away next time
+                from app.products.shared import learn as learning
+
+                learning.ask_to_learn(db, "office", text, guess="needed: " + (need.en[:60] if need.en else ""))
+            except ValueError:
+                pass
+            if need.hi.startswith("Ye poori tarah samajh nahi aaya") and not is_doc:
+                # not understood: offer the closest things this file can answer, not a dead end
+                near = mo.closest_options(text, tables, hi)
+                if near:
+                    msg = ("Ye poori tarah samajh nahi aaya. Is file pe inme se kuch chahiye?" if hi
+                           else "I didn't fully get that. Did you mean one of these?")
+                    opts = near
+            if need.hi.startswith("Ye poori tarah samajh nahi aaya"):
+                opts = opts[:6] + ["Agent ko sikhao" if hi else "Teach the agent"]
+            mind.set_pattern("other", None)
+            mind.asked_back()
+            return msg, opts
+    if is_doc and plan.get("job") == "list" and not plan.get("filters") and re.search(
+            r"\b(which|what|who|why|when|kaun|kaunsa|kya|kyun|kab)\b", text or "", re.I):
+        plan = word.fallback(text, f.path) or plan       # 'which region is weakest': what the text says, not every table row
+    # the named sheet is the sheet (a check on the plan, whatever job it became)
+    named = asker.named_sheet(text, tables)
+    if named is not None and plan.get("table") not in (named.name, None) and plan.get("job") not in ("lookup", "combine", "reconcile"):
+        try:
+            plan = asker.understand(text, [named])
+        except asker.NeedMore:
+            pass
+    if plan.get("table"):
+        inputs["focus_sheet"] = plan["table"]            # the next question that names no sheet stays here
+    # the same question again after an answer: don't repeat that answer; offer the other readings
+    if (sig.get("repeat") or sig.get("frustrated")) and last_plan and mo._same(plan, last_plan) and not plan.get("derive"):
+        alts = mo.other_readings(text, tables, plan, hi)
+        try:                                       # the last answer missed: this sentence goes to the learning list
+            from app.products.shared import learn as learning
+
+            learning.ask_to_learn(db, "office", text, guess="missed: " + mo.label_of(plan))
+        except ValueError:
+            pass
+        if alts:
+            agent.inputs = dumps(inputs)
+            db.commit()
+            mind.set_pattern(mo.label_of(plan), plan)
+            mind.asked_back()
+            return (("Pichli baar maine ise aise samjha tha, shayad galat. Inme se kaunsa chahiye?" if hi
+                     else "Last time I read this one way and it may have been wrong. Which of these did you mean?"), alts)
+    if asker.NO_CHANGE.search(text or "") or prof.get("control") == "ask_first":
+        plan["readonly"] = True                            # "before making changes, tell me...": answer only
+    show_fx = bool(sig.get("wants_formula") or (prof.get("formula") is True and not sig.get("no_formula")) or re.search(
+        r"\b(in excel|excel mein|excel me)\b.{0,20}\b(kaise|how)\b|\bhow (do|can|to) i\b.{0,30}\b(calculate|count|sum|find)\b", text or "", re.I))
+    other = None if (plan.get("derive") or plan.get("job", "").startswith("word_")) else mo.sheet_or_value(text, tables, plan, hi)
+    inputs["mind_plan"] = json.loads(json.dumps(plan, default=str))
+    agent.inputs = dumps(inputs)
+    mind.set_pattern(mo.label_of(plan), plan)
+    args = {"plan": plan, "hi": hi}
+    if not heavy(f):
+        f.status, f.task, f.args = "queued", "ask", dumps(args)
+        db.commit()
+        _work(f.id, "ask", args)
+        db.refresh(f)
+        r = loads(f.result, {}) or {}
+        if f.status == "ready" and r.get("task") == "ask":
+            tail = ""
+            if r.get("sheet"):
+                tail = (f" Nayi sheet \"{r['sheet']}\" file mein jod di; card pe Download karo." if hi and r["sheet"].startswith("Answer") else
+                        f" Ye \"{r['sheet']}\" sheet mein hai; card pe Download karo." if hi else
+                        f" Added to the file as \"{r['sheet']}\"; download it from the card.")
+            # the answer itself; the formula only when they asked for one (it's always in Details on the card)
+            fx = (f" Formula: {r['formula']}" if r.get("formula") and show_fx else "")
+            if show_fx != bool(r.get("show_formula")):
+                f.result = dumps({**r, "show_formula": show_fx})
+                db.commit()
+            if plan.get("readonly") and not r.get("sheet"):
+                tail = " Nothing in your file was changed." if not hi else " File mein kuch nahi badla."
+            reply = f"{r['say']}.{fx}{tail}".replace("..", ".")
+            links = r.get("sheet_links") or []
+            if len(links) > 1:
+                # several sheets named: each one is a tap away
+                return reply, [(f"{n} dikhao" if hi else f"Show {n}") for n in links[:8]]
+            if other:
+                # answered the likelier reading; the other one is one tap away
+                reply += (" Agar aapka matlab kuch aur tha, neeche chuno." if hi else " If you meant something else, pick it below.")
+                return reply, [other]
+            return reply
+        return f.error or ("Ye kaam poora nahi ho saka." if hi else "Couldn't finish that.")
+    _start(db, f, "ask", args)
+    return "Badi file hai, kaam chal raha hai; card pe jawab aayega." if hi else "Big file, working on it; the answer will show on the card."
+
+
+# ------------------------------------------------------------------ hooks the brain calls (named in the office pack)
+def _outranked(text: str) -> bool:
+    """Words of a field whose pack outranks this one (e.g. 'export my database to excel' while a sheet is open)."""
+    return any(packs.mentions(name, text) for name, p in packs.all_packs().items() if "office" in p.get("outranks", []))
+
+
+def holds_conversation(db: Session, goal: Goal, text: str, any_text: bool = False) -> Agent | None:
+    """A file is open in this conversation: what the person types is about that file."""
+    agent = goal_agent(db, goal)
+    if agent is None or open_file(db, agent) is None:
+        return None
+    if not any_text and _outranked(text):
+        return None
+    return agent
+
+
+def continue_turn(db: Session, goal: Goal, agent: Agent, text: str):
+    from app.ml.normalize import _ALSO_ENGLISH, HINGLISH_MARKERS, detect_language, tokens
+
+    lang = detect_language(text)
+    if lang == "English" and goal.detected_language in ("Hinglish", "Hindi") and (
+            len(text.split()) < 4 or any(w in HINGLISH_MARKERS and w not in _ALSO_ENGLISH for w in tokens(text))):
+        lang = goal.detected_language
+    hi = lang in ("Hinglish", "Hindi")
+    reply = chat_task(db, agent, text, hi)
+    options = []
+    if isinstance(reply, tuple):
+        reply, options = reply
+    if not reply:
+        reply = cant_yet(open_file(db, agent), hi)
+    return reply, options, hi
+
+
+def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) -> bool:
+    if GSHEET_RE.search(text or ""):
+        return True                                      # a Google Sheet link: the file to work on
+    if relation in ("safety", "chit_chat"):
+        return False
+    return (held and not _outranked(text)) or wants_office(goal, text, db)
+
+
+def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
+    """Excel / file work: the agent works on the file itself and gives back a fixed copy."""
+    from app.products.sheetu.officeknow import brain as officebrain
+
+    rec = officebrain.recognize(text)
+    agent = goal_agent(db, goal) or create_agent(db, goal)
+    if GSHEET_RE.search(text or ""):
+        goal.title = goal.title or ("Google Sheet ka kaam" if turn.hi else "Google Sheet work")
+        goal.missing_info, goal.pending = "[]", None
+        try:
+            import_link(db, agent, text)
+        except OfficeAgentError as exc:
+            db.commit()
+            return str(exc), [], "agent_plan"
+        except Exception:  # noqa: BLE001 - network: say so
+            db.commit()
+            return ("I couldn't reach Google Sheets just now. Try the link again in a minute, or download it as .xlsx and upload it."
+                    ), [], "agent_plan"
+        db.commit()
+        return ("Google Sheet mil gayi. Padh raha hoon; card pe dikhega, phir kuch bhi poocho." if turn.hi else
+                "Got your Google Sheet. Reading it now; it shows on the card, then ask me anything about it."), [], "agent_plan"
+    task_reply = chat_task(db, agent, text, turn.hi)
+    soon = not_yet(text) if not task_reply else None          # the file tools come first: only what they can't do is "not yet"
+    if soon and not ops_in(text):
+        name = soon.get("hi" if turn.hi else "en") or soon["en"]
+        goal.title = name[:1].upper() + name[1:]
+        goal.missing_info, goal.pending = "[]", None
+        db.commit()
+        return coming_soon(soon, turn.hi), [], "agent_plan"
+    inputs = loads(agent.inputs, {}) or {}
+    describes_problem = rec.get("kind") != "issue" or bool(PROBLEM_WORDS.search(text or "") or SYMPTOM_WORDS.search(text or ""))
+    if not describes_problem:
+        rec = {**rec, "confidence": 0.0}           # 'I need to work on my excel file': no problem named, so none guessed
+    from app.products.sheetu.officeknow import diagnose
+
+    if not task_reply and open_file(db, agent) is None and diagnose.describes_problem(text):
+        inputs["complaint"] = text
+        likely = diagnose.likely(text, turn.hi)
+    else:
+        likely = ""
+    if rec["confidence"] >= SURE and describes_problem and not task_reply and open_file(db, agent) is None:
+        inputs["brain"] = rec
+        goal.title = officebrain.describe(rec, turn.hi)
+    elif not goal.title:
+        goal.title = "Excel / file ka kaam" if turn.hi else "Excel and file work"
+    agent.inputs = dumps(inputs)
+    goal.missing_info = "[]"
+    goal.pending = None
+    goal.next_action_type = "execute"
+    goal.next_action = "Give the file to the agent"
+    db.commit()
+    opened = open_file(db, agent)
+    if not task_reply and opened is not None:
+        task_reply = cant_yet(opened, turn.hi)
+    options = []
+    if isinstance(task_reply, tuple):
+        task_reply, options = task_reply
+    return (task_reply or likely or plan_reply(rec, turn.hi)), options, "agent_plan"

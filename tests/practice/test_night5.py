@@ -331,7 +331,7 @@ def test_every_rule_records_where_it_was_proven():
     funds = fundamentals()["fundamentals"]
     assert all(any(t in f["topics"] for f in funds.values()) for t in {**sqlchange.PROVEN, **sqlroutine.PROVEN}), "every topic has its fundamental"
     for eng in ("mysql", "mariadb", "postgresql"):
-        rules = json.load(open(f"app/dbknow/dialects/{eng}.json"))["query_rules"]
+        rules = json.load(open(f"app/products/dbaba/dbknow/dialects/{eng}.json"))["query_rules"]
         for key in ("update_join", "update_from", "set_qualified", "delete_join", "delete_using", "on_duplicate_key", "on_conflict",
                     "change_limit", "insert_ignore", "replace_into"):
             assert rules[key]["proven"] and rules[key]["says"] and rules[key]["behaviour"] in ("works", "error"), (eng, key)

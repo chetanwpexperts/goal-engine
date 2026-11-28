@@ -422,7 +422,7 @@ def test_final_exam_50_generated_problems(engines):
 
 
 def test_tonights_fundamental_is_in_the_core():
-    funds = json.load(open("app/dbknow/core/query_fundamentals.json"))["fundamentals"]
+    funds = json.load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"]
     f = funds["portability"]
     assert {"date_math", "interval_unit", "cast_char", "power_xor"} <= set(f["topics"]) and set(f["proven"]) >= {"mariadb", "postgresql"}
     from app.dbknow import engines as E

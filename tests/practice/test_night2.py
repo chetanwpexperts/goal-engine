@@ -270,7 +270,7 @@ def test_every_rule_says_where_it_was_proven():
 
     assert set(sqljoins.PROVEN) == {"cartesian", "join_key", "natural_join", "anti_join", "self_join", "distinct_join"}
     assert all(set(v) >= {"mariadb", "postgresql"} for v in sqljoins.PROVEN.values())
-    d = Path(sqljoins.__file__).resolve().parents[1] / "dbknow" / "dialects"
+    d = Path(sqljoins.__file__).resolve().parent / "dbknow" / "dialects"
     for fam, eng in (("mysql", "mariadb"), ("postgresql", "postgresql")):
         refuses = json.loads((d / f"{fam}.json").read_text(encoding="utf-8"))["refuses"]
         assert refuses and all(eng in r["proven"] for r in refuses), fam

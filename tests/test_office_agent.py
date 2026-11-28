@@ -146,7 +146,7 @@ def test_only_one_process_resumes(tmp_path):
     tmp_path.mkdir(exist_ok=True)
     held = open(tmp_path / ".resume.lock", "w")
     fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)          # another worker already owns it
-    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=str(__import__("pathlib").Path(o.__file__).parents[2]))
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=str(__import__("pathlib").Path(__file__).resolve().parents[1]))   # the repository root
     assert out.stdout.strip() == "False", out.stderr
     held.close()
 
@@ -340,6 +340,21 @@ def _messy_without_calc_settings():
                 data = re.sub(rb"<calcPr[^>]*/>", b"", data)
             z.writestr(item, data)
     return out.getvalue()
+
+
+def test_clean_up_list_on_a_small_file_runs_the_fix_once(client, ml_mode, monkeypatch):
+    """A small file's clean-up list is fixed inside the request. No background fix may run at the same time: both would
+    write the same new version and could leave a broken file ("invalid stored block lengths")."""
+    from app.products.sheetu import office_agent as oa
+
+    r = say(client, "excel file ke formula check karo")
+    goal, agent = r["goal"]["id"], next(a for a in r["agents"] if a.get("office"))
+    f = _upload(client, agent["id"], _messy_without_calc_settings(), name="sales.xlsx")
+    assert f["status"] == "ready"
+    runs, real = [], oa._work
+    monkeypatch.setattr(oa, "_work", lambda fid, task, args: (runs.append(task), real(fid, task, args))[1])
+    reply = say(client, "clean this file: duplicate records, extra spaces, numbers stored as text", goal)["reply"]
+    assert reply.startswith("Done in sales.xlsx") and runs.count("fix") == 1
 
 
 def test_clean_up_list_on_a_file_without_calc_settings(client, ml_mode):

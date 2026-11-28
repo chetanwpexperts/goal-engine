@@ -27,8 +27,8 @@ from app.models import (Agent, DbConnectLog, Enquiry, ExpertRequest, LearnedPhra
 
 router = APIRouter(prefix="/api/admin")
 ROOT = Path(__file__).resolve().parent.parent
-DBKNOW = Path(__file__).resolve().parent / "dbknow"
-OFFICEKNOW = Path(__file__).resolve().parent / "officeknow"
+DBKNOW = Path(__file__).resolve().parent / "products" / "dbaba" / "dbknow"
+OFFICEKNOW = Path(__file__).resolve().parent / "products" / "sheetu" / "officeknow"
 
 AREAS = {"dbaba": ("DBaba (databases)", {"database", "db_report", "sql_review", "db_automation"}),
          "sheetu": ("Sheetu (Excel and Word)", {"office"}),
@@ -216,7 +216,7 @@ def knowledge() -> dict:
         engines.append({"name": d.get("name") or Path(f).stem, "tested": not d.get("notes_only"),
                         "error_codes": _size(d.get("codes")), "messages": _size(d.get("messages")), "fixes": _size(d.get("fix")),
                         "query_rules": rules, "live_checks": _size(d.get("live")), "notes": _size(d.get("notes"))})
-    checkers = sorted(Path(p).stem for p in glob.glob(str(ROOT / "app" / "agents" / "sql*.py")))
+    checkers = sorted(Path(p).stem for p in glob.glob(str(ROOT / "app" / "products" / "dbaba" / "sql*.py")))
     practice = sorted(glob.glob(str(ROOT / "tests" / "practice" / "test_night*.py")))
     office = {name: _size(_load(OFFICEKNOW / f"{name}.json")) for name in ("issues", "formulas", "fundamentals")}
     return {

@@ -27,7 +27,7 @@ def fresh(client):
 
 def test_tonights_concepts_are_complete():
     ids = {c["id"] for c in K.concepts()}
-    funds = json.load(open("app/dbknow/core/query_fundamentals.json"))["fundamentals"]
+    funds = json.load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"]
     assert set(NIGHT5) <= ids and len(NIGHT5) >= 15
     for cid in NIGHT5:
         c = K.by_id(cid)

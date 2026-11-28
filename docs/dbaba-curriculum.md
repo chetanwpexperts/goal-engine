@@ -14,7 +14,7 @@ This file is the plan it grows by: one night per nightly run, ticked off in the 
   becomes a rule. Every rule records the engines it was proven on.
 - A rule is general, never one example: a check in the SQL checker (or the reasoning core for server errors), a safe
   rewrite that does the intended thing on every engine, and the fundamental it belongs to
-  (`app/dbknow/core/query_fundamentals.json`). Sure mistakes are `error`/`wrong`; anything that depends on the data or on
+  (`app/products/dbaba/dbknow/core/query_fundamentals.json`). Sure mistakes are `error`/`wrong`; anything that depends on the data or on
   what the person meant is `check`, and its rewrite is only offered ("If that's what you meant").
 - Real users first: the learning feed's database items (questions DBaba couldn't answer, answers people said were wrong)
   come before the night's topic, and each becomes a permanent test.
@@ -32,9 +32,9 @@ sure); only "Not sure" gets an answer per engine, labelled. SQL Server, Oracle a
 notes until they have lab-tested knowledge of their own. Basic concept questions that are the same everywhere are answered
 directly, with the engine differences added.
 
-**B. Shared core, per-engine files.** What is true for every database lives in the shared core (`app/dbknow/core`, the
+**B. Shared core, per-engine files.** What is true for every database lives in the shared core (`app/products/dbaba/dbknow/core`, the
 query fundamentals, general rules, concepts). What belongs to one engine lives only in
-`app/dbknow/dialects/<engine>.json`. Every rule says which engines proved it, so each engine can later become its own
+`app/products/dbaba/dbknow/dialects/<engine>.json`. Every rule says which engines proved it, so each engine can later become its own
 sub-agent.
 
 **C. A running score in every PR.** Catch rate (planted mistakes found / planted, across the generators), false-alarm rate
@@ -45,7 +45,7 @@ tonight vs last night.
 kya hota hai", "DELETE vs TRUNCATE", "how to find duplicate emails", "how to delete duplicate rows in mysql": a short correct
 answer in the language asked, with what it is, when to use it, one example query run on MariaDB and PostgreSQL with its
 result, the common mistake, and the engine differences. How-to questions get a tested template for the user's database;
-anything that changes data comes with a preview query first. Knowledge lives in `app/dbknow/core/concepts.json`. Question
+anything that changes data comes with a preview query first. Knowledge lives in `app/products/dbaba/dbknow/core/concepts.json`. Question
 shapes are recognised generally (what is / kya hota hai / X vs Y / difference between / how to / kaise / when to use / why),
 never as fixed sentences. These questions never go to the query checker, the error diagnoser, a connect step or the generic
 "no specific answer" reply. An unknown concept is said honestly, with the nearest known ones, and recorded in the learning
@@ -305,7 +305,7 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   practice bank, 10 new generator families. Lab lessons worth keeping: NULLs sort first in ASC on MariaDB and first in DESC on
   PostgreSQL; text sorts case-blind on MariaDB and case-sensitive on PostgreSQL; `ORDER BY 1 IS NULL` is a constant, not
   column 1; `||` is OR on MariaDB; integer division truncates on PostgreSQL.
-- **Night 2 (5 Nov 2026).** Rule A in `app/dbknow/engines.py`: the database named in the words is remembered on the goal and
+- **Night 2 (5 Nov 2026).** Rule A in `app/products/dbaba/dbknow/engines.py`: the database named in the words is remembered on the goal and
   switched when another is named; one shown by the query's syntax or the error's format is detected, said, and correctable with
   one tap; otherwise DBaba asks first (MySQL / MariaDB / PostgreSQL / SQL Server / Oracle / Not sure), for queries and for errors.
   How each database is named, its syntax marks, its error format and what it refuses live in its dialect file (`named`,
@@ -531,7 +531,7 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   '01' and '1abc' into 1 (warning 1292) while PostgreSQL refuses (42883); ADD COLUMN ... NOT NULL without DEFAULT fills old
   rows with '' / 0 on MariaDB but is refused on PostgreSQL (23502); InnoDB adds an index for a foreign key, PostgreSQL doesn't.
 - **Night 11 (13 Nov 2026).** Query-only reasoning, in `app/agents/sqlconfidence.py` (new fundamental `proof_classes`; classes
-  and the facts they wait on in `app/dbknow/core/confidence.json`; each engine's check words in its dialect file under
+  and the facts they wait on in `app/products/dbaba/dbknow/core/confidence.json`; each engine's check words in its dialect file under
   `verify`, rule B). Every finding gets one class: PROVEN (the text decides it: refused, '= NULL', an aggregate in WHERE, an alias
   never defined), LIKELY RISK (the data or the intent decides: copies after a one-to-many join, AND/OR, averages of averages),
   NEEDS SCHEMA (NULLs, keys, a time of day, types) or NEEDS EXECUTION (speed: indexes, row counts, the plan). The class comes from
@@ -597,7 +597,7 @@ support (a language server, then a VS Code extension, then JetBrains) built on `
   derived table, MariaDB into both uses of a CTE too, PostgreSQL not into a CTE read twice unless NOT MATERIALIZED (1064 on
   MariaDB); a SELECT alias in HAVING without GROUP BY runs on MariaDB, 42703 on PostgreSQL.
 - **Night 14 (14 Nov 2026).** Safe rewrites with proof, in `app/agents/sqlproof.py` (a new fundamental, `rewrite_equivalence`;
-  the contracts in `app/dbknow/core/rewrites.json`; engine facts in the dialect files' query_rules: nulls_sort_order,
+  the contracts in `app/products/dbaba/dbknow/core/rewrites.json`; engine facts in the dialect files' query_rules: nulls_sort_order,
   row_comparison, volatile_once, exists_to_in). Every rewrite is checked on five things it must keep: matching, NULLs,
   duplicates, ordering and grain; each finding carries a proof (family, verdict same / same if / differs, what it keeps, when it
   holds, when it breaks) and the card says why the rows are the same. Found from the query alone: several correlated totals over

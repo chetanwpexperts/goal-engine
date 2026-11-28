@@ -1,0 +1,62 @@
+[
+  {
+    "id": "mysql-unknown-column",
+    "engines": ["mysql", "mariadb"],
+    "code": "1054",
+    "match": "1054|Unknown column '([^']+)'",
+    "title_en": "Unknown column",
+    "title_hi": "Ye column table mein nahi hai",
+    "explain_en": "The query names a column that doesn't exist in that table, usually a typo or an old name.",
+    "explain_hi": "Query mein jo column likha hai wo table mein nahi hai. Aksar spelling galat hoti hai ya naam purana hota hai.",
+    "fix": {"type": "closest_column", "note": "Suggest the closest real column name from the schema map, then ask before re-running."},
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-ambiguous-column",
+    "engines": ["mysql", "mariadb"],
+    "code": "1052",
+    "match": "1052|Column '([^']+)' in [a-z ]+ is ambiguous",
+    "title_en": "Ambiguous column",
+    "title_hi": "Column do tables mein hai, kaunsa chahiye saaf nahi",
+    "explain_en": "Two joined tables both have a column with this name, so the database doesn't know which one you mean.",
+    "explain_hi": "Jin tables ko joda hai, dono mein is naam ka column hai. Database ko nahi pata kaunsa lena hai.",
+    "fix": {"type": "qualify_column", "note": "Prefix the column with its table name (orders.id)."},
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "mysql-unknown-table",
+    "engines": ["mysql", "mariadb"],
+    "code": "1146",
+    "match": "1146|Table '([^']+)' doesn't exist",
+    "title_en": "Table doesn't exist",
+    "title_hi": "Ye table database mein nahi hai",
+    "explain_en": "The query names a table that isn't in this database.",
+    "explain_hi": "Query mein jo table likha hai wo is database mein nahi hai.",
+    "fix": {"type": "closest_table", "note": "Suggest the closest real table name, then ask before re-running."},
+    "source": "https://dev.mysql.com/doc/mysql-errors/8.0/en/server-error-reference.html"
+  },
+  {
+    "id": "pg-undefined-column",
+    "engines": ["postgres"],
+    "code": "42703",
+    "match": "42703|column \"?([^\" ]+)\"? does not exist",
+    "title_en": "Unknown column",
+    "title_hi": "Ye column table mein nahi hai",
+    "explain_en": "The query names a column that doesn't exist. In PostgreSQL, names with capital letters must be in double quotes.",
+    "explain_hi": "Query mein jo column likha hai wo nahi hai. PostgreSQL mein capital letters wale naam double quotes mein likhne padte hain.",
+    "fix": {"type": "closest_column", "note": "Suggest the closest real column; if only the case differs, add double quotes."},
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  },
+  {
+    "id": "pg-group-by",
+    "engines": ["postgres"],
+    "code": "42803",
+    "match": "42803|must appear in the GROUP BY clause",
+    "title_en": "Column missing from GROUP BY",
+    "title_hi": "GROUP BY mein column missing hai",
+    "explain_en": "When you group rows, every column you show must either be in GROUP BY or inside a total like COUNT or SUM.",
+    "explain_hi": "Jab rows ko group karte ho, to jo bhi column dikhana hai wo ya GROUP BY mein ho ya COUNT/SUM jaise total mein.",
+    "fix": {"type": "add_group_by", "note": "Add the plain columns of the SELECT list to GROUP BY."},
+    "source": "https://www.postgresql.org/docs/current/errcodes-appendix.html"
+  }
+]

@@ -1,0 +1,1634 @@
+"""Database agents through a connector that runs on the user's own server.
+
+Safety model:
+- The connector holds the database password; this server never sees it.
+- The connector only calls out (poll), runs job kinds it allows, and enforces read-only itself.
+- This server also refuses anything that isn't a single read-only statement, so two independent
+  checks must both pass.
+- Tokens are shown once and stored hashed. Disconnecting kills the token immediately.
+"""
+
+import hashlib
+import json
+import os
+import re
+import secrets
+from datetime import timedelta
+from pathlib import Path
+
+import logging
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import Agent, Connector, ConnectorJob, Goal, dumps, loads, utcnow
+
+log = logging.getLogger(__name__)
+from app.mind import packs
+
+
+EXPORT_DIR = Path(__file__).resolve().parents[3] / "data" / "exports"
+JOB_KINDS = ("schema", "query", "export", "explain", "health", "live", "plan", "change", "undo", "checks", "optimize")
+PLAN_TTL = timedelta(minutes=10)      # Apply must follow a fresh preview
+UNDO_TTL = timedelta(days=7)
+MAX_OPEN_JOBS = 4            # per user at once: keeps our server and theirs light
+MAX_UPLOAD_BYTES = 30 * 1024 * 1024
+JOB_TTL = timedelta(minutes=10)
+ONLINE_WINDOW = timedelta(seconds=45)
+PREVIEW_ROWS = 50
+MAX_RESULT_BYTES = 25 * 1024 * 1024
+
+
+class DatabaseError(ValueError):
+    pass
+
+
+# ---------------------------------------------------------------- read-only SQL check (the connector repeats it)
+_STRINGS = re.compile(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"|`[^`]*`")
+_COMMENTS = re.compile(r"/\*.*?\*/|--[^\n]*|#[^\n]*", re.S)
+_WRITE_WORDS = re.compile(r"\b(insert|update|delete|replace|merge|drop|alter|create|truncate|rename|grant|revoke|lock|unlock|"
+                          r"call|exec|execute|load|handler|set|copy|vacuum|analyze\s+table|optimize|repair|into\s+(out|dump)file|"
+                          r"pg_sleep|sleep|benchmark|load_file|pg_read_file|lo_import|dblink)\b", re.I)
+
+
+def read_only_sql(sql: str) -> str:
+    """Return the cleaned statement if it's a single read-only query; raise otherwise."""
+    text = (sql or "").strip().rstrip(";").strip()
+    if not text:
+        raise DatabaseError("The query is empty")
+    if len(text) > 20000:
+        raise DatabaseError("The query is too long")
+    bare = _COMMENTS.sub(" ", _STRINGS.sub("''", text))
+    if ";" in bare:
+        raise DatabaseError("Only one query at a time")
+    if not re.match(r"^\s*(select|with|show|describe|desc|explain)\b", bare, re.I):
+        raise DatabaseError("Only reading queries (SELECT, SHOW, DESCRIBE, EXPLAIN) are allowed at this level")
+    if _WRITE_WORDS.search(bare):
+        raise DatabaseError("This query contains a command that could change data, so it isn't allowed")
+    return text
+
+
+def _ident(name: str) -> str:
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_$]{0,63}(\.[A-Za-z_][A-Za-z0-9_$]{0,63})?$", name or ""):
+        raise DatabaseError("That table name doesn't look right")
+    return name
+
+
+def table_preview_sql(table: str, limit: int = PREVIEW_ROWS) -> str:
+    return f"SELECT * FROM {_ident(table)} LIMIT {int(limit)}"
+
+
+def table_export_sql(table: str) -> str:
+    return f"SELECT * FROM {_ident(table)}"
+
+
+# ---------------------------------------------------------------- connectors
+def _hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def create_connector(db: Session, visitor_id: str, name: str) -> tuple[Connector, str]:
+    if len(list(db.scalars(select(Connector.id).where(Connector.visitor_id == visitor_id,
+                                                       Connector.status != "disconnected")))) >= 5:
+        raise DatabaseError("You already have 5 connectors. Disconnect one first")
+    token = "gec_" + secrets.token_urlsafe(32)
+    connector = Connector(visitor_id=visitor_id, name=(name or "My database").strip()[:80], token_hash=_hash(token),
+                          token_hint=token[:10], status="waiting")
+    db.add(connector)
+    db.commit()
+    return connector, token
+
+
+def authenticate(db: Session, token: str) -> Connector | None:
+    if not token or not token.startswith("gec_"):
+        return None
+    connector = db.scalar(select(Connector).where(Connector.token_hash == _hash(token)))
+    if connector is None or connector.status == "disconnected" or connector.kind in ("direct", "php"):
+        return None                       # (php: the retired website-file connector; its rows never authenticate)
+    return connector
+
+
+def is_online(connector: Connector) -> bool:
+    if connector.kind == "direct":
+        return connector.status == "online"
+    return bool(connector.last_seen_at and utcnow() - connector.last_seen_at < ONLINE_WINDOW
+                and connector.status != "disconnected")
+
+
+def connector_dict(connector: Connector, db: Session | None = None) -> dict:
+    schema = None
+    if db is not None:
+        job = db.scalar(select(ConnectorJob).where(ConnectorJob.connector_id == connector.id, ConnectorJob.kind == "schema",
+                                                   ConnectorJob.status == "done").order_by(ConnectorJob.id.desc()).limit(1))
+        schema = loads(job.result, None) if job else None
+    return {
+        "id": connector.id, "name": connector.name, "status": connector.status, "online": is_online(connector),
+        "db_type": connector.db_type, "db_name": connector.db_name, "can_write": bool(connector.can_write),
+        "host": connector.host_label, "token_hint": connector.token_hint, "kind": connector.kind or "agent",
+        "allow_changes": bool(connector.allow_changes),
+        "last_seen_at": connector.last_seen_at.isoformat() if connector.last_seen_at else None,
+        "tables": (schema or {}).get("tables", []),
+    }
+
+
+def hello(db: Session, connector: Connector, info: dict) -> None:
+    connector.db_type = str(info.get("db_type", ""))[:20] or None
+    connector.db_name = str(info.get("db_name", ""))[:120] or None
+    connector.version = str(info.get("version", ""))[:20] or None
+    connector.host_label = str(info.get("host", ""))[:120] or None
+    connector.can_write = bool(info.get("can_write"))
+    connector.allow_changes = bool(info.get("allow_changes"))
+    connector.status = "online"
+    connector.last_seen_at = utcnow()
+    db.commit()
+
+
+# ---------------------------------------------------------------- jobs
+def normalize_sql(sql: str) -> str:
+    """For the activity log: the shape of the query without any values (WHERE email = ?)."""
+    sql = re.sub(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"", "?", sql or "")
+    sql = re.sub(r"\b\d+(\.\d+)?\b", "?", sql)
+    return re.sub(r"\s+", " ", sql).strip()[:200]
+
+
+def default_summary(kind: str, payload: dict) -> str:
+    return {"schema": "Read the table list", "health": "Health check", "live": "Live view"}.get(kind) or \
+        f"{ {'query': 'Query', 'export': 'Excel', 'explain': 'EXPLAIN'}.get(kind, kind) } · {normalize_sql(payload.get('sql', ''))}"
+
+
+def queue(db: Session, connector: Connector, kind: str, payload: dict | None = None, agent_id: int | None = None,
+          summary: str | None = None) -> ConnectorJob:
+    if connector.status == "disconnected":
+        raise DatabaseError("This connector is disconnected")
+    if kind not in JOB_KINDS:
+        raise DatabaseError("Unknown job")
+    if connector.kind == "direct":
+        from app import dbarea
+
+        if dbarea.enabled():
+            dbarea.check_queue(db, connector.visitor_id)       # jobs run on our server: per-account and total limits
+    payload = dict(payload or {})
+    if kind in ("query", "export", "explain"):
+        payload["sql"] = read_only_sql(payload.get("sql", ""))
+    if kind == "checks":
+        qs = payload.get("queries") or []
+        if not isinstance(qs, list) or not qs or len(qs) > 10:
+            raise DatabaseError("Between 1 and 10 checks")
+        payload["queries"] = [read_only_sql(q) for q in qs]
+    if kind == "optimize":
+        payload["sql"] = read_only_sql(payload.get("sql", ""))
+        payload["rewrites"] = [read_only_sql(q) for q in (payload.get("rewrites") or [])[:5]]
+    if kind in ("plan", "change", "undo") and not connector.allow_changes:
+        raise DatabaseError("Changes are switched off for this database")
+    if kind == "plan":
+        from app.agents.direct import gc
+
+        try:
+            ch = gc.parse_change(payload.get("sql", ""))
+        except ValueError as exc:
+            raise DatabaseError(str(exc)) from exc
+        payload["sql"] = ch["sql"]
+        summary = f"Preview change · {normalize_sql(ch['sql'])}"
+    payload["limit"] = min(int(payload.get("limit") or (PREVIEW_ROWS if kind == "query" else 100000)), 100000)
+    open_jobs = list(db.scalars(select(ConnectorJob).where(ConnectorJob.connector_id == connector.id,
+                                                           ConnectorJob.status.in_(("queued", "claimed")))))
+    if kind == "live":
+        same = next((j for j in open_jobs if j.kind == "live"), None)
+        if same is not None:
+            return same                    # one live view at a time, however often the screen asks
+    if len([j for j in open_jobs if j.created_at > utcnow() - JOB_TTL]) >= MAX_OPEN_JOBS and kind != "schema":
+        raise DatabaseError("A few jobs are still running on this database. Try again in a moment")
+    job = ConnectorJob(connector_id=connector.id, agent_id=agent_id, kind=kind, payload=dumps(payload), status="queued",
+                       summary=(summary or default_summary(kind, payload))[:300])
+    db.add(job)
+    db.commit()
+    if connector.kind == "direct":
+        from app.agents import direct
+
+        direct.start(job.id)
+        db.refresh(job)
+    return job
+
+
+def approve(db: Session, connector: Connector, plan_id: int) -> ConnectorJob:
+    """Apply = run exactly the previewed statement, once, within 10 minutes, expecting the previewed row count."""
+    plan = db.get(ConnectorJob, plan_id)
+    if plan is None or plan.connector_id != connector.id or plan.kind != "plan" or plan.status != "done":
+        raise DatabaseError("Preview the change first")
+    result = loads(plan.result, {}) or {}
+    if result.get("used"):
+        raise DatabaseError("This preview was already applied. Preview again for a new change")
+    if utcnow() - plan.finished_at > PLAN_TTL:
+        raise DatabaseError("The preview is more than 10 minutes old. Preview again")
+    if result.get("blocked"):
+        raise DatabaseError(result["blocked"])
+    sql = (loads(plan.payload, {}) or {}).get("sql", "")
+    result["used"] = True
+    plan.result = dumps(result)
+    db.commit()
+    from app.agents.direct import gc
+
+    ch = gc.parse_change(sql)
+    return queue(db, connector, "change", {"sql": sql, "expected": result.get("count"), "plan_id": plan.id},
+                 summary=normalize_sql(sql))
+
+
+def request_undo(db: Session, connector: Connector, change_id: int, force: bool = False) -> ConnectorJob:
+    change = db.get(ConnectorJob, change_id)
+    if change is None or change.connector_id != connector.id or change.kind != "change" or change.status != "done":
+        raise DatabaseError("Nothing to undo")
+    result = loads(change.result, {}) or {}
+    if result.get("undone"):
+        raise DatabaseError("Already undone")
+    if not (result.get("undo") or {}).get("available") or utcnow() - change.finished_at > UNDO_TTL:
+        raise DatabaseError("The saved copy for this change is gone (kept 7 days), so it can't be undone")
+    pending = db.scalar(select(ConnectorJob).where(ConnectorJob.connector_id == connector.id, ConnectorJob.kind == "undo",
+                                                   ConnectorJob.status.in_(("queued", "claimed"))))
+    if pending is not None:
+        raise DatabaseError("An undo is already running")
+    return queue(db, connector, "undo", {"change_job_id": change.id, "force": bool(force)},
+                 summary=f"Undo · {result.get('table', '')} · change #{change.id}" + (" (overwrite newer edits)" if force else ""))
+
+
+def save_upload_path(job: ConnectorJob) -> Path:
+    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
+    return EXPORT_DIR / f"job_{job.id}_{secrets.token_hex(6)}.csv.gz"
+
+
+def claim(db: Session, connector: Connector, limit: int = 3) -> list[ConnectorJob]:
+    now = utcnow()
+    connector.last_seen_at = now
+    if connector.status == "waiting":
+        connector.status = "online"
+    jobs = []
+    for job in db.scalars(select(ConnectorJob).where(ConnectorJob.connector_id == connector.id, ConnectorJob.status == "queued")
+                          .order_by(ConnectorJob.id).limit(limit)):
+        if now - job.created_at > JOB_TTL:
+            job.status, job.error, job.finished_at = "expired", "The connector didn't pick this up in time", now
+            continue
+        job.status, job.claimed_at = "claimed", now
+        jobs.append(job)
+    db.commit()
+    return jobs
+
+
+def complete(db: Session, connector: Connector, job_id: int, data: dict, file_path=None) -> ConnectorJob:
+    job = db.get(ConnectorJob, job_id)
+    if job is None or job.connector_id != connector.id or job.status not in ("claimed", "queued"):
+        raise DatabaseError("Unknown job")
+    now = utcnow()
+    connector.last_seen_at = now
+    job.finished_at = now
+    if not data.get("ok"):
+        job.status, job.error = "failed", str(data.get("error") or "failed")[:500]
+        db.commit()
+        return job
+    result = data.get("result") or {}
+    csv_text = data.get("csv")
+    if file_path:
+        job.file_path = str(file_path)
+    if job.kind == "export" and isinstance(csv_text, str):       # older connectors send the CSV inline
+        if len(csv_text.encode()) > MAX_RESULT_BYTES:
+            job.status, job.error = "failed", "The export is bigger than 25 MB. Add a WHERE condition or fewer columns"
+            db.commit()
+            return job
+        import gzip
+
+        path = save_upload_path(job)
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as fh:
+            fh.write(csv_text)
+        job.file_path = str(path)
+    if job.kind == "export" and not (job.file_path and os.path.exists(job.file_path)):
+        job.status, job.error = "failed", "The export file didn't arrive. Try again"
+        db.commit()
+        return job
+    if job.kind == "undo":
+        change = db.get(ConnectorJob, (loads(job.payload, {}) or {}).get("change_job_id") or 0)
+        if change is not None:
+            cr = loads(change.result, {}) or {}
+            cr["undone"], cr["undone_by"] = True, job.id
+            change.result, change.undo_blob = dumps(cr), None
+    raw = json.dumps(result, ensure_ascii=False, default=str)
+    job.result = raw if len(raw) < 2_000_000 else json.dumps({"truncated": True})
+    job.status = "done"
+    db.commit()
+    return job
+
+
+def activity(db: Session, connector: Connector, after: int = 0, limit: int = 40) -> list[dict]:
+    q = select(ConnectorJob).where(ConnectorJob.connector_id == connector.id, ConnectorJob.kind != "live", ConnectorJob.id > after)
+    out = []
+    for j in db.scalars(q.order_by(ConnectorJob.id.desc()).limit(limit)):
+        r = loads(j.result, {}) or {}
+        rows = r.get("row_count")
+        if rows is None and j.kind in ("change", "undo"):
+            rows = r.get("rows")
+        if rows is None and j.kind == "plan":
+            rows = r.get("count")
+        if rows is None and j.kind == "schema":
+            rows = len(r.get("tables", []))
+        ms = int((j.finished_at - (j.claimed_at or j.created_at)).total_seconds() * 1000) if j.finished_at else None
+        undo = None
+        if j.kind == "change" and j.status == "done":
+            fresh = j.finished_at and utcnow() - j.finished_at < UNDO_TTL
+            undo = {"available": bool((r.get("undo") or {}).get("available") and fresh and not r.get("undone")),
+                    "undone": bool(r.get("undone")), "where": (r.get("undo") or {}).get("where")}
+        out.append({"id": j.id, "kind": j.kind, "summary": j.summary or j.kind, "status": j.status, "error": j.error,
+                    "rows": rows, "ms": ms, "at": j.created_at.isoformat(), "undo": undo})
+    return out
+
+
+def job_dict(job: ConnectorJob) -> dict:
+    return {"id": job.id, "kind": job.kind, "status": job.status, "error": job.error,
+            "result": loads(job.result, None), "download": bool(job.file_path),
+            "created_at": job.created_at.isoformat(), "finished_at": job.finished_at.isoformat() if job.finished_at else None}
+
+
+def own_connector(db: Session, connector_id: int, visitor_id: str) -> Connector:
+    connector = db.get(Connector, connector_id)
+    if connector is None or connector.visitor_id != visitor_id:
+        raise DatabaseError("Connector not found")
+    return connector
+
+
+def visitor_connectors(db: Session, visitor_id: str) -> list[Connector]:
+    return list(db.scalars(select(Connector).where(Connector.visitor_id == visitor_id, Connector.status != "disconnected",
+                                                   Connector.token_hint != "console")      # the SQL console's own (app/console.py)
+                           .order_by(Connector.id.desc())))
+
+
+# ---------------------------------------------------------------- the database agent (one per goal)
+DB_WORDS = packs.words("database", "about")            # the field's words come from its knowledge pack
+SQL_TEXT = re.compile(r"\bselect\b[\s\S]+?\bfrom\b", re.I)
+QUERY_TALK = re.compile(r"\b(quer(y|ies)|joins?|sql|select|subquer(y|ies)|group by|where clause)\b", re.I)
+
+
+def wants_database(goal: Goal | None, text: str) -> bool:
+    """A database job the connector can do (not a pasted query to review, that's the SQL checker)."""
+    if goal is None:
+        return False
+    from app.dbknow import reasoning
+
+    if reasoning.evidence(text):
+        return True                       # a pasted database error (even with the query in it): the reasoning explains it
+    from app.agents import sqlexplain, sqllock
+
+    if sqllock.read_deadlock(text):
+        return True                       # a pasted deadlock report (SHOW ENGINE INNODB STATUS / PostgreSQL's DETAIL)
+
+    if sqlexplain.looks_like_plan(text) and sqlexplain.read(text):
+        return True                       # a pasted EXPLAIN plan: read step by step
+    if SQL_TEXT.search(text or ""):
+        return False
+    from app.dbknow import brain
+
+    rec = brain.recognize(text)
+    if rec["kind"] == "error" or (rec["kind"] == "issue" and rec["confidence"] >= 0.55 and
+                                  (reasoning.complaints(text) or not QUERY_TALK.search(text or ""))):
+        return True                       # (a query with nothing said to be wrong is a query to check, not a problem)                       # "too many connections", "Hindi text ???? ban jata hai", a pasted DB error
+    if goal.intent == "slow_db_query":   # a slow query: the SQL checker, unless they ask about the whole database
+        sure = (loads(goal.slots, {}) or {}).get("_conf", goal.confidence or 0)
+        if (sure or 0) < 0.5 and not reasoning.complaints(text) and DB_WORDS.search(text or "") and not QUERY_TALK.search(text or ""):
+            # the reader wasn't sure it's about a slow query ('how can I connect my database' scores a coin flip),
+            # nothing slow or failing was said, and it's about the database itself, not a query: the database agent
+            return True
+        return bool(re.search(r"\b(health|size|tables|connections|kitna bada|poora database)\b", text or "", re.I)) and \
+            not QUERY_TALK.search(text or "")
+    return goal.intent == "db_automation" or bool(DB_WORDS.search(text or ""))
+
+
+def account_for(db: Session, visitor_id: str):
+    from app.models import User
+
+    return db.scalar(select(User).where(User.visitor_id == visitor_id)) if visitor_id else None
+
+
+def live_checks(db: Session, user, agent: Agent | None, visitor_id: str, result: dict) -> dict | None:
+    """Read-only checks on the account's connected database (typed details), only while its database area is open."""
+    from datetime import timedelta
+
+    from app import dbarea
+    from app.agents import direct
+    from app.dbknow import reasoning
+    from app.models import UserSession
+
+    if not user.email_verified or not dbarea.connect_open(user):
+        return None
+    if dbarea.enabled() and not db.scalar(select(UserSession.id).where(
+            UserSession.user_id == user.id, UserSession.stepup_at.is_not(None),
+            UserSession.db_seen_at > utcnow() - dbarea.IDLE_LOCK).limit(1)):
+        return None
+    inputs = (loads(agent.inputs, {}) or {}) if agent else {}
+    connector = db.get(Connector, inputs["connector_id"]) if inputs.get("connector_id") else None
+    if connector is None or connector.visitor_id != visitor_id or connector.kind != "direct" or not connector.secret:
+        connector = db.scalar(select(Connector).where(Connector.visitor_id == visitor_id, Connector.kind == "direct",
+                                                      Connector.secret.is_not(None), Connector.status != "disconnected")
+                              .order_by(Connector.last_seen_at.desc()).limit(1))
+    if connector is None:
+        return None
+    plan = reasoning.live_plan(result)
+    if not plan:
+        return None
+    try:
+        conn = direct._open(direct.decrypt(connector.secret))
+    except Exception as exc:  # noqa: BLE001 - can't reach it now: the answer stays "based on what you pasted"
+        log.info("live checks: couldn't open connector %s: %s", connector.id, str(exc)[:200])
+        return None
+    try:
+        if (connector.db_type or "mysql") == "mysql":
+            for limit in ("SET SESSION max_execution_time = 10000", "SET SESSION max_statement_time = 10"):   # MySQL / MariaDB
+                try:
+                    conn.conn.cursor().execute(limit)
+                except Exception:  # noqa: BLE001
+                    pass
+        live = reasoning.run_live(plan, lambda sql, params: conn.rows(sql, params, limit=50)[1])
+        connector.last_seen_at = utcnow()
+        db.commit()
+        return {k: v for k, v in live.items() if v is not None} or None
+    finally:
+        direct._close(conn)
+
+
+def goal_agent(db: Session, goal: Goal) -> Agent | None:
+    return db.scalar(select(Agent).where(Agent.goal_id == goal.id, Agent.recipe == "database").order_by(Agent.id.desc()))
+
+
+def later_parts(text: str) -> list[str]:
+    """Things asked for that belong to the next safety levels."""
+    t = (text or "").lower()
+    out = []
+    if re.search(r"\b(backup|restore)\b", t):
+        out.append("backup")
+    if re.search(r"\b(insert|update|delete|import|badal|hata|migration|migrate|create index)\b", t):
+        out.append("write")
+    return out
+
+
+def detect_mode(text: str) -> str:
+    t = (text or "").lower()
+    if re.search(r"\b(report)\b", t) and re.search(r"\b(roz|daily|har din|weekly|har hafte|monthly|every|subah|schedule|email)\b", t):
+        return "report"
+    if re.search(r"\b(excel|csv|export|download|sheet|nikaal|nikal)\b", t):
+        return "export"
+    if re.search(r"\b(slow|health|size|speed|heavy|load|performance|index)\b", t):
+        return "health"
+    later = later_parts(t)
+    return later[0] if later else "explore"
+
+
+def create_agent(db: Session, goal: Goal, mode: str) -> Agent:
+    agent = Agent(visitor_id=goal.visitor_id, goal_id=goal.id, recipe="database", status="proposed",
+                  inputs=dumps({"mode": mode, "connector_id": None}))
+    db.add(agent)
+    db.flush()
+    return agent
+
+
+MODE_TEXT = {
+    "explore": ("Apne database ki tables aur data dekho", "See your database's tables and data"),
+    "export": ("Database se data Excel/CSV mein nikaalo", "Get data from your database into Excel/CSV"),
+    "report": ("Database ki report schedule pe email karo", "Email a database report on a schedule"),
+    "health": ("Database ki health aur slow queries check karo", "Check database health and slow queries"),
+    "backup": ("Database backup (agla level, jald aa raha)", "Database backups (next level, coming soon)"),
+    "write": ("Data badalna (agla level, har badlaav approval ke saath)", "Changing data (next level, every change approved)"),
+}
+
+
+def blocks(mode: str, hi: bool) -> list[dict]:
+    steps = [{"kind": "connect", "text": "Aapke database se sirf padhne ke liye judunga (read-only), kuch badlunga nahi" if hi
+              else "Connect to your database read-only; nothing gets changed"}]
+    if mode == "export":
+        steps += [{"kind": "think", "text": "Table ya query chuno, pehle 50 rows ka preview" if hi else "Pick a table or write a query; preview 50 rows first"},
+                  {"kind": "do", "text": "Poora data Excel mein dunga: Data sheet, live formulas (COUNTIFS / SUMIFS) wali Pivot sheet aur chart; CSV bhi"
+                   if hi else "Give you the full data in Excel: a Data sheet, a Pivot sheet with live formulas (COUNTIFS / SUMIFS) and a chart; CSV too"}]
+    elif mode == "report":
+        steps += [{"kind": "think", "text": "Report ki query chuno aur preview dekho" if hi else "Choose the report query and preview it"},
+                  {"kind": "when", "text": "Aapke chune samay pe chalega" if hi else "Runs on the schedule you choose"},
+                  {"kind": "do", "text": "CSV report aapko email karunga" if hi else "Email you the CSV report"}]
+    elif mode == "health":
+        steps += [{"kind": "check", "text": "Sabse badi tables, slow queries, connections aur indexes check karunga" if hi
+                   else "Check the biggest tables, slow queries, connections and indexes"},
+                  {"kind": "do", "text": "Kya theek karna hai, saaf shabdon mein bataunga" if hi else "Tell you what to fix, in plain words"}]
+    elif mode in ("backup", "write"):
+        steps += [{"kind": "check", "text": MODE_TEXT[mode][0 if hi else 1]}]
+    else:
+        steps += [{"kind": "think", "text": "Saari tables, rows aur size dikhaunga" if hi else "Show every table with rows and size"},
+                  {"kind": "do", "text": "Kisi bhi table ka data dekh ya download kar sakte ho" if hi else "View or download any table's data"}]
+    return steps
+
+
+def _blocks_for(mode: str, hi: bool, connector) -> list[dict]:
+    steps = blocks(mode, hi)
+    if connector is not None and connector.allow_changes:
+        steps[0] = {"kind": "connect", "text": "Database padhunga; badlaav sirf aapke preview aur Apply ke baad, hamesha Undo ke saath" if hi
+                    else "Read your database; change data only after your preview and Apply, always with Undo"}
+    return steps
+
+
+def database_dict(db: Session, agent: Agent, hi: bool) -> dict:
+    inputs = loads(agent.inputs, {}) or {}
+    mode = inputs.get("mode", "explore")
+    connector = db.get(Connector, inputs["connector_id"]) if inputs.get("connector_id") else None
+    if connector is not None and connector.status == "disconnected":
+        connector = None
+    others = [connector_dict(c, db) for c in visitor_connectors(db, agent.visitor_id)]
+    return {
+        "id": agent.id, "lang": "hi" if hi else "en", "recipe": "database", "database": True, "mode": mode,
+        "name": MODE_TEXT[mode][0 if hi else 1].split(" (")[0], "status": agent.status, "access": "connector",
+        "available": mode not in ("backup", "write"), "blocks": _blocks_for(mode, hi, connector),
+        "connector": connector_dict(connector, db) if connector else None, "connectors": others,
+        "runs": [], "owner": _owner(db, agent.visitor_id), "needs_owner": mode == "report", "brain": _brain_view(inputs.get("brain"), hi),
+        "excel_words": inputs.get("excel_words", ""),
+    }
+
+
+def _brain_view(rec, hi: bool):
+    if not rec or not rec.get("kind"):
+        return None
+    from app.dbknow import brain
+
+    return {**rec, "text": brain.describe(rec, hi)}
+
+
+def _owner(db: Session, visitor_id: str) -> dict:
+    from app.agents.automation import owner_of
+
+    owner = owner_of(db, visitor_id)
+    return {"email": owner.email if owner else "", "verified": bool(owner and owner.verified_at),
+            "business": owner.business_name if owner else ""}
+
+
+def plan_reply(mode: str, hi: bool, has_connector: bool, later: list[str] | None = None, can_connect: bool = True) -> str:
+    title = MODE_TEXT[mode][0 if hi else 1]
+    if not can_connect:          # launch switch: never promise a connection that isn't open yet
+        return ("Database jodna kuch dinon mein shuru hoga. Tab tak apna error message paste karo: main wajah, saboot aur fix "
+                "turant bataunga." if hi else
+                "Connecting your database opens in a few days. Until then, paste the error message you see and I'll give "
+                "you the cause, the proof and the fix right away.")
+    if mode not in ("backup", "write") and later:
+        names = ", ".join(("backup" if p == "backup" else ("data badalna" if hi else "changing data")) for p in later)
+        note = (f" {names.capitalize()} agle level mein aayega." if hi else f" {names.capitalize()} comes in the next level.")
+        return plan_reply(mode, hi, has_connector, can_connect=can_connect) + note
+    if mode in ("backup", "write"):
+        return (f"Main ye karunga: {title}. Pehle read-only connector lagaate hain; badlaav wala level uske baad aayega."
+                if hi else f"Here's what I'll do: {title}. First we connect read-only; the changes level comes after that.")
+    if has_connector:
+        return (f"Main ye karunga: {title}. Aapka database juda hua hai, table chuno." if hi
+                else f"Here's what I'll do: {title}. Your database is connected; pick a table.")
+    return (f"Main ye karunga: {title}. Bas batao aapka database kahan hai, 1-2 step mein jud jayega."
+            if hi else f"Here's what I'll do: {title}. Just tell me where your database is; it connects in a step or two.")
+
+
+def clean_exports(max_age_hours: int = 24) -> None:
+    """Exported files (the CSV and any workbook made from it) are kept for a day, then deleted."""
+    import time
+
+    if not EXPORT_DIR.exists():
+        return
+    cutoff = time.time() - max_age_hours * 3600
+    for f in EXPORT_DIR.glob("job_*"):            # job_N_x.csv.gz, job_N_x.csv.gz.<pick>.xlsx (a bare *.csv missed them)
+        try:
+            if f.stat().st_mtime < cutoff:
+                f.unlink()
+        except OSError:
+            pass
+
+
+
+def mind_state(db: Session, agent: Agent) -> dict:
+    """What the shared mind may build next steps on."""
+    from app.agents.core import goal_agents
+    from app.models import AgentRun
+
+    checked = any(r.status == "done" for a in goal_agents(db, agent.goal_id) if a.recipe == "sql_review"
+                  for r in db.scalars(select(AgentRun).where(AgentRun.agent_id == a.id).limit(1)))
+    return {"connected": bool(visitor_connectors(db, agent.visitor_id)), "query_checked": checked}
+
+
+# ------------------------------------------------------------------ hooks the brain calls (named in the database pack)
+ANOTHER_RE = re.compile(r"\b(check|test|review|fix|see)\s+(an)?other\s+(sql\s+)?query\b|\b(an)?other\s+(sql\s+)?query\b|\bnew\s+query\b|"
+                        r"\bek\s+aur\s+query\b|\b(dusri|doosri|agli)\s+query\b|\bnext\s+query\b", re.I)
+
+
+def concept_question(text: str):
+    """A basic/concept question ('what is a JOIN', 'group by kya hota hai', 'DELETE vs TRUNCATE', 'how to find duplicate
+    emails'): answered from the concepts pack, before the query checker, the error diagnoser or the connect step."""
+    from app.dbknow import concepts
+
+    try:
+        return concepts.match(text)
+    except Exception:  # noqa: BLE001 - a broken pack must never break the chat
+        log.exception("concepts")
+        return None
+
+
+def _write_turn(db: Session, goal: Goal, text: str, hi: bool):
+    """A query written from the person's words, for their database (rule A: named, remembered, or the common form that runs
+    on MySQL, MariaDB, PostgreSQL and SQLite alike, said so)."""
+    from app.agents import sqlwrite
+    from app.dbknow import engines as E
+
+    named = E.named(text)
+    if named:
+        E.remember(goal, named, "named")
+    rec = E.remembered(goal)
+    eng = named or (rec["id"] if rec and rec.get("id") != E.NOT_SURE else None)
+    reply, res = sqlwrite.reply(text, eng, hi or E.lang_of(text) != "en")
+    if res.get("ok") and res.get("parts"):          # the query beside the chat, the explanation in it (like a concept's example)
+        head = res["parts"]["head"]
+        title = _card_title(goal, head)
+        reply = title + reply[len(head):]
+        _keep_card(goal, sqlwrite.card(title, res))
+    goal.title = ("SQL: write a query" if res.get("ok") else "SQL: query to write")[:200]
+    goal.intent = goal.intent or "db_write"
+    goal.missing_info, goal.pending = "[]", None
+    if not res.get("ok"):
+        try:
+            from app.agents import learn as learning
+
+            learning.ask_to_learn(db, "database", text, guess="write")
+        except Exception:  # noqa: BLE001 - learning is an extra
+            db.rollback()
+    db.commit()
+    return reply, [], "concept"
+
+
+def _card_title(goal: Goal, head: str) -> str:
+    """The first line of an answer that has a card: each answer keeps its own card, so a repeated head gets a number."""
+    taken = {c.get("title") for c in (loads(goal.slots, {}) or {}).get("_cards") or []}
+    if head not in taken:
+        return head
+    n = 2
+    while f"{head.rstrip(':')} ({n}):" in taken:
+        n += 1
+    return f"{head.rstrip(':')} ({n}):"
+
+
+def _keep_card(goal: Goal, card: dict):
+    slots = loads(goal.slots, {}) or {}
+    slots["_card"] = card
+    keep = [x for x in slots.get("_cards") or [] if x.get("title") != card["title"]]
+    slots["_cards"] = (keep + [card])[-12:]
+    goal.slots = dumps(slots)
+
+
+def _concept_turn(db: Session, goal: Goal, text: str, hi: bool, m: dict):
+    from app.dbknow import concepts
+    from app.dbknow import engines as E
+
+    if E.named(text):                     # 'how to delete duplicate rows in mysql': remembered for the conversation (rule A)
+        E.remember(goal, E.named(text), "named")
+        m = {**m, "engine": E.named(text)}
+    elif not m.get("engine"):
+        rec = E.remembered(goal)
+        if rec and rec.get("id") != E.NOT_SURE:
+            m = {**m, "engine": rec["id"]}
+    reply, taps = concepts.answer(m, text)
+    c = m["concept"]
+    slots = loads(goal.slots, {}) or {}
+    slots["_card"] = concepts.card(m, text)           # the worked examples, for the side panel of the page
+    if slots["_card"]:                                 # ... and the earlier answers' examples, so each answer keeps its own
+        keep = [x for x in slots.get("_cards") or [] if x.get("title") != slots["_card"]["title"]]
+        slots["_cards"] = (keep + [slots["_card"]])[-12:]
+    goal.slots = dumps(slots)
+    if c is None:                         # a database concept we don't know yet: said honestly, and kept to learn
+        try:
+            from app.agents import learn as learning
+
+            learning.ask_to_learn(db, "database", text, guess="concept")
+        except Exception:  # noqa: BLE001 - learning is an extra
+            db.rollback()
+    title = (c["title"]["en"] if c else "SQL question")
+    goal.title = (("SQL: " + title) if not title.upper().startswith("SQL") else title)[:200]
+    goal.missing_info, goal.pending = "[]", None
+    db.commit()
+    return reply, taps, "concept"
+
+
+def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) -> bool:
+    from app.agents.core import query_in
+
+    from app.agents import sqlwrite
+
+    from app.agents import sqlpuzzle
+
+    if relation != "safety" and (sqlpuzzle.is_puzzle(text) or sqlwrite.is_request(text)):
+        return True                       # 'write a query to list ...': written from the words (night S1)
+    if relation != "safety" and concept_question(text) is not None:
+        return True                       # 'what is a JOIN': the concepts pack, whatever the reader guessed
+    from app.agents import sqlport
+
+    if relation != "safety" and sqlport.is_request(text):
+        return True                       # 'convert this query to PostgreSQL': written in that database's words
+
+    from app.agents import sqlscan
+
+    if relation != "safety" and sqlscan.code_paste(text) is not None:
+        return True                       # code with its queries in it: each query by its line (night 10A)
+
+    if ANOTHER_RE.search(text or "") and not query_in(text):
+        return True                       # the 'Check another query' tap: ask for it, don't repeat the last answer
+
+    if relation in ("howto", "chit_chat") and query_in(text):
+        return True                       # a pasted query read as a how-to ("this one is slow: SELECT ..."): check the query
+    return relation not in ("howto", "safety", "chit_chat") and wants_database(goal, text)
+
+
+def _check_pasted_query(db: Session, goal: Goal, text: str, hi: bool):
+    """Run the SQL checker on the query in this message, in this goal."""
+    from app.agents.core import RECIPES, AgentError, goal_agents, inputs_from_text, run_agent
+    from app.agents.replies import _after_run
+
+    recipe = RECIPES["sql_review"]
+    found = inputs_from_text(recipe, text, {})
+    agent = next((a for a in goal_agents(db, goal.id) if a.recipe == "sql_review"), None)
+    if agent is None:
+        agent = Agent(visitor_id=goal.visitor_id, goal_id=goal.id, recipe="sql_review", inputs=dumps(found), status="proposed")
+        db.add(agent)
+    else:
+        agent.inputs = dumps({**(loads(agent.inputs, {}) or {}), **found})
+    goal.intent = "slow_db_query"
+    db.flush()
+    try:
+        run = run_agent(db, agent, hi)
+        reply, options = _after_run(agent, run, hi)
+    except AgentError as exc:             # 'which database is this for?' (rule A) comes with its taps
+        return str(exc), list(getattr(exc, "options", [])), "agent_plan"
+    return reply, [t for t in options if t in _engine_taps(run)], "agent_run"
+
+
+def _eng(inputs: dict) -> str | None:
+    return (inputs.get("engine_rule") or {}).get("id") or None
+
+
+def _engine_taps(run) -> list[str]:
+    r = loads(run.result, {}) if isinstance(run.result, str) else (run.result or {})
+    return (r or {}).get("taps") or []
+
+
+def _goal_lang(goal: Goal | None, hi: bool) -> str:
+    lang = (goal.detected_language if goal is not None else "") or ""
+    return "hindi" if lang == "Hindi" else "hinglish" if hi or lang == "Hinglish" else "en"
+
+
+def engine_gate(db: Session, agent: Agent, inputs: dict, hi: bool) -> dict:
+    """Standing rule A, before a query is checked: the database named in the message (or earlier in the conversation, or
+    chosen from the taps) decides the answer; else the one the query's syntax shows (said, with a tap to correct it); else
+    ask first. Returns the inputs with 'engine_rule' set, or raises AgentAsks with the question and its taps."""
+    from app.agents.core import AgentAsks
+    from app.dbknow import engines as E
+
+    goal = db.get(Goal, agent.goal_id)
+    text = inputs.get("query", "")
+    said = inputs.get("said") or ""
+    lang = E.lang_of(said) if len(re.findall(r"\w+", said)) >= 2 else "en"
+    if lang == "en":
+        lang = _goal_lang(goal, hi)
+    rec = E.resolve(goal, (inputs.get("said") or "") + "\n" + E._strip_strings(text))
+    if rec is None and (inputs.get("engine_rule") or {}).get("id"):
+        rec = inputs["engine_rule"]
+    if rec is None:
+        if goal is not None:
+            goal.pending = E.PENDING
+        inputs["await_engine"] = True
+        agent.inputs = dumps(inputs)
+        agent.status = "proposed"
+        db.commit()
+        question, taps = E.ask(lang)
+        raise AgentAsks(question, taps)
+    inputs.pop("await_engine", None)
+    inputs["engine_rule"] = {"id": rec["id"], "how": rec.get("how", ""), "why": rec.get("why", ""), "lang": lang}
+    agent.inputs = dumps(inputs)
+    if goal is not None and goal.pending == E.PENDING:
+        goal.pending = None
+    return inputs
+
+
+def _engine_reply(db, goal, agent, eid: str, how: str, hi: bool, again: bool):
+    """The person chose (or corrected) the database: remember it and answer what was waiting, for that database only."""
+    from app.agents.core import AgentError, run_agent
+    from app.dbknow import engines as E
+    from app.agents.replies import _after_run
+
+    E.remember(goal, eid, how)
+    goal.pending = None
+    data = loads(goal.slots, {}) or {}
+    waiting = data.pop("_db_wait", None)
+    goal.slots = dumps(data)
+    lang = _goal_lang(goal, hi)
+    from app.agents import sqlscan
+
+    if waiting and sqlscan.code_paste(waiting) is not None:   # pasted code was waiting for its database
+        db.commit()
+        reply, taps, _r = _code_turn(db, goal, waiting, hi)
+        return reply, taps, hi
+    if waiting:                            # an error message was waiting for its database
+        db.commit()
+        reply, _o, _r = _error_turn(db, goal, waiting, hi, goal.visitor_id)
+        return reply, [], hi
+    inputs = loads(agent.inputs, {}) or {}
+    inputs.pop("engine_rule", None)
+    agent.inputs = dumps(inputs)
+    db.commit()
+    try:
+        run = run_agent(db, agent, hi)
+        reply, options = _after_run(agent, run, hi)
+    except AgentError as exc:
+        return str(exc), list(getattr(exc, "options", [])), hi
+    if again:
+        name = E.label(eid)
+        reply = ((f"Theek hai, {name}. Query dobara {name} ke liye check ki:" if lang != "en" else
+                  f"Got it, {name}. I checked the query again for {name}:") + "\n\n" + reply)
+    return reply, options, hi
+
+
+def _sure(rec: dict) -> bool:
+    """Sure of the problem: very likely, or a clear winner over the next guess (more problems known = lower top scores)."""
+    nxt = (rec.get("alternatives") or [{}])[0].get("confidence", 0)
+    return rec["confidence"] >= 0.6 or (rec["confidence"] >= 0.35 and rec["confidence"] >= 4 * nxt)
+
+
+def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
+    """Database work: the agent works through a connector on the user's own server."""
+    from app.agents.core import query_in
+
+    from app.agents import sqlwrite
+
+    from app.agents import sqlpuzzle
+
+    if sqlpuzzle.is_puzzle(text):         # 'a column holds (1, NULL, 3): what does AVG give?': worked out by running it
+        out = sqlpuzzle.reply(text, turn.hi)
+        res = sqlpuzzle.solve(text) if out else None
+        if out and res:                   # the query it ran and its results beside the chat, the reasons in it
+            head = out.split("\n", 1)[0]
+            title = _card_title(goal, head)
+            out = title + out[len(head):]
+            _keep_card(goal, sqlpuzzle.card(title, res, turn.hi))
+        if out:
+            goal.title = "SQL: what a query returns"
+            goal.intent = goal.intent or "db_concept"
+            goal.missing_info, goal.pending = "[]", None
+            db.commit()
+            return out, [], "concept"
+    if sqlwrite.is_request(text):         # 'write a query to ...': the query, built from the words (night S1)
+        return _write_turn(db, goal, text, turn.hi)
+    m = concept_question(text)
+    if m is not None:                     # a basic question gets its answer, never 'paste a query' / 'connect your database'
+        return _concept_turn(db, goal, text, turn.hi, m)
+    from app.dbknow import brain as dbbrain
+    from app.dbknow import reasoning
+
+    from app.agents.core import query_in as _query_in
+
+    if ANOTHER_RE.search(text or "") and not _query_in(text):
+        goal.intent = "slow_db_query"
+        goal.missing_info, goal.pending = "[]", None
+        db.commit()
+        return (("Agli SQL query paste karo, main use check karunga: pehle sahi hai ya nahi, phir speed." if turn.hi else
+                 "Paste the next SQL query and I'll check it: first whether it's right, then its speed."), [], "agent_plan")
+    from app.agents import sqlexplain
+
+    if sqlexplain.looks_like_plan(text):
+        plan = sqlexplain.read(text)
+        if plan:                          # a pasted EXPLAIN (with or without its query): read step by step, in its engine's words
+            return _plan_turn(db, goal, text, turn.hi, plan)
+    described = bool(reasoning.complaints(text)) and not _query_in(text)   # 'cannot connect', 'connect nahi ho raha'
+    if described and not reasoning.evidence(text) and not reasoning.report(reasoning.diagnose(text), turn.hi):
+        described = False                 # the core has no likely causes for it: the usual reply below
+    from app.agents import sqllock
+
+    if reasoning.evidence(text) or described or sqllock.read_deadlock(text):   # an error / EXPLAIN / lock report, or a problem in words
+        return _error_turn(db, goal, text, turn.hi, visitor_id)
+    from app.agents import sqlport
+
+    if sqlport.is_request(text):          # 'convert this query to PostgreSQL': the query in that database's own words
+        return _translate_turn(db, goal, text, turn.hi)
+    from app.agents import sqlscan
+
+    if sqlscan.code_paste(text) is not None:   # code with several queries / a placeholder mistake: each query by its line
+        return _code_turn(db, goal, text, turn.hi)
+    if query_in(text):                    # a pasted query is for the SQL checker, whatever else the message says
+        return _check_pasted_query(db, goal, text, turn.hi)
+
+    mode = detect_mode(text)
+    rec = dbbrain.recognize(text)
+    agent = goal_agent(db, goal)
+    if agent is None:
+        agent = create_agent(db, goal, mode)
+    inputs = loads(agent.inputs, {}) or {}
+    if mode != "explore":
+        inputs["mode"] = mode
+    if mode == "export":                  # 'status wise, with total amount': the workbook's pivot follows these words (S3)
+        inputs["excel_words"] = (text or "")[:400]
+    from app.dbknow import reasoning as _r
+
+    if rec["kind"] in ("sql", "error") or (rec["kind"] == "do" and rec["confidence"] >= 0.35) or (
+            rec["kind"] == "issue" and _sure(rec) and (_r.complaints(text) or _r.evidence(text))):
+        # name a specific problem only when sure, and only when a problem was actually said ('connect db' is a request)
+        inputs["brain"] = {**rec, "sql": text if rec["kind"] == "sql" else ""}
+    agent.inputs = dumps(inputs)
+    goal.title = MODE_TEXT[inputs.get("mode", "explore")][0 if turn.hi else 1].split(" (")[0]
+    goal.missing_info = "[]"
+    goal.pending = None
+    goal.next_action_type = "execute"
+    goal.next_action = "Connect the database, then pick a table"
+    db.commit()
+    has = bool(visitor_connectors(db, visitor_id))
+    from app import dbarea
+
+    reply = plan_reply(mode, turn.hi, has, later_parts(text), can_connect=dbarea.connect_open(account_for(db, visitor_id)))
+    b = inputs.get("brain") or {}
+    seen = dbbrain.describe(b, turn.hi) if (b.get("kind") in ("issue", "error", "sql") or b.get("id") == "slow_query") else ""
+    if seen:
+        reply = (f"Samjha: {seen}. " if turn.hi else f"Understood: {seen}. ") + (
+            ("Database juda hua hai, card mein check shuru karo." if has else "Bas batao database kahan hai; judte hi main khud check karke wajah aur fix dhoondhunga.") if turn.hi
+            else ("Your database is connected; start the check on the card." if has else "Just tell me where your database is; once it's connected I'll check it myself and find the cause and the fix."))
+    return reply, [], "agent_plan"
+
+
+def _code_turn(db: Session, goal: Goal, text: str, hi: bool):
+    """Code pasted in the chat (night 10A): every query in it, by its line, checked for the person's database (rule A: named,
+    remembered or chosen; else the driver the code uses, said as detected; else ask first). Read only."""
+    from app.agents import sqlscan
+    from app.dbknow import engines as E
+
+    words = "\n".join(ln for ln in text.splitlines() if ln.strip() and not sqlscan.code_lang(ln) and not re.search(r"[;{}()=]", ln))
+    lang = E.lang_of(words) if words and len(re.findall(r"\w+", words)) >= 2 else ("hinglish" if hi else "en")
+    if lang == "en" and hi:
+        lang = "hinglish"
+    eid, detected = None, None
+    named = E.named(words or "")
+    if named:                              # named in the message: only that database, remembered (rule A)
+        eid = E.remember(goal, named, "named")["id"]
+    else:
+        rec = E.remembered(goal)
+        if rec and rec.get("how") in ("named", "chosen"):
+            eid = rec["id"]
+    if eid is None:                        # the driver the code imports shows it (a backtick here is a JS string, not MySQL)
+        guess = sqlscan.code_paste(text)
+        eid = guess and guess.get("engine")
+        if eid:
+            detected = E.remember(goal, eid, "detected", "the database driver the code uses" if lang == "en" else "code ka driver")
+    if eid is None:
+        agent = goal_agent(db, goal) or create_agent(db, goal, detect_mode(text))
+        data = loads(goal.slots, {}) or {}
+        data["_db_wait"] = text[:8000]
+        goal.slots = dumps(data)
+        goal.pending = E.PENDING
+        goal.intent = "slow_db_query"
+        db.commit()
+        question, taps = E.ask(lang)
+        return question, taps, "agent_plan"
+    rep = sqlscan.code_paste(text, eid if eid in ("mysql", "mariadb", "postgresql") else None) or sqlscan.code_paste(text)
+    reply = sqlscan.paste_text(rep, lang)
+    reply += "\n\n" + (f"{E.label(eid)} ke liye check kiya." if lang != "en" else f"Checked for {E.label(eid)}.")
+    taps = []
+    if detected:
+        line, taps = E.detected_line(detected, lang)
+        reply += " " + line
+    goal.title = ("SQL in code: queries checked" if lang == "en" else "Code ki SQL queries check ki")[:200]
+    goal.intent = "slow_db_query"
+    goal.missing_info, goal.pending = "[]", None
+    db.commit()
+    return reply, taps, "agent_run"
+
+
+def _translate_turn(db: Session, goal: Goal, text: str, hi: bool, query: str | None = None):
+    """A query to be written in another database's words (night 10): the target named after to / into / mein is remembered
+    for the conversation (rule A); each construct is rewritten in its words (lab-proven on MariaDB and PostgreSQL), the
+    differences in meaning are named, and what couldn't be translated is said. SQL Server / Oracle: notes only (SQLite is lab-tested from E1)."""
+    from app.agents import sqlport
+    from app.dbknow import engines as E
+
+    if query is None:
+        query, words = sqlport.split_request(text)
+    else:                                  # a follow-up ('now convert it to PostgreSQL'): the checked query, these words
+        words = text
+    target, source = sqlport.target_of(words)
+    E.remember(goal, target, "named")
+    lang = E.lang_of(words) if len(re.findall(r"\w+", words)) >= 2 else _goal_lang(goal, hi)
+    if lang == "en" and (hi or re.search(r"\b(mein|me|badlo|badal\w*|likho|kar\s*do|karo|ye|yeh|isko|ise)\b|[ऀ-ॿ]", words, re.I)):
+        lang = "hinglish"
+    t = sqlport.translate(query, target, source)
+    reply = sqlport.translation_text(query, t, "hindi" if re.search(r"[ऀ-ॿ]", words) else "en" if lang == "en" else "hinglish")
+    goal.title = f"SQL: query for {E.label(target)}"[:200]
+    goal.intent = "slow_db_query"
+    goal.missing_info, goal.pending = "[]", None
+    db.commit()
+    return reply, [], "translate"
+
+
+PLAN_QUERY = re.compile(r"^\s*(?:explain\s+(?:analyze\s+|\(\s*[\w\s,]+\)\s+|format\s*=\s*\w+\s+|extended\s+)?)?((?:select|with)\b[\s\S]*?)"
+                        r"(?:;|\n\s*\n|\n(?=\s*[+|]|\s*QUERY PLAN|\s*\*{5}|\s*id\s|\s*->|\s*[A-Z][a-z]+ (?:Scan|Join|Loop)))", re.I)
+
+
+def _plan_turn(db: Session, goal: Goal, text: str, hi: bool, plan: dict):
+    """A pasted EXPLAIN / EXPLAIN ANALYZE plan. With its query in the message: the query is checked with the plan beside it
+    (the card shows both); without: the plan read step by step, and what to change, for the engine its format shows."""
+    from app.agents import sqlexplain
+
+    from app.dbknow import engines as E
+
+    if not E.named(text) and not E.remembered(goal):     # rule A: the plan's own format shows the database
+        eid = plan["engine"] if plan["engine"] in ("postgresql", "sqlite") else (
+            "mariadb" if re.search(r"\bBNL join\b|\br_rows\b|\br_filtered\b|MariaDB", text) else "mysql")
+        E.remember(goal, eid, "detected", "the EXPLAIN plan's format")
+    lines = (text or "").strip()
+    m = PLAN_QUERY.search(lines[:4000])
+    if m and len(m.group(1)) > 15 and re.search(r"\bfrom\b", m.group(1), re.I):
+        query = m.group(1).strip()
+        rest = text.replace(m.group(0), " ", 1)
+        msg = f"{query};\n"
+        from app.agents.core import RECIPES, inputs_from_text
+
+        found = inputs_from_text(RECIPES["sql_review"], msg, {})
+        found["explain"] = rest.strip()[:20000]
+        agent = next((a for a in _sql_agents(db, goal)), None)
+        if agent is None:
+            agent = Agent(visitor_id=goal.visitor_id, goal_id=goal.id, recipe="sql_review", inputs=dumps(found), status="proposed")
+            db.add(agent)
+        else:
+            agent.inputs = dumps({**(loads(agent.inputs, {}) or {}), **found})
+        goal.intent = "slow_db_query"
+        db.flush()
+        from app.agents.core import AgentError, run_agent
+        from app.agents.replies import _after_run
+
+        try:
+            run = run_agent(db, agent, hi)
+            reply, options = _after_run(agent, run, hi)
+        except AgentError as exc:
+            return str(exc), list(getattr(exc, "options", [])), "agent_plan"
+        return reply, [o for o in options if o in _engine_taps(run)], "agent_run"
+    goal.title = ("EXPLAIN plan ki padhai" if hi else "Reading an EXPLAIN plan")[:200]
+    goal.intent = goal.intent or "slow_db_query"
+    goal.missing_info, goal.pending = "[]", None
+    db.commit()
+    reply = sqlexplain.render(plan, hi)
+    reply += "\n\n" + ("Query bhi paste karo to main use bhi check karke plan ke saath sahi index aur rewrite dunga." if hi else
+                         "Paste the query too and I'll check it against this plan: the exact index and rewrite.")
+    return reply, [], "agent_plan"
+
+
+def _sql_agents(db, goal):
+    from app.agents.core import goal_agents
+
+    return [a for a in goal_agents(db, goal.id) if a.recipe == "sql_review"]
+
+
+def _error_turn(db: Session, goal: Goal, text: str, hi: bool, visitor_id: str):
+    """An error / EXPLAIN / lock report, or a problem put in words: its likely causes, for the person's database (rule A:
+    named in the words, remembered from earlier, or shown by the error's own format; for an error that shows none of
+    them, ask first)."""
+    from app import mind
+    from app.dbknow import brain as dbbrain
+    from app.dbknow import engines as E
+    from app.dbknow import reasoning
+
+    lang = E.lang_of(text) if E.lang_of(text) != "en" or not hi else "hinglish"
+    named = E.named(text)
+    if named:
+        E.remember(goal, named, "named")
+    rec = E.remembered(goal)
+    hint = rec["id"] if rec and rec.get("how") in ("named", "chosen") else None
+    result = reasoning.diagnose(text, engine=hint)
+    if result.get("found") and not result.get("engine") and not rec and not E.shown(text)[0]:
+        agent = goal_agent(db, goal) or create_agent(db, goal, detect_mode(text))   # an error that doesn't show its database
+        brec = dbbrain.recognize(text)
+        if brec["kind"] in ("error", "issue"):
+            inputs = loads(agent.inputs, {}) or {}
+            inputs["brain"] = {**brec, "sql": ""}
+            agent.inputs = dumps(inputs)
+        data = loads(goal.slots, {}) or {}       # ask which one, then answer it for that database
+        data["_db_wait"] = text[:4000]
+        goal.slots = dumps(data)
+        goal.pending = E.PENDING
+        head = reasoning.headline(result, hi) or ""
+        goal.title = (head or ("Database error ki wajah" if hi else "Database error: cause and fix"))[:200]
+        goal.intent = goal.intent or "db_error"
+        db.commit()
+        question, taps = E.ask(lang)
+        question = ((f"Samjha: {head}. " if head and lang != "en" else f"Understood: {head}. " if head else "")
+                    + ("Ye error kai databases mein aata hai, aur fix har ek ka alag hai. " if lang != "en" else
+                       "This error can come from more than one database, and the fix differs. ") + question)
+        return question, taps, "agent_plan"
+    detected = None
+    if result.get("engine") and not named and not (rec and rec.get("how") in ("named", "chosen")):
+        detected = E.remember(goal, result["engine"], "detected", "the error message's format" if lang == "en" else "error ke format")
+    mind.set_pattern("diagnose")
+    agent = goal_agent(db, goal) or create_agent(db, goal, detect_mode(text))     # the card stays: connect to prove it
+    user = account_for(db, visitor_id)
+    live = live_checks(db, user, agent, visitor_id, result) if user is not None else None
+    if live:
+        result = reasoning.diagnose(text, live, engine=hint)  # proved (or ruled out) on their own database
+    brec = dbbrain.recognize(text)
+    if brec["kind"] in ("error", "issue"):
+        inputs = loads(agent.inputs, {}) or {}
+        inputs["brain"] = {**brec, "sql": ""}
+        agent.inputs = dumps(inputs)
+    # the title follows what this message is about (an earlier, different problem must not stay on it)
+    goal.title = (reasoning.headline(result, hi) or (("Database ki dikkat ki wajah" if hi else "Database problem: likely causes")
+                                                     if not reasoning.evidence(text) else
+                                                     ("Database error ki wajah" if hi else "Database error: cause and fix")))[:200]
+    goal.intent = goal.intent or "db_error"
+    goal.missing_info, goal.pending = "[]", None
+    db.commit()
+    from app import dbarea
+
+    reply = reasoning.report(result, hi, signed_in=user is not None, can_connect=dbarea.connect_open(user))
+    from app.agents import sqllock
+
+    dl = sqllock.read_deadlock(text)
+    if dl:                                # the deadlock report itself: which rows, in which order, and the fix
+        reply = (dl["hi"] if hi else dl["en"]) + ("\n\n" + reply if reply else "")
+    taps = []
+    eid = named or (rec or {}).get("id")
+    if detected and result.get("found"):
+        line, taps = E.detected_line(detected, lang)
+        reply += "\n\n" + line
+    elif eid and E.notes_only(eid):
+        reply += "\n\n" + E.notes_line(eid, lang)
+    reply += _pasted_statement_fix(text, eid, hi)
+    return reply, taps, "agent_plan"
+
+
+def _statement_in(text: str) -> str | None:
+    """The SQL statement written inside a message that is mostly about an error ('why does this fail ...: SELECT ...'): from its
+    first word to its ';' (outside quotes) or the end."""
+    m = re.search(r"(?im)(?:^|[:?.]\s)\s*((?:select|with|update|delete)\b)", text or "")
+    if not m:
+        return None
+    rest = text[m.start(1):]
+    q, out = None, []
+    for ch in rest:
+        if q:
+            q = None if ch == q else q
+        elif ch in "'\"`":
+            q = ch
+        elif ch == ";":
+            break
+        out.append(ch)
+    stmt = "".join(out).strip()
+    return stmt if NEW_SQL_RE.search(stmt) and len(stmt) < 20000 else None
+
+
+def _pasted_statement_fix(text: str, eid: str | None, hi: bool) -> str:
+    """Night X1: an error explained in general is half the answer when the person pasted the statement too: their own
+    statement, put right, follows (a change only as a preview, never run)."""
+    stmt = _statement_in(text)
+    if not stmt:
+        return ""
+    from app.agents.core import statements_text
+    from app.agents.sql import analyze_sql
+
+    try:
+        res = analyze_sql(stmt, engine=eid or None, said=text.replace(stmt, " ")[:300])
+    except Exception:  # noqa: BLE001 - the explanation above already answers; the fix is an extra
+        return ""
+    c = res.get("correct") or {}
+    sure = [f for f in c.get("findings") or [] if f["kind"] in ("error", "wrong")]
+    if not sure or not c.get("corrected"):
+        return ""
+    head = ("Aapki query mein:" if hi else "In your query:") + "\n" + "\n".join(f"- {f['title_hi' if hi else 'title_en']}" for f in sure[:3])
+    return "\n\n" + head + statements_text(res, hi, sure=True)
+
+
+# ------------------------------------------------------------------ after a query check: "optimize it", "why slow", "kya karu"
+SQL_FOLLOW_RE = re.compile(r"\b(optimi[sz]\w*|faster|speed( (it|this|that))? up|improve|better|rewrite|re-write|fix (it|this|the query)|tune|slow|fast|"
+                           r"index(es)?|why|explain|kaise|kya karu|kya karna|theek karo|tez|jaldi|behtar|sudharo|samjhao|"
+                           r"wrong|galat|joins?|mistakes?|errors?|correct|sahi|small(er)?|short(er)?|chhot\w*|big|badi|bada|problems?)\b", re.I)
+WRONG_RE = re.compile(r"\b(wrong|galat|mistakes?|errors?|correct|sahi|problems?|issues?|kya galat|what.s wrong)\b", re.I)
+SHORT_RE = re.compile(r"\b(small(er)?|short(er)?|chhot\w*|big query|badi query|bada|simplif\w*|less code|kam)\b", re.I)
+SPEED_RE = re.compile(r"\b(slow|fast(er)?|speed|optimi[sz]\w*|index(es)?|tez|jaldi|performance|tune)\b", re.I)
+DEV_FOLLOW_RE = re.compile(r"तेज़|तेज|ऑप्टिमाइ|बेहतर|सुधार|धीम|स्लो|इंडेक्स|क्यों|क्यूं|समझा|बदल|फ़र्क|फर्क|अंतर|वजह|कारण")
+NEW_SQL_RE = re.compile(r"\b(select|update|delete|insert)\b[\s\S]+\b(from|into|set)\b", re.I)
+
+
+def _sql_agent(db, goal):
+    from app.agents.core import goal_agents
+    from app.models import AgentRun
+
+    a = next((x for x in goal_agents(db, goal.id) if x.recipe == "sql_review"), None)
+    if a is None:
+        return None, None
+    run = db.scalars(select(AgentRun).where(AgentRun.agent_id == a.id).order_by(AgentRun.id.desc()).limit(1)).first()
+    return a, run
+
+
+def holds_conversation(db, goal, text: str, any_text: bool = False):
+    """A query was checked in this conversation and the person asks about it: answer about THAT query. Also: the answer to
+    'which database is this for?', and a short 'it's PostgreSQL' correcting the database DBaba detected (rule A)."""
+    from app.dbknow import engines as E
+
+    if goal is not None and text and not any_text and goal.pending == E.PENDING and E.choice(text) and concept_question(text) is None:
+        a, _run = _sql_agent(db, goal)
+        waiting = (loads(goal.slots, {}) or {}).get("_db_wait")
+        return goal_agent(db, goal) if waiting else (a or goal_agent(db, goal))
+    if goal is not None and text and not any_text and E.correction(text, goal) and concept_question(text) is None:
+        a, run = _sql_agent(db, goal)
+        if run is not None and run.status == "done":
+            return a
+    from app.agents import sqlport
+
+    if text and not any_text and sqlport.is_followup(text):
+        a, run = _sql_agent(db, goal)     # 'now convert it to PostgreSQL': the checked query, in that database's words
+        if run is not None and run.status == "done":
+            return a
+    if text and not any_text and TREE_RE.search(text) and not re.match(r"\s*(what (is|are) (an? )?(query )?(block|dependency|cte)|"
+                                                                         r".*\bkya (hota|hoti|hote) (hai|hain)\s*$)", text, re.I):
+        a, run = _sql_agent(db, goal)     # 'show the dependency tree' after a check: that query's blocks (night 12)
+        if run is not None and run.status == "done":
+            return a
+    if text and not any_text and concept_question(text) is not None:
+        return None                       # 'what is a LEFT JOIN' after a check: a concept question, not about that query
+    if (text or "").strip().startswith(("Why: ", "Kyun: ")) and not any_text:
+        a, run = _sql_agent(db, goal)
+        return a if run is not None and run.status == "done" else None
+    if any_text or NEW_SQL_RE.search(text or "") or not (SQL_FOLLOW_RE.search(text or "") or DIFF_RE.search(text or "") or FEEDBACK_RE.search(text or "")
+                                                         or PROOF_RE.search(text or "") or TREE_RE.search(text or "")
+                                                         or READ_RE.search(text or "")
+                                                         or WHY_RE.search(text or "") or DEV_FOLLOW_RE.search(text or "")):
+        return None
+    a, run = _sql_agent(db, goal)
+    return a if run is not None and run.status == "done" else None
+
+
+FEEDBACK_RE = re.compile(r"\b(wrong|incorrect|not (correct|right|working|resolved|solved|fixed|giving|the result|what i)|still (not|wrong|same)|"
+                         r"does ?n.?t (do|work|fix|give)|did ?n.?t (do|work|fix|catch|find)|not able to (find|detect)|missed|"
+                         r"galat|sahi nahi|theek nahi|kaam nahi|nahi hua|nahi pakda)\b", re.I)
+# 'what can't you prove', 'how sure are you', 'kitna pakka hai', 'assumptions?': the query-only report (night 11)
+PROOF_RE = re.compile(r"\b(can.?t|cannot|can not|could ?n.?t) (you )?(be )?(prove|proven|tell|know|see)\b|\bhow (sure|confident|certain)\b|"
+                      r"\bconfidence\b|\bassum\w*|\binferred schema\b|\b(full|whole|complete) report\b|\bwhat (do|did) you assume\b|"
+                      r"\bproven\b|\blikely risks?\b|\bneeds? (schema|execution)\b|\bkitna (pakka|sure|yakeen)\b|\bpakka (hai|h) kya\b|"
+                      r"\bkya (maana|maan ke|assume)\b|कितना पक्का|पक्का है|मान (कर|के)", re.I)
+# 'show the dependency tree', 'grain of each block', 'har CTE ka grain': the blocks and their grain (night 12)
+TREE_RE = re.compile(r"\b(dependency|block|cte) tree\b|\btree\b.*\b(block|cte|query)s?\b|\b(blocks|ctes|stages)\b.*\bgrain\b|"
+                     r"\bgrain\b.*\b(each|every|per|har)\b.*\b(block|cte|stage|step)s?\b|\bhar (block|cte|stage)\b|"
+                     r"\b(show|list) (the |all )?(blocks|ctes)\b|\bwhich (cte|block)s? depends?\b|ब्लॉक", re.I)
+READ_RE = re.compile(r"\bwhat (does|is) (this|my|the) query (do|doing)\b|\bexplain (this|my|the) query\b(?!.*\b(slow|fast|speed)\b)|"
+                     r"\bbreak (it|this|the query) down\b|\bstep by step\b|\bhow does (this|my|the) query work\b|\bread (this|my|the) query\b|"
+                     r"\bquery (samjhao|samjha do|kya karti hai|kya karegi|kaise kaam karti)\b|\b(ye|yeh) query kya\b|\bfundamentals?\b|\bgrain\b", re.I)
+DIFF_RE = re.compile(r"\b(what (did )?you change|what changed|what is the diff\w*|diff\w*|compare|original|kya badla|kya change|"
+                     r"farak|fark|antar|same (hi )?hai|any change)\b", re.I)
+WHY_RE = re.compile(r"\b(why|kyun|kyu|reason|wajah|explain|samjhao|kaise slow|what makes)\b|क्यों|क्यूं|वजह|कारण|समझा", re.I)
+DIFF_DEV_RE = re.compile(r"बदला|बदलाव|फ़र्क|फर्क|अंतर|क्या बदल")
+INDEX_RE = re.compile(r"\b(which|what|kaun\w*|konsa|kaunsa)\b[^?]*\bindex(es)?\b|\bindex(es)?\b[^?]*\b(kaun\w*|konsa|lagau\w*|lagana|lagaye|need|add|chahiye)\b"
+                      r"|इंडेक्स", re.I)
+
+
+def continue_turn(db, goal, agent, text: str):
+    """The answer about the checked query; when the person says it was wrong, the miss is also kept to learn from."""
+    from app.agents.sql import mask_values
+    from app.dbknow import engines as E
+    from app.ml.normalize import detect_language
+
+    hi0 = detect_language(text) in ("Hinglish", "Hindi") or goal.detected_language in ("Hinglish", "Hindi")
+    if goal.pending == E.PENDING and E.choice(text):          # the tap that answers 'which database?': the waiting check runs
+        return (*_engine_reply(db, goal, agent, E.choice(text), "chosen", hi0, again=False), "agent_run")
+    if agent.recipe == "sql_review" and E.correction(text, goal):   # 'it's PostgreSQL': check it again for that one
+        return _engine_reply(db, goal, agent, E.correction(text, goal), "named", hi0, again=True)
+
+    from app.agents import sqlport
+
+    if agent.recipe == "sql_review" and sqlport.is_followup(text):
+        raw = (loads(agent.inputs, {}) or {}).get("query", "")
+        if raw.strip():
+            reply, options, _rel = _translate_turn(db, goal, text, hi0, query=raw)
+            return reply, options, hi0
+    if agent.recipe == "sql_review" and TREE_RE.search(text or "") and not FEEDBACK_RE.search(text or ""):
+        return _tree_turn(db, goal, agent, text)
+    if agent.recipe == "sql_review" and PROOF_RE.search(text or "") and not FEEDBACK_RE.search(text or ""):
+        return _proof_turn(db, goal, agent, text)
+    if not FEEDBACK_RE.search(text or ""):
+        return _continue_turn(db, goal, agent, text)
+    inputs = loads(agent.inputs, {}) or {}
+    raw = inputs.get("query", "")
+    _a, last_run = _sql_agent(db, goal)
+    saved = False
+    if raw.strip():
+        try:
+            from app.agents import learn as learning
+
+            learning.report_miss(db, "database", text, mask_values(raw), (last_run.summary if last_run is not None else "") or "")
+            saved = True
+        except Exception:  # noqa: BLE001 - learning is an extra; it never breaks the answer
+            db.rollback()
+    hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
+    from app.agents.sql import analyze_sql
+
+    res = analyze_sql(raw, inputs.get("explain", ""), engine=_eng(inputs))
+    broken = [f for f in (res.get("correct") or {}).get("findings") or [] if f["kind"] in ("error", "wrong")]
+    if broken:
+        reply, options, hi = _continue_turn(db, goal, agent, text)
+    else:
+        reply, options = (("Is query ke text se mujhe pakki galti nahi mili. Batao isse kya result aana chahiye (ya ye kya karni chahiye), "
+                           "main usi ke hisaab se check karunga." if hi else
+                           "From the query text alone I couldn't find a definite mistake. Tell me what result it should give (or what it "
+                           "should do), and I'll check it against that."), [])
+    if saved:
+        reply += ("\n\nMaine ye query (values chhupa ke) seekhne ke liye rakh li hai, taaki aise sawaal aage behtar samjhun." if hi else
+                  "\n\nI've kept this query (with its values hidden) to learn from, so questions like it get a better answer.")
+    return reply, options, hi
+
+
+def _tree_turn(db, goal, agent, text: str):
+    """'Show the dependency tree' / 'grain of each block': the checked query's blocks (CTEs, derived tables, subqueries, UNION
+    parts), what each reads, and the grain going in and coming out of each, with the joins that change it."""
+    from app.agents.sql import analyze_sql
+    from app.ml.normalize import detect_language
+
+    hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
+    inputs = loads(agent.inputs, {}) or {}
+    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=_eng(inputs))
+    b = res.get("blocks")
+    if not b:
+        reading = (res.get("reading") or {}).get("hi" if hi else "en") or ""
+        return (("Is query mein ek hi block hai (koi CTE, derived table ya subquery nahi). Uska grain:\n" if hi else
+                 "This query is a single block (no CTE, derived table or subquery). Its grain:\n") + reading), [], hi
+    head = ("Blocks, kaun kis pe tika hai, aur har block ka grain (andar -> bahar):" if hi else
+            "The blocks, what each depends on, and the grain going in and out of each:")
+    tail = ("'!' wali join grain badalti hai: uske baad ke totals dobara check karo, ya join se pehle total nikaalo." if hi else
+            "A join marked '!' changes the grain: every total after it is re-checked; total before the join when it repeats rows.")
+    inputs["last_ask"] = "tree"
+    agent.inputs = dumps(inputs)
+    return f"{head}\n{b['hi' if hi else 'en']}\n\n{tail}", [], hi
+
+
+def _proof_turn(db, goal, agent, text: str):
+    """'What can't you prove?' / 'kitna pakka hai': the query-only report for the checked query (app/agents/sqlconfidence.py):
+    how sure each finding is, the schema the query implies (verified=false), what can't be proven from the text, the rewrite
+    and why it is (or isn't) the same rows, and the read-only queries that settle the rest in that database's own words."""
+    from app.agents import sqlconfidence
+    from app.agents.sql import analyze_sql
+    from app.ml.normalize import detect_language
+
+    hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
+    inputs = loads(agent.inputs, {}) or {}
+    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=_eng(inputs))
+    rep = (res.get("query_only") or {}).get("hi" if hi else "en") or ""
+    if not rep:
+        return _continue_turn(db, goal, agent, text)
+    head = sqlconfidence.counts_line(res, hi)
+    inputs["last_ask"] = "proof"
+    agent.inputs = dumps(inputs)
+    return (head + "\n\n" + rep if head else rep), [], hi
+
+
+def _continue_turn(db, goal, agent, text: str):
+    """'What does this query do': the query read stage by stage, with the fundamentals behind what's wrong. When the words
+    also ask why ('explain this query' after a slow query), the usual answer follows the reading."""
+    from app.agents.core import why_label
+    from app.agents.sql import analyze_sql
+    from app.ml.normalize import detect_language
+
+    if not READ_RE.search(text or "") or text.strip().startswith(("Why: ", "Kyun: ")):
+        return _answer_turn(db, goal, agent, text)
+    hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
+    inputs = loads(agent.inputs, {}) or {}
+    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=_eng(inputs))
+    corr = res.get("correct") or {}
+    reading = (res.get("reading") or {}).get("hi" if hi else "en") or ""
+    lines = [("Query aise padhi (stage by stage):" if hi else "How DBaba read this query, stage by stage:"), reading]
+    seen = []
+    for f in (corr.get("findings") or []):
+        b = f.get("basis")
+        if b and b["id"] not in seen and f["kind"] in ("error", "wrong", "check"):
+            seen.append(b["id"])
+            lines.append(f"- {b['hi' if hi else 'en']}: {b['rule_hi' if hi else 'rule_en']}")
+    if seen:
+        lines.insert(2, "\n" + ("Galtiyon ki buniyaad:" if hi else "The fundamentals behind what's wrong:"))
+    read_text = "\n".join(lines).strip()
+    if WHY_RE.search(text or "") or DEV_FOLLOW_RE.search(text or ""):     # 'explain this query': the reading, then the why
+        reply, options, hi2 = _answer_turn(db, goal, agent, text)
+        return read_text + "\n\n" + reply, options, hi2
+    inputs["last_ask"] = "read"
+    agent.inputs = dumps(inputs)
+    return read_text, [why_label(f, hi) for f in corr.get("findings") or [] if f["kind"] in ("error", "wrong")][:3], hi
+
+
+def _answer_turn(db, goal, agent, text: str):
+    """Answers about the query that was checked: the optimised version, what changed, or why it's slow.
+    Worked out again from the query itself, so it's never a stale or repeated answer."""
+    from app.agents.sql import analyze_sql, rewrite, unwrap
+    from app.ml.normalize import detect_language
+    from app.models import Message
+
+    hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
+    inputs = loads(agent.inputs, {}) or {}
+    query = unwrap(inputs.get("query", ""))
+    res = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=_eng(inputs))      # the raw text: what they said they want counts too
+    better = res.get("rewritten") or rewrite(query)
+    changed = _norm(better) != _norm(query)
+    last = db.scalars(select(Message).where(Message.goal_id == goal.id, Message.role == "assistant")
+                      .order_by(Message.id.desc()).limit(1)).first()
+    corr = res.get("correct") or {}
+    broken = [f for f in corr.get("findings") or [] if f["kind"] in ("error", "wrong")]   # real mistakes, not notes
+    asks_other = bool(DIFF_RE.search(text or "") or DIFF_DEV_RE.search(text or "") or WHY_RE.search(text or ""))
+    from app.agents.core import why_label
+
+    tapped = next((f for f in corr.get("findings") or [] if text.strip() in (why_label(f, False), why_label(f, True))), None)
+    if tapped is not None:                                   # 'Why: ...' tapped: that one mistake, nothing else
+        h = text.strip().startswith("Kyun:")
+        fix = tapped["fix_hi" if h else "fix_en"]
+        reply = f"{fix}\n\n{tapped['evidence']}" if tapped.get("evidence") else fix
+        asked = set(inputs.get("why_asked") or []) | {tapped["title_en"]}
+        inputs["last_ask"], inputs["why_asked"] = "why_one", sorted(asked)
+        agent.inputs = dumps(inputs)
+        rest = [why_label(f, h) for f in corr["findings"] if f["kind"] in ("error", "wrong") and f["title_en"] not in asked][:3]
+        return reply, rest, h
+    if broken and not SPEED_RE.search(text or "") and not DEV_FOLLOW_RE.search(text or ""):
+        from app.agents.core import correctness_text
+
+        if SHORT_RE.search(text or "") and not WRONG_RE.search(text or ""):
+            fixed = corr.get("corrected") or query
+            gone = [f for f in corr["findings"] if "joined twice" in f["title_en"]]
+            reply = ((f"Chhoti aur sahi query ({len(query.splitlines())} se {len(fixed.splitlines())} lines):" if hi else
+                      f"The shorter, corrected query ({len(query.splitlines())} lines down to {len(fixed.splitlines())}):")
+                     + f"\n\n{fixed}" + (("\n\nHataya: " if hi else "\n\nRemoved: ") + "; ".join(f["title_hi" if hi else "title_en"] for f in gone)
+                                          if gone else ""))
+        else:
+            only = "join" if re.search(r"\bjoins?\b", text or "", re.I) and any(f["topic"] == "join" for f in corr["findings"]) else None
+            reply = correctness_text(res, hi, only, follow_up=True)
+            if corr.get("corrected"):
+                reply += "\n\n" + ("Theek ki hui query ('-- check' wale naam apni table se mila lena):" if hi else
+                                    "The corrected query (match the names marked '-- check' to your tables):") + f"\n\n{corr['corrected']}"
+        inputs["last_ask"] = "correct"
+        agent.inputs = dumps(inputs)
+        return reply, [], hi
+    if broken and SPEED_RE.search(text or "") and not asks_other:
+        reply = _optimized(corr.get("corrected") or query, inputs.get("explain", ""), hi)   # asked for speed: give it, now
+        inputs["last_ask"] = "optimize"
+        agent.inputs = dumps(inputs)
+        return reply, [], hi
+    if broken and corr.get("corrected"):
+        query = corr["corrected"]                                    # speed advice is for the corrected query
+        res = analyze_sql(query, inputs.get("explain", ""), engine=_eng(inputs))
+        better = res.get("rewritten") or rewrite(query)
+        changed = _norm(better) != _norm(query)
+    ask = ("diff" if DIFF_RE.search(text or "") or DIFF_DEV_RE.search(text or "") else "why" if WHY_RE.search(text or "")
+           else "index" if INDEX_RE.search(text or "") else "optimize")
+    asked = ask
+    reply = _sql_reply(ask, query, better, changed, res, hi)
+    if last is not None and _norm(last.text) == _norm(reply):          # never the same answer twice in a row
+        if inputs.get("last_ask") == ask:                              # they asked the same thing again: the other angle
+            ask = {"optimize": "why", "why": "diff", "diff": "why", "index": "why"}[ask]
+            reply = _sql_reply(ask, query, better, changed, res, hi)
+        else:                                                          # it's what my last answer already said: say so, in short
+            reply = (("Ye upar wale jawab mein hi hai, short mein:\n\n" if hi else "That's what my last answer covered; in short:\n\n")
+                     + _first_part(_sql_reply(ask, query, better, changed, res, hi)))
+    inputs["last_ask"] = asked
+    agent.inputs = dumps(inputs)
+    return reply, [], hi
+
+
+def _optimized(query: str, explain: str, hi: bool) -> str:
+    """The optimized query and its index commands, with at most 3 short notes. No questions, no theory."""
+    from app.agents.sql import analyze_sql
+
+    res = analyze_sql(query, explain)
+    sp = res.get("speed_later") or res
+    better = res.get("rewritten") if res.get("rewritten") and not (res.get("correct") or {}).get("corrected") else query
+    out = [("Fast query:" if hi else "Optimized query:") + f"\n\n{better}"]
+    if sp.get("indexes"):
+        out.append((("Ye index lagao (jo pehle se hain unhe chhod do):" if hi else "Add these indexes (skip any you already have):")
+                    if res.get("indexes_verified") else
+                    ("Dekh lo ye index pehle se hain ya nahi; jo nahi hain sirf wahi lagao:" if hi else
+                     "Worth checking whether these indexes exist; add only the ones that don't:"))
+                   + "\n\n" + "\n".join(sp["indexes"]))
+    notes = [f["title_hi" if hi else "title_en"] for f in sp.get("findings") or []
+             if not f["title_en"].lower().startswith(("worth checking whether these columns", "missing indexes"))][:3]
+    out += [f"- {n}" for n in notes]
+    return "\n\n".join(out)
+
+
+def _first_part(reply: str) -> str:
+    """The opening of an answer: its first paragraph, and what that paragraph introduces."""
+    paras = reply.split("\n\n")
+    return "\n\n".join(paras[:2] if paras[0].rstrip().endswith(":") and len(paras) > 1 else paras[:1])
+
+
+def _norm(q: str) -> str:
+    return re.sub(r"\s+", " ", (q or "")).strip().rstrip(";").lower()
+
+
+SPEED_TOPICS = {"sargable", "or_union", "keyset", "keyset_offset", "leading_wildcard", "select_star", "index_prefix", "index_range_first",
+                "implicit_cast", "repeat_subquery", "same_subquery", "having_key", "cte_filter_late", "star_join",
+                "preagg", "compute_once", "rw_exists", "rw_not_exists", "rw_in", "rw_not_in", "rw_join", "rw_cte", "rw_cte_derived",
+                "rw_keyset", "rw_once"}
+
+
+def _sql_reply(ask, query, better, changed, res, hi) -> str:
+    notes = [n["hi" if hi else "en"] for n in res.get("notes", [])]
+    fixes = [f for f in res.get("findings", [])
+             if not f["title_en"].lower().startswith(("worth checking whether these columns", "missing indexes"))]
+    idx = res.get("indexes") or []
+    parts = []
+    if ask == "diff":
+        if changed:
+            parts.append(("Ye badla (result wahi rahega):" if hi else "What I changed (the result stays the same):"))
+            parts += [f"- {f['title_hi' if hi else 'title_en']}: {f['fix_hi' if hi else 'fix_en']}" for f in fixes] or \
+                     [("- Query ka likhne ka tareeka, result wahi" if hi else "- How it's written, not what it returns")]
+            parts.append(("Pehle:" if hi else "Before:") + f"\n\n{query}\n\n" + ("Ab:" if hi else "After:") + f"\n\n{better}")
+        elif fixes:
+            parts.append("Maine aapki query ka text nahi badla: neeche ki baatein badalne se result badal sakta hai, isliye ye faisla aapka hai:"
+                         if hi else "I didn't change your query's text: changing the points below could change what it returns, so "
+                         "they're your call:")
+            parts += [f"- {f['title_hi' if hi else 'title_en']}: {f['fix_hi' if hi else 'fix_en']}" for f in fixes]
+        else:
+            parts.append(("Maine aapki query ka text nahi badla: ye pehle se theek likhi hai, isme koi aisa pattern nahi jo index ko rokta ho. "
+                          + ("Farak sirf index ka hai (neeche), query wahi rahegi." if idx else "Koi naya index bhi nahi chahiye.")) if hi else
+                         ("I didn't change your query's text: it's already written well, with nothing in it that stops an index "
+                          "being used. " + ("The only difference is the indexes below; your query stays exactly as it is." if idx
+                                            else "It needs no new index either.")))
+        if idx:
+            parts.append(("Index:" if hi else "Indexes:") + "\n\n" + "\n".join(idx))
+        return "\n\n".join(parts)
+    if ask == "why":
+        parts.append("Ye query slow kyun ho sakti hai:" if hi else "Why this query can be slow:")
+        reasons = []
+        if idx:
+            short = lambda x: re.sub(r"^(?:ALTER TABLE (\S+) ADD INDEX \S+|CREATE INDEX \S+ ON (\S+)) \((.+)\);$",  # noqa: E731
+                                     lambda m: f"{m.group(1) or m.group(2)} ({m.group(3)})", x)
+            reasons.append(("Jin columns pe ye filter aur join karti hai unpe index na ho to database har table poori padhta hai: "
+                            + ", ".join(short(x) for x in idx)) if hi else
+                           ("Without an index on the columns it filters and joins on, the database reads each table in full: "
+                            + ", ".join(short(x) for x in idx)))
+        reasons += [f["title_hi" if hi else "title_en"] + ": " + f["fix_hi" if hi else "fix_en"] for f in fixes]
+        reasons += notes
+        parts += [f"- {r}" for r in reasons] or [("- Isme slow hone wala koi pattern nahi dikha; EXPLAIN output paste karo." if hi else
+                                                  "- Nothing in it looks slow by itself; paste the EXPLAIN output and I'll find the step.")]
+        if res.get("check_query"):
+            parts.append(("Pehle dekho kaunse index pehle se hain:" if hi else "First see which indexes you already have:")
+                         + f"\n\n{res['check_query']}")
+        return "\n\n".join(parts)
+    if ask == "index":
+        if not idx:
+            parts.append("Is query ke liye koi naya index nahi chahiye: jin columns pe ye filter ya join karti hai wo primary key hain, "
+                         "pehle se indexed hain, ya index unke kaam nahi aata." if hi else
+                         "No new index is needed for this query: the columns it filters and joins on are primary keys, already "
+                         "indexed, or not ones an index can help with.")
+            if fixes:
+                parts.append(("Speed in baaton se aayegi:\n" if hi else "The speed-up comes from these points instead:\n")
+                             + "\n".join(f"- {f['fix_hi' if hi else 'fix_en']}" for f in fixes[:5]))
+            return "\n\n".join(parts)
+        if res.get("check_query"):
+            parts.append(("Dekhne layak: ye index pehle se hain ya nahi (sirf query se nahi dikhta). Pehle ye chalao, dekho kaunse hain:" if hi else
+                          "It's worth checking whether these indexes exist (the query alone can't show them). First run this to see which you have:")
+                         + f"\n\n{res['check_query']}")
+            parts.append(("Phir inme se sirf wo lagao jo upar nahi dikhe:" if hi else "Then add only the ones it doesn't show:")
+                         + "\n\n" + "\n".join(idx))
+        else:
+            parts.append(("Is query ke liye ye index lagao (aapke table structure se check kiye):" if hi else
+                          "Add these indexes for this query (checked against your table structure):") + "\n\n" + "\n".join(idx))
+        if res.get("assumed_primary"):
+            ap = res["assumed_primary"]
+            parts.append(f"{', '.join(ap)} ko primary key maana (inpe pehle se index hota hai)." if hi else
+                         f"I took {', '.join(ap)} to be {'primary keys' if len(ap) > 1 else 'the primary key'} (already indexed).")
+        return "\n\n".join(parts)
+    # optimize
+    if changed:
+        parts.append(("Aapki query ka behtar roop (result wahi rahega):" if hi else "Your query, optimised (same result):") + f"\n\n{better}")
+        if fixes:
+            parts.append(("Kya badla:\n" if hi else "What changed:\n") + "\n".join(f"- {f['fix_hi' if hi else 'fix_en']}" for f in fixes[:5]))
+    elif fixes and res.get("suggested_kind") == "speed" and all(f.get("topic") in SPEED_TOPICS or not f.get("kind") for f in fixes):
+        parts.append(("Query ka text maine nahi badla: tez roop alag shakal ka hai par rows wahi deta hai; neeche hai, EXPLAIN se dono "
+                      "milao:\n" if hi else "I haven't changed your query's text: the faster form has another shape but returns the same "
+                      "rows; it's below, compare the two with EXPLAIN:\n") + "\n".join(f"- {f['fix_hi' if hi else 'fix_en']}" for f in fixes[:5]))
+    elif fixes:
+        parts.append(("Query ka text maine nahi badla: inhe badalne se result badal sakta hai, isliye faisla aapka. Ye baatein ise tez "
+                      "karengi:\n" if hi else "I haven't changed the query's text: these changes could change what it returns, so "
+                      "they're your call. They're what makes it faster:\n") + "\n".join(f"- {f['fix_hi' if hi else 'fix_en']}" for f in fixes[:5]))
+    elif idx:
+        parts.append("Aapki query pehle se theek likhi hai, iske text mein badalne layak kuch nahi; isliye wahi query rakho. "
+                     "Speed index aur in baaton se aayegi:" if hi else
+                     "Your query is already written well, so I'm not changing its text. The speed-up comes from the indexes "
+                     "and these points:")
+    else:
+        parts.append("Aapki query pehle se theek likhi hai aur koi naya index bhi nahi chahiye; isliye wahi query rakho." if hi else
+                     "Your query is already written well and needs no new index, so I'm not changing anything.")
+    if res.get("suggested") and res.get("suggested_kind") == "speed":
+        parts.append(("Ye tez roop try karo (rows wahi rahengi; EXPLAIN se dono milao):" if hi else
+                      "A faster form to try (the same rows; compare the two with EXPLAIN):") + f"\n\n{res['suggested']}")
+    if res.get("plan"):
+        parts.append(res["plan"]["hi" if hi else "en"])
+    if notes:
+        parts.append("\n".join(f"- {n}" for n in notes))
+    if idx:
+        if res.get("check_query"):
+            parts.append(("Pehle ye chalao, dekho kaunse index pehle se hain:" if hi else
+                          "First run this to see which indexes you already have:") + f"\n\n{res['check_query']}")
+            parts.append(("Phir inme se sirf wo lagao jo upar nahi dikhe:" if hi else "Then add only the ones it doesn't show:")
+                         + "\n\n" + "\n".join(idx))
+        else:
+            parts.append((("Ye index lagao:" if hi else "Add these indexes:") if res.get("indexes_verified") else
+                          ("Dekh lo ye index hain ya nahi, jo nahi wahi lagao:" if hi else
+                           "Worth checking whether these indexes exist; add the ones that don't:")) + "\n\n" + "\n".join(idx))
+    if res.get("assumed_primary"):
+        ap = res["assumed_primary"]
+        parts.append(f"{', '.join(ap)} ko primary key maana (inpe pehle se index hota hai)." if hi else
+                     f"I took {', '.join(ap)} to be {'primary keys' if len(ap) > 1 else 'the primary key'} (already indexed).")
+    parts.append(("Index lagane ke baad EXPLAIN chala ke output paste karo, main confirm kar dunga." if hi else
+                  "After adding them, paste the query's EXPLAIN output and I'll confirm the indexes are used.") if idx else
+                 ("Phir bhi slow lage to EXPLAIN chala ke output paste karo, main wo step dhoondh dunga." if hi else
+                  "If it's still slow, paste the query's EXPLAIN output and I'll find the slow step."))
+    return "\n\n".join(parts)

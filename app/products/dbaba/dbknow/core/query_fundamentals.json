@@ -1,0 +1,807 @@
+{
+ "about": "How DBaba reasons about a query, in our own words: read it as stages (output, tables, links, row filters, totals, group filters, windows, final cut), state what one result row stands for, then check each stage against the fundamentals below. Every finding of the SQL checker names the fundamental it breaks. Learned from the official manuals first; practice problems only point at what to check.",
+ "checklist": [
+  {
+   "id": "output",
+   "en": "What must each result row show?",
+   "hi": "Har result row mein kya dikhna chahiye?"
+  },
+  {
+   "id": "tables",
+   "en": "Which tables hold those values?",
+   "hi": "Ye values kin tables mein hain?"
+  },
+  {
+   "id": "links",
+   "en": "How are the tables linked, and is each link one-to-one or one-to-many?",
+   "hi": "Tables kaise jude hain, aur har link ek-se-ek hai ya ek-se-kai?"
+  },
+  {
+   "id": "row_filters",
+   "en": "Which raw rows are kept (WHERE), and does a filter on an outer-joined table undo the outer join?",
+   "hi": "Kaunsi rows rakhi jaati hain (WHERE), aur kya outer-join wali table ka filter outer join ko khatam karta hai?"
+  },
+  {
+   "id": "totals",
+   "en": "What is totalled (COUNT/SUM/AVG/MIN/MAX), and at which level?",
+   "hi": "Kya total hota hai (COUNT/SUM/AVG/MIN/MAX), aur kis level pe?"
+  },
+  {
+   "id": "grain",
+   "en": "What does one result row stand for (the grain)?",
+   "hi": "Ek result row kis cheez ki hai (grain)?"
+  },
+  {
+   "id": "group_filters",
+   "en": "Is a condition on a total in HAVING, not WHERE?",
+   "hi": "Total wali condition HAVING mein hai, WHERE mein nahi?"
+  },
+  {
+   "id": "stages",
+   "en": "Should it be split into stages (subqueries / CTEs), each at one grain?",
+   "hi": "Kya ise stages mein todna chahiye (subquery / CTE), har stage ek grain pe?"
+  },
+  {
+   "id": "windows",
+   "en": "Is ranking, a running total or a previous-row comparison needed (window functions)?",
+   "hi": "Ranking, running total ya pichhli row se compare chahiye (window functions)?"
+  },
+  {
+   "id": "final_cut",
+   "en": "Which rows survive at the end (HAVING, rank filter, LIMIT), and is the order deterministic?",
+   "hi": "Aakhir mein kaunsi rows bachti hain (HAVING, rank filter, LIMIT), aur order pakka hai?"
+  },
+  {
+   "id": "speed",
+   "en": "Which filters and joins need an index, and does a function on a column stop the index?",
+   "hi": "Kin filters aur joins ko index chahiye, aur kya column pe function index rok deta hai?"
+  },
+  {
+   "id": "subqueries",
+   "en": "For each subquery: where does it stand (one value, a set, EXISTS), and which names tie it to the outer row?",
+   "hi": "Har subquery ke liye: wo kahan khadi hai (ek value, set, EXISTS), aur kaunse naam use bahar ki row se jodte hain?"
+  },
+  {
+   "id": "design",
+   "en": "For a table design: does each table name its rows (primary key), does each link point at a key of the same type with an index, does each column's type match its values, and is each fact kept once?",
+   "hi": "Table design ke liye: har table apni rows ko naam deti hai (primary key), har link same type ki key pe index ke saath, har column ka type uski values se mel khata hai, aur har baat ek hi baar?"
+  },
+  {
+   "id": "words",
+   "en": "Is every function, operator and type written in this database's own words, and does each one mean here what it meant where it came from (dates, case, division, NULLs)?",
+   "hi": "Kya har function, operator aur type is database ke apne shabdon mein hai, aur kya uska matlab yahan wahi hai jo wahan tha (dates, case, bhaag, NULL)?"
+  },
+  {
+   "id": "code",
+   "en": "If the query lives in code: is every value bound through a placeholder (not inside quotes, not standing for a name), and is the text the database receives the text you meant (no -- comment swallowing joined pieces)?",
+   "hi": "Agar query code mein hai: kya har value placeholder se bind hai (quotes ke andar nahi, naam ki jagah nahi), aur kya database tak wahi text pahunchta hai jo tumne socha (jode tukdon ko -- comment nigal na le)?"
+  },
+  {
+   "id": "same_rows",
+   "en": "If you rewrite it, does the new form keep matching, NULLs, duplicates, ordering and grain?",
+   "hi": "Agar badla, to naya roop matching, NULL, duplicates, order aur grain wahi rakhta hai?"
+  }
+ ],
+ "fundamentals": {
+  "grain": {
+   "title_en": "Grain: what one row stands for",
+   "title_hi": "Grain: ek row kis cheez ki hai",
+   "rule_en": "Every stage of a query has a grain (one row per order, per customer, per category). Totals, comparisons and ranks are only right when they are taken at the grain the question asks for; mixing two grains in one step is the most common silent mistake. In a long query every block has a grain of its own: each CTE, derived table, subquery and UNION part takes rows at one grain and hands them on at another. A block's own GROUP BY (or DISTINCT, or a total with no GROUP BY) proves which of its columns are unique, so a join on them keeps the grain; a join to a child moves it down, and every total after that join is re-checked (total the child before the join).",
+   "rule_hi": "Query ke har stage ka ek grain hota hai (har order, har customer, har category ki ek row). Total, compare aur rank tabhi sahi hain jab sawaal wale grain pe liye jaayein; ek step mein do grain milana sabse aam chhupi galti hai. Lambi query mein har block ka apna grain hota hai: har CTE, derived table, subquery aur UNION ka hissa rows ek grain pe leta hai aur doosre pe aage deta hai. Block ka apna GROUP BY (ya DISTINCT, ya bina GROUP BY ka total) sabit karta hai kaunse columns unique hain, isliye un pe join grain rakhta hai; child se join grain neeche le jaata hai, aur us join ke baad ka har total dobara check hota hai (child ka total join se pehle nikaalo).",
+   "topics": [
+    "group",
+    "per_group",
+    "top_n",
+    "distinct",
+    "count_said"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/group-by-handling.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/with.html",
+    "https://www.postgresql.org/docs/current/queries-with.html"
+   ]
+  },
+  "cardinality": {
+   "title_en": "Cardinality: one-to-many links multiply rows",
+   "title_hi": "Cardinality: ek-se-kai link rows ko guna karte hain",
+   "rule_en": "Joining a table with many rows per key repeats the other side once per match. Two such joins on the same parent multiply each other, so totals of either side grow; total each child at its own grain first, then join the totals.",
+   "rule_hi": "Kai rows wali table join karne se doosri taraf har match pe dohraati hai. Ek parent pe do aise join ek doosre ko guna karte hain; pehle har child ka total uske apne grain pe nikaalo, phir join karo.",
+   "topics": [
+    "join",
+    "distinct_join",
+    "semi_join",
+    "join_fanout"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-table-expressions.html"
+  },
+  "outer_join": {
+   "title_en": "Outer joins keep unmatched rows, with NULLs",
+   "title_hi": "Outer join bina match wali rows rakhta hai, NULL ke saath",
+   "rule_en": "A LEFT JOIN keeps every left row; where nothing matches, the right-side columns are NULL. A WHERE condition on those columns removes the unmatched rows again (put it in ON instead), and COUNT(*) counts the unmatched row as 1 (count a right-side column instead).",
+   "rule_hi": "LEFT JOIN har left row rakhta hai; match na ho to right ke columns NULL hote hain. Un columns pe WHERE condition bina match wali rows hata deti hai (ON mein likho), aur COUNT(*) unhe 1 ginta hai (right ka column gino).",
+   "topics": [
+    "count",
+    "anti_join"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/outer-join-simplification.html"
+  },
+  "null_logic": {
+   "title_en": "NULL means unknown",
+   "title_hi": "NULL ka matlab anjaan",
+   "rule_en": "Any comparison with NULL is unknown, not true or false: = NULL never matches (use IS NULL), and NOT IN over a list that contains a NULL matches nothing (use NOT EXISTS). Arithmetic with NULL is NULL (COALESCE(x, 0) when missing means zero), and where NULLs sort differs: first in ASC on MySQL/MariaDB, first in DESC on PostgreSQL.",
+   "rule_hi": "NULL se har comparison anjaan hota hai, na true na false: = NULL kabhi match nahi karta (IS NULL likho), aur NULL wali list pe NOT IN kuch match nahi karta (NOT EXISTS likho). NULL ke saath hisaab NULL hota hai (khaali ka matlab zero ho to COALESCE(x, 0)), aur sort mein NULL MySQL/MariaDB pe ASC mein pehle, PostgreSQL pe DESC mein pehle aate hain.",
+   "topics": [
+    "null",
+    "not_in",
+    "null_fn",
+    "null_math",
+    "nulls_order",
+    "all_null",
+    "in_list_null",
+    "not_in_outer",
+    "sub_sum_null"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-comparison.html"
+  },
+  "filter_level": {
+   "title_en": "WHERE filters rows, HAVING filters groups",
+   "title_hi": "WHERE rows filter karta hai, HAVING groups",
+   "rule_en": "WHERE runs on single rows before any totals exist, so it can't use SUM()/COUNT() or names made in SELECT. A condition on a total belongs in HAVING after GROUP BY. A condition on a GROUP BY column gives the same rows in WHERE and in HAVING, but WHERE removes rows before the grouping (and can use an index). A CTE read twice is kept whole by PostgreSQL, so a filter on one use stays outside unless it is written AS NOT MATERIALIZED.",
+   "rule_hi": "WHERE totals banne se pehle ek-ek row pe chalta hai, isliye SUM()/COUNT() ya SELECT ke naam use nahi kar sakta. Total wali condition GROUP BY ke baad HAVING mein. GROUP BY column wali condition WHERE aur HAVING dono mein wahi rows deti hai, par WHERE grouping se pehle rows hata deta hai (aur index use kar sakta hai). Do baar padha CTE PostgreSQL poora rakhta hai, isliye ek use ka filter bahar rehta hai jab tak AS NOT MATERIALIZED na likho.",
+   "topics": [
+    "where",
+    "having",
+    "having_key",
+    "cte_filter_late"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/select.html",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "subquery_shape": {
+   "title_en": "A subquery is one value or a set",
+   "title_hi": "Subquery ek value hai ya ek set",
+   "rule_en": "Where a subquery stands decides how much it may return. After = < > or in the SELECT list it must give one row and one column; after IN / NOT IN / ANY / ALL one column and any number of rows; after EXISTS only whether there is at least one row matters, so what it selects doesn't matter, and an aggregate without GROUP BY always gives exactly one row (EXISTS (SELECT COUNT(*) ...) is always true). LIMIT without ORDER BY inside it keeps whichever row came first. A subquery is evaluated against the data as it was when the statement started, and MySQL won't let it read the table an UPDATE/DELETE is changing unless it is wrapped as a derived table; MySQL and MariaDB also refuse LIMIT inside IN and a subquery in FROM without a name.",
+   "rule_hi": "Subquery kahan khadi hai, wahi tay karta hai wo kitna de sakti hai. = < > ke baad ya SELECT list mein ek row aur ek column; IN / NOT IN / ANY / ALL ke baad ek column aur kitni bhi rows; EXISTS ke baad sirf ye ki koi row hai ya nahi, isliye wo kya select karti hai farak nahi padta, aur GROUP BY ke bina aggregate hamesha ek row deta hai (EXISTS (SELECT COUNT(*) ...) hamesha true). Andar ORDER BY ke bina LIMIT jo row pehle mili wahi rakhta hai. MySQL UPDATE/DELETE ki apni table ko subquery mein tabhi padhne deta hai jab use derived table mein lapeta jaaye; MySQL/MariaDB IN ke andar LIMIT aur bina naam ki FROM subquery bhi nahi maante.",
+   "topics": [
+    "subquery",
+    "same_table",
+    "exists_agg",
+    "sub_columns",
+    "scalar_rows",
+    "sub_limit_order",
+    "in_limit",
+    "derived_alias"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/subquery-errors.html",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "values_types": {
+   "title_en": "Values have types: text in quotes, dates in quotes",
+   "title_hi": "Values ke type hote hain: text aur date quotes mein",
+   "rule_en": "A word without quotes is a column name and a date without quotes is arithmetic (2024-01-01 is 2022). Each side of a condition must be a whole comparison: status = 'a' OR 'b' compares nothing on the OR side; write IN ('a', 'b'). BETWEEN needs the smaller value first. Operators depend on the type and the engine: + adds numbers (text joins with CONCAT; || joins text only on PostgreSQL), integer / integer drops the fraction on PostgreSQL, in LIKE % and _ are wildcards, and double quotes mean a name on PostgreSQL. On SQLite every value carries its own type: an expression's text (strftime, substr) is never equal to a number, and dates compare as text, so only 'YYYY-MM-DD' sorts like time.",
+   "rule_hi": "Bina quotes ka shabd column ka naam hai aur bina quotes ki date hisaab hai (2024-01-01 = 2022). OR ke dono taraf poora comparison chahiye: IN ('a', 'b') likho. BETWEEN mein chhoti value pehle. Operator type aur database pe nirbhar hain: + number jodta hai (text CONCAT se; || sirf PostgreSQL pe text jodta hai), PostgreSQL pe integer / integer decimal kaat deta hai, LIKE mein % aur _ wildcard hain, aur PostgreSQL pe double quotes naam hote hain.",
+   "topics": [
+    "value",
+    "or",
+    "between",
+    "concat",
+    "like",
+    "division",
+    "quotes",
+    "type_compare",
+    "date_shape"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/type-conversion.html",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "names_scope": {
+   "title_en": "Names belong to a scope",
+   "title_hi": "Naam ek scope ke hote hain",
+   "rule_en": "Once a table has an alias, only the alias works; a column with no table in front is ambiguous when two joined tables have it; a name made in SELECT exists only for ORDER BY (and HAVING in MySQL), never for WHERE. SELECT * over a join keeps every column of every table, so a name two tables share (id) comes out twice: MariaDB refuses that in a derived table or CTE (1060), PostgreSQL refuses only when the name is used (42702).",
+   "rule_hi": "Table ko alias dene ke baad sirf alias chalta hai; do tables mein same column ho to bina table ke naam ambiguous hai; SELECT mein banaya naam WHERE mein nahi chalta. Join pe SELECT * har table ke saare columns rakhta hai, isliye do tables ka common naam (id) do baar aata hai: MariaDB derived table / CTE mein mana karta hai (1060), PostgreSQL naam use karne pe (42702).",
+   "topics": [
+    "alias",
+    "column",
+    "order",
+    "having_alias",
+    "cte_order",
+    "star_dup",
+    "star_join",
+    "cte_unused"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-alias.html",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "ranking": {
+   "title_en": "Ranking: windows, partitions and ties",
+   "title_hi": "Ranking: window, partition aur ties",
+   "rule_en": "LIMIT cuts the whole result once; 'top N per group' needs a window function partitioned by the group. ROW_NUMBER() gives tied rows different numbers, RANK() gives them the same rank with gaps, DENSE_RANK() without gaps. ORDER BY gives one exact order only when its last column is unique; otherwise ties (and a LIMIT without ORDER BY) return rows in no promised order.",
+   "rule_hi": "LIMIT poore result ko ek baar kaat-ta hai; 'har group ke top N' ke liye group se PARTITION wala window function chahiye. ROW_NUMBER() barabar rows ko alag number deta hai, RANK() same rank (gaps ke saath), DENSE_RANK() bina gaps. ORDER BY tabhi pakka kram deta hai jab aakhri column unique ho; warna barabari (aur bina ORDER BY ka LIMIT) koi tay kram nahi deta.",
+   "topics": [
+    "ties",
+    "top_n",
+    "stable_order"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/window-function-descriptions.html"
+  },
+  "time_ranges": {
+   "title_en": "Time ranges are half-open",
+   "title_hi": "Time range half-open hoti hai",
+   "rule_en": "'2026-01-31' on a column with time means midnight at the start of that day. Write ranges as >= start AND < next period start: right for DATE and DATETIME alike, and a plain column comparison can still use an index (a function like YEAR(col) can't).",
+   "rule_hi": "Time wale column pe '2026-01-31' ka matlab us din ki shuruaat (00:00). Range >= start AND < agla period likho: DATE aur DATETIME dono pe sahi, aur index bhi chalta hai (YEAR(col) jaisa function nahi).",
+   "topics": [
+    "date_range"
+   ],
+   "source": "https://www.postgresql.org/docs/current/datatype-datetime.html"
+  },
+  "changes_safety": {
+   "title_en": "Changing data: which rows, how often, what value, which column",
+   "title_hi": "Data badalna: kaunsi rows, kitni baar, kya value, kaunsa column",
+   "rule_en": "A change touches exactly the rows its WHERE and joins let through, so run the same FROM and WHERE as a SELECT first. Every joined table must be tied to the target row, or every target row passes; PostgreSQL's FROM in an UPDATE is a separate list, so naming the target table there again adds an unlinked copy. Each target row is changed at most once per statement, so a row with several matching child rows gets one of them (total the children first). SET col = (SELECT ...) gives NULL where the subquery finds nothing. INSERT ... SELECT fills the column list by position, never by name. Deleting duplicates needs a rule for which copy stays (t1.id > t2.id). In SET, assignments are separated by commas (AND makes one boolean expression). Change very large sets in batches.",
+   "rule_hi": "Change wahi rows chhoota hai jo uska WHERE aur joins dete hain, isliye pehle wahi FROM aur WHERE SELECT mein chalao. Har joined table target row se judi honi chahiye, warna har row badalti hai; PostgreSQL ke UPDATE ka FROM alag list hai, wahan target table dobara likhna ek bina-judi copy hai. Har target row ek statement mein ek hi baar badalti hai, isliye kai child rows mein se ek hi lagti hai (pehle total banao). SET col = (SELECT ...) match na mile to NULL deta hai. INSERT ... SELECT position se bharta hai, naam se nahi. Duplicate hatane mein batao kaunsi copy rahe (t1.id > t2.id). SET mein comma, AND nahi. Badi rows batches mein.",
+   "topics": [
+    "set",
+    "update_from_self",
+    "change_unlinked",
+    "join_change_many",
+    "set_subquery_null",
+    "insert_order",
+    "insert_count",
+    "insert_no_columns",
+    "dedupe_self",
+    "insert_ignore",
+    "replace_into"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/update.html",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "precedence": {
+   "title_en": "Conditions combine in a fixed order: NOT, then AND, then OR",
+   "title_hi": "Conditions ek tay kram mein judti hain: NOT, phir AND, phir OR",
+   "rule_en": "AND binds tighter than OR, like multiplication before addition, so a OR b AND c is a OR (b AND c). Bracket every OR that is one choice among several.",
+   "rule_hi": "AND OR se pehle lagta hai, jaise jod se pehle guna, isliye a OR b AND c ka matlab a OR (b AND c). Jo OR ek hi chunav hai uspe bracket lagao.",
+   "topics": [
+    "and_or"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/operator-precedence.html"
+  },
+  "join_condition": {
+   "title_en": "A join condition must connect the right rows",
+   "title_hi": "Join condition sahi rows ko jodni chahiye",
+   "rule_en": "Every joined table needs a condition that ties it to a table already in the query, usually child.foreign_key = parent.primary_key. A join with no condition, or with one that mentions only one of the two tables, pairs every row with every row (a cartesian product). Comparing two primary keys (o.id = c.id), a key the wrong way round, or a column that isn't unique on the parent side (a name) pairs rows that don't belong together. NATURAL JOIN and USING pick the columns by name, so a shared column like id or created_at joins things that aren't related. In a self join the same row also meets itself, and every pair appears twice unless one side is kept smaller (a.id < b.id).",
+   "rule_hi": "Har judi table ko ek condition chahiye jo use pehle se maujood table se jode, aam taur pe child.foreign_key = parent.primary_key. Bina condition ka join, ya aisi condition jo sirf ek table ka naam leti hai, har row ko har row se jodta hai (cartesian product). Do primary keys ko milana (o.id = c.id), ulti key, ya parent ki aisi column jo unique nahi (naam), galat rows jodti hai. NATURAL JOIN aur USING naam se column chunte hain, isliye id ya created_at jaisi common column bekaar rishta bana deti hai. Self join mein row khud se bhi milti hai, aur har jodi do baar aati hai jab tak ek taraf chhoti na rakho (a.id < b.id).",
+   "topics": [
+    "join_key",
+    "cartesian",
+    "natural_join",
+    "self_join"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/join.html",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "engine_syntax": {
+   "title_en": "Each database has its own syntax beyond standard SQL",
+   "title_hi": "Har database ka standard SQL ke alawa apna syntax hai",
+   "rule_en": "SQL is the shared language, but each database adds its own words: MySQL/MariaDB have backtick names, LIMIT offset,count, IFNULL, GROUP_CONCAT, DATE_FORMAT; PostgreSQL has :: casts, ILIKE, DISTINCT ON, NULLS FIRST/LAST, string_agg; SQL Server has TOP n, [brackets], GETDATE(). A database refuses another one's words, so the answer depends on which database runs the query: name it, or DBaba reads it from the query.",
+   "rule_hi": "SQL sabki common language hai, par har database apne shabd jodta hai: MySQL/MariaDB mein backtick naam, LIMIT offset,count, IFNULL, GROUP_CONCAT; PostgreSQL mein :: cast, ILIKE, DISTINCT ON, NULLS FIRST/LAST; SQL Server mein TOP n, [brackets], GETDATE(). Ek database doosre ke shabd mana kar deta hai, isliye jawab is baat pe tika hai ki query kaunsa database chalayega.",
+   "topics": [
+    "dialect",
+    "update_join_syntax",
+    "delete_join_syntax",
+    "set_qualified",
+    "upsert_syntax",
+    "conflict_ambiguous",
+    "conflict_no_target",
+    "change_limit",
+    "delete_no_target",
+    "delimiter",
+    "trigger_body_pg",
+    "no_language",
+    "cursor_handler",
+    "declare_order",
+    "ddl_dialect",
+    "reserved_name",
+    "varchar_length",
+    "text_key",
+    "row_too_big"
+   ],
+   "source": "https://www.postgresql.org/docs/current/features.html",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "aggregation": {
+   "title_en": "A total sees only the rows and values that reach it",
+   "title_hi": "Total sirf unhi rows aur values ko dekhta hai jo us tak pahunchti hain",
+   "rule_en": "An aggregate works on the rows left after WHERE and the joins, and of those only on the values that are not NULL; COUNT(*) is the one that counts rows. So COUNT(x) counts filled values, not true ones (a 0 or a false is counted); SUM and AVG skip NULLs, so AVG is the average of the rows that have a value, and SUM of no rows or of only NULLs is NULL, not 0; DISTINCT inside a total works on values, so equal amounts of different rows count once. Totals are made once per group: a total can't hold another total at the same level (do it in two stages), and in a grouped query a window function sees one row per group, so its argument must itself be a total. An average of per-group averages weighs every group the same, and a share is only right when its total covers the same rows as its part.",
+   "rule_hi": "Aggregate WHERE aur joins ke baad bachi rows par chalta hai, aur unme bhi sirf un values par jo NULL nahi; sirf COUNT(*) rows ginta hai. Isliye COUNT(x) bhari values ginta hai, true wali nahi (0 ya false bhi gina jaata hai); SUM aur AVG NULL chhod dete hain, to AVG sirf value wali rows ka average hai, aur khaali ya sirf-NULL ka SUM NULL hai, 0 nahi; total ke andar DISTINCT values par chalta hai, to alag rows ki barabar raqam ek baar gini jaati hai. Total har group ka ek baar banta hai: total ke andar total ek hi level par nahi chalta (do stage mein karo), aur grouped query mein window har group ki ek row dekhta hai, to uska argument bhi total hona chahiye. Group averages ka average har group ko barabar wazan deta hai, aur share tabhi sahi hai jab total un hi rows ka ho jinka hissa hai.",
+   "topics": [
+    "count_case",
+    "count_bool",
+    "sum_bool",
+    "nested_agg",
+    "window_agg",
+    "sum_null",
+    "sum_distinct",
+    "avg_null",
+    "avg_avg",
+    "count_multi",
+    "pct_total"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-aggregate.html",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "correlation": {
+   "title_en": "A subquery reads its own FROM first",
+   "title_hi": "Subquery pehle apna FROM padhti hai",
+   "rule_en": "A name inside a subquery is looked up in the subquery's own FROM first and only then in the query around it. A subquery is tied to the outer row (correlated) only through a name that belongs to the outer query; without one it gives the same answer for every row. So when the subquery reads the same table again, orders.customer_id inside it means the inner orders (x = x, always true) unless the inner copy gets a name of its own; a column of the outer row in the subquery's SELECT list just repeats the row's own value; and IN (SELECT MAX(y) ... GROUP BY g) gives values without saying which group they belong to, so a row matches any group's maximum, not its own. Compare the pair ((g, y) IN (SELECT g, MAX(y) ...)) or correlate on g. A total in SELECT that names no outer column is one grand total repeated on every row; a condition that compares the inner table with itself (o.customer_id = o.id) never reaches the outer row; and a link column must be compared with the table it is named after (p.order_id = o.id, not c.id).",
+   "rule_hi": "Subquery ke andar naam pehle uske apne FROM mein dhoondha jaata hai, phir bahar wali query mein. Subquery bahar ki row se tabhi judti hai (correlated) jab usme bahar wali query ka koi naam ho; warna har row ka ek hi jawab. Isliye wahi table dobara padhne par andar orders.customer_id andar wali orders hai (x = x, hamesha true) jab tak andar wali copy ko apna naam na do; SELECT list mein bahar ki row ka column bas usi row ki value dohraata hai; aur IN (SELECT MAX(y) ... GROUP BY g) values deta hai par ye nahi batata kis group ki, isliye row kisi bhi group ke max se match ho jaati hai. Jodi compare karo ((g, y) IN (SELECT g, MAX(y) ...)) ya g par correlate karo. SELECT ka total jo bahar ka koi column nahi leta, har row pe wahi poora total hai; andar ki table ko khud se milane wali condition (o.customer_id = o.id) bahar ki row tak nahi pahunchti; aur link column ko usi table se milao jiske naam pe wo hai (p.order_id = o.id, c.id nahi).",
+   "topics": [
+    "exists_uncorr",
+    "sub_outer_col",
+    "corr_self",
+    "in_grouped_agg",
+    "sub_key",
+    "scalar_uncorr",
+    "corr_inner",
+    "corr_key"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-expressions.html#SQL-SYNTAX-SCALAR-SUBQUERIES",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "routine_flow": {
+   "title_en": "A routine must end, answer, and not feed itself",
+   "title_hi": "Routine ko khatam hona, jawab dena, aur khud ko na chalana zaroori hai",
+   "rule_en": "A loop ends only when its condition reads something the body changes, or when it reaches LEAVE / EXIT / RETURN. A function must reach a RETURN on every path; a PostgreSQL trigger function returns the row to save (RETURN NEW), and NULL from a BEFORE row trigger means skip the row. A trigger must not run a statement on its own table: MySQL/MariaDB refuse it (1442), PostgreSQL fires it again until the stack runs out. To change the row being saved, change NEW in a BEFORE trigger; in an AFTER trigger the row is already saved.",
+   "rule_hi": "Loop tabhi rukta hai jab condition kuch aisa padhe jo body badalti hai, ya LEAVE / EXIT / RETURN aaye. Function ko har raaste pe RETURN chahiye; PostgreSQL trigger function save hone wali row lautata hai (RETURN NEW), BEFORE row trigger se NULL ka matlab row chhodo. Trigger apni hi table pe statement na chalaye: MySQL/MariaDB mana (1442), PostgreSQL baar baar chalata hai. Row badalni hai to BEFORE trigger mein NEW badlo; AFTER mein row save ho chuki hoti hai.",
+   "topics": [
+    "endless_loop",
+    "function_return",
+    "trigger_same_table",
+    "after_new",
+    "trigger_return"
+   ],
+   "source": "https://www.postgresql.org/docs/current/plpgsql-trigger.html",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "table_keys": {
+   "title_en": "Every table names its rows; every link points at a key",
+   "title_hi": "Har table apni rows ko naam deti hai; har link kisi key pe point karta hai",
+   "rule_en": "A primary key says what one row is, so a table has exactly one (it may span several columns). A foreign key points at a parent's primary key or UNIQUE column, in a table that already exists, and both ends hold the same type (MySQL/MariaDB: same integer size and signedness). The link is read from the child's side (joins from the parent, a parent's DELETE), so the child column wants an index: MySQL/MariaDB InnoDB make one, PostgreSQL does not. MyISAM tables keep no foreign keys at all. On SQLite only a column declared exactly INTEGER PRIMARY KEY numbers itself (INT PRIMARY KEY gives NULL ids), any other key accepts NULL unless its columns say NOT NULL, and foreign keys are checked only on connections that turn them on.",
+   "rule_hi": "Primary key batati hai ek row kya hai, isliye table mein ek hi hoti hai (kai columns ki bhi ho sakti hai). Foreign key parent ki primary key ya UNIQUE column pe point karti hai, pehle se bani table mein, aur dono sire same type ke hon. Link child ki taraf se padha jaata hai, isliye child column pe index chahiye: InnoDB khud banata hai, PostgreSQL nahi. MyISAM foreign key rakhta hi nahi.",
+   "topics": [
+    "no_primary_key",
+    "two_primary_keys",
+    "fk_order",
+    "fk_target",
+    "fk_type",
+    "fk_no_index",
+    "myisam_fk",
+    "sqlite_rowid_pk",
+    "sqlite_pk_null",
+    "sqlite_fk_off"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "column_types": {
+   "title_en": "A column's type is a promise about its values",
+   "title_hi": "Column ka type uski values ka vaada hai",
+   "rule_en": "Pick the type by what the value is and what will be done with it. Money is exact: DECIMAL / NUMERIC, never FLOAT / DOUBLE / REAL (binary guesses). Days and moments are DATE / DATETIME / TIMESTAMP, never text (text sorts letter by letter and accepts 30 February). Quantities are numbers; codes made of digits (phone, PIN code, account number) are text (numbers drop the leading 0 and overflow). On MySQL/MariaDB, text needs utf8mb4 (their 'utf8' is the 3-byte utf8mb3), TIMESTAMP only covers 1970-2038, and VARCHARs share a 65,535-byte row. A length is also a check: make it fit real values. On SQLite a type only gives the column an affinity: VARCHAR(n) and UNSIGNED aren't checked, there is no date type and no exact decimal (dates are 'YYYY-MM-DD' text, exact money is INTEGER paise), STRING means NUMERIC, and a STRICT table takes only INT, INTEGER, REAL, TEXT, BLOB and ANY.",
+   "rule_hi": "Type value ke hisaab se chuno. Paisa exact: DECIMAL / NUMERIC, FLOAT / DOUBLE / REAL kabhi nahi. Din aur samay DATE / DATETIME / TIMESTAMP, text nahi (text akshar se sort hota hai aur 30 February le leta hai). Quantity number; digits wale code (phone, PIN) text (number aage ka 0 hata deta hai). MySQL/MariaDB pe text ke liye utf8mb4, TIMESTAMP sirf 1970-2038, aur VARCHARs ek 65,535-byte row baant-te hain.",
+   "topics": [
+    "money_float",
+    "date_as_text",
+    "number_as_text",
+    "code_as_number",
+    "utf8mb3",
+    "timestamp_range",
+    "over_wide",
+    "sqlite_unenforced",
+    "sqlite_date_type",
+    "sqlite_money",
+    "sqlite_affinity",
+    "sqlite_strict_type"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.4/en/problems-with-float.html",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "one_fact_one_place": {
+   "title_en": "One fact in one place",
+   "title_hi": "Ek baat ek hi jagah",
+   "rule_en": "Each fact is stored once, in the table it belongs to (normalization). A list inside one value ('3,7,12'), numbered copies of a column (phone1, phone2) and a parent's details copied next to its id (customer_id with customer_name) all let one fact be written twice and disagree. Lists and repeats become rows of a child or link table; a parent's details are read with a JOIN, unless the copy is a deliberate snapshot.",
+   "rule_hi": "Har baat ek baar, apni table mein (normalization). Ek value mein list ('3,7,12'), numbered columns (phone1, phone2) aur id ke saath parent ki details ki copy, sab ek baat ko do jagah likhte hain jo baad mein alag ho jaati hai. List aur repeat child/link table ki rows bante hain; parent ki details JOIN se padho.",
+   "topics": [
+    "list_in_column",
+    "repeating_group",
+    "parent_copy"
+   ],
+   "source": "https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-FK",
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "case_logic": {
+   "title_en": "CASE takes the first WHEN that is true, and gives one type",
+   "title_hi": "CASE pehla true WHEN leta hai, aur ek hi type deta hai",
+   "rule_en": "CASE is read from the top and stops at the first WHEN whose condition is true; the WHENs after it are never looked at for that row. So the narrow conditions must come before the wide ones (> 10000 before > 100), a WHEN that an earlier one already covers can never run, and CASE x WHEN NULL never matches because it means x = NULL. A row that matches no WHEN gets the ELSE, and with no ELSE it gets NULL (an empty label, or a NULL that sorts first on MySQL/MariaDB and last on PostgreSQL). All THEN and ELSE results make one column, so they must be one type: text mixed with numbers is refused by PostgreSQL and turns the column into text on MySQL/MariaDB.",
+   "rule_hi": "CASE upar se padha jaata hai aur pehle true WHEN par ruk jaata hai; us row ke liye baad ke WHEN dekhe hi nahi jaate. Isliye chhoti (narrow) conditions pehle (> 10000, > 100 se pehle); jis WHEN ko pehle wala WHEN dhak leta hai wo kabhi nahi chalta, aur CASE x WHEN NULL kabhi match nahi hota kyunki uska matlab x = NULL hai. Kisi WHEN se match na hone wali row ko ELSE milta hai, ELSE na ho to NULL. Saare THEN/ELSE ek column banate hain, isliye ek hi type ke hone chahiye.",
+   "topics": [
+    "case_unreachable",
+    "case_null",
+    "case_no_else",
+    "case_types"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-conditional.html#FUNCTIONS-CASE",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "recursion": {
+   "title_en": "A recursive query runs round after round until a round makes no rows",
+   "title_hi": "Recursive query round par round chalti hai jab tak kisi round mein koi row na bane",
+   "rule_en": "WITH names a query; only WITH RECURSIVE lets a query read its own name. A recursive query is an anchor, run once, UNION [ALL] a recursive part that is run again on the rows the last round made; it ends only when a round makes no new rows. So the recursive part needs something that runs out (a WHERE bound, or a join that finds no more children), a walk through data that can loop needs a depth limit or a visited-path check, and the recursive part can't total, group, sort or LIMIT the whole result. The anchor fixes each column's type and size, so text that grows must start wide enough. Databases guard runaway recursion differently: MariaDB silently stops after 1000 rounds, MySQL 8 errors after 1000, PostgreSQL has no limit.",
+   "rule_hi": "WITH ek query ko naam deta hai; sirf WITH RECURSIVE query ko apna naam padhne deta hai. Recursive query ek anchor (ek baar) aur ek recursive hissa hai jo pichle round ki rows par dobara chalta hai; wo tabhi rukti hai jab kisi round mein nayi row na bane. Isliye recursive hisse ko rukne ki shart chahiye (WHERE ya join jo khatam ho), loop wale data mein depth limit, aur anchor itna chauda ho ki badhta text fit ho. MariaDB 1000 round par chupchaap rukta hai, MySQL 8 error deta hai, PostgreSQL ki koi limit nahi.",
+   "topics": [
+    "cte_recursive_kw",
+    "cte_no_stop",
+    "cte_cycle",
+    "cte_width",
+    "cte_depth",
+    "cte_recursive_term",
+    "cte_columns",
+    "cte_dup_name"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-with.html#QUERIES-WITH-RECURSIVE",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "window_frames": {
+   "title_en": "A window function runs last, over a partition, an order and a frame",
+   "title_hi": "Window function sabse aakhir mein, partition, order aur frame par chalta hai",
+   "rule_en": "A window function adds a value to each row without merging rows, and it is worked out after WHERE, GROUP BY and HAVING, on the rows left; so it can't be used in WHERE, HAVING or GROUP BY (number in a subquery, filter outside). PARTITION BY says which rows belong together (none = the whole result), ORDER BY says their order (none = any order, so LAG, LEAD, RANK and FIRST_VALUE mean nothing), and the frame says which of them the function sees. With ORDER BY and no frame, the frame is RANGE from the start to the current row and its ties: a running total gives tied rows the same value and LAST_VALUE returns the current row. ROW_NUMBER numbers tied rows in any order; RANK and DENSE_RANK give ties one number.",
+   "rule_hi": "Window function rows ko milaye bina har row ko ek value deta hai, aur WHERE, GROUP BY, HAVING ke baad bachi rows par banta hai; isliye WHERE/HAVING/GROUP BY mein nahi chalta (subquery mein number karo, bahar filter). PARTITION BY batata hai kaunsi rows saath hain, ORDER BY unka kram (na ho to koi bhi kram), aur frame kaunsi rows dikhti hain. ORDER BY ho aur frame na ho to frame shuru se current row aur uske barabar wali rows tak: running total barabar rows ko ek hi value deta hai aur LAST_VALUE current row deta hai. ROW_NUMBER barabar rows ko kisi bhi kram mein number deta hai; RANK aur DENSE_RANK unhe ek number dete hain.",
+   "topics": [
+    "win_where",
+    "win_alias_where",
+    "win_nested",
+    "win_no_order",
+    "win_last_value",
+    "win_running_ties",
+    "win_rank_ties",
+    "win_partition_said",
+    "win_version"
+   ],
+   "source": "https://www.postgresql.org/docs/current/sql-expressions.html#SYNTAX-WINDOW-FUNCTIONS",
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "index_use": {
+   "title_en": "An index finds rows only by the bare column, from its first column on",
+   "title_hi": "Index rows sirf seedhe column se dhoondhta hai, pehle column se shuru karke",
+   "rule_en": "An index is a sorted copy of some columns with a pointer to each row; it can jump to the rows whose stored value matches. So the condition must compare the column as it is stored with a value of its own type: a function or arithmetic around the column (YEAR(d), d + 1, LOWER(x), COALESCE(c, 0)), a text column compared with a number, or a LIKE that starts with % gives every row a new value to check, and the whole table (or index) is read. A composite index (a, b) is sorted by a, then by b inside each a: it serves a, or a and b, never b alone, and after a range on a, b only filters. OR between columns of two joined tables can't use one index (UNION ALL of the cases can). OFFSET m still reads the m rows it skips (paging by the last row seen does not). Speed rewrites must return exactly the same rows, and a plan (EXPLAIN) is the proof of what the database actually does.",
+   "rule_hi": "Index kuch columns ki sorted copy hai, har row ke pointer ke saath; ye seedha un rows tak jaata hai jinki stored value match kare. Isliye condition mein column waisa hi ho jaisa store hai, apne type ki value se compare: column pe function ya hisaab (YEAR(d), d + 1, LOWER(x), COALESCE(c, 0)), text column ko number se compare, ya % se shuru LIKE har row ki nayi value banata hai aur poori table padhi jaati hai. Composite index (a, b) pehle a se, phir har a ke andar b se sort hai: a, ya a aur b mein kaam aata hai, akele b mein nahi, aur a pe range ke baad b sirf filter karta hai. Do jude tables ke columns ka OR ek index use nahi kar sakta (UNION ALL kar sakta hai). OFFSET m chhodi hui m rows bhi padhta hai (pichli row se paging nahi). Speed ke rewrite bilkul wahi rows dein, aur EXPLAIN plan saboot hai ki database asal mein kya karta hai.",
+   "topics": [
+    "sargable",
+    "or_union",
+    "keyset",
+    "index_prefix",
+    "index_range_first",
+    "implicit_cast",
+    "leading_wildcard",
+    "plan_full_scan",
+    "plan_index_ignored",
+    "plan_function",
+    "plan_join_scan",
+    "plan_filesort",
+    "plan_temporary",
+    "plan_spill",
+    "plan_estimate",
+    "plan_filter_after_index",
+    "plan_full_index",
+    "plan_heap_fetches",
+    "plan_dependent",
+    "plan_impossible",
+    "plan_auto_index"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/mysql-indexes.html",
+   "seen_at": [
+    "https://use-the-index-luke.com/",
+    "https://www.postgresql.org/docs/current/indexes.html",
+    "https://www.postgresql.org/docs/current/using-explain.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "locking": {
+   "title_en": "A change locks its rows until its transaction ends; others that need them wait",
+   "title_hi": "Badlaav apni rows ko transaction khatam hone tak lock rakhta hai; jinhe wahi rows chahiye wo rukte hain",
+   "rule_en": "Every UPDATE, DELETE and SELECT ... FOR UPDATE locks the rows it touches until COMMIT or ROLLBACK, and a writer that needs a locked row waits (until a lock timeout: MySQL/MariaDB 1205, PostgreSQL 55P03). Plain reads don't wait for writers (each sees the last committed version). So: keep transactions short; change huge sets of rows in batches, each its own transaction, so the final table is the same but nobody waits long; MySQL/MariaDB lock every row their search reads (and, under REPEATABLE READ, the gaps between them), so a WHERE without an index locks the whole table, while PostgreSQL locks only the rows it changes. Two transactions that take the same rows in opposite orders deadlock: one is rolled back (1213 / 40P01) and must be retried; taking rows in one fixed order everywhere prevents it. Queue workers take free rows with FOR UPDATE SKIP LOCKED instead of waiting on the first one. And one statement per value (N+1) costs a round trip each: one statement with IN (...) does the same work.",
+   "rule_hi": "Har UPDATE, DELETE aur SELECT ... FOR UPDATE apni rows ko COMMIT ya ROLLBACK tak lock rakhta hai, aur jise locked row chahiye wo rukta hai (lock timeout tak: 1205 / 55P03). Sirf padhne wale writers ka intezaar nahi karte. Isliye transaction chhote rakho; badi tadaad ki rows tukdon mein badlo, har tukda alag transaction; MySQL/MariaDB search mein padhi har row (aur REPEATABLE READ mein beech ke gaps) lock karte hain, isliye bina index ka WHERE poori table lock karta hai, PostgreSQL sirf badli rows. Do transaction ulte kram mein rows lein to deadlock: ek rollback hota hai (1213 / 40P01) aur dobara chalana padta hai; har jagah ek hi kram se ye nahi hota. Queue workers FOR UPDATE SKIP LOCKED se free rows lein. Aur har value ke liye alag statement (N+1) har baar chakkar lagata hai: IN (...) wala ek statement wahi kaam karta hai.",
+   "topics": [
+    "batch_change",
+    "skip_locked",
+    "lock_scan",
+    "n_plus_one",
+    "deadlock_order"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/explicit-locking.html",
+    "https://dba.stackexchange.com/questions/tagged/deadlock",
+    "https://www.percona.com/blog/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "portability": {
+   "title_en": "One SQL language, each database's own words: a translation keeps the meaning, not just the spelling",
+   "title_hi": "SQL ek bhasha hai, par har database ke kuch shabd apne hain: translation matlab bachata hai, sirf spelling nahi",
+   "rule_en": "SQL is a standard, but every database spells some ideas its own way: the first n rows (LIMIT, TOP, FETCH FIRST, ROWNUM), today's date (NOW(), CURRENT_DATE, GETDATE(), SYSDATE), adding to a date (DATE_ADD, + INTERVAL, DATEADD), the days between two dates (DATEDIFF, date - date), finding text in text (LOCATE, POSITION, CHARINDEX, INSTR, STRPOS), joining a group's text (GROUP_CONCAT, string_agg), quoting names (`backticks`, \"double quotes\", [brackets]) and cast type names. Text one database refuses is easy to see; the dangerous kind runs everywhere but means something else: date - date is a number of days on PostgreSQL and a meaningless subtraction of YYYYMMDD numbers on MySQL/MariaDB, PostgreSQL reads INTERVAL '2' WEEK as two seconds, CAST(x AS CHAR) keeps one character on PostgreSQL, ^ is a power on PostgreSQL and XOR on MySQL, text comparison ignores case on MySQL/MariaDB and not on PostgreSQL, integer division drops the fraction on PostgreSQL, and CONCAT / GREATEST treat NULL differently. So a translation rewrites each construct into the target's own words, proves on the target that it gives the same values, and names the differences in meaning it can't remove. On SQLite dates are text, so date - date subtracts the leading years (0), date + 1 gives the next year as a number, and CAST(x AS DATE) keeps only the year (2024); julianday() and date modifiers say it in its words.",
+   "rule_hi": "SQL standard hai, par har database kuch cheezein apne shabdon mein likhta hai: pehli n rows (LIMIT, TOP, FETCH FIRST, ROWNUM), aaj ki date (NOW(), CURRENT_DATE, GETDATE()), date mein din jodna (DATE_ADD, + INTERVAL, DATEADD), do dates ke beech din (DATEDIFF, date - date), text mein text dhoondhna (LOCATE, POSITION, CHARINDEX), group ka text jodna (GROUP_CONCAT, string_agg), naam quote karna aur cast ke type. Jo database mana kare wo dikh jaata hai; khatarnaak wo hai jo har jagah chalta hai par matlab alag: date - date PostgreSQL pe din, MySQL/MariaDB pe bekaar number; INTERVAL '2' WEEK PostgreSQL pe 2 second; CAST(x AS CHAR) PostgreSQL pe ek akshar; ^ PostgreSQL pe power, MySQL pe XOR; text compare MySQL pe case ignore, PostgreSQL pe nahi; integer bhaag PostgreSQL pe fraction hatata hai. Isliye translation har cheez target ke shabdon mein likhta hai, target pe same values sabit karta hai, aur jo matlab ka farak nahi hat sakta use batata hai. SQLite pe dates text hain: date - date sirf saal ghatata hai (0), date + 1 agla saal number banata hai, aur CAST(x AS DATE) sirf saal (2024) rakhta hai; julianday() aur date modifiers sahi tareeqa hain.",
+   "topics": [
+    "date_math",
+    "interval_unit",
+    "cast_char",
+    "power_xor",
+    "cast_date"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-datetime.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/date-and-time-functions.html",
+    "https://mariadb.com/kb/en/date-time-functions/",
+    "https://learn.microsoft.com/en-us/sql/t-sql/functions/date-and-time-data-types-and-functions-transact-sql",
+    "https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/Functions.html",
+    "https://www.sqlite.org/lang_datefunc.html",
+    "https://stackoverflow.com/questions/tagged/sql-server+mysql",
+    "https://dba.stackexchange.com/questions/tagged/migration"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "code_parameters": {
+   "title_en": "SQL inside code: values travel beside the SQL, never inside its text",
+   "title_hi": "Code ke andar SQL: values SQL ke saath alag jaati hain, uske text ke andar nahi",
+   "rule_en": "A query in a program is a string the code hands to a driver. Its values belong in placeholders (?, $1, :name, %s) and are sent separately, so the database reads the SQL once and a value can't change what it does. Three things follow from that and can be checked from the text alone: a placeholder inside quotes is just characters (the value never goes in); a placeholder can't stand for a name (FROM ? is refused, ORDER BY ? sorts by a constant); and a value written into the SQL text by interpolation, concatenation or formatting is a risk (injection) unless it is forced to a number. A query is the text the database finally receives: pieces joined without a newline turn a -- comment into a comment over everything after it, and a query built across functions can't be read from one string, so it is reported as unread, never guessed.",
+   "rule_hi": "Program ki query ek string hai jo code driver ko deta hai. Values placeholder (?, $1, :name, %s) mein alag jaati hain, taaki database SQL ek baar padhe aur value uska kaam na badle. Isse text se hi teen baatein jaanchi ja sakti hain: quotes ke andar placeholder sirf akshar hai; placeholder naam nahi ho sakta (FROM ? mana, ORDER BY ? constant se sort); aur interpolation / jodne / format se SQL text mein likhi value khatra hai (injection), jab tak wo number na banayi gayi ho. Query wahi text hai jo database tak pahunchta hai: bina newline jude tukdon mein -- comment aage sab kuch comment bana deta hai, aur functions mein tukdon se bani query ek string se nahi padhi ja sakti, isliye use 'padhi nahi' batate hain, andaza nahi.",
+   "topics": [
+    "quoted_placeholder",
+    "placeholder_name",
+    "injection",
+    "comment_swallows"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/sql-prepared-statements.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/sql-prepare.html",
+    "https://mariadb.com/kb/en/prepare-statement/",
+    "https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html",
+    "https://www.psycopg.org/docs/usage.html#passing-parameters-to-sql-queries",
+    "https://developer.wordpress.org/reference/classes/wpdb/prepare/",
+    "https://www.php.net/manual/en/pdo.prepare.php"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "schema_facts": {
+   "title_en": "Facts about the tables decide what a query does: look them up before guessing",
+   "title_hi": "Tables ke facts tay karte hain query kya karegi: andaza lagane se pehle dekho",
+   "rule_en": "Many query risks depend on facts the query text doesn't show: whether a column can be NULL (NOT IN, arithmetic, CONCAT, anti-joins), whether a column set is a key (a join that can repeat rows, ties before LIMIT, a scalar subquery with several rows), whether a column holds a time of day (BETWEEN up to a date), what type each side of a comparison is (a number against text), and which indexes exist. Without the schema these stay a 'check'. With it (CREATE TABLE scripts, a schema dump, migrations replayed in version order, read with each framework's own rule, e.g. a Laravel column is NOT NULL unless ->nullable()) each fact is looked up: the finding is verified, with the file:line that says it, or dropped, with the reason. A name the table doesn't have is a definite error. A table that was only partly read decides nothing.",
+   "rule_hi": "Query ke kai risk un baaton pe tike hain jo query text mein nahi dikhti: column NULL ho sakta hai ya nahi, columns key hain ya nahi, column mein time hai ya nahi, comparison ke dono taraf type kya hai, aur kaunse index hain. Schema ke bina ye 'check' rehte hain. Schema ke saath (CREATE TABLE, dump, version ke kram mein migrations, har framework ke apne niyam se, jaise Laravel column ->nullable() ke bina NOT NULL) har fact dekha jaata hai: finding pakki hoti hai (file:line ke saath) ya hat jaati hai (wajah ke saath). Table mein jo naam nahi wo pakki galti. Adhuri padhi table kuch tay nahi karti.",
+   "topics": [
+    "schema_column",
+    "schema_table",
+    "join_types",
+    "index_missing"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/information-schema-columns-table.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/infoschema-columns.html",
+    "https://www.postgresql.org/docs/current/typeconv-oper.html",
+    "https://laravel.com/docs/11.x/migrations",
+    "https://mariadb.com/kb/en/alter-table/",
+    "https://use-the-index-luke.com/sql/where-clause/obfuscation"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "proof_classes": {
+   "title_en": "Say how sure you are: prove what the query text proves, label the rest",
+   "title_hi": "Kitna pakka hai ye batao: jo query text se sabit ho wo sabit karo, baaki ko label karo",
+   "rule_en": "With only the query, there is no schema, no index list, no data and no plan, so none of those may be invented. A finding is PROVEN when the SQL text alone decides it (the engine refuses it, '= NULL', an aggregate in WHERE, an alias that was never defined). It is a LIKELY RISK when the shape suggests it but the data or the intent decides (a one-to-many join before a total copies rows only when a parent really has several children). It NEEDS SCHEMA when a fact about the tables decides it (can the column be NULL, is it a key, does it hold a time of day, what type is it), and it NEEDS EXECUTION when it is about speed (indexes, row counts and the plan decide). What the query implies about the tables (tables, aliases, columns and their roles, a rough type only where a literal or a function shows it, links from the ON conditions) is written down as an inferred schema with verified=false, and every assumption comes with the read-only query that settles it. Index advice says 'worth checking whether an index exists', never 'the index is missing', until the indexes have been seen. When the schema, EXPLAIN or data arrive, each finding is upgraded to verified or dropped: a pasted plan that reads a table in full confirms the speed risk on it, a plan that reaches it through an index rules the risk out (night 15).",
+   "rule_hi": "Sirf query ho to schema, index list, data aur plan kuch nahi hota, isliye inme se kuch bhi gadha nahi jaata. Finding PAKKI tab hai jab sirf SQL text use tay kare (engine mana kare, '= NULL', WHERE mein aggregate, alias jo kabhi bana hi nahi). SHAYAD RISK tab jab shakal se lagta hai par data ya matlab tay karta hai (total se pehle one-to-many join tabhi rows copy karta hai jab parent ke sach mein kai child hon). TABLE STRUCTURE chahiye jab tables ka koi fact tay kare (column NULL ho sakta hai, key hai, time rakhta hai, type kya hai), aur EXPLAIN chahiye jab baat speed ki ho (index, rows ki ginti aur plan tay karte hain). Query se tables ke baare mein jo dikhta hai (tables, alias, columns aur unka kaam, type sirf jab literal ya function dikhaye, ON se links) wo inferred schema mein verified=false ke saath likha jaata hai, aur har assumption ke saath wo read-only query jo use tay kare. Index ki salah 'dekh lo index hai ya nahi' hoti hai, 'index missing hai' nahi, jab tak index dekhe na hon. Schema, EXPLAIN ya data aane par har finding pakki hoti hai ya hat jaati hai.",
+   "topics": [],
+   "source": "https://www.postgresql.org/docs/current/infoschema-columns.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/explain.html",
+    "https://mariadb.com/kb/en/analyze-statement/",
+    "https://www.postgresql.org/docs/current/using-explain.html",
+    "https://dev.mysql.com/doc/refman/8.0/en/information-schema-columns-table.html",
+    "https://use-the-index-luke.com/sql/explain-plan"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "set_operations": {
+   "title_en": "UNION removes repeats, UNION ALL keeps them",
+   "title_hi": "UNION repeats hatata hai, UNION ALL rakhta hai",
+   "rule_en": "UNION stacks the rows of its parts and then removes every repeated row, including repeats inside one part, which needs a sort or a hash of all rows. UNION ALL only stacks them. So UNION ALL returns the same rows exactly when no row can appear twice: the parts can't share a row (a constant column that differs per part, conditions that exclude each other) and each part has no repeats of its own (it lists a key, or has DISTINCT / GROUP BY on its columns). When each value is wanted once, UNION (or DISTINCT) is needed. Rows are compared with the column's collation: MariaDB's usual _ci collation counts 'A@x' and 'a@x' as one row, PostgreSQL doesn't.",
+   "rule_hi": "UNION parts ki rows jodta hai aur phir har repeat row hata deta hai, ek hi part ke andar ke repeats bhi, jiske liye saari rows ka sort ya hash chahiye. UNION ALL sirf jodta hai. Isliye UNION ALL bilkul wahi rows tab deta hai jab koi row do baar aa hi na sake: parts ki rows kabhi same na hon (har part mein alag constant column, ya aapas mein ulti conditions) aur har part mein apne repeats na hon (key, ya DISTINCT / GROUP BY). Har value ek baar chahiye to UNION (ya DISTINCT) zaroori hai. Rows column ke collation se compare hoti hain: MariaDB ka _ci 'A@x' aur 'a@x' ko ek maanta hai, PostgreSQL nahi.",
+   "topics": [
+    "union_all",
+    "union_all_dups"
+   ],
+   "source": "https://www.postgresql.org/docs/current/queries-union.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/union/",
+    "https://dev.mysql.com/doc/refman/8.4/en/union.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "repeated_work": {
+   "title_en": "The same subquery written twice is worked out twice",
+   "title_hi": "Do baar likhi wahi subquery do baar chalti hai",
+   "rule_en": "Each copy of a subquery is its own piece of work: PostgreSQL makes one SubPlan (correlated) or InitPlan (not correlated) per copy, MariaDB one DEPENDENT SUBQUERY or SUBQUERY per copy. Work it out once instead: give a SELECT item a name and use the name in ORDER BY, wrap the query in a derived table to filter on that name (WHERE can't see SELECT names), or join a one-row derived table (CROSS JOIN) for a total without GROUP BY, which always has exactly one row. The rows don't change; only the work does, so it is a speed risk to check with EXPLAIN.",
+   "rule_hi": "Subquery ki har copy alag kaam hai: PostgreSQL har copy ka ek SubPlan / InitPlan banata hai, MariaDB har copy ka ek DEPENDENT SUBQUERY / SUBQUERY. Ek baar nikalo: SELECT item ko naam do aur ORDER BY mein naam lo, us naam pe filter ke liye query ko derived table mein rakho (WHERE SELECT ke naam nahi dekhta), ya bina GROUP BY ke total ke liye ek row ki derived table CROSS JOIN karo (wo hamesha ek hi row hoti hai). Rows nahi badalti, sirf kaam; isliye ye speed ka risk hai, EXPLAIN se dekho.",
+   "topics": [
+    "repeat_subquery",
+    "same_subquery"
+   ],
+   "source": "https://www.postgresql.org/docs/current/using-explain.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/subquery-cache/",
+    "https://mariadb.com/kb/en/condition-pushdown-into-derived-table-optimization/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "rewrite_equivalence": {
+   "title_en": "A rewrite is the same query only if it keeps matching, NULLs, duplicates, ordering and grain",
+   "title_hi": "Rewrite tabhi wahi query hai jab matching, NULL, duplicates, order aur grain wahi rahein",
+   "rule_en": "Two queries are the same only when, on every possible data, they return the same rows the same number of times in the promised order. So a rewrite is checked on five things: which rows pass (matching), what an unknown value does (NULLs: IN vs EXISTS differ under NOT and in SELECT; NOT IN never passes once its list holds a NULL; COUNT of nothing is 0 but NULL after a LEFT JOIN), how many times a row comes (a JOIN repeats rows a semi-join keeps once; UNION removes repeats UNION ALL keeps), the order ORDER BY promises (keyset paging needs a unique, NULL-free sort), and what one output row stands for (grain: a LEFT JOIN to a table grouped by the link keeps one row per outer row). A volatile expression (RAND()) is a new value each time, so computing it once is not the same. What one case shows proves nothing: the proof is the reasoning on all five, checked by running both forms on varied data.",
+   "rule_hi": "Do queries tabhi same hain jab har data pe wahi rows, utni hi baar, wahi order mein dein. Isliye rewrite paanch cheezon pe jaancha jaata hai: kaunsi rows paas hoti hain (matching), NULL kya karta hai (IN vs EXISTS NOT ke andar aur SELECT mein alag; list mein NULL ho to NOT IN kabhi paas nahi; khaali COUNT 0 par LEFT JOIN ke baad NULL), row kitni baar aati hai (JOIN rows dohrata hai, semi-join ek baar; UNION repeats hataata hai, UNION ALL rakhta hai), ORDER BY ka wada (keyset ke liye unique, bina NULL sort), aur ek output row kya hai (grain). RAND() har baar nayi value hai, isliye use ek baar nikalna same nahi. Ek case se kuch pakka nahi hota: paanchon pe soch, aur alag data pe dono roop chala ke jaanch.",
+   "topics": [
+    "preagg",
+    "compute_once",
+    "volatile_repeat",
+    "rw_exists",
+    "rw_not_exists",
+    "rw_in",
+    "rw_not_in",
+    "rw_join",
+    "rw_cte",
+    "rw_cte_derived",
+    "rw_union_all",
+    "rw_keyset",
+    "rw_once",
+    "rw_nothing"
+   ],
+   "source": "https://www.postgresql.org/docs/current/functions-subquery.html",
+   "seen_at": [
+    "https://mariadb.com/kb/en/exists-to-in-optimization/",
+    "https://use-the-index-luke.com/no-offset",
+    "https://www.postgresql.org/docs/current/xfunc-volatility.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  },
+  "transactions": {
+   "title_en": "A transaction is all-or-nothing, and each database says differently when one begins and ends",
+   "title_hi": "Transaction sab-ya-kuch-nahi hai, aur har database alag batata hai ki wo kab shuru aur khatam hoti hai",
+   "rule_en": "Statements between BEGIN and COMMIT are saved together; ROLLBACK (or a lost connection) undoes them together; outside a transaction each statement is saved on its own as it runs, so a ROLLBACK later undoes nothing and a failure halfway leaves half the changes. Read a script as a sequence of states (is a transaction open, what has it read and written, which savepoints exist) and check each statement against the database's own rules: a second BEGIN (SQLite refuses it, MySQL/MariaDB commit the first part, PostgreSQL ignores it), table changes inside a transaction (MySQL/MariaDB commit first; PostgreSQL and SQLite keep them inside), commands that can't run inside one (VACUUM, CREATE INDEX CONCURRENTLY, a journal-mode change), savepoints that don't exist, where SET TRANSACTION goes (before START TRANSACTION on MySQL, right after BEGIN on PostgreSQL), what an error inside a transaction does (MySQL/MariaDB and SQLite undo only that statement, PostgreSQL refuses everything until ROLLBACK), and a transaction left open (its locks stay; on SQLite the whole database). On SQLite, one connection writes at a time: a transaction that reads and then writes starts with BEGIN IMMEDIATE, because a plain BEGIN's later write fails at once if another connection wrote in between, busy timeout or not.",
+   "rule_hi": "BEGIN aur COMMIT ke beech ke statements saath save hote hain; ROLLBACK unhe saath hatata hai; transaction ke bahar har statement chalte hi save hota hai, isliye baad ka ROLLBACK kuch nahi karta aur beech mein fail aadhe badlav chhod deta hai. Script ko states ki tarah padho (transaction khuli hai ya nahi, kya padha/likha, kaunse savepoints) aur har statement ko database ke apne rule se jaancho: doosra BEGIN (SQLite mana, MySQL/MariaDB pehla hissa commit, PostgreSQL ignore), transaction mein table badlaav (MySQL/MariaDB pehle commit), transaction mein na chalne wali commands (VACUUM, CREATE INDEX CONCURRENTLY, journal mode), na bane savepoints, SET TRANSACTION ki jagah, transaction mein error (PostgreSQL ROLLBACK tak sab mana karta hai), aur khuli chhodi transaction. SQLite mein ek waqt ek writer: padh-kar-likhne wali transaction BEGIN IMMEDIATE se.",
+   "topics": [
+    "transaction"
+   ],
+   "source": "https://www.sqlite.org/lang_transaction.html",
+   "seen_at": [
+    "https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html",
+    "https://www.postgresql.org/docs/current/tutorial-transactions.html",
+    "https://dba.stackexchange.com/questions/tagged/transaction",
+    "https://www.reddit.com/r/sqlite/"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql",
+    "sqlite"
+   ]
+  },
+  "statement_shape": {
+   "title_en": "A statement has a fixed shape before it has a meaning",
+   "title_hi": "Statement ka ek tay dhancha hota hai, matlab baad mein",
+   "rule_en": "The parser reads clauses in one order (SELECT: FROM, JOIN, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT; UPDATE: SET, WHERE, ORDER BY, LIMIT; DELETE: FROM, WHERE, ORDER BY, LIMIT) and knows only its own comparison operators (=, <>, !=, <, <=, >, >=). A clause out of place or an operator from another language (==, =<, =>) stops the statement before any row is read. Each clause keeps its own text, so putting it back in its place has exactly one meaning and that repair is sure; what the statement then means is checked next.",
+   "rule_hi": "Parser clauses ek hi order mein padhta hai (SELECT: FROM, JOIN, WHERE, GROUP BY, HAVING, ORDER BY, LIMIT) aur sirf apne operators jaanta hai (=, <>, <=, >=). Galat jagah ka clause ya doosri language ka operator (==, =<, =>) query ko pehli row padhne se pehle rok deta hai. Har clause apna text rakhta hai, isliye use sahi jagah rakhna pakka fix hai; matlab uske baad check hota hai.",
+   "topics": [
+    "clause_order",
+    "operator"
+   ],
+   "source": "https://dev.mysql.com/doc/refman/8.0/en/select.html",
+   "seen_at": [
+    "https://www.postgresql.org/docs/current/sql-select.html",
+    "https://mariadb.com/kb/en/select/",
+    "https://www.postgresql.org/docs/current/functions-comparison.html"
+   ],
+   "proven": [
+    "mariadb",
+    "postgresql"
+   ]
+  }
+ }
+}

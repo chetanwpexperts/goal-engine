@@ -1,0 +1,384 @@
+{
+ "extends": "mysql",
+ "name": "MariaDB",
+ "words": [
+  "mariadb",
+  "mariadbd",
+  "galera",
+  "aria"
+ ],
+ "codes": {
+  "1969": "statement_timeout",
+  "4025": "check_violation"
+ },
+ "messages": [
+  {
+   "cause": "source_log_purged",
+   "re": "connecting slave requested to start from GTID [\\d-]+, which is not in the master's binlog"
+  },
+  {
+   "cause": "statement_timeout",
+   "re": "max_statement_time exceeded"
+  },
+  {
+   "cause": "check_violation",
+   "re": "CONSTRAINT `(?P<constraint>[^`]+)` failed for"
+  }
+ ],
+ "fix": {
+  "statement_timeout": [
+   "EXPLAIN <your query>;  -- look for type = ALL and a big rows number",
+   "-- MariaDB's limit is max_statement_time (seconds); add the missing index rather than raising it."
+  ],
+  "check_violation": [
+   "SELECT CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_NAME = '{constraint}';"
+  ],
+  "lock_wait": [
+   "-- Who is blocking whom (MariaDB):\nSELECT * FROM information_schema.innodb_lock_waits;\nSELECT trx_id, trx_started, trx_query, trx_mysql_thread_id FROM information_schema.innodb_trx ORDER BY trx_started;",
+   "-- If a forgotten transaction blocks: KILL <trx_mysql_thread_id>;  (after checking what it is)"
+  ],
+  "too_many_connections": [
+   "SHOW VARIABLES LIKE 'max_connections';\nSHOW GLOBAL STATUS LIKE 'Threads_connected';\nSHOW GLOBAL STATUS LIKE 'Max_used_connections';",
+   "-- Short term: SET GLOBAL max_connections = 300;  (and in my.cnf)\n-- Real fix: a connection pool and closing connections; lower wait_timeout:\nSET GLOBAL wait_timeout = 120;"
+  ],
+  "write_on_replica": [
+   "SELECT @@hostname, @@port, @@read_only;   -- read_only = 1: this server is a replica or switched to read-only (MariaDB has no super_read_only; users with READ ONLY ADMIN can still write)",
+   "-- Send writes to the primary: check the host in the app's database config. After a failover, recycle the app's connection pool.",
+   "-- Common mistake: SET GLOBAL read_only = OFF on a replica to make the error go away; writes there make it drift and stop replication later."
+  ]
+ },
+ "settings": {
+  "timeout": "max_statement_time"
+ },
+ "live": {
+  "too_many_connections": {
+   "type": "ratio",
+   "sql": [
+    "SELECT variable_value FROM information_schema.global_status WHERE variable_name = 'MAX_USED_CONNECTIONS'",
+    "SELECT @@max_connections"
+   ],
+   "above": 0.9
+  },
+  "binlog_not_expiring": {
+   "type": "rows_present",
+   "sql": "SELECT 1 FROM information_schema.GLOBAL_VARIABLES v WHERE v.VARIABLE_NAME = 'LOG_BIN' AND v.VARIABLE_VALUE = 'ON' AND NOT EXISTS (SELECT 1 FROM information_schema.GLOBAL_VARIABLES e WHERE e.VARIABLE_NAME IN ('BINLOG_EXPIRE_LOGS_SECONDS', 'EXPIRE_LOGS_DAYS', 'MAX_BINLOG_TOTAL_SIZE') AND e.VARIABLE_VALUE + 0 > 0)",
+   "proof": "binary logging is on and no expiry or size limit is set, so old binary logs are never removed"
+  }
+ },
+ "named": ["\\bmaria\\s?db\\b", "\\bmariadbd\\b", "मारिया\\s?डीबी"],
+ "error_marks": ["your MariaDB server version"],
+ "query_marks": [
+  "`[^`]+`",
+  "\\blimit\\s+\\d+\\s*,\\s*\\d+",
+  "\\b(ifnull|curdate|date_format|str_to_date|group_concat|unix_timestamp)\\s*\\(",
+  "\\bauto_increment\\b",
+  "\\bupdate\\s+[\\w`.]+(?:\\s+(?:as\\s+)?\\w+)?\\s+(?:inner\\s+|left\\s+(?:outer\\s+)?)?join\\b",
+  "\\bdelete\\s+[\\w`]+(?:\\s*,\\s*[\\w`]+)*\\s+from\\b",
+  "\\bon\\s+duplicate\\s+key\\s+update\\b",
+  "\\binsert\\s+ignore\\b",
+  "(?<!or )(?<!OR )\\breplace\\s+into\\b",
+  "(?m)^\\s*delimiter\\s+\\S+"
+ ],
+ "query_rules": {
+  "double_equals": {"behaviour": "error", "says": "MariaDB refuses it with error 1064 (a syntax error).", "proven": ["mariadb"]},
+  "pipes": "or",
+  "plus_on_text": "number",
+  "int_division": "decimal",
+  "nulls_in_desc": "last",
+  "isnull_args": 1,
+  "ifnull": true,
+  "nvl": true,
+  "double_quotes": "string",
+  "concat_null": "null",
+  "like_case": "insensitive",
+  "limit_in_subquery": {"behaviour": "error", "code": "1235", "says": "MySQL and MariaDB refuse LIMIT inside IN / ANY / ALL / SOME (error 1235, doesn't yet support 'LIMIT & IN/ALL/ANY/SOME subquery').", "proven": ["mariadb"]},
+  "derived_alias": {"behaviour": "error", "code": "1248", "says": "MySQL refuses a subquery in FROM without a name (error 1248, Every derived table must have its own alias); MariaDB stops with a syntax error (1064).", "proven": ["mariadb"]},
+  "sum_boolean": {"behaviour": "works", "says": "MySQL and MariaDB treat true as 1 and false as 0, so SUM(condition) counts the matches there.", "proven": ["mariadb"]},
+  "having_alias": {"behaviour": "works", "says": "MySQL and MariaDB let HAVING use a name made in SELECT.", "proven": ["mariadb"]},
+  "count_distinct_multi": {"behaviour": "works", "says": "MySQL and MariaDB accept COUNT(DISTINCT a, b) and skip a combination that has a NULL in it.", "proven": ["mariadb"]},
+  "window_over_ungrouped": {"behaviour": "arbitrary", "says": "MariaDB runs it and takes the plain column from one row of each group (silently wrong); MySQL refuses it when ONLY_FULL_GROUP_BY is on (its default).", "proven": ["mariadb"]},
+  "update_join": {"behaviour": "works", "says": "MySQL and MariaDB write a joined UPDATE as UPDATE a JOIN b ON ... SET a.col = ... (or UPDATE a, b SET ... WHERE ...).", "proven": ["mariadb"]},
+  "update_from": {"behaviour": "error", "code": "1064", "says": "MySQL and MariaDB have no FROM in UPDATE: UPDATE a SET ... FROM b stops with error 1064 (syntax error near 'FROM').", "proven": ["mariadb"]},
+  "set_qualified": {"behaviour": "works", "says": "MySQL and MariaDB accept SET alias.col = ... (in a joined UPDATE they need it).", "proven": ["mariadb"]},
+  "delete_join": {"behaviour": "works", "says": "MySQL and MariaDB delete through a join as DELETE a FROM a JOIN b ON ... WHERE ...", "proven": ["mariadb"]},
+  "delete_using": {"behaviour": "error", "code": "1064", "says": "MySQL and MariaDB read DELETE FROM a USING b differently (the USING list must contain a): it stops with error 1064 when a has an alias, or 1109 (Unknown table in MULTI DELETE).", "proven": ["mariadb"]},
+  "on_duplicate_key": {"behaviour": "works", "says": "MySQL and MariaDB upsert with INSERT ... ON DUPLICATE KEY UPDATE col = VALUES(col).", "proven": ["mariadb"]},
+  "on_conflict": {"behaviour": "error", "code": "1064", "says": "MySQL and MariaDB don't know ON CONFLICT: error 1064 (syntax error near 'CONFLICT').", "proven": ["mariadb"]},
+  "change_limit": {"behaviour": "works", "says": "MySQL and MariaDB accept ORDER BY and LIMIT on a single-table UPDATE or DELETE.", "proven": ["mariadb"]},
+  "insert_ignore": {"behaviour": "works", "says": "MySQL and MariaDB accept INSERT IGNORE.", "proven": ["mariadb"]},
+  "replace_into": {"behaviour": "works", "says": "MySQL and MariaDB accept REPLACE INTO.", "proven": ["mariadb"]},
+  "case_mixed_types": {"behaviour": "converts", "says": "MySQL and MariaDB run it but turn the whole CASE column into text, so the numbers then sort and compare as text ('1000' before '50').", "proven": ["mariadb"]},
+  "recursion_limit": {"behaviour": "silent", "code": "3636", "says": "MariaDB stops after max_recursive_iterations (1000) rounds with NO error and returns only the rows made so far (in the lab, a series to 2000 returned 1001 rows).", "proven": ["mariadb"], "source": "https://mariadb.com/kb/en/server-system-variables/#max_recursive_iterations"},
+  "recursive_text_width": {"behaviour": "error", "code": "1406", "says": "MySQL and MariaDB size a text column from the anchor ('x' is one character, a VARCHAR(40) column is 40), and a longer value from the recursive part stops the query with error 1406 (Data too long for column) in strict mode.", "proven": ["mariadb"]},
+  "window_needs_order": {"behaviour": "error", "code": "4018", "says": "MariaDB refuses LAG, LEAD, RANK, DENSE_RANK, PERCENT_RANK and CUME_DIST without ORDER BY in the window (error 4018, No order list in window specification).", "proven": ["mariadb"]},
+  "like_prefix_index": {"behaviour": "fast", "says": "On MySQL/MariaDB an ordinary index serves LIKE 'abc%' as a range (lab: type range on MariaDB 10.11).", "proven": ["mariadb"]},
+  "text_vs_number": {"behaviour": "silent", "code": "1292", "says": "MySQL/MariaDB turn every value of the column into a number to compare it, so the index can't be used (lab: type index / ALL) and '098...' and '98... ' match too (a 1292 note, no error).", "proven": ["mariadb"]},
+  "or_same_table": {"behaviour": "fast", "says": "MariaDB combines two indexes for an OR on one table (EXPLAIN: index_merge, Using union(a,b)).", "proven": ["mariadb"]},
+  "expression_index": {"behaviour": "versioned", "says": "MySQL 8.0.13+ can index an expression (INDEX ((LOWER(email)))). MariaDB 10.11 can't: add a virtual column (email_lc VARCHAR(80) AS (LOWER(email)) VIRTUAL, INDEX (email_lc)) and compare that column by name; the lab showed WHERE LOWER(email) = ... still reads the whole index.", "proven": ["mariadb"]},
+  "offset_reads": {"behaviour": "slow", "says": "MariaDB's EXPLAIN for ORDER BY id LIMIT 20 OFFSET 15000 shows rows = 15020: every skipped row is read.", "proven": ["mariadb"]},
+  "optimizer_sargable": {"behaviour": "versioned", "says": "MariaDB 11.1+ turns DATE(col) and YEAR(col) compared with a constant into a range on the index by itself (the CI run on MariaDB 11 also did it for LEFT(col, n) = 'abc'); MariaDB 10.11 and MySQL 8 don't (lab: 10.11 read the whole index). The bare-column form is fast on every version and on PostgreSQL.", "proven": ["mariadb"]},
+  "skip_locked": {"behaviour": "versioned", "says": "MySQL 8.0.1+ and MariaDB 10.6+ have SKIP LOCKED (lab: MariaDB 10.11 gave the second worker job 2 at once); NOWAIT on MariaDB fails at once with 1205 (MySQL 8: 3572).", "proven": ["mariadb"]},
+  "lock_scan": {"behaviour": "locks_scanned", "says": "MySQL/MariaDB (InnoDB) lock every index record the search reads: with no index on the WHERE's column that is every row, so a second session changing another row waits (lab: 1205 after the lock wait timeout).", "proven": ["mariadb"]},
+  "gap_locks": {"behaviour": "locks_gaps", "says": "Under REPEATABLE READ (the InnoDB default) a range change also locks the gaps: an INSERT into the range waits (lab: 1205).", "proven": ["mariadb"]},
+  "deadlock": {"behaviour": "error", "code": "1213", "says": "MySQL/MariaDB stop one of the two with 1213 (SQLSTATE 40001, Deadlock found when trying to get lock) and roll it back; SHOW ENGINE INNODB STATUS keeps the LATEST DETECTED DEADLOCK.", "proven": ["mariadb"]},
+  "join_without_on": {"behaviour": "works", "says": "MySQL/MariaDB run JOIN or INNER JOIN without ON as a cross join (lab: 8 customers x 8 orders = 64 rows, no error).", "proven": ["mariadb"]},
+  "star_dup_derived": {"behaviour": "error", "code": "1060", "says": "MySQL/MariaDB refuse a derived table or CTE whose SELECT * over a join has the same column name twice (error 1060, Duplicate column name).", "proven": ["mariadb"]},
+  "union_collation": {"behaviour": "works", "says": "MySQL/MariaDB compare UNION rows with the column's collation: under the usual _ci collation 'aarav@mail.test' and 'AARAV@mail.test' are one row (lab: 9 e-mails vs PostgreSQL's 10).", "proven": ["mariadb"]},
+  "repeated_subquery": {"behaviour": "slow", "says": "MariaDB's EXPLAIN shows one DEPENDENT SUBQUERY per copy (its subquery cache may remember results for repeated outer values).", "proven": ["mariadb"]},
+  "same_subquery": {"behaviour": "slow", "says": "MariaDB's EXPLAIN shows one SUBQUERY per copy.", "proven": ["mariadb"]},
+  "cte_read_twice": {"behaviour": "works", "says": "MariaDB pushes a filter on a CTE's GROUP BY column into each copy it reads (EXPLAIN FORMAT=JSON: attached_condition inside both), and refuses AS NOT MATERIALIZED (1064).", "proven": ["mariadb"]},
+  "nulls_sort_order": {"behaviour": "works", "says": "MySQL and MariaDB sort NULLs first in ASC and last in DESC (lab: ORDER BY discount, id puts order 1, with no discount, first).", "proven": ["mariadb"]},
+  "row_comparison": {"behaviour": "works", "says": "(a, b) > (x, y) works on MySQL and MariaDB (lab: the same 6 rows as the spelled-out form); a NULL in either row makes it not TRUE.", "proven": ["mariadb"]},
+  "volatile_once": {"behaviour": "differs", "says": "RAND() written twice gives two values per row (lab: 10 rows passed 'r < 0.5 AND r >= 0.5'); inside a derived table or CTE it is worked out once per row (0 rows).", "proven": ["mariadb"]},
+  "exists_to_in": {"behaviour": "works", "says": "MariaDB rewrites a correlated EXISTS into IN by itself (EXISTS-to-IN optimization) and MySQL 8 runs both as semi-joins, so the plan rarely changes with the spelling.", "proven": ["mariadb"]}
+ },
+ "proven": [
+  "mariadb"
+ ],
+ "schema_rules": {
+  "about": "How MySQL/MariaDB take a CREATE TABLE (night 6): what they refuse, what they silently change, and their limits. Lab: MariaDB 10.11.",
+  "marks": [
+   "\\bengine\\s*=\\s*\\w+",
+   "\\bauto_increment\\b",
+   "`[^`]+`",
+   "\\bunsigned\\b",
+   "\\b(?:default\\s+)?(?:charset|character\\s+set)\\s*=",
+   "\\b(tinyint|mediumint|longtext|mediumtext|tinytext|longblob|mediumblob|tinyblob|datetime)\\b",
+   "\\bcomment\\s+'",
+   "\\bon\\s+update\\s+current_timestamp\\b",
+   "\\benum\\s*\\("
+  ],
+  "fk_auto_index": {
+   "behaviour": "made",
+   "says": "InnoDB makes an index on a foreign key column by itself when none leads with it.",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "utf8": {
+   "behaviour": "utf8mb3",
+   "code": "1366",
+   "says": "'utf8' is utf8mb3 (3 bytes): a 4-byte character (emoji) is refused in strict mode (1366 Incorrect string value).",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "myisam_fk": {
+   "behaviour": "ignored",
+   "says": "ENGINE=MyISAM accepts FOREIGN KEY / REFERENCES with no warning and never checks them.",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "inline_references": {
+   "behaviour": "enforced",
+   "says": "MariaDB 10.5+ keeps a column's inline REFERENCES as a real foreign key (lab: MariaDB 10.11 refused a missing parent, 1452). MySQL before 9.0 parsed it and ignored it (documented; not lab-tested here): write FOREIGN KEY (col) REFERENCES t (id) as its own line.",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "fk_same_type": {
+   "behaviour": "error",
+   "code": "1005 errno 150",
+   "says": "Both ends of a foreign key need the same integer size and signedness; INT -> BIGINT, INT -> INT UNSIGNED and INT -> VARCHAR are refused (errno 150).",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "fk_target": {
+   "behaviour": "index",
+   "says": "A foreign key may point at any indexed parent column (a non-unique one is accepted, against the SQL standard); a parent column with no index is refused (errno 150).",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "max_row_bytes": {
+   "value": 65535,
+   "code": "1118",
+   "says": "All VARCHARs of a row together may use at most 65,535 bytes (characters x 4 in utf8mb4); one VARCHAR over 16,383 utf8mb4 characters is 1074.",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "text_primary_key": {
+   "behaviour": "error",
+   "code": "1170",
+   "says": "A TEXT / BLOB column can't be a primary key without a prefix length (1170). MariaDB 10.4+ accepts TEXT in UNIQUE (a hidden hash); MySQL refuses it there too (documented).",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "timestamp_range": {
+   "value": [
+    "1970-01-01 00:00:01",
+    "2038-01-19 03:14:07"
+   ],
+   "code": "1292",
+   "says": "TIMESTAMP holds 1970-01-01 to 2038-01-19 UTC (2106 on MariaDB 11.5+; 1292 outside it); DATETIME holds years 1000-9999.",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "varchar_needs_length": {
+   "behaviour": "error",
+   "code": "1064",
+   "says": "VARCHAR without a length is a syntax error.",
+   "proven": [
+    "mariadb"
+   ]
+  },
+  "reserved": [
+   "all",
+   "analyze",
+   "binary",
+   "both",
+   "change",
+   "check",
+   "column",
+   "condition",
+   "constraint",
+   "create",
+   "current_date",
+   "current_user",
+   "default",
+   "desc",
+   "distinct",
+   "div",
+   "else",
+   "except",
+   "false",
+   "fetch",
+   "for",
+   "foreign",
+   "from",
+   "grant",
+   "group",
+   "having",
+   "in",
+   "index",
+   "intersect",
+   "interval",
+   "into",
+   "key",
+   "leading",
+   "limit",
+   "localtime",
+   "lock",
+   "mod",
+   "natural",
+   "not",
+   "null",
+   "offset",
+   "on",
+   "or",
+   "order",
+   "primary",
+   "range",
+   "read",
+   "references",
+   "release",
+   "returning",
+   "rows",
+   "select",
+   "table",
+   "to",
+   "trailing",
+   "true",
+   "union",
+   "unique",
+   "usage",
+   "using",
+   "values",
+   "when",
+   "where",
+   "with",
+   "write"
+  ],
+  "reserved_note": "Lab-tested on MariaDB 10.11 as bare table and column names. MySQL 8 also reserves rank, groups, window, lateral, row_number, lead, lag (documented, not lab-tested here).",
+  "foreign_types": {
+   "timestamptz": "DATETIME",
+   "timestamp with time zone": "DATETIME",
+   "timestamp without time zone": "DATETIME",
+   "jsonb": "JSON",
+   "bytea": "LONGBLOB",
+   "bigserial": "BIGINT AUTO_INCREMENT",
+   "smallserial": "SMALLINT AUTO_INCREMENT",
+   "inet": "VARCHAR(45)",
+   "cidr": "VARCHAR(45)",
+   "money": "DECIMAL(19,2)",
+   "citext": "VARCHAR(255)",
+   "array": "JSON"
+  },
+  "foreign_attrs": [
+   [
+    "\\bgenerated\\s+(?:always|by\\s+default)\\s+as\\s+identity(?:\\s*\\([^()]*\\))?",
+    "AUTO_INCREMENT",
+    "GENERATED ... AS IDENTITY"
+   ],
+   [
+    "::\\s*[a-z]\\w*(?:\\s*\\[\\s*\\])?",
+    "",
+    ":: casts"
+   ]
+  ],
+  "foreign_options": [],
+  "proven": [
+   "mariadb"
+  ]
+ },
+ "explain": {
+  "about": "MySQL and MariaDB EXPLAIN: one row per table, in join order. type says how that table's rows are found; rows is the estimate (MariaDB ANALYZE adds r_rows, the real count, and r_filtered).",
+  "proven": ["mariadb"],
+  "access": {
+   "SYSTEM": {"en": "the table has one row", "hi": "table mein ek hi row hai"},
+   "CONST": {"en": "at most one row, found by the primary key or a unique key compared with a value, read once", "hi": "primary/unique key se zyada se zyada ek row, ek hi baar"},
+   "EQ_REF": {"en": "one row for each row before it, by its primary or unique key (the best join step)", "hi": "pichli har row ke liye primary/unique key se ek row (sabse achha join)"},
+   "REF": {"en": "the rows with one value of an index (a non-unique index, or a key prefix)", "hi": "index ki ek value wali rows"},
+   "REF_OR_NULL": {"en": "like ref, plus the rows where the column IS NULL", "hi": "ref jaisa, saath mein NULL wali rows"},
+   "FULLTEXT": {"en": "a FULLTEXT index search", "hi": "FULLTEXT index se search"},
+   "RANGE": {"en": "a stretch of an index (>, <, BETWEEN, IN, LIKE 'abc%')", "hi": "index ka ek hissa (>, <, BETWEEN, IN, LIKE 'abc%')"},
+   "INDEX_MERGE": {"en": "two or more indexes read and their rows combined (an OR or AND across indexed columns)", "hi": "do ya zyada index padh ke rows milaayi"},
+   "INDEX": {"en": "the whole index is read, entry by entry (cheaper than the table, but every entry)", "hi": "poora index entry-entry padha jaata hai"},
+   "ALL": {"en": "every row of the table is read and checked (a full table scan)", "hi": "table ki har row padh ke check hoti hai (full table scan)"},
+   "UNIQUE_SUBQUERY": {"en": "an IN subquery answered by a unique index lookup", "hi": "IN subquery unique index se"},
+   "INDEX_SUBQUERY": {"en": "an IN subquery answered by an index lookup", "hi": "IN subquery index se"}
+  },
+  "extra": {
+   "Using index condition": {"en": "part of the WHERE is checked inside the index before reading the row", "hi": "WHERE ka hissa row padhne se pehle index mein check"},
+   "Using index for group-by": {"en": "groups read straight from the index", "hi": "groups seedha index se"},
+   "Using index": {"en": "everything needed is in the index (covering): the table itself isn't read", "hi": "saara data index mein hai (covering): table nahi padhi"},
+   "Using where": {"en": "rows are checked against the WHERE after they are read", "hi": "rows padhne ke baad WHERE se check"},
+   "Using filesort": {"en": "rows are sorted after they are found, not read in index order", "hi": "rows milne ke baad sort hoti hain"},
+   "Using temporary": {"en": "a temporary table holds the groups or distinct rows", "hi": "groups ke liye temporary table"},
+   "Using join buffer": {"en": "this table has no usable index for the join, so rows are matched in batches", "hi": "join ke liye index nahi, rows batch mein milaayi jaati hain"},
+   "Using union": {"en": "rows from two indexes are combined (index merge for an OR)", "hi": "do index ki rows milaayi (OR ke liye)"},
+   "Impossible WHERE": {"en": "the WHERE can never be true: no row is read", "hi": "WHERE kabhi true nahi: koi row nahi padhi"},
+   "Range checked for each record": {"en": "no good index is known in advance; one is chosen again for every row before it", "hi": "pichli har row ke liye index naye sire se chuna jaata hai"}
+  },
+  "tree": {
+   "Table scan on": {"en": "every row of the table is read", "hi": "table ki har row padhi jaati hai"},
+   "Index scan on": {"en": "the whole index is read in order", "hi": "poora index kram se padha jaata hai"},
+   "Covering index scan on": {"en": "the whole index is read; the table itself isn't needed", "hi": "poora index padha, table nahi"},
+   "Index lookup on": {"en": "rows with one value of an index", "hi": "index ki ek value wali rows"},
+   "Single-row index lookup on": {"en": "one row by a unique key", "hi": "unique key se ek row"},
+   "Covering index lookup on": {"en": "rows with one value, read from the index alone", "hi": "ek value ki rows, sirf index se"},
+   "Index range scan on": {"en": "a stretch of an index", "hi": "index ka ek hissa"},
+   "Filter:": {"en": "rows checked against a condition after they are read", "hi": "padhne ke baad condition se check"},
+   "Nested loop": {"en": "for each row of the first input, the matching rows of the second are looked up", "hi": "pehle input ki har row ke liye doosre ki matching rows"},
+   "Inner hash join": {"en": "one side is put in a hash table and the other side probes it", "hi": "ek taraf hash table, doosri usme dhoondhti hai"},
+   "Sort:": {"en": "rows sorted after they are found", "hi": "rows milne ke baad sort"},
+   "Aggregate": {"en": "totals worked out", "hi": "totals banaye"},
+   "Limit:": {"en": "only the first rows are passed on", "hi": "sirf pehli rows aage"}
+  }
+ },
+ "schema_facts": {
+  "join_number_text": {"behaviour": "silently_converts", "code": "1292", "says": "MariaDB turns the text side into a number for every row: '01', ' 2' and '1abc' all match 1 (warning 1292) and the text column's index can't be used.", "proven": ["mariadb"]},
+  "add_not_null_no_default": {"behaviour": "fills_empty", "says": "ADD COLUMN ... NOT NULL without DEFAULT on a table with rows gives the old rows '' (text) or 0 (numbers), with no error.", "proven": ["mariadb"]},
+  "unknown_column": {"behaviour": "error", "code": "1054", "says": "A column the table doesn't have: error 1054 (42S22) Unknown column.", "proven": ["mariadb"]},
+  "fk_makes_index": {"behaviour": "index_made", "says": "InnoDB creates an index for a FOREIGN KEY that has none (it shows in information_schema.statistics under the column's name).", "proven": ["mariadb"]}
+ },
+ "verify": {"nullable": "SELECT column_name, is_nullable, data_type FROM information_schema.columns WHERE table_name = '{table}' AND column_name IN ({cols})", "nulls_now": "SELECT COUNT(*) AS null_rows FROM {table} WHERE {col} IS NULL", "dupes": "SELECT {cols}, COUNT(*) AS n FROM {table} GROUP BY {cols} HAVING COUNT(*) > 1 LIMIT 5", "structure": "SHOW CREATE TABLE {table}", "indexes": "SHOW INDEX FROM {table}", "plan": "EXPLAIN {query}", "plan_run": "ANALYZE {query}", "plan_run_note": "MariaDB has no EXPLAIN ANALYZE (error 1064): ANALYZE <statement> runs it and adds the real row counts (r_rows) to the plan. ANALYZE on UPDATE/DELETE really changes rows: use plain EXPLAIN for those.", "proven": ["mariadb"], "lab": "EXPLAIN ANALYZE SELECT -> 1064 on MariaDB 10.11; ANALYZE SELECT returns the plan with r_rows. information_schema.columns doesn't list TEMPORARY tables on MariaDB."},
+ "syntax_refused": {"about": "Statements MySQL 8 accepts and this MariaDB refuses with a syntax error (1064), found in the lab on MariaDB 10.11 (night 15, tests/practice/test_night15.py LAB). The reasoning and the rewrite are general (app/agents/sqlport.py, _engine_syntax); only these facts are MariaDB's.", "lag_default": {"error": "error 1064 (syntax)", "proven": ["mariadb"], "says_en": "MariaDB's LAG / LEAD take the value and the offset only, not a default for the missing row (MySQL 8 and PostgreSQL accept a third argument).", "says_hi": "MariaDB ke LAG / LEAD sirf value aur offset lete hain, khaali row ka default nahi (MySQL 8 aur PostgreSQL teesra argument lete hain)."}, "cte_before_change": {"error": "error 1064 (syntax)", "proven": ["mariadb"], "says_en": "MariaDB reads WITH only in front of a SELECT: WITH ... UPDATE / DELETE / INSERT is a syntax error there (MySQL 8 and PostgreSQL run it). Inside the statement it works: the WITH goes into the subquery that reads it, or after INSERT INTO t (...).", "says_hi": "MariaDB WITH ko sirf SELECT ke aage padhta hai: WITH ... UPDATE / DELETE / INSERT wahan syntax error hai (MySQL 8 aur PostgreSQL chala dete hain). Statement ke andar chalta hai: WITH us subquery mein jaata hai jo use padhti hai, ya INSERT INTO t (...) ke baad."}},
+ "grouping": {"case": "insensitive", "trailing_spaces": "ignored", "accents": "ignored", "says": "GROUP BY on a text column follows the column's collation. With MariaDB's default utf8mb4_general_ci, 'Red', 'red' and 'RED' are one group, 'e' and 'é' are one group, and 'a' and 'a ' are one group (trailing spaces are ignored even with utf8mb4_bin).", "proven": ["mariadb"]},
+ "support_ended": {"versions": {"10.3": "2023-05-25", "10.4": "2024-06-18", "10.5": "2025-06-24", "10.6": "2026-07-06"}, "source": "https://mariadb.org/about/#maintenance-policy", "note": "Long-term releases only; published end-of-life dates (not lab-provable)."}
+}

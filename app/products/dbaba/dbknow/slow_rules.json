@@ -1,0 +1,32 @@
+[
+  {
+    "id": "function-on-indexed-column",
+    "engines": ["mysql", "mariadb", "postgres"],
+    "detect": "where[\\s\\S]*\\b(year|month|date|lower|upper|trim)\\s*\\(\\s*[a-z_][\\w.]*\\s*\\)\\s*(=|<|>|in\\b|like\\b)",
+    "title_en": "A function on the column stops the index from being used",
+    "title_hi": "Column pe function lagane se index use nahi hota",
+    "fix_en": "Compare the plain column against a range instead, e.g. created_at >= '2026-01-01' AND created_at < '2027-01-01' instead of YEAR(created_at) = 2026.",
+    "fix_hi": "Column pe function ki jagah range use karo, jaise YEAR(created_at) = 2026 ki jagah created_at >= '2026-01-01' AND created_at < '2027-01-01'.",
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/range-optimization.html"
+  },
+  {
+    "id": "leading-wildcard-like",
+    "engines": ["mysql", "mariadb", "postgres"],
+    "detect": "like\\s+'%[^']*'",
+    "title_en": "LIKE '%...' can't use a normal index",
+    "title_hi": "LIKE '%...' normal index use nahi kar sakta",
+    "fix_en": "Search from the start (LIKE 'abc%') where possible, or use a full-text index (MySQL FULLTEXT, PostgreSQL pg_trgm).",
+    "fix_hi": "Ho sake to shuru se search karo (LIKE 'abc%'), warna full-text index use karo (MySQL FULLTEXT, PostgreSQL pg_trgm).",
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/index-btree-hash.html"
+  },
+  {
+    "id": "select-star-order-limit-offset",
+    "engines": ["mysql", "mariadb", "postgres"],
+    "detect": "offset\\s+\\d{4,}|limit\\s+\\d{4,}\\s*,",
+    "title_en": "Large OFFSET reads and throws away many rows",
+    "title_hi": "Bada OFFSET bahut saari rows padh ke chhod deta hai",
+    "fix_en": "Page by the last seen id instead (WHERE id > last_id ORDER BY id LIMIT 50).",
+    "fix_hi": "Pichli id ke hisaab se page karo (WHERE id > last_id ORDER BY id LIMIT 50).",
+    "source": "https://dev.mysql.com/doc/refman/8.0/en/limit-optimization.html"
+  }
+]

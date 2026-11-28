@@ -59,6 +59,7 @@ def _scheduler(stop: threading.Event) -> None:
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     init_db()
+    from app.products import dbaba, sheetu  # register product capabilities
     from app.engine import learning as rules
     from app.data import learning as storage
     from app.services import learning as service

@@ -364,7 +364,7 @@ def fetch_sheet(sheet_id: str) -> bytes:
 
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 GoalEngine"})
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    with urllib.request.urlopen(req, timeout=60) as resp:  # fixed https://docs.google.com URL; sheet_id is [A-Za-z0-9_-] (GSHEET_RE)  # nosec B310
         data = resp.read(GSHEET_MAX + 1)
     if len(data) > GSHEET_MAX:
         raise OfficeAgentError("This Google Sheet is too big to fetch by link (over 200 MB). Download it as .xlsx and upload the file.")

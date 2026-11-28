@@ -396,7 +396,7 @@ def judge(g: dict, engine: str, db: dict, ram: int | None = None, slow_checks=No
                                            "Queries slower than long_query_time are not written anywhere.",
                                            "Switch it on to keep a record of slow queries between DBaba's checks.",
                                            "SET GLOBAL slow_query_log = ON;  SET GLOBAL long_query_time = 1;"))
-        if str(val("bind_address")) in ("0.0.0.0", "*", "::"):
+        if str(val("bind_address")) in ("0.0.0.0", "*", "::"):  # reading the database's setting to warn about it, not binding  # nosec B104
             items["security"].append(_item("bind_all", "warning", "The database listens on every network address",
                                            f"bind_address = {val('bind_address')}.",
                                            "Anyone who can reach this machine can try passwords. If only apps on this machine use "
@@ -414,7 +414,7 @@ def judge(g: dict, engine: str, db: dict, ram: int | None = None, slow_checks=No
                                            "Nothing clears dead rows or refreshes statistics by itself.",
                                            "Tables keep growing, plans go stale, and in the end PostgreSQL stops writing to "
                                            "protect itself (transaction ID wraparound).", "ALTER SYSTEM SET autovacuum = on; SELECT pg_reload_conf();"))
-        if str(val("listen_addresses")) in ("*", "0.0.0.0"):
+        if str(val("listen_addresses")) in ("*", "0.0.0.0"):  # reading the database's setting to warn about it, not binding  # nosec B104
             items["security"].append(_item("listen_all", "warning", "PostgreSQL listens on every network address",
                                            f"listen_addresses = '{val('listen_addresses')}'.",
                                            "Anyone who can reach this machine can try passwords. Limit it, and keep pg_hba.conf strict."))

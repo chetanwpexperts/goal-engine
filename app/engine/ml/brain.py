@@ -177,7 +177,7 @@ def _next_step(goal: Goal, hi: bool) -> Turn:
     goal.pending = None
     refresh(goal, hi)
     reply, next_line = _answer(goal, hi)
-    digest = hashlib.sha1(reply.encode()).hexdigest()[:12]
+    digest = hashlib.sha1(reply.encode(), usedforsecurity=False).hexdigest()[:12]
     data = _slots(goal)
     if data.get("_last_answer") == digest:
         # Never send the same answer twice: offer to explain one step instead.

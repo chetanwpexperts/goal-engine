@@ -22,8 +22,8 @@ _spec = importlib.util.spec_from_file_location("goal_connector", Path(__file__).
 gc = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(gc)
 
-SOCKETS = {"mysql": ("/run/mysqld/mysqld.sock", "/var/run/mysqld/mysqld.sock", "/var/lib/mysql/mysql.sock", "/tmp/mysql.sock"),
-           "postgresql": ("/run/postgresql/.s.PGSQL.5432", "/var/run/postgresql/.s.PGSQL.5432", "/tmp/.s.PGSQL.5432")}
+SOCKETS = {"mysql": ("/run/mysqld/mysqld.sock", "/var/run/mysqld/mysqld.sock", "/var/lib/mysql/mysql.sock", "/tmp/mysql.sock"),  # where a database puts its socket; only read  # nosec B108
+           "postgresql": ("/run/postgresql/.s.PGSQL.5432", "/var/run/postgresql/.s.PGSQL.5432", "/tmp/.s.PGSQL.5432")}  # only read  # nosec B108
 
 
 def _mysql_greeting(host: str, port: int, timeout: float = 1.0) -> str | None:

@@ -171,8 +171,10 @@ python -m tests.arch_scan
 
 Replace the three lists with the corresponding sorted output lists,
 preserving the baseline metadata. Review the diff to ensure only resolved
-entries disappear. The current route scan inventories existing routes;
-Step 7 adds recognition of permission declarations. Maintain scanner
+entries disappear. The route scan lists routes that declare no permission
+(`Depends(require(...))` on the route or on its `APIRouter`); after Step 7 that list is empty, and
+tests/test_route_permissions.py also checks the running site and on-server apps, so a route without a permission
+fails the tests. `require(perm, hidden=True)` answers a refused caller 404 instead of 401 (the DB area). Maintain scanner
 coverage as code moves so that relocation alone cannot hide a violation.
 
 ## Migration plan

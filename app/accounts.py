@@ -15,6 +15,7 @@ import secrets
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request, Response
+from app.security.permissions import require
 from fastapi.responses import JSONResponse
 from app.domain.schemas.accounts import (
     SignupIn,
@@ -33,7 +34,7 @@ from app.domain.models import AuthAttempt, EmailCode, User, UserSession, utcnow 
 from app.security.audit import record as audit_record
 
 log = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require("public"))])   # each route checks the session itself
 
 SESSION_COOKIE = "ge_sess"
 SESSION_DAYS = 30

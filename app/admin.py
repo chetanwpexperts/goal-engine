@@ -12,6 +12,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from app.security.permissions import require
 from app.domain.schemas.admin import (
     EnquiryUpdate,
     MissUpdate,
@@ -26,7 +27,7 @@ from app.security.audit import record
 from app.domain.models import (Agent, DbConnectLog, Enquiry, ExpertRequest, LearnedPhrase, LearnMiss, LearnRequest, Message,
                         User, UserSession, utcnow)
 
-router = APIRouter(prefix="/api/admin")
+router = APIRouter(prefix="/api/admin", dependencies=[Depends(require("admin"))])
 ROOT = Path(__file__).resolve().parent.parent
 DBKNOW = Path(__file__).resolve().parent / "products" / "dbaba" / "dbknow"
 OFFICEKNOW = Path(__file__).resolve().parent / "products" / "sheetu" / "officeknow"

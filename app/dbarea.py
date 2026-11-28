@@ -13,6 +13,7 @@ import re
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request
+from app.security.permissions import require
 from fastapi.responses import JSONResponse
 from app.domain.schemas.dbarea import (
     CodeIn,
@@ -25,7 +26,7 @@ from app.core.db import get_db
 from app.domain.models import Connector, ConnectorJob, DbConnectLog, User, UserSession, utcnow
 
 log = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require("account", hidden=True))])   # guests see 404, as before
 
 IDLE_LOCK = timedelta(minutes=15)
 TOUCH_EVERY = timedelta(seconds=30)

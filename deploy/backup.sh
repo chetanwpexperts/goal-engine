@@ -19,7 +19,7 @@ chmod 600 "$CNF"
 DB_NAME="$(.venv/bin/python - "$CNF" <<'PY'
 import sys
 from sqlalchemy.engine import make_url
-from app.config import get_settings
+from app.core.config import get_settings
 
 u = make_url(str(get_settings().sqlalchemy_url()) if not hasattr(get_settings().sqlalchemy_url(), "render_as_string")
              else get_settings().sqlalchemy_url().render_as_string(hide_password=False))

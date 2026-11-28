@@ -277,10 +277,10 @@ def test_every_rewrite_has_a_contract_and_records_where_it_was_proven():
     for t in sqlproof.SAME:
         assert sqlproof.family_of(t), t
     assert all(v == ["mariadb", "postgresql"] for v in sqlproof.PROVEN.values()) and set(sqlproof.PROVEN) >= TONIGHT
-    funds = json.load(open("app/dbknow/core/query_fundamentals.json"))["fundamentals"]
+    funds = json.load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"]
     assert TONIGHT <= {t for f in funds.values() for t in f["topics"]}
     for eng in ("mysql", "mariadb", "postgresql"):
-        rules = json.load(open(f"app/dbknow/dialects/{eng}.json"))["query_rules"]
+        rules = json.load(open(f"app/products/dbaba/dbknow/dialects/{eng}.json"))["query_rules"]
         for key in ("nulls_sort_order", "row_comparison", "volatile_once", "exists_to_in"):
             assert rules[key]["says"] and rules[key]["proven"], (eng, key)
 

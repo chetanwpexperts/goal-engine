@@ -33,7 +33,7 @@ def test_tonights_concepts_are_complete():
         assert set(c["proven"]) >= {"mariadb", "postgresql"} and all(e.get("result") is not None for e in c["examples"]), cid
         assert c["source"].startswith(("https://dev.mysql.com/", "https://www.postgresql.org/docs/", "https://mariadb.com/kb/")), cid
         assert set(c["engines"]) >= {"mysql", "mariadb", "postgresql"}, cid
-        assert all(set(f) <= set(K.pack() and __import__("json").load(open("app/dbknow/core/query_fundamentals.json"))["fundamentals"])
+        assert all(set(f) <= set(K.pack() and __import__("json").load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"])
                    for f in [c["fundamentals"]]), cid
 
 

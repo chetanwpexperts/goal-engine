@@ -2250,7 +2250,7 @@ def _in_engine_words(out: dict, engine: str) -> dict:
     fam = E.query_family(engine)
     if fam not in ("postgresql", "sqlite"):
         return out
-    d = json.loads((Path(__file__).resolve().parents[1] / "dbknow" / "dialects" / f"{fam}.json").read_text(encoding="utf-8"))
+    d = json.loads((Path(__file__).resolve().parent / "dbknow" / "dialects" / f"{fam}.json").read_text(encoding="utf-8"))
     words = [(re.compile(w["re"]), w["to"]) for w in d.get("wording", [])]
     drop = [re.compile(x) for x in d.get("not_here", [])]
     kinds = [(re.compile(k["re"]), k["kind"]) for k in d.get("kinds", [])]

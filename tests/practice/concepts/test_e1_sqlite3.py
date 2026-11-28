@@ -19,7 +19,7 @@ E1N3 = ["sqlite_explain_query_plan", "sqlite_scan_search", "sqlite_automatic_ind
 
 def test_tonights_concepts_are_complete():
     ids = {c["id"] for c in K.concepts()}
-    funds = json.load(open("app/dbknow/core/query_fundamentals.json"))["fundamentals"]
+    funds = json.load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"]
     assert set(E1N3) <= ids and len(E1N3) >= 15
     for cid in E1N3:
         c = K.by_id(cid)

@@ -296,10 +296,10 @@ def test_every_structural_rule_records_where_it_was_proven():
     import json
 
     assert all(v == ["mariadb", "postgresql"] for v in sqlstruct.PROVEN.values()) and set(sqlstruct.PROVEN) >= TONIGHT
-    funds = json.load(open("app/dbknow/core/query_fundamentals.json"))["fundamentals"]
+    funds = json.load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"]
     mapped = {t for f in funds.values() for t in f["topics"]}
     assert TONIGHT <= mapped
     for eng in ("mysql", "mariadb", "postgresql"):
-        rules = json.load(open(f"app/dbknow/dialects/{eng}.json"))["query_rules"]
+        rules = json.load(open(f"app/products/dbaba/dbknow/dialects/{eng}.json"))["query_rules"]
         for key in ("join_without_on", "star_dup_derived", "union_collation", "repeated_subquery", "same_subquery", "cte_read_twice"):
             assert rules[key]["says"] and rules[key]["proven"], (eng, key)

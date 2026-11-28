@@ -1,4 +1,4 @@
-"""The lab for the concepts pack: every example query in app/dbknow/core/concepts.json is run on MariaDB/MySQL and on
+"""The lab for the concepts pack: every example query in app/products/dbaba/dbknow/core/concepts.json is run on MariaDB/MySQL and on
 PostgreSQL against the practice schema (tests/practice/schema.py); a SQLite example (E1) runs on SQLite (Python's sqlite3). The result kept with the example is what both engines
 returned; an example whose engines disagree (when it is meant to be the same) is a failure.
 

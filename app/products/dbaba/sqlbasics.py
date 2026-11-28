@@ -17,7 +17,7 @@ from pathlib import Path
 
 from app.agents.sqlverify import keep as schema_keep
 
-DIALECTS = Path(__file__).resolve().parent.parent / "dbknow" / "dialects"
+DIALECTS = Path(__file__).resolve().parent / "dbknow" / "dialects"
 
 # money-like columns that are often left empty (no discount, no commission): NULL in a sum makes the sum NULL
 OPTIONAL_NUM = set("""discount discount_amount shipping shipping_cost shipping_fee shipping_charge delivery_charge delivery_fee commission bonus

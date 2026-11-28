@@ -21,7 +21,7 @@ from pathlib import Path
 
 from app.agents import sqlcorrect as C
 
-CORE = Path(__file__).resolve().parent.parent / "dbknow" / "core" / "confidence.json"
+CORE = Path(__file__).resolve().parent / "dbknow" / "core" / "confidence.json"
 PROVEN_ON = ["mariadb", "postgresql"]          # every class rule and every check query below: tests/practice/test_night11.py LAB
 
 NAME = r"(?:`[^`]+`|\"[^\"]+\"|[A-Za-z_][\w$]*)"

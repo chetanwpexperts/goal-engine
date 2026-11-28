@@ -25,7 +25,7 @@ from pathlib import Path
 
 from app.agents.sqlroutine import _mask
 
-DIALECTS = Path(__file__).resolve().parent.parent / "dbknow" / "dialects"
+DIALECTS = Path(__file__).resolve().parent / "dbknow" / "dialects"
 PROVEN = {k: ["mariadb", "postgresql"] for k in (
     "money_float", "date_as_text", "number_as_text", "code_as_number", "no_primary_key", "fk_no_index", "utf8mb3", "myisam_fk",
     "ddl_dialect", "two_primary_keys", "fk_type", "fk_order", "fk_target", "varchar_length", "reserved_name", "row_too_big",

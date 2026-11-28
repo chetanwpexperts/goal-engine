@@ -297,7 +297,7 @@ def test_every_rule_says_where_it_was_proven():
     assert all(set(v) >= {"mariadb", "postgresql"} for v in sqlaggs.PROVEN.values())
     topics = {t for f in fundamentals()["fundamentals"].values() for t in f["topics"]}
     assert set(sqlaggs.PROVEN) <= topics
-    d = Path(sqlaggs.__file__).resolve().parents[1] / "dbknow" / "dialects"
+    d = Path(sqlaggs.__file__).resolve().parent / "dbknow" / "dialects"
     for fam in ("mysql", "mariadb", "postgresql"):
         rules = json.loads((d / f"{fam}.json").read_text(encoding="utf-8"))["query_rules"]
         for key in ("sum_boolean", "having_alias", "count_distinct_multi", "window_over_ungrouped"):

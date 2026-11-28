@@ -34,7 +34,7 @@ FUNC_IN_FILTER = re.compile(r"\b(extract|date_part|date|year|month|lower|upper|\
 
 @lru_cache(maxsize=None)
 def _meanings(family: str) -> dict:
-    d = json.loads((Path(__file__).resolve().parents[1] / "dbknow" / "dialects" / f"{family}.json").read_text(encoding="utf-8"))
+    d = json.loads((Path(__file__).resolve().parent / "dbknow" / "dialects" / f"{family}.json").read_text(encoding="utf-8"))
     return d.get("explain", {})
 
 

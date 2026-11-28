@@ -26,7 +26,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-DIALECTS = Path(__file__).resolve().parent.parent / "dbknow" / "dialects"
+DIALECTS = Path(__file__).resolve().parent / "dbknow" / "dialects"
 
 # the date parts people write (SQL Server's short names included), in the standard words both engines read
 UNITS = {"year": "YEAR", "years": "YEAR", "yy": "YEAR", "yyyy": "YEAR", "quarter": "QUARTER", "quarters": "QUARTER", "qq": "QUARTER",

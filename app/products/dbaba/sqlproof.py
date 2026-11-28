@@ -88,7 +88,7 @@ def contracts() -> dict:
     """The shared contracts (app/dbknow/core/rewrites.json)."""
     global _RW
     if _RW is None:
-        here = os.path.join(os.path.dirname(__file__), "..", "dbknow", "core", "rewrites.json")
+        here = os.path.join(os.path.dirname(__file__), "dbknow", "core", "rewrites.json")
         with open(here, encoding="utf-8") as fh:
             _RW = json.load(fh)
     return _RW

@@ -1,4 +1,4 @@
-"""Query fundamentals (app/dbknow/core/query_fundamentals.json) and reading a query stage by stage (app/agents/sqlread.py):
+"""Query fundamentals (app/products/dbaba/dbknow/core/query_fundamentals.json) and reading a query stage by stage (app/agents/sqlread.py):
 every finding names the fundamental it breaks, the card shows 'How DBaba read this query', and the chat answers 'what does
 this query do / ye query kya karti hai' with the reading and the fundamentals behind what's wrong."""
 

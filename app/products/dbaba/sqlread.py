@@ -10,7 +10,7 @@ from pathlib import Path
 
 from app.agents import sqlcorrect as C
 
-FUND = Path(__file__).resolve().parent.parent / "dbknow" / "core" / "query_fundamentals.json"
+FUND = Path(__file__).resolve().parent / "dbknow" / "core" / "query_fundamentals.json"
 
 
 @lru_cache(maxsize=1)

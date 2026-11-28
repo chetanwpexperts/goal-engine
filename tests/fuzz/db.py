@@ -12,7 +12,7 @@ Families:
              verified/unverified wording, findings match what was injected
   followups  a chat through the API: the slow-database message, the query, then follow-ups (optimise, what changed,
              why slow, which indexes, explain)
-  phrasings  new descriptions of every playbook in app/dbknow/issues.json: the right playbook, or "not sure"
+  phrasings  new descriptions of every playbook in app/products/dbaba/dbknow/issues.json: the right playbook, or "not sure"
 
 Tables are named fz<seed>_* and dropped afterwards. An engine whose server is down is skipped.
 """

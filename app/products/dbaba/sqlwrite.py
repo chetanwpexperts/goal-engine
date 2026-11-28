@@ -27,7 +27,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
-WORDS_FILE = Path(__file__).resolve().parent.parent / "dbknow" / "core" / "write_words.json"
+WORDS_FILE = Path(__file__).resolve().parent / "dbknow" / "core" / "write_words.json"
 
 # "write a query", "query to", "sql for", "kaise likhu", or a request verb followed by what to get
 ASK_RE = re.compile(

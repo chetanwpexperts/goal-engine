@@ -519,7 +519,7 @@ def test_every_rule_records_where_it_was_proven():
     topics = set(fundamentals()["fundamentals"]["index_use"]["topics"])
     assert set(sqlspeed.PROVEN) <= topics and set(sqlexplain.PROVEN) <= topics
     for eng in ("mysql", "mariadb", "postgresql"):
-        d = json.load(open(f"app/dbknow/dialects/{eng}.json"))
+        d = json.load(open(f"app/products/dbaba/dbknow/dialects/{eng}.json"))
         keys = ("like_prefix_index", "text_vs_number", "or_same_table", "expression_index", "offset_reads")
         for key in keys + (("optimizer_sargable",) if eng != "postgresql" else ()):
             assert d["query_rules"][key]["proven"] and d["query_rules"][key]["says"], (eng, key)

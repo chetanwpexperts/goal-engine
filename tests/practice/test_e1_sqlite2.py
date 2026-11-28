@@ -384,7 +384,7 @@ def test_tonights_topics_have_their_fundamentals_and_proof():
 
     from app.agents import sqlschema
 
-    funds = json.load(open("app/dbknow/core/query_fundamentals.json"))["fundamentals"]
+    funds = json.load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"]
     topics = {t for f in funds.values() for t in f["topics"]}
     tonight = {"sqlite_rowid_pk", "sqlite_pk_null", "sqlite_unenforced", "sqlite_date_type", "sqlite_money", "sqlite_affinity", "sqlite_fk_off",
                "sqlite_strict_type", "type_compare", "date_shape"}

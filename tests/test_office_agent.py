@@ -146,7 +146,7 @@ def test_only_one_process_resumes(tmp_path):
     tmp_path.mkdir(exist_ok=True)
     held = open(tmp_path / ".resume.lock", "w")
     fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)          # another worker already owns it
-    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=str(__import__("pathlib").Path(o.__file__).parents[2]))
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=str(__import__("pathlib").Path(__file__).resolve().parents[1]))   # the repository root
     assert out.stdout.strip() == "False", out.stderr
     held.close()
 

@@ -7,24 +7,26 @@ from app.security.visitor import visitor_id
 from app.domain.schemas.learning import LearnVoteIn, LearnAskIn, LearnStatusIn
 from app.services import learning as service
 
+from app.security.permissions import require
+
 router = APIRouter()
 
 
-@router.post("/api/learn/choice")
+@router.post("/api/learn/choice", dependencies=[Depends(require("visitor"))])
 def learn_choice(body: LearnVoteIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     return service.learn_choice(body, db, visitor)
 
 
-@router.post("/api/learn/ask")
+@router.post("/api/learn/ask", dependencies=[Depends(require("public"))])
 def learn_ask(body: LearnAskIn, db: Session = Depends(get_db)):
     return service.learn_ask(body, db)
 
 
-@router.get("/api/admin/learning")
+@router.get("/api/admin/learning", dependencies=[Depends(require("admin"))])
 def admin_learning(request: Request, status: str = "new", db: Session = Depends(get_db)):
     return service.admin_learning(request, status, db)
 
 
-@router.post("/api/admin/learning/{kind}/{item_id}")
+@router.post("/api/admin/learning/{kind}/{item_id}", dependencies=[Depends(require("admin"))])
 def admin_learning_set(kind: str, item_id: int, body: LearnStatusIn, request: Request, db: Session = Depends(get_db)):
     return service.admin_learning_set(kind, item_id, body, request, db)

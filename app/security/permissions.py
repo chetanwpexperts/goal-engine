@@ -5,6 +5,8 @@ so this module never imports a product or a service. Missing checks deny access.
 Ownership and request-specific safeguards remain the responsibility of the route.
 """
 from collections.abc import Callable
+import hmac
+import os
 
 from fastapi import HTTPException, Request
 
@@ -32,12 +34,16 @@ def require(perm: str) -> Callable:
             allowed = getattr(request.state, "user", None) is not None
         elif perm == "admin":
             allowed = _is_admin(request)
+        elif perm == "api_key" and request.url.path == "/api/learning/feed":
+            want = os.getenv("LEARN_KEY", "")
+            allowed = len(want) >= 16 and hmac.compare_digest(request.query_params.get("key", ""), want)
         else:
             checks = getattr(request.app.state, "permission_checks", {})
             validator = checks.get(perm)
             allowed = validator is not None and validator(request)
         if not allowed:
-            raise HTTPException(status_code=403 if perm == "admin" else 401,
-                                detail="Not authorized")
+            if perm == "admin" or (perm == "api_key" and request.url.path == "/api/learning/feed"):
+                raise HTTPException(status_code=404, detail="Not Found")
+            raise HTTPException(status_code=401, detail="Not authorized")
 
     return check

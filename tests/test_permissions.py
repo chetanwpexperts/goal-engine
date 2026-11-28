@@ -45,12 +45,12 @@ def test_web_permissions(monkeypatch, fresh_db):
     with TestClient(app) as client:
         assert client.get("/permission/public").status_code == 200
         for name in PERMISSIONS - {"public"}:
-            assert client.get("/permission/" + name).status_code in (401, 403)
+            assert client.get("/permission/" + name).status_code in (401, 404)
         assert client.get("/permission/visitor", headers={"x-test-visitor": "yes"}).status_code == 200
         assert client.get("/permission/account", headers={"x-test-account": "yes"}).status_code == 200
         assert client.get("/permission/account", headers={"x-test-visitor": "yes"}).status_code == 401
         client.cookies.set(ADMIN_COOKIE, "invalid")
-        assert client.get("/permission/admin").status_code == 403
+        assert client.get("/permission/admin").status_code == 404
         client.cookies.set(ADMIN_COOKIE, _admin_token())
         assert client.get("/permission/admin").status_code == 200
         assert client.get("/permission/api_key", headers={"Authorization": "Bearer invalid"}).status_code == 401

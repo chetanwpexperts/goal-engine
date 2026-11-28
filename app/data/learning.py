@@ -2,7 +2,7 @@
 from datetime import timedelta
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
-from app.models import LearnedPhrase, LearnRequest, LearnVote, LearnMiss, utcnow
+from app.domain.models import LearnedPhrase, LearnRequest, LearnVote, LearnMiss, utcnow
 
 REQUEST_TTL = timedelta(days=180)
 VOTE_TTL = timedelta(days=90)
@@ -14,7 +14,7 @@ def learned_phrases(db: Session, brain: str) -> list[tuple[str, str]]:
 
 
 def load_examples(brain: str) -> list[tuple[str, str]]:
-    from app.db import _SessionLocal, get_engine
+    from app.core.db import _SessionLocal, get_engine
 
     get_engine()
     with _SessionLocal() as db:
@@ -111,7 +111,7 @@ def set_status(db: Session, kind: str, item_id: int, status: str) -> bool:
 
 def feed(db: Session, limit: int = 50) -> list[dict]:
     """For the nightly learning: the most-asked problems no brain understood yet, then answers people said were wrong."""
-    from app.models import LearnMiss
+    from app.domain.models import LearnMiss
 
     rows = db.scalars(select(LearnRequest).where(LearnRequest.status == "new")
                       .order_by(LearnRequest.count.desc(), LearnRequest.last_seen.desc()).limit(limit))
@@ -129,7 +129,7 @@ def maintain(db: Session, now=None) -> dict:
         "learn_votes": db.execute(delete(LearnVote).where(LearnVote.created_at < now - VOTE_TTL)).rowcount,
         "learn_requests": db.execute(delete(LearnRequest).where(LearnRequest.last_seen < now - REQUEST_TTL)).rowcount,
     }
-    from app.models import LearnMiss
+    from app.domain.models import LearnMiss
 
     done["learn_misses"] = db.execute(delete(LearnMiss).where(LearnMiss.last_seen < now - REQUEST_TTL)).rowcount
     return done

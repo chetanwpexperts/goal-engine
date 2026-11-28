@@ -2,7 +2,7 @@
 from datetime import timedelta
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
-from app.models import PatternStep, PersonalStep, utcnow
+from app.domain.models import PatternStep, PersonalStep, utcnow
 
 
 def record(db: Session, brain: str, history: list[str], new: str, who: str | None = None, *, any_pattern: str) -> None:

@@ -19,8 +19,8 @@ from app.domain.schemas.enquiry import (
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.db import get_db
-from app.models import Enquiry, dumps, loads, utcnow
+from app.core.db import get_db
+from app.domain.models import Enquiry, dumps, loads, utcnow
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -62,7 +62,7 @@ def create(db: Session, body: EnquiryIn, visitor_id: str, user_id: int | None, i
     if len(message) < 5 and not body.interest:
         raise EnquiryError("Tell us a little about what you need, or pick what you're interested in.")
     from app import captcha
-    from app.models import AuthAttempt
+    from app.domain.models import AuthAttempt
 
     try:
         captcha.check(db, body.captcha_token, body.captcha)

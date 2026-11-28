@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.core.redact import scrub, scrub_detail
 
-from app.models import (Agent, AgentRun, Connector, ConnectorJob, ExpertRequest, Goal, Message, OwnerContact, SentEmail, UsageCounter,
+from app.domain.models import (Agent, AgentRun, Connector, ConnectorJob, ExpertRequest, Goal, Message, OwnerContact, SentEmail, UsageCounter,
                         dumps, loads, utcnow)
 
 DB_RESULT_TTL = timedelta(minutes=15)
@@ -105,7 +105,7 @@ def delete_visitor(db: Session, visitor_id: str) -> dict:
     counts["email_log"] = db.execute(delete(SentEmail).where(SentEmail.visitor_id == visitor_id)).rowcount
     counts["email"] = db.execute(delete(OwnerContact).where(OwnerContact.visitor_id == visitor_id)).rowcount
     counts["expert_requests"] = db.execute(delete(ExpertRequest).where(ExpertRequest.visitor_id == visitor_id)).rowcount
-    from app.models import Enquiry
+    from app.domain.models import Enquiry
 
     counts["enquiries"] = db.execute(delete(Enquiry).where(Enquiry.visitor_id == visitor_id)).rowcount
     counts["messages"] = db.execute(delete(Message).where(Message.visitor_id == visitor_id)).rowcount
@@ -114,7 +114,7 @@ def delete_visitor(db: Session, visitor_id: str) -> dict:
 
     counts["learning_votes"] = learning.delete_voter(db, fingerprint(f"learn:{visitor_id}"))
     from app.agents import office_agent
-    from app.models import OfficeFile
+    from app.domain.models import OfficeFile
 
     for f in db.scalars(select(OfficeFile).where(OfficeFile.visitor_id == visitor_id)):
         office_agent.remove_file(f)

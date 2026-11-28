@@ -16,7 +16,7 @@ def _own_conn(db: Session, connector_id: int, visitor: str):
 
 
 def _own_job(db: Session, job_id: int, visitor: str):
-    from app.models import Connector, ConnectorJob
+    from app.domain.models import Connector, ConnectorJob
 
     job = db.get(ConnectorJob, job_id)
     connector = db.get(Connector, job.connector_id) if job else None
@@ -120,7 +120,7 @@ def download_db_job(job_id: int, db: Session, visitor: str):
 def db_job_excel(job_id: int, body: ExcelIn, db: Session, visitor: str):
     """S3: the export as a workbook: Data, a Pivot with live COUNTIFS / SUMIFS and a chart, About. Nothing is sent anywhere."""
     from app.agents import sqlexcel
-    from app.models import Connector
+    from app.domain.models import Connector
 
     job = _own_job(db, job_id, visitor)
     try:

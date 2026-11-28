@@ -9,7 +9,7 @@ from app import privacy
 from app.agents import automation, database as dbagent
 from app.agents.core import AgentError, agent_dict, goal_agents, run_agent
 from app.services.goals import _after_run, all_goals
-from app.models import Agent, Goal, Message, dumps, loads
+from app.domain.models import Agent, Goal, Message, dumps, loads
 from app.domain.schemas.agents import StartIn, OwnerIn
 from app.services.output import public
 

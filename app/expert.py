@@ -10,7 +10,7 @@ import urllib.parse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import ExpertRequest, Goal, dumps, loads, utcnow
+from app.domain.models import ExpertRequest, Goal, dumps, loads, utcnow
 
 STATUSES = ("new", "talking", "done", "spam")
 PER_VISITOR_PER_DAY = 3

@@ -1,6 +1,6 @@
 """Coordinate pattern persistence and prediction rules."""
 from app.privacy import fingerprint
-from app.models import utcnow
+from app.domain.models import utcnow
 from app.data.mind import predict as storage
 from app.engine.mind import predict as rules
 from app.engine.mind.predict import ANY, ALPHA, PERSONAL_ALPHA, DECAY, DROP_BELOW, ONE_OFF_AGE, PERSONAL_TTL, prior

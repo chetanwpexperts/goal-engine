@@ -30,8 +30,8 @@ from app.domain.schemas.console import (
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import get_db
-from app.models import Connector, utcnow
+from app.core.db import get_db
+from app.domain.models import Connector, utcnow
 
 router = APIRouter(prefix="/api/console")
 

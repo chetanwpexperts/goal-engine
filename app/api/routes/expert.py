@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
-from app.db import get_db
+from app.core.db import get_db
 from app.domain.schemas.expert import ExpertIn, ExpertUpdate
 from app.security.visitor import visitor_id
 from app.services import expert

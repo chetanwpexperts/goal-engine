@@ -1,7 +1,7 @@
 """Conversation history and transaction helpers."""
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.models import Message
+from app.domain.models import Message
 
 
 def previous_texts(db: Session, visitor_id: str, goal_id: int | None, limit: int = 3) -> list[str]:
@@ -27,7 +27,7 @@ def commit(db):
 def record_apart(record, brain, chain, label, visitor_id):
     """Record in a short separate transaction, retrying a conflicting write once."""
     from sqlalchemy.exc import IntegrityError, OperationalError
-    from app.db import get_engine
+    from app.core.db import get_engine
 
     for _ in range(2):
         with Session(get_engine()) as own:

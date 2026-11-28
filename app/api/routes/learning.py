@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
-from app.db import get_db
+from app.core.db import get_db
 from app.security.visitor import visitor_id
 from app.domain.schemas.learning import LearnVoteIn, LearnAskIn, LearnStatusIn
 from app.services import learning as service

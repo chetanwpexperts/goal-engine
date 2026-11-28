@@ -1,7 +1,7 @@
 """Goal and message persistence."""
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.models import Goal, Message
+from app.domain.models import Goal, Message
 
 RECENT_MESSAGES = 6
 

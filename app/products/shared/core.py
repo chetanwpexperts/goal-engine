@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.agents.sql import analyze_sql
 from app.products.shared.website import check_website
-from app.models import Agent, AgentRun, Goal, Message, dumps, loads, utcnow
+from app.domain.models import Agent, AgentRun, Goal, Message, dumps, loads, utcnow
 
 
 @dataclass(frozen=True)

@@ -20,7 +20,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.models import Connector, ConnectorJob, dumps, loads, utcnow
+from app.domain.models import Connector, ConnectorJob, dumps, loads, utcnow
 
 log = logging.getLogger(__name__)
 
@@ -245,7 +245,7 @@ def _write_job(db: Session, connector: Connector, job: ConnectorJob) -> dict:
 
 def run_job(job_id: int) -> None:
     from app.agents import database as dbagent
-    from app.db import get_db
+    from app.core.db import get_db
 
     gen = get_db()
     db = next(gen)

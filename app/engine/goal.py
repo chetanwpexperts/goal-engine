@@ -1,7 +1,7 @@
 """Goal interpretation and message validation rules."""
 import re
 from app.ai.schema import Interpretation
-from app.models import Goal, dumps, loads
+from app.domain.models import Goal, dumps, loads
 
 MAX_CONTEXT_GOALS = 6
 RECENT_MESSAGES = 6

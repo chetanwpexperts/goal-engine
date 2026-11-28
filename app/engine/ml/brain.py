@@ -19,7 +19,7 @@ from app.engine.ml.intent import IntentModel, Prediction
 from app.engine.ml.normalize import _ALSO_ENGLISH, HINGLISH_MARKERS, detect_language, normalize, tokens
 from app.engine.ml.registry import BUSINESS_DOMAIN, short_title
 from app.engine.ml.slots import INTENT_LABELS, RELATED, SPECS, Slot, extract_all, main_issue
-from app.models import Goal, dumps, loads
+from app.domain.models import Goal, dumps, loads
 
 
 MAX_QUESTIONS_PER_GOAL = 2

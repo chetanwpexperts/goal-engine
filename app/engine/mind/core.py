@@ -11,7 +11,7 @@ import contextvars
 from datetime import datetime, timedelta
 
 from app.engine.mind import packs, predict, profile, signals
-from app.models import utcnow
+from app.domain.models import utcnow
 
 _current: contextvars.ContextVar[dict | None] = contextvars.ContextVar("mind", default=None)
 PAUSE = timedelta(minutes=30)       # a longer gap in the same conversation starts a fresh chain of questions

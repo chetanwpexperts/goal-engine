@@ -21,7 +21,7 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Agent, Connector, ConnectorJob, Goal, dumps, loads, utcnow
+from app.domain.models import Agent, Connector, ConnectorJob, Goal, dumps, loads, utcnow
 
 log = logging.getLogger(__name__)
 from app.mind import packs
@@ -398,7 +398,7 @@ def wants_database(goal: Goal | None, text: str) -> bool:
 
 
 def account_for(db: Session, visitor_id: str):
-    from app.models import User
+    from app.domain.models import User
 
     return db.scalar(select(User).where(User.visitor_id == visitor_id)) if visitor_id else None
 
@@ -410,7 +410,7 @@ def live_checks(db: Session, user, agent: Agent | None, visitor_id: str, result:
     from app import dbarea
     from app.agents import direct
     from app.dbknow import reasoning
-    from app.models import UserSession
+    from app.domain.models import UserSession
 
     if not user.email_verified or not dbarea.connect_open(user):
         return None
@@ -598,7 +598,7 @@ def clean_exports(max_age_hours: int = 24) -> None:
 def mind_state(db: Session, agent: Agent) -> dict:
     """What the shared mind may build next steps on."""
     from app.agents.core import goal_agents
-    from app.models import AgentRun
+    from app.domain.models import AgentRun
 
     checked = any(r.status == "done" for a in goal_agents(db, agent.goal_id) if a.recipe == "sql_review"
                   for r in db.scalars(select(AgentRun).where(AgentRun.agent_id == a.id).limit(1)))
@@ -1206,7 +1206,7 @@ NEW_SQL_RE = re.compile(r"\b(select|update|delete|insert)\b[\s\S]+\b(from|into|s
 
 def _sql_agent(db, goal):
     from app.agents.core import goal_agents
-    from app.models import AgentRun
+    from app.domain.models import AgentRun
 
     a = next((x for x in goal_agents(db, goal.id) if x.recipe == "sql_review"), None)
     if a is None:
@@ -1411,7 +1411,7 @@ def _answer_turn(db, goal, agent, text: str):
     Worked out again from the query itself, so it's never a stale or repeated answer."""
     from app.agents.sql import analyze_sql, rewrite, unwrap
     from app.ml.normalize import detect_language
-    from app.models import Message
+    from app.domain.models import Message
 
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
     inputs = loads(agent.inputs, {}) or {}

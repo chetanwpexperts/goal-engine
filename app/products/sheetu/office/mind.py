@@ -251,7 +251,7 @@ SUGGEST_MAX_BYTES = 10 * 1024 * 1024       # bigger files: no reading the whole 
 
 def suggest(db, agent, scores: dict, cur: dict, hi: bool, text: str) -> list[str]:
     from app.products.sheetu import office_agent
-    from app.models import loads
+    from app.domain.models import loads
     from app.products.sheetu.office.sheetdata import load_tables
 
     f = office_agent.open_file(db, agent) if agent is not None else None

@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.products.sheetu import office
 from app.mind import packs
-from app.models import Agent, Goal, OfficeFile, dumps, loads, utcnow
+from app.domain.models import Agent, Goal, OfficeFile, dumps, loads, utcnow
 
 DATA = Path(__file__).resolve().parents[3] / "data" / "office"
 MAX_SIZE = 1536 * 1024 * 1024
@@ -395,7 +395,7 @@ def _start(db: Session, f: OfficeFile, task: str, args: dict) -> OfficeFile:
 
 
 def _work(file_id: int, task: str, args: dict) -> None:
-    from app.db import _SessionLocal, get_engine
+    from app.core.db import _SessionLocal, get_engine
 
     get_engine()
     with _SessionLocal() as db:
@@ -548,7 +548,7 @@ def resume_interrupted(boot) -> int:
     """After a restart (an update, a crash), carry on with work that was running, in one process only."""
     from sqlalchemy import update
 
-    from app.db import _SessionLocal, get_engine
+    from app.core.db import _SessionLocal, get_engine
 
     if not _resume_owner():
         return 0

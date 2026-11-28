@@ -27,11 +27,11 @@ from app.agents import database as dbagent
 from app.agents import direct as dbagent_direct
 from app.agents.core import AgentError, agent_dict, claim_due, goal_agents, run_agent
 from app.agents.mailer import SmtpMailer
-from app.engine import _after_run
+from app.agents.replies import _after_run
 from app.models import Agent, dumps, loads, utcnow
 from app.config import get_settings
 from app.db import get_db, init_db
-from app.engine import InvalidMessage, all_goals, handle_message
+from app.services.goals import InvalidMessage, all_goals, handle_message
 from app.limits import LimitReached, usage_today
 from app.models import Goal, Message
 from app.security.visitor import COOKIE, visitor_id

@@ -737,7 +737,7 @@ def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) ->
 def _check_pasted_query(db: Session, goal: Goal, text: str, hi: bool):
     """Run the SQL checker on the query in this message, in this goal."""
     from app.agents.core import RECIPES, AgentError, goal_agents, inputs_from_text, run_agent
-    from app.engine import _after_run
+    from app.agents.replies import _after_run
 
     recipe = RECIPES["sql_review"]
     found = inputs_from_text(recipe, text, {})
@@ -808,7 +808,7 @@ def _engine_reply(db, goal, agent, eid: str, how: str, hi: bool, again: bool):
     """The person chose (or corrected) the database: remember it and answer what was waiting, for that database only."""
     from app.agents.core import AgentError, run_agent
     from app.dbknow import engines as E
-    from app.engine import _after_run
+    from app.agents.replies import _after_run
 
     E.remember(goal, eid, how)
     goal.pending = None
@@ -1052,7 +1052,7 @@ def _plan_turn(db: Session, goal: Goal, text: str, hi: bool, plan: dict):
         goal.intent = "slow_db_query"
         db.flush()
         from app.agents.core import AgentError, run_agent
-        from app.engine import _after_run
+        from app.agents.replies import _after_run
 
         try:
             run = run_agent(db, agent, hi)

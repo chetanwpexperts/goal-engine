@@ -6,9 +6,7 @@
     "agents.direct -> privacy",
     "agents.office_agent -> dbknow",
     "db -> domain",
-    "dbknow.reasoning -> office",
-    "engine.goal -> agents",
-    "engine.goal -> limits"
+    "dbknow.reasoning -> office"
   ],
   "db_session_debts": [
     "app/accounts.py:_limit",
@@ -90,11 +88,6 @@
     "app/dbarea.py:guard",
     "app/dbarea.py:lock",
     "app/dbarea.py:maintain",
-    "app/engine/goal.py:_respond",
-    "app/engine/goal.py:active_goals",
-    "app/engine/goal.py:all_goals",
-    "app/engine/goal.py:focus_goal",
-    "app/engine/goal.py:recent_messages",
     "app/engine/ml/answers.py:find_work",
     "app/engine/ml/answers.py:no_customers",
     "app/engine/ml/answers.py:payments_collection",
@@ -145,7 +138,6 @@
     "app/services/db_reports.py:_after_db_job",
     "app/services/db_reports.py:_run_db_report",
     "app/services/db_reports.py:schedule_db_report",
-    "app/services/goals.py:own_goal",
     "app/services/office.py:office_start",
     "app/services/runtime.py:_scheduler",
     "app/usage.py:series"

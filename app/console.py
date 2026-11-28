@@ -22,7 +22,11 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from app.domain.schemas.console import (
+    ConnectIn,
+    SqlIn,
+    AskIn,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -40,19 +44,6 @@ NO_STORE = {"Cache-Control": "no-store", "Pragma": "no-cache", "X-Robots-Tag": "
 
 _runs: dict[str, list[float]] = {}
 _runs_lock = threading.Lock()
-
-
-class ConnectIn(BaseModel):
-    type: str = "mysql"
-    host: str = ""
-    port: str = ""
-    database: str = ""
-    user: str = ""
-    password: str = ""
-
-
-class SqlIn(BaseModel):
-    sql: str = ""
 
 
 def _visitor(request: Request) -> str:
@@ -281,10 +272,6 @@ def check(body: SqlIn, db: Session = Depends(get_db), visitor: str = Depends(_vi
 
 
 # ---------------------------------------------------------------- Ask DBaba: any issue, in words, an error, code or SQL
-class AskIn(BaseModel):
-    text: str = ""
-
-
 ENGINE_ID = {"mysql": "mysql", "postgres": "postgresql"}
 LIVE_CHECK_ROWS = 50
 

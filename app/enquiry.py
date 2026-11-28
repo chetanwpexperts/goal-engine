@@ -13,7 +13,9 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from app.domain.schemas.enquiry import (
+    EnquiryIn,
+)
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -32,23 +34,6 @@ STATUSES = ("new", "talking", "customer", "closed", "spam")
 PER_HOUR_PER_ADDRESS = 3
 KEEP = timedelta(days=365)
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[A-Za-z]{2,}$")
-
-
-class EnquiryIn(BaseModel):
-    name: str = ""
-    email: str = ""
-    phone: str = ""
-    company: str = ""
-    role: str = ""
-    interest: list[str] = []
-    team: str = ""
-    message: str = ""
-    consent: bool = False
-    source: str = ""
-    website: str = ""          # honeypot: people never see it, bots fill it
-    elapsed_ms: int = 0        # time spent on the form
-    captcha_token: str = ""
-    captcha: str = ""          # the characters typed from the picture
 
 
 class EnquiryError(ValueError):

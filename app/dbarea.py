@@ -14,7 +14,9 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from app.domain.schemas.dbarea import (
+    CodeIn,
+)
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -193,10 +195,6 @@ def check_queue(db: Session, visitor_id: str) -> None:
 
 
 # ---------------------------------------------------------------- endpoints
-class CodeIn(BaseModel):
-    code: str = ""
-
-
 def _who(request: Request, db: Session):
     user, sess = accounts.current_user(request), getattr(request.state, "user_session", None)
     if user is None or sess is None:

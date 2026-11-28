@@ -8,13 +8,36 @@ from contextlib import asynccontextmanager
 import re
 import secrets
 from pathlib import Path
-from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field
+from app.domain.schemas.main import (
+    ExpertIn,
+    ExpertUpdate,
+    OfficeStartIn,
+    OfficeFixIn,
+    OfficeCompareIn,
+    LearnVoteIn,
+    LearnAskIn,
+    LearnStatusIn,
+    MessageIn,
+    StatusIn,
+    StartIn,
+    OwnerIn,
+    ConnectorIn,
+    DirectIn,
+    DbJobIn,
+    DbReportIn,
+    DiagnoseIn,
+    OptimizeIn,
+    RecognizeIn,
+    PlanIn,
+    ApplyIn,
+    UndoIn,
+    ExcelIn,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -225,22 +248,6 @@ def _is_admin(request: Request) -> bool:
     return bool(token) and hmac.compare_digest(request.cookies.get(ADMIN_COOKIE, ""), token)
 
 
-class ExpertIn(BaseModel):
-    goal_id: int | None = None
-    need: str = ""
-    name: str = ""
-    phone: str = ""
-    email: str = ""
-    contact: str = "whatsapp"
-    consent: bool = False
-    website: str = ""          # honeypot
-
-
-class ExpertUpdate(BaseModel):
-    status: str | None = None
-    note: str | None = None
-
-
 @app.middleware("http")
 async def visitor_cookie(request: Request, call_next):
     """Anonymous visitor id, so each person only ever sees their own goals."""
@@ -325,21 +332,6 @@ def admin_update(req_id: int, body: ExpertUpdate, request: Request, db: Session 
 
 
 # ---------------------------------------------------------------- Microsoft agent: files (app/agents/office_agent.py)
-class OfficeStartIn(BaseModel):
-    name: str
-    size: int
-    agent_id: int | None = None
-
-
-class OfficeFixIn(BaseModel):
-    ops: list[str]
-
-
-class OfficeCompareIn(BaseModel):
-    other: str
-    key: str = ""
-
-
 def _office_call(fn):
     from app.agents.office_agent import OfficeAgentError
 
@@ -442,23 +434,6 @@ def office_delete(token: str, db: Session = Depends(get_db), visitor: str = Depe
 
 
 # ---------------------------------------------------------------- brains learning from users (app/learning.py)
-class LearnVoteIn(BaseModel):
-    brain: str
-    text: str = Field(max_length=2000)
-    label: str = Field(max_length=80)
-
-
-class LearnAskIn(BaseModel):
-    brain: str
-    text: str = Field(max_length=2000)
-    guess: str = ""
-    confidence: float = 0.0
-
-
-class LearnStatusIn(BaseModel):
-    status: str
-
-
 @app.post("/api/learn/choice")
 def learn_choice(body: LearnVoteIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     from app import learning
@@ -510,15 +485,6 @@ def learning_feed(key: str = "", db: Session = Depends(get_db)):
 
     # plus the question paths real people take (labels only), so the nightly run can tune the starting chains
     return {"requests": learning.feed(db), "paths": {b: predict.top_paths(db, b) for b in packs.all_packs()}}
-
-
-class MessageIn(BaseModel):
-    text: str
-    goal_id: int | None = None   # the goal the person is looking at
-
-
-class StatusIn(BaseModel):
-    status: Literal["active", "done", "dropped"]
 
 
 @app.post("/api/privacy/delete-all")
@@ -682,10 +648,6 @@ def post_message(body: MessageIn, request: Request, db: Session = Depends(get_db
     return public(result)
 
 
-class StartIn(BaseModel):
-    inputs: dict[str, str] = {}
-
-
 def own_agent(db: Session, agent_id: int, visitor: str) -> Agent:
     agent = db.get(Agent, agent_id)
     if not agent or agent.visitor_id != visitor:
@@ -725,12 +687,6 @@ def start_agent(agent_id: int, body: StartIn, db: Session = Depends(get_db), vis
                    "goal": goal.as_dict() if goal else None,
                    "goals": [g.summary() for g in all_goals(db, visitor)],
                    "agents": [agent_dict(a, db, hi) for a in goal_agents(db, agent.goal_id)]})
-
-
-class OwnerIn(BaseModel):
-    email: str = ""
-    business: str = ""
-    code: str = ""
 
 
 def _agent_payload(db: Session, agent: Agent, visitor: str, reply: str = "") -> dict:
@@ -933,38 +889,6 @@ def _after_db_job(db: Session, job) -> None:
         logging.getLogger(__name__).exception("Database report email failed")
 
 
-class ConnectorIn(BaseModel):
-    name: str = ""
-    agent_id: int | None = None
-
-
-class DirectIn(BaseModel):
-    type: str = "mysql"
-    host: str = ""
-    port: str = ""
-    database: str = ""
-    user: str = ""
-    password: str = ""
-    name: str = ""
-    agent_id: int | None = None
-    allow_changes: bool = False
-
-
-class DbJobIn(BaseModel):
-    kind: str
-    sql: str = ""
-    table: str = ""
-
-
-class DbReportIn(BaseModel):
-    sql: str = ""
-    table: str = ""
-    every: str = "day"
-    at: str = "09:00"
-    weekday: int = 0
-    title: str = ""
-
-
 def _public_base(request: Request) -> str:
     if os.getenv("PUBLIC_URL"):
         return os.getenv("PUBLIC_URL", "").rstrip("/")
@@ -1018,19 +942,6 @@ def connect_direct(body: DirectIn, request: Request, db: Session = Depends(get_d
         db.commit()
         return _agent_payload(db, agent, visitor)
     return {"connector": dbagent.connector_dict(connector, db)}
-
-
-class DiagnoseIn(BaseModel):
-    issue_id: str
-
-
-class OptimizeIn(BaseModel):
-    sql: str
-
-
-class RecognizeIn(BaseModel):
-    text: str
-    lang: str = "en"
 
 
 @app.post("/api/dbbrain/recognize")
@@ -1128,19 +1039,6 @@ def create_db_job(connector_id: int, body: DbJobIn, db: Session = Depends(get_db
     return dbagent.job_dict(job)
 
 
-class PlanIn(BaseModel):
-    sql: str
-
-
-class ApplyIn(BaseModel):
-    plan_id: int
-
-
-class UndoIn(BaseModel):
-    change_id: int
-    force: bool = False
-
-
 def _own_conn(db: Session, connector_id: int, visitor: str):
     try:
         return dbagent.own_connector(db, connector_id, visitor)
@@ -1199,13 +1097,6 @@ def download_db_job(job_id: int, db: Session = Depends(get_db), visitor: str = D
         return FileResponse(job.file_path, media_type="text/csv", filename=f"export_{job.id}.csv",
                             headers={"Content-Encoding": "gzip", "Cache-Control": "no-store"})
     return FileResponse(job.file_path, media_type="text/csv", filename=f"export_{job.id}.csv")
-
-
-class ExcelIn(BaseModel):
-    by: str = Field("", max_length=80)          # the column to group by (empty: DBaba picks one, or none)
-    measure: str = Field("", max_length=80)     # the number column to add up
-    words: str = Field("", max_length=400)      # or the person's own words: "status wise with total amount"
-    hi: bool = False
 
 
 @app.post("/api/connector-jobs/{job_id}/excel")

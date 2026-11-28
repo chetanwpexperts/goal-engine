@@ -26,9 +26,9 @@ def knowledge() -> dict:
 
 
 def complaints(text: str) -> dict[str, float]:
-    """What the person says is wrong, read by meaning (app/office/meaning.py: any words, any order); the issue the
+    """What the person says is wrong, read by meaning (app/products/shared/meaning.py: any words, any order); the issue the
     ears recognised adds to it."""
-    from app.products.sheetu.office import meaning as M
+    from app.products.shared import meaning as M
 
     k = knowledge()
     r = M.Reading(text)

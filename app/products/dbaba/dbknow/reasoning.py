@@ -9,7 +9,7 @@ A new database = a new dialect file (and, for a new kind, a few family fundament
 Evidence comes from what the person pastes (error text, codes, EXPLAIN, lock reports) and, when their database is
 connected, from read-only checks on it. A cause is only stated when the evidence shows it (app/mind/reason.py);
 otherwise the reply says what is likely and what to paste or check next. Words are read by meaning
-(app/office/meaning.py with the database vocabulary), never by fixed sentences.
+(app/products/shared/meaning.py with the database vocabulary), never by fixed sentences.
 """
 
 import difflib
@@ -196,13 +196,11 @@ def explain_facts(text: str) -> dict | None:
 
 def complaints(text: str) -> dict[str, float]:
     """What the person says is wrong, by meaning: any words, any order, Hinglish, typos."""
-    from app.products.shared import bridge
+    from app.products.shared import meaning as M
 
-    r = bridge.call("sheetu.reading", text, lex_path=LEXICON)
-    if r is None:
-        return {}
-    lex = bridge.call("sheetu.lexicon", LEXICON, default={"complaints": {}})
-    said = {cid: 1.0 for cid, recs in lex["complaints"].items() if any(bridge.call("sheetu.satisfied", r, rec, default=False) for rec in recs)}
+    r = M.Reading(text, lex_path=LEXICON)
+    lex = M.lexicon(LEXICON)
+    said = {cid: 1.0 for cid, recs in lex["complaints"].items() if any(M.satisfied(r, rec) for rec in recs)}
     for specific, loose in (lex.get("outranks") or {}).items():
         if specific in said and isinstance(loose, list):
             for cid in loose:

@@ -3,7 +3,7 @@ bold header, freeze the top row, fit column widths, filter buttons, remove blank
 serial numbers, split text into columns, a dropdown list, find & replace, date / money / decimal formats,
 UPPER / Proper / lower case, one sheet per value of a column, charts, highlighting.
 
-Understood by meaning (app/office/meaning.py), never by fixed sentences: the words say what kind of order it is,
+Understood by meaning (app/products/shared/meaning.py), never by fixed sentences: the words say what kind of order it is,
 the person's own file says which column, which value, which sheet.
 
 plan_edit(text, tables) -> a plan {"job": "edit", "op": ..., "table": ..., ...} or None (not an order).
@@ -21,7 +21,7 @@ from openpyxl.styles.differential import DifferentialStyle
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from app.products.sheetu.office import meaning as M
+from app.products.shared import meaning as M
 
 # Indian grouping (1,23,45,678.00): Excel has no built-in code for it, so three ranges
 INDIAN = '[>=10000000]"₹"##\\,##\\,##\\,##0.00;[>=100000]"₹"##\\,##\\,##0.00;"₹"##,##0.00'

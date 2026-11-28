@@ -12,6 +12,7 @@ import re
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request
+from app.security.permissions import require
 from fastapi.responses import JSONResponse
 from app.domain.schemas.enquiry import (
     EnquiryIn,
@@ -23,7 +24,7 @@ from app.core.db import get_db
 from app.domain.models import Enquiry, dumps, loads, utcnow
 
 log = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require("public"))])   # each route checks the session itself
 
 ROLES = {"developer": "Developer", "dba": "Database admin (DBA)", "business": "Business owner / manager", "analyst": "Analyst / Excel user",
          "student": "Student", "other": "Other"}

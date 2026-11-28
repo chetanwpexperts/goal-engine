@@ -21,6 +21,7 @@ import time
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request
+from app.security.permissions import require
 from fastapi.responses import JSONResponse
 from app.domain.schemas.console import (
     ConnectIn,
@@ -33,7 +34,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.domain.models import Connector, utcnow
 
-router = APIRouter(prefix="/api/console")
+router = APIRouter(prefix="/api/console", dependencies=[Depends(require("visitor"))])
 
 IDLE = timedelta(minutes=10)      # no typing and no query for this long: disconnected, details wiped
 MAX_ROWS = 1000                   # rows shown per query (the reply says when there were more)

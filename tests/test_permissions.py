@@ -106,3 +106,18 @@ def test_local_route_permission_alternatives(tmp_path):
         client.cookies.clear()
         app.state.cfg.update(lambda d: d.__setitem__("setup_done", True))
         assert client.post("/api/setup/test", json={}).status_code == 409
+
+
+def test_hidden_permission_answers_404():
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.security.permissions import require
+
+    app = FastAPI()
+
+    @app.get("/area", dependencies=[Depends(require("account", hidden=True))])
+    def area():
+        return {"ok": True}
+
+    assert TestClient(app).get("/area").status_code == 404          # a guest is not told the area exists

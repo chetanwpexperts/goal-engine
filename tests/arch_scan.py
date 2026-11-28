@@ -132,7 +132,8 @@ def scan_db() -> set[str]:
 
 
 def scan_routes() -> set[str]:
-    """"site|local METHOD /path" for every route, wherever it is defined: @app.<method>(...) or @<router>.<method>(...) in any
+    """"site|local METHOD /path" for every route that declares no permission (Depends(require("<perm>")) in the
+    decorator's dependencies, or in its APIRouter(dependencies=...)), wherever it is defined: @app.<method>(...) or @<router>.<method>(...) in any
     module under app/ (app/main.py today, app/api/routes/*.py after Step 3). Keyed by method and path only, so moving a
     route to another file is not a change."""
     out = set()
@@ -144,10 +145,37 @@ def scan_routes() -> set[str]:
                             and d.func.attr in ("get", "post", "put", "delete", "patch")
                             and isinstance(d.func.value, ast.Name) and d.args and isinstance(d.args[0], ast.Constant)
                             and isinstance(d.args[0].value, str) and d.args[0].value.startswith("/")):
+                        if _declares(d) or _router_declares(f, d.func.value.id):
+                            continue
                         scope = "local" if "local" in _modname(f).split(".") else "site"   # on-server DBaba is its own app
                         out.add(f"{scope} {d.func.attr.upper()} {_prefix(f, d.func.value.id)}{d.args[0].value}")
     return out
 
+
+
+def _perm_of(node: ast.AST) -> str | None:
+    """'admin' for Depends(require("admin")), else None."""
+    if (isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", "")) == "Depends" and node.args
+            and isinstance(node.args[0], ast.Call) and getattr(node.args[0].func, "id", getattr(node.args[0].func, "attr", "")) == "require"
+            and node.args[0].args and isinstance(node.args[0].args[0], ast.Constant)):
+        return node.args[0].args[0].value
+    return None
+
+
+def _declares(call: ast.Call) -> bool:
+    for k in call.keywords:
+        if k.arg == "dependencies" and isinstance(k.value, (ast.List, ast.Tuple)):
+            if any(_perm_of(e) for e in k.value.elts):
+                return True
+    return False
+
+
+def _router_declares(f: pathlib.Path, name: str) -> bool:
+    for n in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+        if (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in n.targets)
+                and isinstance(n.value, ast.Call) and getattr(n.value.func, "id", getattr(n.value.func, "attr", "")) in ("APIRouter", "FastAPI")):
+            return _declares(n.value)
+    return False
 
 def _prefix(f: pathlib.Path, name: str) -> str:
     """A router's prefix, when it is made in the same file as APIRouter(prefix="...")."""

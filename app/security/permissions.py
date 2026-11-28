@@ -19,8 +19,10 @@ PERMISSIONS = frozenset({
 })
 
 
-def require(perm: str) -> Callable:
-    """Return a FastAPI dependency; reject misspelled permissions immediately."""
+def require(perm: str, hidden: bool = False) -> Callable:
+    """Return a FastAPI dependency; reject misspelled permissions immediately.
+
+    hidden=True answers a refused caller 404 instead of 401, for areas whose existence is not shown to guests."""
     if perm not in PERMISSIONS:
         raise ValueError(f"Unknown permission: {perm}")
 
@@ -47,7 +49,7 @@ def require(perm: str) -> Callable:
             else:
                 allowed = result
         if not allowed:
-            if perm == "admin" or (perm == "api_key" and request.url.path == "/api/learning/feed"):
+            if hidden or perm == "admin" or (perm == "api_key" and request.url.path == "/api/learning/feed"):
                 raise HTTPException(status_code=404, detail="Not Found")
             reject = getattr(request.app.state, "permission_denied", None)
             if reject is not None:

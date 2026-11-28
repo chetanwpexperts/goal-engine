@@ -60,10 +60,17 @@ from app.security.visitor import COOKIE, visitor_id
 from app.security.admin import ADMIN_COOKIE, _admin_token, _is_admin
 from app.security.site import PREVIEW_COOKIE, _site_open, _preview_token, _has_preview
 from app.services.output import GOAL_INTERNAL, public
+from app.core.paths import STATIC
+from app.security.headers import CONSOLE_CSP, ENQUIRY_CSP
+from app.services.urls import _public_base
+from app.services import health as health_service
+from app.api.routes import pages as pages_routes, expert as expert_routes, health as health_routes, learning_feed as learning_feed_routes
+from app.api.routes.pages import robots, preview, privacy_page, product_page, how_page, self_hosted_page, enquiry_page, index
+from app.api.routes.expert import ask_expert, my_expert_requests, admin_requests, admin_update
+from app.api.routes.learning_feed import learning_feed
 
 
 logging.basicConfig(level=logging.INFO)
-STATIC = Path(__file__).resolve().parent / "static"
 VISITOR_RE = re.compile(r"^[A-Za-z0-9_-]{20,64}$")
 
 @asynccontextmanager
@@ -121,6 +128,19 @@ def app_js():
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+app.include_router(pages_routes.router)
+app.include_router(expert_routes.router)
+app.include_router(health_routes.router)
+app.include_router(learning_feed_routes.router)
+
+# Resolve the legacy mailer hook at request time (existing callers may replace it).
+app.state.mailer = lambda: mailer()
+
+
+def health() -> dict:
+    return health_service.health(app.state.router)
+
 
 
 def _run_db_report(db: Session, agent: Agent) -> None:
@@ -202,26 +222,6 @@ async def coming_soon(request: Request, call_next):
     return response
 
 
-@app.get("/robots.txt")
-def robots() -> Response:
-    return Response("User-agent: *\nDisallow: /\n" if not _site_open() else "User-agent: *\nAllow: /\n", media_type="text/plain")
-
-
-@app.get("/preview")
-def preview(key: str = "") -> Response:
-    """Private entry while the site is closed: /preview?key=<PREVIEW_KEY>. /preview?off=1 leaves preview."""
-    from fastapi.responses import RedirectResponse
-
-    response = RedirectResponse("/", status_code=303)
-    token = _preview_token()
-    if token and key and hmac.compare_digest(hmac.new(key.encode(), b"goal-engine-preview", "sha256").hexdigest(), token):
-        response.set_cookie(PREVIEW_COOKIE, token, max_age=60 * 60 * 24 * 30, httponly=True, samesite="lax",
-                            secure=get_settings().cookie_secure)
-    else:
-        response.delete_cookie(PREVIEW_COOKIE)
-    return response
-
-
 # ---------------------------------------------------------------- expert hand-off
 @app.middleware("http")
 async def visitor_cookie(request: Request, call_next):
@@ -252,21 +252,6 @@ def own_goal(db: Session, goal_id: int, visitor: str) -> Goal:
     return goal
 
 
-@app.post("/api/expert")
-def ask_expert(body: ExpertIn, request: Request, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    try:
-        req = expert.create(db, visitor, body.model_dump())
-    except expert.ExpertError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-    expert.notify(req, mailer(), _public_base(request))
-    return {"ok": True, "request": expert.as_dict(req), "requests": expert.mine(db, visitor)}
-
-
-@app.get("/api/expert")
-def my_expert_requests(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    return {"requests": expert.mine(db, visitor)}
-
-
 @app.get("/admin")
 def admin_page(request: Request, key: str = "") -> Response:
     from fastapi.responses import RedirectResponse
@@ -283,23 +268,6 @@ def admin_page(request: Request, key: str = "") -> Response:
     return FileResponse(STATIC / "admin.html", headers={"X-Robots-Tag": "noindex", "Cache-Control": "no-store",
                                                         "Content-Security-Policy": ADMIN_CSP, "X-Frame-Options": "DENY",
                                                         "Referrer-Policy": "no-referrer"})
-
-
-@app.get("/api/admin/requests")
-def admin_requests(request: Request, status: str = "", db: Session = Depends(get_db)):
-    if not _is_admin(request):
-        raise HTTPException(404, "Not Found")
-    return {"requests": expert.all_requests(db, status)}
-
-
-@app.post("/api/admin/requests/{req_id}")
-def admin_update(req_id: int, body: ExpertUpdate, request: Request, db: Session = Depends(get_db)):
-    if not _is_admin(request):
-        raise HTTPException(404, "Not Found")
-    try:
-        return expert.as_dict(expert.update(db, req_id, body.status, body.note), admin=True)
-    except expert.ExpertError:
-        raise HTTPException(404, "Not Found")
 
 
 # ---------------------------------------------------------------- Microsoft agent: files (app/agents/office_agent.py)
@@ -444,20 +412,6 @@ def admin_learning_set(kind: str, item_id: int, body: LearnStatusIn, request: Re
     return {"ok": True}
 
 
-@app.get("/api/learning/feed")
-def learning_feed(key: str = "", db: Session = Depends(get_db)):
-    """For the nightly learning only (LEARN_KEY): scrubbed sentences people asked us to learn."""
-    from app import learning
-
-    want = os.getenv("LEARN_KEY", "")
-    if len(want) < 16 or not hmac.compare_digest(key, want):
-        raise HTTPException(404, "Not Found")
-    from app.mind import packs, predict
-
-    # plus the question paths real people take (labels only), so the nightly run can tune the starting chains
-    return {"requests": learning.feed(db), "paths": {b: predict.top_paths(db, b) for b in packs.all_packs()}}
-
-
 @app.post("/api/privacy/delete-all")
 def delete_all(request: Request, response: Response, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     counts = {}
@@ -473,27 +427,7 @@ def delete_all(request: Request, response: Response, db: Session = Depends(get_d
     return {"ok": True, "deleted": counts}
 
 
-@app.get("/privacy")
-def privacy_page() -> FileResponse:
-    return FileResponse(STATIC / "privacy.html")
-
-
 # the site's other pages: what the product does, how it works, installing it on your own server
-@app.get("/product")
-def product_page() -> FileResponse:
-    return FileResponse(STATIC / "product.html")
-
-
-@app.get("/how-it-works")
-def how_page() -> FileResponse:
-    return FileResponse(STATIC / "how-it-works.html")
-
-
-@app.get("/self-hosted")
-def self_hosted_page() -> FileResponse:
-    return FileResponse(STATIC / "self-hosted.html")
-
-
 @app.get("/connector/install.sh")
 def connector_installer(request: Request) -> Response:
     text = (Path(__file__).resolve().parents[1] / "connector" / "install.sh").read_text()
@@ -505,8 +439,6 @@ def connector_script() -> FileResponse:
     return FileResponse(Path(__file__).resolve().parents[1] / "connector" / "goal_connector.py", media_type="text/x-python")
 
 
-CONSOLE_CSP = ("default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; "
-               "connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
 
 @app.get("/console", include_in_schema=False)
@@ -517,19 +449,7 @@ def console_page() -> FileResponse:
                                                           "X-Robots-Tag": "noindex, nofollow"})
 
 
-ENQUIRY_CSP = CONSOLE_CSP.replace("form-action 'none'", "form-action 'self'")
 ADMIN_CSP = CONSOLE_CSP
-
-
-@app.get("/enquiry", include_in_schema=False)
-def enquiry_page() -> FileResponse:
-    """Talk to us: the enquiry form (app/enquiry.py)."""
-    return FileResponse(STATIC / "enquiry.html", headers={"Content-Security-Policy": ENQUIRY_CSP, "X-Frame-Options": "DENY"})
-
-
-@app.get("/")
-def index() -> FileResponse:
-    return FileResponse(STATIC / "index.html")
 
 
 @app.get("/api/known")
@@ -554,17 +474,6 @@ def known() -> dict:
 def live_status():
     """Home screen: one quiet line that the agents are up."""
     return {"online": True}
-
-
-@app.get("/api/health")
-def health() -> dict:
-    router: AIRouter = app.state.router
-    from app.ml.slots import SPECS
-
-    if not get_settings().expose_internals:
-        return {"ok": True}                                  # how the engine works isn't anyone's business
-    return {"ok": True, "engine": get_settings().engine_mode, "problem_types": len(SPECS) - 1,
-            "ai_providers": [p.name for p in router.providers]}
 
 
 @app.get("/api/state")
@@ -840,15 +749,6 @@ def _after_db_job(db: Session, job) -> None:
         mailer().send(owner.email, f"{title} · {utcnow():%d %b}", text, from_name="Goal Engine", attachments=files)
     except Exception:  # noqa: BLE001 - the next run will try again
         logging.getLogger(__name__).exception("Database report email failed")
-
-
-def _public_base(request: Request) -> str:
-    if os.getenv("PUBLIC_URL"):
-        return os.getenv("PUBLIC_URL", "").rstrip("/")
-    base = str(request.base_url).rstrip("/")
-    if request.headers.get("x-forwarded-proto") == "https" and base.startswith("http://"):
-        base = "https://" + base[7:]
-    return base
 
 
 @app.post("/api/connectors")

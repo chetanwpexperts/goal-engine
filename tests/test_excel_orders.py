@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from openpyxl import load_workbook
 
-from app.office import ask
-from app.office.sheetdata import load_tables
+from app.products.sheetu.office import ask
+from app.products.sheetu.office.sheetdata import load_tables
 from tests.test_follow_orders import open_file  # noqa: F401 - fixture
 from tests.test_ml import say
 from tests.test_office_agent import _wait

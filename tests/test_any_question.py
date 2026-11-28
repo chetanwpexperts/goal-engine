@@ -8,9 +8,9 @@ from collections import Counter
 
 import pytest
 
-from app.office import ask
-from app.office import understand as U
-from app.office.sheetdata import load_tables
+from app.products.sheetu.office import ask
+from app.products.sheetu.office import understand as U
+from app.products.sheetu.office.sheetdata import load_tables
 from tests.battery_books import make_all
 
 

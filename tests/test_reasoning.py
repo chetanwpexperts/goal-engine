@@ -49,8 +49,8 @@ def test_agent_explains_and_fixes_in_chat(client, ml_mode):
 
 
 def test_fundamentals_are_complete_and_official():
-    from app.officeknow import diagnose
-    from app.officeknow.diagnose import NO
+    from app.products.sheetu.officeknow import diagnose
+    from app.products.sheetu.officeknow.diagnose import NO
 
     k = diagnose.knowledge()
     for cid, c in k["causes"].items():
@@ -73,7 +73,7 @@ def test_orders_understood_in_any_wording(seed):
 def test_no_fixed_sentence_patterns_in_the_orders():
     import inspect
 
-    from app.office import edits
+    from app.products.sheetu.office import edits
 
     src = inspect.getsource(edits)
     assert "ORDERS = [" not in src and "QUESTION_RE" not in src and "MACRO_RE" not in src

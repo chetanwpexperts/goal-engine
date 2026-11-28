@@ -6,11 +6,11 @@ import random
 import pytest
 from openpyxl import Workbook
 
-from app.office import mind as mo
+from app.products.sheetu.office import mind as mo
 from app.services.mind import predict
 from app.engine.mind import signals
-from app.office import ask
-from app.office.sheetdata import load_tables
+from app.products.sheetu.office import ask
+from app.products.sheetu.office.sheetdata import load_tables
 from tests.test_follow_orders import PRACTICE, open_file  # noqa: F401 - fixture
 from tests.test_ml import say
 from tests.test_office_agent import _upload, _wait
@@ -309,7 +309,7 @@ def test_what_it_could_not_answer_directly_goes_to_learning(client, open_file): 
 
 
 def test_a_single_answer_reads_the_file_once_and_writes_nothing(client, open_file):  # noqa: F811
-    from app.office import sheetdata
+    from app.products.sheetu.office import sheetdata
 
     r1 = say(client, "total sales kitni hai", open_file)
     hits = []
@@ -333,7 +333,7 @@ def test_suggestions_add_up_totals_not_unit_prices():
 
 
 def test_table_cache_stays_within_its_memory_budget(tmp_path, monkeypatch):
-    from app.office import sheetdata
+    from app.products.sheetu.office import sheetdata
 
     monkeypatch.setattr(sheetdata, "CACHE_BUDGET", 3 * 1024 * 1024)
     sheetdata._cache.clear()

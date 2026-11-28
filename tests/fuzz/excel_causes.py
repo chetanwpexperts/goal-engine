@@ -172,7 +172,7 @@ def case(i: int, seed: int, folder: str):
 
 def expected(inject: set, said: dict) -> set:
     from app.engine.mind.reason import FOUND_MIN
-    from app.officeknow import diagnose
+    from app.products.sheetu.officeknow import diagnose
 
     k = diagnose.knowledge()["causes"]
     present = set(inject).union(*(SIDE.get(c, set()) for c in inject)) if inject else set()
@@ -181,8 +181,8 @@ def expected(inject: set, said: dict) -> set:
 
 def check(i: int, seed: int, folder: str) -> list[str]:
     """[] when the agent got it exactly right; otherwise what went wrong."""
-    from app import office
-    from app.officeknow import diagnose, evidence
+    from app.products.sheetu import office
+    from app.products.sheetu.officeknow import diagnose, evidence
 
     path, inject, text, truth = case(i, seed, folder)
     report = office.scan(path)

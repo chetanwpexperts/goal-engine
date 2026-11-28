@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1] / "app"
 
 def test_every_checker_topic_has_a_fundamental():
     topics = set()
-    for f in ("agents/sqlcorrect.py", "agents/sqlbasics.py"):
+    for f in ("products/dbaba/sqlcorrect.py", "products/dbaba/sqlbasics.py"):
         text = (ROOT / f).read_text(encoding="utf-8")
         topics |= set(re.findall(r'(?:Finding|F|add)\((?:"(?:error|wrong|check)"|kind)(?: if [^,]+ else "\w+")?, "([a-z_]+)"', text))
     topics -= {"learned"}                       # rules learned from the manuals carry their own reason

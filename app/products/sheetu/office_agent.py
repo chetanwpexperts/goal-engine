@@ -335,11 +335,15 @@ def finish_upload(db: Session, f: OfficeFile) -> OfficeFile:
     return _start(db, f, "scan", {})
 
 
-def start_fix(db: Session, f: OfficeFile, ops: list[str], sheets: list[str] | None = None) -> OfficeFile:
+def _fix_ops(f: OfficeFile, ops: list[str]) -> list[str]:
     ops = [o for o in ops if o in office.FIX_OPS]
     if f.status not in ("ready", "error") or not ops:
         raise OfficeAgentError("Pehle check poora hone do.")
-    return _start(db, f, "fix", {"ops": ops, "sheets": sheets or []})
+    return ops
+
+
+def start_fix(db: Session, f: OfficeFile, ops: list[str], sheets: list[str] | None = None) -> OfficeFile:
+    return _start(db, f, "fix", {"ops": _fix_ops(f, ops), "sheets": sheets or []})
 
 
 def start_compare(db: Session, a: OfficeFile, b: OfficeFile, key: str = "") -> OfficeFile:
@@ -827,9 +831,9 @@ def _clean_now(db: Session, f: OfficeFile, ops: list[str], sheets: list[str], hi
         ops = [*ops, "data_quality"]
     if heavy(f):
         return _doing(start_fix(db, f, ops, sheets), ops, sheets, hi)
-    start_fix(db, f, ops, sheets)
-    f.status = "queued"
-    db.commit()
+    ops = _fix_ops(f, ops)                       # small file: run the fix here, once (a second, background run would
+    f.status, f.task, f.error, f.args = "queued", "fix", None, dumps({"ops": ops, "sheets": sheets or []})
+    db.commit()                                  # write the same new version at the same time and corrupt it)
     _work(f.id, "fix", {"ops": ops, "sheets": sheets or []})
     db.refresh(f)
     if f.status != "ready":

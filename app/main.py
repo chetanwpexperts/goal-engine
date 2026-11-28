@@ -56,11 +56,14 @@ from app.db import get_db, init_db
 from app.engine import InvalidMessage, all_goals, handle_message
 from app.limits import LimitReached, usage_today
 from app.models import Goal, Message
+from app.security.visitor import COOKIE, visitor_id
+from app.security.admin import ADMIN_COOKIE, _admin_token, _is_admin
+from app.security.site import PREVIEW_COOKIE, _site_open, _preview_token, _has_preview
+from app.services.output import GOAL_INTERNAL, public
 
 
 logging.basicConfig(level=logging.INFO)
 STATIC = Path(__file__).resolve().parent / "static"
-COOKIE = "ge_vid"
 VISITOR_RE = re.compile(r"^[A-Za-z0-9_-]{20,64}$")
 
 @asynccontextmanager
@@ -175,24 +178,9 @@ def _scheduler(stop: threading.Event) -> None:
 
 
 # ---------------------------------------------------------------- coming soon (closed until SITE_MODE=open)
-PREVIEW_COOKIE = "ge_preview"
 OPEN_PATHS = ("/api/health", "/api/connector/", "/connector/", "/robots.txt", "/preview", "/static/coming-soon.html",
               "/admin", "/api/admin/", "/static/admin.", "/api/learning/feed",   # admin and the feed have their own keys
               "/enquiry", "/api/enquiry", "/static/enquiry.")      # people interested can reach us before launch too
-
-
-def _site_open() -> bool:
-    return os.getenv("SITE_MODE", "closed").strip().lower() == "open"
-
-
-def _preview_token() -> str:
-    key = os.getenv("PREVIEW_KEY", "")
-    return hmac.new(key.encode(), b"goal-engine-preview", "sha256").hexdigest() if len(key) >= 16 else ""
-
-
-def _has_preview(request: Request) -> bool:
-    token = _preview_token()
-    return bool(token) and hmac.compare_digest(request.cookies.get(PREVIEW_COOKIE, ""), token)
 
 
 @app.middleware("http")
@@ -235,19 +223,6 @@ def preview(key: str = "") -> Response:
 
 
 # ---------------------------------------------------------------- expert hand-off
-ADMIN_COOKIE = "ge_admin"
-
-
-def _admin_token() -> str:
-    key = os.getenv("ADMIN_KEY", "")
-    return hmac.new(key.encode(), b"goal-engine-admin", "sha256").hexdigest() if len(key) >= 16 else ""
-
-
-def _is_admin(request: Request) -> bool:
-    token = _admin_token()
-    return bool(token) and hmac.compare_digest(request.cookies.get(ADMIN_COOKIE, ""), token)
-
-
 @app.middleware("http")
 async def visitor_cookie(request: Request, call_next):
     """Anonymous visitor id, so each person only ever sees their own goals."""
@@ -268,10 +243,6 @@ async def visitor_cookie(request: Request, call_next):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "same-origin")
     return response
-
-
-def visitor_id(request: Request) -> str:
-    return request.state.visitor_id
 
 
 def own_goal(db: Session, goal_id: int, visitor: str) -> Goal:
@@ -594,24 +565,6 @@ def health() -> dict:
         return {"ok": True}                                  # how the engine works isn't anyone's business
     return {"ok": True, "engine": get_settings().engine_mode, "problem_types": len(SPECS) - 1,
             "ai_providers": [p.name for p in router.providers]}
-
-
-GOAL_INTERNAL = ("intent", "confidence", "interpreted_problem", "desired_goal", "sub_goals", "constraints", "next_action",
-                 "original_request", "updates")
-
-
-def public(data: dict) -> dict:
-    """What the browser gets: the replies, cards and goal titles, never how the brain read the message."""
-    if get_settings().expose_internals or not isinstance(data, dict):
-        return data
-    out = {k: v for k, v in data.items() if k not in ("provider", "intent", "confidence")}
-    for key in ("goal", "current"):
-        if isinstance(out.get(key), dict):
-            out[key] = {k: v for k, v in out[key].items() if k not in GOAL_INTERNAL}
-    if isinstance(out.get("agents"), list):
-        out["agents"] = [{**a, "brain": {k: v for k, v in a["brain"].items() if k not in ("confidence", "ranking", "scores", "score")}}
-                         if isinstance(a, dict) and isinstance(a.get("brain"), dict) else a for a in out["agents"]]
-    return out
 
 
 @app.get("/api/state")

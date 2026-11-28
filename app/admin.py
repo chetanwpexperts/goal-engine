@@ -38,7 +38,7 @@ DAYS = 30
 
 
 def _admin(request: Request) -> None:
-    from app.main import _is_admin
+    from app.security.admin import _is_admin
 
     if not _is_admin(request):
         raise HTTPException(404, "Not Found")

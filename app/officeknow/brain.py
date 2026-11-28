@@ -51,7 +51,7 @@ def labels() -> set[str]:
 
 
 def _training():
-    from app import learning
+    from app.engine import learning
 
     texts, labels_ = _examples()
     known = set(labels_)

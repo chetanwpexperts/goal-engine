@@ -52,7 +52,7 @@ def _examples():
 
 def _training():
     """Knowledge files + what real users taught it (app/learning.py)."""
-    from app import learning
+    from app.engine import learning
 
     texts, labels = _examples()
     known = set(labels)

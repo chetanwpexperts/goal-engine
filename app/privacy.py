@@ -23,6 +23,8 @@ from pathlib import Path
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from app.core.redact import scrub, scrub_detail
+
 from app.models import (Agent, AgentRun, Connector, ConnectorJob, ExpertRequest, Goal, Message, OwnerContact, SentEmail, UsageCounter,
                         dumps, loads, utcnow)
 
@@ -108,9 +110,9 @@ def delete_visitor(db: Session, visitor_id: str) -> dict:
     counts["enquiries"] = db.execute(delete(Enquiry).where(Enquiry.visitor_id == visitor_id)).rowcount
     counts["messages"] = db.execute(delete(Message).where(Message.visitor_id == visitor_id)).rowcount
     counts["goals"] = db.execute(delete(Goal).where(Goal.visitor_id == visitor_id)).rowcount
-    from app import learning
+    from app.data import learning
 
-    counts["learning_votes"] = learning.delete_voter(db, visitor_id)
+    counts["learning_votes"] = learning.delete_voter(db, fingerprint(f"learn:{visitor_id}"))
     from app.agents import office_agent
     from app.models import OfficeFile
 
@@ -205,7 +207,7 @@ def maintain(db: Session, now=None) -> dict:
     db.execute(delete(ExpertRequest).where(ExpertRequest.created_at < now - timedelta(days=180)))
 
     # 2c. learning: votes 90 days, "please learn this" sentences 180 days (scrubbed, no visitor id)
-    from app import learning
+    from app.data import learning
 
     done.update(learning.maintain(db, now))
     from app.agents import office_agent

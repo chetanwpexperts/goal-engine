@@ -59,6 +59,21 @@ def _scheduler(stop: threading.Event) -> None:
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     init_db()
+    from app.engine import learning as rules
+    from app.data import learning as storage
+    from app.services import learning as service
+    from app.agents import learn
+    # Legacy callers receive the same functions without an upward engine import.
+    import sys
+
+    legacy = sys.modules.get("app.learning")
+    if legacy is None:
+        import app.learning as legacy
+    for name in ("vote", "set_status", "delete_voter", "overview", "feed", "maintain"):
+        setattr(legacy, name, getattr(service, name))
+    legacy.ask_to_learn = learn.ask_to_learn
+    legacy.report_miss = learn.report_miss
+    rules.set_examples_source(storage.load_examples)
     if not hasattr(application.state, "router"):
         application.state.router = AIRouter.from_settings(get_settings())
     if not hasattr(application.state, "brain"):

@@ -1,0 +1,543 @@
+"""Agent assignment: the system picks and assembles the agent for a goal, the user only approves.
+
+A recipe is a chain of building blocks (connect -> check -> act -> when -> verify) plus the
+inputs it needs and how risky it is. The user never configures anything: inputs come from the
+conversation, the plan is shown in plain words, and one tap starts it.
+"""
+
+import json
+import re
+import threading
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import Callable
+
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session
+
+from app.agents.sql import analyze_sql
+from app.products.shared.website import check_website
+from app.models import Agent, AgentRun, Goal, Message, dumps, loads, utcnow
+
+
+@dataclass(frozen=True)
+class Block:
+    kind: str        # connect / check / act / when / verify
+    en: str
+    hi: str
+
+
+@dataclass(frozen=True)
+class Input:
+    key: str
+    kind: str        # url / sql / text
+    label_en: str
+    label_hi: str
+    required: bool = True
+    multiline: bool = False
+
+
+@dataclass(frozen=True)
+class Recipe:
+    key: str
+    name_en: str
+    name_hi: str
+    access: str                      # none / connector
+    blocks: tuple[Block, ...]
+    inputs: tuple[Input, ...]
+    run: Callable[[dict], dict] | None
+    summarize: Callable[[dict, bool], str] | None
+    interval_minutes: int | None = None
+    available: bool = True
+
+
+# ---------------------------------------------------------------- summaries in plain words
+def _website_summary(result: dict, hi: bool) -> str:
+    if not result.get("ok"):
+        return (f"Check nahi ho paya: {result.get('error')}" if hi else f"Couldn't check: {result.get('error')}")
+    findings = result["findings"]
+    if not findings:
+        return ("Website check ki: koi badi problem nahi mili. Score 100/100." if hi
+                else "Checked the website: no problems found. Score 100/100.")
+    worst = findings[0]["title_hi" if hi else "title_en"]
+    count = len(findings)
+    return (f"Website check ki: {count} problem mili. Sabse badi: {worst}. Score {result['score']}/100." if hi
+            else f"Checked the website: found {count} problem{'s' if count > 1 else ''}. Biggest: {worst}. Score {result['score']}/100.")
+
+
+def _sql_summary(result: dict, hi: bool) -> str:
+    text = _sql_summary_text(result, hi)
+    if result.get("ok") and result.get("preview"):           # a change: see its rows first (fundamental 'changes_safety')
+        text += ("\n\nChalane se pehle dekh lo kaunsi rows badlengi (ye sirf padhti hai):" if hi else
+                 "\n\nBefore running it, see the rows it will change (this only reads):") + f"\n\n{result['preview']}"
+    rec = result.get("engine_rule") or {}
+    if rec and result.get("ok"):
+        from app.dbknow import engines
+
+        lang = rec.get("lang") or ("hinglish" if hi else "en")
+        extra = engines.detected_line(rec, lang)[0] or engines.notes_line(rec["id"], lang, result.get("notes_for", ""))   # 'not sure': each finding names its engines
+        if rec.get("how") in ("named", "chosen", "remembered") and rec["id"] != engines.NOT_SURE and not extra:
+            extra = (f"Checked for {engines.label(rec['id'])}." if lang == "en" else f"{engines.label(rec['id'])} ke liye check kiya.")
+        elif engines.notes_only(rec["id"]) and rec.get("how") == "detected":
+            extra = engines.detected_line(rec, lang)[0] + "\n" + engines.notes_line(rec["id"], lang, result.get("notes_for", ""))
+        if extra:
+            text = f"{text}\n\n{extra}"
+    return text
+
+
+def _sql_summary_text(result: dict, hi: bool) -> str:
+    if not result.get("ok"):
+        return (f"Query check nahi ho payi: {result.get('error')}" if hi else f"Couldn't check the query: {result.get('error')}")
+    if (result.get("correct") or {}).get("findings"):
+        return correctness_text(result, hi)
+    n, idx = len(result["findings"]), len(result.get("indexes", []))
+    extra = (" Rewritten query bhi taiyar hai." if hi else " A rewritten query is ready too.") if result.get("rewritten") else ""
+    if idx and not result.get("indexes_verified"):
+        extra += (" Aapke maujooda index mujhe nahi dikhte, isliye pehle card wali check query chalao (ya SHOW CREATE TABLE paste karo)."
+                  if hi else " I can't see your current indexes from the query alone, so run the check query in the card first "
+                             "(or paste SHOW CREATE TABLE) and I'll list only the missing ones.")
+    if not n and not idx and not result.get("rewritten"):
+        note = (" Ye kaise chalti hai, uska note goal card mein hai." if hi else " A note on how it runs is in the goal card.") \
+            if result.get("notes") else ""
+        return (f"Query check ki: koi problem nahi mili.{note}" if hi else f"Checked the query: no problems found.{note}") + ruled_out_text(result, hi)
+    what = ("index lag sakte hain" if hi else "possible indexes") if idx and not result.get("indexes_verified") else (
+        "index suggest kiye" if hi else f"index{'es' if idx != 1 else ''} suggested")
+    return (f"Query check ki: {n} problem mili, {idx} {what}.{extra}" if hi
+            else f"Checked the query: {n} problem{'s' if n != 1 else ''} found, {idx} {what}.{extra}") + ruled_out_text(result, hi)
+
+
+def correctness_text(result: dict, hi: bool, only: str | None = None, follow_up: bool = False) -> str:
+    """The mistakes, one short line each (the why is one tap away). Detail only when asked for."""
+    fs = [f for f in result["correct"]["findings"] if only is None or f["topic"] == only or
+          (only == "join" and re.match(r"(on\b|.*\bjoin\b)", f["evidence"], re.I))]
+    n_err = sum(f["kind"] == "error" for f in fs)
+    n_wrong = sum(f["kind"] == "wrong" for f in fs)
+    n_check = len(fs) - n_err - n_wrong
+    bits = []
+    if n_err + n_wrong:
+        bits.append((f"{n_err + n_wrong} galti" + (f" ({n_err} se query chalegi hi nahi)" if n_err else "")) if hi else
+                    f"{n_err + n_wrong} mistake{'s' if n_err + n_wrong != 1 else ''}" + (f" ({n_err} stop it running)" if n_err else ""))
+    if n_check:
+        bits.append(f"{n_check} check karne layak" if hi else f"{n_check} to check")
+    if not follow_up and result["correct"].get("corrected") and n_err + n_wrong:   # the fix, and at most 3 short notes
+        left_t = {x["title_en"] for x in result["correct"].get("left") or []}
+        fixed = [f for f in sorted(fs, key=lambda f: "ewc".index(f["kind"][0])) if f["kind"] != "check" and f["title_en"] not in left_t]
+        top, n = fixed[:3], len(fixed)
+        out = [(f"{n} galti theek ki:" if hi else f"Fixed {n} mistake{'s' if n != 1 else ''}:")]
+        out += [f"- {f['title_hi' if hi else 'title_en']}" for f in top]
+        if result["correct"].get("left"):
+            out.append("GROUP BY/total wala hissa waisa hi chhoda: wo aapke data ke hisaab se badlega." if hi else
+                       "The GROUP BY/total part is left as written: the right version depends on the result you want.")
+        return "\n".join(out) + statements_text(result, hi, sure=True)
+    out = [", ".join(bits) + ":"]
+    tag = {"error": "✗", "wrong": "!", "check": "?"}
+    for k, f in enumerate(sorted(fs, key=lambda f: "ewc".index(f["kind"][0])), 1):
+        out.append(f"{k}. {tag[f['kind']]} {f['title_hi' if hi else 'title_en']}")
+        if not n_err + n_wrong and not follow_up and len(fs) <= 2 and f.get("fix_hi" if hi else "fix_en"):
+            out.append("   " + f["fix_hi" if hi else "fix_en"])          # only things to check: say why right here
+    left = result["correct"].get("left") or []
+    if left and not follow_up:
+        out.append(("Aapka faisla: " if hi else "Your call: ") + "; ".join(f["title_hi" if hi else "title_en"] for f in left) + ".")
+    if result["correct"].get("corrected") and not follow_up:
+        return "\n".join(out) + statements_text(result, hi, sure=bool(n_err + n_wrong), fs=fs) + ruled_out_text(result, hi)
+    return "\n".join(out) + ("" if follow_up else ruled_out_text(result, hi))
+
+
+def _stmt(q: str) -> str:
+    """The statement ended with ';' (before a '-- note' on its last line, so the note can't swallow it)."""
+    from app.agents.sqlcorrect import _mask
+
+    q = q.strip()
+    m = re.search(r"--[^\n]*$|#[^\n]*$", _mask(q).rstrip() and q)
+    if m and _mask(q)[m.start()] == " ":                # the mask blanks comments: this '--' is a comment, not text in quotes
+        body = q[:m.start()].rstrip()
+        return (body if body.endswith(";") else body + ";") + "   " + q[m.start():]
+    return q if q.endswith(";") else q + ";"
+
+
+def statements_text(result: dict, hi: bool, sure: bool, fs: list | None = None) -> str:
+    """Night X1: the corrected statement itself, runnable, in the reply (not only in the card), and every other honest reading
+    of the mistake written out under 'if that's what you meant'. A change (UPDATE / DELETE / INSERT) is a preview: shown,
+    never run here."""
+    c = result.get("correct") or {}
+    q = c.get("corrected")
+    if not q:
+        return ""
+    fs = fs if fs is not None else c.get("findings") or []
+    change = bool(re.match(r"\s*(update|delete|insert|replace|merge)\b", q, re.I))
+    topics = {f["topic"] for f in fs}
+    from app.agents.sql import MEANING_CHECKS, SPEED_OFFERS
+
+    if sure:
+        head = (("Sahi statement (preview: main ise chalata nahi; pehle neeche wali query se dekh lo kaunsi rows badlengi):" if hi else
+                 "Corrected statement (a preview: I don't run it; first see the rows it will change with the query below):")
+                if change else ("Sahi query:" if hi else "Corrected query:"))
+    elif any(f["topic"] == "join" and "cancels the" in f["title_en"] for f in fs):
+        head = ("Agar sirf match wali rows chahiye (INNER JOIN):" if hi else "If you only want rows that have a match (INNER JOIN):")
+    elif topics and topics <= SPEED_OFFERS | {"sargable"}:
+        head = ("Tez roop (rows wahi):" if hi else "The faster form (the same rows):")
+    elif topics and topics <= {"same_table"}:
+        head = ("Har database pe chalne wala roop:" if hi else "A version that runs on every database:")
+    elif topics & MEANING_CHECKS:
+        head = ("Agar aapka matlab yahi tha:" if hi else "If that's what you meant:")
+    else:
+        head = ("Theek ki hui query ('check' wale naam andaze se):" if hi else "Corrected query ('check' marks names I guessed):")
+    if change and not sure:
+        head = head.rstrip(":") + (" (preview: main ise chalata nahi):" if hi else " (a preview: I don't run it):")
+    out = f"\n\n{head}\n\n{_stmt(q)}"
+    meant = c.get("meant")
+    if sure and meant and meant.strip() != q.strip():
+        out += "\n\n" + ("Aur agar aapka matlab yahi tha (upar ke 'check' wale point bhi):" if hi else
+                          "And if that's what you meant (the points to check above, applied too):") + f"\n\n{_stmt(meant)}"
+    for a in c.get("alternatives") or []:
+        if a["sql"].strip() not in (q.strip(), (meant or "").strip()):
+            out += f"\n\n{a['hi' if hi else 'en']}\n\n{_stmt(a['sql'])}"
+    return out
+
+
+def ruled_out_text(result: dict, hi: bool) -> str:
+    """What the table structure the person gave rules out (night 10B): said once, briefly, so a risk that can't happen isn't
+    left hanging."""
+    ruled = result.get("ruled_out") or (result.get("correct") or {}).get("dropped") or []
+    if not ruled:
+        return ""
+    out = ""
+    for by, (h_hi, h_en) in (("schema", ("Aapki table structure se ye risk yahan nahi hai: ", "Your table structure rules these out here: ")),
+                             ("plan", ("Aapke EXPLAIN plan mein ye speed risk nahi dikhta: ", "Your EXPLAIN plan rules these out: "))):
+        part = [d for d in ruled if (d.get("by") or "schema") == by]
+        if part:
+            out += "\n" + (h_hi if hi else h_en) + "; ".join(f"{d['title_hi' if hi else 'title_en']} ({d['why_hi' if hi else 'why_en']})"
+                                                         for d in part[:3])
+    return out
+
+
+def correctness_options(result: dict, hi: bool) -> list[str]:
+    """Taps made from THIS query's mistakes: the why of the worst ones, and speed only once nothing is wrong."""
+    fs = (result.get("correct") or {}).get("findings") or []
+    return ["Ise fast karo" if hi else "Optimize it"] if fs else []      # the next real action, nothing to quiz about
+
+
+def quiet_next(db, goal, text: str) -> bool:
+    """The query checker is waiting for the query someone said they have: that is the next step, nothing else."""
+    from app.agents.database import QUERY_TALK
+
+    return goal is not None and QUERY_TALK.search(text or "") is not None and \
+        any(a.recipe == "sql_review" and a.status == "proposed" for a in goal_agents(db, goal.id))
+
+
+def why_label(f: dict, hi: bool) -> str:
+    t = f["title_hi" if hi else "title_en"]
+    head = t.split(":")[0] if ":" in t[:45] else t
+    if len(head) > 38:
+        head = head[:38].rsplit(" ", 1)[0] + "…"
+    return (f"Kyun: {head}" if hi else f"Why: {head}")
+
+
+def _run_website(inputs: dict) -> dict:
+    return check_website(inputs.get("url", ""))
+
+
+def _run_sql(inputs: dict) -> dict:
+    rec = inputs.get("engine_rule") or {}
+    out = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=rec.get("id") or None, said=inputs.get("said") or "")
+    if rec:
+        out["engine_rule"] = rec
+        from app.dbknow import engines
+
+        out["taps"] = engines.detected_line(rec, rec.get("lang", "en"))[1]
+    return out
+
+
+RECIPES: dict[str, Recipe] = {
+    "website_check": Recipe(
+        "website_check", "Website Checker", "Website Checker", "none",
+        (Block("connect", "Open your public website, like a visitor (no login or password needed)",
+               "Aapki public website kholunga, jaise visitor kholta hai (koi login ya password nahi)"),
+         Block("check", "Check security, speed, phone layout, errors, Google basics and contact buttons",
+               "Security, speed, phone layout, errors, Google basics aur contact buttons check karunga"),
+         Block("act", "Report every problem in plain words, worst first, with the fix",
+               "Har problem saaf shabdon mein bataunga, sabse badi pehle, aur uska fix")),
+        (Input("url", "url", "Website address", "Website ka address"),),
+        _run_website, _website_summary),
+    "website_watch": Recipe(
+        "website_watch", "Website Watch (daily)", "Website Watch (roz)", "none",
+        (Block("when", "Every day", "Roz"),
+         Block("check", "Check the website is up, secure and fast", "Check karunga website khul rahi hai, secure aur fast hai"),
+         Block("act", "Add an alert to this goal if something breaks", "Kuch tootega to is goal mein alert daalunga"),
+         Block("verify", "Keep a log of every check", "Har check ka log rakhunga")),
+        (Input("url", "url", "Website address", "Website ka address"),),
+        _run_website, _website_summary, interval_minutes=24 * 60),
+    "sql_review": Recipe(
+        "sql_review", "SQL Query Checker", "SQL Query Checker", "none",
+        (Block("connect", "Read only the query you paste (no database access, no data)",
+               "Sirf aapki paste ki hui query padhunga (database access nahi, data nahi)"),
+         Block("check", "Check it's right first: joins, aliases, columns, NULLs, GROUP BY; then speed",
+               "Pehle check karunga query sahi hai: joins, alias, columns, NULL, GROUP BY; phir speed"),
+         Block("act", "Give the corrected query, every mistake explained; indexes only when it's right",
+               "Theek ki hui query aur har galti ki wajah dunga; index sirf query sahi hone ke baad")),
+        (Input("query", "sql", "Paste the SQL query", "SQL query yahan paste karo", multiline=True),
+         Input("explain", "text", "EXPLAIN output or CREATE TABLE (optional)", "EXPLAIN output ya CREATE TABLE (optional)",
+               required=False, multiline=True)),
+        _run_sql, _sql_summary),
+    "db_automation": Recipe(
+        "db_automation", "Database Automation", "Database Automation", "connector",
+        (Block("connect", "Connect through a small read-only connector on your server (your password never leaves it)",
+               "Aapke server pe chhota read-only connector (aapka password wahin rehta hai)"),
+         Block("when", "On the schedule you choose (e.g. every day 9 AM)", "Aapke chune samay pe (jaise roz subah 9 baje)"),
+         Block("act", "Run the approved job: backup, report or alert", "Approved kaam: backup, report ya alert"),
+         Block("verify", "Log every run and alert you if it fails", "Har run ka log aur fail hone pe alert")),
+        (), None, None, available=False),
+}
+
+RECIPE_FOR_INTENT = {
+    "website_problem": "website_check",
+    "wordpress_issue": "website_check",
+    "no_customers": "website_check",
+    "server_down": "website_watch",
+    "slow_db_query": "sql_review",
+}
+
+INPUT_SLOTS = {"website_check": ("website_url",), "website_watch": ("website_url",)}
+URL_RE = re.compile(r"\b((?:https?://)?(?:www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.(?:com|in|co\.in|net|org|co|io|biz|info|store|shop|online|co\.uk|com\.au|ae|dev|app|site|tech)(?:/[^\s]*)?)", re.I)
+SQL_RE = re.compile(r"\b(select\b[\s\S]+?\bfrom\b|update\s+[`\w.]+\s+set\b|delete\s+from\b|update\s+[`\w.]+(?:\s+(?:as\s+)?\w+)?\s+"
+                    r"(?:inner\s+|left\s+)?join\b|delete\s+[`\w]+(?:\s*,\s*[`\w]+)*\s+from\b|"
+                    r"(?:insert|replace)\s+(?:ignore\s+)?into\s+[`\"\w.]+[\s\S]*?\b(?:values?|select|set)\b|"
+                    r"create\s+(?:or\s+replace\s+)?(?:definer\s*=\s*\S+\s+)?(?:procedure|function|trigger)\s+[`\"\w.]+|do\s+\$|"
+                    r"create\s+(?:temp(?:orary)?\s+)?table\s+(?:if\s+not\s+exists\s+)?[`\"\w.]+\s*\()", re.I)
+YES_RE = re.compile(r"^\s*(haan|ha|haa|han|yes|yep|ok|okay|theek hai|thik hai|kar do|karo|start|go|chalu karo|shuru karo|please do)\b", re.I)
+
+RUNS_PER_VISITOR_PER_DAY = 30
+_running = threading.Lock()
+
+
+def pasted_query(text: str) -> bool:
+    """The whole message is one SQL query (maybe straight from code), or a short line and then one."""
+    return query_in(text) is not None
+
+
+def query_in(text: str) -> str | None:
+    """The SQL query pasted in this message (maybe straight from code), after at most a short lead-in line like
+    'here is my query:'; None when the message is a sentence that only mentions SQL."""
+    from app.agents.sql import _strip_comments, unwrap
+
+    lines = (text or "").strip().splitlines()
+    m = re.match(r"\s*([^\n:]{1,60}):[ \t]*(?=\(?\s*(?:select|with|update|delete|insert|replace)\b)", lines[0] if lines else "", re.I)
+    if m and len(m.group(1).split()) <= 8:          # 'MariaDB: UPDATE ...' / 'fix this: SELECT ...' on one line (night X1)
+        lines = [lines[0][m.end():]] + lines[1:]
+        text = m.group(1) + "\n" + "\n".join(lines)
+        lines = text.splitlines()
+    for k in range(min(len(lines), 4)):
+        lead, rest = " ".join(lines[:k]), "\n".join(lines[k:])
+        if len(lead.split()) > 15:
+            break
+        q = _strip_comments(unwrap(rest)).strip()
+        if re.match(r"^\(?\s*(select|with|update|delete|insert|replace|create|delimiter|do)\b", q, re.I) and SQL_RE.search(q):
+            return rest.strip()
+    return None
+
+
+def recipe_for(goal: Goal | None) -> Recipe | None:
+    if goal is None:
+        return None
+    key = RECIPE_FOR_INTENT.get(goal.intent or "")
+    if key == "website_check" and goal.intent == "no_customers":
+        if (loads(goal.slots, {}) or {}).get("has_website") != "yes" and not (loads(goal.slots, {}) or {}).get("website_url"):
+            return None  # no website to check
+    return RECIPES.get(key) if key else None
+
+
+def agent_dict(agent: Agent, db: Session, hi: bool) -> dict:
+    if agent.recipe == "automation":
+        from app.products.shared.automation import automation_dict
+
+        return automation_dict(db, agent, hi)
+    if agent.recipe == "database":
+        from app.agents.database import database_dict
+
+        return database_dict(db, agent, hi)
+    if agent.recipe == "office":
+        from app.agents.office_agent import office_dict
+
+        return office_dict(db, agent, hi)
+    if agent.recipe == "db_report":
+        inputs = loads(agent.inputs, {}) or {}
+        from app.products.shared.spec import schedule_text
+
+        return {"id": agent.id, "lang": "hi" if hi else "en", "recipe": "db_report", "db_report": True,
+                "name": inputs.get("title", "Database report"), "status": agent.status,
+                "schedule": schedule_text(inputs.get("schedule") or {"every": "day", "at": "09:00"}, hi),
+                "next_run_at": agent.next_run_at.isoformat() if agent.next_run_at else None, "sql": inputs.get("sql", ""),
+                "blocks": [], "runs": [], "access": "connector", "available": True}
+    recipe = RECIPES[agent.recipe]
+    runs = list(db.scalars(select(AgentRun).where(AgentRun.agent_id == agent.id).order_by(AgentRun.id.desc()).limit(5)))
+    inputs = loads(agent.inputs, {}) or {}
+    return {
+        "id": agent.id,
+        "lang": "hi" if hi else "en",
+        "recipe": recipe.key,
+        "name": recipe.name_hi if hi else recipe.name_en,
+        "status": agent.status,
+        "access": recipe.access,
+        "available": recipe.available,
+        "blocks": [{"kind": b.kind, "text": b.hi if hi else b.en} for b in recipe.blocks],
+        "inputs": [{"key": i.key, "kind": i.kind, "label": i.label_hi if hi else i.label_en, "required": i.required,
+                    "multiline": i.multiline, "value": inputs.get(i.key, "")} for i in recipe.inputs],
+        "ready": recipe.available and all(inputs.get(i.key) for i in recipe.inputs if i.required),
+        "schedule": (f"every {recipe.interval_minutes // 60}h" if recipe.interval_minutes else "once"),
+        "next_run_at": agent.next_run_at.isoformat() if agent.next_run_at else None,
+        "runs": [{"id": r.id, "status": r.status, "summary": r.summary, "result": loads(r.result, None),
+                  "started_at": r.started_at.isoformat(), "finished_at": r.finished_at.isoformat() if r.finished_at else None}
+                 for r in runs],
+    }
+
+
+def goal_agents(db: Session, goal_id: int) -> list[Agent]:
+    return list(db.scalars(select(Agent).where(Agent.goal_id == goal_id).order_by(Agent.id.desc())))
+
+
+def plan_text(recipe: Recipe, hi: bool, missing: list[Input]) -> str:
+    """One short line: the plan itself is drawn in the agent panel."""
+    head = (f"Main ye karunga: {recipe.name_hi}." if hi else f"Here's what I'll do: {recipe.name_en}.")
+    if not recipe.available:
+        return head + (" Ye agent abhi ban raha hai; aapki zaroorat note kar li hai. Tab tak steps dekh sakte ho."
+                       if hi else " This agent is being built; your need is noted. Meanwhile you can see the steps.")
+    if missing:
+        need = missing[0]
+        return head + (f" Bas ek cheez chahiye: {need.label_hi}." if hi else f" I just need one thing: {need.label_en}.")
+    return head + (" Shuru karun? Start dabao ya \"haan\" likho." if hi else " Shall I start? Tap Start or type \"yes\".")
+
+
+def inputs_from_text(recipe: Recipe, text: str, slots: dict) -> dict:
+    found: dict[str, str] = {}
+    for inp in recipe.inputs:
+        if inp.kind == "url":
+            m = URL_RE.search(text) or (URL_RE.search(slots.get("website_url", "")) if slots.get("website_url") else None)
+            if m:
+                found[inp.key] = m.group(1)
+        elif inp.kind == "sql":
+            m = SQL_RE.search(text)
+            if m:                                  # pasted from code: keep the code around it, the checker unwraps it
+                found[inp.key] = (query_in(text) or text[m.start():]).strip()[:20000]
+                found["said"] = text.replace(found[inp.key], " ").strip()[:300]   # 'this is a postgres query:' (rule A)
+    return found
+
+
+def assign(db: Session, goal: Goal | None, text: str, hi: bool, asking: bool) -> tuple[Agent | None, str | None, bool]:
+    """Create or update the goal's agent from this message.
+
+    Returns (agent, reply_override, run_now). The reply override replaces generic advice with the plan.
+    """
+    recipe = recipe_for(goal)
+    if goal is not None and (recipe is None or not any(i.kind == "sql" for i in recipe.inputs)) and pasted_query(text):
+        goal.intent, recipe = "slow_db_query", RECIPES["sql_review"]   # the message IS a query: whatever the chat was about, check it
+    if recipe is None or goal is None:
+        return None, None, False
+    if any(a.recipe == "automation" for a in goal_agents(db, goal.id)):
+        return None, None, False  # this goal already has its automation agent
+    slots = loads(goal.slots, {}) or {}
+    agent = next((a for a in goal_agents(db, goal.id) if a.recipe == recipe.key), None)
+    found = inputs_from_text(recipe, text, slots)
+    if agent is None:
+        if asking and goal.pending in INPUT_SLOTS.get(recipe.key, ()):
+            goal.pending = None        # the agent asks for its own input (e.g. the website address)
+            asking = False
+        direct = goal.intent == "website_problem" and recipe.key in INPUT_SLOTS
+        if asking and not found and not direct:
+            return None, None, False   # the conversation is still asking its one question; propose after
+        if direct:
+            goal.pending = None        # "my website has issues": the agent only needs the address; ask for that, not an essay
+        agent = Agent(visitor_id=goal.visitor_id, goal_id=goal.id, recipe=recipe.key, inputs=dumps(found),
+                      status="proposed" if recipe.available else "planned")
+        db.add(agent)
+        db.flush()
+        missing = [i for i in recipe.inputs if i.required and not found.get(i.key)]
+        if recipe.available and not missing and any(i.kind == "sql" and found.get(i.key) for i in recipe.inputs):
+            return agent, None, True   # a pasted query is the whole input (only its text is read): check it now, don't ask "start?"
+        return agent, plan_text(recipe, hi, missing), False
+
+    inputs = loads(agent.inputs, {}) or {}
+    if found:
+        inputs.update(found)
+        agent.inputs = dumps(inputs)
+    ready = recipe.available and all(inputs.get(i.key) for i in recipe.inputs if i.required)
+    if agent.status in ("proposed", "done", "failed") and ready and (YES_RE.search(text) or found):
+        return agent, None, True
+    return agent, None, False   # the plan was shown once; never repeat it
+
+
+def runs_today(db: Session, visitor_id: str) -> int:
+    start = datetime(*utcnow().timetuple()[:3])
+    return len(list(db.scalars(select(AgentRun.id).join(Agent, Agent.id == AgentRun.agent_id)
+                               .where(Agent.visitor_id == visitor_id, AgentRun.started_at >= start))))
+
+
+class AgentError(RuntimeError):
+    pass
+
+
+class AgentAsks(AgentError):
+    """The agent needs one choice before it can answer (e.g. which database the query is for): the question and its taps."""
+
+    def __init__(self, text: str, options: list[str]):
+        super().__init__(text)
+        self.options = options
+
+
+def run_agent(db: Session, agent: Agent, hi: bool, scheduled: bool = False) -> AgentRun:
+    """Run now. Scheduled runs also post their summary into the goal's conversation."""
+    recipe = RECIPES[agent.recipe]
+    if not recipe.available or recipe.run is None:
+        raise AgentError("This agent isn't available yet")
+    inputs = loads(agent.inputs, {}) or {}
+    missing = [i.label_en for i in recipe.inputs if i.required and not inputs.get(i.key)]
+    if missing:
+        raise AgentError(f"Missing: {', '.join(missing)}")
+    if not scheduled and runs_today(db, agent.visitor_id) >= RUNS_PER_VISITOR_PER_DAY:
+        raise AgentError("Today's limit for agent runs is reached. Please try again tomorrow.")
+    if recipe.key == "sql_review" and not scheduled:
+        from app.agents.database import engine_gate
+
+        inputs = engine_gate(db, agent, inputs, hi)       # rule A: which database decides the answer (may ask first)
+
+    run = AgentRun(agent_id=agent.id, status="running")
+    db.add(run)
+    agent.status = "running"
+    db.commit()
+    try:
+        result = recipe.run(inputs)
+        run.status = "done" if result.get("ok", True) else "failed"
+    except Exception as exc:  # noqa: BLE001 - an agent failure must never break the app
+        result = {"ok": False, "error": f"Agent failed: {type(exc).__name__}"}
+        run.status = "failed"
+    run.result = dumps(result)
+    run.summary = recipe.summarize(result, hi) if recipe.summarize else ""
+    run.finished_at = utcnow()
+    agent.last_run_at = run.finished_at
+    if recipe.interval_minutes:
+        agent.status = "active"
+        agent.interval_minutes = recipe.interval_minutes
+        agent.next_run_at = run.finished_at + timedelta(minutes=recipe.interval_minutes)
+    else:
+        agent.status = run.status
+    goal = db.get(Goal, agent.goal_id)
+    if goal is not None:
+        goal.next_action_type = "execute" if run.status == "done" else "investigate"
+        goal.next_action = run.summary
+        if scheduled:
+            db.add(Message(visitor_id=agent.visitor_id, goal_id=goal.id, role="assistant", text=run.summary,
+                           relation="agent_run", provider="agent"))
+    db.commit()
+    return run
+
+
+def claim_due(db: Session, now: datetime) -> list[Agent]:
+    """Claim scheduled agents that are due. Safe with several workers: each due agent is claimed once."""
+    claimed = []
+    for agent in db.scalars(select(Agent).where(Agent.status == "active", Agent.next_run_at <= now).limit(20)):
+        result = db.execute(update(Agent).where(Agent.id == agent.id, Agent.next_run_at == agent.next_run_at)
+                            .values(next_run_at=now + timedelta(minutes=agent.interval_minutes or 1440)))
+        db.commit()
+        if result.rowcount == 1:
+            db.refresh(agent)
+            claimed.append(agent)
+    return claimed

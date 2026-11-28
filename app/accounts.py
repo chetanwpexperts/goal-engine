@@ -16,7 +16,13 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from app.domain.schemas.accounts import (
+    SignupIn,
+    LoginIn,
+    CodeIn,
+    ForgotIn,
+    ResetIn,
+)
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
@@ -253,36 +259,6 @@ def _err(exc: AccountError) -> JSONResponse:
 
 
 # ---------------------------------------------------------------- endpoints
-class SignupIn(BaseModel):
-    full_name: str = ""
-    phone: str = ""
-    email: str = ""
-    location: str = ""
-    username: str = ""
-    password: str = ""
-    why: str = ""
-    website: str = ""          # honeypot: people never see it
-
-
-class LoginIn(BaseModel):
-    login: str = ""            # email or username
-    password: str = ""
-
-
-class CodeIn(BaseModel):
-    code: str = ""
-
-
-class ForgotIn(BaseModel):
-    email: str = ""
-
-
-class ResetIn(BaseModel):
-    email: str = ""
-    code: str = ""
-    password: str = ""
-
-
 def _clean(body: SignupIn) -> dict:
     d = {
         "full_name": " ".join(body.full_name.split())[:120],

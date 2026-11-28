@@ -63,7 +63,19 @@ def _files():
 
 def _targets(f: pathlib.Path, tree: ast.AST) -> list[str]:
     out = []
+    pkg = _modname(f).split(".")
+    if f.name != "__init__.py":
+        pkg = pkg[:-1]                                   # a module's package; a package's __init__ is its own package
     for n in ast.walk(tree):
+        if isinstance(n, ast.ImportFrom) and n.level > 0:   # relative imports count too: "from .domain import x" in app/db.py
+            base = pkg[:len(pkg) - (n.level - 1)] if n.level - 1 <= len(pkg) else []
+            mod = ".".join(base + ([n.module] if n.module else []))
+            if mod:
+                out.append(mod)
+                out += [f"{mod}.{a.name}" for a in n.names if (APP / mod.replace(".", "/") / f"{a.name}.py").exists()]
+            else:
+                out += [a.name for a in n.names]
+            continue
         if isinstance(n, ast.ImportFrom) and n.level == 0 and n.module and (n.module == "app" or n.module.startswith("app.")):
             if n.module == "app":
                 out += [a.name for a in n.names]

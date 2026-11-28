@@ -7,7 +7,7 @@
     "agents.database -> dbarea",
     "agents.direct -> privacy",
     "agents.office_agent -> dbknow",
-    "db -> models",
+    "db -> domain",
     "dbknow.reasoning -> office",
     "engine -> agents",
     "engine -> limits",

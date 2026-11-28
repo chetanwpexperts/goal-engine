@@ -12,7 +12,11 @@ from datetime import timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from app.domain.schemas.admin import (
+    EnquiryUpdate,
+    MissUpdate,
+    TryIn,
+)
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -134,11 +138,6 @@ def users(request: Request, db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------- enquiries
-class EnquiryUpdate(BaseModel):
-    status: str | None = None
-    note: str | None = None
-
-
 @router.get("/enquiries")
 def enquiries(request: Request, status: str = "", db: Session = Depends(get_db)):
     _admin(request)
@@ -247,10 +246,6 @@ def knowledge_view(request: Request, db: Session = Depends(get_db)):
             "learned": [{"agent": b, "status": s, "count": n} for b, s, n in learned]}
 
 
-class MissUpdate(BaseModel):
-    status: str
-
-
 @router.post("/knowledge/miss/{mid}")
 def miss_update(mid: int, body: MissUpdate, request: Request, db: Session = Depends(get_db)):
     _admin(request)
@@ -260,10 +255,6 @@ def miss_update(mid: int, body: MissUpdate, request: Request, db: Session = Depe
     m.status = body.status
     db.commit()
     return {"ok": True}
-
-
-class TryIn(BaseModel):
-    text: str = ""
 
 
 @router.post("/knowledge/try")

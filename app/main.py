@@ -40,6 +40,7 @@ from app.security.site import PREVIEW_COOKIE, _site_open, _preview_token, _has_p
 from app.services.output import GOAL_INTERNAL, public
 from app.core.paths import STATIC
 from app.security.headers import CONSOLE_CSP, ENQUIRY_CSP
+from app.security.crawlers import CrawlerMiddleware
 from app.services.urls import _public_base
 from app.services import health as health_service
 from app.api.routes import pages as pages_routes, expert as expert_routes, health as health_routes, learning_feed as learning_feed_routes
@@ -159,3 +160,7 @@ async def visitor_cookie(request: Request, call_next):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "same-origin")
     return response
+
+
+# Register last so blocked requests do not reach visitor or site-mode checks.
+app.add_middleware(CrawlerMiddleware)

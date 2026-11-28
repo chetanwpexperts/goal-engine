@@ -16,7 +16,7 @@ import hashlib
 from app.engine.ml.answers import PLAYBOOKS
 from app.engine.ml.howto import BY_KEY, STEP_CHOICES, choices_for, find_howto, render
 from app.engine.ml.intent import IntentModel, Prediction
-from app.engine.ml.normalize import _ALSO_ENGLISH, HINGLISH_MARKERS, detect_language, normalize, tokens
+from app.core.text import _ALSO_ENGLISH, HINGLISH_MARKERS, detect_language, normalize, tokens
 from app.engine.ml.registry import BUSINESS_DOMAIN, short_title
 from app.engine.ml.slots import INTENT_LABELS, RELATED, SPECS, Slot, extract_all, main_issue
 from app.domain.models import Goal, dumps, loads

@@ -16,7 +16,7 @@ from app.products.shared.core import URL_RE
 from app.products.shared.planner import plan as plan_automation
 from app.engine.ml.brain import SKIP_RE, steps_text
 from app.engine.ml.registry import domain_of
-from app.engine.ml.normalize import normalize
+from app.core.text import normalize
 from app.engine.mind import route
 from app.domain.models import Agent, Goal, Message, dumps, loads
 

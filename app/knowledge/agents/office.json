@@ -692,13 +692,13 @@
   ]
  },
  "hooks": {
-  "suggest": "app.office.mind:suggest",
-  "ready": "app.office.mind:ready",
-  "holds": "app.agents.office_agent:holds_conversation",
-  "continue": "app.agents.office_agent:continue_turn",
-  "wants": "app.agents.office_agent:wants_turn",
-  "take": "app.agents.office_agent:take_turn",
-  "labels": "app.officeknow.brain:labels"
+  "suggest": "app.products.sheetu.office.mind:suggest",
+  "ready": "app.products.sheetu.office.mind:ready",
+  "holds": "app.products.sheetu.office_agent:holds_conversation",
+  "continue": "app.products.sheetu.office_agent:continue_turn",
+  "wants": "app.products.sheetu.office_agent:wants_turn",
+  "take": "app.products.sheetu.office_agent:take_turn",
+  "labels": "app.products.sheetu.officeknow.brain:labels"
  },
  "goals": {
   "review": "check",

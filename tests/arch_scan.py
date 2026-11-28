@@ -24,11 +24,9 @@ BASELINE = pathlib.Path(__file__).resolve().parent / "architecture_baseline.json
 LAYERS = {"core": 1, "domain": 2, "data": 3, "security": 4, "engine": 5, "products": 6, "services": 7, "api": 8, "main": 9}
 
 # today's top-level packages and modules -> their layer (new folders named like a layer map to themselves)
-LAYER_OF = {"config": "core", "db": "core", "models": "domain", "mind": "engine", "ml": "engine", "learning": "engine",
-            "engine": "engine", "ai": "engine", "agents": "products", "dbknow": "products", "officeknow": "products",
-            "office": "products", "local": "products", "accounts": "services", "admin": "services", "enquiry": "services",
-            "expert": "services", "privacy": "services", "usage": "services", "limits": "services", "captcha": "services",
-            "console": "services", "dbarea": "services", "main": "main",
+LAYER_OF = {"learning": "engine", "ai": "engine", "local": "products", "accounts": "services", "admin": "services",
+            "enquiry": "services", "expert": "services", "privacy": "services", "usage": "services", "limits": "services",
+            "captcha": "services", "console": "services", "dbarea": "services", "main": "main",
             **{k: k for k in LAYERS}}
 
 DB_ATTRS = {"query", "execute", "scalar", "scalars", "get"}
@@ -41,16 +39,12 @@ def _modname(f: pathlib.Path) -> str:
 
 
 def product_of(mod: str) -> str | None:
-    """'dbaba' | 'sheetu' | 'shared' for product code, else None. Works for today's paths and for app/products/<name>/."""
+    """'dbaba' | 'sheetu' | 'shared' for product code, else None. app/products/<name>/, plus the old on-server path app/local."""
     p = mod.split(".")
     if p[0] == "products" and len(p) > 1:
         return p[1]
-    if p[0] in ("office", "officeknow") or mod.startswith("agents.office_agent"):
-        return "sheetu"
-    if p[0] in ("dbknow", "local") or (p[0] == "agents" and len(p) > 1 and (p[1].startswith("sql") or p[1] == "database")):
+    if p[0] == "local":                                  # the old on-server entry path (app/local), kept for install files
         return "dbaba"
-    if p[0] == "agents":
-        return "shared"
     return None
 
 

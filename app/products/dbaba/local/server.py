@@ -504,7 +504,9 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         def run():
             from app.core.config import get_settings
             from app.core.db import get_db
-            from app.engine import InvalidMessage, handle_message
+            from app.engine.goal import InvalidMessage
+            # known debt (tests/architecture_baseline.json): the on-server app has no startup of its own to hand the chat in
+            from app.services.goals import handle_message
 
             ce = chat_engine()
             gen = get_db()

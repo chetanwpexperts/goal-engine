@@ -1,10 +1,8 @@
 {
-  "_about": "Baseline for tests/test_layers.py and tests/test_route_permissions.py (scans in tests/arch_scan.py), taken from main on 2026-11-28 (routes keyed \"site|local METHOD /path\", wherever defined). These lists may only shrink: a test fails on any new entry and on any entry that no longer exists. Refresh with: python -m tests.arch_scan",
+  "_about": "Baseline for tests/test_layers.py and tests/test_route_permissions.py (scans in tests/arch_scan.py), taken from main on 2026-11-28 (routes keyed \"site|local METHOD /path\", wherever defined). Step 6 (2026-11-28) removed 3 import debts and made one hidden import visible (products.dbaba.local.server -> services: it used to go through a string import in app/engine/__init__.py). These lists may only shrink: a test fails on any new entry and on any entry that no longer exists. Refresh with: python -m tests.arch_scan",
   "import_debts": [
-    "db -> domain",
     "products.dbaba.database -> dbarea",
-    "products.shared.automation -> privacy",
-    "products.shared.direct -> privacy"
+    "products.dbaba.local.server -> services"
   ],
   "db_session_debts": [
     "app/accounts.py:_limit",

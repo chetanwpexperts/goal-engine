@@ -156,9 +156,9 @@
   ]
  },
  "hooks": {
-  "state": "app.agents.website:mind_state",
-  "holds": "app.agents.website:holds_conversation",
-  "continue": "app.agents.website:continue_turn"
+  "state": "app.products.shared.website:mind_state",
+  "holds": "app.products.shared.website:holds_conversation",
+  "continue": "app.products.shared.website:continue_turn"
  },
  "goals": {
   "web_check": "check",

@@ -10,7 +10,7 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Callable
 
-from app.engine.ml.normalize import normalize
+from app.core.text import normalize
 
 
 # ---------------------------------------------------------------- extractors

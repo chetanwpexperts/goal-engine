@@ -50,15 +50,15 @@ def on_done(fn):
     return fn
 
 
-# ---------------------------------------------------------------- secrets (see app/privacy.py)
+# ---------------------------------------------------------------- secrets (see app/security/secrets.py)
 def encrypt(data: dict) -> str:
-    from app import privacy
+    from app.security import secrets as privacy
 
     return privacy.encrypt(data, "db-credentials")
 
 
 def decrypt(token: str) -> dict:
-    from app import privacy
+    from app.security import secrets as privacy
 
     try:
         return privacy.decrypt(token, "db-credentials")
@@ -226,7 +226,7 @@ def start(job_id: int) -> None:
 
 def _write_job(db: Session, connector: Connector, job: ConnectorJob) -> dict:
     """Approved change or its undo, for a database connected with typed details. The undo copy is kept encrypted."""
-    from app import privacy
+    from app.security import secrets as privacy
 
     payload = loads(job.payload, {}) or {}
     conn = _open({**decrypt(connector.secret or ""), "writer": True})

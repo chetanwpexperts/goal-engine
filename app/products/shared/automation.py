@@ -21,7 +21,7 @@ from app.products.shared.blocks import (RULE_FIELDS, BlockError, Table, fill, lo
                                summarize, valid_email)
 from app.products.shared.mailer import Mailer, SmtpMailer
 from app.products.shared.spec import describe, next_run, schedule_text, validate
-from app import privacy
+from app.security import secrets as privacy
 from app.domain.models import Agent, AgentRun, Goal, Message, OwnerContact, SentEmail, dumps, loads, utcnow
 
 SOURCE_LINK_RE = re.compile(r"https?://(?:docs\.google\.com/spreadsheets/[^\s]+|[^\s]+\.csv\b[^\s]*)", re.I)   # where its data lives

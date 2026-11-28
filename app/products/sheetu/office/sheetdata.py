@@ -271,15 +271,18 @@ class _Evaluator:
         expr = re.sub(r"(\d+(?:\.\d+)?)%", r"(\1/100)", expr).replace("^", "**")
         for i, s in enumerate(strings):
             expr = expr.replace(f"_s{i}", s)
-        if re.search(r"[A-Za-z_]\w*", re.sub(r"\b(_\w+)\b", "", re.sub(r'"[^"]*"', "", expr))):
+        bare = re.sub(r'"[^"]*"', "", expr)
+        if re.search(r"[A-Za-z_]\w*", re.sub(r"\b(_\w+)\b", "", bare)):
             return None                                   # names we don't know
+        if re.search(r"__|\.\s*[A-Za-z_]|[\[\]]|\)\s*\(", bare):
+            return None                                   # no attribute access, indexing or calling a result: a formula can't
         env = {k: (0 if v is None else v) if not isinstance(v, _Range) else v for k, v in names.items()}
         env.update(_IF=lambda c, a=0, b=False: a if c else b, _SUM=_agg(sum), _AVERAGE=_agg(lambda x: sum(x) / len(x) if x else 0),
                    _MIN=_agg(lambda x: min(x) if x else 0), _MAX=_agg(lambda x: max(x) if x else 0), _COUNT=_agg(len),
                    _COUNTA=lambda *a: sum(1 for v in _flat(a) if v not in (None, "")), _ROUND=lambda x, n=0: round(x, int(n)),
                    _ABS=abs, _IFERROR=lambda a, b: a, _AND=lambda *a: all(_flat(a)), _OR=lambda *a: any(_flat(a)), _NOT=lambda a: not a,
                    _INDEX=lambda r, n, m=1: list(r)[int(n) - 1], _MATCH=_match)
-        out = eval(compile(expr, "<formula>", "eval"), {"__builtins__": {}}, env)
+        out = eval(compile(expr, "<formula>", "eval"), {"__builtins__": {}}, env)  # only numbers, quoted text, our _NAMES and operators reach here (checked above)  # nosec B307
         return out if not isinstance(out, _Range) else None
 
 

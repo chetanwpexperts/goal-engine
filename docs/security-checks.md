@@ -10,13 +10,28 @@ to repository contents, and does not persist checkout credentials.
 
 | Check | Command | Purpose |
 | --- | --- | --- |
-| Dependency vulnerabilities | `python -m pip_audit -r requirements.txt` | Resolve the application requirements and look for published vulnerabilities in direct and transitive dependencies. |
-| Static security analysis | `python -m bandit -r app -ll` | Scan application Python source for potentially unsafe patterns at medium or high severity. |
+| Locked install | `python -m pip install --require-hashes --no-deps -r requirements.lock` | Installs exactly the versions in the lock; every downloaded file must match its recorded SHA-256 hash, so a swapped or tampered package fails. |
+| Lock matches requirements | small script in the workflow | Every pin in `requirements.txt` has the same version in `requirements.lock`. |
+| Dependency vulnerabilities | `python -m pip_audit --disable-pip --no-deps -r requirements.lock` | Looks up every locked package (direct and transitive) in the published advisory databases. |
+| Static security analysis | `python -m bandit -r app -ll -b .bandit-baseline.json` | Scans application source for unsafe patterns at medium or high severity. Findings already reviewed are in `.bandit-baseline.json`; only new ones fail. |
 
-The workflow first installs the application requirements and the two
-scanners. Both scans can run even when the dependency scan fails, provided
-installation succeeded and the run was not cancelled. Neither scanner's
-failure is suppressed. The existing test workflow remains independent.
+The scanners are pinned (pip-audit 2.10.1, bandit 1.9.4) so a new scanner release cannot turn a run red by itself.
+
+### The reviewed static findings
+
+All 113 entries in `.bandit-baseline.json` are B608 ("SQL built from strings"). They are in DBaba's SQL modules and
+Sheetu's compare: DBaba writes example and corrected queries as text for people to read, and runs queries only on
+its own scratch SQLite copies. The two queries in `app/products/dbaba/database.py` take a table name only after
+`_ident()` has checked it is a plain name. A new B608 anywhere still fails the check and needs the same review.
+
+Findings fixed or explained in the code (Step 9):
+
+- B307 `eval` of spreadsheet formulas (`app/products/sheetu/office/sheetdata.py`): a crafted formula could reach Python
+  objects through `__class__`, indexing or calling a result. Such formulas are now refused before evaluation
+  (`tests/test_formula_sandbox.py`); what is left is numbers, quoted text, Sheetu's own functions and operators.
+- B324 SHA-1 in `app/engine/ml/brain.py`: used only to notice a repeated answer; marked `usedforsecurity=False`.
+- B310, B104, B108: a fixed `https://docs.google.com` URL, reading a database's listen setting to warn about it, and
+  the usual socket paths a database uses. Each line says why with `# nosec`.
 
 ## Reading a failure
 
@@ -45,14 +60,21 @@ failure is suppressed. The existing test workflow remains independent.
 From the repository root, in a clean Python 3.13 virtual environment:
 
 ```sh
-python -m pip install -r requirements.txt pip-audit bandit
-python -m pip_audit -r requirements.txt
-python -m bandit -r app -ll
+python -m pip install --require-hashes --no-deps -r requirements.lock
+python -m pip install pip-audit==2.10.1 bandit==1.9.4
+python -m pip_audit --disable-pip --no-deps -r requirements.lock
+python -m bandit -r app -ll -b .bandit-baseline.json
 ```
 
-The dependency scan requires access to public package and advisory services.
-It does not need application database credentials. The static scan reads
-application source; it does not run the application.
+## Changing a dependency
+
+1. Change the pin in `requirements.txt`.
+2. Regenerate the lock (Linux, Python 3.13):
+   `pip install pip-tools && pip-compile --generate-hashes --allow-unsafe --strip-extras --no-emit-index-url -o requirements.lock requirements.txt`
+3. Run the tests and the checks above. Commit both files together.
+
+To update the static baseline after reviewing a new finding (only when it is a reviewed false positive, with the
+reason added here): `python -m bandit -r app -ll -f json -o .bandit-baseline.json`.
 
 ## Scope and limitations
 
@@ -62,8 +84,5 @@ guarantee the absence of unknown vulnerabilities. The static scan is
 limited to the application tree and the configured severity threshold.
 The workflow does not audit operating-system packages or container images.
 
-The dependency lock and its hashes are maintained separately from this
-workflow change. Installing pinned direct requirements alone does not
-guarantee a fully reproducible dependency tree, and the scanners themselves
-are not pinned by this workflow. Review scanner output and the actual
-resolved versions when investigating a failure.
+The lock is made on Linux with Python 3.13, the platform the site and CI run on. The on-server installers still
+install from `requirements.txt`; moving them to the lock is a separate change.

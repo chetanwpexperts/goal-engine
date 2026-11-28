@@ -19,11 +19,29 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Install application dependencies and scanners
+      - name: Install the locked dependencies (every file checked against its hash)
         id: install
-        run: python -m pip install -r requirements.txt pip-audit bandit
-      - name: Dependency vulnerability scan
-        run: python -m pip_audit -r requirements.txt
-      - name: Static security scan (medium and high severity)
+        run: |
+          python -m pip install --require-hashes --no-deps -r requirements.lock
+          python -m pip check
+          python -m pip install pip-audit==2.10.1 bandit==1.9.4
+      - name: The lock matches requirements.txt
+        run: |
+          python - <<'PY'
+          import re, sys
+          want = {}
+          for line in open("requirements.txt"):
+              m = re.match(r"\s*([A-Za-z0-9_.-]+)(?:\[[^\]]*\])?==([^\s#;]+)", line)
+              if m:
+                  want[m.group(1).lower().replace("_", "-")] = m.group(2)
+          have = {m.group(1).lower().replace("_", "-"): m.group(2)
+                  for m in re.finditer(r"^([A-Za-z0-9_.-]+)==(\S+)", open("requirements.lock").read(), re.M)}
+          bad = [f"{k}: requirements.txt {v}, lock {have.get(k)}" for k, v in want.items() if have.get(k) != v]
+          print("\n".join(bad) or "lock matches requirements.txt")
+          sys.exit(1 if bad else 0)
+          PY
+      - name: Dependency vulnerability scan (the exact locked versions)
+        run: python -m pip_audit --disable-pip --no-deps -r requirements.lock
+      - name: Static security scan (medium and high severity, new findings only)
         if: ${{ !cancelled() && steps.install.outcome != 'failure' }}
-        run: python -m bandit -r app -ll
+        run: python -m bandit -r app -ll -b .bandit-baseline.json

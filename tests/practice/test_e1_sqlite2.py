@@ -21,8 +21,8 @@ import pytest
 
 from app.agents import sqlcorrect, sqlport
 from app.agents.sql import analyze_sql
-from app.dbknow import engines as E
-from app.dbknow import reasoning as R
+from app.products.dbaba.dbknow import engines as E
+from app.products.dbaba.dbknow import reasoning as R
 from tests.practice import schema as S
 
 V353 = sqlite3.sqlite_version_info >= (3, 53, 0)

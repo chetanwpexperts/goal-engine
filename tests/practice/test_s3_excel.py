@@ -292,7 +292,7 @@ def test_the_say_in_hinglish():
 
 
 def test_grouping_facts_are_lab_marked():
-    from app.dbknow import engines
+    from app.products.dbaba.dbknow import engines
 
     for e, case in (("mariadb", "insensitive"), ("postgresql", "sensitive"), ("sqlite", "sensitive"), ("mysql", "insensitive")):
         g = engines.dialect(e)["grouping"]

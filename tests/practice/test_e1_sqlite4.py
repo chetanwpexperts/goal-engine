@@ -25,8 +25,8 @@ import time
 import pytest
 
 from app.agents import sqlcorrect, sqltxn
-from app.dbknow import engines as E
-from app.dbknow import reasoning as R
+from app.products.dbaba.dbknow import engines as E
+from app.products.dbaba.dbknow import reasoning as R
 from tests.practice import txnlab as L
 
 ENGINE_FILE = {"sqlite": "sqlite", "mariadb": "mysql", "postgresql": "postgresql"}

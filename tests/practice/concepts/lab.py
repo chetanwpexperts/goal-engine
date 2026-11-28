@@ -14,7 +14,7 @@ import json
 import re
 import sys
 
-from app.dbknow import concepts as K
+from app.products.dbaba.dbknow import concepts as K
 from tests.practice import schema as S
 
 DDL = re.compile(r"^\s*create\b", re.I)

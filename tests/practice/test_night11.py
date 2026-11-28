@@ -316,7 +316,7 @@ def test_the_lab_table_still_holds(engines):
 def test_every_class_rule_records_where_it_was_proven():
     import json
 
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     assert sqlconfidence.PROVEN_ON == ["mariadb", "postgresql"]
     funds = json.load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"]

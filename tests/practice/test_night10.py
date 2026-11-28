@@ -257,7 +257,7 @@ def test_same_text_different_values(engines):
 def test_sqlite_notes_are_lab_checked():
     """Every SQLite note with a lab line was run on SQLite itself (Python's sqlite3). (SQLite left notes-only at E1 night 4,
     tests/practice/test_e1_sqlite4.py; its notes stay, still lab-checked.)"""
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     d = E.dialect("sqlite")
     assert d["notes"] and d["lab"]
@@ -425,7 +425,7 @@ def test_tonights_fundamental_is_in_the_core():
     funds = json.load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"]
     f = funds["portability"]
     assert {"date_math", "interval_unit", "cast_char", "power_xor"} <= set(f["topics"]) and set(f["proven"]) >= {"mariadb", "postgresql"}
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     for fam in ("mysql", "postgresql"):
         port = E.dialect(fam)["port"]

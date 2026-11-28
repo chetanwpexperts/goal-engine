@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from app.dbknow import concepts as K
+from app.products.dbaba.dbknow import concepts as K
 from tests.practice.concepts.test_e1_sqlite1 import WRONG_PLACES, fresh
 from tests.test_ml import say, say_sql
 

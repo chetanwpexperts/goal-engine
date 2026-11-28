@@ -5,7 +5,7 @@ indexes, subqueries, window functions. Each phrasing goes through the real chat 
 
 import pytest
 
-from app.dbknow import concepts as K
+from app.products.dbaba.dbknow import concepts as K
 from tests.practice.concepts.test_night12 import WRONG_PLACES, fresh
 from tests.test_ml import say
 
@@ -94,7 +94,7 @@ def test_after_an_error_turn_a_concept_answer_still_has_its_examples(client, ml_
     ("myslq", "mysql"), ("maridb", "mariadb"), ("sqllite", "sqlite"), ("orcale", "oracle"),
 ])
 def test_a_database_name_typed_with_a_slip_is_still_that_database(client, ml_mode, text, eid):
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     assert E.named(text) == eid and K.engine_named(text) == eid, text
 
@@ -102,7 +102,7 @@ def test_a_database_name_typed_with_a_slip_is_still_that_database(client, ml_mod
 @pytest.mark.parametrize("text", ["what is a poster", "i did it myself", "join posts and users", "mysterious error", "the server is down",
                                   "postal code column", "posted date", "marie and maria", "mistake in my query"])
 def test_ordinary_words_are_not_database_names(text):
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     assert E.named(text) is None and K.engine_named(text) is None, text
 

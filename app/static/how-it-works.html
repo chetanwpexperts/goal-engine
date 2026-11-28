@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>How it works · Goal Engine</title>
+  <meta name="description" content="Goal Engine's own model understands the question; real MariaDB and PostgreSQL engines prove the answer. No outside AI service.">
+  <meta name="theme-color" content="#FFFFFF">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/site.css">
+</head>
+<body class="site">
+  <header class="snav"><div class="wrap">
+    <a class="brand" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="16" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="24" cy="24" r="4"/><path d="M12 16h4l4-6M16 16l4 6"/></svg>Goal Engine</a>
+    <nav class="snav-links" aria-label="Site"><a href="/product">Product</a><a href="/how-it-works" aria-current="page">How it works</a><a href="/self-hosted">Self-hosted</a><a href="/enquiry?from=nav">Contact</a></nav>
+    <a class="btn-s pri sm" href="/">Try it free</a>
+  </div></header>
+  <main>
+    <section class="page-hero center"><div class="wrap">
+      <p class="kick">How it works</p>
+      <h1 class="h1">A model to understand.<br>Real engines to prove.</h1>
+      <p class="lead">A trained classifier works out what you are asking. Written rules and real database engines decide what is true, so every answer comes with evidence instead of a guess.</p>
+    </div></section>
+
+    <section class="band soft"><div class="wrap">
+      <div class="steps">
+        <ol>
+          <li class="on"><b>Understand</b><span>Your message, in English, Hindi or Hinglish, is classified by Goal Engine's own model. Spelling slips are expected.</span></li>
+          <li><b>Read</b><span>A query is split into blocks: the rows each step keeps, what it groups, where a join multiplies rows.</span></li>
+          <li><b>Prove</b><span>The suspected cause is reproduced on real MariaDB and PostgreSQL engines, read-only, and the answer says how sure it is.</span></li>
+          <li><b>Fix</b><span>You see the change and the rows it touches first. Nothing runs without your approval, and every change has Undo.</span></li>
+        </ol>
+        <div class="shot-frame"><img src="/static/img/shot-error.webp" width="1920" height="1146" alt="DBaba explaining a duplicate-entry error with its cause, proof and fix"></div>
+      </div>
+    </div></section>
+
+    <section class="band" id="model"><div class="wrap">
+      <div class="split2">
+        <div>
+          <p class="kick">The model</p>
+          <h2 class="h2">Small, fast and trained on confirmed examples.</h2>
+          <ul class="list-check">
+            <li>Character and word n-grams with TF-IDF, then logistic regression. Character n-grams cope with Hinglish spellings like "chal rha" and "chl raha".</li>
+            <li>It retrains in about a second and runs on Goal Engine's own server. No outside AI service is called.</li>
+            <li>When three different people confirm what a sentence meant, it becomes a training example and the model retrains within minutes. One person alone can't teach it, so it can't be poisoned.</li>
+            <li>Only that one sentence is kept, with emails, numbers and passwords removed, and without who sent it.</li>
+          </ul>
+        </div>
+<pre class="code-s"><span class="d"># what the model sees</span>
+<span class="k">input</span>   "mera query bahut slow chal rha"
+<span class="k">tokens</span>  mera · query · slow · chal · rha
+        + character n-grams: "slo", "low", "cha" ...
+
+<span class="d"># what it returns</span>
+slow query   <span class="g">0.91</span>
+lock wait    0.06
+error        0.03
+
+<span class="d"># then: read the query, prove it on an engine</span></pre>
+      </div>
+    </div></section>
+
+    <section class="band soft"><div class="wrap center">
+      <p class="kick">Measured</p>
+      <h2 class="h2">Tested on real engines before it goes live.</h2>
+      <div class="stats">
+        <div><b>400<small>/400</small></b><span>queries written correctly from plain words, on MySQL and PostgreSQL</span></div>
+        <div><b>0<small>/6,000</small></b><span>false alarms on correct queries</span></div>
+        <div><b>3</b><span>languages: English, Hindi and Hinglish</span></div>
+        <div><b>0</b><span>messages sent to any outside AI service</span></div>
+      </div>
+      <p class="tiny" style="margin-top:14px">From Goal Engine's own test suites, which generate thousands of cases and check each answer on MariaDB and PostgreSQL.</p>
+    </div></section>
+  </main>
+  <section class="cta-band"><div class="wrap">
+    <h2 class="h2">See it on your own query.</h2>
+    <p class="lead">Paste a query or an error and watch it read the problem step by step.</p>
+    <div class="row"><a class="btn-s pri" href="/">Try it free</a><a class="btn-s sec" href="/enquiry?from=how">Talk to us</a></div>
+  </div></section>
+  <footer class="sfoot"><div class="wrap">
+    <div class="cols">
+      <div><a class="brand" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="16" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="24" cy="24" r="4"/><path d="M12 16h4l4-6M16 16l4 6"/></svg>Goal Engine</a><p class="blurb">Diagnostics for databases and spreadsheets, with its own models and no outside AI service.</p></div>
+      <div><h4>Product</h4><ul><li><a href="/product#dbaba">DBaba</a></li><li><a href="/product#sheetu">Sheetu</a></li><li><a href="/product#report">Health report</a></li></ul></div>
+      <div><h4>Learn</h4><ul><li><a href="/how-it-works">How it works</a></li><li><a href="/how-it-works#model">The model</a></li><li><a href="/self-hosted">Self-hosted</a></li></ul></div>
+      <div><h4>Company</h4><ul><li><a href="/enquiry?from=footer">Contact</a></li><li><a href="/privacy">Privacy</a></li></ul></div>
+    </div>
+    <div class="base"><span>© 2026 Goal Engine</span><span>Please don't type passwords or card numbers into the chat.</span></div>
+  </div></footer>
+</body>
+</html>

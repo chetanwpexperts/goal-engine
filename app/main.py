@@ -541,6 +541,22 @@ def privacy_page() -> FileResponse:
     return FileResponse(STATIC / "privacy.html")
 
 
+# the site's other pages: what the product does, how it works, installing it on your own server
+@app.get("/product")
+def product_page() -> FileResponse:
+    return FileResponse(STATIC / "product.html")
+
+
+@app.get("/how-it-works")
+def how_page() -> FileResponse:
+    return FileResponse(STATIC / "how-it-works.html")
+
+
+@app.get("/self-hosted")
+def self_hosted_page() -> FileResponse:
+    return FileResponse(STATIC / "self-hosted.html")
+
+
 @app.get("/connector/install.sh")
 def connector_installer(request: Request) -> Response:
     text = (Path(__file__).resolve().parents[1] / "connector" / "install.sh").read_text()

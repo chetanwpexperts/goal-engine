@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Product · Goal Engine</title>
+  <meta name="description" content="DBaba for MySQL, MariaDB and PostgreSQL and Sheetu for Excel and Word: errors explained, slow queries, SQL from plain words, a full database health report.">
+  <meta name="theme-color" content="#FFFFFF">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/site.css">
+</head>
+<body class="site">
+  <header class="snav"><div class="wrap">
+    <a class="brand" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="16" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="24" cy="24" r="4"/><path d="M12 16h4l4-6M16 16l4 6"/></svg>Goal Engine</a>
+    <nav class="snav-links" aria-label="Site"><a href="/product" aria-current="page">Product</a><a href="/how-it-works">How it works</a><a href="/self-hosted">Self-hosted</a><a href="/enquiry?from=nav">Contact</a></nav>
+    <a class="btn-s pri sm" href="/">Try it free</a>
+  </div></header>
+  <main>
+    <section class="page-hero center"><div class="wrap">
+      <p class="kick">Product</p>
+      <h1 class="h1">Two agents. One for databases,<br>one for spreadsheets.</h1>
+      <p class="lead">DBaba works on MySQL, MariaDB and PostgreSQL. Sheetu works on Excel and Word files. Both explain the cause, show the proof and give a fix you can undo.</p>
+      <div class="shot-frame"><img src="/static/img/shot-query.webp" width="1920" height="1146" alt="DBaba writing a query from plain words, with the checked SQL beside the explanation"></div>
+      <p class="shot-cap">A real answer: a query written from plain words, checked before it is shown.</p>
+    </div></section>
+
+    <section class="band soft" id="dbaba"><div class="wrap">
+      <p class="kick">DBaba · databases</p>
+      <h2 class="h2">From an error message to the real cause.</h2>
+      <div class="cards">
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></svg></span><h3>Errors explained</h3><p>Paste an error such as 1062, a deadlock or "access denied". DBaba names the cause, the layer it comes from and the fix for your engine.</p></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16a8 8 0 1 1 16 0"/><path d="M12 16l4-5"/></svg></span><h3>Slow queries</h3><p>It reads the query step by step, finds what stops an index from being used and gives the rewritten query and the right index.</p></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></span><h3>SQL from plain words</h3><p>Ask in English, Hindi or Hinglish. Joins, groups, top N per group, ranks and running totals, checked before you run them.</p></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h7"/></svg></span><h3>Concepts with live examples</h3><p>Ask what a LEFT JOIN or an index is: the explanation comes with a worked example run on MariaDB and PostgreSQL.</p></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M3.5 15h17M9.5 4v16"/></svg></span><h3>Results to Excel</h3><p>A query's result becomes a workbook with typed data, a live pivot sheet and a chart.</p></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v4h4"/></svg></span><h3>Nothing changes without you</h3><p>Any change is shown first with the rows it touches. You approve it, and every change can be undone.</p></article>
+      </div>
+    </div></section>
+
+    <section class="band" id="report"><div class="wrap">
+      <div class="split2">
+        <div>
+          <p class="kick">Health report</p>
+          <h2 class="h2">Everything a DBA would check, in one report.</h2>
+          <p class="lead">Installed next to your database, DBaba scans it every night and gives a score out of 100. Each finding says what it is, why it matters and how to fix it, and each report is compared with the last one.</p>
+          <a class="btn-s sec" href="/self-hosted" style="margin-top:24px">How to install it</a>
+        </div>
+        <div class="shot-frame" style="margin:0"><img src="/static/img/shot-report.webp" width="1813" height="1124" alt="DBaba's health report on a test PostgreSQL database"></div>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Section</th><th>What it checks</th></tr></thead>
+        <tbody>
+          <tr><td>Now</td><td>Connections against the limit, queries running over a minute, who waits on whom, deadlocks</td></tr>
+          <tr><td>Slow queries</td><td>The slowest queries from performance_schema or pg_stat_statements, each read against the real tables</td></tr>
+          <tr><td>Indexes</td><td>Duplicate and covered indexes, unused ones after 7 days, foreign keys without an index, big tables read without one</td></tr>
+          <tr><td>Tables</td><td>No primary key, wasted space, dead rows, stale statistics, the biggest tables</td></tr>
+          <tr><td>Settings</td><td>Memory for data against this machine's memory, connections near the limit, the slow log</td></tr>
+          <tr><td>Backups</td><td>Whether point-in-time recovery is possible</td></tr>
+          <tr><td>Security</td><td>Accounts that can change data, remote root, empty passwords, anonymous users, open network, old versions</td></tr>
+          <tr><td>Server</td><td>Version and support status</td></tr>
+        </tbody>
+      </table>
+    </div></section>
+
+    <section class="band soft" id="sheetu"><div class="wrap">
+      <p class="kick">Sheetu · Excel and Word</p>
+      <h2 class="h2">Spreadsheets that stopped adding up.</h2>
+      <div class="cards">
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M3.5 15h17M9.5 4v16"/></svg></span><h3>Broken formulas</h3><p>#REF!, #N/A and formulas that point at the wrong cells: which ones, and why they broke.</p></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M8 7h7"/></svg></span><h3>Messy data</h3><p>Duplicate rows, totals that don't match and numbers stored as text, shown cell by cell.</p></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.2"/><path d="M4 4v4h4"/></svg></span><h3>Fixes with Undo</h3><p>You see the exact cells before anything changes, and every fix can be undone.</p></article>
+      </div>
+    </div></section>
+
+    <section class="band"><div class="wrap">
+      <p class="kick">Example</p>
+      <h2 class="h2">What an answer looks like</h2>
+      <div class="ex">
+        <div>
+          <p class="lab">Question</p>
+          <p>"This should show paid and shipped orders, but I only get the paid ones."</p>
+          <pre><code>SELECT id, amount
+FROM orders
+WHERE status = 'paid' OR 'shipped';</code></pre>
+        </div>
+        <div>
+          <p class="lab">DBaba <em>proven from the query</em></p>
+          <p><b>OR needs the column again.</b> <code>OR 'shipped'</code> doesn't compare anything with <code>status</code>. MySQL turns the word into the number 0 and quietly keeps only the paid orders; PostgreSQL refuses the query.</p>
+          <pre><code>WHERE status IN ('paid', 'shipped')</code></pre>
+          <p class="note">Checked on MariaDB and PostgreSQL: the fixed query returns both kinds of order.</p>
+        </div>
+      </div>
+    </div></section>
+  </main>
+  <section class="cta-band"><div class="wrap">
+    <h2 class="h2">Try it on your own problem.</h2>
+    <p class="lead">Paste an error, a slow query or a spreadsheet problem. No sign-up needed.</p>
+    <div class="row"><a class="btn-s pri" href="/">Try it free</a><a class="btn-s sec" href="/enquiry?from=product">Talk to us</a></div>
+  </div></section>
+  <footer class="sfoot"><div class="wrap">
+    <div class="cols">
+      <div><a class="brand" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="16" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="24" cy="24" r="4"/><path d="M12 16h4l4-6M16 16l4 6"/></svg>Goal Engine</a><p class="blurb">Diagnostics for databases and spreadsheets, with its own models and no outside AI service.</p></div>
+      <div><h4>Product</h4><ul><li><a href="/product#dbaba">DBaba</a></li><li><a href="/product#sheetu">Sheetu</a></li><li><a href="/product#report">Health report</a></li></ul></div>
+      <div><h4>Learn</h4><ul><li><a href="/how-it-works">How it works</a></li><li><a href="/how-it-works#model">The model</a></li><li><a href="/self-hosted">Self-hosted</a></li></ul></div>
+      <div><h4>Company</h4><ul><li><a href="/enquiry?from=footer">Contact</a></li><li><a href="/privacy">Privacy</a></li></ul></div>
+    </div>
+    <div class="base"><span>© 2026 Goal Engine</span><span>Please don't type passwords or card numbers into the chat.</span></div>
+  </div></footer>
+</body>
+</html>

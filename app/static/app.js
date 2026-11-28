@@ -2083,8 +2083,8 @@
     const trap = el("input"); trap.name = "website"; trap.tabIndex = -1; trap.autocomplete = "off"; trap.className = "trap"; trap.setAttribute("aria-hidden", "true");
     const consentRow = el("label", "check");
     const consent = el("input"); consent.type = "checkbox";
-    consentRow.append(consent, el("span", null, T(hi, "Chetan Sharma (Goal Engine) mujhse is baare mein contact kar sakte hain. Meri details sirf isi ke liye use hongi.",
-                                                    "Chetan Sharma (Goal Engine) may contact me about this. My details are used only for this.")));
+    consentRow.append(consent, el("span", null, T(hi, "Goal Engine team mujhse is baare mein contact kar sakti hai. Meri details sirf isi ke liye use hongi.",
+                                                    "The Goal Engine team may contact me about this. My details are used only for this.")));
     const go = el("button", "btn go", T(hi, "Request bhejo", "Send request")); go.type = "submit";
     const err = el("p", "note err"); err.hidden = true;
     form.append(field(T(hi, "Aapko kya chahiye?", "What do you need?"), need), field(T(hi, "Aapka naam", "Your name"), name),
@@ -2096,8 +2096,8 @@
         await api("/api/expert", { method: "POST", body: JSON.stringify({ goal_id: goal.id, need: need.value, name: name.value,
           phone: phone.value, email: email.value, contact, consent: consent.checked, website: trap.value }) });
         expertAsked.add(goal.id);
-        form.replaceChildren(el("p", "expert-done", T(hi, `Request bhej di. Chetan aapse ${contact === "email" ? "email" : contact === "call" ? "call" : "WhatsApp"} pe jaldi baat karenge, aam taur pe kuch ghanton mein.`,
-                                                      `Request sent. Chetan will reach you on ${contact === "email" ? "email" : contact === "call" ? "a call" : "WhatsApp"} soon, usually within a few hours.`)));
+        form.replaceChildren(el("p", "expert-done", T(hi, `Request bhej di. Hamari team aapse ${contact === "email" ? "email" : contact === "call" ? "call" : "WhatsApp"} pe jaldi baat karegi, aam taur pe kuch ghanton mein.`,
+                                                      `Request sent. Our team will reach you on ${contact === "email" ? "email" : contact === "call" ? "a call" : "WhatsApp"} soon, usually within a few hours.`)));
       } catch (ex) { err.textContent = ex.message; err.hidden = false; go.disabled = false; }
     });
     return form;
@@ -2215,6 +2215,12 @@
     for (const t of document.querySelectorAll(".brain-tile")) t.setAttribute("aria-pressed", String(t === tile));
   }
   for (const tile of document.querySelectorAll(".brain-tile")) tile.addEventListener("click", () => showScope(tile));
+  // "Try it free" on the home page: back to the input box at the top
+  for (const a of document.querySelectorAll("[data-focus-input]")) a.addEventListener("click", (e) => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+    input.focus({ preventScroll: true });
+  });
   const syncTyping = () => body.classList.toggle("typing", !!input.value.trim() && !$("#options").hidden);
   input.addEventListener("input", syncTyping);
 

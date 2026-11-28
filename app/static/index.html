@@ -3,13 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Goal Engine: free help with database errors, slow queries and Excel problems</title>
-  <meta name="description" content="Free for everyone: no card, no UPI, no limits. Tell Goal Engine what is wrong with your Excel file, Word document or database error in English, Hindi or Hinglish. It finds the real cause, shows the proof and fixes it, with Undo. No AI.">
-  <meta name="theme-color" content="#EEF1F6">
+  <title>Goal Engine: find the cause of every database problem</title>
+  <meta name="description" content="Goal Engine diagnoses database errors, slow SQL queries and spreadsheet problems in English, Hindi or Hinglish. It reads the query step by step, proves the cause on real MySQL, MariaDB and PostgreSQL engines, and gives a fix with Undo. Its own models, no outside AI service.">
+  <meta name="theme-color" content="#FFFFFF">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/site.css">
+  <link rel="stylesheet" href="/static/home.css">
 </head>
 <body data-state="idle">
   <script>try { if (localStorage.getItem("ge_chat") === "1") document.body.dataset.state = "active"; } catch (e) {}</script>
@@ -17,6 +19,7 @@
     <a class="mark" href="/" aria-label="Goal Engine">
       <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="16" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="24" cy="24" r="4"/><path d="M12 16h4l4-6M16 16l4 6"/></svg>
     </a>
+    <nav class="site-links" aria-label="Site"><a href="/product">Product</a><a href="/how-it-works">How it works</a><a href="/self-hosted">Self-hosted</a><a href="/enquiry?from=nav">Contact</a></nav>
     <nav class="tools">
       <a href="/enquiry?from=header" class="talk" title="Want Goal Engine for your work or team? Tell us">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
@@ -50,77 +53,100 @@
     </aside>
   </main>
 
-  <main class="home" id="home">
+  <main class="home site" id="home">
     <div id="status" class="status" aria-live="polite" hidden></div>
-    <div class="hero" id="hero">
-      <h1>Tell it what's wrong.<br><span class="accent">It finds out why.</span></h1>
-      <p>Database errors, slow queries, Excel formulas that stopped working. Write it the way you'd tell a colleague, in English, Hindi or Hinglish. You get the cause, the proof from your own query or file, and a fix you can undo.</p>
-      <p class="free-line">Free for everyone. No card, no UPI, no limits.</p>
-    </div>
-    <div id="composer-slot" class="composer-slot">
-  <form id="composer" class="composer">
-    <div class="field">
-      <textarea id="input" rows="1" maxlength="10000" aria-label="Say what you need"></textarea>
-      <div id="ghost" class="ghost" aria-hidden="true"></div>
-      <div class="field-meta">
-        <span id="wordcount" class="wordcount" hidden></span>
-        <button id="mic-lang" type="button" class="mic-lang" hidden></button>
+
+    <section class="h-hero"><div class="wrap center">
+      <div class="hero" id="hero">
+        <a class="pill" href="/product#report"><b>New</b>The DBaba database health report →</a>
+        <h1 class="h1">Find the cause of every<br>database problem.</h1>
+        <p class="lead">Paste an error, a slow query or a spreadsheet problem, in English, Hindi or Hinglish. Goal Engine finds the cause, proves it on real database engines and gives a fix you can undo.</p>
       </div>
-    </div>
-    <button id="mic" type="button" class="mic" aria-label="Speak instead of typing" title="Speak" hidden>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
-    </button>
-    <button id="send" type="submit" class="send" aria-label="Send">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
-    </button>
-  </form>
-    </div>
-    <section class="brains" id="brains" aria-label="Agents">
-      <button type="button" class="brain-tile db" data-scope="db" data-example="I get ERROR 1062 Duplicate entry when saving the form, why?">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6"/></svg>
-        <b>DBaba</b><span class="tile-sub">for databases</span>
-      </button>
-      <button type="button" class="brain-tile xl" data-scope="ms" data-example="My Excel sheet shows #REF! errors, please fix them">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M3.5 15h17M9.5 4v16"/></svg>
-        <b>Sheetu</b><span class="tile-sub">for Excel &amp; Word</span>
-      </button>
-    </section>
-    <div id="scope" class="scope" hidden aria-live="polite"></div>
-    <section class="sample" aria-labelledby="sample-h">
-      <h2 id="sample-h">What an answer looks like</h2>
-      <div class="sample-card">
-        <div class="sample-ask">
-          <p class="who">Someone asked</p>
-          <p>"This should show paid and shipped orders, but I only get the paid ones."</p>
-          <pre><code>SELECT id, amount
-FROM orders
-WHERE status = 'paid' OR 'shipped';</code></pre>
-        </div>
-        <div class="sample-reply">
-          <p class="who">DBaba <span class="sure">Proven from the query</span></p>
-          <p><b>OR needs the column again.</b> <code>OR 'shipped'</code> doesn't compare anything with <code>status</code>. MySQL turns the word into the number 0 and quietly keeps only the paid orders; PostgreSQL refuses the query.</p>
-          <pre><code>WHERE status IN ('paid', 'shipped')</code></pre>
-          <p class="note">Checked on MariaDB and PostgreSQL: the fixed query returns both kinds of order.</p>
-        </div>
+      <div id="composer-slot" class="composer-slot">
+        <form id="composer" class="composer">
+          <div class="field">
+            <textarea id="input" rows="1" maxlength="10000" aria-label="Say what you need"></textarea>
+            <div id="ghost" class="ghost" aria-hidden="true"></div>
+            <div class="field-meta">
+              <span id="wordcount" class="wordcount" hidden></span>
+              <button id="mic-lang" type="button" class="mic-lang" hidden></button>
+            </div>
+          </div>
+          <button id="mic" type="button" class="mic" aria-label="Speak instead of typing" title="Speak" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>
+          </button>
+          <button id="send" type="submit" class="send" aria-label="Send">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+          </button>
+        </form>
       </div>
-    </section>
-    <section class="how" aria-labelledby="how-h">
-      <h2 id="how-h">How it works</h2>
-      <ol class="how-list">
-        <li><b>It reads your query or file step by step.</b> Which rows it keeps, what it adds up, where a join copies rows. Then it points at the step that's wrong and shows why.</li>
-        <li><b>It tells you how sure it is.</b> Some mistakes are certain from the text alone. Others depend on your data or table structure, and it says so, with the query that settles it.</li>
-        <li><b>Nothing changes without you.</b> You see the rows before anything is changed, and every change can be undone.</li>
-      </ol>
-      <p class="how-note">There's no ChatGPT or other AI service behind it. DBaba and Sheetu work from written rules and checks, each one tested on real MariaDB and PostgreSQL databases before it goes live, and they run on this site's own server. Your files are never sent anywhere else.</p>
-    </section>
-    <section class="talk-cta" aria-labelledby="talk-h">
-      <div>
-        <h2 id="talk-h">Want it for your team or business?</h2>
-        <p>Tell us what you need: databases, Excel and Word files, website checks or automation. We reply by email, usually within a day.</p>
+      <section class="brains" id="brains" aria-label="Agents">
+        <button type="button" class="brain-tile db" data-scope="db" data-example="I get ERROR 1062 Duplicate entry when saving the form, why?">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6M5 12v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6"/></svg>
+          <b>DBaba</b><span class="tile-sub">for databases</span>
+        </button>
+        <button type="button" class="brain-tile xl" data-scope="ms" data-example="My Excel sheet shows #REF! errors, please fix them">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M3.5 15h17M9.5 4v16"/></svg>
+          <b>Sheetu</b><span class="tile-sub">for Excel &amp; Word</span>
+        </button>
+      </section>
+      <div id="scope" class="scope" hidden aria-live="polite"></div>
+      <p class="tiny h-note">Free to try · No sign-up · No outside AI service</p>
+      <div class="shot-frame h-shot"><img src="/static/img/shot-concept.webp" width="1920" height="1146" alt="Goal Engine answering 'what is a left join' with the explanation in the chat and a worked example beside it"></div>
+    </div></section>
+
+    <section class="h-works"><div class="wrap center">
+      <p class="tiny">Works with</p>
+      <div class="works-row"><span>MySQL</span><span>MariaDB</span><span>PostgreSQL</span><span>SQLite</span><span>Excel</span><span>Word</span></div>
+    </div></section>
+
+    <section class="band"><div class="wrap center">
+      <p class="kick">The problem</p>
+      <h2 class="h2">An error message tells you what failed, not why.</h2>
+      <div class="cards">
+        <article class="card"><span class="ic red"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5h.01"/></svg></span><h3>Errors without a reason</h3><p>"Duplicate entry", "deadlock", "access denied". The message is short and the real cause is somewhere else.</p></article>
+        <article class="card"><span class="ic red"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg></span><h3>Slow queries nobody can explain</h3><p>The index exists, but the query still reads every row. Finding out why takes a senior DBA and an afternoon.</p></article>
+        <article class="card"><span class="ic red"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M9.5 4v16M14 13l4 4M18 13l-4 4"/></svg></span><h3>Spreadsheets that break quietly</h3><p>A #REF! after one deleted column, totals that stop matching, numbers stored as text.</p></article>
       </div>
-      <a class="talk-btn" href="/enquiry?from=home-card">Talk to us</a>
-    </section>
-    <p class="byline">Made by Chetan Sharma, a developer and DBA. Questions or ideas? <a href="/enquiry?from=byline">Write to me</a>.</p>
+    </div></section>
+
+    <section class="band soft"><div class="wrap center">
+      <p class="kick">The solution</p>
+      <h2 class="h2">One place that finds the cause and proves it.</h2>
+      <div class="cards">
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><path d="M17 15l3 3-3 3"/></svg></span><h3>Understands your words</h3><p>Its own trained model reads English, Hindi and Hinglish, spelling slips included.</p><a class="more" href="/how-it-works">How it works →</a></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v12c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6"/><path d="M9 13l2 2 4-4"/></svg></span><h3>Proves it on real engines</h3><p>Each answer is checked on MariaDB and PostgreSQL before you see it, and says how sure it is.</p><a class="more" href="/product">See the product →</a></article>
+        <article class="card"><span class="ic"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg></span><h3>Watches your database</h3><p>Install DBaba on your server for a nightly health report. Read-only, and nothing leaves the machine.</p><a class="more" href="/self-hosted">Self-hosted →</a></article>
+      </div>
+    </div></section>
+
+    <section class="band"><div class="wrap">
+      <div class="center"><p class="kick">How it works</p><h2 class="h2">Three steps to the answer</h2></div>
+      <div class="steps">
+        <ol>
+          <li class="on"><b>Paste the problem</b><span>An error, a query, a question or a file, written the way you would tell a colleague.</span></li>
+          <li><b>Get the cause, with proof</b><span>The cause, the layer it comes from and the evidence, checked on a real engine.</span></li>
+          <li><b>Fix it, with Undo</b><span>See the change and the rows it touches first. Nothing runs without your approval.</span></li>
+        </ol>
+        <div class="shot-frame"><img src="/static/img/shot-error.webp" width="1920" height="1146" alt="DBaba explaining a duplicate-entry error with its cause, proof and fix" loading="lazy"></div>
+      </div>
+    </div></section>
+
+    <section class="cta-band"><div class="wrap">
+      <h2 class="h2">Start with your own problem.</h2>
+      <p class="lead">Free to try, no sign-up. For your team or your servers, talk to us.</p>
+      <div class="row"><a class="btn-s pri" href="#hero" data-focus-input>Try it free</a><a class="btn-s sec" href="/enquiry?from=home-card">Talk to us</a></div>
+    </div></section>
+
+    <footer class="sfoot"><div class="wrap">
+      <div class="cols">
+        <div><a class="brand" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="16" r="4"/><circle cx="24" cy="8" r="4"/><circle cx="24" cy="24" r="4"/><path d="M12 16h4l4-6M16 16l4 6"/></svg>Goal Engine</a><p class="blurb">Diagnostics for databases and spreadsheets, with its own models and no outside AI service.</p></div>
+        <div><h4>Product</h4><ul><li><a href="/product#dbaba">DBaba</a></li><li><a href="/product#sheetu">Sheetu</a></li><li><a href="/product#report">Health report</a></li></ul></div>
+        <div><h4>Learn</h4><ul><li><a href="/how-it-works">How it works</a></li><li><a href="/how-it-works#model">The model</a></li><li><a href="/self-hosted">Self-hosted</a></li></ul></div>
+        <div><h4>Company</h4><ul><li><a href="/enquiry?from=footer">Contact</a></li><li><a href="/privacy">Privacy &amp; delete my data</a></li></ul></div>
+      </div>
+      <div class="base"><span>© 2026 Goal Engine</span><span>Please don't type passwords or card numbers into the chat.</span></div>
+    </div></footer>
   </main>
   <div id="options" class="options" hidden></div>
   <p id="fineprint" class="fineprint">Please don't type passwords or card numbers here. <a href="/privacy">Privacy &amp; delete my data</a> · <a href="/enquiry?from=home">Talk to us</a></p>

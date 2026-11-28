@@ -1376,8 +1376,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
                 "CROSS JOIN mein ON nahi hota (har row har row se judti hai). MySQL ise INNER JOIN maan leta hai, PostgreSQL error deta hai. "
                 "Matching chahiye to INNER JOIN likho.")
         if x.kind in ("join", "left", "right", "full", "cross", "inner") and not x.on and not x.using and x.kind != "cross":
-            from app.products.dbaba import sqlstruct                 # night 13: what each engine does
-            from app.products.shared import and the link the names suggest
+            from app.products.dbaba import sqlstruct                 # night 13: what each engine does, and the link the names suggest
 
             fam, says = sqlstruct._says("join_without_on")
             link = sqlstruct.guess_link(x, srcs[:i]) if x.name else None

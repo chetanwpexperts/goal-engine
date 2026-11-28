@@ -211,7 +211,7 @@ def mind_state(db, agent) -> dict:
     """What the shared mind may build next steps on: was a check done, which address."""
     from sqlalchemy import select
 
-    from app.models import AgentRun, loads
+    from app.domain.models import AgentRun, loads
 
     run = db.scalars(select(AgentRun).where(AgentRun.agent_id == agent.id).order_by(AgentRun.id.desc()).limit(1)).first()
     inputs = loads(agent.inputs, {}) or {}

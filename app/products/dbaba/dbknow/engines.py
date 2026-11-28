@@ -172,7 +172,7 @@ def _strip_strings(t: str) -> str:
 
 # ------------------------------------------------------------------ the goal remembers it
 def remembered(goal) -> dict | None:
-    from app.models import loads
+    from app.domain.models import loads
 
     if goal is None:
         return None
@@ -180,7 +180,7 @@ def remembered(goal) -> dict | None:
 
 
 def remember(goal, eid: str, how: str, why: str = "") -> dict:
-    from app.models import dumps, loads
+    from app.domain.models import dumps, loads
 
     data = loads(goal.slots, {}) or {}
     rec = {"id": eid, "how": how, "why": why}

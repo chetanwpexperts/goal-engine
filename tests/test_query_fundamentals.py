@@ -84,8 +84,8 @@ def test_explain_after_a_slow_query_still_says_why(client, ml_mode):
 
 def test_saying_it_was_wrong_is_still_kept_to_learn(client, ml_mode):
     """learn-from-misses (PR #14) keeps working after the merge with the stage-by-stage reading."""
-    from app.db import _SessionLocal
-    from app.models import LearnMiss
+    from app.core.db import _SessionLocal
+    from app.domain.models import LearnMiss
 
     client.post("/api/new-chat")
     client.cookies.clear()

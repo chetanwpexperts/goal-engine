@@ -689,7 +689,7 @@ def for_job(job, connector, by: str | None = None, measure: str | None = None, h
         by, measure = w.get("by"), w.get("measure")
     tag = hashlib.sha256(f"{by}|{measure}|{hi}".encode()).hexdigest()[:10]
     out = f"{job.file_path}.{tag}.xlsx"
-    from app.models import loads
+    from app.domain.models import loads
 
     payload = loads(job.payload, {}) or {}
     res = loads(job.result, {}) or {}

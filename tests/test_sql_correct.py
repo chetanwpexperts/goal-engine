@@ -416,8 +416,8 @@ def test_two_child_tables_multiply_a_parent_total():
 def test_a_wrong_answer_is_kept_to_learn_from_with_values_hidden(client, ml_mode):
     """'Still not right' after a check: the query is kept for the nightly learning, every value hidden, one row per miss."""
     from app import learning
-    from app.db import _SessionLocal
-    from app.models import LearnMiss
+    from app.core.db import _SessionLocal
+    from app.domain.models import LearnMiss
     from tests.test_ml import say, say_sql
 
     q = "SELECT name FROM customers WHERE email = 'ravi@example.in' AND phone = '9876543210' AND city = 'Delhi' AND id = 1234567"

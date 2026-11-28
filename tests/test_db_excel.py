@@ -102,8 +102,8 @@ def test_scheduled_report_attaches_the_workbook(client, ml_mode, parcel_db, monk
     client.post("/api/owner/code", json={"email": "owner@parcel.test", "business": "Parcels"})
     client.post("/api/owner/verify", json={"code": re.search(r"\d{6}", mail.sent[-1]["body"]).group(0)})
     assert client.post(f"/api/agents/{agent['id']}/db-report", json={"table": "parcels", "every": "day", "at": "09:00"}).status_code == 200
-    from app.db import get_db
-    from app.models import Agent
+    from app.core.db import get_db
+    from app.domain.models import Agent
 
     s = next(main.app.dependency_overrides.get(get_db, get_db)())
     main._run_db_report(s, s.query(Agent).filter_by(recipe="db_report").one())

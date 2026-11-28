@@ -103,8 +103,8 @@ def test_unknown_concepts_are_said_honestly_and_kept_to_learn(client, ml_mode):
     r = ask(client, "what is a tablespace in postgresql")      # (stored procedures were unknown here until night 5 taught them)
     assert r["relation"] == "concept" and "won't guess" in r["reply"] and not WRONG_PLACES.search(r["reply"])
     feed = client.get("/api/learning/feed").json() if False else None
-    from app.db import _SessionLocal
-    from app.models import LearnRequest
+    from app.core.db import _SessionLocal
+    from app.domain.models import LearnRequest
 
     with _SessionLocal() as db:
         rows = db.query(LearnRequest).filter(LearnRequest.brain == "database").all()

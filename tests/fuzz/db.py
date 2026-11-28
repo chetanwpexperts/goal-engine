@@ -910,8 +910,8 @@ def _make_client():
     """The app with a fresh test database (like tests/conftest.py), in ML mode."""
     from fastapi.testclient import TestClient
 
-    from app.config import get_settings
-    from app.db import Base, get_engine, init_db
+    from app.core.config import get_settings
+    from app.core.db import Base, get_engine, init_db
     from app.main import app
 
     engine = get_engine()

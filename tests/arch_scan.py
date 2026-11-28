@@ -6,7 +6,7 @@ Three scans:
                   or between the dbaba and sheetu products.
   scan_db()       "app/file.py:function" for every function outside app/db.py that runs a query on a DB session
                   (db/session/sess/s .query/.execute/.scalar/.scalars/.get) or opens a Session itself.
-  scan_routes()   "app/file.py METHOD /path" for every route in app/main.py and app/local/server.py.
+  scan_routes()   "site|local METHOD /path" for every route in any module under app/ (file-independent, so routes can move).
 
 The layer of each of today's top-level packages is in LAYER_OF; when code moves to app/core, app/domain, app/data, ...
 those folder names are layers themselves (see LAYERS).
@@ -34,7 +34,6 @@ LAYER_OF = {"config": "core", "db": "core", "models": "domain", "mind": "engine"
 DB_ATTRS = {"query", "execute", "scalar", "scalars", "get"}
 SESSION_NAMES = {"db", "session", "sess", "s"}
 SESSION_FACTORIES = {"Session", "SessionLocal", "_SessionLocal"}
-ROUTE_FILES = ("main.py", "local/server.py")
 
 
 def _modname(f: pathlib.Path) -> str:
@@ -139,19 +138,32 @@ def scan_db() -> set[str]:
 
 
 def scan_routes() -> set[str]:
+    """"site|local METHOD /path" for every route, wherever it is defined: @app.<method>(...) or @<router>.<method>(...) in any
+    module under app/ (app/main.py today, app/api/routes/*.py after Step 3). Keyed by method and path only, so moving a
+    route to another file is not a change."""
     out = set()
-    for name in ROUTE_FILES:
-        f = APP / name
-        if not f.exists():
-            continue
+    for f in _files():
         for n in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 for d in n.decorator_list:
                     if (isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute)
                             and d.func.attr in ("get", "post", "put", "delete", "patch")
-                            and isinstance(d.func.value, ast.Name) and d.args and isinstance(d.args[0], ast.Constant)):
-                        out.add(f"app/{name} {d.func.attr.upper()} {d.args[0].value}")
+                            and isinstance(d.func.value, ast.Name) and d.args and isinstance(d.args[0], ast.Constant)
+                            and isinstance(d.args[0].value, str) and d.args[0].value.startswith("/")):
+                        scope = "local" if "local" in _modname(f).split(".") else "site"   # on-server DBaba is its own app
+                        out.add(f"{scope} {d.func.attr.upper()} {_prefix(f, d.func.value.id)}{d.args[0].value}")
     return out
+
+
+def _prefix(f: pathlib.Path, name: str) -> str:
+    """A router's prefix, when it is made in the same file as APIRouter(prefix="...")."""
+    for n in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+        if (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in n.targets)
+                and isinstance(n.value, ast.Call) and getattr(n.value.func, "id", getattr(n.value.func, "attr", "")) == "APIRouter"):
+            for k in n.value.keywords:
+                if k.arg == "prefix" and isinstance(k.value, ast.Constant):
+                    return k.value.value
+    return ""
 
 
 def load_baseline() -> dict:

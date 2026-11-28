@@ -32,13 +32,14 @@ import threading
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from app.products.dbaba.local import dbconn, tunnel
 from app.products.dbaba.local.config import ENGINES, Config
 from app.products.dbaba.local.jobs import Jobs
+from app.security.permissions import require
 
 STATIC = Path(__file__).resolve().parents[3] / "static"
 COOKIE = "dbaba_session"
@@ -103,6 +104,49 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             return "token"
         return None
 
+    # Route-specific credential alternatives preserve the original contract.
+    def route_permission(req: Request, perm: str):
+        path = req.url.path
+        if perm == "local_setup":
+            if path == "/api/state":
+                return bool(need(req, "key", "session", "token"))
+            if path == "/api/setup/ssh" and cfg.setup_done:
+                return bool(need(req, "key", "session"))
+            if path in ("/api/setup/detect", "/api/setup/test", "/api/setup/save", "/api/setup/ssh"):
+                if cfg.setup_done:
+                    # Preserve the original 409, even without credentials.
+                    return True
+                return bool(need(req, "session", "token"))
+        if perm == "api_key" and path in (
+            "/api/database", "/api/keys", "/api/setup/reset", "/api/report",
+            "/api/report.html", "/api/report/scan", "/api/jobs", "/api/new-chat", "/api/message",
+        ):
+            return bool(need(req, "key", "session"))
+        if perm == "api_key" and (path.startswith("/api/jobs/") or path.startswith("/api/alerts/")):
+            return bool(need(req, "key", "session"))
+        return None
+
+    st.route_permission = route_permission
+
+    class PermissionDenied(HTTPException):
+        pass
+
+    def permission_denied(req: Request, perm: str):
+        path = req.url.path
+        if perm == "local_screen":
+            message = "Log in on the screen to revoke an API key." if path.endswith("/revoke") else "Log in on the screen to create an API key."
+        elif perm == "local_setup" and path != "/api/state" and not (path == "/api/setup/ssh" and cfg.setup_done):
+            message = "Log in, or use the setup token from 127.0.0.1."
+        else:
+            message = "Log in first."
+        raise PermissionDenied(status_code=401, detail=message)
+
+    @app.exception_handler(PermissionDenied)
+    async def permission_error(req: Request, exc: PermissionDenied):
+        return err(exc.status_code, exc.detail)
+
+    st.permission_denied = permission_denied
+
     # Reuse the existing precedence and setup-token checks for declarations.
     st.permission_checks = {
         "api_key": lambda req: who(req) == "key",
@@ -145,22 +189,22 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         return data if isinstance(data, dict) else {}
 
     # ---------------------------------------------------------------- the screen
-    @app.get("/")
+    @app.get("/", dependencies=[Depends(require("public"))])
     def screen():
         page = STATIC / "local.html"
         return FileResponse(page) if page.exists() else HTMLResponse("<p>DBaba is running.</p>")
 
-    @app.get("/local/{name}")
+    @app.get("/local/{name}", dependencies=[Depends(require("public"))])
     def asset(name: str):
         if name not in ("local.js", "local.css"):
             return err(404, "Not found")
         return FileResponse(STATIC / name, media_type="text/css" if name.endswith(".css") else "application/javascript")
 
-    @app.get("/api/health")
+    @app.get("/api/health", dependencies=[Depends(require("public"))])
     def health():
         return {"ok": True, "version": version()}
 
-    @app.post("/api/login")
+    @app.post("/api/login", dependencies=[Depends(require("public"))])
     async def login(req: Request):
         ip = client_ip(req)
         now = time.time()
@@ -182,7 +226,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         resp.set_cookie(COOKIE, tok, httponly=True, samesite="strict", secure=req.url.scheme == "https", max_age=SESSION_IDLE)
         return resp
 
-    @app.post("/api/logout")
+    @app.post("/api/logout", dependencies=[Depends(require("public"))])
     def logout(req: Request):
         st.sessions.pop(req.cookies.get(COOKIE), None)
         resp = JSONResponse({"ok": True})
@@ -190,7 +234,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         return resp
 
     # ---------------------------------------------------------------- state
-    @app.get("/api/state")
+    @app.get("/api/state", dependencies=[Depends(require("local_setup"))])
     def state(req: Request):
         if not need(req, "key", "session", "token"):
             return err(401, "Log in first.")
@@ -242,7 +286,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         ssh, why = tunnel.clean(data.get("ssh"))
         return ssh, why
 
-    @app.post("/api/setup/detect")
+    @app.post("/api/setup/detect", dependencies=[Depends(require("local_setup"))])
     async def setup_detect(req: Request):
         gate = setup_gate(req)
         if gate:
@@ -263,7 +307,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             found = dbconn.detect()
         return {"found": [{k: f[k] for k in ("engine", "host", "port", "how")} for f in found]}
 
-    @app.post("/api/setup/ssh")
+    @app.post("/api/setup/ssh", dependencies=[Depends(require("local_setup"))])
     async def setup_ssh(req: Request):
         """An SSH server's host keys: {"ssh"} -> {"trusted", "keys": [{"type", "fingerprint"}]}; with "accept":
         "SHA256:..." the key with that fingerprint is accepted (scanned again now, never replacing a known key)."""
@@ -293,7 +337,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             return {"ok": False, "reason": f"No SSH server answered at {ssh['host']} port {ssh['port']}."}
         return {"ok": True, "trusted": False, "keys": [{"type": k["type"], "fingerprint": k["fingerprint"]} for k in keys]}
 
-    @app.post("/api/setup/test")
+    @app.post("/api/setup/test", dependencies=[Depends(require("local_setup"))])
     async def setup_test(req: Request):
         gate = setup_gate(req)
         if gate:
@@ -303,7 +347,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             return {"ok": False, "version": "", "reason": why}
         return await run_in_threadpool(dbconn.test, db)
 
-    @app.post("/api/setup/save")
+    @app.post("/api/setup/save", dependencies=[Depends(require("local_setup"))])
     async def setup_save(req: Request):
         gate = setup_gate(req)
         if gate:
@@ -339,7 +383,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         return out
 
     # ---------------------------------------------------------------- after setup: the database address, API keys
-    @app.post("/api/database")
+    @app.post("/api/database", dependencies=[Depends(require("api_key"))])
     async def change_database(req: Request):
         """Point DBaba at a new address (an SSH tunnel's new local port, a moved server) without setting up again: the
         new details are tested first and saved only if they work; a missing password keeps the saved one."""
@@ -373,13 +417,13 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             out["warning"] = res["warning"]
         return out
 
-    @app.get("/api/keys")
+    @app.get("/api/keys", dependencies=[Depends(require("api_key"))])
     def keys(req: Request):
         if not need(req, "key", "session"):
             return err(401, "Log in first.")
         return {"keys": cfg.list_api_keys()}
 
-    @app.post("/api/keys")
+    @app.post("/api/keys", dependencies=[Depends(require("local_screen"))])
     async def new_key(req: Request):
         """Only a logged-in screen makes keys (a key can't make more keys). The key is shown once."""
         if need(req, "session") != "session":
@@ -390,7 +434,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         key = cfg.new_api_key(name.strip())
         return {"api_key": key, "keys": cfg.list_api_keys()}
 
-    @app.post("/api/keys/{kid}/revoke")
+    @app.post("/api/keys/{kid}/revoke", dependencies=[Depends(require("local_screen"))])
     def revoke_key(kid: str, req: Request):
         if need(req, "session") != "session":
             return err(401, "Log in on the screen to revoke an API key.")
@@ -398,7 +442,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             return err(404, "No such key")
         return {"ok": True, "keys": cfg.list_api_keys()}
 
-    @app.post("/api/setup/reset")
+    @app.post("/api/setup/reset", dependencies=[Depends(require("api_key"))])
     def setup_reset(req: Request):
         if not need(req, "key", "session"):
             return err(401, "Log in first.")
@@ -408,7 +452,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         return {"ok": True}
 
     # ---------------------------------------------------------------- report
-    @app.get("/api/report")
+    @app.get("/api/report", dependencies=[Depends(require("api_key"))])
     def get_report(req: Request):
         if not need(req, "key", "session"):
             return err(401, "Log in first.")
@@ -418,7 +462,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
                     "pending": bool(jobs.scanning)}
         return {**rep, "pending": bool(jobs.scanning)}
 
-    @app.get("/api/report.html")
+    @app.get("/api/report.html", dependencies=[Depends(require("api_key"))])
     def get_report_html(req: Request):
         if not need(req, "key", "session"):
             return err(401, "Log in first.")
@@ -427,20 +471,20 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         rep = jobs.last_report() or {"at": None, "score": 0, "engine": None, "sections": []}
         return HTMLResponse(as_html(rep), headers={"Content-Disposition": 'attachment; filename="dbaba-report.html"'})
 
-    @app.post("/api/report/scan")
+    @app.post("/api/report/scan", dependencies=[Depends(require("api_key"))])
     def start_scan(req: Request):
         if not need(req, "key", "session"):
             return err(401, "Log in first.")
         return {"started": jobs.scan_in_background()}
 
     # ---------------------------------------------------------------- jobs and alerts
-    @app.get("/api/jobs")
+    @app.get("/api/jobs", dependencies=[Depends(require("api_key"))])
     def list_jobs(req: Request):
         if not need(req, "key", "session"):
             return err(401, "Log in first.")
         return {"jobs": jobs.listing()}
 
-    @app.post("/api/jobs/{jid}")
+    @app.post("/api/jobs/{jid}", dependencies=[Depends(require("api_key"))])
     async def change_job(jid: str, req: Request):
         if not need(req, "key", "session"):
             return err(401, "Log in first.")
@@ -455,7 +499,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         except KeyError:
             return err(404, "No such job")
 
-    @app.post("/api/alerts/{aid}/ack")
+    @app.post("/api/alerts/{aid}/ack", dependencies=[Depends(require("api_key"))])
     def ack(aid: str, req: Request):
         if not need(req, "key", "session"):
             return err(401, "Log in first.")
@@ -489,7 +533,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             os.chmod(path, 0o600)
         return v
 
-    @app.post("/api/new-chat")
+    @app.post("/api/new-chat", dependencies=[Depends(require("api_key"))])
     def new_chat(req: Request):
         if not need(req, "key", "session"):
             return err(401, "Log in first.")
@@ -498,7 +542,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         os.chmod(path, 0o600)
         return {"ok": True}
 
-    @app.post("/api/message")
+    @app.post("/api/message", dependencies=[Depends(require("api_key"))])
     async def message(req: Request):
         if not need(req, "key", "session"):
             return err(401, "Log in first.")

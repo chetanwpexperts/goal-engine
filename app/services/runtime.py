@@ -74,6 +74,10 @@ async def lifespan(application: FastAPI):
     legacy.ask_to_learn = learn.ask_to_learn
     legacy.report_miss = learn.report_miss
     rules.set_examples_source(storage.load_examples)
+    from app.engine.mind import core as mind_core
+    from app.services.mind import store as mind_store
+
+    mind_core.set_store(mind_store)
     if not hasattr(application.state, "router"):
         application.state.router = AIRouter.from_settings(get_settings())
     if not hasattr(application.state, "brain"):

@@ -20,7 +20,7 @@ from app.agents.planner import plan as plan_automation
 from app.engine.ml.brain import SKIP_RE, steps_text
 from app.engine.ml.registry import domain_of
 from app.engine.ml.normalize import normalize
-from app.mind import route
+from app.engine.mind import route
 from app.models import Agent, Goal, Message, dumps, loads
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,7 @@ def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: 
     db.commit()
     nxt: list[str] = []
     try:                                   # the mind: learn this step, work out the likely next questions
-        from app import mind
+        from app.engine import mind
 
         thought = mind.after(db, visitor_id, goal, text, reply, goal_agents(db, goal.id) if goal else [], hi)
         # when the agent just asked the person something, the answer comes first: no suggestions next to it
@@ -122,7 +122,7 @@ def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: 
     except Exception:  # noqa: BLE001 - the mind never breaks a reply
         logger.exception("mind")
     finally:
-        from app.mind import core as _mc
+        from app.engine.mind import core as _mc
 
         _mc._current.set(None)
     agents = [agent_dict(a, db, hi) for a in goal_agents(db, goal.id)] if goal else []
@@ -170,7 +170,7 @@ SMALL_TALK_RE = re.compile(r"^\s*(hi|hello|hey|thanks?|thank you|thx|ok|okay|bye
 def _handle_ml(db: Session, visitor_id: str, text: str, brain, goal_id: int | None) -> dict[str, Any]:
     focus = focus_goal(db, visitor_id, goal_id)
     try:                                   # the mind reads the person before any agent answers
-        from app import mind
+        from app.engine import mind
 
         mind.before(db, visitor_id, focus.id if focus is not None else None, text)
     except Exception:  # noqa: BLE001

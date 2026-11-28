@@ -4,7 +4,7 @@ from app.core.redact import scrub
 from app.core.text import fingerprint as _fp, normalize
 
 def _brains() -> tuple[str, ...]:
-    from app.mind import packs
+    from app.engine.mind import packs
 
     return tuple(packs.all_packs()) + ("general",)
 
@@ -30,7 +30,7 @@ def labels(brain: str) -> set[str]:
         from app.engine.ml.intent import training_examples
 
         return set(training_examples(include_learned=False)[1])
-    from app.mind import packs
+    from app.engine.mind import packs
 
     fn = packs.hook(brain, "labels")          # the agent's pack names where its meanings come from
     return set(fn()) if fn is not None else set()

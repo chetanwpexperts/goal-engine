@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app import expert
-from app.domain.schemas.main import ExpertIn, ExpertUpdate
+from app.domain.schemas.expert import ExpertIn, ExpertUpdate
 from app.security.admin import _is_admin
 from app.services.urls import _public_base
 

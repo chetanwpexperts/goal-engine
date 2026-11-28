@@ -16,16 +16,11 @@ from starlette.concurrency import run_in_threadpool
 from app.domain.schemas.main import (
     ExpertIn,
     ExpertUpdate,
-    OfficeStartIn,
-    OfficeFixIn,
-    OfficeCompareIn,
     LearnVoteIn,
     LearnAskIn,
     LearnStatusIn,
     MessageIn,
     StatusIn,
-    StartIn,
-    OwnerIn,
     ConnectorIn,
     DirectIn,
     DbJobIn,
@@ -68,6 +63,15 @@ from app.api.routes import pages as pages_routes, expert as expert_routes, healt
 from app.api.routes.pages import robots, preview, privacy_page, product_page, how_page, self_hosted_page, enquiry_page, index
 from app.api.routes.expert import ask_expert, my_expert_requests, admin_requests, admin_update
 from app.api.routes.learning_feed import learning_feed
+from app.domain.schemas.office import OfficeStartIn, OfficeFixIn, OfficeCompareIn
+from app.domain.schemas.agents import StartIn, OwnerIn
+from app.api.routes import office as office_routes, agents as agents_routes
+from app.api.routes.office import office_start, office_chunk, office_done, office_answer, office_get, office_fix, office_compare, office_download, office_undo, office_delete
+from app.api.routes.agents import start_agent, preview_agent, activate_agent, owner_verify, my_agents, link_connector, pause_agent
+from app.services.office import _office_call
+from app.services.agents import own_agent, _goal_hi, _agent_payload
+from app.services import agents as agent_service
+from app.services.goals import own_goal
 
 
 logging.basicConfig(level=logging.INFO)
@@ -133,6 +137,8 @@ app.include_router(pages_routes.router)
 app.include_router(expert_routes.router)
 app.include_router(health_routes.router)
 app.include_router(learning_feed_routes.router)
+app.include_router(office_routes.router)
+app.include_router(agents_routes.router)
 
 # Resolve the legacy mailer hook at request time (existing callers may replace it).
 app.state.mailer = lambda: mailer()
@@ -245,13 +251,6 @@ async def visitor_cookie(request: Request, call_next):
     return response
 
 
-def own_goal(db: Session, goal_id: int, visitor: str) -> Goal:
-    goal = db.get(Goal, goal_id)
-    if not goal or goal.visitor_id != visitor:
-        raise HTTPException(404, "Goal not found")
-    return goal
-
-
 @app.get("/admin")
 def admin_page(request: Request, key: str = "") -> Response:
     from fastapi.responses import RedirectResponse
@@ -271,107 +270,6 @@ def admin_page(request: Request, key: str = "") -> Response:
 
 
 # ---------------------------------------------------------------- Microsoft agent: files (app/agents/office_agent.py)
-def _office_call(fn):
-    from app.agents.office_agent import OfficeAgentError
-
-    try:
-        return fn()
-    except OfficeAgentError as exc:
-        raise HTTPException(400, str(exc))
-
-
-@app.post("/api/office/files")
-def office_start(body: OfficeStartIn, request: Request, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    from app.agents import office_agent as oa
-
-    try:
-        accounts._limit(db, "upload-ip", accounts.client_ip(request))
-    except accounts.AccountError as exc:
-        return JSONResponse({"error": "Too many uploads from your network. Please try again in an hour."}, status_code=exc.status)
-
-    if body.agent_id is not None:
-        agent = db.get(Agent, body.agent_id)
-        if not agent or agent.visitor_id != visitor or agent.recipe != "office":
-            raise HTTPException(404, "Not found")
-    return _office_call(lambda: oa.file_dict(oa.start_upload(db, visitor, body.agent_id, body.name, body.size)))
-
-
-@app.put("/api/office/files/{token}/chunk")
-async def office_chunk(token: str, offset: int, request: Request, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    from app.agents import office_agent as oa
-
-    data = await request.body()
-    return _office_call(lambda: oa.file_dict(oa.add_chunk(db, oa.own_file(db, token, visitor), offset, data)))
-
-
-@app.post("/api/office/files/{token}/done")
-def office_done(token: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    from app.agents import office_agent as oa
-
-    return _office_call(lambda: oa.file_dict(oa.finish_upload(db, oa.own_file(db, token, visitor))))
-
-
-@app.get("/api/office/answer")
-def office_answer(goal_id: int, name: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    from app.agents import office_agent as oa
-
-    goal = own_goal(db, goal_id, visitor)
-    return _office_call(lambda: oa.answer_sheet(db, goal, name[:40]))
-
-
-@app.get("/api/office/files/{token}")
-def office_get(token: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    from app.agents import office_agent as oa
-
-    return _office_call(lambda: oa.file_dict(oa.own_file(db, token, visitor)))
-
-
-@app.post("/api/office/files/{token}/fix")
-def office_fix(token: str, body: OfficeFixIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    from app.agents import office_agent as oa
-
-    return _office_call(lambda: oa.file_dict(oa.start_fix(db, oa.own_file(db, token, visitor), body.ops)))
-
-
-@app.post("/api/office/files/{token}/compare")
-def office_compare(token: str, body: OfficeCompareIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    from app.agents import office_agent as oa
-
-    return _office_call(lambda: oa.file_dict(oa.start_compare(db, oa.own_file(db, token, visitor), oa.own_file(db, body.other, visitor), body.key)))
-
-
-@app.get("/api/office/files/{token}/download")
-def office_download(token: str, what: str = "file", db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    """The latest version of the file (every fix so far), or the comparison report."""
-    from app.agents import office_agent as oa
-
-    f = _office_call(lambda: oa.own_file(db, token, visitor))
-    if what == "compare":
-        path, name = f.result_path, f.result_name or "comparison.xlsx"
-    else:
-        path, name = (f.path if len(oa.steps(f)) > 1 else None), oa._named(f.name, "fixed")
-    if not path or not os.path.exists(path):
-        raise HTTPException(404, "Not ready")
-    return FileResponse(path, filename=name, headers={"Cache-Control": "no-store"})
-
-
-@app.post("/api/office/files/{token}/undo")
-def office_undo(token: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    from app.agents import office_agent as oa
-
-    return _office_call(lambda: oa.file_dict(oa.start_undo(db, oa.own_file(db, token, visitor))))
-
-
-@app.delete("/api/office/files/{token}")
-def office_delete(token: str, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    from app.agents import office_agent as oa
-
-    f = _office_call(lambda: oa.own_file(db, token, visitor))
-    oa.remove_file(f)
-    db.commit()
-    return {"ok": True}
-
-
 # ---------------------------------------------------------------- brains learning from users (app/learning.py)
 @app.post("/api/learn/choice")
 def learn_choice(body: LearnVoteIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
@@ -510,130 +408,12 @@ def post_message(body: MessageIn, request: Request, db: Session = Depends(get_db
     return public(result)
 
 
-def own_agent(db: Session, agent_id: int, visitor: str) -> Agent:
-    agent = db.get(Agent, agent_id)
-    if not agent or agent.visitor_id != visitor:
-        raise HTTPException(404, "Agent not found")
-    return agent
-
-
-def _goal_hi(goal: Goal | None) -> bool:
-    return bool(goal is None or goal.detected_language in ("Hinglish", "Hindi"))
-
-
-@app.post("/api/agents/{agent_id}/start")
-def start_agent(agent_id: int, body: StartIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    agent = own_agent(db, agent_id, visitor)
-    goal = db.get(Goal, agent.goal_id)
-    hi = _goal_hi(goal)
-    inputs = loads(agent.inputs, {}) or {}
-    for key, value in body.inputs.items():
-        if key in ("url", "query", "explain") and isinstance(value, str) and value.strip():
-            inputs[key] = value.strip()[:20000]
-    agent.inputs = dumps(inputs)
-    db.commit()
-    try:
-        run = run_agent(db, agent, hi)
-    except AgentError as exc:
-        if getattr(exc, "options", None):              # one choice first (e.g. which database): asked in the chat, with taps
-            db.add(Message(visitor_id=visitor, goal_id=agent.goal_id, role="assistant", text=str(exc), relation="agent_plan", provider="agent"))
-            db.commit()
-            return public({"reply": str(exc), "options": exc.options, "relation": "agent_plan",
-                           "goal": goal.as_dict() if goal else None, "goals": [g.summary() for g in all_goals(db, visitor)],
-                           "agents": [agent_dict(a, db, hi) for a in goal_agents(db, agent.goal_id)]})
-        return JSONResponse({"error": str(exc)}, status_code=400)
-    reply, options = _after_run(agent, run, hi)
-    db.add(Message(visitor_id=visitor, goal_id=agent.goal_id, role="assistant", text=reply, relation="agent_run", provider="agent"))
-    db.commit()
-    return public({"reply": reply, "options": options, "relation": "agent_run",
-                   "goal": goal.as_dict() if goal else None,
-                   "goals": [g.summary() for g in all_goals(db, visitor)],
-                   "agents": [agent_dict(a, db, hi) for a in goal_agents(db, agent.goal_id)]})
-
-
-def _agent_payload(db: Session, agent: Agent, visitor: str, reply: str = "") -> dict:
-    goal = db.get(Goal, agent.goal_id)
-    hi = _goal_hi(goal)
-    return public({"reply": reply, "relation": "agent_run", "goal": goal.as_dict() if goal else None,
-                   "goals": [g.summary() for g in all_goals(db, visitor)],
-                   "agents": [agent_dict(a, db, hi) for a in goal_agents(db, agent.goal_id)]})
-
-
 def mailer() -> SmtpMailer:
     return SmtpMailer()
 
 
-@app.post("/api/agents/{agent_id}/preview")
-def preview_agent(agent_id: int, body: StartIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    agent = own_agent(db, agent_id, visitor)
-    if agent.recipe != "automation":
-        raise HTTPException(400, "Preview is for automation agents")
-    inputs = loads(agent.inputs, {}) or {}
-    if "sheet_url" in body.inputs:
-        inputs["sheet_url"] = (body.inputs["sheet_url"] or "").strip()[:2000]
-    if "csv_text" in body.inputs:
-        privacy.set_rows(inputs, (body.inputs["csv_text"] or "").strip()[:200000])   # stored encrypted
-    agent.inputs = dumps(inputs)
-    db.commit()
-    hi = _goal_hi(db.get(Goal, agent.goal_id))
-    run = automation.run(db, agent, hi, preview=True)
-    reply = run.summary or ""
-    db.add(Message(visitor_id=visitor, goal_id=agent.goal_id, role="assistant", text=reply, relation="agent_run", provider="agent"))
-    db.commit()
-    return _agent_payload(db, agent, visitor, reply)
-
-
-@app.post("/api/agents/{agent_id}/activate")
-def activate_agent(agent_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    agent = own_agent(db, agent_id, visitor)
-    if agent.recipe != "automation":
-        raise HTTPException(400, "Only automation agents run on a schedule")
-    try:
-        automation.activate(db, agent)
-    except automation.AutomationError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-    goal = db.get(Goal, agent.goal_id)
-    hi = _goal_hi(goal)
-    spec = automation.spec_of(agent)
-    when = automation.schedule_text(spec["schedule"], hi)
-    reply = (f"Agent chalu ho gaya. {when} apne aap chalega. Har run ke baad aapko summary email aayegi." if hi
-             else f"Agent is on. It runs {when.lower()} by itself, and emails you a summary after each run.")
-    db.add(Message(visitor_id=visitor, goal_id=agent.goal_id, role="assistant", text=reply, relation="agent_run", provider="agent"))
-    db.commit()
-    return _agent_payload(db, agent, visitor, reply)
-
-
-@app.post("/api/owner/code")
 def owner_code(body: OwnerIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    try:
-        automation.request_code(db, visitor, body.email, body.business, mailer(), hi=getattr(body, "lang", "en") != "en")
-    except automation.AutomationError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-    except RuntimeError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=503)
-    return {"ok": True}
-
-
-@app.post("/api/owner/verify")
-def owner_verify(body: OwnerIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    try:
-        owner = automation.verify_code(db, visitor, body.code)
-    except automation.AutomationError as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
-    return {"ok": True, "email": owner.email}
-
-
-@app.get("/api/agents")
-def my_agents(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)) -> dict:
-    """My Agents: every agent this visitor has, newest first."""
-    rows = list(db.scalars(select(Agent).where(Agent.visitor_id == visitor).order_by(Agent.id.desc()).limit(50)))
-    out = []
-    for agent in rows:
-        goal = db.get(Goal, agent.goal_id)
-        item = agent_dict(agent, db, _goal_hi(goal))
-        item["goal_id"], item["goal_title"] = agent.goal_id, goal.title if goal else ""
-        out.append(item)
-    return {"agents": out}
+    return agent_service.owner_code(body, db, visitor, mailer)
 
 
 # ---------------------------------------------------------------- database connector (runs on the user's server)
@@ -863,20 +643,6 @@ def disconnect_connector(connector_id: int, db: Session = Depends(get_db), visit
     return {"ok": True}
 
 
-@app.post("/api/agents/{agent_id}/connect/{connector_id}")
-def link_connector(agent_id: int, connector_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    agent = own_agent(db, agent_id, visitor)
-    try:
-        connector = dbagent.own_connector(db, connector_id, visitor)
-    except dbagent.DatabaseError:
-        raise HTTPException(404, "Connector not found")
-    inputs = loads(agent.inputs, {}) or {}
-    inputs["connector_id"] = connector.id
-    agent.inputs = dumps(inputs)
-    db.commit()
-    return _agent_payload(db, agent, visitor)
-
-
 @app.post("/api/connectors/{connector_id}/jobs")
 def create_db_job(connector_id: int, body: DbJobIn, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     try:
@@ -1017,15 +783,6 @@ def schedule_db_report(agent_id: int, body: DbReportIn, db: Session = Depends(ge
     db.add(Message(visitor_id=visitor, goal_id=agent.goal_id, role="assistant", text=reply, relation="agent_run", provider="agent"))
     db.commit()
     return _agent_payload(db, agent, visitor, reply)
-
-
-@app.post("/api/agents/{agent_id}/pause")
-def pause_agent(agent_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
-    agent = own_agent(db, agent_id, visitor)
-    agent.status, agent.next_run_at = "paused", None
-    db.commit()
-    goal = db.get(Goal, agent.goal_id)
-    return {"agents": [agent_dict(a, db, _goal_hi(goal)) for a in goal_agents(db, agent.goal_id)]}
 
 
 PREV_COOKIE = "ge_prev"

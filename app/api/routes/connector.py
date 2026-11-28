@@ -7,54 +7,56 @@ from app.security.visitor import visitor_id
 from app.domain.schemas.connector import ConnectorIn, DirectIn
 from app.services import connector as service
 
+from app.security.permissions import require
+
 router = APIRouter()
 
 
-@router.post("/api/connector/hello")
+@router.post("/api/connector/hello", dependencies=[Depends(require("api_key"))])
 async def connector_hello(request: Request, db: Session = Depends(get_db)):
     return await service.connector_hello(request, db)
 
 
-@router.post("/api/connector/poll")
+@router.post("/api/connector/poll", dependencies=[Depends(require("api_key"))])
 async def connector_poll(request: Request, db: Session = Depends(get_db)):
     return await service.connector_poll(request, db)
 
 
-@router.post("/api/connector/upload/{job_id}")
+@router.post("/api/connector/upload/{job_id}", dependencies=[Depends(require("api_key"))])
 async def connector_upload(job_id: int, request: Request, db: Session = Depends(get_db)):
     return await service.connector_upload(job_id, request, db)
 
 
-@router.post("/api/connector/result/{job_id}")
+@router.post("/api/connector/result/{job_id}", dependencies=[Depends(require("api_key"))])
 async def connector_result(job_id: int, request: Request, db: Session = Depends(get_db)):
     return await service.connector_result(job_id, request, db)
 
 
-@router.post("/api/connectors")
+@router.post("/api/connectors", dependencies=[Depends(require("visitor"))])
 def create_connector(body: ConnectorIn, request: Request, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     return service.create_connector(body, request, db, visitor)
 
 
-@router.post("/api/connectors/direct")
+@router.post("/api/connectors/direct", dependencies=[Depends(require("visitor"))])
 def connect_direct(body: DirectIn, request: Request, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     return service.connect_direct(body, request, db, visitor)
 
 
-@router.get("/api/connector-info")
+@router.get("/api/connector-info", dependencies=[Depends(require("public"))])
 def connector_info():
     return service.connector_info()
 
 
-@router.get("/api/connectors")
+@router.get("/api/connectors", dependencies=[Depends(require("visitor"))])
 def list_connectors(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     return service.list_connectors(db, visitor)
 
 
-@router.post("/api/connectors/{connector_id}/disconnect")
+@router.post("/api/connectors/{connector_id}/disconnect", dependencies=[Depends(require("visitor"))])
 def disconnect_connector(connector_id: int, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     return service.disconnect_connector(connector_id, db, visitor)
 
 
-@router.get("/api/connectors/{connector_id}/activity")
+@router.get("/api/connectors/{connector_id}/activity", dependencies=[Depends(require("visitor"))])
 def connector_activity(connector_id: int, after: int = 0, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     return service.connector_activity(connector_id, after, db, visitor)

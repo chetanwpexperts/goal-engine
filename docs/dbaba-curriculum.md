@@ -144,10 +144,21 @@ Claude (daytime sessions and the nightly run, in this order):
   missing database), first scan; report sections now / tables / indexes / security / server (S5 adds the rest); jobs
   health (5 min, alerts raised once and cleared) and scan (daily). Chat is DBaba's own reasoning. Not yet: chat answers
   run on the connected database, and fixes as preview + approve + Undo (only suggestions so far). tests/test_local.py.
-- [ ] S4b. Laptop-only DBaba (nothing installed on the server): the desktop app carries DBaba's engine (S4's screen) and
+- [x] S4b. Laptop-only DBaba (nothing installed on the server): the desktop app carries DBaba's engine (S4's screen) and
   reaches the database through an SSH tunnel to the database's own port (or directly when it is reachable); chat and the
   report work, automation runs while the laptop is on. The start screen offers the two choices plainly: "Try it now" (this
   computer only) or "Let DBaba look after it 24/7" (install on the server)
+  Done 28 Nov (engine side): app/local/tunnel.py. DBaba opens and reopens its own tunnel with the computer's OpenSSH client
+  (database.ssh in dbaba.json: host, port, user, key file path or ssh-agent; no SSH password ever), so the saved address
+  never goes stale after sleep or a new port. Host key accepted by its SHA256 fingerprint into DBaba's own known_hosts;
+  unknown and CHANGED keys refused. Forward on 127.0.0.1 only, `ssh -F none -N -T`, BatchMode, no agent/X11 forwarding.
+  Screen: "On a server I reach by SSH" (fingerprint check, "Find it for me" on the server), the jobs note that they run
+  while the laptop is on. Report: memory advice left out when DBaba isn't on the server (it saw the laptop's memory
+  through a 127.0.0.1 tunnel before), SSL-off not flagged through SSH. Lab (OpenSSH 9.6, private sshd before MariaDB and
+  PostgreSQL): 12 failures each in plain words (unknown / changed key, refused key, passphrase key -> ssh-agent, key
+  readable by others, refused port, unknown name, timeout, AllowTcpForwarding no, nothing at the database port there).
+  tests/test_local_ssh.py (47). For S9: the desktop "Try it now" still opens its own tunnel only during setup and doesn't
+  reopen it after a restart; passing `ssh` to the engine (contract) fixes that.
 - [x] S5. The full database report (first scan, then on a schedule): a health score and sections, worst first, each item with
   what it is, why it matters, and the fix (a change only as preview + approve + Undo): problems right now (deadlocks, locks
   and who waits on whom, long-running queries, connections near the limit, replication lag); slow queries (slow log /

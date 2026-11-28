@@ -5,13 +5,18 @@
   answers a TLS question with one byte ('S' or 'N'). Socket files are checked too.
 * test(): connect with the details given and say in plain words why it failed.
 * open_db(): a read-only connection for the report and the checks (goal_connector: read-only transactions, time limits).
+* A database with an "ssh" part is reached through an SSH tunnel from this computer (app/local/tunnel.py, S4b); its
+  "host" and "port" are then the database's address as the SSH server sees it (usually 127.0.0.1).
 """
 
+import contextlib
 import importlib.util
 import os
 import socket
 import struct
 from pathlib import Path
+
+from app.local import tunnel
 
 _spec = importlib.util.spec_from_file_location("goal_connector", Path(__file__).resolve().parents[2] / "connector" / "goal_connector.py")
 gc = importlib.util.module_from_spec(_spec)
@@ -87,17 +92,72 @@ def driver_cfg(db: dict) -> dict:
             "user": db.get("user") or "", "password": db.get("password") or "", "database": db.get("name") or ""}
 
 
+def default_port(engine: str) -> int:
+    return 5432 if engine == "postgresql" else 3306
+
+
+def via(db: dict) -> str:
+    """Where the database is from DBaba's point of view: 'here' (this machine), 'ssh' (through a tunnel), 'network'."""
+    if db.get("ssh"):
+        return "ssh"
+    return "here" if (db.get("host") or "127.0.0.1") in ("127.0.0.1", "localhost", "::1") else "network"
+
+
 def open_db(db: dict):
+    cfg = driver_cfg(db)
+    ssh = None
+    if db.get("ssh"):
+        ssh, why = tunnel.clean(db["ssh"])
+        if ssh is None:
+            raise ConnectError(why)
+        try:
+            cfg["host"], cfg["port"] = tunnel.manager.local_end(ssh, cfg["host"], cfg["port"])
+        except tunnel.TunnelError as exc:
+            raise ConnectError(str(exc), exc.code, exc.host_keys) from exc
     try:
-        return gc.Database(driver_cfg(db)).connect()
+        return gc.Database(cfg).connect()
     except SystemExit as exc:                          # the driver isn't installed
         raise ConnectError(str(exc)) from exc
     except Exception as exc:  # noqa: BLE001 - one plain sentence for every driver error
+        if ssh:
+            said = tunnel.manager.why_failed(ssh, driver_cfg(db)["host"], driver_cfg(db)["port"])
+            if said:
+                raise ConnectError(said[0], said[1]) from exc
         raise ConnectError(reason(exc, db)) from exc
 
 
 class ConnectError(ValueError):
-    pass
+    def __init__(self, text: str, code: str = "", host_keys: list | None = None):
+        super().__init__(text)
+        self.code = code
+        self.host_keys = host_keys or []
+
+
+def detect_via_ssh(ssh: dict) -> list[dict]:
+    """"Find it for me" on the SSH server: the same greetings as detect(), sent through a short-lived tunnel."""
+    found = []
+    try:
+        ends = tunnel.manager.detect(ssh)
+    except tunnel.TunnelError as exc:
+        raise ConnectError(str(exc), exc.code, exc.host_keys) from exc
+    try:
+        for host, port, lp in ends:
+            if port == 3306:
+                version = _mysql_greeting("127.0.0.1", lp, timeout=3.0)
+                if version is not None:
+                    engine = "mariadb" if "mariadb" in version.lower() else "mysql"
+                    if version.startswith("5.5.5-"):
+                        version = version[6:]
+                    found.append({"engine": engine, "host": host, "port": port, "version": version,
+                                  "how": f"{'MariaDB' if engine == 'mariadb' else 'MySQL'} {version.split('-')[0]} answers on "
+                                         f"{tunnel.where(ssh)} ({host}:{port} there)"})
+            elif _postgres_answers("127.0.0.1", lp, timeout=3.0):
+                found.append({"engine": "postgresql", "host": host, "port": port, "version": "",
+                              "how": f"PostgreSQL answers on {tunnel.where(ssh)} ({host}:{port} there)"})
+    finally:
+        with contextlib.suppress(Exception):
+            tunnel.manager.end_detect()
+    return found
 
 
 def reason(exc: Exception, db: dict) -> str:
@@ -125,7 +185,12 @@ def test(db: dict) -> dict:
     try:
         conn = open_db(db)
     except ConnectError as exc:
-        return {"ok": False, "version": "", "reason": str(exc)}
+        out = {"ok": False, "version": "", "reason": str(exc)}
+        if exc.code:
+            out["code"] = exc.code
+        if exc.host_keys:
+            out["host_keys"] = [{"type": k["type"], "fingerprint": k["fingerprint"]} for k in exc.host_keys]
+        return out
     try:
         version = conn.version()
         writes = conn.can_write()

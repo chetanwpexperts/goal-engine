@@ -28,7 +28,8 @@ The format the installer and the Docker entrypoint already write. DBaba keeps ev
 {"version": 1, "port": 8765,
  "screen_password": {"algorithm": "scrypt", "salt": "<hex>", "hash": "<hex>", "n": 16384, "r": 8, "p": 1} | null,
  "database": {"type": "mysql|mariadb|postgresql", "host": "127.0.0.1", "port": 3306, "name": "...",
-              "user": "...", "password": "...", "socket": "<optional>"} | null,
+              "user": "...", "password": "...", "socket": "<optional>",
+              "ssh": {"host": "db.example.org", "port": 22, "user": "deploy", "key_file": "/home/me/.ssh/id_ed25519" | ""} | absent} | null,
  "api_keys": [{"name": "desktop", "hash": "<sha256 hex of the key>", "created": "<ISO-8601>"}],
  "setup_done": true,
  "jobs": {"scan": {"enabled": true, "at": "02:40"}},
@@ -37,6 +38,12 @@ The format the installer and the Docker entrypoint already write. DBaba keeps ev
 ```
 
 * `setup_done` missing (an older file): set up when `database` is present.
+* `database.ssh` (S4b, laptop-only DBaba): the database is on another server and DBaba reaches it through an SSH tunnel it
+  opens itself with this computer's OpenSSH client. `host` / `port` are then the database's address **as the SSH server
+  sees it** (usually `127.0.0.1` and 3306 / 5432). Keys only: `key_file` is an absolute path to a private key (never its
+  contents), or `""` for this computer's ssh-agent; a key with a passphrase must be loaded into ssh-agent. No SSH password
+  is ever asked for or stored. Accepted server keys live in `data/local/known_hosts` (mode 0600); an unknown or changed
+  key is refused.
 * An API key is shown once (in the `/api/setup/save` answer); only its SHA-256 is stored.
 * Writes are atomic (temporary file, mode 0600, rename).
 
@@ -64,12 +71,13 @@ The format the installer and the Docker entrypoint already write. DBaba keeps ev
 | `GET /api/health` | `{"ok": true, "version": "x.y.z"}` |
 | `POST /api/login` `{"password"}` | `{"ok": true}` and the cookie; 401 wrong; 409 no password yet; 429 locked |
 | `POST /api/logout` | `{"ok": true}` |
-| `GET /api/state` | `{"version", "setup_done", "has_password", "database": {"engine", "host", "port", "name", "connected"} \| null, "alerts": [Alert], "last_scan": {"at", "score"} \| null}` |
-| `POST /api/setup/detect` | `{"found": [{"engine", "host", "port", "how"}]}` |
-| `POST /api/setup/test` `{"engine", "host", "port", "database", "user", "password"}` | `{"ok", "version", "reason", "warning"?}` (`reason` in plain words when not ok; `warning` when the user can change data) |
+| `GET /api/state` | `{"version", "setup_done", "has_password", "database": {"engine", "host", "port", "name", "connected", "via": "here\|ssh\|network", "ssh": {"host", "port", "user"} \| null} \| null, "alerts": [Alert], "last_scan": {"at", "score"} \| null}` |
+| `POST /api/setup/detect` `{"ssh"?}` | `{"found": [{"engine", "host", "port", "how"}]}`. With `ssh`: looks on the SSH server (3306 / 5432 there, through a short-lived tunnel) and may add `"reason"`, `"code"`, `"host_keys"` when SSH fails |
+| `POST /api/setup/ssh` `{"ssh", "accept"?}` (setup token or session before setup; key or session after) | The SSH server's keys: `{"ok": true, "trusted": bool, "keys": [{"type", "fingerprint": "SHA256:..."}]}`. With `"accept": "<fingerprint>"` the server is asked again and only a key with exactly that fingerprint is written to DBaba's known_hosts: `{"ok": true, "trusted": true}`; otherwise `{"ok": false, "reason"}`. A host already known is never overwritten |
+| `POST /api/setup/test` `{"engine", "host", "port", "database", "user", "password", "ssh"?}` | `{"ok", "version", "reason", "warning"?, "code"?, "host_keys"?}` (`reason` in plain words when not ok; `warning` when the user can change data). Through SSH, `code` names the failure: `host_key_unknown` (with `host_keys` to show and accept), `host_key_changed`, `auth`, `key_passphrase`, `key_permissions`, `key_unreadable`, `refused`, `dns`, `timeout`, `forwarding_forbidden`, `remote_db`, `no_ssh` |
 | `POST /api/setup/save` `{same, "screen_password"?}` | `{"ok": true, "api_key", "warning"?}` or `{"ok": false, "reason"}`. `screen_password` (8+ characters) is required when the file has none. Starts the first scan and a health check. |
 | `POST /api/setup/reset` (key or session) | `{"ok": true}`; setup is open again and a new token is printed |
-| `POST /api/database` (key or session) `{"engine"?, "host"?, "port"?, "database"?, "user"?, "password"?}` | After setup: a new address for the same database (an SSH tunnel's new local port, a moved server). Missing fields keep the saved ones; a missing `password` keeps the saved password. Tested first: `{"ok": true, "version", "warning"?}` and saved, or `{"ok": false, "reason"}` (status 200) and nothing changed. 409 before setup. |
+| `POST /api/database` (key or session) `{"engine"?, "host"?, "port"?, "database"?, "user"?, "password"?, "ssh"?}` | After setup: a new address for the same database (an SSH tunnel's new local port, a moved server). `"ssh": {...}` switches to DBaba's own tunnel, `"ssh": null` back to a direct address. Missing fields keep the saved ones; a missing `password` keeps the saved password. Tested first: `{"ok": true, "version", "warning"?}` and saved, or `{"ok": false, "reason"}` (status 200) and nothing changed. 409 before setup. |
 | `GET /api/keys` (key or session) | `{"keys": [{"id", "name", "created"}]}`; `id` is the first 12 hex characters of the key's SHA-256, never the key |
 | `POST /api/keys` `{"name"}` (**session only**) | `{"api_key", "keys"}`; the key is shown this once. 400 for a name outside letters, digits, space, `.` `-` `_` (1–40) |
 | `POST /api/keys/{id}/revoke` (**session only**) | `{"ok": true, "keys"}`; the key is refused from the next request. 404 unknown id |
@@ -98,7 +106,18 @@ The format the installer and the Docker entrypoint already write. DBaba keeps ev
   `security` (DBaba's user can change data, remote root, empty passwords, anonymous users, open network, md5, versions out of
   support), `server` (version). A new critical item also raises an alert.
 
+## Laptop-only DBaba (S4b)
+
+Nothing is installed on the server: DBaba runs on the laptop (the desktop app's "Try it now", or `python -m app.local
+serve`) and either reaches the database directly, or through SSH with `database.ssh` above. With `ssh` DBaba opens and
+reopens the tunnel itself (after sleep or a network change the next check opens a new one), so the saved address never
+goes stale. The tunnel listens on `127.0.0.1` only, runs `ssh -F none -N -T` with `BatchMode`, strict host keys,
+no agent / X11 forwarding and no remote command. Chat and the report work the same; the jobs run while the laptop is on
+and DBaba is open (a daily scan whose time passed while it was off runs when it is back). Memory advice is left out when
+DBaba isn't on the database server (it can only see the laptop's memory), with an `info` item saying so; a desktop app
+that keeps opening its own tunnel and calls `POST /api/database` with the new port keeps working as before.
+
 ## Files DBaba keeps (next to dbaba.json, mode 0600)
 
 `data/dbaba.db` (chat history), `data/local/alerts.json` (newest 200), `data/local/runs.json`, `data/local/report.json`,
-`data/local/chat_id`. Nothing is sent anywhere.
+`data/local/chat_id`, `data/local/known_hosts` (accepted SSH server keys). Nothing is sent anywhere.

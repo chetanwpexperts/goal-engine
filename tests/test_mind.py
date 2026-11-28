@@ -7,7 +7,8 @@ import pytest
 from openpyxl import Workbook
 
 from app.office import mind as mo
-from app.mind import predict, signals
+from app.services.mind import predict
+from app.engine.mind import signals
 from app.office import ask
 from app.office.sheetdata import load_tables
 from tests.test_follow_orders import PRACTICE, open_file  # noqa: F401 - fixture

@@ -8,11 +8,11 @@ from pathlib import Path
 
 import pytest
 
-from app.mind import packs
+from app.engine.mind import packs
 from tests.test_ml import say
 
 ROOT = Path(__file__).resolve().parents[1] / "app"
-BRAIN_FILES = sorted((ROOT / "mind").glob("*.py")) + [ROOT / "engine" / "goal.py", ROOT / "engine" / "learning.py"]
+BRAIN_FILES = sorted((ROOT / "engine" / "mind").glob("*.py")) + [ROOT / "engine" / "goal.py", ROOT / "engine" / "learning.py"]
 TECH = re.compile(r"\b(wordpress|php|mysql|mariadb|postgres\w*|excel|xlsx|xls|csv|laravel|shopify|codeigniter|sql|vlookup|xlookup|"
                   r"database|spreadsheets?|sheets?|nginx|apache|htaccess|innodb|google|woocommerce|magento|oracle|mongodb)\b", re.I)
 

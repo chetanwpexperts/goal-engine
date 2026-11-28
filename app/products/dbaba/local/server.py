@@ -39,6 +39,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from app.products.dbaba.local import dbconn, tunnel
 from app.products.dbaba.local.config import ENGINES, Config
 from app.products.dbaba.local.jobs import Jobs
+from app.security.crawlers import CrawlerMiddleware
 from app.security.permissions import require
 from app.security.audit import record_local
 
@@ -598,4 +599,5 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         out = await run_in_threadpool(run)
         return err(400, out["error"]) if "error" in out else out
 
+    app.add_middleware(CrawlerMiddleware)
     return app

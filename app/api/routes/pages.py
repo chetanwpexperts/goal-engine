@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse, Response
 from app.core.config import get_settings
 from app.core.paths import STATIC
 from app.security.headers import ENQUIRY_CSP
+from app.security.crawlers import robots_groups
 from app.security.site import PREVIEW_COOKIE, _preview_token, _site_open
 
 from app.security.permissions import require
@@ -17,7 +18,11 @@ router = APIRouter()
 
 @router.get("/robots.txt", dependencies=[Depends(require("public"))])
 def robots() -> Response:
-    return Response("User-agent: *\nDisallow: /\n" if not _site_open() else "User-agent: *\nAllow: /\n", media_type="text/plain")
+    if not _site_open():
+        return Response("User-agent: *\nDisallow: /\n", media_type="text/plain")
+    rules = "User-agent: *\nAllow: /\n"
+    rules += robots_groups()
+    return Response(rules, media_type="text/plain")
 
 
 @router.get("/preview", dependencies=[Depends(require("public"))])

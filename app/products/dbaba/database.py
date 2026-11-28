@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from app.domain.models import Agent, Connector, ConnectorJob, Goal, dumps, loads, utcnow
 
 log = logging.getLogger(__name__)
-from app.mind import packs
+from app.engine.mind import packs
 
 
 EXPORT_DIR = Path(__file__).resolve().parents[3] / "data" / "exports"
@@ -1080,7 +1080,7 @@ def _error_turn(db: Session, goal: Goal, text: str, hi: bool, visitor_id: str):
     """An error / EXPLAIN / lock report, or a problem put in words: its likely causes, for the person's database (rule A:
     named in the words, remembered from earlier, or shown by the error's own format; for an error that shows none of
     them, ask first)."""
-    from app import mind
+    from app.engine import mind
     from app.dbknow import brain as dbbrain
     from app.dbknow import engines as E
     from app.dbknow import reasoning
@@ -1280,7 +1280,7 @@ def continue_turn(db, goal, agent, text: str):
     """The answer about the checked query; when the person says it was wrong, the miss is also kept to learn from."""
     from app.agents.sql import mask_values
     from app.dbknow import engines as E
-    from app.ml.normalize import detect_language
+    from app.core.text import detect_language
 
     hi0 = detect_language(text) in ("Hinglish", "Hindi") or goal.detected_language in ("Hinglish", "Hindi")
     if goal.pending == E.PENDING and E.choice(text):          # the tap that answers 'which database?': the waiting check runs
@@ -1335,7 +1335,7 @@ def _tree_turn(db, goal, agent, text: str):
     """'Show the dependency tree' / 'grain of each block': the checked query's blocks (CTEs, derived tables, subqueries, UNION
     parts), what each reads, and the grain going in and coming out of each, with the joins that change it."""
     from app.agents.sql import analyze_sql
-    from app.ml.normalize import detect_language
+    from app.core.text import detect_language
 
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
     inputs = loads(agent.inputs, {}) or {}
@@ -1360,7 +1360,7 @@ def _proof_turn(db, goal, agent, text: str):
     and why it is (or isn't) the same rows, and the read-only queries that settle the rest in that database's own words."""
     from app.agents import sqlconfidence
     from app.agents.sql import analyze_sql
-    from app.ml.normalize import detect_language
+    from app.core.text import detect_language
 
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
     inputs = loads(agent.inputs, {}) or {}
@@ -1379,7 +1379,7 @@ def _continue_turn(db, goal, agent, text: str):
     also ask why ('explain this query' after a slow query), the usual answer follows the reading."""
     from app.agents.core import why_label
     from app.agents.sql import analyze_sql
-    from app.ml.normalize import detect_language
+    from app.core.text import detect_language
 
     if not READ_RE.search(text or "") or text.strip().startswith(("Why: ", "Kyun: ")):
         return _answer_turn(db, goal, agent, text)
@@ -1410,7 +1410,7 @@ def _answer_turn(db, goal, agent, text: str):
     """Answers about the query that was checked: the optimised version, what changed, or why it's slow.
     Worked out again from the query itself, so it's never a stale or repeated answer."""
     from app.agents.sql import analyze_sql, rewrite, unwrap
-    from app.ml.normalize import detect_language
+    from app.core.text import detect_language
     from app.domain.models import Message
 
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)

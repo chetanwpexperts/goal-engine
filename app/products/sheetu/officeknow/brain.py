@@ -7,7 +7,7 @@ import re
 import threading
 
 from app.products.sheetu import officeknow
-from app.ml.normalize import normalize
+from app.core.text import normalize
 
 CODE_RE = re.compile(r"#(?:REF!|N/A|VALUE!|DIV/0!|NAME\?|NUM!|NULL!|SPILL!|CALC!|FIELD!)|0x[0-9A-Fa-f]{8}", re.I)
 
@@ -68,7 +68,7 @@ def _train():
     fp = hashlib.sha256(repr((texts, labels_)).encode()).hexdigest()
     if _model is not None and fp == _fingerprint:
         return _model
-    from app.ml.intent import DATA_DIR
+    from app.engine.ml.intent import DATA_DIR
     import joblib
 
     saved = DATA_DIR / "models" / "officeknow.joblib"

@@ -9,7 +9,7 @@ import json
 import re
 
 from app.products.shared.spec import clean, validate
-from app.ml.normalize import normalize
+from app.core.text import normalize
 
 
 NUM_WORDS = {"ek": 1, "do": 2, "teen": 3, "char": 4, "chaar": 4, "paanch": 5, "panch": 5, "saat": 7, "das": 10,

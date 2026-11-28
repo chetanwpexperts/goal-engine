@@ -6,7 +6,7 @@ import json
 import re
 from collections import Counter
 
-from app.mind import packs
+from app.engine.mind import packs
 from app.products.sheetu.office import ask as asker
 from app.products.sheetu.office.sheetdata import Table
 

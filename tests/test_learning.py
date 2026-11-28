@@ -83,7 +83,7 @@ def test_delete_all_removes_votes(client):
 
 
 def test_general_brain_learns_too(client):
-    from app.ml.intent import training_examples
+    from app.engine.ml.intent import training_examples
 
     label = training_examples(include_learned=False)[1][0]
     text = "ek dum naya tareeka bolne ka jo kisi ne nahi socha"

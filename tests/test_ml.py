@@ -3,9 +3,9 @@
 from sqlalchemy import select
 
 from app.core.db import get_db
-from app.ml.intent import IntentModel
-from app.ml.normalize import detect_language, normalize
-from app.ml.slots import INTENT_LABELS, extract_all
+from app.engine.ml.intent import IntentModel
+from app.core.text import detect_language, normalize
+from app.engine.ml.slots import INTENT_LABELS, extract_all
 from app.domain.models import Message
 
 

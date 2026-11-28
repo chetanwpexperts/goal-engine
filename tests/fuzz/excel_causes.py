@@ -171,7 +171,7 @@ def case(i: int, seed: int, folder: str):
 
 
 def expected(inject: set, said: dict) -> set:
-    from app.mind.reason import FOUND_MIN
+    from app.engine.mind.reason import FOUND_MIN
     from app.officeknow import diagnose
 
     k = diagnose.knowledge()["causes"]

@@ -289,7 +289,7 @@ def nearest(text: str, k: int = 3) -> list[dict]:
 
 
 def _lang(text: str) -> str:
-    from app.ml.normalize import detect_language
+    from app.core.text import detect_language
 
     return {"Hindi": "hindi", "Hinglish": "hinglish"}.get(detect_language(text), "en")
 

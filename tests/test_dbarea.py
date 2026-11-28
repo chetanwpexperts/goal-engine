@@ -227,7 +227,7 @@ def test_a_connection_problem_in_words_gets_its_likely_causes(client, monkeypatc
 
 
 def test_plain_english_with_to_stays_english():
-    from app.ml.normalize import detect_language
+    from app.core.text import detect_language
 
     assert detect_language("how to connect database") == "English"
     assert detect_language("cannot connect to database") == "English"
@@ -246,7 +246,7 @@ def test_asking_for_help_with_a_query_goes_to_the_query_checker(client, monkeypa
 
 
 def test_my_sql_as_mine_stays_two_words():
-    from app.ml.normalize import normalize
+    from app.core.text import normalize
 
     assert "mysql" not in normalize("can you correct my sql")
     assert "mysql" in normalize("my sql server is not starting")

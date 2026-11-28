@@ -462,7 +462,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             from app.ai.router import AIRouter
             from app.core.config import get_settings
             from app.core.db import init_db
-            from app.ml.brain import Brain
+            from app.engine.ml.brain import Brain
 
             init_db()
             brain = Brain()

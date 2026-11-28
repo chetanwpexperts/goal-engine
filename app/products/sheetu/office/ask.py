@@ -17,7 +17,7 @@ from openpyxl.formatting.rule import FormulaRule
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from app.ml.normalize import tokens
+from app.core.text import tokens
 from app.products.sheetu.office.sheetdata import Table, load_tables
 
 SYNONYMS = {
@@ -45,7 +45,7 @@ SYNONYMS = {
 def _pack_synonyms():
     """More ways people name columns, from the Excel agent's pack (so they grow without code changes)."""
     try:
-        from app.mind import packs
+        from app.engine.mind import packs
 
         for k, ws in packs.get("office").get("column_synonyms", {}).items():
             SYNONYMS.setdefault(k, set()).update(ws)
@@ -542,8 +542,8 @@ def understand(text: str, tables: list[Table]) -> dict:
     """What the question asks, read against what the file really has. Hindi script is read in Roman letters
     (the way the file's headings are matched), with the Excel pack's word list for common Hindi words."""
     if re.search(r"[\u0900-\u097f]", text or ""):
-        from app.mind import packs
-        from app.ml.normalize import transliterate
+        from app.engine.mind import packs
+        from app.core.text import transliterate
 
         words = packs.get("office").get("romanised_words", {})
         roman = " ".join(words.get(w, w) for w in re.findall(r"[\w%.]+", transliterate(text).lower()))

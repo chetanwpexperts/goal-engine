@@ -18,7 +18,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from app.mind import reason
+from app.engine.mind import reason
 
 HERE = Path(__file__).resolve().parent
 CORE = HERE / "core"

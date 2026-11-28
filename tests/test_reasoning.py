@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from app.mind import reason
+from app.engine.mind import reason
 from tests.fuzz import excel_causes as gen
 from tests.test_follow_orders import _upload
 from tests.test_ml import say

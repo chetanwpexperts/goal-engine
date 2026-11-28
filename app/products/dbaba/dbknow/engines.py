@@ -302,6 +302,6 @@ def not_sure_line(lang: str) -> str:
 
 
 def lang_of(text: str) -> str:
-    from app.ml.normalize import detect_language
+    from app.core.text import detect_language
 
     return {"Hindi": "hindi", "Hinglish": "hinglish"}.get(detect_language(text or ""), "en")

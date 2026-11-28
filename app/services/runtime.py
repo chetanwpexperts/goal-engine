@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app import accounts, console, dbarea, enquiry, privacy
 from app.ai.router import AIRouter
-from app.ml.brain import Brain
+from app.engine.ml.brain import Brain
 from app.core.config import get_settings
 from app.core.db import init_db
 from app.agents import automation

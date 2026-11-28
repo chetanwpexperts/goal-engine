@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ai.router import AIRouter, AIUnavailable
-from app.ml.brain import Brain
+from app.engine.ml.brain import Brain
 from app.agents import automation
 from app import accounts, admin, console, dbarea, enquiry, expert, privacy
 from app.agents import database as dbagent

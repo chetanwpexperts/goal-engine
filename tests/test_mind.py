@@ -272,7 +272,7 @@ def test_after_a_long_pause_the_chain_starts_fresh(client, open_file):  # noqa: 
     from sqlalchemy.orm import Session
 
     from app.core.db import get_engine
-    from app.mind import core
+    from app.engine.mind import core
     from app.domain.models import MindSession, dumps, loads, utcnow
 
     say(client, "total sales by region", open_file)

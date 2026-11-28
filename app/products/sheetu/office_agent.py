@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.products.sheetu import office
-from app.mind import packs
+from app.engine.mind import packs
 from app.domain.models import Agent, Goal, OfficeFile, dumps, loads, utcnow
 
 DATA = Path(__file__).resolve().parents[3] / "data" / "office"
@@ -594,7 +594,7 @@ UPLOADED_RE = re.compile(r"^\s*(done|uploaded|ho gaya|daal di|daal diya|upload (
 
 
 def _words(text: str) -> list[str]:
-    from app.ml.normalize import tokens
+    from app.core.text import tokens
 
     return tokens(text or "")
 
@@ -722,7 +722,7 @@ def chat_task(db: Session, agent: Agent, text: str, hi: bool) -> str | None:
         return "Pichla kaam abhi chal raha hai, khatam hote hi agla karta hoon. Card pe dikhega." if hi else "Still working on the last task; the card shows when it's done."
     report = loads(f.report, {}) or {}
     offer = pending_offer(agent)
-    from app import mind
+    from app.engine import mind
 
     if offer and YES_RE.search(text or "") and not ops_in(text):
         mind.set_pattern("fix")
@@ -912,7 +912,7 @@ def _answer(agent, report, ops, sheets, hi, f) -> str:
 
 
 def _diagnose_reply(agent, f, report, text, hi) -> str:
-    from app import mind
+    from app.engine import mind
     from app.products.sheetu.officeknow import diagnose, evidence
 
     facts = evidence.collect(f.path, report)
@@ -1045,7 +1045,7 @@ def ask_task(db: Session, agent: Agent, f: OfficeFile, text: str, hi: bool):
     Before answering it checks the plan against the question and the person: the sheet they named, whether they
     want changes or only the answer, formulas only when they want them, and a different reading when the same
     question comes back because the last answer missed."""
-    from app import mind
+    from app.engine import mind
     from app.products.sheetu.office import mind as mo
     from app.products.sheetu.office import ask as asker
     from app.products.sheetu.office.sheetdata import load_tables
@@ -1220,7 +1220,7 @@ def holds_conversation(db: Session, goal: Goal, text: str, any_text: bool = Fals
 
 
 def continue_turn(db: Session, goal: Goal, agent: Agent, text: str):
-    from app.ml.normalize import _ALSO_ENGLISH, HINGLISH_MARKERS, detect_language, tokens
+    from app.core.text import _ALSO_ENGLISH, HINGLISH_MARKERS, detect_language, tokens
 
     lang = detect_language(text)
     if lang == "English" and goal.detected_language in ("Hinglish", "Hindi") and (

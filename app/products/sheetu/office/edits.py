@@ -265,7 +265,7 @@ def _mask_values(text: str, tables) -> str:
 
 
 def _file_words(tables) -> set[str]:
-    from app.ml.normalize import tokens
+    from app.core.text import tokens
 
     return {w for t in tables for h in list(t.header) + [t.name] if h for w in tokens(str(h))}
 

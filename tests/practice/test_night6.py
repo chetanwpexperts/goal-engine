@@ -18,8 +18,8 @@ LAB below is what each engine does with the wrong design (reproduced on MariaDB 
 
 import pytest
 
-from app.agents.sql import analyze_sql
-from app.agents.sqlroutine import split_script
+from app.products.dbaba.sql import analyze_sql
+from app.products.dbaba.sqlroutine import split_script
 from tests.practice import schema as S
 
 TEN = "INSERT INTO n6_t (id, amount) VALUES " + ", ".join(f"({i}, 0.1)" for i in range(1, 11))

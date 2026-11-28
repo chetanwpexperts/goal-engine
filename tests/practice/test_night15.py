@@ -22,8 +22,9 @@ import re
 
 import pytest
 
-from app.agents import sqlblocks, sqlconfidence
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqlblocks
+from app.products.dbaba import sqlconfidence
+from app.products.dbaba.sql import analyze_sql
 from tests.fuzz import bigq
 from tests.practice import schema as S
 
@@ -300,7 +301,7 @@ def test_explain_rules_out_a_risk_the_plan_avoids(engines):
         assert not [f for f in _all(res) if f.get("topic") == "sargable"], name
         ruled = [d for d in res["ruled_out"] if d["by"] == "plan" and d["topic"] == "sargable"]
         assert ruled and "through an index" in ruled[0]["why_en"], name
-    from app.agents.core import ruled_out_text
+    from app.products.shared.core import ruled_out_text
 
     assert "Your EXPLAIN plan rules these out" in ruled_out_text(res, False)
 
@@ -375,7 +376,7 @@ def test_lab(engines):
 
 
 def test_the_facts_live_in_the_engine_file():
-    from app.agents.sqlport import dialect
+    from app.products.dbaba.sqlport import dialect
 
     facts = dialect("mariadb")["syntax_refused"]
     assert {"lag_default", "cte_before_change"} <= set(facts) and all(facts[k]["proven"] == ["mariadb"] for k in ("lag_default", "cte_before_change"))

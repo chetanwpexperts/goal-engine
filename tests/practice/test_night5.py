@@ -17,8 +17,8 @@ LAB below is what each engine really does with the wrong statement (reproduced o
 
 import pytest
 
-from app.agents.sql import analyze_sql
-from app.agents.sqlroutine import split_script
+from app.products.dbaba.sql import analyze_sql
+from app.products.dbaba.sqlroutine import split_script
 from tests.practice import schema as S
 
 PG_ORDERS_PUNE = "UPDATE orders o SET amount = 0 FROM customers c WHERE c.id = o.customer_id AND c.city = 'Pune'"
@@ -322,8 +322,9 @@ def test_every_rule_records_where_it_was_proven():
     """Standing rule B: each rule and each engine fact says which engines the lab proved it on."""
     import json
 
-    from app.agents import sqlchange, sqlroutine
-    from app.agents.sqlread import fundamentals
+    from app.products.dbaba import sqlchange
+    from app.products.dbaba import sqlroutine
+    from app.products.dbaba.sqlread import fundamentals
 
     topics = {p[3] for p in P} | {r[3] for r in R}
     assert topics <= set(sqlchange.PROVEN) | set(sqlroutine.PROVEN)

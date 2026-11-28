@@ -12,7 +12,7 @@ LAB below is what each engine really does with the wrong query (reproduced on Ma
 
 import pytest
 
-from app.agents.sql import analyze_sql
+from app.products.dbaba.sql import analyze_sql
 from tests.practice import schema as S
 
 # (id, words, wrong query, topic, correct query or None, keep row order?, run only on, database said)
@@ -259,7 +259,7 @@ VALID = [
 
 def test_valid_totals_get_no_findings():
     """The aggregation checks stay quiet on totals that are right (no false alarms)."""
-    from app.agents import sqlaggs
+    from app.products.dbaba import sqlaggs
 
     for sql in VALID:
         res = analyze_sql(sql)
@@ -291,8 +291,8 @@ def test_every_rule_says_where_it_was_proven():
     import json
     from pathlib import Path
 
-    from app.agents import sqlaggs
-    from app.agents.sqlread import fundamentals
+    from app.products.dbaba import sqlaggs
+    from app.products.dbaba.sqlread import fundamentals
 
     assert all(set(v) >= {"mariadb", "postgresql"} for v in sqlaggs.PROVEN.values())
     topics = {t for f in fundamentals()["fundamentals"].values() for t in f["topics"]}

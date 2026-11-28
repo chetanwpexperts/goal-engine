@@ -10,7 +10,7 @@ The lab table (what each engine really does with the wrong query) is in LAB belo
 
 import pytest
 
-from app.agents.sql import analyze_sql
+from app.products.dbaba.sql import analyze_sql
 from tests.practice import schema as S
 
 # (id, words, wrong query, topic DBaba must find, correct query (None: found is enough), keep row order?, engines to run on)

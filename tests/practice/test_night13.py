@@ -16,8 +16,8 @@ import re
 
 import pytest
 
-from app.agents import sqlstruct
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqlstruct
+from app.products.dbaba.sql import analyze_sql
 from tests.practice import schema as S
 
 TONIGHT = {"scalar_uncorr", "corr_inner", "corr_key", "repeat_subquery", "same_subquery", "union_all", "union_all_dups", "having_key",

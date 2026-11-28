@@ -17,8 +17,8 @@ import time
 
 import pytest
 
-from app.agents import sqllock
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqllock
+from app.products.dbaba.sql import analyze_sql
 from tests.fuzz.db import MYSQL, PG, Engine
 from tests.practice import schema as S
 
@@ -398,7 +398,7 @@ def test_the_lab_table_still_holds(lab):
 def test_every_rule_records_where_it_was_proven():
     import json
 
-    from app.agents.sqlread import fundamentals
+    from app.products.dbaba.sqlread import fundamentals
 
     assert all(set(v) >= {"mariadb", "postgresql"} for v in sqllock.PROVEN.values())
     assert set(sqllock.PROVEN) <= set(fundamentals()["fundamentals"]["locking"]["topics"])

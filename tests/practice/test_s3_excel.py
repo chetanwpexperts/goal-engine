@@ -17,7 +17,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.agents import sqlexcel
+from app.products.dbaba import sqlexcel
 from tests.fuzz import dbexcel as DX
 
 HUBS = ["Mohali", "mohali", "MOHALI", "Kharar", "Zirakpur", "Panchkula", "Café Point", "Cafe Point", "Depot ", "Depot",

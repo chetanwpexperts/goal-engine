@@ -13,7 +13,8 @@ from collections import Counter
 
 import pytest
 
-from app.agents import sqlproject, sqlwrite
+from app.products.dbaba import sqlproject
+from app.products.dbaba import sqlwrite
 from tests.practice import schema as S
 
 DDL = "\n".join(f"CREATE TABLE {n} ({', '.join(cols)}, PRIMARY KEY (id));" for n, (cols, _rows) in S.TABLES.items()) + """

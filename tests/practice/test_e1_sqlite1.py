@@ -19,8 +19,9 @@ import tempfile
 
 import pytest
 
-from app.agents import sqlcorrect, sqlport
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqlcorrect
+from app.products.dbaba import sqlport
+from app.products.dbaba.sql import analyze_sql
 from app.products.dbaba.dbknow import engines as E
 from app.products.dbaba.dbknow import reasoning as R
 from tests.practice import schema as S

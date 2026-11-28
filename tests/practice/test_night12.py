@@ -16,8 +16,8 @@ import re
 
 import pytest
 
-from app.agents import sqlblocks
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqlblocks
+from app.products.dbaba.sql import analyze_sql
 from tests.practice import schema as S
 
 PAID_PER = "SELECT customer_id, SUM(amount) AS s FROM orders WHERE status = 'paid' GROUP BY customer_id ORDER BY customer_id"

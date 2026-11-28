@@ -11,7 +11,7 @@ from collections import Counter
 
 import pytest
 
-from app.agents import sqlwrite
+from app.products.dbaba import sqlwrite
 from tests.practice import schema as S
 from tests.practice.test_s1_write import SCHEMA, _rows
 
@@ -238,7 +238,7 @@ PUZZLES = [
 
 @pytest.mark.parametrize("text,want", PUZZLES, ids=[f"puzzle{k}" for k in range(len(PUZZLES))])
 def test_puzzles_are_worked_out(text, want):
-    from app.agents import sqlpuzzle
+    from app.products.dbaba import sqlpuzzle
 
     assert sqlpuzzle.is_puzzle(text) and not sqlwrite.is_request(text)
     got = {a.split(" ON ")[0]: b for a, b in sqlpuzzle.solve(text)["lines"]}
@@ -246,7 +246,7 @@ def test_puzzles_are_worked_out(text, want):
 
 
 def test_full_outer_join_puzzles_say_which_engines_lack_it():
-    from app.agents import sqlpuzzle
+    from app.products.dbaba import sqlpuzzle
 
     out = sqlpuzzle.reply(PUZZLES[2][0])
     assert "MySQL and MariaDB don't have FULL OUTER JOIN" in out and "NULL never equals" in out
@@ -255,7 +255,7 @@ def test_full_outer_join_puzzles_say_which_engines_lack_it():
 @pytest.mark.parametrize("text", ["SELECT COUNT(*) FROM t WHERE a IN (1, 2, 3)", "insert into t values (1, 2)",
                                   "list orders where status is paid"])
 def test_queries_and_requests_are_not_puzzles(text):
-    from app.agents import sqlpuzzle
+    from app.products.dbaba import sqlpuzzle
 
     assert not sqlpuzzle.is_puzzle(text)
 

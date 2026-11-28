@@ -16,7 +16,7 @@ import re
 import sqlite3
 import tempfile
 
-from app.agents.sqlroutine import split_script
+from app.products.dbaba.sqlroutine import split_script
 
 SETUP = ["CREATE TABLE lab_tx (id INT PRIMARY KEY, v INT)", "INSERT INTO lab_tx VALUES (1, 10)",
          "CREATE TABLE lab_log (id INT PRIMARY KEY, note VARCHAR(40))"]

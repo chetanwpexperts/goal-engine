@@ -15,7 +15,9 @@ LAB is what each engine really does with tonight's facts (MariaDB 10.11 / Postgr
 
 import pytest
 
-from app.agents import sqlproject, sqlscan, sqlverify
+from app.products.dbaba import sqlproject
+from app.products.dbaba import sqlscan
+from app.products.dbaba import sqlverify
 from tests.practice import schema as S
 
 DUMP = """-- practice shop, mysqldump --no-data style

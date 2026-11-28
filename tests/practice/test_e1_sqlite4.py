@@ -24,7 +24,8 @@ import time
 
 import pytest
 
-from app.agents import sqlcorrect, sqltxn
+from app.products.dbaba import sqlcorrect
+from app.products.dbaba import sqltxn
 from app.products.dbaba.dbknow import engines as E
 from app.products.dbaba.dbknow import reasoning as R
 from tests.practice import txnlab as L
@@ -470,7 +471,7 @@ def test_sqlite_answers_for_itself_now():
     assert not E.notes_only("sqlite") and E.notes_only("sqlserver") and E.notes_only("oracle")
     assert E.notes_line("sqlite", "en", "SELECT 1") == ""
     assert E.query_family("sqlite") == "sqlite" and E.syntax_family("sqlite") == "sqlite"
-    from app.agents import sqlconfidence
+    from app.products.dbaba import sqlconfidence
 
     assert sqlconfidence._verify("sqlite")[0][0] == "SQLite"
 
@@ -552,7 +553,7 @@ def test_exam_errors(text, cause):
 
 
 def test_exam_dates_and_plans():
-    from app.agents import sqlexplain
+    from app.products.dbaba import sqlexplain
 
     res = sqlcorrect.check("SELECT id FROM orders WHERE order_date - 7 > '2024-06-01'", engine="sqlite")
     assert res["findings"], res

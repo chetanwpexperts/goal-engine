@@ -17,8 +17,9 @@ from collections import Counter
 
 import pytest
 
-from app.agents import sqlcorrect, sqlport
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqlcorrect
+from app.products.dbaba import sqlport
+from app.products.dbaba.sql import analyze_sql
 from tests.practice import schema as S
 
 PAY = "FROM orders o JOIN payments p ON p.order_id = o.id"

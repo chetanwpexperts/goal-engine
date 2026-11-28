@@ -12,7 +12,7 @@ import re
 
 import pytest
 
-from app.agents import sqlscan
+from app.products.dbaba import sqlscan
 from tests.practice import schema as S
 
 # (id, requirement, file, code, line, topic, the right query, values bound in order, database)

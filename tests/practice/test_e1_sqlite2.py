@@ -19,8 +19,9 @@ import tempfile
 
 import pytest
 
-from app.agents import sqlcorrect, sqlport
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqlcorrect
+from app.products.dbaba import sqlport
+from app.products.dbaba.sql import analyze_sql
 from app.products.dbaba.dbknow import engines as E
 from app.products.dbaba.dbknow import reasoning as R
 from tests.practice import schema as S
@@ -370,7 +371,7 @@ def test_mysql_and_postgresql_designs_are_read_as_before():
 
 
 def test_rule_a_a_sqlite_script_is_read_as_sqlite_without_being_named():
-    from app.agents.sqlbasics import CHOSEN
+    from app.products.dbaba.sqlbasics import CHOSEN
 
     assert CHOSEN.get() is None
     res = sqlcorrect.check("CREATE TABLE notes (id INT PRIMARY KEY, body TEXT) STRICT")
@@ -382,7 +383,7 @@ def test_rule_a_a_sqlite_script_is_read_as_sqlite_without_being_named():
 def test_tonights_topics_have_their_fundamentals_and_proof():
     import json
 
-    from app.agents import sqlschema
+    from app.products.dbaba import sqlschema
 
     funds = json.load(open("app/products/dbaba/dbknow/core/query_fundamentals.json"))["fundamentals"]
     topics = {t for f in funds.values() for t in f["topics"]}

@@ -20,7 +20,8 @@ import tempfile
 
 import pytest
 
-from app.agents import sqlcorrect, sqlexplain
+from app.products.dbaba import sqlcorrect
+from app.products.dbaba import sqlexplain
 from app.products.dbaba.dbknow import engines as E
 from tests.practice import schema as S
 

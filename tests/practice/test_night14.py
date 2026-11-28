@@ -17,8 +17,8 @@ import re
 
 import pytest
 
-from app.agents import sqlproof
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqlproof
+from app.products.dbaba.sql import analyze_sql
 from tests.practice import schema as S
 
 TONIGHT = {"preagg", "compute_once", "volatile_repeat", "rw_exists", "rw_not_exists", "rw_in", "rw_not_in", "rw_join", "rw_cte",

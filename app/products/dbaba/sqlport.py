@@ -384,7 +384,7 @@ def _regex_rewrites(text: str, fam: str) -> str:
 # ---------------------------------------------------------------- what the checker reports
 def port(sql: str, s: str, intent: str, F, is_select: bool) -> list:
     from app.agents.sqlbasics import CHOSEN
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     chosen = CHOSEN.get()
     fam = E.syntax_family(chosen)
@@ -1064,7 +1064,7 @@ def target_of(text: str) -> tuple[str | None, str | None]:
     """(target, source) named in a translation request: 'convert this mysql query to postgres' -> ('postgresql', 'mysql');
     'ye query postgres mein badlo' -> ('postgresql', None). The target is the database after to / into / for, or before
     mein / me / में / wala / version; the other named one is the source."""
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     q, words = split_request(text)
     words = words if q else (text or "")
@@ -1181,7 +1181,7 @@ def translate(sql: str, target: str, source: str | None = None) -> dict:
     """The query in the target database's words: {'sql', 'changes' [(evidence, new, why)], 'also' [definite mistakes fixed on
     the way], 'left' [what couldn't be translated automatically], 'notes' [meaning notes], 'notes_only': bool}."""
     from app.agents import sqlcorrect
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     fam = E.syntax_family(target)
     if source is None:
@@ -1225,7 +1225,7 @@ def translate(sql: str, target: str, source: str | None = None) -> dict:
 def notes_for(eid: str, sql: str = "") -> list[tuple[str, str]]:
     """The notes of a notes-only database (SQL Server, Oracle, SQLite) that speak to what this query uses (LIMIT, IFNULL,
     NOW() ...), from its dialect file's 'notes' and 'note_marks'; all of them when nothing matches."""
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     d = E.dialect(eid)
     notes, marks = d.get("notes", {}), d.get("note_marks", {})
@@ -1259,7 +1259,7 @@ HEADS = {
 
 def translation_text(sql: str, t: dict, lang: str) -> str:
     """The chat reply for a translation, in the language asked (finding titles in English, or Hinglish for both others)."""
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     name = E.label(t["target"])
     src = E.label(t["source"]) if t.get("source") else ""

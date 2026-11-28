@@ -54,7 +54,7 @@ CHOSEN: contextvars.ContextVar = contextvars.ContextVar("dbaba_engine", default=
 def engine_seen(sql: str) -> str | None:
     """'mysql' or 'postgresql': the database the person named or chose (rule A), else the one the query's own syntax shows,
     else None (then each rule says what happens on each)."""
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     chosen = CHOSEN.get()
     if chosen:
@@ -70,7 +70,7 @@ def _short(t: str, n: int = 40) -> str:
 
 
 def _label(eng) -> str:
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     return E.label(eng)
 
@@ -136,7 +136,7 @@ def _inside_null_fn(sql: str, pos: int) -> bool:
 
 def _own_port(chosen: str | None) -> bool:
     """A database whose refused words come from its own dialect file rather than the MySQL/PostgreSQL families (SQLite)."""
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     fam = E.syntax_family(chosen)
     return bool(fam) and fam not in ("mysql", "postgresql")
@@ -602,7 +602,7 @@ def _refuses(fam: str) -> list:
 def _foreign_syntax(sql: str, s: str, F) -> list:
     """The person named (or chose) a database, and the query uses syntax that database doesn't have: it refuses the query.
     What each database refuses, its own error, and the rewrite are in its dialect file ('refuses'), proven in the lab."""
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     chosen = CHOSEN.get()
     fam = E.syntax_family(chosen)

@@ -85,7 +85,7 @@ async def lifespan(application: FastAPI):
         application.state.brain = Brain()
     application.state.brain.model.load()  # train or load the ML model before the first visitor
     try:                                  # and the problem recognisers, so the first visitor never waits for training
-        from app.dbknow import brain as _dbb
+        from app.products.dbaba.dbknow import brain as _dbb
         from app.products.sheetu.officeknow import brain as _ofb
 
         _dbb._train()

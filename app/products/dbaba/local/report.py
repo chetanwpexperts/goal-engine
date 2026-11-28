@@ -170,7 +170,7 @@ def _support(engine, version):
     """A version whose maker no longer fixes it (dialect file 'support_ended', from the makers' published policies)."""
     import re as _re
 
-    from app.dbknow import engines
+    from app.products.dbaba.dbknow import engines
 
     eid = "mariadb" if "mariadb" in version.lower() else engine
     try:

@@ -2043,7 +2043,7 @@ def _check_select(sql: str, s: str, slip_edits: list, _again: bool, intent: str 
             continue                                          # already said, in our own words
         # the engine's own words are the reason (proved); the drafted title and fix are only a pointer, with the example
         from app.agents.sqlbasics import CHOSEN
-        from app.dbknow import engines as _E
+        from app.products.dbaba.dbknow import engines as _E
 
         mine = {"postgresql": ["postgres"], "mysql": [_x for _x in ("mariadb", "mysql") if CHOSEN.get() == _x] or ["mysql", "mariadb"]}.get(
             _E.family(CHOSEN.get()) or "", [])
@@ -2245,7 +2245,7 @@ def _in_engine_words(out: dict, engine: str) -> dict:
     import json
     from pathlib import Path
 
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     fam = E.query_family(engine)
     if fam not in ("postgresql", "sqlite"):

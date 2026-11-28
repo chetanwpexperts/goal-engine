@@ -26,7 +26,7 @@ def _own_job(db: Session, job_id: int, visitor: str):
 
 
 def brain_recognize(body: RecognizeIn):
-    from app.dbknow import brain
+    from app.products.dbaba.dbknow import brain
 
     rec = brain.recognize(body.text)
     hi = body.lang != "en"
@@ -35,7 +35,7 @@ def brain_recognize(body: RecognizeIn):
 
 
 def brain_playbook(issue_id: str):
-    from app.dbknow import service
+    from app.products.dbaba.dbknow import service
 
     issue = service.playbook(issue_id) or service.error_entry(issue_id)
     if issue is None:
@@ -45,7 +45,7 @@ def brain_playbook(issue_id: str):
 
 def brain_diagnose(connector_id: int, body: DiagnoseIn, db: Session, visitor: str):
     """Run a playbook's own read-only checks on this database."""
-    from app.dbknow import service
+    from app.products.dbaba.dbknow import service
 
     try:
         job, issue, checks = service.start_checks(db, _own_conn(db, connector_id, visitor), body.issue_id)
@@ -56,7 +56,7 @@ def brain_diagnose(connector_id: int, body: DiagnoseIn, db: Session, visitor: st
 
 def brain_optimize(connector_id: int, body: OptimizeIn, db: Session, visitor: str):
     """The solving loop: try the fixes on the real database and prove which one is the same answer and faster."""
-    from app.dbknow import service
+    from app.products.dbaba.dbknow import service
 
     try:
         job, analysis = service.start_optimize(db, _own_conn(db, connector_id, visitor), body.sql)

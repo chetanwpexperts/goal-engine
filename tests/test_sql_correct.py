@@ -103,7 +103,7 @@ def test_numbers_in_quotes_in_range_comparisons():
 
 
 def test_the_recognisers_are_ready_before_the_first_message():
-    from app.dbknow import brain as dbb
+    from app.products.dbaba.dbknow import brain as dbb
     from app.products.sheetu.officeknow import brain as ofb
 
     assert dbb._train() is dbb._train() and ofb._train() is ofb._train()

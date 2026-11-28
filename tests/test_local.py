@@ -10,7 +10,7 @@ What is proved here:
   database that doesn't exist), save stores the database and starts the first scan, the scan finds a planted table
   without a primary key on each engine;
 * jobs and alerts: listing, changing, due times, raise once / clear / acknowledge;
-* the real process: `python -m app.local serve` prints the setup token, listens only on 127.0.0.1, and goes through
+* the real process: `python -m app.products.dbaba.local serve` prints the setup token, listens only on 127.0.0.1, and goes through
   setup over HTTP.
 """
 
@@ -27,10 +27,10 @@ import urllib.request
 import pytest
 from starlette.testclient import TestClient
 
-from app.local import dbconn, report
-from app.local.config import Config
-from app.local.jobs import Jobs
-from app.local.server import make_app
+from app.products.dbaba.local import dbconn, report
+from app.products.dbaba.local.config import Config
+from app.products.dbaba.local.jobs import Jobs
+from app.products.dbaba.local.server import make_app
 
 MARIA = {"engine": "mariadb", "host": "127.0.0.1", "port": 3306, "database": "shop_db", "user": "shopapp", "password": "app pass"}
 PG = {"engine": "postgresql", "host": "127.0.0.1", "port": 5432, "database": "shop_pg", "user": "shopapp", "password": "app pass"}
@@ -266,7 +266,7 @@ def test_the_real_process(tmp_path):
     env = {**os.environ, "PYTHONPATH": os.getcwd(), "GEMINI_API_KEY": "sk-should-be-cleared", "ENGINE_MODE": "ai",
            "VISITOR_DAILY_CAP": "1"}                                             # the environment can't switch AI on
     env.pop("DATABASE_URL", None)
-    p = subprocess.Popen([sys.executable, "-m", "app.local", "serve", "--port", str(port), "--config", str(tmp_path / "dbaba.json")],
+    p = subprocess.Popen([sys.executable, "-m", "app.products.dbaba.local", "serve", "--port", str(port), "--config", str(tmp_path / "dbaba.json")],
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     try:
         line = p.stdout.readline().strip()
@@ -304,7 +304,7 @@ def test_the_real_process(tmp_path):
 def test_reset_command(tmp_path):
     cfg = installer_file(tmp_path / "dbaba.json", database=_db(MARIA))
     assert Config(cfg).setup_done is True                                        # an installer file with a database is set up
-    r = subprocess.run([sys.executable, "-m", "app.local", "reset", "--config", str(cfg)], capture_output=True, text=True,
+    r = subprocess.run([sys.executable, "-m", "app.products.dbaba.local", "reset", "--config", str(cfg)], capture_output=True, text=True,
                        env={**os.environ, "PYTHONPATH": os.getcwd()})
     assert r.returncode == 0 and Config(cfg).setup_done is False
 

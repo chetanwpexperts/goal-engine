@@ -15,7 +15,7 @@ import time
 
 import pytest
 
-from app.local import checks, report
+from app.products.dbaba.local import checks, report
 from tests.test_local import needs_maria, needs_pg
 
 MY_DB = {"type": "mariadb", "host": "127.0.0.1", "port": 3306, "name": "shop_db", "user": "shopapp", "password": "app pass"}
@@ -279,7 +279,7 @@ def test_lab_lock_wait_names_who_blocks_whom(lab, db, kind):
     a, b, th = _hold_lock(MYSQL if kind == "mysql" else PG, "UPDATE s5_hubs SET name = 'held' WHERE id = 1",
                           "UPDATE s5_hubs SET name = 'waiting' WHERE id = 1")
     try:
-        from app.local import dbconn
+        from app.products.dbaba.local import dbconn
 
         conn = dbconn.open_db(db)
         try:
@@ -336,7 +336,7 @@ def test_lab_deadlock_is_counted(lab, db, kind):
 def test_report_through_the_api_has_every_section_and_compares(tmp_path, lab):
     from starlette.testclient import TestClient
 
-    from app.local.server import make_app
+    from app.products.dbaba.local.server import make_app
 
     app = make_app(str(tmp_path / "dbaba.json"), 8765, "T", announce=lambda line: None)
     c = TestClient(app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 1))

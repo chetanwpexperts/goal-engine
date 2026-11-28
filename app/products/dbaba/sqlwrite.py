@@ -129,7 +129,7 @@ def _lesson(text: str) -> bool:
     if re.search(r"\b(?:farak|fark|farq|antar|difference|differences|vs|versus)\b|अंतर|फ़र्क|फर्क", text, re.I):
         return True
     try:
-        from app.dbknow import concepts as K
+        from app.products.dbaba.dbknow import concepts as K
 
         m = K.match(text)
     except Exception:  # noqa: BLE001
@@ -1151,7 +1151,7 @@ def reply(text: str, engine: str | None = None, hi: bool = False, schema: dict |
                  f"main bana dunga.") if hi else
                 (f"I can't build that one yet: I need {res['cant']}. Give me the table and column names (or paste the "
                  f"CREATE TABLE) and I'll write it.")), res
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     where = (E.label(engine) if engine else "MySQL, MariaDB, PostgreSQL and SQLite")
     head = ("Ye rahi query:" if hi else "Here's the query:")

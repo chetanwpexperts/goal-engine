@@ -1,7 +1,7 @@
 """The database brain at work: from a problem to checks, causes, proven fixes. Knowledge stays here;
 connectors only run the read-only checks we send."""
 
-from app import dbknow
+from app.products.dbaba import dbknow
 from app.agents import database as dbagent
 from app.agents.sql import analyze_sql
 

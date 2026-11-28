@@ -9,7 +9,7 @@ import os
 import re
 import threading
 
-from app import dbknow
+from app.products.dbaba import dbknow
 from app.core.text import normalize
 
 SQL_RE = re.compile(r"\b(select\b[\s\S]+?\bfrom\b|update\s+[`\"\w.]+\s+set\b|delete\s+from\b|insert\s+into\b)", re.I)

@@ -367,7 +367,7 @@ def wants_database(goal: Goal | None, text: str) -> bool:
     """A database job the connector can do (not a pasted query to review, that's the SQL checker)."""
     if goal is None:
         return False
-    from app.dbknow import reasoning
+    from app.products.dbaba.dbknow import reasoning
 
     if reasoning.evidence(text):
         return True                       # a pasted database error (even with the query in it): the reasoning explains it
@@ -380,7 +380,7 @@ def wants_database(goal: Goal | None, text: str) -> bool:
         return True                       # a pasted EXPLAIN plan: read step by step
     if SQL_TEXT.search(text or ""):
         return False
-    from app.dbknow import brain
+    from app.products.dbaba.dbknow import brain
 
     rec = brain.recognize(text)
     if rec["kind"] == "error" or (rec["kind"] == "issue" and rec["confidence"] >= 0.55 and
@@ -409,7 +409,7 @@ def live_checks(db: Session, user, agent: Agent | None, visitor_id: str, result:
 
     from app import dbarea
     from app.agents import direct
-    from app.dbknow import reasoning
+    from app.products.dbaba.dbknow import reasoning
     from app.domain.models import UserSession
 
     if not user.email_verified or not dbarea.connect_open(user):
@@ -545,7 +545,7 @@ def database_dict(db: Session, agent: Agent, hi: bool) -> dict:
 def _brain_view(rec, hi: bool):
     if not rec or not rec.get("kind"):
         return None
-    from app.dbknow import brain
+    from app.products.dbaba.dbknow import brain
 
     return {**rec, "text": brain.describe(rec, hi)}
 
@@ -613,7 +613,7 @@ ANOTHER_RE = re.compile(r"\b(check|test|review|fix|see)\s+(an)?other\s+(sql\s+)?
 def concept_question(text: str):
     """A basic/concept question ('what is a JOIN', 'group by kya hota hai', 'DELETE vs TRUNCATE', 'how to find duplicate
     emails'): answered from the concepts pack, before the query checker, the error diagnoser or the connect step."""
-    from app.dbknow import concepts
+    from app.products.dbaba.dbknow import concepts
 
     try:
         return concepts.match(text)
@@ -626,7 +626,7 @@ def _write_turn(db: Session, goal: Goal, text: str, hi: bool):
     """A query written from the person's words, for their database (rule A: named, remembered, or the common form that runs
     on MySQL, MariaDB, PostgreSQL and SQLite alike, said so)."""
     from app.agents import sqlwrite
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     named = E.named(text)
     if named:
@@ -673,8 +673,8 @@ def _keep_card(goal: Goal, card: dict):
 
 
 def _concept_turn(db: Session, goal: Goal, text: str, hi: bool, m: dict):
-    from app.dbknow import concepts
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import concepts
+    from app.products.dbaba.dbknow import engines as E
 
     if E.named(text):                     # 'how to delete duplicate rows in mysql': remembered for the conversation (rule A)
         E.remember(goal, E.named(text), "named")
@@ -776,7 +776,7 @@ def engine_gate(db: Session, agent: Agent, inputs: dict, hi: bool) -> dict:
     chosen from the taps) decides the answer; else the one the query's syntax shows (said, with a tap to correct it); else
     ask first. Returns the inputs with 'engine_rule' set, or raises AgentAsks with the question and its taps."""
     from app.agents.core import AgentAsks
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     goal = db.get(Goal, agent.goal_id)
     text = inputs.get("query", "")
@@ -807,7 +807,7 @@ def engine_gate(db: Session, agent: Agent, inputs: dict, hi: bool) -> dict:
 def _engine_reply(db, goal, agent, eid: str, how: str, hi: bool, again: bool):
     """The person chose (or corrected) the database: remember it and answer what was waiting, for that database only."""
     from app.agents.core import AgentError, run_agent
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
     from app.agents.replies import _after_run
 
     E.remember(goal, eid, how)
@@ -875,8 +875,8 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     m = concept_question(text)
     if m is not None:                     # a basic question gets its answer, never 'paste a query' / 'connect your database'
         return _concept_turn(db, goal, text, turn.hi, m)
-    from app.dbknow import brain as dbbrain
-    from app.dbknow import reasoning
+    from app.products.dbaba.dbknow import brain as dbbrain
+    from app.products.dbaba.dbknow import reasoning
 
     from app.agents.core import query_in as _query_in
 
@@ -920,7 +920,7 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
         inputs["mode"] = mode
     if mode == "export":                  # 'status wise, with total amount': the workbook's pivot follows these words (S3)
         inputs["excel_words"] = (text or "")[:400]
-    from app.dbknow import reasoning as _r
+    from app.products.dbaba.dbknow import reasoning as _r
 
     if rec["kind"] in ("sql", "error") or (rec["kind"] == "do" and rec["confidence"] >= 0.35) or (
             rec["kind"] == "issue" and _sure(rec) and (_r.complaints(text) or _r.evidence(text))):
@@ -950,7 +950,7 @@ def _code_turn(db: Session, goal: Goal, text: str, hi: bool):
     """Code pasted in the chat (night 10A): every query in it, by its line, checked for the person's database (rule A: named,
     remembered or chosen; else the driver the code uses, said as detected; else ask first). Read only."""
     from app.agents import sqlscan
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     words = "\n".join(ln for ln in text.splitlines() if ln.strip() and not sqlscan.code_lang(ln) and not re.search(r"[;{}()=]", ln))
     lang = E.lang_of(words) if words and len(re.findall(r"\w+", words)) >= 2 else ("hinglish" if hi else "en")
@@ -998,7 +998,7 @@ def _translate_turn(db: Session, goal: Goal, text: str, hi: bool, query: str | N
     for the conversation (rule A); each construct is rewritten in its words (lab-proven on MariaDB and PostgreSQL), the
     differences in meaning are named, and what couldn't be translated is said. SQL Server / Oracle: notes only (SQLite is lab-tested from E1)."""
     from app.agents import sqlport
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     if query is None:
         query, words = sqlport.split_request(text)
@@ -1027,7 +1027,7 @@ def _plan_turn(db: Session, goal: Goal, text: str, hi: bool, plan: dict):
     (the card shows both); without: the plan read step by step, and what to change, for the engine its format shows."""
     from app.agents import sqlexplain
 
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     if not E.named(text) and not E.remembered(goal):     # rule A: the plan's own format shows the database
         eid = plan["engine"] if plan["engine"] in ("postgresql", "sqlite") else (
@@ -1081,9 +1081,9 @@ def _error_turn(db: Session, goal: Goal, text: str, hi: bool, visitor_id: str):
     named in the words, remembered from earlier, or shown by the error's own format; for an error that shows none of
     them, ask first)."""
     from app.engine import mind
-    from app.dbknow import brain as dbbrain
-    from app.dbknow import engines as E
-    from app.dbknow import reasoning
+    from app.products.dbaba.dbknow import brain as dbbrain
+    from app.products.dbaba.dbknow import engines as E
+    from app.products.dbaba.dbknow import reasoning
 
     lang = E.lang_of(text) if E.lang_of(text) != "en" or not hi else "hinglish"
     named = E.named(text)
@@ -1218,7 +1218,7 @@ def _sql_agent(db, goal):
 def holds_conversation(db, goal, text: str, any_text: bool = False):
     """A query was checked in this conversation and the person asks about it: answer about THAT query. Also: the answer to
     'which database is this for?', and a short 'it's PostgreSQL' correcting the database DBaba detected (rule A)."""
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     if goal is not None and text and not any_text and goal.pending == E.PENDING and E.choice(text) and concept_question(text) is None:
         a, _run = _sql_agent(db, goal)
@@ -1279,7 +1279,7 @@ INDEX_RE = re.compile(r"\b(which|what|kaun\w*|konsa|kaunsa)\b[^?]*\bindex(es)?\b
 def continue_turn(db, goal, agent, text: str):
     """The answer about the checked query; when the person says it was wrong, the miss is also kept to learn from."""
     from app.agents.sql import mask_values
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
     from app.core.text import detect_language
 
     hi0 = detect_language(text) in ("Hinglish", "Hindi") or goal.detected_language in ("Hinglish", "Hindi")

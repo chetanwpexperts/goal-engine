@@ -72,7 +72,7 @@ def _sql_summary(result: dict, hi: bool) -> str:
                  "\n\nBefore running it, see the rows it will change (this only reads):") + f"\n\n{result['preview']}"
     rec = result.get("engine_rule") or {}
     if rec and result.get("ok"):
-        from app.dbknow import engines
+        from app.products.dbaba.dbknow import engines
 
         lang = rec.get("lang") or ("hinglish" if hi else "en")
         extra = engines.detected_line(rec, lang)[0] or engines.notes_line(rec["id"], lang, result.get("notes_for", ""))   # 'not sure': each finding names its engines
@@ -242,7 +242,7 @@ def _run_sql(inputs: dict) -> dict:
     out = analyze_sql(inputs.get("query", ""), inputs.get("explain", ""), engine=rec.get("id") or None, said=inputs.get("said") or "")
     if rec:
         out["engine_rule"] = rec
-        from app.dbknow import engines
+        from app.products.dbaba.dbknow import engines
 
         out["taps"] = engines.detected_line(rec, rec.get("lang", "en"))[1]
     return out

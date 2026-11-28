@@ -184,7 +184,7 @@ def engine_named(text: str) -> str | None:
     for eid, (rx, _label) in ENGINES.items():
         if re.search(rx, text or "", re.I):
             return eid
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     return E._misspelt(text or "")                    # 'postgrasql', 'mysq': the name typed with a slip
 
@@ -205,7 +205,7 @@ def _is_work(text: str) -> bool:
                                    text or "", re.I):
         return True
     try:
-        from app.dbknow import reasoning
+        from app.products.dbaba.dbknow import reasoning
 
         facts = reasoning.evidence(text)
         # a question that only NAMES a setting ('what is ONLY_FULL_GROUP_BY') is a concept; a pasted message or code is work

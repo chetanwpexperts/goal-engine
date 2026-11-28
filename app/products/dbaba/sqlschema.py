@@ -86,7 +86,7 @@ def _fam_rules(fam: str | None) -> dict:
 def _family(sql: str) -> tuple[str | None, bool]:
     """(family, named): the database the person named or chose (rule A), else the one the script's syntax shows."""
     from app.agents.sqlbasics import CHOSEN, engine_seen
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     chosen = CHOSEN.get()
     if chosen:
@@ -751,7 +751,7 @@ def _list_col(t: dict, c: dict, add, ev: str) -> bool:
 def _is_lite(sql: str) -> bool:
     """SQLite: named or chosen (rule A), or shown by words only SQLite takes in a table script (AUTOINCREMENT, STRICT, WITHOUT ROWID)."""
     from app.agents.sqlbasics import CHOSEN
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     chosen = CHOSEN.get()
     if chosen:

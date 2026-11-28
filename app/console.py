@@ -337,8 +337,8 @@ def _query_blocks(q: str, engine: str | None, hi: bool, connected: bool) -> list
 
 def _diagnosis_blocks(text: str, engine: str | None, hi: bool, conn) -> list[dict]:
     """An error, or a problem in words: the likely causes, proven or ruled out on the connected database when there is one."""
-    from app.dbknow import brain as dbbrain
-    from app.dbknow import reasoning, service
+    from app.products.dbaba.dbknow import brain as dbbrain
+    from app.products.dbaba.dbknow import reasoning, service
 
     blocks = []
     result = reasoning.diagnose(text, engine=engine)
@@ -474,9 +474,9 @@ def answer(text: str, c: Connector | None = None) -> tuple[list[dict], str | Non
     words. With a connected database (c), its read-only checks run on it. Shared by the workspace and the admin test box."""
     from app.agents import direct
     from app.agents.core import query_in
-    from app.dbknow import concepts
-    from app.dbknow import engines as E
-    from app.dbknow import reasoning
+    from app.products.dbaba.dbknow import concepts
+    from app.products.dbaba.dbknow import engines as E
+    from app.products.dbaba.dbknow import reasoning
 
     lang = E.lang_of(text)
     hi = lang != "en"

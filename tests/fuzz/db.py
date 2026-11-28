@@ -1045,7 +1045,7 @@ _DISTINCT: dict = {}
 def _distinct(issue: dict) -> set:
     """Words only this playbook's symptoms use: what makes a description about IT and not another problem."""
     if not _DISTINCT:
-        from app import dbknow
+        from app.products.dbaba import dbknow
 
         words = {i["id"]: {w.lower() for s in i["symptoms"] for w in _TOKEN.findall(s)} for i in dbknow.load("issues")}
         df = Counter(w for ws in words.values() for w in ws)
@@ -1090,9 +1090,9 @@ def phrase(issue: dict, rnd: random.Random) -> str:
 
 
 def phrasings(seed: int, rnd: random.Random) -> list[dict]:
-    from app import dbknow
+    from app.products.dbaba import dbknow
     from app.agents.database import _sure
-    from app.dbknow import brain
+    from app.products.dbaba.dbknow import brain
 
     out = []
     for issue in dbknow.load("issues"):

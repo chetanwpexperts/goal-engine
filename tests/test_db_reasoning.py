@@ -7,7 +7,7 @@ import socket
 
 import pytest
 
-from app.dbknow import reasoning as R
+from app.products.dbaba.dbknow import reasoning as R
 from tests.fuzz import db_errors as gen
 from tests.test_ml import say
 

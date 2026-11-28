@@ -29,7 +29,7 @@ inside the script is also checked on its own by the usual checker. Returns {'fin
 import difflib
 import re
 
-from app.dbknow import engines as E
+from app.products.dbaba.dbknow import engines as E
 
 CONTROL = ("begin", "commit", "rollback", "rollback_to", "savepoint", "release", "set_txn", "autocommit", "lock", "unlock", "setting")
 NAME = r"[`\"]?([A-Za-z_][\w$]*)[`\"]?"

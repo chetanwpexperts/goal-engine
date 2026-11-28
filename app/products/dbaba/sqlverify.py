@@ -270,7 +270,7 @@ def judge(needs: list, sql: str, sch: dict) -> dict:
 
 def _family():
     from app.agents.sqlbasics import CHOSEN
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     return E.family(CHOSEN.get()) if CHOSEN.get() else None
 

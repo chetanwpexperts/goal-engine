@@ -73,7 +73,7 @@ def _own(eng) -> bool:
 
 
 def _name(eng) -> str:
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     return E.label(eng)
 

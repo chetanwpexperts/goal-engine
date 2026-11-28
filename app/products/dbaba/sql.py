@@ -235,7 +235,7 @@ def _owner(col: str, tables: list[Table]) -> tuple[Table | None, str]:
 
 
 def _notes_only(engine: str | None) -> bool:
-    from app.dbknow import engines as E
+    from app.products.dbaba.dbknow import engines as E
 
     return E.notes_only(engine)
 

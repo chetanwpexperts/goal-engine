@@ -137,7 +137,7 @@ WRONG = re.compile(r"I don't have a specific answer|paste (the|your|a) (sql )?qu
 
 @pytest.mark.parametrize("cid", ["query_to_excel", "group_by_capitals"])
 def test_concept_phrasings(client, ml_mode, cid):
-    from app.dbknow import concepts as K
+    from app.products.dbaba.dbknow import concepts as K
 
     c = K.by_id(cid)
     titles = set(c["title"].values())

@@ -3,7 +3,7 @@
 from sqlalchemy import select
 
 from app import learning
-from app.dbknow import brain
+from app.products.dbaba.dbknow import brain
 from app.domain.models import LearnedPhrase, LearnRequest, LearnVote
 
 PHRASE = "mera data ulta pulta ho gaya hai saare tables mein"

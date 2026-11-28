@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from app.ai.prompts import SYSTEM_PROMPT
 from app.ai.providers import GeminiProvider, GroqProvider, Provider, ProviderError
 from app.ai.schema import Interpretation
-from app.config import Settings
+from app.core.config import Settings
 
 
 logger = logging.getLogger(__name__)

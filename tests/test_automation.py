@@ -111,8 +111,8 @@ def test_full_flow_preview_verify_activate_and_run(client, ml_mode, fake_mail):
     on = client.post(f"/api/agents/{agent['id']}/activate").json()
     assert on["agents"][0]["status"] == "active" and on["agents"][0]["next_run_at"]
 
-    from app.db import get_db
-    from app.models import Agent
+    from app.core.db import get_db
+    from app.domain.models import Agent
     db = next(get_db())
     row = db.get(Agent, agent["id"])
     before = len(fake_mail.sent)
@@ -158,8 +158,8 @@ def test_daily_cap(client, ml_mode, fake_mail, monkeypatch):
     client.post(f"/api/agents/{agent_id}/preview", json={"inputs": {"csv_text": sheet()}})
     client.post("/api/owner/code", json={"email": "owner@shop.com"})
     client.post("/api/owner/verify", json={"code": re.search(r"\d{6}", fake_mail.sent[-1]["body"]).group(0)})
-    from app.db import get_db
-    from app.models import Agent
+    from app.core.db import get_db
+    from app.domain.models import Agent
     db = next(get_db())
     run = automation.run(db, db.get(Agent, agent_id), True, preview=False, mailer=fake_mail)
     result = __import__("json").loads(run.result)

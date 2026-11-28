@@ -29,8 +29,8 @@ def mail(monkeypatch):
     m = FakeMailer()
     monkeypatch.setattr(accounts, "_mailer", m)
     monkeypatch.setenv("APP_SECRET", "t" * 32)
-    from app.db import get_engine
-    from app.models import AuthAttempt
+    from app.core.db import get_engine
+    from app.domain.models import AuthAttempt
     from sqlalchemy import delete
     with get_engine().begin() as c:          # each test starts with fresh limits
         c.execute(delete(AuthAttempt))

@@ -2,11 +2,11 @@
 
 from sqlalchemy import select
 
-from app.db import get_db
+from app.core.db import get_db
 from app.ml.intent import IntentModel
 from app.ml.normalize import detect_language, normalize
 from app.ml.slots import INTENT_LABELS, extract_all
-from app.models import Message
+from app.domain.models import Message
 
 
 def say(client, text, goal_id=None):
@@ -186,7 +186,7 @@ def test_answer_to_a_different_question_is_not_forced_into_the_asked_slot(client
 
 
 def test_goal_from_ai_mode_without_type_does_not_crash(client, ml_mode):
-    from app.models import Goal
+    from app.domain.models import Goal
 
     say(client, "hello")  # creates the visitor cookie
     db = next(get_db())

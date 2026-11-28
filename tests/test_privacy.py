@@ -9,8 +9,8 @@ from sqlalchemy import func, select
 
 import app.main as main
 from app import privacy
-from app.db import get_db
-from app.models import (Agent, AgentRun, Connector, ConnectorJob, Goal, Message, OwnerContact, SentEmail, dumps, loads,
+from app.core.db import get_db
+from app.domain.models import (Agent, AgentRun, Connector, ConnectorJob, Goal, Message, OwnerContact, SentEmail, dumps, loads,
                         utcnow)
 from tests.test_automation import FakeMailer, sheet
 from tests.test_database import gc, pump, shop_db  # noqa: F401 - fixture

@@ -128,7 +128,7 @@ def new(now: float | None = None) -> dict:
 def check(db: Session, token: str, answer: str, now: float | None = None) -> None:
     """Raises CaptchaError unless the typed code fits the token, the token is fresh and it wasn't used before.
     Right or wrong, a token is spent by trying it: a wrong answer means a new picture."""
-    from app.models import AuthAttempt, utcnow
+    from app.domain.models import AuthAttempt, utcnow
 
     try:
         nonce, expires_s, sig = (token or "").split(".")

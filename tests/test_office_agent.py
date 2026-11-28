@@ -88,8 +88,8 @@ def test_files_are_private_and_cleaned(client, ml_mode):
     assert other.get(f"/api/office/files/{f['id']}").status_code == 400
     assert client.post("/api/office/files", json={"name": "virus.exe", "size": 10}).status_code == 400
     client.post("/api/privacy/delete-all")
-    from app.db import _SessionLocal
-    from app.models import OfficeFile
+    from app.core.db import _SessionLocal
+    from app.domain.models import OfficeFile
 
     with _SessionLocal() as db:
         assert db.query(OfficeFile).filter(OfficeFile.token == f["id"]).count() == 0
@@ -99,8 +99,8 @@ def test_old_files_removed_after_an_hour(client, ml_mode):
     from datetime import timedelta
 
     from app.agents import office_agent
-    from app.db import _SessionLocal
-    from app.models import OfficeFile, utcnow
+    from app.core.db import _SessionLocal
+    from app.domain.models import OfficeFile, utcnow
 
     r = say(client, "csv file mein duplicate hatane hain")
     agent = next(a for a in r["agents"] if a.get("office"))
@@ -118,8 +118,8 @@ def test_work_cut_off_by_a_restart_carries_on(client, ml_mode):
     from datetime import timedelta
 
     from app.agents import office_agent
-    from app.db import _SessionLocal
-    from app.models import OfficeFile, utcnow
+    from app.core.db import _SessionLocal
+    from app.domain.models import OfficeFile, utcnow
 
     r = say(client, "excel file ke formula check karo")
     agent = next(a for a in r["agents"] if a.get("office"))

@@ -51,7 +51,7 @@ def _open_area(client, mail, n):
 
 def _everything_stored() -> str:
     """Every value in every table of Goal Engine's own database, as one text."""
-    from app.db import get_engine
+    from app.core.db import get_engine
 
     eng = get_engine()
     out = []
@@ -63,8 +63,8 @@ def _everything_stored() -> str:
 
 
 def _age(connector_id: int, minutes: int):
-    from app.db import _SessionLocal
-    from app.models import Connector, utcnow
+    from app.core.db import _SessionLocal
+    from app.domain.models import Connector, utcnow
 
     with _SessionLocal() as db:
         c = db.get(Connector, connector_id)
@@ -73,8 +73,8 @@ def _age(connector_id: int, minutes: int):
 
 
 def _console_row():
-    from app.db import _SessionLocal
-    from app.models import Connector
+    from app.core.db import _SessionLocal
+    from app.domain.models import Connector
 
     with _SessionLocal() as db:
         return db.query(Connector).filter(Connector.token_hint == "console").order_by(Connector.id.desc()).first()
@@ -133,8 +133,8 @@ def test_connect_run_and_nothing_is_kept(client, locked, caplog):
     assert marker not in stored and "app pass" not in stored and "shopapp" not in stored
     assert stored.count("connector_jobs") == before_jobs
     assert marker not in caplog.text
-    from app.db import _SessionLocal
-    from app.models import ConnectorJob
+    from app.core.db import _SessionLocal
+    from app.domain.models import ConnectorJob
 
     with _SessionLocal() as db:
         assert db.query(ConnectorJob).count() == 0                     # no job rows at all: nothing queued, nothing saved
@@ -176,7 +176,7 @@ def test_only_one_read_only_statement_and_the_databases_own_error(client, locked
 @pytest.mark.skipif(not _up(3306), reason="needs local MySQL")
 def test_ten_idle_minutes_disconnect_and_typing_keeps_it(client, locked):
     from app import console
-    from app.db import _SessionLocal
+    from app.core.db import _SessionLocal
 
     _open_area(client, locked, 45)
     assert client.post("/api/console/connect", json=DB).status_code == 200
@@ -203,8 +203,8 @@ def test_disconnect_lock_and_logout_wipe_the_details(client, locked):
     assert client.post("/api/console/connect", json=DB).status_code == 200
     first = _console_row().id
     assert client.post("/api/console/connect", json=DB).status_code == 200       # one console connection at a time
-    from app.db import _SessionLocal
-    from app.models import Connector
+    from app.core.db import _SessionLocal
+    from app.domain.models import Connector
 
     with _SessionLocal() as db:
         assert db.get(Connector, first).secret is None
@@ -316,8 +316,8 @@ def test_asking_keeps_nothing(client, locked, caplog):
     marker = "zq-ask-marker-5512"
     r = client.post("/api/console/ask", json={"text": f"SELECT id FROM orders WHERE note = '{marker}' AND amount = NULL"})
     assert r.status_code == 200
-    from app.db import _SessionLocal
-    from app.models import Goal, LearnRequest, Message
+    from app.core.db import _SessionLocal
+    from app.domain.models import Goal, LearnRequest, Message
 
     stored = _everything_stored()
     assert marker not in stored and marker not in caplog.text

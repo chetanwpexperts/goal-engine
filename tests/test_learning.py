@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from app import learning
 from app.dbknow import brain
-from app.models import LearnedPhrase, LearnRequest, LearnVote
+from app.domain.models import LearnedPhrase, LearnRequest, LearnVote
 
 PHRASE = "mera data ulta pulta ho gaya hai saare tables mein"
 
@@ -45,7 +45,7 @@ def test_unknown_meaning_rejected(client):
 def test_none_of_these_goes_to_learning_list_scrubbed(client, monkeypatch):
     for n in range(2):
         _client_as(client, n).post("/api/learn/ask", json={"brain": "database", "text": "mongodb atlas se connect nahi ho raha ali@x.com", "guess": "do:health"})
-    from app.db import _SessionLocal
+    from app.core.db import _SessionLocal
 
     with _SessionLocal() as db:
         row = db.scalar(select(LearnRequest).where(LearnRequest.text.like("mongodb atlas%")))
@@ -62,7 +62,7 @@ def test_rejected_phrase_is_not_learned(client):
     label = "do:health"
     for n in range(3):
         _client_as(client, 10 + n).post("/api/learn/choice", json={"brain": "database", "text": text, "label": label})
-    from app.db import _SessionLocal
+    from app.core.db import _SessionLocal
 
     with _SessionLocal() as db:
         p = db.scalar(select(LearnedPhrase).where(LearnedPhrase.text == text))
@@ -73,7 +73,7 @@ def test_rejected_phrase_is_not_learned(client):
 def test_delete_all_removes_votes(client):
     c = _client_as(client, 99)
     c.post("/api/learn/choice", json={"brain": "database", "text": "kuch bhi alag sa sawaal hai yeh", "label": "do:health"})
-    from app.db import _SessionLocal
+    from app.core.db import _SessionLocal
     from app.privacy import fingerprint
 
     voter = fingerprint("learn:visitor-99-0000000000000000")

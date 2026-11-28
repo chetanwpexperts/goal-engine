@@ -150,8 +150,8 @@ def test_scheduled_report_emails_csv(client, ml_mode, shop_db, monkeypatch):
     res = client.post(f"/api/agents/{agent['id']}/db-report", json={"table": "orders", "every": "day", "at": "09:00"})
     assert res.status_code == 200 and "09:00" in res.json()["reply"]
 
-    from app.db import get_db
-    from app.models import Agent
+    from app.core.db import get_db
+    from app.domain.models import Agent
 
     gen = main.app.dependency_overrides.get(get_db, get_db)()
     s = next(gen)
@@ -247,8 +247,8 @@ def test_direct_end_to_end_with_real_mysql(client, ml_mode, monkeypatch):
     c = card["connector"]
     assert c["kind"] == "direct" and c["online"] and c["can_write"] is True and "orders" in [t["name"] for t in c["tables"]]
 
-    from app.db import get_db
-    from app.models import Connector
+    from app.core.db import get_db
+    from app.domain.models import Connector
     s = next(get_db())
     saved = s.get(Connector, c["id"]).secret
     assert "app pass" not in saved and "shopapp" not in saved

@@ -105,8 +105,8 @@ def test_daily_watch_and_scheduler(client, ml_mode, fake_web):
     agents = {a["recipe"]: a for a in watch["agents"]}
     assert agents["website_watch"]["status"] == "active" and agents["website_watch"]["next_run_at"]
 
-    from app.db import get_db
-    from app.models import Agent
+    from app.core.db import get_db
+    from app.domain.models import Agent
     db = next(get_db())
     agent = db.query(Agent).filter_by(recipe="website_watch").one()
     agent.next_run_at = datetime.utcnow() - timedelta(minutes=1)

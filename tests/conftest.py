@@ -59,8 +59,22 @@ def interpretation(**overrides):
     return base
 
 
+def _wait_for_file_workers(timeout: float = 60.0) -> None:
+    """A test that starts work on an uploaded file leaves a background worker thread running. Rebuilding the database
+    under it gives the next test's file the same id (1), and the old worker then changes that file ("This upload has
+    already finished"). So wait for every such worker before the database is rebuilt."""
+    import threading
+    import time
+
+    end = time.monotonic() + timeout
+    for t in list(threading.enumerate()):
+        if t is not threading.current_thread() and t.name.endswith("(_work)"):
+            t.join(max(0.0, end - time.monotonic()))
+
+
 @pytest.fixture()
 def fresh_db():
+    _wait_for_file_workers()
     engine = get_engine()
     Base.metadata.drop_all(engine)
     init_db()

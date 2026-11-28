@@ -8,11 +8,11 @@ from fastapi import FastAPI
 from app import accounts, console, dbarea, enquiry, privacy
 from app.ai.router import AIRouter
 from app.ml.brain import Brain
-from app.config import get_settings
-from app.db import init_db
+from app.core.config import get_settings
+from app.core.db import init_db
 from app.agents import automation
 from app.agents.core import AgentError, claim_due, run_agent
-from app.models import Goal, utcnow
+from app.domain.models import Goal, utcnow
 from app.services.db_reports import _run_db_report
 
 _last_maintenance = 0.0
@@ -21,7 +21,7 @@ _last_maintenance = 0.0
 def _scheduler(stop: threading.Event) -> None:
     """Runs daily agents when they're due. Safe with several workers (each run is claimed once)."""
     log = logging.getLogger("agent-scheduler")
-    from app.db import get_db as _get_db
+    from app.core.db import get_db as _get_db
 
     while not stop.wait(60):
         try:

@@ -21,8 +21,8 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app import accounts
-from app.db import get_db
-from app.models import Connector, ConnectorJob, DbConnectLog, User, UserSession, utcnow
+from app.core.db import get_db
+from app.domain.models import Connector, ConnectorJob, DbConnectLog, User, UserSession, utcnow
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -84,7 +84,7 @@ def guard(request: Request):
     user, sess = accounts.current_user(request), getattr(request.state, "user_session", None)
     if not enabled():
         return None if connect_open(user) else _locked_reply("soon")
-    from app.db import get_engine
+    from app.core.db import get_engine
 
     with Session(get_engine(), expire_on_commit=False) as db:
         st = state(db, user, sess)

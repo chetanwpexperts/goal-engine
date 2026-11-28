@@ -7,12 +7,12 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app import accounts, privacy
-from app.config import get_settings
+from app.core.config import get_settings
 from app.services.goals import InvalidMessage, all_goals, handle_message
 from app.ai.router import AIUnavailable
 from app.limits import LimitReached, usage_today
 from app.agents.core import agent_dict, goal_agents
-from app.models import Message
+from app.domain.models import Message
 from app.domain.schemas.chat import MessageIn, StatusIn
 from app.security.visitor import COOKIE
 from app.services.agents import _goal_hi

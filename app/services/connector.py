@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from app import accounts, dbarea
 from app.agents import database as dbagent, direct as dbagent_direct
-from app.models import dumps, loads
+from app.domain.models import dumps, loads
 from app.domain.schemas.connector import ConnectorIn, DirectIn
 from app.services.agents import own_agent, _agent_payload
 from app.services.urls import _public_base
@@ -53,7 +53,7 @@ async def connector_poll(request: Request, db: Session):
 
 async def connector_upload(job_id: int, request: Request, db: Session):
     """The connector streams an export here (gzip). Written to disk piece by piece, never held in memory."""
-    from app.models import ConnectorJob
+    from app.domain.models import ConnectorJob
 
     connector = await run_in_threadpool(_connector_from, request, db)
     job = await run_in_threadpool(db.get, ConnectorJob, job_id)

@@ -1,5 +1,5 @@
 """Coordinate working style persistence and rules."""
-from app.models import utcnow
+from app.domain.models import utcnow
 from app.data.mind import profile as storage
 from app.engine.mind import profile as rules
 from app.engine.mind.profile import STYLE_KEYS, STYLE_TTL, SESSION_TTL, HISTORY, update, add_pattern

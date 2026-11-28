@@ -1,7 +1,7 @@
 """Working style and conversation persistence."""
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
-from app.models import MindSession, VisitorStyle, dumps, loads, utcnow
+from app.domain.models import MindSession, VisitorStyle, dumps, loads, utcnow
 
 
 def load_session(db, goal_id):

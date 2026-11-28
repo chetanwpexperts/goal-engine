@@ -21,8 +21,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import enquiry, usage
-from app.db import get_db
-from app.models import (Agent, DbConnectLog, Enquiry, ExpertRequest, LearnedPhrase, LearnMiss, LearnRequest, Message,
+from app.core.db import get_db
+from app.domain.models import (Agent, DbConnectLog, Enquiry, ExpertRequest, LearnedPhrase, LearnMiss, LearnRequest, Message,
                         User, UserSession, utcnow)
 
 router = APIRouter(prefix="/api/admin")

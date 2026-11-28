@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from app import accounts
-from app.models import Agent
+from app.domain.models import Agent
 from app.domain.schemas.office import OfficeStartIn, OfficeFixIn, OfficeCompareIn
 from app.services.goals import own_goal
 

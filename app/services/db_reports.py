@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
 from app.agents import automation, database as dbagent
 from app.agents.mailer import SmtpMailer
-from app.models import Agent, Goal, Message, dumps, loads, utcnow
+from app.domain.models import Agent, Goal, Message, dumps, loads, utcnow
 from app.domain.schemas.db_jobs import DbReportIn
 from app.services.agents import own_agent, _goal_hi, _agent_payload
 
@@ -15,7 +15,7 @@ mailer = SmtpMailer
 
 def _run_db_report(db: Session, agent: Agent) -> None:
     from app.agents.spec import next_run
-    from app.models import Connector
+    from app.domain.models import Connector
 
     inputs = loads(agent.inputs, {}) or {}
     connector = db.get(Connector, inputs.get("connector_id") or 0)
@@ -50,7 +50,7 @@ def _after_db_job(db: Session, job) -> None:
         text = f"{title}\n\nRows: {rows}\nThe CSV file is attached (opens in Excel)."
         try:                                        # S3: the same rows as a workbook with a live pivot and its chart
             from app.agents import sqlexcel
-            from app.models import Connector
+            from app.domain.models import Connector
 
             info = sqlexcel.for_job(job, db.get(Connector, job.connector_id))
             with open(info["path"], "rb") as fh:

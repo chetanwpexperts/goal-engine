@@ -6,8 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config import Settings
-from app.models import UsageCounter
+from app.core.config import Settings
+from app.domain.models import UsageCounter
 
 
 class LimitReached(RuntimeError):

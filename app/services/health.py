@@ -1,7 +1,7 @@
 """Health response for the website."""
 
 from app.ai.router import AIRouter
-from app.config import get_settings
+from app.core.config import get_settings
 
 
 def health(router: AIRouter) -> dict:

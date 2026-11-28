@@ -26,9 +26,9 @@ from app.domain.schemas.accounts import (
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
-from app.db import get_db
-from app.models import AuthAttempt, EmailCode, User, UserSession, utcnow  # noqa: F401 - User used by main
+from app.core.config import get_settings
+from app.core.db import get_db
+from app.domain.models import AuthAttempt, EmailCode, User, UserSession, utcnow  # noqa: F401 - User used by main
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -234,7 +234,7 @@ def resolve(request: Request) -> None:
     token = request.cookies.get(SESSION_COOKIE, "")
     if not token:
         return
-    from app.db import get_engine
+    from app.core.db import get_engine
     from sqlalchemy.orm import Session as S
 
     with S(get_engine(), expire_on_commit=False) as db:

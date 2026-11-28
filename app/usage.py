@@ -8,7 +8,7 @@ from datetime import timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import UsageCounter, utcnow
+from app.domain.models import UsageCounter, utcnow
 
 NAMES = {"workspace_ask": "DBaba workspace: questions asked", "workspace_run": "DBaba workspace: queries run",
          "workspace_connect": "DBaba workspace: databases connected", "enquiry": "Enquiries sent"}

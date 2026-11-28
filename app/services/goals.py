@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.ai.prompts import build_user_prompt
 from app.ai.router import AIRouter
-from app.config import Settings
+from app.core.config import Settings
 from app.limits import release_ai_call, reserve_ai_call
 from app.agents.core import (YES_RE, AgentError, agent_dict, assign, goal_agents, inputs_from_text,
                              recipe_for, run_agent)
@@ -18,7 +18,7 @@ from app.engine.ml.brain import SKIP_RE, steps_text
 from app.engine.ml.registry import domain_of
 from app.engine.ml.normalize import normalize
 from app.engine.mind import route
-from app.models import Agent, Goal, Message, dumps, loads
+from app.domain.models import Agent, Goal, Message, dumps, loads
 
 logger = logging.getLogger(__name__)
 

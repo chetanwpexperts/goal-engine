@@ -5,7 +5,7 @@ import hmac
 from fastapi import APIRouter
 from fastapi.responses import FileResponse, Response
 
-from app.config import get_settings
+from app.core.config import get_settings
 from app.core.paths import STATIC
 from app.security.headers import ENQUIRY_CSP
 from app.security.site import PREVIEW_COOKIE, _preview_token, _site_open

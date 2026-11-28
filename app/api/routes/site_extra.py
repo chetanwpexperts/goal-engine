@@ -3,7 +3,7 @@ import hmac
 from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
-from app.config import get_settings
+from app.core.config import get_settings
 from app.core.paths import STATIC
 from app.security.admin import ADMIN_COOKIE, _admin_token, _is_admin
 from app.security.headers import CONSOLE_CSP

@@ -4,9 +4,11 @@
   --ink: #1B2340;
   --muted: #66708A;
   --line: #D5DBE7;
-  --signal: #F2A33A;
-  --signal-ink: #8A5300;
-  --signal-soft: #FCEBD2;
+  --signal: #F76707;
+  --signal-ink: #C2410C;
+  --signal-soft: #FFF1E3;
+  --grad: linear-gradient(100deg, #E8590C 0%, #F76707 55%, #FAB005 100%);   /* the brand: orange first, a little yellow */
+  --grad-hover: linear-gradient(100deg, #D9480F 0%, #E8590C 55%, #F59F00 100%);
   --ok: #1F8A7E;
   --ok-soft: #DDF1EE;
   --alert: #C8463B;
@@ -79,7 +81,8 @@ body[data-state="active"] .ghost::after { display: none; }
 .mic { border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
 .mic.listening { border-color: var(--signal); background: var(--signal-soft); animation: listen 1.4s ease-in-out infinite; }
 @keyframes listen { 50% { box-shadow: 0 0 0 8px rgba(242, 163, 58, .18); } }
-.send { border: 0; background: var(--ink); color: var(--paper); }
+.send { border: 0; background: var(--grad); color: #fff; }
+.send:hover { background: var(--grad-hover); }
 .send:disabled { opacity: .45; cursor: wait; }
 body[data-state="idle"] .mic, body[data-state="idle"] .send { width: 56px; height: 56px; }
 
@@ -165,7 +168,8 @@ body[data-state="active"]::after { content: ""; position: fixed; left: 0; right:
 .slot .msg-template { white-space: pre-wrap; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 8px 0 0; font-size: 14px; }
 .acts { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0 46px; }
 .btn { border: 1px solid var(--ink); background: transparent; color: var(--ink); border-radius: 999px; padding: 10px 18px; font-weight: 600; cursor: pointer; }
-.btn.solid { background: var(--ink); color: var(--paper); }
+.btn.solid { background: var(--grad); color: #fff; border-color: transparent; }
+.btn.solid:hover { background: var(--grad-hover); }
 .btn.go { background: var(--ok); border-color: var(--ok); color: #fff; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .note { margin: 10px 0 0 46px; font-size: 13px; color: var(--muted); }
@@ -571,7 +575,7 @@ body[data-state="idle"] .composer { padding: 8px 8px 8px 18px; gap: 10px; border
   background: var(--panel); box-shadow: none; }
 body[data-state="idle"] .composer:focus-within { border-color: var(--signal-ink); }
 body[data-state="idle"] .mic { background: var(--panel); border-color: var(--line); }
-body[data-state="idle"] .send { background: var(--ink); color: var(--paper); border-radius: 10px; box-shadow: none; }
+body[data-state="idle"] .send { background: var(--grad); color: #fff; border-radius: 10px; box-shadow: none; }
 body[data-state="idle"] #input, body[data-state="idle"] .ghost { font-size: clamp(16px, 1.3vw, 18px); }
 body[data-state="idle"] .ghost { color: #8C93A8; }
 
@@ -631,7 +635,7 @@ body[data-state="active"]::after { background: linear-gradient(rgba(244, 245, 25
 .trace li::before { transform: none; }
 body[data-state="active"] #input { background: #fff; border-color: #E2E5F3; box-shadow: 0 16px 36px -26px rgba(64, 72, 160, .5); }
 body[data-state="active"] #input:focus { border-color: #8E83F0; }
-body[data-state="active"] .send { background: linear-gradient(135deg, #5B5BF0, #7B4FE0); color: #fff; box-shadow: 0 10px 22px -10px rgba(91, 79, 230, .8); }
+body[data-state="active"] .send { background: var(--grad); color: #fff; box-shadow: 0 10px 22px -10px rgba(232, 89, 12, .7); }
 body[data-state="active"] .mic { background: #fff; border-color: #E2E5F3; }
 .machine .agent { background: rgba(255, 255, 255, .85); border: 1px solid #E4E7F5; border-radius: 20px; padding: 20px 22px;
   box-shadow: 0 22px 46px -34px rgba(64, 72, 160, .55); }
@@ -718,17 +722,17 @@ body[data-state="active"] .bar { background: linear-gradient(to bottom, var(--pa
 .found.folded details .f, .found.folded details .e { margin-top: 4px; }
 
 /* ---------------------------------------------------------------- talk to us (enquiry form, /enquiry) */
-.talk { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 15px; border-radius: 999px; background: var(--ink);
+.talk { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 15px; border-radius: 999px; background: var(--grad);
   color: var(--paper); font-weight: 700; font-size: 14px; text-decoration: none; margin-right: 4px; white-space: nowrap; }
 .talk svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
-.talk:hover { background: #2A3560; }
+.talk:hover { background: var(--grad-hover); }
 .talk:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
 .talk-cta { width: min(1140px, 100%); margin-top: 20px; padding: 22px clamp(18px, 3vw, 32px); border-radius: 22px; display: flex;
   align-items: center; justify-content: space-between; gap: 18px; background: #141A38; color: #fff; text-align: left; box-sizing: border-box; }
 .talk-cta h2 { margin: 0 0 4px; font-size: clamp(19px, 2vw, 24px); letter-spacing: -0.01em; }
 .talk-cta p { margin: 0; color: #C5CBE3; max-width: 62ch; line-height: 1.5; }
-.talk-btn { flex: none; background: var(--signal); color: #1B2340; font-weight: 800; text-decoration: none; border-radius: 999px; padding: 13px 24px; }
-.talk-btn:hover { background: #F7B65C; }
+.talk-btn { flex: none; background: var(--grad); color: #fff; font-weight: 800; text-decoration: none; border-radius: 999px; padding: 13px 24px; }
+.talk-btn:hover { background: var(--grad-hover); }
 .talk-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 body.typing .talk-cta { visibility: hidden; }
 @media (max-width: 640px) {
@@ -773,7 +777,8 @@ body[data-state="active"] .options { padding: 8px 10px; border-radius: 18px; bac
 /* ---------------------------------------------------------------- plain colours in the conversation too (no purple glow) */
 body[data-state="active"] { background: var(--paper); }
 body[data-state="active"]::after { background: linear-gradient(to top, var(--paper) 55%, rgba(238, 241, 246, 0)); }
-body[data-state="active"] .send, body[data-state="active"] .btn.solid { background: var(--ink); color: var(--paper); border-color: var(--ink); box-shadow: none; }
+body[data-state="active"] .send, body[data-state="active"] .btn.solid { background: var(--grad); color: #fff; border-color: transparent; box-shadow: none; }
+body[data-state="active"] .send:hover, body[data-state="active"] .btn.solid:hover { background: var(--grad-hover); }
 body[data-state="active"] #input { background: var(--panel); border-color: var(--line); box-shadow: none; }
 body[data-state="active"] #input:focus { border-color: var(--ink); }
 .turn-machine { background: var(--panel); border-color: var(--line); border-left-color: var(--signal); box-shadow: none; border-radius: 12px; }

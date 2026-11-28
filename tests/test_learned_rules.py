@@ -6,7 +6,7 @@ import random
 import re
 from pathlib import Path
 
-from app.agents import sqlcorrect
+from app.products.dbaba import sqlcorrect
 from tests.fuzz import db as dbfuzz
 
 RULES = json.loads((Path(__file__).parents[1] / "app" / "knowledge" / "sql_rules" / "learned.json").read_text())

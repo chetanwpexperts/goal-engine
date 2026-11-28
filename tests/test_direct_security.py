@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.agents import direct
+from app.products.shared import direct
 
 
 @pytest.fixture(autouse=True)

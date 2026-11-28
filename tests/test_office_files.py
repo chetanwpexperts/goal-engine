@@ -129,7 +129,7 @@ def test_same_word_different_capitals_is_found_and_fixed(tmp_path):
 
 
 def _hold_lane(q):
-    from app.agents.office_agent import _big_lane
+    from app.products.sheetu.office_agent import _big_lane
 
     _big_lane.acquire()
     q.put("held")
@@ -144,7 +144,7 @@ def test_one_big_file_at_a_time_across_processes():
     import multiprocessing as mp
     import time
 
-    from app.agents.office_agent import _big_lane
+    from app.products.sheetu.office_agent import _big_lane
 
     ctx = mp.get_context("spawn")
     q = ctx.Queue()

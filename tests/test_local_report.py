@@ -173,7 +173,7 @@ def test_tidy_mariadb_statement_text():
 def test_postgres_date_functions_block_the_index_whatever_the_value():
     """Found by S5 on pg_stat_statements text: EXTRACT / date_trunc / date_part around a column were missed when compared
     with a placeholder ($2), which is how every PostgreSQL driver sends values."""
-    from app.agents.sql import analyze_sql
+    from app.products.dbaba.sql import analyze_sql
 
     for q in ("SELECT * FROM t WHERE EXTRACT(YEAR FROM d) = $2", "SELECT * FROM t WHERE EXTRACT(YEAR FROM d) = 2025",
               "SELECT * FROM t WHERE date_trunc('month', d) = $1", "SELECT * FROM t WHERE date_part('year', d) = ?"):

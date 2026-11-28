@@ -673,7 +673,7 @@ def _agg_bug(seed, bug, rnd, schema, tables, t):
             truth, broken = base.format(f"COALESCE(SUM(c.{m}), 0)"), base.format(f"SUM(c.{m})")
             words = f"total {m} for every {parent['base']} row, 0 when it has none"
         else:
-            from app.agents.sqljoins import _fk
+            from app.products.dbaba.sqljoins import _fk
 
             if _fk(parent["name"]).replace("_", "") != fk["name"].lower().replace("_", ""):
                 return None                               # the words name the parent; its key column must follow the usual name
@@ -727,7 +727,7 @@ SUB_BUGS = {"exists_agg", "corr_self", "in_grouped_agg", "sub_columns", "sub_sum
 
 def _sub_bug(seed, bug, rnd, schema, tables, t):
     """Night 4: subquery mistakes on random real tables. truth = the statement the person meant."""
-    from app.agents.sqljoins import _base
+    from app.products.dbaba.sqljoins import _base
 
     links = [(c, x) for x in tables for c in x["cols"] if c["kind"] == "fk"]       # (fk column, child table)
     if not links:
@@ -1032,7 +1032,7 @@ def _sd_design(t, name, fam, types=None, names=None, extra=None, pk=True, fks=Tr
 def _schema_bug(seed, bug, rnd, schema, tables, t):
     """Night 6: a table design with one planted mistake, made from a random real table (same columns and data). truth = the
     design the person meant; its rows (the real table's, copied in) and its catalog (types, keys, indexes) are the answer."""
-    from app.agents import sqlschema as SS
+    from app.products.dbaba import sqlschema as SS
 
     if schema["style"] != "snake":
         return None                                      # the names must read the same on both engines
@@ -1220,7 +1220,7 @@ def _drop_ddl(eng, names):
 def _ddl_effect(eng, script, item):
     """What a design makes: its columns and types, primary key, indexes, foreign keys, engine and charset, and the real table's
     rows copied into it. ('refused', ...) when the design doesn't run."""
-    from app.agents.sqlroutine import split_script
+    from app.products.dbaba.sqlroutine import split_script
 
     name = item["table"]
     _drop_ddl(eng, item["drop"])
@@ -1261,7 +1261,7 @@ def _ddl_effect(eng, script, item):
 
 
 def _check_ddl(item, engines, res, tag) -> list[str]:
-    from app.agents import sqlcorrect
+    from app.products.dbaba import sqlcorrect
 
     bad = []
     if item["truth"] is not None:
@@ -1543,7 +1543,7 @@ def _speed_bug(seed, bug, rnd, schema, tables, t, wrap, stmt):
 def _check_keyset(item, engines, tag) -> list[str]:
     """Keyset gives the page OFFSET gives: the same query with a small OFFSET (the tables are small), rewritten by the same code,
     with the last row of the page before it put in place of the placeholders (what the app remembers)."""
-    from app.agents import sqlspeed
+    from app.products.dbaba import sqlspeed
 
     ks, pk, table = item["keyset"], item["schema"]["tables"][item["table"]]["pk"], item["table"]
     eng_word = {"postgresql": "postgresql", "mariadb": "mysql"}.get(item.get("engine") or "")
@@ -1648,7 +1648,7 @@ def _check_lock(item, engines, res, tag) -> list[str]:
     N+1: the combined statement returns / changes exactly what the separate ones did."""
     import re as _re
 
-    from app.agents import sqllock
+    from app.products.dbaba import sqllock
 
     pk, table = item["schema"]["tables"][item["table"]]["pk"], item["table"]
     bad = []
@@ -1715,9 +1715,11 @@ def _effect(eng, sql, table, pk):
 
 
 def check(item, engines: dict) -> list[str]:
-    from app.agents import sqlcorrect, sqlproject, sqlverify
+    from app.products.dbaba import sqlcorrect
+    from app.products.dbaba import sqlproject
+    from app.products.dbaba import sqlverify
 
-    from app.agents.sql import request_words, unwrap
+    from app.products.dbaba.sql import request_words, unwrap
 
     if item.get("project"):                       # night 10B: checked against the project's CREATE TABLE script
         res = sqlverify.check(unwrap(item["broken"]), sqlproject.from_text(item["project"]), intent=request_words(item["broken"]),
@@ -2200,7 +2202,7 @@ def _sqlite_bug(seed, bug, rnd, schema, tables, t):
     independently in SQLite's words (substr / julianday arithmetic rather than the rewrite's own form where one exists), run
     on SQLite (Python's sqlite3). Date columns are only used when their name says what they hold (a date-named column that
     holds times is a real ambiguity: DBaba writes date() for it and says datetime() keeps the time)."""
-    from app.agents.sqlport import _is_date
+    from app.products.dbaba.sqlport import _is_date
 
     pk, name = t["pk"], t["name"]
     col = lambda *kinds: [c["name"] for c in t["cols"] if c["kind"] in kinds]   # noqa: E731
@@ -2426,7 +2428,7 @@ def _sqlite2_bug(seed, bug, rnd, schema, tables, t):
     """E1 (SQLite) night 2. Designs: a new table in SQLite's words (the truth) and the same table as a person writes it from
     MySQL / PostgreSQL habits; the corrected script must make on SQLite exactly what the truth makes. Queries: a comparison
     across types on the practice data, the truth written independently in SQLite's words."""
-    from app.agents.sqlport import _is_date
+    from app.products.dbaba.sqlport import _is_date
 
     pk, name = t["pk"], t["name"]
     if bug in ("s2_strftime_eq", "s2_strftime_ge", "s2_strftime_text", "s2_date_unpadded", "s2_date_dmy", "s2_length_text"):
@@ -2787,7 +2789,7 @@ def _lite_ddl_effect(script: str, item) -> tuple:
 
 
 def _check_lite_ddl(item, res, tag) -> list[str]:
-    from app.agents import sqlcorrect
+    from app.products.dbaba import sqlcorrect
 
     bad = []
     tf = [f["title_en"] for f in sqlcorrect.check(item["truth"], engine="sqlite")["findings"] if f["kind"] in ("error", "wrong")]
@@ -2926,7 +2928,7 @@ def _project_bug(seed, bug, rnd, schema, tables, t, wrap, stmt):
         return item(broken, truth)
     if bug in ("ps_between_time", "ps_between_date"):
         want = "datetime" if bug == "ps_between_time" else "date"
-        from app.agents.sqlcorrect import TIME_COL
+        from app.products.dbaba.sqlcorrect import TIME_COL
 
         cols = [c for c in t["cols"] if c["kind"] == want and (want == "datetime" or TIME_COL.search(c["name"]))]
         if not cols:
@@ -2977,8 +2979,8 @@ def _classes(item, res, tag) -> list[str]:
     """Night 11: every finding says how sure it is, the planted one with its expected class, and the schema read from the query
     names only real tables and columns (a CTE / derived table is not a table; a bare column in a nested block may belong to
     an outer table, so that one only needs to be a column of one of the query's tables)."""
-    from app.agents import sqlconfidence as K
-    from app.agents.sql import unwrap
+    from app.products.dbaba import sqlconfidence as K
+    from app.products.dbaba.sql import unwrap
 
     sql = unwrap(item["broken"])
     K.annotate_findings(res["findings"], sql)
@@ -3242,7 +3244,7 @@ def _bigq_bug(seed, bug, rnd, schema, tables, t):
 
 def _struct_bug(seed, bug, rnd, schema, tables, t):
     """Night 13: structural mistakes (correlation, repeats, UNION, HAVING on a key, JOIN without ON) on random real tables."""
-    from app.agents.sqljoins import _fk
+    from app.products.dbaba.sqljoins import _fk
 
     engine = rnd.choice(["mariadb", "postgresql", None])
     pairs = [(schema["tables"][c["ref"]], x, c) for x in tables for c in x["cols"] if c["kind"] == "fk" and c.get("ref") != x["name"]]
@@ -3478,7 +3480,7 @@ def _proof_bug(seed, bug, rnd, schema, tables, t):
 def _check_proof(item, engines, res, tag) -> list[str]:
     """Night 14: the rewrite returns exactly the rows of the query as written (in the same order when it has a unique ORDER BY),
     on every running database; the refusals offer no swap."""
-    from app.agents import sqlproof
+    from app.products.dbaba import sqlproof
 
     bug, want = item["bug"], TOPIC[item["bug"]]
     bad = []

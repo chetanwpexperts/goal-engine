@@ -88,7 +88,7 @@ def make(seed: int):
 
 
 def check(item, eng) -> list[str]:
-    from app.agents import sqlcorrect
+    from app.products.dbaba import sqlcorrect
 
     res = sqlcorrect.check(item["broken"])
     topics = {f["topic"] for f in res["findings"]}

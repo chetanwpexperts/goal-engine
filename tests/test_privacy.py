@@ -42,7 +42,7 @@ def test_sent_log_keeps_no_addresses_and_run_details_expire(client, ml_mode, mai
     client.post("/api/owner/code", json={"email": "owner@shop.com", "business": "Shop"})
     client.post("/api/owner/verify", json={"code": re.search(r"\d{6}", mail.sent[-1]["body"]).group(0)})
     client.post(f"/api/agents/{agent['id']}/activate")
-    from app.agents import automation
+    from app.products.shared import automation
     s = session()
     a = s.get(Agent, agent["id"])
     automation.run(s, a, True, preview=False, mailer=mail)

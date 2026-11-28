@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from app.agents import sqlcorrect
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqlcorrect
+from app.products.dbaba.sql import analyze_sql
 from tests.fuzz import db as dbfuzz
 from tests.fuzz import sqlbugs
 

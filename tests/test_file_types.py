@@ -81,7 +81,7 @@ def test_not_an_excel_file_is_explained(client, ml_mode):
 def test_google_sheet_link_is_fetched_and_answered(client, ml_mode, tmp_path, monkeypatch):
     from openpyxl import Workbook
 
-    from app.agents import office_agent
+    from app.products.sheetu import office_agent
     from tests.test_office_agent import _wait
 
     wb = Workbook()
@@ -101,7 +101,7 @@ def test_google_sheet_link_is_fetched_and_answered(client, ml_mode, tmp_path, mo
 
 
 def test_private_google_sheet_says_how_to_share(client, ml_mode, monkeypatch):
-    from app.agents import office_agent
+    from app.products.sheetu import office_agent
 
     def private(sid):
         raise office_agent.OfficeAgentError("I can't open this Google Sheet: it isn't shared. In the sheet, click Share, set General access "

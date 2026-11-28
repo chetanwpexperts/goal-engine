@@ -502,7 +502,7 @@ def _same(item, got, want) -> bool:
 
 
 def check(item, engines) -> tuple[list[str], bool]:
-    from app.agents import sqlwrite
+    from app.products.dbaba import sqlwrite
 
     res = sqlwrite.build(item["request"], item["schema"])
     tag = f"{item['family']} ({item['lang']}) seed {item['seed']}"

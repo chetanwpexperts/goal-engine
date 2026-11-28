@@ -737,7 +737,7 @@ def _rows(eng: Engine, sql: str, q: Q, tables: list[str]):
 
 def check_query(item: dict, engines: dict, schema: dict) -> list[str]:
     """Every problem with the agent's answer for one generated query (empty = pass)."""
-    from app.agents.sql import analyze_sql, unwrap
+    from app.products.dbaba.sql import analyze_sql, unwrap
 
     bare, wrapped, q = item["sql"], item["wrapped"], item["q"]
     fails = []
@@ -802,7 +802,7 @@ def check_query(item: dict, engines: dict, schema: dict) -> list[str]:
 
 
 def _check_indexes(wrapped, eng: Engine, kind: str, schema: dict, item: dict) -> list[str]:
-    from app.agents.sql import analyze_sql
+    from app.products.dbaba.sql import analyze_sql
     from connector import goal_connector as gc
 
     fails = []
@@ -932,7 +932,7 @@ def _make_client():
 
 def followups(client, seed: int, sql_items: list[dict], rnd: random.Random) -> list[dict]:
     """One conversation: the slow-database message, a query pasted (maybe from code), then 4 random follow-ups."""
-    from app.agents.sql import analyze_sql, unwrap
+    from app.products.dbaba.sql import analyze_sql, unwrap
 
     selects = [i for i in sql_items if i["q"].kind == "select"] or sql_items
     item = rnd.choice(selects)
@@ -1091,7 +1091,7 @@ def phrase(issue: dict, rnd: random.Random) -> str:
 
 def phrasings(seed: int, rnd: random.Random) -> list[dict]:
     from app.products.dbaba import dbknow
-    from app.agents.database import _sure
+    from app.products.dbaba.database import _sure
     from app.products.dbaba.dbknow import brain
 
     out = []

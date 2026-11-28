@@ -125,7 +125,7 @@ def test_tables_without_primary_key_are_refused(db):
 # ---------------------------------------------------------------- through Goal Engine's API
 from datetime import timedelta  # noqa: E402
 
-from app.agents import direct  # noqa: E402
+from app.products.shared import direct  # noqa: E402
 from app.core.db import get_db  # noqa: E402
 from app.domain.models import ConnectorJob, utcnow  # noqa: E402
 from tests.test_ml import say  # noqa: E402

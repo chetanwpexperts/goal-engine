@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 import app.main as main
-from app.agents import database as dbagent
+from app.products.dbaba import database as dbagent
 from tests.test_ml import say
 
 _spec = importlib.util.spec_from_file_location("goal_connector", Path(__file__).resolve().parents[1] / "connector" / "goal_connector.py")
@@ -190,7 +190,7 @@ def test_installer_is_served_with_server_address(client):
 
 
 # ---------------------------------------------------------------- direct connection (typed on Goal Engine)
-from app.agents import direct  # noqa: E402
+from app.products.shared import direct  # noqa: E402
 
 
 def test_direct_refuses_private_addresses(client, monkeypatch):

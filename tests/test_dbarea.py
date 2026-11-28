@@ -23,7 +23,7 @@ def locked(monkeypatch, mail):
     monkeypatch.setenv("DB_AREA_LOCK", "on")
     monkeypatch.setenv("DIRECT_DB_ALLOW_PRIVATE", "1")
     monkeypatch.setenv("DIRECT_DB_SYNC", "1")
-    from app.agents import direct
+    from app.products.shared import direct
     direct._attempts.clear()
     return mail
 
@@ -103,7 +103,7 @@ def test_logout_wipes_typed_passwords(client, locked):
 
 
 def test_no_probing_many_servers(client, locked, monkeypatch):
-    from app.agents import direct
+    from app.products.shared import direct
 
     monkeypatch.setattr(direct, "public_ip", lambda host, port: (_ for _ in ()).throw(direct.DirectError("Couldn't find the server")))
     _verified(client, locked, 24)

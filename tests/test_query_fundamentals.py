@@ -5,8 +5,8 @@ this query do / ye query kya karti hai' with the reading and the fundamentals be
 import re
 from pathlib import Path
 
-from app.agents import sqlread
-from app.agents.sql import analyze_sql
+from app.products.dbaba import sqlread
+from app.products.dbaba.sql import analyze_sql
 from tests.test_ml import say, say_sql
 
 ROOT = Path(__file__).resolve().parents[1] / "app"

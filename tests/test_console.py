@@ -34,7 +34,7 @@ def locked(monkeypatch, mail):
     monkeypatch.setenv("DB_AREA_LOCK", "on")
     monkeypatch.setenv("DIRECT_DB_ALLOW_PRIVATE", "1")
     from app import console
-    from app.agents import direct
+    from app.products.shared import direct
 
     direct._attempts.clear()
     console._runs.clear()

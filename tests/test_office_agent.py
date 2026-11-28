@@ -98,7 +98,7 @@ def test_files_are_private_and_cleaned(client, ml_mode):
 def test_old_files_removed_after_an_hour(client, ml_mode):
     from datetime import timedelta
 
-    from app.agents import office_agent
+    from app.products.sheetu import office_agent
     from app.core.db import _SessionLocal
     from app.domain.models import OfficeFile, utcnow
 
@@ -117,7 +117,7 @@ def test_old_files_removed_after_an_hour(client, ml_mode):
 def test_work_cut_off_by_a_restart_carries_on(client, ml_mode):
     from datetime import timedelta
 
-    from app.agents import office_agent
+    from app.products.sheetu import office_agent
     from app.core.db import _SessionLocal
     from app.domain.models import OfficeFile, utcnow
 
@@ -138,9 +138,9 @@ def test_only_one_process_resumes(tmp_path):
     import subprocess
     import sys
 
-    code = ("from app.agents import office_agent as o; import pathlib; o.DATA = pathlib.Path(r'%s');"
+    code = ("from app.products.sheetu import office_agent as o; import pathlib; o.DATA = pathlib.Path(r'%s');"
             "print(o._resume_owner())") % tmp_path
-    from app.agents import office_agent as o
+    from app.products.sheetu import office_agent as o
     import fcntl
 
     tmp_path.mkdir(exist_ok=True)
@@ -261,7 +261,7 @@ def test_formula_requests_get_a_formula_for_their_sheet(client, ml_mode):
 
 
 def test_files_too_big_for_the_ram_are_refused_before_upload(client, ml_mode):
-    from app.agents import office_agent as oa
+    from app.products.sheetu import office_agent as oa
     r = say(client, "excel file ke formula check karo")
     agent = next(a for a in r["agents"] if a.get("office"))
     mb = 1024 * 1024

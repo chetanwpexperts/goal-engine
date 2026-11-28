@@ -118,7 +118,7 @@ def test_old_exports_are_cleaned(tmp_path, monkeypatch):
     import os
     import time
 
-    from app.agents import database as dbagent
+    from app.products.dbaba import database as dbagent
 
     monkeypatch.setattr(dbagent, "EXPORT_DIR", tmp_path)
     old = [tmp_path / "job_1_ab.csv.gz", tmp_path / "job_1_ab.csv.gz.0123456789.xlsx"]

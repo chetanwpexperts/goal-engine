@@ -30,6 +30,8 @@ from app.core.config import get_settings
 from app.core.db import get_db
 from app.domain.models import AuthAttempt, EmailCode, User, UserSession, utcnow  # noqa: F401 - User used by main
 
+from app.security.audit import record as audit_record
+
 log = logging.getLogger(__name__)
 router = APIRouter()
 
@@ -210,6 +212,7 @@ def _start_session(db: Session, user: User, request: Request, response: Response
     db.add(UserSession(user_id=user.id, token_hash=_token_hash(token), expires_at=now + timedelta(days=SESSION_DAYS),
                        ip=client_ip(request)))
     user.last_login_at = now
+    audit_record(db, f"account:{user.id}", "login", "account", client_ip(request))
     db.commit()
     response.set_cookie(SESSION_COOKIE, token, max_age=SESSION_DAYS * 86400, httponly=True, samesite="lax",
                         secure=get_settings().cookie_secure)
@@ -360,7 +363,13 @@ WRONG_LOGIN = "Wrong email/username or password."
 @router.post("/api/account/login")
 def login(body: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
     try:
-        _limit(db, "login-ip", client_ip(request))
+        try:
+            _limit(db, "login-ip", client_ip(request))
+        except AccountError as exc:
+            if exc.status == 429:
+                audit_record(db, "anonymous", "login_lockout", "account", client_ip(request))
+                db.commit()
+            raise
         who = body.login.strip().lower()
         user = db.scalar(select(User).where(or_(User.email == who, User.username == who))) if who else None
         if user is None:
@@ -375,6 +384,7 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
             user.failed_logins = (user.failed_logins or 0) + 1
             if user.failed_logins >= LOCK_AFTER:
                 user.locked_until, user.failed_logins = now + LOCK_FOR, 0
+                audit_record(db, f"account:{user.id}", "login_lockout", "account", client_ip(request))
             db.commit()
             raise AccountError(WRONG_LOGIN, 401)
         user.failed_logins, user.locked_until = 0, None
@@ -403,6 +413,7 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
         if sess is not None:
             dbarea.lock(db, sess)                 # typed database passwords go with the session
         db.execute(delete(UserSession).where(UserSession.id == s.id))
+        audit_record(db, f"account:{s.user_id}", "logout", "account", client_ip(request))
         db.commit()
     response.delete_cookie(SESSION_COOKIE)
     _new_guest_cookie(response)
@@ -454,11 +465,13 @@ def reset(body: ResetIn, request: Request, response: Response, db: Session = Dep
         return _err(exc)
 
 
-def delete_account(db: Session, user_id: int) -> int:
+def delete_account(db: Session, user_id: int, ip: str = "") -> int:
     """'Delete all my data' while logged in: the account goes too (its chats were removed with the visitor id)."""
     for model in (UserSession, EmailCode):
         db.execute(delete(model).where(model.user_id == user_id))
     n = db.execute(delete(User).where(User.id == user_id)).rowcount
+    if n:
+        audit_record(db, f"account:{user_id}", "account_delete", "account", ip)
     db.commit()
     return n
 

@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
 from datetime import timedelta
 from app.security.admin import _is_admin
+from app.security.audit import record
 from app.core.redact import scrub
 from app.core.text import normalize, fingerprint
 from app.engine import learning as rules
@@ -39,6 +40,8 @@ def admin_learning(request: Request, status: str, db: Session):
 def admin_learning_set(kind: str, item_id: int, body: LearnStatusIn, request: Request, db: Session):
     if not _is_admin(request) or not set_status(db, kind, item_id, body.status):
         raise HTTPException(404, "Not Found")
+    record(db, "admin", "admin_action", f"learning:{item_id}", request.client.host if request.client else "")
+    db.commit()
     return {"ok": True}
 
 

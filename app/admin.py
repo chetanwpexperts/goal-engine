@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app import enquiry, usage
 from app.core.db import get_db
+from app.security.audit import record
 from app.domain.models import (Agent, DbConnectLog, Enquiry, ExpertRequest, LearnedPhrase, LearnMiss, LearnRequest, Message,
                         User, UserSession, utcnow)
 
@@ -158,6 +159,7 @@ def enquiry_update(eid: int, body: EnquiryUpdate, request: Request, db: Session 
         e.status = body.status
     if body.note is not None:
         e.note = body.note.strip()[:4000]
+    record(db, "admin", "admin_action", f"enquiries:{eid}", request.client.host if request.client else "")
     db.commit()
     return enquiry.as_dict(e)
 
@@ -170,6 +172,7 @@ def enquiry_delete(eid: int, request: Request, db: Session = Depends(get_db)):
     if e is None:
         raise HTTPException(404, "Not Found")
     db.delete(e)
+    record(db, "admin", "admin_action", f"enquiries:{eid}", request.client.host if request.client else "")
     db.commit()
     return {"ok": True}
 
@@ -253,6 +256,7 @@ def miss_update(mid: int, body: MissUpdate, request: Request, db: Session = Depe
     if m is None or body.status not in ("new", "learned", "ignored"):
         raise HTTPException(404, "Not Found")
     m.status = body.status
+    record(db, "admin", "admin_action", f"learning:{mid}", request.client.host if request.client else "")
     db.commit()
     return {"ok": True}
 

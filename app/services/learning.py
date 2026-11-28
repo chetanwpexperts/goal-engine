@@ -34,7 +34,10 @@ def learn_ask(body: LearnAskIn, db: Session):
 def admin_learning(request: Request, status: str, db: Session):
     if not _is_admin(request):
         raise HTTPException(404, "Not Found")
-    return overview(db, status)
+    result = overview(db, status)
+    record(db, "admin", "admin_action", "learning", request.client.host if request.client else "")
+    db.commit()
+    return result
 
 
 def admin_learning_set(kind: str, item_id: int, body: LearnStatusIn, request: Request, db: Session):

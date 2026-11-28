@@ -27,7 +27,10 @@ def my_expert_requests(db: Session, visitor: str):
 def admin_requests(request: Request, status: str, db: Session):
     if not _is_admin(request):
         raise HTTPException(404, "Not Found")
-    return {"requests": expert.all_requests(db, status)}
+    result = {"requests": expert.all_requests(db, status)}
+    record(db, "admin", "admin_action", "expert_requests", request.client.host if request.client else "")
+    db.commit()
+    return result
 
 
 def admin_update(req_id: int, body: ExpertUpdate, request: Request, db: Session):

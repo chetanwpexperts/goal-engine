@@ -63,6 +63,8 @@ def _per_day(stamps, n: int = DAYS) -> list[int]:
 @router.get("/overview")
 def overview(request: Request, db: Session = Depends(get_db)):
     _admin(request)
+    record(db, "admin", "admin_action", "admin", request.client.host if request.client else "")
+    db.commit()
     since = utcnow() - timedelta(days=DAYS)
     week = utcnow() - timedelta(days=7)
     days = _days()
@@ -113,6 +115,8 @@ def overview(request: Request, db: Session = Depends(get_db)):
 @router.get("/users")
 def users(request: Request, db: Session = Depends(get_db)):
     _admin(request)
+    record(db, "admin", "admin_action", "account", request.client.host if request.client else "")
+    db.commit()
     rows = db.scalars(select(User).order_by(User.created_at.desc()).limit(500)).all()
     vids = [u.visitor_id for u in rows]
     ids = [u.id for u in rows]
@@ -142,6 +146,8 @@ def users(request: Request, db: Session = Depends(get_db)):
 @router.get("/enquiries")
 def enquiries(request: Request, status: str = "", db: Session = Depends(get_db)):
     _admin(request)
+    record(db, "admin", "admin_action", "enquiries", request.client.host if request.client else "")
+    db.commit()
     q = select(Enquiry).order_by(Enquiry.created_at.desc()).limit(500)
     if status:
         q = q.where(Enquiry.status == status)
@@ -235,6 +241,8 @@ def knowledge() -> dict:
 @router.get("/knowledge")
 def knowledge_view(request: Request, db: Session = Depends(get_db)):
     _admin(request)
+    record(db, "admin", "admin_action", "learning", request.client.host if request.client else "")
+    db.commit()
     misses = db.scalars(select(LearnMiss).where(LearnMiss.status == "new")
                         .order_by(LearnMiss.count.desc(), LearnMiss.last_seen.desc()).limit(100)).all()
     asked = db.scalars(select(LearnRequest).where(LearnRequest.status == "new")
@@ -262,7 +270,7 @@ def miss_update(mid: int, body: MissUpdate, request: Request, db: Session = Depe
 
 
 @router.post("/knowledge/try")
-def try_dbaba(body: TryIn, request: Request):
+def try_dbaba(body: TryIn, request: Request, db: Session = Depends(get_db)):
     """Test box: DBaba's answer to anything, exactly as the workspace would give it (no database connected). Not kept."""
     from app import console
 
@@ -271,4 +279,6 @@ def try_dbaba(body: TryIn, request: Request):
     if not text:
         raise HTTPException(400, "Type something")
     blocks, engine = console.answer(text, None)
+    record(db, "admin", "admin_action", "learning", request.client.host if request.client else "")
+    db.commit()
     return {"blocks": blocks, "engine": engine}

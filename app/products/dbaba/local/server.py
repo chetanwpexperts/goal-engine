@@ -40,6 +40,7 @@ from app.products.dbaba.local import dbconn, tunnel
 from app.products.dbaba.local.config import ENGINES, Config
 from app.products.dbaba.local.jobs import Jobs
 from app.security.permissions import require
+from app.security.audit import record_local
 
 STATIC = Path(__file__).resolve().parents[3] / "static"
 COOKIE = "dbaba_session"
@@ -103,6 +104,10 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         if token_ok(req):
             return "token"
         return None
+
+    def audit(req: Request, action: str, target: str, actor: str | None = None):
+        actor = actor or {"key": "api_key", "session": "local_screen", "token": "local_setup"}.get(who(req), "anonymous")
+        record_local(cfg.data_dir, actor, action, target, client_ip(req))
 
     # Route-specific credential alternatives preserve the original contract.
     def route_permission(req: Request, perm: str):
@@ -218,17 +223,21 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         pw = data.get("password") if isinstance(data.get("password"), str) else ""
         if len(pw) > 4096 or not cfg.check_password(pw):
             tries.append(now)
+            if len(tries) == LOGIN_TRIES:
+                audit(req, "login_lockout", "screen", "anonymous")
             return err(401, "That password isn't right.")
         st.fails.pop(ip, None)
         tok = secrets.token_urlsafe(32)
         st.sessions[tok] = now + SESSION_IDLE
+        audit(req, "login", "screen", "local_screen")
         resp = JSONResponse({"ok": True})
         resp.set_cookie(COOKIE, tok, httponly=True, samesite="strict", secure=req.url.scheme == "https", max_age=SESSION_IDLE)
         return resp
 
     @app.post("/api/logout", dependencies=[Depends(require("public"))])
     def logout(req: Request):
-        st.sessions.pop(req.cookies.get(COOKIE), None)
+        if st.sessions.pop(req.cookies.get(COOKIE), None) is not None:
+            audit(req, "logout", "screen", "local_screen")
         resp = JSONResponse({"ok": True})
         resp.delete_cookie(COOKIE)
         return resp
@@ -327,6 +336,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             if data.get("accept"):
                 if not await run_in_threadpool(tunnel.trust, ssh, kh, data["accept"]):
                     return {"ok": False, "reason": "The server didn't offer a key with that fingerprint just now. Check it again."}
+                audit(req, "settings_change", "settings")
                 return {"ok": True, "trusted": True, "keys": []}
             if await run_in_threadpool(tunnel.trusted, ssh, kh):
                 return {"ok": True, "trusted": True, "keys": []}
@@ -373,6 +383,10 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             d["setup_done"] = True
         cfg.update(apply)
         key = cfg.new_api_key("desktop" if kind == "token" else "screen")
+        actor = "local_setup" if kind == "token" else "local_screen"
+        audit(req, "settings_change", "setup", actor)
+        audit(req, "database_change", "database", actor)
+        audit(req, "api_key_create", "api_key", actor)
         st.token = None
         jobs.connected = True
         threading.Thread(target=jobs.health, daemon=True, name="dbaba-first-health").start()
@@ -411,6 +425,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
                 new.pop("ssh", None)
             d["database"] = new
         cfg.update(apply)
+        audit(req, "database_change", "database")
         jobs.connected = True
         out = {"ok": True, "version": res["version"]}
         if res.get("warning"):
@@ -432,6 +447,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         if not isinstance(name, str) or not re.fullmatch(r"[\w .-]{1,40}", name.strip()):
             return err(400, "Give the key a short name (letters, digits, space, . - _).")
         key = cfg.new_api_key(name.strip())
+        audit(req, "api_key_create", "api_key")
         return {"api_key": key, "keys": cfg.list_api_keys()}
 
     @app.post("/api/keys/{kid}/revoke", dependencies=[Depends(require("local_screen"))])
@@ -440,6 +456,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
             return err(401, "Log in on the screen to revoke an API key.")
         if not re.fullmatch(r"[0-9a-f]{12}", kid) or not cfg.revoke_api_key(kid):
             return err(404, "No such key")
+        audit(req, "api_key_revoke", "api_key")
         return {"ok": True, "keys": cfg.list_api_keys()}
 
     @app.post("/api/setup/reset", dependencies=[Depends(require("api_key"))])
@@ -447,6 +464,7 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         if not need(req, "key", "session"):
             return err(401, "Log in first.")
         cfg.update(lambda d: d.__setitem__("setup_done", False))
+        audit(req, "settings_change", "setup")
         st.token = secrets.token_urlsafe(24)
         st.announce(f"DBABA-SETUP-TOKEN {st.token}")
         return {"ok": True}
@@ -495,7 +513,9 @@ def make_app(config_path: str, port: int = 8765, setup_token: str | None = None,
         if not isinstance(data.get("enabled"), bool) or (at is not None and not (isinstance(at, str) and TIME_RX.match(at))):
             return err(400, "Send {\"enabled\": true|false, \"at\": \"HH:MM\" or null}")
         try:
-            return jobs.change(jid, data["enabled"], at)
+            result = jobs.change(jid, data["enabled"], at)
+            audit(req, "settings_change", "jobs")
+            return result
         except KeyError:
             return err(404, "No such job")
 

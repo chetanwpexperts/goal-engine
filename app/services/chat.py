@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 from app import accounts, privacy
 from app.config import get_settings
-from app.engine import InvalidMessage, all_goals, handle_message
+from app.services.goals import InvalidMessage, all_goals, handle_message
 from app.ai.router import AIUnavailable
 from app.limits import LimitReached, usage_today
 from app.agents.core import agent_dict, goal_agents

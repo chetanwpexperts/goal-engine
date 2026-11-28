@@ -83,3 +83,26 @@ def test_local_permissions(tmp_path):
         assert client.get("/permission/local_screen").status_code == 401
     with TestClient(app, base_url=base, client=("192.0.2.1", 50000)) as remote:
         assert remote.get("/permission/local_setup", headers={"X-DBaba-Setup": token}).status_code == 401
+
+
+def test_local_route_permission_alternatives(tmp_path):
+    import time
+
+    token = secrets.token_urlsafe(32)
+    app = make_app(str(tmp_path / "dbaba.json"), setup_token=token, announce=lambda _: None)
+    key = app.state.cfg.new_api_key("Test")
+    session = secrets.token_urlsafe(32)
+    app.state.sessions[session] = time.time() + SESSION_IDLE
+    with TestClient(app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 50000)) as client:
+        assert client.get("/api/report").json() == {"error": "Log in first."}
+        assert client.get("/api/state", headers={"X-DBaba-Setup": token}).status_code == 200
+        assert client.get("/api/report", headers={"X-DBaba-Setup": token}).status_code == 401
+        headers = {"Authorization": "Bearer " + key}
+        assert client.get("/api/report", headers=headers).status_code == 200
+        assert client.post("/api/keys", headers=headers, json={"name": "Test"}).status_code == 401
+        client.cookies.set(COOKIE, session)
+        assert client.get("/api/report").status_code == 200
+        assert client.post("/api/keys", json={"name": "Test"}).status_code == 200
+        client.cookies.clear()
+        app.state.cfg.update(lambda d: d.__setitem__("setup_done", True))
+        assert client.post("/api/setup/test", json={}).status_code == 409

@@ -23,6 +23,8 @@ from pathlib import Path
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from app.core.redact import scrub, scrub_detail
+
 from app.models import (Agent, AgentRun, Connector, ConnectorJob, ExpertRequest, Goal, Message, OwnerContact, SentEmail, UsageCounter,
                         dumps, loads, utcnow)
 

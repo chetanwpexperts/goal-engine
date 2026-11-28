@@ -31,7 +31,7 @@
     ["One-click fixes you can always undo", "Nightly backups that are actually test-restored", "Alerts before a small problem becomes a 3 a.m. outage"].forEach(function (t) {
       list.appendChild(el("li", null, t));
     });
-    var p3 = el("p", "bn-text", "No ChatGPT or outside AI is used: Goal Engine runs on its own models, so your data stays here. If something looks wrong, tell us; it gets fixed fast.");
+    var p3 = el("p", "bn-text", "No outside AI is used: Goal Engine runs on its own models, so your data stays here. If something looks wrong, tell us; it gets fixed fast.");
 
     var row = el("div", "bn-row");
     var go = el("button", "bn-go", "Start exploring");

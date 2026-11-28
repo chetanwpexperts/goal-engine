@@ -1,7 +1,7 @@
 """Remaining website pages and public status routes."""
 import hmac
 from pathlib import Path
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import FileResponse, JSONResponse, Response
 from app.core.config import get_settings
 from app.core.paths import STATIC
@@ -9,10 +9,12 @@ from app.security.admin import ADMIN_COOKIE, _admin_token, _is_admin
 from app.security.headers import CONSOLE_CSP
 from app.services.urls import _public_base
 ADMIN_CSP = CONSOLE_CSP
+from app.security.permissions import require
+
 router = APIRouter()
 
 
-@router.get("/admin")
+@router.get("/admin", dependencies=[Depends(require("public"))])
 def admin_page(request: Request, key: str = "") -> Response:
     from fastapi.responses import RedirectResponse
 
@@ -30,18 +32,18 @@ def admin_page(request: Request, key: str = "") -> Response:
                                                         "Referrer-Policy": "no-referrer"})
 
 
-@router.get("/connector/install.sh")
+@router.get("/connector/install.sh", dependencies=[Depends(require("public"))])
 def connector_installer(request: Request) -> Response:
     text = (STATIC.parent.parent / "connector" / "install.sh").read_text()
     return Response(text.replace("__SERVER__", _public_base(request)), media_type="text/x-shellscript")
 
 
-@router.get("/connector/goal_connector.py")
+@router.get("/connector/goal_connector.py", dependencies=[Depends(require("public"))])
 def connector_script() -> FileResponse:
     return FileResponse(STATIC.parent.parent / "connector" / "goal_connector.py", media_type="text/x-python")
 
 
-@router.get("/console", include_in_schema=False)
+@router.get("/console", include_in_schema=False, dependencies=[Depends(require("public"))])
 def console_page() -> FileResponse:
     """The SQL console: its own page, its own strict rules (no other site's code, no framing, nothing cached)."""
     return FileResponse(STATIC / "console.html", headers={"Content-Security-Policy": CONSOLE_CSP, "X-Frame-Options": "DENY",
@@ -49,7 +51,7 @@ def console_page() -> FileResponse:
                                                           "X-Robots-Tag": "noindex, nofollow"})
 
 
-@router.get("/api/known")
+@router.get("/api/known", dependencies=[Depends(require("public"))])
 def known() -> dict:
     """How many problems, errors, questions and fixes the agents know (grows every night)."""
     import glob
@@ -67,7 +69,7 @@ def known() -> dict:
     return {"fixes": n}
 
 
-@router.get("/api/status")
+@router.get("/api/status", dependencies=[Depends(require("public"))])
 def live_status():
     """Home screen: one quiet line that the agents are up."""
     return {"online": True}

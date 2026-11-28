@@ -8,24 +8,26 @@ from app.domain.schemas.expert import ExpertIn, ExpertUpdate
 from app.security.visitor import visitor_id
 from app.services import expert
 
+from app.security.permissions import require
+
 router = APIRouter()
 
 
-@router.post("/api/expert")
+@router.post("/api/expert", dependencies=[Depends(require("visitor"))])
 def ask_expert(body: ExpertIn, request: Request, db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     return expert.ask_expert(body, request, db, visitor)
 
 
-@router.get("/api/expert")
+@router.get("/api/expert", dependencies=[Depends(require("visitor"))])
 def my_expert_requests(db: Session = Depends(get_db), visitor: str = Depends(visitor_id)):
     return expert.my_expert_requests(db, visitor)
 
 
-@router.get("/api/admin/requests")
+@router.get("/api/admin/requests", dependencies=[Depends(require("admin"))])
 def admin_requests(request: Request, status: str = "", db: Session = Depends(get_db)):
     return expert.admin_requests(request, status, db)
 
 
-@router.post("/api/admin/requests/{req_id}")
+@router.post("/api/admin/requests/{req_id}", dependencies=[Depends(require("admin"))])
 def admin_update(req_id: int, body: ExpertUpdate, request: Request, db: Session = Depends(get_db)):
     return expert.admin_update(req_id, body, request, db)

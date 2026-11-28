@@ -199,7 +199,7 @@ def _score(c: dict, t: str) -> int:
 
 def _is_work(text: str) -> bool:
     """A pasted query, a pasted error, or a complaint about their own query/database: the checker's or diagnoser's job."""
-    from app.agents.core import query_in
+    from app.products.shared.core import query_in
 
     if query_in(text) or re.search(r"\bselect\b[\s\S]+\bfrom\b|\b(update|delete\s+from|insert\s+into)\b\s+[`\"]?\w+[`\"]?\s+(set|where|values)\b",
                                    text or "", re.I):

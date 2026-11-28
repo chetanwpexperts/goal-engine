@@ -7,7 +7,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from app import accounts, dbarea
-from app.agents import database as dbagent, direct as dbagent_direct
+from app.products.dbaba import database as dbagent
+from app.products.shared import direct as dbagent_direct
 from app.domain.models import dumps, loads
 from app.domain.schemas.connector import ConnectorIn, DirectIn
 from app.services.agents import own_agent, _agent_payload

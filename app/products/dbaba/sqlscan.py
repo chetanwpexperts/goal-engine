@@ -15,7 +15,7 @@ with the language's concatenation, and keeps a string only when it has a real SQ
 Placeholders (?, :name, $1, %s, %(name)s, %d) are values. Each finding is reported as file:line with the corrected query.
 Nothing is ever written to the project.
 
-Run: python -m app.agents.sqlscan check <folder> [--engine mysql|mariadb|postgresql]   (or: scripts/dbaba check <folder>)
+Run: python -m app.products.dbaba.sqlscan check <folder> [--engine mysql|mariadb|postgresql]   (or: scripts/dbaba check <folder>)
 """
 
 import contextvars
@@ -901,7 +901,8 @@ PROJECT: contextvars.ContextVar = contextvars.ContextVar("dbaba_project_schema",
 
 
 def _run_check(sql: str, engine: str | None) -> dict:
-    from app.agents import sqlcorrect, sqlverify
+    from app.products.dbaba import sqlcorrect
+    from app.products.dbaba import sqlverify
 
     try:
         sch = PROJECT.get()
@@ -1022,7 +1023,7 @@ def _finish(path, line, sql, asm, res, mine, engine, driver: str = "?", wp: bool
     order = {"error": 0, "wrong": 1, "check": 2}
     fs.sort(key=lambda f: order.get(f["kind"], 3))
     try:                                               # every finding names the fundamental it breaks
-        from app.agents import sqlread
+        from app.products.dbaba import sqlread
 
         funds = sqlread.fundamentals()["fundamentals"]
         for f in fs:
@@ -1143,7 +1144,7 @@ def _format_pieces(pieces: list, kind: str, label: str = "") -> list:
 
 
 def _scan_sql_file(path: str, text: str, engine: str | None) -> list[Found]:
-    from app.agents.sqlroutine import split_script
+    from app.products.dbaba.sqlroutine import split_script
 
     out, cur = [], 0
     for stmt in split_script(text):
@@ -1179,7 +1180,7 @@ def scan(root: str, engine: str | None = None) -> dict:
     how = "named" if engine else ""
     if not engine:
         engine, how = detect_engine(root) if os.path.isdir(root) else (None, "")
-    from app.agents import sqlproject
+    from app.products.dbaba import sqlproject
 
     sch = sqlproject.read_project(root) if os.path.isdir(root) else sqlproject.empty()
     token = PROJECT.set(sch)
@@ -1263,7 +1264,8 @@ def report_text(rep: dict, lang: str = "en") -> str:
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "schema":                  # the schema the project's files create, as DBaba read it
-        from app.agents import sqlproject, sqlverify
+        from app.products.dbaba import sqlproject
+        from app.products.dbaba import sqlverify
 
         if len(argv) < 2:
             print("usage: dbaba schema <folder> [--json]")

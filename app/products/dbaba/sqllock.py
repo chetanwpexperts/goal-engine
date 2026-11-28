@@ -39,7 +39,7 @@ NAME = r"[`\"]?[A-Za-z_][\w$]*[`\"]?(?:\.[`\"]?[A-Za-z_][\w$]*[`\"]?)?"
 
 
 def _C():
-    from app.agents import sqlcorrect as C
+    from app.products.dbaba import sqlcorrect as C
 
     return C
 
@@ -54,13 +54,13 @@ def _short(t: str, n: int = 90) -> str:
 
 
 def _engine(sql: str):
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.engine_seen(sql)
 
 
 def _says(key: str, eng) -> str:
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     if eng:
         return sqlbasics.rules(eng).get(key, {}).get("says", "")
@@ -299,8 +299,8 @@ def n_plus_one(text: str) -> dict | None:
 def lock_fit(query: str, extra: str, eng=None) -> list[dict]:
     """With the structure pasted: an UPDATE / DELETE / SELECT ... FOR UPDATE whose WHERE has no usable index. MySQL/MariaDB lock
     every row the search reads (the whole table); PostgreSQL only reads it all."""
-    from app.agents import sqlspeed
-    from app.agents.sql import _strip_comments
+    from app.products.dbaba import sqlspeed
+    from app.products.dbaba.sql import _strip_comments
 
     st = sqlspeed.structure(extra)
     q = _strip_comments(query or "")

@@ -68,12 +68,12 @@ def _phrases() -> list:
 # ------------------------------------------------------------------------------------------------ is it a request
 def is_request(text: str) -> bool:
     """A request to WRITE a query (not a pasted query to check, not a concept question)."""
-    from app.agents.core import query_in
+    from app.products.shared.core import query_in
 
     t = text or ""
     if not t.strip() or query_in(t) or CODE_RE.search(t):
         return False
-    from app.agents import sqlpuzzle
+    from app.products.dbaba import sqlpuzzle
 
     if sqlpuzzle.is_puzzle(t):                                  # 'given (1, NULL, 3), what does AVG return?': worked out, not written
         return False
@@ -446,7 +446,7 @@ def build(text: str, schema: dict | None = None, engine: str | None = None) -> d
 
 
 def _build(r: Reader) -> str:
-    from app.agents import sqlshapes
+    from app.products.dbaba import sqlshapes
 
     sql = sqlshapes.build(r)                                 # night S2: self joins, Nth, top per group, %, ranks, changes
     if sql:
@@ -1104,7 +1104,7 @@ def _render(r: Reader) -> str:
 def _self_check(sql: str, engine: str | None, schema: dict | None = None) -> tuple[bool, str]:
     """The written query goes through DBaba's own checker: nothing it calls an error or wrong is ever shown. And it must
     really parse and name only real columns: it is run (no rows) on an empty SQLite copy of the tables it was built from."""
-    from app.agents import sqlcorrect
+    from app.products.dbaba import sqlcorrect
 
     if schema and (engine or "") not in ("sqlserver", "oracle"):
         import sqlite3
@@ -1138,7 +1138,7 @@ def _self_check(sql: str, engine: str | None, schema: dict | None = None) -> tup
 # ------------------------------------------------------------------------------------------------ the reply
 def reply(text: str, engine: str | None = None, hi: bool = False, schema: dict | None = None) -> tuple[str, dict]:
     """(reply text, result) for a request in words."""
-    from app.agents import sqlproject
+    from app.products.dbaba import sqlproject
 
     sch = schema
     if sch is None and re.search(r"\bcreate\s+table\b", text or "", re.I):

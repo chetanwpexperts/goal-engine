@@ -146,7 +146,7 @@ def _deep(conn, engine, db, items, thresholds=None):
 
 def _check_query(conn, engine, text):
     """DBaba's own query checker on a slow statement, with the real definitions of the tables it names."""
-    from app.agents.sql import analyze_sql
+    from app.products.dbaba.sql import analyze_sql
     from app.products.dbaba.local import checks
 
     ddl = checks.structure(conn, engine, checks.TABLES_RX.findall(text))

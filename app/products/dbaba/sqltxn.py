@@ -36,7 +36,7 @@ NAME = r"[`\"]?([A-Za-z_][\w$]*)[`\"]?"
 
 
 def _mask(sql: str) -> str:
-    from app.agents.sqlcorrect import _mask as m
+    from app.products.dbaba.sqlcorrect import _mask as m
 
     return m(sql)
 
@@ -97,7 +97,7 @@ def _target(s: str) -> str:
 
 
 def statements(sql: str) -> list[dict]:
-    from app.agents.sqlroutine import split_script
+    from app.products.dbaba.sqlroutine import split_script
 
     out = []
     for t in split_script(sql):
@@ -112,7 +112,7 @@ def is_script(sql: str) -> bool:
     """A transaction script: any transaction-control statement (BEGIN, COMMIT, ROLLBACK, SAVEPOINT, SET TRANSACTION, LOCK
     TABLES ...), or two or more changes on different tables with none (all-or-nothing is the question then). Routines
     (CREATE PROCEDURE ... BEGIN ... END) are not scripts."""
-    from app.agents import sqlroutine
+    from app.products.dbaba import sqlroutine
 
     if not sql or not re.search(r"\b(begin|start|commit|rollback|savepoint|release|end|abort|transaction|autocommit|lock|unlock|"
                                 r"insert|update|delete|replace|\w*timeout)\b", sql, re.I):
@@ -136,7 +136,7 @@ def has_control(sql: str) -> bool:
 def _fams() -> list[str]:
     """The dialect files whose txn_rules answer: the named / chosen database's family (rule A); MySQL/MariaDB and PostgreSQL,
     labelled, when not sure; none for a notes-only database (general reasoning only, said so by the notes line)."""
-    from app.agents.sqlbasics import CHOSEN
+    from app.products.dbaba.sqlbasics import CHOSEN
 
     eng = CHOSEN.get()
     if eng in ("mysql", "mariadb"):
@@ -221,7 +221,7 @@ def check(sql: str, intent: str, F) -> dict:
                       "via_savepoint": False, "inner": None})
         loose.clear()
 
-    from app.agents.sqlbasics import _foreign_syntax
+    from app.products.dbaba.sqlbasics import _foreign_syntax
 
     for i, x in enumerate(st):                        # another database's transaction words this one refuses (its 'refuses')
         if x["kind"] in ("read", "write"):
@@ -434,7 +434,7 @@ def check(sql: str, intent: str, F) -> dict:
 
 def _inner(st: list[dict], intent: str) -> tuple[list, list]:
     """Each SELECT / INSERT / UPDATE / DELETE inside the script, checked on its own by the usual checker."""
-    from app.agents import sqlcorrect
+    from app.products.dbaba import sqlcorrect
 
     found, ops = [], []
     for i, x in enumerate(st):

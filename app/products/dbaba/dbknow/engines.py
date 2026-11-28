@@ -274,7 +274,7 @@ def notes_line(eid: str, lang: str, sql: str = "") -> str:
     if not notes_only(eid):
         return ""
     d = dialect(eid)
-    from app.agents.sqlport import notes_for
+    from app.products.dbaba.sqlport import notes_for
 
     notes = " ".join(n for n, _h in notes_for(eid, sql))
     part = d.get("proven_parts")                   # an engine part-way through its nights: say which parts are lab-tested

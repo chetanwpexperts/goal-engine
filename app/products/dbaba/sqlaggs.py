@@ -37,7 +37,7 @@ no select from all""".split())
 
 
 def _helpers():
-    from app.agents import sqlcorrect as C
+    from app.products.dbaba import sqlcorrect as C
 
     return C
 
@@ -58,7 +58,7 @@ def _flat(t: str) -> str:
 
 def _engine(sql: str):
     """('mysql' | 'postgresql' | None, its query_rules)."""
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     eng = sqlbasics.engine_seen(sql)
     return eng, (sqlbasics.rules(eng) if eng else {})
@@ -72,7 +72,7 @@ def _db_says(rule: dict, fallback: str = "") -> str:
 
 def _refused(key: str, eng, sql: str):
     """For an engine-specific rule: (kind or None to stay quiet, text naming the engines). Engine facts from the dialect files."""
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     my, pg = sqlbasics.rules("mysql").get(key, {}), sqlbasics.rules("postgresql").get(key, {})
     if eng == "mysql":
@@ -320,7 +320,7 @@ def aggs(sql: str, s: str, cl: dict, srcs: list, alias_of, items: list, intent: 
     where = cl.get("where")
     wtext = s[where[0]:where[1]].lower() if where else ""
     if group and lefts:
-        from app.agents.sqlbasics import _inside_null_fn
+        from app.products.dbaba.sqlbasics import _inside_null_fn
 
         for it in items:
             for m in re.finditer(r"\bsum\s*\(\s*([A-Za-z_]\w*)\.(\w+)\s*\)", s[it["start"]:it["end"]], re.I):
@@ -384,7 +384,7 @@ def aggs(sql: str, s: str, cl: dict, srcs: list, alias_of, items: list, intent: 
         break
 
     # ---- 11. AVG of a column that is often empty (discount, commission): NULLs are skipped, not counted as 0
-    from app.agents.sqlbasics import OPTIONAL_NUM, _inside_null_fn
+    from app.products.dbaba.sqlbasics import OPTIONAL_NUM, _inside_null_fn
 
     for m in re.finditer(r"\bavg\s*\(\s*(?:([A-Za-z_]\w*)\.)?(\w+)\s*\)", s, re.I):
         col = m.group(2).lower()
@@ -460,7 +460,7 @@ def _norm(c: str) -> str:
 def _count_said(sql, s, cl, srcs, alias_of, items, said, F) -> list:
     """'how many customers ...' while the rows counted belong to another table (orders): each customer is counted once per
     order. The noun the person said is matched to a table of the query, or to a '<noun>_id' column in it."""
-    from app.agents import sqljoins as J
+    from app.products.dbaba import sqljoins as J
 
     if not said or not srcs:
         return []

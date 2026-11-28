@@ -36,7 +36,7 @@ AGG = re.compile(r"^\s*(count|sum|avg|min|max)\s*\(", re.I)
 
 
 def _C():
-    from app.agents import sqlcorrect as C
+    from app.products.dbaba import sqlcorrect as C
 
     return C
 
@@ -55,19 +55,19 @@ def _uq(n: str) -> str:
 
 
 def _engine(sql: str):
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.engine_seen(sql)
 
 
 def _said(key: str, fam: str) -> str:
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.rules(fam).get(key, {}).get("says", "")
 
 
 def _own(eng) -> bool:
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.own_rules(eng)
 
@@ -79,14 +79,14 @@ def _name(eng) -> str:
 
 
 def _says_hi(key: str, eng) -> str:
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.says_hi(key, eng)
 
 
 def _verdict(key: str, eng, works_on: str):
     """An engine-syntax rule: works_on = the family whose syntax this is. (kind or None, text naming the engines)."""
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     if sqlbasics.own_rules(eng):
         return sqlbasics.verdict(key, eng), _said(key, eng)
@@ -151,7 +151,7 @@ def _refs(text: str) -> set:
 
 
 def _fk(name: str) -> str:
-    from app.agents.sqljoins import _fk as fk
+    from app.products.dbaba.sqljoins import _fk as fk
 
     return fk(name)
 
@@ -819,7 +819,7 @@ def _insert(sql: str, s: str, intent: str, F) -> list:
                           f"that was being inserted and the key column must have a PRIMARY KEY or UNIQUE constraint.",
                           f"{says} PostgreSQL: ON CONFLICT (key column) DO UPDATE SET col = EXCLUDED.col (EXCLUDED = jo row insert ho "
                           f"rahi thi; key column pe PRIMARY KEY ya UNIQUE hona chahiye)."), edits))
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     lite = sqlbasics.CHOSEN.get() == "sqlite"
     if ins["conflict"] and lite:

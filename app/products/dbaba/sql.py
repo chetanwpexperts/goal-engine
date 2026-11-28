@@ -183,8 +183,8 @@ def _all_wheres(sql: str) -> str:
     """The WHERE of every block (CTEs, derived tables, UNION parts, subqueries), each read in its own block, joined by newlines."""
     if not re.search(r"\(\s*select\b|^\s*with\b|\bunion\b", sql, re.I):
         return ""
-    from app.agents import sqlblocks
-    from app.agents.sqlcorrect import _clauses, _depths
+    from app.products.dbaba import sqlblocks
+    from app.products.dbaba.sqlcorrect import _clauses, _depths
 
     try:
         bl = sqlblocks.blocks(sql)
@@ -243,7 +243,7 @@ def _notes_only(engine: str | None) -> bool:
 def analyze_sql(query: str, extra: str = "", engine: str | None = None, said: str = "") -> dict:
     """query: the SQL. extra: optional EXPLAIN output and/or CREATE TABLE statements. engine: the database the person named,
     chose or that was detected (standing rule A: app/dbknow/engines.py); None = not known, each engine's behaviour is said."""
-    from app.agents.sqlbasics import CHOSEN
+    from app.products.dbaba.sqlbasics import CHOSEN
 
     if engine is None:
         return _analyze_sql(query, extra, said)
@@ -261,14 +261,15 @@ def analyze_sql(query: str, extra: str = "", engine: str | None = None, said: st
 def _analyze_sql(query: str, extra: str = "", lead: str = "") -> dict:
     original = unwrap(query)
     said = " ".join(x for x in (request_words(query), lead.strip()) if x)   # the words after it, and before it (night X1)
-    from app.agents import sqlverify
+    from app.products.dbaba import sqlverify
 
     both = sqlverify.split_paste(original)            # CREATE TABLE ... ; then one query: the tables are the query's schema (10B)
     if both:
         original, extra = both[1], (extra + "\n" + both[0]).strip()
     if not original:
         return {"ok": False, "error": "No query given", "findings": []}
-    from app.agents import sqllock, sqltxn
+    from app.products.dbaba import sqllock
+    from app.products.dbaba import sqltxn
 
     if sqltxn.is_script(_strip_comments(original)) and sqltxn.has_control(_strip_comments(original)):
         return _analyze_other(original, said)        # BEGIN ... COMMIT: a transaction script, read statement by statement
@@ -276,7 +277,7 @@ def _analyze_sql(query: str, extra: str = "", lead: str = "") -> dict:
     if many:                                          # a log of the same statement per value (N+1): one statement does the work
         sql_one = many.pop("sql")
         f = {**many, "basis": None}
-        from app.agents.sqlread import fundamentals as _funds
+        from app.products.dbaba.sqlread import fundamentals as _funds
 
         fd = _funds()["fundamentals"]["locking"]
         f["basis"] = {"id": "locking", "en": fd["title_en"], "hi": fd["title_hi"], "rule_en": fd["rule_en"], "rule_hi": fd["rule_hi"]}
@@ -284,7 +285,7 @@ def _analyze_sql(query: str, extra: str = "", lead: str = "") -> dict:
                 "notes": [], "rewritten": sql_one, "tables": [],
                 "correct": {"findings": [f], "corrected": sql_one, "guesses": []}}
     head = _strip_comments(original)
-    from app.agents import sqlschema
+    from app.products.dbaba import sqlschema
 
     if re.match(r"^\s*(insert|replace)\b", head, re.I) or ROUTINE_RE.match(head) or sqlschema.is_schema(head) or sqltxn.is_script(head):
         return _analyze_other(original, said)        # INSERT / REPLACE / CREATE PROCEDURE, FUNCTION, TRIGGER: correctness only
@@ -303,7 +304,8 @@ def _analyze_sql(query: str, extra: str = "", lead: str = "") -> dict:
     def add(sev, ten, thi, ev, fen, fhi, topic=""):
         findings.append(SqlFinding(sev, ten, thi, ev, fen, fhi, topic))
 
-    from app.agents import sqlexplain, sqlspeed
+    from app.products.dbaba import sqlexplain
+    from app.products.dbaba import sqlspeed
 
     plan = sqlexplain.read(extra) if extra else None
     eng = sqlspeed._engine(original) or ((plan or {}).get("engine") if plan else None) or \
@@ -378,7 +380,7 @@ def _analyze_sql(query: str, extra: str = "", lead: str = "") -> dict:
     if re.search(r"\bor\b", where, re.I):
         cols = {c.lower() for c in re.findall(r"([`\w.]+)\s*(?:=|in\b|like\b|>|<)", where, re.I)}
         if len(cols) > 1 and len(tables) == 1:          # one table: both engines combine two indexes (lab); across tables: or_union
-            from app.agents.sqlbasics import rules as _rules
+            from app.products.dbaba.sqlbasics import rules as _rules
 
             says = {"mysql": _rules("mysql")["or_same_table"]["says"], "postgresql": _rules("postgresql")["or_same_table"]["says"]}
             or_note = {"en": "The OR compares different columns of one table. That is fine when each of them has its own index: "
@@ -551,7 +553,7 @@ def _analyze_sql(query: str, extra: str = "", lead: str = "") -> dict:
         out["plan"] = {"engine": plan["engine"], "en": sqlexplain.render(plan), "hi": sqlexplain.render(plan, True),
                        "steps": [{k: st.get(k) for k in ("table", "alias", "access", "key", "rows")} for st in plan["steps"]]}
     if not is_select:                                 # see the rows first (fundamental 'changes_safety'): app/agents/sqlchange.py
-        from app.agents import sqlchange
+        from app.products.dbaba import sqlchange
 
         out["preview"] = sqlchange.preview(_strip_comments(original).strip().rstrip(";"))
     return _with_reading(original, _with_correctness(original, out, said, extra))
@@ -576,10 +578,11 @@ SEVERITY = {"error": 5, "wrong": 4, "check": 3}
 def _with_correctness(original: str, out: dict, said: str = "", extra: str = "") -> dict:
     """Is it right before is it fast: mistakes come first, and while the query is wrong there's no speed advice
     (indexes for a query that doesn't run, or returns wrong rows, help nobody). Speed comes when it's right, or on asking."""
-    from app.agents import sqlcorrect
+    from app.products.dbaba import sqlcorrect
 
     try:
-        from app.agents import sqlproject, sqlverify
+        from app.products.dbaba import sqlproject
+        from app.products.dbaba import sqlverify
 
         try:                                          # the tables given with the query decide what depends on them (10B)
             sch = sqlproject.from_text(extra) if extra and re.search(r"\bcreate\s+table\b", extra, re.I) else None
@@ -620,7 +623,7 @@ def _with_correctness(original: str, out: dict, said: str = "", extra: str = "")
             if offered and offered <= SPEED_OFFERS:
                 out["suggested_kind"] = "speed"          # the same rows, faster: 'try this form', not 'if that's what you meant'
     try:                                              # night 14: what each rewrite keeps the same, and when it holds
-        from app.agents import sqlproof
+        from app.products.dbaba import sqlproof
 
         sqlproof.prove(out)
     except Exception:  # noqa: BLE001 - the proof is an extra; never let it break the check
@@ -630,7 +633,8 @@ def _with_correctness(original: str, out: dict, said: str = "", extra: str = "")
 
 def _with_reading(original: str, out: dict) -> dict:
     """The query read stage by stage (app/agents/sqlread.py), and the fundamental behind each mistake found."""
-    from app.agents import sqlread, sqlschema
+    from app.products.dbaba import sqlread
+    from app.products.dbaba import sqlschema
 
     try:
         if sqlschema.is_schema(original):            # a table design: its tables, what names a row, and the links
@@ -638,8 +642,8 @@ def _with_reading(original: str, out: dict) -> dict:
             r = None
             out["reading"] = {"en": en["text"], "hi": hi["text"], "grain": en["grain"]}
         else:
-            from app.agents import sqlblocks
-            from app.agents.sqlcorrect import BLOCK_KEYS
+            from app.products.dbaba import sqlblocks
+            from app.products.dbaba.sqlcorrect import BLOCK_KEYS
 
             tok = BLOCK_KEYS.set(sqlblocks.keys(original))
             try:
@@ -663,7 +667,7 @@ def _with_reading(original: str, out: dict) -> dict:
 def _with_blocks(original: str, out: dict) -> None:
     """Night 12: a query with CTEs, derived tables, subqueries or UNION parts gets its dependency tree and the grain of every
     block (app/agents/sqlblocks.py); from 30 lines on, the reading shows them too."""
-    from app.agents import sqlblocks
+    from app.products.dbaba import sqlblocks
 
     try:
         if not re.search(r"\(\s*select\b|^\s*with\b", sqlblocks.C._mask(original), re.I):
@@ -688,7 +692,7 @@ def _with_blocks(original: str, out: dict) -> None:
 def _with_confidence(original: str, out: dict) -> dict:
     """How sure each finding is (proven / likely risk / needs schema / needs execution), the schema the query implies with
     verified=false on every fact, and what the query alone can't prove (app/agents/sqlconfidence.py, night 11)."""
-    from app.agents import sqlconfidence
+    from app.products.dbaba import sqlconfidence
 
     sch = out.pop("_schema", None)
     try:

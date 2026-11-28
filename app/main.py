@@ -21,13 +21,13 @@ from sqlalchemy.orm import Session
 
 from app.ai.router import AIRouter, AIUnavailable
 from app.engine.ml.brain import Brain
-from app.agents import automation
+from app.products.shared import automation
 from app import accounts, admin, console, dbarea, enquiry, expert, privacy
-from app.agents import database as dbagent
-from app.agents import direct as dbagent_direct
-from app.agents.core import AgentError, agent_dict, claim_due, goal_agents, run_agent
-from app.agents.mailer import SmtpMailer
-from app.agents.replies import _after_run
+from app.products.dbaba import database as dbagent
+from app.products.shared import direct as dbagent_direct
+from app.products.shared.core import AgentError, agent_dict, claim_due, goal_agents, run_agent
+from app.products.shared.mailer import SmtpMailer
+from app.products.shared.replies import _after_run
 from app.domain.models import Agent, dumps, loads, utcnow
 from app.core.config import get_settings
 from app.core.db import get_db, init_db

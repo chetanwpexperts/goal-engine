@@ -143,7 +143,7 @@ def maintain(db: Session) -> dict:
 
 # ---------------------------------------------------------------- limits and log around a connect
 def before_connect(db: Session, user: User, host: str, ip: str) -> None:
-    from app.agents.direct import DirectError
+    from app.products.shared.direct import DirectError
 
     now = utcnow()
     tries = db.scalar(select(func.count()).select_from(DbConnectLog).where(DbConnectLog.user_id == user.id,
@@ -181,7 +181,7 @@ def tell_owner(user: User, host: str, database: str, ip: str) -> None:
 
 
 def check_queue(db: Session, visitor_id: str) -> None:
-    from app.agents.database import DatabaseError
+    from app.products.dbaba.database import DatabaseError
 
     waiting = (ConnectorJob.status.in_(("queued", "claimed")), ConnectorJob.created_at > utcnow() - timedelta(minutes=10))
     mine = db.scalar(select(func.count()).select_from(ConnectorJob).join(Connector, Connector.id == ConnectorJob.connector_id)

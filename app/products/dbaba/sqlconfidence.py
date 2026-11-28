@@ -19,7 +19,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from app.agents import sqlcorrect as C
+from app.products.dbaba import sqlcorrect as C
 
 CORE = Path(__file__).resolve().parent / "dbknow" / "core" / "confidence.json"
 PROVEN_ON = ["mariadb", "postgresql"]          # every class rule and every check query below: tests/practice/test_night11.py LAB
@@ -73,7 +73,7 @@ def classify(f: dict) -> str:
 
 
 def _engine() -> str | None:
-    from app.agents.sqlbasics import CHOSEN
+    from app.products.dbaba.sqlbasics import CHOSEN
 
     return CHOSEN.get() or None
 
@@ -150,7 +150,7 @@ def _depends(f: dict, sql: str, amap: dict, single: str | None, eid: str | None)
 
 def _on_cols(sql: str, alias: str) -> list[str]:
     """The columns of this alias its join's ON compares (the columns that decide one match or many)."""
-    from app.agents.sqlverify import _join_on
+    from app.products.dbaba.sqlverify import _join_on
 
     on = _join_on(sql, alias) or ""
     got = [m.group(2) for m in C.QREF.finditer(C._mask(on)) if _uq(m.group(1)) == _uq(alias)]
@@ -185,7 +185,7 @@ def annotate_findings(findings: list, sql: str, amap: dict | None = None) -> Non
 
 
 def _amap(sql: str) -> dict:
-    from app.agents.sqlverify import aliases
+    from app.products.dbaba.sqlverify import aliases
 
     try:
         return aliases(sql)
@@ -438,7 +438,7 @@ def _direction(lt: str, lc: str, rt: str, rc: str) -> str:
 
 
 def _verify_with(inf: dict, sch: dict) -> None:
-    from app.agents import sqlproject as P
+    from app.products.dbaba import sqlproject as P
 
     for t in inf["tables"]:
         td = P.table(sch, t["name"])
@@ -573,7 +573,7 @@ def _equivalence(res: dict, hi: bool) -> str:
             return ("Wahi rows kyun: " if hi else "Why it returns the same rows: ") + "; ".join(bits) + "."
     proofs = [p for p in res.get("proof") or [] if p["verdict"] in ("same", "same_if")]
     if proofs and (res.get("suggested_kind") == "speed" or res.get("rewritten")):   # night 14: the five things it keeps
-        from app.agents import sqlproof
+        from app.products.dbaba import sqlproof
 
         p = proofs[0]
         k = "hi" if hi else "en"
@@ -652,7 +652,7 @@ def annotate(sql: str, res: dict, sch: dict | None = None) -> dict:
     """Classes on every finding, the inferred schema, what can't be proven, and the report text (en / hi) on the result."""
     if not res.get("ok", True) or not sql.strip():
         return res
-    from app.agents import sqlschema
+    from app.products.dbaba import sqlschema
 
     corr = (res.get("correct") or {})
     amap = _amap(sql)

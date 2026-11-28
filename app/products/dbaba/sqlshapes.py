@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import re
 
-from app.agents import sqlwrite as W
-from app.agents.sqlwrite import CantBuild, Col, Reader, Table
+from app.products.dbaba import sqlwrite as W
+from app.products.dbaba.sqlwrite import CantBuild, Col, Reader, Table
 
 ROLE = r"(manager|boss|supervisor|parent|mentor|referrer|team lead|lead|reporting manager)"
 ENTITY = set("""department dept team class section branch store warehouse category project company group division batch course

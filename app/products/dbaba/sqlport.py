@@ -51,19 +51,19 @@ def spec(fam: str) -> dict:
 
 
 def _close(s: str, i: int) -> int:
-    from app.agents.sqlcorrect import _close as c
+    from app.products.dbaba.sqlcorrect import _close as c
 
     return c(s, i)
 
 
 def _args(text: str) -> list[str]:
-    from app.agents.sqlbasics import _split_args
+    from app.products.dbaba.sqlbasics import _split_args
 
     return _split_args(text)
 
 
 def _mask(sql: str) -> str:
-    from app.agents.sqlcorrect import _mask as m
+    from app.products.dbaba.sqlcorrect import _mask as m
 
     return m(sql)
 
@@ -365,7 +365,7 @@ def rewrite_calls(sql: str, fam: str) -> tuple[str, list[dict]]:
 def _regex_rewrites(text: str, fam: str) -> str:
     """The plain word swaps this database's 'refuses' list rewrites (GETDATE() -> NOW(), CURDATE() -> CURRENT_DATE ...),
     applied inside a call's arguments so the outer rewrite is whole."""
-    from app.agents.sqlbasics import _bare_ident, _refuses
+    from app.products.dbaba.sqlbasics import _bare_ident, _refuses
 
     s = _mask(text)
     edits = []
@@ -383,7 +383,7 @@ def _regex_rewrites(text: str, fam: str) -> str:
 
 # ---------------------------------------------------------------- what the checker reports
 def port(sql: str, s: str, intent: str, F, is_select: bool) -> list:
-    from app.agents.sqlbasics import CHOSEN
+    from app.products.dbaba.sqlbasics import CHOSEN
     from app.products.dbaba.dbknow import engines as E
 
     chosen = CHOSEN.get()
@@ -449,7 +449,7 @@ def _engine_syntax(sql: str, s: str, eid: str, name: str, F) -> list:
                           f"pichhli row hai par uski value khud NULL hai (COALESCE use bhi default bana deta hai)."),
                         [(m.start(), end, new)]))
     if "cte_before_change" in facts and re.match(r"\s*with\b", s, re.I):
-        from app.agents import sqlblocks
+        from app.products.dbaba import sqlblocks
 
         ctes, main_at = sqlblocks._ctes(s)
         km = re.match(r"\s*(update|delete|insert|replace)\b", s[main_at:], re.I)
@@ -497,7 +497,7 @@ def _engine_syntax(sql: str, s: str, eid: str, name: str, F) -> list:
 
 
 def C_depth(s: str, i: int) -> int:
-    from app.agents.sqlcorrect import _depths
+    from app.products.dbaba.sqlcorrect import _depths
 
     return _depths(s)[i] if i < len(s) else 0
 
@@ -1095,8 +1095,8 @@ TRANSLATE_WORDS = re.compile(r"\b(convert\w*|translat\w*|port|migrat\w*|rewrite|
 def split_request(text: str) -> tuple[str | None, str]:
     """(the query, the person's words around it). The query may follow a lead-in on the same line ('convert to postgres:
     SELECT ...') or come first with the words after a ';'."""
-    from app.agents.core import query_in
-    from app.agents.sql import _split_tail
+    from app.products.shared.core import query_in
+    from app.products.dbaba.sql import _split_tail
 
     q = query_in(text)
     if q:
@@ -1180,7 +1180,7 @@ MEANING = [   # (id, pattern on the masked query, source family, target family, 
 def translate(sql: str, target: str, source: str | None = None) -> dict:
     """The query in the target database's words: {'sql', 'changes' [(evidence, new, why)], 'also' [definite mistakes fixed on
     the way], 'left' [what couldn't be translated automatically], 'notes' [meaning notes], 'notes_only': bool}."""
-    from app.agents import sqlcorrect
+    from app.products.dbaba import sqlcorrect
     from app.products.dbaba.dbknow import engines as E
 
     fam = E.syntax_family(target)

@@ -20,7 +20,7 @@ on SQLite 3.53 (tests/practice/test_e1_sqlite2.py); the reasoning here is the sa
 
 import re
 
-from app.agents import sqlschema as S
+from app.products.dbaba import sqlschema as S
 from app.products.dbaba.dbknow import engines as E
 
 NOT_TYPE = r"(?:constraint|primary|not|null|unique|check|default|collate|references|generated|as|on)"

@@ -22,8 +22,8 @@ is guessed from it: findings about a partial table are never upgraded or dropped
 import os
 import re
 
-from app.agents.sqlroutine import _mask, split_script
-from app.agents.sqlschema import NAME, read_design
+from app.products.dbaba.sqlroutine import _mask, split_script
+from app.products.dbaba.sqlschema import NAME, read_design
 
 SKIP_DIRS = {".git", ".svn", ".hg", "vendor", "node_modules", "bower_components", "build", "dist", "out", "target", "coverage",
              "__pycache__", ".venv", "venv", "env", "storage", "cache", ".cache", ".idea", ".vscode", ".next", ".nuxt"}

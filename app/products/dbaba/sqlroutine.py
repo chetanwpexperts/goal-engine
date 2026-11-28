@@ -259,7 +259,7 @@ def routines(sql: str, intent: str, F) -> list:
 
 
 def _engine(sql: str):
-    from app.agents import sqlbasics
+    from app.products.dbaba import sqlbasics
 
     return sqlbasics.engine_seen(sql)
 

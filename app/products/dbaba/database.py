@@ -181,7 +181,7 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
     if kind in ("plan", "change", "undo") and not connector.allow_changes:
         raise DatabaseError("Changes are switched off for this database")
     if kind == "plan":
-        from app.agents.direct import gc
+        from app.products.shared.direct import gc
 
         try:
             ch = gc.parse_change(payload.get("sql", ""))
@@ -203,7 +203,7 @@ def queue(db: Session, connector: Connector, kind: str, payload: dict | None = N
     db.add(job)
     db.commit()
     if connector.kind == "direct":
-        from app.agents import direct
+        from app.products.shared import direct
 
         direct.start(job.id)
         db.refresh(job)
@@ -226,7 +226,7 @@ def approve(db: Session, connector: Connector, plan_id: int) -> ConnectorJob:
     result["used"] = True
     plan.result = dumps(result)
     db.commit()
-    from app.agents.direct import gc
+    from app.products.shared.direct import gc
 
     ch = gc.parse_change(sql)
     return queue(db, connector, "change", {"sql": sql, "expected": result.get("count"), "plan_id": plan.id},
@@ -371,7 +371,8 @@ def wants_database(goal: Goal | None, text: str) -> bool:
 
     if reasoning.evidence(text):
         return True                       # a pasted database error (even with the query in it): the reasoning explains it
-    from app.agents import sqlexplain, sqllock
+    from app.products.dbaba import sqlexplain
+    from app.products.dbaba import sqllock
 
     if sqllock.read_deadlock(text):
         return True                       # a pasted deadlock report (SHOW ENGINE INNODB STATUS / PostgreSQL's DETAIL)
@@ -408,7 +409,7 @@ def live_checks(db: Session, user, agent: Agent | None, visitor_id: str, result:
     from datetime import timedelta
 
     from app import dbarea
-    from app.agents import direct
+    from app.products.shared import direct
     from app.products.dbaba.dbknow import reasoning
     from app.domain.models import UserSession
 
@@ -551,7 +552,7 @@ def _brain_view(rec, hi: bool):
 
 
 def _owner(db: Session, visitor_id: str) -> dict:
-    from app.agents.automation import owner_of
+    from app.products.shared.automation import owner_of
 
     owner = owner_of(db, visitor_id)
     return {"email": owner.email if owner else "", "verified": bool(owner and owner.verified_at),
@@ -597,7 +598,7 @@ def clean_exports(max_age_hours: int = 24) -> None:
 
 def mind_state(db: Session, agent: Agent) -> dict:
     """What the shared mind may build next steps on."""
-    from app.agents.core import goal_agents
+    from app.products.shared.core import goal_agents
     from app.domain.models import AgentRun
 
     checked = any(r.status == "done" for a in goal_agents(db, agent.goal_id) if a.recipe == "sql_review"
@@ -625,7 +626,7 @@ def concept_question(text: str):
 def _write_turn(db: Session, goal: Goal, text: str, hi: bool):
     """A query written from the person's words, for their database (rule A: named, remembered, or the common form that runs
     on MySQL, MariaDB, PostgreSQL and SQLite alike, said so)."""
-    from app.agents import sqlwrite
+    from app.products.dbaba import sqlwrite
     from app.products.dbaba.dbknow import engines as E
 
     named = E.named(text)
@@ -644,7 +645,7 @@ def _write_turn(db: Session, goal: Goal, text: str, hi: bool):
     goal.missing_info, goal.pending = "[]", None
     if not res.get("ok"):
         try:
-            from app.agents import learn as learning
+            from app.products.shared import learn as learning
 
             learning.ask_to_learn(db, "database", text, guess="write")
         except Exception:  # noqa: BLE001 - learning is an extra
@@ -693,7 +694,7 @@ def _concept_turn(db: Session, goal: Goal, text: str, hi: bool, m: dict):
     goal.slots = dumps(slots)
     if c is None:                         # a database concept we don't know yet: said honestly, and kept to learn
         try:
-            from app.agents import learn as learning
+            from app.products.shared import learn as learning
 
             learning.ask_to_learn(db, "database", text, guess="concept")
         except Exception:  # noqa: BLE001 - learning is an extra
@@ -706,22 +707,22 @@ def _concept_turn(db: Session, goal: Goal, text: str, hi: bool, m: dict):
 
 
 def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) -> bool:
-    from app.agents.core import query_in
+    from app.products.shared.core import query_in
 
-    from app.agents import sqlwrite
+    from app.products.dbaba import sqlwrite
 
-    from app.agents import sqlpuzzle
+    from app.products.dbaba import sqlpuzzle
 
     if relation != "safety" and (sqlpuzzle.is_puzzle(text) or sqlwrite.is_request(text)):
         return True                       # 'write a query to list ...': written from the words (night S1)
     if relation != "safety" and concept_question(text) is not None:
         return True                       # 'what is a JOIN': the concepts pack, whatever the reader guessed
-    from app.agents import sqlport
+    from app.products.dbaba import sqlport
 
     if relation != "safety" and sqlport.is_request(text):
         return True                       # 'convert this query to PostgreSQL': written in that database's words
 
-    from app.agents import sqlscan
+    from app.products.dbaba import sqlscan
 
     if relation != "safety" and sqlscan.code_paste(text) is not None:
         return True                       # code with its queries in it: each query by its line (night 10A)
@@ -736,8 +737,8 @@ def wants_turn(db: Session, goal: Goal, text: str, relation: str, held: bool) ->
 
 def _check_pasted_query(db: Session, goal: Goal, text: str, hi: bool):
     """Run the SQL checker on the query in this message, in this goal."""
-    from app.agents.core import RECIPES, AgentError, goal_agents, inputs_from_text, run_agent
-    from app.agents.replies import _after_run
+    from app.products.shared.core import RECIPES, AgentError, goal_agents, inputs_from_text, run_agent
+    from app.products.shared.replies import _after_run
 
     recipe = RECIPES["sql_review"]
     found = inputs_from_text(recipe, text, {})
@@ -775,7 +776,7 @@ def engine_gate(db: Session, agent: Agent, inputs: dict, hi: bool) -> dict:
     """Standing rule A, before a query is checked: the database named in the message (or earlier in the conversation, or
     chosen from the taps) decides the answer; else the one the query's syntax shows (said, with a tap to correct it); else
     ask first. Returns the inputs with 'engine_rule' set, or raises AgentAsks with the question and its taps."""
-    from app.agents.core import AgentAsks
+    from app.products.shared.core import AgentAsks
     from app.products.dbaba.dbknow import engines as E
 
     goal = db.get(Goal, agent.goal_id)
@@ -806,9 +807,9 @@ def engine_gate(db: Session, agent: Agent, inputs: dict, hi: bool) -> dict:
 
 def _engine_reply(db, goal, agent, eid: str, how: str, hi: bool, again: bool):
     """The person chose (or corrected) the database: remember it and answer what was waiting, for that database only."""
-    from app.agents.core import AgentError, run_agent
+    from app.products.shared.core import AgentError, run_agent
     from app.products.dbaba.dbknow import engines as E
-    from app.agents.replies import _after_run
+    from app.products.shared.replies import _after_run
 
     E.remember(goal, eid, how)
     goal.pending = None
@@ -816,7 +817,7 @@ def _engine_reply(db, goal, agent, eid: str, how: str, hi: bool, again: bool):
     waiting = data.pop("_db_wait", None)
     goal.slots = dumps(data)
     lang = _goal_lang(goal, hi)
-    from app.agents import sqlscan
+    from app.products.dbaba import sqlscan
 
     if waiting and sqlscan.code_paste(waiting) is not None:   # pasted code was waiting for its database
         db.commit()
@@ -850,11 +851,11 @@ def _sure(rec: dict) -> bool:
 
 def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     """Database work: the agent works through a connector on the user's own server."""
-    from app.agents.core import query_in
+    from app.products.shared.core import query_in
 
-    from app.agents import sqlwrite
+    from app.products.dbaba import sqlwrite
 
-    from app.agents import sqlpuzzle
+    from app.products.dbaba import sqlpuzzle
 
     if sqlpuzzle.is_puzzle(text):         # 'a column holds (1, NULL, 3): what does AVG give?': worked out by running it
         out = sqlpuzzle.reply(text, turn.hi)
@@ -878,7 +879,7 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     from app.products.dbaba.dbknow import brain as dbbrain
     from app.products.dbaba.dbknow import reasoning
 
-    from app.agents.core import query_in as _query_in
+    from app.products.shared.core import query_in as _query_in
 
     if ANOTHER_RE.search(text or "") and not _query_in(text):
         goal.intent = "slow_db_query"
@@ -886,7 +887,7 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
         db.commit()
         return (("Agli SQL query paste karo, main use check karunga: pehle sahi hai ya nahi, phir speed." if turn.hi else
                  "Paste the next SQL query and I'll check it: first whether it's right, then its speed."), [], "agent_plan")
-    from app.agents import sqlexplain
+    from app.products.dbaba import sqlexplain
 
     if sqlexplain.looks_like_plan(text):
         plan = sqlexplain.read(text)
@@ -895,15 +896,15 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
     described = bool(reasoning.complaints(text)) and not _query_in(text)   # 'cannot connect', 'connect nahi ho raha'
     if described and not reasoning.evidence(text) and not reasoning.report(reasoning.diagnose(text), turn.hi):
         described = False                 # the core has no likely causes for it: the usual reply below
-    from app.agents import sqllock
+    from app.products.dbaba import sqllock
 
     if reasoning.evidence(text) or described or sqllock.read_deadlock(text):   # an error / EXPLAIN / lock report, or a problem in words
         return _error_turn(db, goal, text, turn.hi, visitor_id)
-    from app.agents import sqlport
+    from app.products.dbaba import sqlport
 
     if sqlport.is_request(text):          # 'convert this query to PostgreSQL': the query in that database's own words
         return _translate_turn(db, goal, text, turn.hi)
-    from app.agents import sqlscan
+    from app.products.dbaba import sqlscan
 
     if sqlscan.code_paste(text) is not None:   # code with several queries / a placeholder mistake: each query by its line
         return _code_turn(db, goal, text, turn.hi)
@@ -949,7 +950,7 @@ def take_turn(db: Session, goal: Goal, text: str, turn, visitor_id: str):
 def _code_turn(db: Session, goal: Goal, text: str, hi: bool):
     """Code pasted in the chat (night 10A): every query in it, by its line, checked for the person's database (rule A: named,
     remembered or chosen; else the driver the code uses, said as detected; else ask first). Read only."""
-    from app.agents import sqlscan
+    from app.products.dbaba import sqlscan
     from app.products.dbaba.dbknow import engines as E
 
     words = "\n".join(ln for ln in text.splitlines() if ln.strip() and not sqlscan.code_lang(ln) and not re.search(r"[;{}()=]", ln))
@@ -997,7 +998,7 @@ def _translate_turn(db: Session, goal: Goal, text: str, hi: bool, query: str | N
     """A query to be written in another database's words (night 10): the target named after to / into / mein is remembered
     for the conversation (rule A); each construct is rewritten in its words (lab-proven on MariaDB and PostgreSQL), the
     differences in meaning are named, and what couldn't be translated is said. SQL Server / Oracle: notes only (SQLite is lab-tested from E1)."""
-    from app.agents import sqlport
+    from app.products.dbaba import sqlport
     from app.products.dbaba.dbknow import engines as E
 
     if query is None:
@@ -1025,7 +1026,7 @@ PLAN_QUERY = re.compile(r"^\s*(?:explain\s+(?:analyze\s+|\(\s*[\w\s,]+\)\s+|form
 def _plan_turn(db: Session, goal: Goal, text: str, hi: bool, plan: dict):
     """A pasted EXPLAIN / EXPLAIN ANALYZE plan. With its query in the message: the query is checked with the plan beside it
     (the card shows both); without: the plan read step by step, and what to change, for the engine its format shows."""
-    from app.agents import sqlexplain
+    from app.products.dbaba import sqlexplain
 
     from app.products.dbaba.dbknow import engines as E
 
@@ -1039,7 +1040,7 @@ def _plan_turn(db: Session, goal: Goal, text: str, hi: bool, plan: dict):
         query = m.group(1).strip()
         rest = text.replace(m.group(0), " ", 1)
         msg = f"{query};\n"
-        from app.agents.core import RECIPES, inputs_from_text
+        from app.products.shared.core import RECIPES, inputs_from_text
 
         found = inputs_from_text(RECIPES["sql_review"], msg, {})
         found["explain"] = rest.strip()[:20000]
@@ -1051,8 +1052,8 @@ def _plan_turn(db: Session, goal: Goal, text: str, hi: bool, plan: dict):
             agent.inputs = dumps({**(loads(agent.inputs, {}) or {}), **found})
         goal.intent = "slow_db_query"
         db.flush()
-        from app.agents.core import AgentError, run_agent
-        from app.agents.replies import _after_run
+        from app.products.shared.core import AgentError, run_agent
+        from app.products.shared.replies import _after_run
 
         try:
             run = run_agent(db, agent, hi)
@@ -1071,7 +1072,7 @@ def _plan_turn(db: Session, goal: Goal, text: str, hi: bool, plan: dict):
 
 
 def _sql_agents(db, goal):
-    from app.agents.core import goal_agents
+    from app.products.shared.core import goal_agents
 
     return [a for a in goal_agents(db, goal.id) if a.recipe == "sql_review"]
 
@@ -1136,7 +1137,7 @@ def _error_turn(db: Session, goal: Goal, text: str, hi: bool, visitor_id: str):
     from app import dbarea
 
     reply = reasoning.report(result, hi, signed_in=user is not None, can_connect=dbarea.connect_open(user))
-    from app.agents import sqllock
+    from app.products.dbaba import sqllock
 
     dl = sqllock.read_deadlock(text)
     if dl:                                # the deadlock report itself: which rows, in which order, and the fix
@@ -1178,8 +1179,8 @@ def _pasted_statement_fix(text: str, eid: str | None, hi: bool) -> str:
     stmt = _statement_in(text)
     if not stmt:
         return ""
-    from app.agents.core import statements_text
-    from app.agents.sql import analyze_sql
+    from app.products.shared.core import statements_text
+    from app.products.dbaba.sql import analyze_sql
 
     try:
         res = analyze_sql(stmt, engine=eid or None, said=text.replace(stmt, " ")[:300])
@@ -1205,7 +1206,7 @@ NEW_SQL_RE = re.compile(r"\b(select|update|delete|insert)\b[\s\S]+\b(from|into|s
 
 
 def _sql_agent(db, goal):
-    from app.agents.core import goal_agents
+    from app.products.shared.core import goal_agents
     from app.domain.models import AgentRun
 
     a = next((x for x in goal_agents(db, goal.id) if x.recipe == "sql_review"), None)
@@ -1228,7 +1229,7 @@ def holds_conversation(db, goal, text: str, any_text: bool = False):
         a, run = _sql_agent(db, goal)
         if run is not None and run.status == "done":
             return a
-    from app.agents import sqlport
+    from app.products.dbaba import sqlport
 
     if text and not any_text and sqlport.is_followup(text):
         a, run = _sql_agent(db, goal)     # 'now convert it to PostgreSQL': the checked query, in that database's words
@@ -1278,7 +1279,7 @@ INDEX_RE = re.compile(r"\b(which|what|kaun\w*|konsa|kaunsa)\b[^?]*\bindex(es)?\b
 
 def continue_turn(db, goal, agent, text: str):
     """The answer about the checked query; when the person says it was wrong, the miss is also kept to learn from."""
-    from app.agents.sql import mask_values
+    from app.products.dbaba.sql import mask_values
     from app.products.dbaba.dbknow import engines as E
     from app.core.text import detect_language
 
@@ -1288,7 +1289,7 @@ def continue_turn(db, goal, agent, text: str):
     if agent.recipe == "sql_review" and E.correction(text, goal):   # 'it's PostgreSQL': check it again for that one
         return _engine_reply(db, goal, agent, E.correction(text, goal), "named", hi0, again=True)
 
-    from app.agents import sqlport
+    from app.products.dbaba import sqlport
 
     if agent.recipe == "sql_review" and sqlport.is_followup(text):
         raw = (loads(agent.inputs, {}) or {}).get("query", "")
@@ -1307,14 +1308,14 @@ def continue_turn(db, goal, agent, text: str):
     saved = False
     if raw.strip():
         try:
-            from app.agents import learn as learning
+            from app.products.shared import learn as learning
 
             learning.report_miss(db, "database", text, mask_values(raw), (last_run.summary if last_run is not None else "") or "")
             saved = True
         except Exception:  # noqa: BLE001 - learning is an extra; it never breaks the answer
             db.rollback()
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
-    from app.agents.sql import analyze_sql
+    from app.products.dbaba.sql import analyze_sql
 
     res = analyze_sql(raw, inputs.get("explain", ""), engine=_eng(inputs))
     broken = [f for f in (res.get("correct") or {}).get("findings") or [] if f["kind"] in ("error", "wrong")]
@@ -1334,7 +1335,7 @@ def continue_turn(db, goal, agent, text: str):
 def _tree_turn(db, goal, agent, text: str):
     """'Show the dependency tree' / 'grain of each block': the checked query's blocks (CTEs, derived tables, subqueries, UNION
     parts), what each reads, and the grain going in and coming out of each, with the joins that change it."""
-    from app.agents.sql import analyze_sql
+    from app.products.dbaba.sql import analyze_sql
     from app.core.text import detect_language
 
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
@@ -1358,8 +1359,8 @@ def _proof_turn(db, goal, agent, text: str):
     """'What can't you prove?' / 'kitna pakka hai': the query-only report for the checked query (app/agents/sqlconfidence.py):
     how sure each finding is, the schema the query implies (verified=false), what can't be proven from the text, the rewrite
     and why it is (or isn't) the same rows, and the read-only queries that settle the rest in that database's own words."""
-    from app.agents import sqlconfidence
-    from app.agents.sql import analyze_sql
+    from app.products.dbaba import sqlconfidence
+    from app.products.dbaba.sql import analyze_sql
     from app.core.text import detect_language
 
     hi = detect_language(text) in ("Hinglish", "Hindi") or (goal.detected_language in ("Hinglish", "Hindi") and len(text.split()) < 6)
@@ -1377,8 +1378,8 @@ def _proof_turn(db, goal, agent, text: str):
 def _continue_turn(db, goal, agent, text: str):
     """'What does this query do': the query read stage by stage, with the fundamentals behind what's wrong. When the words
     also ask why ('explain this query' after a slow query), the usual answer follows the reading."""
-    from app.agents.core import why_label
-    from app.agents.sql import analyze_sql
+    from app.products.shared.core import why_label
+    from app.products.dbaba.sql import analyze_sql
     from app.core.text import detect_language
 
     if not READ_RE.search(text or "") or text.strip().startswith(("Why: ", "Kyun: ")):
@@ -1409,7 +1410,7 @@ def _continue_turn(db, goal, agent, text: str):
 def _answer_turn(db, goal, agent, text: str):
     """Answers about the query that was checked: the optimised version, what changed, or why it's slow.
     Worked out again from the query itself, so it's never a stale or repeated answer."""
-    from app.agents.sql import analyze_sql, rewrite, unwrap
+    from app.products.dbaba.sql import analyze_sql, rewrite, unwrap
     from app.core.text import detect_language
     from app.domain.models import Message
 
@@ -1424,7 +1425,7 @@ def _answer_turn(db, goal, agent, text: str):
     corr = res.get("correct") or {}
     broken = [f for f in corr.get("findings") or [] if f["kind"] in ("error", "wrong")]   # real mistakes, not notes
     asks_other = bool(DIFF_RE.search(text or "") or DIFF_DEV_RE.search(text or "") or WHY_RE.search(text or ""))
-    from app.agents.core import why_label
+    from app.products.shared.core import why_label
 
     tapped = next((f for f in corr.get("findings") or [] if text.strip() in (why_label(f, False), why_label(f, True))), None)
     if tapped is not None:                                   # 'Why: ...' tapped: that one mistake, nothing else
@@ -1437,7 +1438,7 @@ def _answer_turn(db, goal, agent, text: str):
         rest = [why_label(f, h) for f in corr["findings"] if f["kind"] in ("error", "wrong") and f["title_en"] not in asked][:3]
         return reply, rest, h
     if broken and not SPEED_RE.search(text or "") and not DEV_FOLLOW_RE.search(text or ""):
-        from app.agents.core import correctness_text
+        from app.products.shared.core import correctness_text
 
         if SHORT_RE.search(text or "") and not WRONG_RE.search(text or ""):
             fixed = corr.get("corrected") or query
@@ -1483,7 +1484,7 @@ def _answer_turn(db, goal, agent, text: str):
 
 def _optimized(query: str, explain: str, hi: bool) -> str:
     """The optimized query and its index commands, with at most 3 short notes. No questions, no theory."""
-    from app.agents.sql import analyze_sql
+    from app.products.dbaba.sql import analyze_sql
 
     res = analyze_sql(query, explain)
     sp = res.get("speed_later") or res

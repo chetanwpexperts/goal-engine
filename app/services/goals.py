@@ -9,11 +9,11 @@ from app.ai.prompts import build_user_prompt
 from app.ai.router import AIRouter
 from app.core.config import Settings
 from app.limits import release_ai_call, reserve_ai_call
-from app.agents.core import (YES_RE, AgentError, agent_dict, assign, goal_agents, inputs_from_text,
+from app.products.shared.core import (YES_RE, AgentError, agent_dict, assign, goal_agents, inputs_from_text,
                              recipe_for, run_agent)
-from app.agents import automation as auto
-from app.agents.core import URL_RE
-from app.agents.planner import plan as plan_automation
+from app.products.shared import automation as auto
+from app.products.shared.core import URL_RE
+from app.products.shared.planner import plan as plan_automation
 from app.engine.ml.brain import SKIP_RE, steps_text
 from app.engine.ml.registry import domain_of
 from app.engine.ml.normalize import normalize
@@ -28,7 +28,7 @@ from app.data import goals as storage
 from app.data.goals import active_goals, all_goals, focus_goal, recent_messages
 from app.engine.goal import (InvalidMessage, MAX_CONTEXT_GOALS, LIST_GOALS, STEPS_LABELS, WATCH_LABELS,
                              NO_EXPERT, NO_EXPERT_DOMAINS, SMALL_TALK_RE, _apply, agent_mode, validate_message)
-from app.agents.replies import _after_run
+from app.products.shared.replies import _after_run
 
 
 def own_goal(db: Session, goal_id: int, visitor: str) -> Goal:
@@ -52,7 +52,7 @@ def _respond(db: Session, visitor_id: str, text: str, goal: Goal | None, reply: 
 
         thought = mind.after(db, visitor_id, goal, text, reply, goal_agents(db, goal.id) if goal else [], hi)
         # when the agent just asked the person something, the answer comes first: no suggestions next to it
-        from app.agents.core import quiet_next
+        from app.products.shared.core import quiet_next
 
         own = any(o in ("Optimize it", "Ise fast karo") for o in options or []) or quiet_next(db, goal, text)
         # (the query checker waiting for its query: the query is the next step, nothing else)

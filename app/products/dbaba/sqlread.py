@@ -8,7 +8,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from app.agents import sqlcorrect as C
+from app.products.dbaba import sqlcorrect as C
 
 FUND = Path(__file__).resolve().parent / "dbknow" / "core" / "query_fundamentals.json"
 

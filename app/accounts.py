@@ -142,7 +142,7 @@ _mailer = None
 def mailer():
     global _mailer
     if _mailer is None:
-        from app.agents.mailer import SmtpMailer
+        from app.products.shared.mailer import SmtpMailer
 
         _mailer = SmtpMailer()
     return _mailer

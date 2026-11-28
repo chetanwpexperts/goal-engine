@@ -4,7 +4,7 @@ import re
 from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
-from app.agents import database as dbagent
+from app.products.dbaba import database as dbagent
 from app.domain.schemas.db_jobs import DbJobIn, DiagnoseIn, OptimizeIn, RecognizeIn, PlanIn, ApplyIn, UndoIn, ExcelIn
 
 
@@ -119,7 +119,7 @@ def download_db_job(job_id: int, db: Session, visitor: str):
 
 def db_job_excel(job_id: int, body: ExcelIn, db: Session, visitor: str):
     """S3: the export as a workbook: Data, a Pivot with live COUNTIFS / SUMIFS and a chart, About. Nothing is sent anywhere."""
-    from app.agents import sqlexcel
+    from app.products.dbaba import sqlexcel
     from app.domain.models import Connector
 
     job = _own_job(db, job_id, visitor)

@@ -113,7 +113,7 @@ def delete_visitor(db: Session, visitor_id: str) -> dict:
     from app.data import learning
 
     counts["learning_votes"] = learning.delete_voter(db, fingerprint(f"learn:{visitor_id}"))
-    from app.agents import office_agent
+    from app.products.sheetu import office_agent
     from app.domain.models import OfficeFile
 
     for f in db.scalars(select(OfficeFile).where(OfficeFile.visitor_id == visitor_id)):
@@ -210,7 +210,7 @@ def maintain(db: Session, now=None) -> dict:
     from app.data import learning
 
     done.update(learning.maintain(db, now))
-    from app.agents import office_agent
+    from app.products.sheetu import office_agent
 
     done["office_files"] = office_agent.maintain(db, now)
     # 2d. the mind: working-style notes expire; question-path counts fade so recent habits weigh more

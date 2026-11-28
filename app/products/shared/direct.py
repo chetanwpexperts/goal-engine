@@ -185,7 +185,7 @@ def _clean_form(form: dict) -> dict:
 
 
 def connect(db: Session, visitor_id: str, form: dict, name: str = "", allow_changes: bool = False, client_ip: str = "") -> Connector:
-    from app.agents import database as dbagent
+    from app.products.dbaba import database as dbagent
 
     details = _clean_form(form)
     _rate_limit(visitor_id, client_ip, details["host"])
@@ -244,7 +244,7 @@ def _write_job(db: Session, connector: Connector, job: ConnectorJob) -> dict:
 
 
 def run_job(job_id: int) -> None:
-    from app.agents import database as dbagent
+    from app.products.dbaba import database as dbagent
     from app.core.db import get_db
 
     gen = get_db()

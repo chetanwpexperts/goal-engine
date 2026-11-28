@@ -3,6 +3,8 @@
 from typing import Literal
 
 from pydantic import BaseModel, Field
+from app.domain.schemas.agents import StartIn, OwnerIn  # compatibility re-exports
+from app.domain.schemas.office import OfficeStartIn, OfficeFixIn, OfficeCompareIn  # compatibility re-exports
 
 
 class ExpertIn(BaseModel):
@@ -19,21 +21,6 @@ class ExpertIn(BaseModel):
 class ExpertUpdate(BaseModel):
     status: str | None = None
     note: str | None = None
-
-
-class OfficeStartIn(BaseModel):
-    name: str
-    size: int
-    agent_id: int | None = None
-
-
-class OfficeFixIn(BaseModel):
-    ops: list[str]
-
-
-class OfficeCompareIn(BaseModel):
-    other: str
-    key: str = ""
 
 
 class LearnVoteIn(BaseModel):
@@ -60,16 +47,6 @@ class MessageIn(BaseModel):
 
 class StatusIn(BaseModel):
     status: Literal["active", "done", "dropped"]
-
-
-class StartIn(BaseModel):
-    inputs: dict[str, str] = {}
-
-
-class OwnerIn(BaseModel):
-    email: str = ""
-    business: str = ""
-    code: str = ""
 
 
 class ConnectorIn(BaseModel):

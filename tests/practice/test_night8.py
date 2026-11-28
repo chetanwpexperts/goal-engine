@@ -274,6 +274,27 @@ def big(engines):
             eng.run(f"DROP TEMPORARY TABLE IF EXISTS {t}" if my else f"DROP TABLE IF EXISTS pg_temp.{t}")
 
 
+def _rows_read(eng, q) -> float:
+    """MariaDB: the rows the query really read, from ANALYZE FORMAT=JSON (it runs the query and counts). EXPLAIN's "rows"
+    is only an estimate from sampled statistics and can come out below the true number (CI saw 14009 for 15000)."""
+    import json
+
+    found = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k == "r_rows" and isinstance(v, (int, float)):
+                    found.append(float(v))
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(json.loads(eng.run("ANALYZE FORMAT=JSON " + q)[0][0]))
+    return max(found)
+
+
 def _plan(eng, q) -> str:
     if eng.kind == "mysql":
         return " | ".join(f"{r[2]}:{r[3]}:{r[9]}" for r in eng.run("EXPLAIN " + q))
@@ -368,7 +389,7 @@ def test_keyset_gives_the_same_page_as_offset(big, order, offset, said):
             sql = sql.replace(f":last_{c}", f"'{v}'" if not isinstance(v, int) else str(v))
         assert [tuple(r) for r in eng.run(sql)] == [tuple(r) for r in page], (name, sql)
         if eng.kind == "mysql":                                    # MariaDB: OFFSET reads offset + limit rows, keyset reads the page
-            assert int(eng.run("EXPLAIN " + q)[0][8]) >= offset
+            assert _rows_read(eng, q) >= offset                    # measured (ANALYZE), not EXPLAIN's sampled estimate
 
 
 def test_offset_without_a_unique_tail_is_said_but_not_rewritten():

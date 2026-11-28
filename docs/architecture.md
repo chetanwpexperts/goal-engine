@@ -44,6 +44,25 @@ folder under app/products with its own logic and knowledge, use shared
 helpers and lower layers, and expose its use cases through services and
 routes. Do not modify another product to implement the new one.
 
+### Where the products live now (after Step 5)
+
+- `app/products/dbaba/`: the SQL agents (`sql*.py`), `database.py`, the knowledge in `dbknow/` (core, dialects,
+  issues, errors, questions), and `local/` (DBaba installed on a client's server; `python -m app.local serve` still
+  works through the forwarding package `app/local`).
+- `app/products/sheetu/`: `office_agent.py`, `office/` (reading and fixing workbooks) and `officeknow/`.
+- `app/products/shared/`: the agents both use (core, automation, website checker, mailer, planner, blocks, safety,
+  direct, learn) and `bridge.py`.
+- **DBaba and Sheetu never import each other.** When one needs something from the other, the owner registers it
+  in `app/products/shared/bridge.py` (`provide("dbaba.concept_match", fn)`) and the other calls it
+  (`call("dbaba.concept_match", ..., default=...)`). Plain shared constants live in `app/products/shared/`.
+  A new product registers its own names the same way and touches nothing else.
+- Knowledge files exist once, next to the code that reads them; code finds them with `Path(__file__)`, so after
+  moving a module the number of `.parent` steps must be rechecked.
+- Old import paths (`app/agents/...`, `app/office`, `app/officeknow`, `app/dbknow`, `app/local`) are forwarding
+  modules only. They never alias a package or change a package's search path. Step 6 removes the ones nothing uses.
+- Still to do (small follow-up PR): split `app/products/dbaba/database.py` and `app/products/sheetu/office_agent.py`
+  (1,300-1,600 lines each) into smaller modules by topic.
+
 ## Security model
 
 The target is default deny. Each route declares exactly one permission

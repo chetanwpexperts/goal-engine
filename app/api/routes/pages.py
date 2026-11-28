@@ -17,7 +17,30 @@ router = APIRouter()
 
 @router.get("/robots.txt", dependencies=[Depends(require("public"))])
 def robots() -> Response:
-    return Response("User-agent: *\nDisallow: /\n" if not _site_open() else "User-agent: *\nAllow: /\n", media_type="text/plain")
+    if not _site_open():
+        return Response("User-agent: *\nDisallow: /\n", media_type="text/plain")
+    rules = "User-agent: *\nAllow: /\n"
+    rules += (
+        "\nUser-agent: GPTBot\nDisallow: /\n"
+        "\nUser-agent: ChatGPT-User\nDisallow: /\n"
+        "\nUser-agent: OAI-SearchBot\nDisallow: /\n"
+        "\nUser-agent: ClaudeBot\nDisallow: /\n"
+        "\nUser-agent: Claude-Web\nDisallow: /\n"
+        "\nUser-agent: anthropic-ai\nDisallow: /\n"
+        "\nUser-agent: Google-Extended\nDisallow: /\n"
+        "\nUser-agent: CCBot\nDisallow: /\n"
+        "\nUser-agent: PerplexityBot\nDisallow: /\n"
+        "\nUser-agent: Bytespider\nDisallow: /\n"
+        "\nUser-agent: Applebot-Extended\nDisallow: /\n"
+        "\nUser-agent: meta-externalagent\nDisallow: /\n"
+        "\nUser-agent: Amazonbot\nDisallow: /\n"
+        "\nUser-agent: cohere-ai\nDisallow: /\n"
+        "\nUser-agent: Diffbot\nDisallow: /\n"
+        "\nUser-agent: ImagesiftBot\nDisallow: /\n"
+        "\nUser-agent: Omgilibot\nDisallow: /\n"
+        "\nUser-agent: YouBot\nDisallow: /\n"
+    )
+    return Response(rules, media_type="text/plain")
 
 
 @router.get("/preview", dependencies=[Depends(require("public"))])
